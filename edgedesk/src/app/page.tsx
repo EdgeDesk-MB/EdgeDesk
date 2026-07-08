@@ -6,6 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { LivePnlChart } from "@/components/dashboard/live-pnl-chart";
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
+import { DashboardNextActions } from "@/components/dashboard/dashboard-next-actions";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { EmptyState } from "@/components/help/empty-state";
@@ -13,6 +14,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
 import { HistoryFeed } from "@/components/history/history-feed";
 import { buildHistoryContext } from "@/lib/history-display";
+import { listOfferNextActions } from "@/lib/offers/next-actions";
 import {
   dashboardMainGrid,
   dashboardPage,
@@ -47,9 +49,11 @@ export default function DashboardPage() {
     [state]
   );
 
-  const showEmptyCta = openBets.length === 0 && betCount === 0;
-  const showActivity = betCount > 0 || liveEvents.length > 0 || Math.abs(liveTotal) > 0.01;
   const offers = state?.offers ?? [];
+  const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
+  const showEmptyCta =
+    openBets.length === 0 && betCount === 0 && nextActions.length === 0;
+  const showActivity = betCount > 0 || liveEvents.length > 0 || Math.abs(liveTotal) > 0.01;
 
   return (
     <PageShell fullHeight>
@@ -63,6 +67,8 @@ export default function DashboardPage() {
           offers={offers}
           bets={state?.bets ?? []}
         />
+
+        <DashboardNextActions offers={offers} />
 
         {showEmptyCta ? (
           <EmptyState

@@ -14,12 +14,12 @@ export interface RoadmapCategory {
 }
 
 export const ROADMAP_VERSION = {
-  current: "1.0.0-rc.1",
-  currentLabel: "v1.0 RC",
-  target: "1.0.0",
-  targetLabel: "v1.0",
+  current: "1.1.0-dev",
+  currentLabel: "v1.1 Offer Command",
+  target: "1.1.0",
+  targetLabel: "v1.1",
   targetNote:
-    "Design system pass complete — Flashscore-style desk headers, stat strips, and condensed tables across all pages. Monthly P&L, Lucky 31/63 lay matrix, and calculator polish shipped. v1.0 release candidate; Tauri packaging and paid-tier auto features remain post-v1.0.",
+    "Offer Command Centre — next-action engine on Home, offer pipeline stages, bet campaigns, and advantage ranking. v1.0 RC remains the recoverable baseline on main / backup/pre-offer-command-centre.",
 } as const;
 
 export const ROADMAP_STATUS_LABELS: Record<RoadmapStatus, string> = {
@@ -87,6 +87,28 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "off-link", title: "Auto-link bets to offers", status: "done" },
       { id: "off-pnl", title: "Per-offer P&L slice on dashboard", status: "done" },
       { id: "off-checklist", title: "Offer checklist / step tracker", status: "done" },
+      {
+        id: "off-next-actions",
+        title: "Next-action engine + Home queue",
+        description: "Ranked next steps per offer campaign on Home and Offers nav badge",
+        status: "in_progress",
+      },
+      {
+        id: "off-pipeline",
+        title: "Offer pipeline stages UX",
+        description: "Planned → Qualifying → Awarded → Converting → Settled",
+        status: "planned",
+      },
+      {
+        id: "off-advantage",
+        title: "Advantage ranking (expected retained value)",
+        status: "planned",
+      },
+      {
+        id: "off-templates",
+        title: "Offer template import / terms parser",
+        status: "planned",
+      },
       { id: "off-calendar", title: "Offer calendar with reminders", status: "future" },
     ],
   },
@@ -101,6 +123,17 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "trk-balances", title: "Balances & bookmaker wallets", status: "done" },
       { id: "trk-export", title: "CSV export", status: "done" },
       { id: "trk-monthly", title: "Monthly breakdown & per-bookie P&L", status: "done" },
+      {
+        id: "trk-campaigns",
+        title: "Bet campaigns & offer queues",
+        description: "Group bets by offer; Open / Needs lay / Orphans views",
+        status: "planned",
+      },
+      {
+        id: "trk-settle-inbox",
+        title: "Settlement inbox",
+        status: "planned",
+      },
     ],
   },
   {

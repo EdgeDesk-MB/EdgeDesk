@@ -25,11 +25,12 @@ import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
 import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
+import { listOfferNextActions } from "@/lib/offers/next-actions";
 
 const links = [
   { href: "/", label: "Home", icon: Home },
   { href: "/history", label: "History", icon: History },
-  { href: "/offers", label: "Offers", icon: Gift },
+  { href: "/offers", label: "Offers", icon: Gift, offerActions: true },
   {
     href: "/calculators",
     label: "Calculators",
@@ -80,6 +81,10 @@ export function AppNav() {
     () => (state?.events ?? []).filter((e) => effectiveEventStatus(e) === "live").length,
     [state?.events]
   );
+  const offerActionCount = useMemo(
+    () => listOfferNextActions(state?.offers ?? []).length,
+    [state?.offers]
+  );
 
   return (
     <aside
@@ -89,7 +94,7 @@ export function AppNav() {
       )}
     >
       <nav className="flex flex-1 flex-col gap-0.5">
-        {links.map(({ href, label, icon: Icon, quickAction, livePulse }) => {
+        {links.map(({ href, label, icon: Icon, quickAction, livePulse, offerActions }) => {
           const active =
             href === "/"
               ? pathname === "/"
@@ -98,6 +103,7 @@ export function AppNav() {
                   !pathname.startsWith("/calculators/ep-desk")
                 : pathname.startsWith(href);
           const iconLive = livePulse && liveTrackedCount > 0;
+          const showOfferBadge = offerActions && offerActionCount > 0;
           const quickIcon =
             quickAction === "matchedCalculator" ? (
               <Calculator className="size-3.5" />
@@ -139,6 +145,18 @@ export function AppNav() {
                   )}
                 />
                 <span className="truncate">{label}</span>
+                {showOfferBadge ? (
+                  <span
+                    className={cn(
+                      "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums",
+                      active
+                        ? "bg-primary-foreground/20 text-primary-foreground"
+                        : "bg-primary text-primary-foreground"
+                    )}
+                  >
+                    {offerActionCount > 9 ? "9+" : offerActionCount}
+                  </span>
+                ) : null}
               </Link>
               {quickAction && onQuickAction && (
                 <button

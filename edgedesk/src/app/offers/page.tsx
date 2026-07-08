@@ -39,12 +39,13 @@ import { formatGbp } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { filterPillState } from "@/lib/ui/surface-styles";
 import { formatPillLabel, offerStatusBadgeVariant } from "@/lib/ui/status-badges";
+import { listOfferNextActions, offerNextActionLabel } from "@/lib/offers/next-actions";
 import { Gift, Pencil, Plus, Tag, Trash2, Trophy, X } from "lucide-react";
 
 export default function OffersPage() {
   const { state, refresh } = useAppState(4000);
   const offers = useMemo(() => state?.offers ?? [], [state]);
-  const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "completed" | "needs_action">("all");
   const [title, setTitle] = useState("");
   const [bookmaker, setBookmaker] = useState("");
   const [expected, setExpected] = useState("");
@@ -75,10 +76,17 @@ export default function OffersPage() {
       .sort((a, b) => (a.expiresAt ?? 0) - (b.expiresAt ?? 0));
   }, [offers]);
 
+  const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
+  const needsActionIds = useMemo(
+    () => new Set(nextActions.map((a) => a.offerId)),
+    [nextActions]
+  );
+
   const filtered = useMemo(() => {
     if (filter === "all") return offers;
+    if (filter === "needs_action") return offers.filter((o) => needsActionIds.has(o.id));
     return offers.filter((o) => o.status === filter);
-  }, [offers, filter]);
+  }, [offers, filter, needsActionIds]);
 
   const totals = useMemo(() => {
     const completed = offers.filter((o) => o.status === "completed");
@@ -211,10 +219,11 @@ export default function OffersPage() {
         helpId="offers"
         icon={Tag}
         title="Offers"
-        description="Track sign-ups, reloads and promos — bets auto-link when the label or trigger looks like an offer."
+        description="Offer Command Centre — track campaigns, next actions, and promo P&L. Bets auto-link when the label or trigger looks like an offer."
         action={
           <>
             <PageHeaderStat label="Active">{totals.active}</PageHeaderStat>
+            <PageHeaderStat label="Actions">{nextActions.length}</PageHeaderStat>
             <PageHeaderStat label="Actual">
               <MoneyFlow value={totals.actual} signColor className="inline font-semibold" />
             </PageHeaderStat>
@@ -228,14 +237,16 @@ export default function OffersPage() {
         }
         toolbar={
           <>
-            {(["all", "active", "completed"] as const).map((f) => (
+            {(["all", "needs_action", "active", "completed"] as const).map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
                 className={cn(filterPillState(filter === f))}
               >
-                {formatPillLabel(f)}
+                {f === "needs_action"
+                  ? `Needs action${nextActions.length ? ` (${nextActions.length})` : ""}`
+                  : formatPillLabel(f)}
               </button>
             ))}
           </>
@@ -504,26 +515,39 @@ export default function OffersPage() {
           {filtered.length === 0 && (
             <EmptyState
               icon={Gift}
-              title={filter === "active" ? "No active offers" : "No offers yet"}
+              title={
+                filter === "needs_action"
+                  ? "Nothing needs action"
+                  : filter === "active"
+                    ? "No active offers"
+                    : "No offers yet"
+              }
               description={
-                filter === "active"
-                  ? "Add a place-refund racing offer to unlock Intelligence on the Racing Desk, or log a general promo."
-                  : "Add an offer manually with the form, or log a bet with a promo trigger in the tracker."
+                filter === "needs_action"
+                  ? "All open offers are waiting on results or already complete — check back after settlements."
+                  : filter === "active"
+                    ? "Add a place-refund racing offer to unlock Intelligence on the Racing Desk, or log a general promo."
+                    : "Add an offer manually with the form, or log a bet with a promo trigger in the tracker."
               }
               action={{ label: "Add racing offer", href: "/offers" }}
               secondaryAction={{ label: "Offers guide", href: "/help?guide=offers" }}
             />
           )}
 
-          {filtered.map((offer) => (
-            <OfferCard
-              key={offer.id}
-              offer={offer}
-              onRefresh={refresh}
-              onEdit={startEdit}
-              isEditing={editingId === offer.id}
-            />
-          ))}
+          {filtered.map((offer) => {
+            const action = nextActions.find((a) => a.offerId === offer.id);
+            return (
+              <OfferCard
+                key={offer.id}
+                offer={offer}
+                nextActionLabel={action ? offerNextActionLabel(action.kind) : null}
+                nextActionDetail={action?.detail ?? null}
+                onRefresh={refresh}
+                onEdit={startEdit}
+                isEditing={editingId === offer.id}
+              />
+            );
+          })}
         </div>
       </div>
     </PageShell>
@@ -532,11 +556,15 @@ export default function OffersPage() {
 
 function OfferCard({
   offer,
+  nextActionLabel,
+  nextActionDetail,
   onRefresh,
   onEdit,
   isEditing,
 }: {
   offer: OfferSummary;
+  nextActionLabel?: string | null;
+  nextActionDetail?: string | null;
   onRefresh: () => void;
   onEdit: (offer: OfferSummary) => void;
   isEditing: boolean;
@@ -571,6 +599,11 @@ function OfferCard({
               <Badge variant={offerStatusBadgeVariant(offer.status)}>
                 {formatPillLabel(offer.status)}
               </Badge>
+              {nextActionLabel ? (
+                <Badge variant="outline" className="border-primary/30 text-primary">
+                  {nextActionLabel}
+                </Badge>
+              ) : null}
               {offer.sport === "horse_racing" && (
                 <Badge variant="outline" className="gap-1">
                   <Trophy className="size-3" /> Racing
@@ -581,6 +614,9 @@ function OfferCard({
               )}
             </div>
             <CardTitle className="mt-1 text-base leading-snug">{offer.title}</CardTitle>
+            {nextActionDetail ? (
+              <p className="mt-1 text-xs text-primary/90">{nextActionDetail}</p>
+            ) : null}
             {rulesSummary && (
               <CardDescription className="mt-1 line-clamp-2">{rulesSummary}</CardDescription>
             )}
