@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { filterPillState } from "@/lib/ui/surface-styles";
 import { formatPillLabel, offerStatusBadgeVariant } from "@/lib/ui/status-badges";
 import { listOfferNextActions, offerNextActionLabel } from "@/lib/offers/next-actions";
+import { OfferPipelineStrip } from "@/components/offers/offer-pipeline-strip";
 import { Gift, Pencil, Plus, Tag, Trash2, Trophy, X } from "lucide-react";
 
 export default function OffersPage() {
@@ -617,6 +618,7 @@ function OfferCard({
             {nextActionDetail ? (
               <p className="mt-1 text-xs text-primary/90">{nextActionDetail}</p>
             ) : null}
+            <OfferPipelineStrip offer={offer} className="mt-2" />
             {rulesSummary && (
               <CardDescription className="mt-1 line-clamp-2">{rulesSummary}</CardDescription>
             )}

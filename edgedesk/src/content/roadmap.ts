@@ -97,7 +97,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         id: "off-pipeline",
         title: "Offer pipeline stages UX",
         description: "Planned → Qualifying → Awarded → Converting → Settled",
-        status: "planned",
+        status: "in_progress",
       },
       {
         id: "off-advantage",
