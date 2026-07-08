@@ -38,9 +38,14 @@ EdgeDesk answers three questions every day:
 - Campaign grouping by `offerId` with campaign P&L
 - Deep-link from Home next actions via `?offer=&queue=offers`
 
-### A4 — Advantage ranking
+### A4 — Advantage ranking ✅
 - Expected retained value ranking across active offers
-- “Best next” callout on Home
+- “Best next” callout on Home (above Next actions)
+
+## Phase B — Close the loop (next)
+- Settlement inbox
+- Balance-aware placement
+- Month-end / export polish
 
 ## Design rules (keep consistent)
 

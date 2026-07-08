@@ -6,6 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { LivePnlChart } from "@/components/dashboard/live-pnl-chart";
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
+import { DashboardBestAdvantage } from "@/components/dashboard/dashboard-best-advantage";
 import { DashboardNextActions } from "@/components/dashboard/dashboard-next-actions";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
@@ -68,6 +69,7 @@ export default function DashboardPage() {
           bets={state?.bets ?? []}
         />
 
+        <DashboardBestAdvantage offers={offers} />
         <DashboardNextActions offers={offers} />
 
         {showEmptyCta ? (

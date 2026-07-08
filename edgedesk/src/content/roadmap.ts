@@ -102,7 +102,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       {
         id: "off-advantage",
         title: "Advantage ranking (expected retained value)",
-        status: "planned",
+        status: "in_progress",
       },
       {
         id: "off-templates",
