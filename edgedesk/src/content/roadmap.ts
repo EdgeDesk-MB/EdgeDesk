@@ -127,7 +127,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         id: "trk-campaigns",
         title: "Bet campaigns & offer queues",
         description: "Group bets by offer; Open / Needs lay / Orphans views",
-        status: "planned",
+        status: "in_progress",
       },
       {
         id: "trk-settle-inbox",

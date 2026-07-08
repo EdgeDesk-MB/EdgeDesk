@@ -94,7 +94,7 @@ export function deriveOfferNextAction(
         profit.freeBetAwardAmount != null
           ? `£${profit.freeBetAwardAmount.toFixed(2)} free bet ready — place SNR/SR conversion.`
           : "Free bet awarded — place the conversion bet.",
-      href: `/tracker?offer=${offer.id}&action=convert`,
+      href: `/tracker?offer=${offer.id}&queue=offers&action=convert`,
     };
   }
 
@@ -105,7 +105,7 @@ export function deriveOfferNextAction(
       priority: 20,
       title: "Finish conversion",
       detail: `${profit.freeBetOpenCount} free-bet leg${profit.freeBetOpenCount === 1 ? "" : "s"} still open.`,
-      href: `/tracker?offer=${offer.id}`,
+      href: `/tracker?offer=${offer.id}&queue=offers`,
     };
   }
 
@@ -123,7 +123,7 @@ export function deriveOfferNextAction(
       detail: bookmaker
         ? `No bets linked yet — start the qualifying leg at ${bookmaker}.`
         : "No bets linked yet — start the qualifying leg.",
-      href: `/tracker?offer=${offer.id}&action=qualify`,
+      href: `/tracker?offer=${offer.id}&queue=offers&action=qualify`,
     };
   }
 

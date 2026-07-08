@@ -33,9 +33,10 @@ EdgeDesk answers three questions every day:
 - Filter by “needs action”
 - Next: richer campaign P&L header per offer
 
-### A3 — Bet Desk queues
-- Tracker views: Open · Needs lay · Linked to offer · Orphans
-- Campaign grouping by `offerId`
+### A3 — Bet Desk queues ✅
+- Tracker views: All · Open · Needs lay · Offer campaigns · Orphans
+- Campaign grouping by `offerId` with campaign P&L
+- Deep-link from Home next actions via `?offer=&queue=offers`
 
 ### A4 — Advantage ranking
 - Expected retained value ranking across active offers

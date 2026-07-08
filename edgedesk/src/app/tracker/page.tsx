@@ -25,9 +25,23 @@ import {
 } from "@/components/ui/tooltip";
 import { MonthlyPnlSection } from "@/components/tracker/monthly-pnl-section";
 import { BetLogTable } from "@/components/tracker/bet-log-table";
+import { BetCampaignSections } from "@/components/tracker/bet-campaign-sections";
+import {
+  BET_DESK_QUEUES,
+  countDeskQueue,
+  deskQueueEmptyCopy,
+  filterBetsByDeskQueue,
+  groupBetsByCampaign,
+  type BetDeskQueue,
+} from "@/lib/bets/desk-queues";
 import { filterPillState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2, Download, NotebookPen } from "lucide-react";
+
+function parseDeskQueue(raw: string | null): BetDeskQueue {
+  if (raw && BET_DESK_QUEUES.some((q) => q.id === raw)) return raw as BetDeskQueue;
+  return "all";
+}
 
 export default function TrackerPage() {
   return (
@@ -42,6 +56,9 @@ function TrackerContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "pnl" ? "pnl" : "bets";
+  const deskQueue = parseDeskQueue(searchParams.get("queue"));
+  const offerFilterParam = searchParams.get("offer");
+  const offerFilterId = offerFilterParam != null ? Number(offerFilterParam) : null;
   const highlightParam = searchParams.get("highlight");
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [editingBet, setEditingBet] = useState<BetRow | null>(null);
@@ -56,14 +73,50 @@ function TrackerContent() {
   );
   const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
 
+  const scopedBets = useMemo(() => {
+    let list = bets;
+    if (offerFilterId != null && Number.isFinite(offerFilterId)) {
+      list = list.filter((b) => b.offerId === offerFilterId);
+    }
+    return filterBetsByDeskQueue(list, deskQueue);
+  }, [bets, deskQueue, offerFilterId]);
+
+  const campaignGroups = useMemo(
+    () =>
+      deskQueue === "offers" || deskQueue === "all"
+        ? groupBetsByCampaign(scopedBets, offerById, {
+            includeOrphans: deskQueue === "all",
+          })
+        : [],
+    [scopedBets, offerById, deskQueue]
+  );
+
+  const useCampaignView =
+    (deskQueue === "offers" || deskQueue === "all") &&
+    campaignGroups.some((g) => g.offerId != null);
+
+  function setDeskQueue(queue: BetDeskQueue) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("tab");
+    if (queue === "all") params.delete("queue");
+    else params.set("queue", queue);
+    const qs = params.toString();
+    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+  }
+
   useEffect(() => {
     if (!highlightParam) return;
     const id = Number(highlightParam);
     if (!Number.isFinite(id)) return;
     setHighlightId(id);
-    router.replace("/tracker", { scroll: false });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("highlight");
+    const qs = params.toString();
+    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
     const fadeTimer = window.setTimeout(() => setHighlightId(null), 2000);
     return () => clearTimeout(fadeTimer);
+    // Only react to highlight changes — avoid replace loops from searchParams identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightParam, router]);
 
   useEffect(() => {
@@ -105,7 +158,7 @@ function TrackerContent() {
       <PageHeader
         helpId="tracker"
         title="Profit Tracker"
-        description="Every position, linked to real events. Results settle bets automatically — enter a score once and every derived market updates."
+        description="Bet Desk — organise positions by queue and offer campaign. Results settle derived markets automatically."
         action={
           <>
             <Button variant="outline" {...pageSecondaryButtonProps} asChild>
@@ -132,7 +185,12 @@ function TrackerContent() {
             <button
               type="button"
               className={filterPillState(activeTab === "bets")}
-              onClick={() => router.replace("/tracker", { scroll: false })}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete("tab");
+                const qs = params.toString();
+                router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+              }}
             >
               Bet log
             </button>
@@ -168,20 +226,73 @@ function TrackerContent() {
       ) : (
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle section>Bet log</CardTitle>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle section>Bet Desk</CardTitle>
+              {offerFilterId != null && Number.isFinite(offerFilterId) ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete("offer");
+                    params.delete("action");
+                    const qs = params.toString();
+                    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+                  }}
+                >
+                  Clear offer filter
+                </button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {BET_DESK_QUEUES.map((q) => {
+                const count = countDeskQueue(
+                  offerFilterId != null && Number.isFinite(offerFilterId)
+                    ? bets.filter((b) => b.offerId === offerFilterId)
+                    : bets,
+                  q.id
+                );
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => setDeskQueue(q.id)}
+                    className={cn(filterPillState(deskQueue === q.id))}
+                  >
+                    {q.label}
+                    {q.id !== "all" ? (
+                      <span className="ml-1 tabular-nums opacity-70">{count}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {bets.length === 0 ? (
+          {scopedBets.length === 0 ? (
             <EmptyState
               icon={NotebookPen}
-              title="No bets logged yet"
-              description="Add a bet manually, push one from any calculator, or import a screenshot. Link an event and scores will settle derived markets automatically."
+              title={deskQueueEmptyCopy(deskQueue).title}
+              description={deskQueueEmptyCopy(deskQueue).description}
               action={{ label: "Open calculators", href: "/calculators" }}
-              secondaryAction={{ label: "Getting started guide", href: "/help?guide=getting-started" }}
+              secondaryAction={{ label: "Offers", href: "/offers" }}
+            />
+          ) : useCampaignView ? (
+            <BetCampaignSections
+              groups={campaignGroups}
+              events={events}
+              promoAwards={promoAwards}
+              offerById={offerById}
+              eventById={eventById}
+              highlightId={highlightId}
+              onEdit={setEditingBet}
+              onPatch={patchBet}
             />
           ) : (
             <BetLogTable
-              bets={bets}
+              bets={scopedBets}
               events={events}
               promoAwards={promoAwards}
               offerById={offerById}
