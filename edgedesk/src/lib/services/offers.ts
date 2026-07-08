@@ -53,17 +53,28 @@ function settledProfit(bets: BetRow[]): number {
 
 /** Free-bet award amount implied by label/trigger (even if wallet credit failed). */
 export function expectedFreeBetAmountFromBet(bet: BetRow): number | null {
-  const effects = aiEffectsForBet(bet.triggerRule, bet.label);
+  const fromRuleOrLabel = aiEffectsForBet(bet.triggerRule, bet.label);
+  const fromTriggerText = bet.triggerText?.trim()
+    ? aiEffectsForBet(null, bet.triggerText)
+    : [];
+  const effects = fromRuleOrLabel.length > 0 ? fromRuleOrLabel : fromTriggerText;
   const award = effects.find((e) => e.kind === "free_bet_award");
   return award && award.amount > 0 ? award.amount : null;
 }
 
+function freeBetEffectsForBet(bet: BetRow) {
+  const fromRuleOrLabel = aiEffectsForBet(bet.triggerRule, bet.label);
+  if (fromRuleOrLabel.length > 0) return fromRuleOrLabel;
+  if (bet.triggerText?.trim()) return aiEffectsForBet(null, bet.triggerText);
+  return [];
+}
+
 function betHasPlaceFreeBetTrigger(bet: BetRow): boolean {
-  return aiEffectsForBet(bet.triggerRule, bet.label).some(isPlaceFreeBetEffect);
+  return freeBetEffectsForBet(bet).some(isPlaceFreeBetEffect);
 }
 
 function betHasUnconditionalFreeBet(bet: BetRow): boolean {
-  return aiEffectsForBet(bet.triggerRule, bet.label).some(
+  return freeBetEffectsForBet(bet).some(
     (e) => e.kind === "free_bet_award" && e.positions.length === 0
   );
 }
