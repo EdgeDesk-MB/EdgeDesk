@@ -1,0 +1,692 @@
+/**
+ * Central state service: ticks simulations forward, refreshes live API events,
+ * auto-settles bets on finished events, and computes the live P&L picture.
+ */
+import { eq, inArray } from "drizzle-orm";
+import { db, events, bets, history, type EventRow, type BetRow, type HistoryRow } from "@/lib/db";
+import { ledgerFromSettledBet, getBalanceSummary, getPromoAwardsByBetId, ledgerPromoAward, type BalanceSummary } from "@/lib/services/balances";
+import { simStateAt, type SimGoal } from "./sim";
+import { fixtureGoalEvents, fixturesByIds, hasApiKey } from "./apifootball";
+import {
+  syncRacingResultsForOpenBets,
+  syncRecentTrackedRacingResults,
+} from "@/lib/services/sync-racing-results";
+import { hasRacingApiKey } from "@/lib/services/theracingapi";
+import {
+  getAllExchangeProviderStatuses,
+  getDefaultExchangeName,
+  getDefaultExchangeProvider,
+  getExchangeProviderStatus,
+} from "@/lib/services/exchange";
+import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
+import {
+  aiEffectsForBet,
+  betWinRuleForBet,
+  evaluateFreeBetAward,
+  evaluateUnconditionalFreeBet,
+  isPlaceFreeBetEffect,
+  evaluateTrigger,
+  provisionalProfit,
+  settleBet,
+  settleFromOutcome,
+  settleRacingBet,
+  triggerIfEndedNow,
+  type DutchLegRecord,
+  type GoalEvent,
+  type MatchResult,
+  type SettleableBet,
+  type TriggerContext,
+  type TriggerRule,
+} from "@/lib/calc";
+import { parseRaceResults, racingEventStatusDetail, selectionPosition } from "@/lib/racing";
+import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes";
+import { formatRacingEventTitle } from "@/lib/events";
+import { formatEventTitle } from "@/lib/events";
+import { livePositionValuation } from "@/lib/calc/ep/live-pnl";
+import { getHistoryFeed } from "@/lib/services/history-feed";
+import { getAppSettings, type AppSettings } from "@/lib/services/settings";
+import { parseEwMeta } from "@/lib/bets/ew-meta";
+import { backfillOffersFromBets, listOfferSummaries, syncOfferStatuses, type OfferSummary } from "@/lib/services/offers";
+
+export function toSettleable(bet: BetRow): SettleableBet {
+  return {
+    market: bet.market as SettleableBet["market"],
+    selection: bet.selection,
+    betType: bet.betType as SettleableBet["betType"],
+    backStake: bet.backStake,
+    backOdds: bet.backOdds,
+    layStake: bet.layStake,
+    layOdds: bet.layOdds,
+    commission: bet.commission,
+    earlyPayout: !!bet.earlyPayout,
+    refundAmount: bet.refundAmount ?? undefined,
+    refundRetention: bet.refundRetention ?? undefined,
+    legs: bet.legs ? (JSON.parse(bet.legs) as DutchLegRecord[]) : undefined,
+    ewMeta: parseEwMeta(bet.notes) ?? undefined,
+  };
+}
+
+export function toMatchResult(event: EventRow): MatchResult {
+  return {
+    homeScore: event.homeScore,
+    awayScore: event.awayScore,
+    homeLed2: !!event.homeLed2,
+    awayLed2: !!event.awayLed2,
+    inPlay: event.status === "live",
+  };
+}
+
+export function toTriggerContext(event: EventRow): TriggerContext {
+  return {
+    homeTeam: event.homeTeam,
+    awayTeam: event.awayTeam,
+    homeScore: event.homeScore,
+    awayScore: event.awayScore,
+    finished: event.status === "finished",
+    goals: event.goals ? (JSON.parse(event.goals) as GoalEvent[]) : [],
+  };
+}
+
+/** Does this rule need the goal timeline (scorers/order), not just the score? */
+function ruleNeedsTimeline(rule: TriggerRule): boolean {
+  switch (rule.kind) {
+    case "first_goalscorer":
+    case "last_goalscorer":
+    case "player_scores":
+    case "team_scores_first":
+      return true;
+    case "and":
+      return rule.rules.some(ruleNeedsTimeline);
+    default:
+      return false;
+  }
+}
+
+function parseRule(bet: BetRow): TriggerRule | null {
+  return betWinRuleForBet(bet.triggerRule);
+}
+
+function hasBetWinTrigger(bet: BetRow): boolean {
+  return parseRule(bet) != null;
+}
+
+/** Advance all running simulations to the current wall clock. */
+function tickSimulations(): void {
+  const sims = db
+    .select()
+    .from(events)
+    .where(eq(events.source, "sim"))
+    .all()
+    .filter((e) => e.status !== "finished" && e.simStartedAt);
+
+  for (const sim of sims) {
+    const script = JSON.parse(sim.simScript ?? "[]") as SimGoal[];
+    const state = simStateAt(script, sim.simStartedAt!);
+    db.update(events)
+      .set({
+        minute: state.minute,
+        homeScore: state.homeScore,
+        awayScore: state.awayScore,
+        homeLed2: state.homeLed2 ? 1 : 0,
+        awayLed2: state.awayLed2 ? 1 : 0,
+        status: state.finished ? "finished" : state.minute > 0 ? "live" : "upcoming",
+        goals: JSON.stringify(state.goals),
+      })
+      .where(eq(events.id, sim.id))
+      .run();
+  }
+}
+
+/** Refresh imported API events that are tracked (scores poll every ~60s via fixtures cache). */
+async function refreshApiEvents(): Promise<void> {
+  if (!hasApiKey()) return;
+  const now = Date.now();
+
+  const apiEvents = db
+    .select()
+    .from(events)
+    .where(eq(events.source, "api"))
+    .all()
+    .filter(
+      (e) =>
+        (e.sport ?? "football") === "football" &&
+        e.externalId &&
+        e.status !== "finished" &&
+        e.startTime < now + 5 * 60 * 1000 && // kickoff imminent or passed
+        e.startTime > now - 4 * 60 * 60 * 1000 // and not ancient
+    );
+  if (apiEvents.length === 0) return;
+
+  // Goal timeline is expensive — only fetch for open trigger bets that need scorers.
+  const openTriggerBets = db
+    .select()
+    .from(bets)
+    .where(eq(bets.status, "open"))
+    .all()
+    .filter((b) => b.eventId && b.triggerRule && hasBetWinTrigger(b));
+  const needTimeline = new Set(
+    openTriggerBets
+      .filter((b) => {
+        const rule = parseRule(b);
+        return rule && ruleNeedsTimeline(rule);
+      })
+      .map((b) => b.eventId)
+  );
+
+  try {
+    const fixtures = await fixturesByIds(apiEvents.map((e) => e.externalId!));
+    for (const event of apiEvents) {
+      const fixture = fixtures.find((f) => f.externalId === event.externalId);
+      if (!fixture) continue;
+      // 2UP flags must be tracked from score progression: once a side leads by 2, latch it.
+      const homeLed2 = event.homeLed2 || (fixture.homeScore - fixture.awayScore >= 2 ? 1 : 0);
+      const awayLed2 = event.awayLed2 || (fixture.awayScore - fixture.homeScore >= 2 ? 1 : 0);
+
+      let goals = event.goals;
+      if (needTimeline.has(event.id) && fixture.status !== "upcoming") {
+        try {
+          goals = JSON.stringify(await fixtureGoalEvents(event.externalId!, fixture.homeTeam));
+        } catch {
+          // keep the previous timeline; triggers just wait for the next poll
+        }
+      }
+
+      db.update(events)
+        .set({
+          status: fixture.status,
+          homeScore: fixture.homeScore,
+          awayScore: fixture.awayScore,
+          minute: fixture.minute,
+          homeLed2,
+          awayLed2,
+          goals,
+        })
+        .where(eq(events.id, event.id))
+        .run();
+    }
+  } catch {
+    // API hiccups must never break the dashboard; scores just refresh next poll
+  }
+}
+
+/** Refresh tracked horse-racing events with results from The Racing API. */
+async function refreshRacingApiEvents(): Promise<{ updated: number; settledLabels: string[] }> {
+  const r1 = await syncRacingResultsForOpenBets();
+  const r2 = await syncRecentTrackedRacingResults();
+
+  return {
+    updated: r1.updated + r2.updated,
+    settledLabels: [...r1.settledLabels, ...r2.settledLabels],
+  };
+}
+
+/**
+ * Settle "The bet wins IF" trigger bets in REAL TIME — the moment the outcome is
+ * irreversible (e.g. the first goal goes in), not just at full time.
+ */
+function settleTriggers(): void {
+  const openBets = db
+    .select()
+    .from(bets)
+    .where(eq(bets.status, "open"))
+    .all()
+    .filter((b) => b.eventId && hasBetWinTrigger(b) && b.betType !== "dutch");
+  if (openBets.length === 0) return;
+  const eventIds = [...new Set(openBets.map((b) => b.eventId!))];
+  const byId = new Map(
+    db.select().from(events).where(inArray(events.id, eventIds)).all().map((e) => [e.id, e])
+  );
+
+  for (const bet of openBets) {
+    const event = byId.get(bet.eventId!);
+    if (!event || event.status === "upcoming") continue;
+    const rule = parseRule(bet);
+    if (!rule) continue;
+    const verdict = evaluateTrigger(rule, toTriggerContext(event));
+    if (verdict.status === "pending") continue;
+
+    const outcome = settleFromOutcome(toSettleable(bet), verdict.status === "won");
+    const explanation = `Trigger ${verdict.status}: ${verdict.reason} — ${outcome.explanation}`;
+    db.update(bets)
+      .set({
+        status: outcome.status,
+        actualProfit: outcome.profit,
+        settledAt: Date.now(),
+        notes: bet.notes ? `${bet.notes} | ${explanation}` : explanation,
+      })
+      .where(eq(bets.id, bet.id))
+      .run();
+    const updated = db.select().from(bets).where(eq(bets.id, bet.id)).get();
+    if (updated) ledgerFromSettledBet(updated);
+  }
+}
+
+/** Auto-settle open bets attached to finished events. */
+function autoSettle(): void {
+  const openBets = db.select().from(bets).where(eq(bets.status, "open")).all();
+  const eventIds = [...new Set(openBets.map((b) => b.eventId).filter((x): x is number => !!x))];
+  if (eventIds.length === 0) return;
+  const eventRows = db.select().from(events).where(inArray(events.id, eventIds)).all();
+  const byId = new Map(eventRows.map((e) => [e.id, e]));
+
+  for (const bet of openBets) {
+    if (hasBetWinTrigger(bet)) continue; // bet-win triggers settle via the trigger engine
+    const event = bet.eventId ? byId.get(bet.eventId) : undefined;
+    if (!event || event.status !== "finished") continue;
+
+    let outcome;
+    if (event.sport === "horse_racing") {
+      const race = parseRaceResults(event.goals);
+      if (!race) continue;
+      outcome = settleRacingBet(toSettleable(bet), race);
+    } else {
+      outcome = settleBet(toSettleable(bet), toMatchResult(event));
+    }
+    if (!outcome) continue; // underivable market → stays open for manual settlement
+    let explanation = outcome.explanation;
+    if (event.sport === "horse_racing") {
+      const race = parseRaceResults(event.goals);
+      if (race && bet.selection.trim()) {
+        const posLabel = formatFinishingPosition(selectionPosition(bet.selection, race));
+        if (posLabel) explanation = `${explanation} · ${posLabel}`;
+      }
+    }
+    db.update(bets)
+      .set({
+        status: outcome.status,
+        actualProfit: outcome.profit,
+        settledAt: Date.now(),
+        notes: bet.notes ? `${bet.notes} | ${explanation}` : explanation,
+      })
+      .where(eq(bets.id, bet.id))
+      .run();
+    const updated = db.select().from(bets).where(eq(bets.id, bet.id)).get();
+    if (updated) ledgerFromSettledBet(updated);
+  }
+}
+
+/** Apply AI trigger side-effects (e.g. free bet awards on place finishes). */
+function processAiEffects(): void {
+  const candidates = db
+    .select()
+    .from(bets)
+    .all()
+    .filter((b) => aiEffectsForBet(b.triggerRule, b.label).length > 0);
+
+  if (candidates.length === 0) return;
+
+  const eventIds = [
+    ...new Set(candidates.map((b) => b.eventId).filter((id): id is number => id != null)),
+  ];
+  const byId = new Map(
+    (eventIds.length
+      ? db.select().from(events).where(inArray(events.id, eventIds)).all()
+      : []
+    ).map((e) => [e.id, e])
+  );
+
+  for (const bet of candidates) {
+    for (const effect of aiEffectsForBet(bet.triggerRule, bet.label)) {
+      if (effect.kind !== "free_bet_award") continue;
+
+      if (!isPlaceFreeBetEffect(effect)) {
+        const verdict = evaluateUnconditionalFreeBet(effect, bet.status);
+        if (verdict.met) ledgerPromoAward(bet, effect.amount, verdict.reason);
+        continue;
+      }
+
+      const event = bet.eventId ? byId.get(bet.eventId) : undefined;
+      if (!event || event.status !== "finished" || event.sport !== "horse_racing") continue;
+
+      const race = parseRaceResults(event.goals);
+      if (!race) continue;
+
+      const verdict = evaluateFreeBetAward(effect, bet.selection, race);
+      if (verdict.met) ledgerPromoAward(bet, effect.amount, verdict.reason);
+    }
+  }
+}
+
+/**
+ * Live commentary feed (Flashscore-style): kick-offs, goals with scorers, 2UP
+ * triggers, full times, and bet settlements. Entries are written idempotently —
+ * every fact has a natural dedupe key — so this can run on every poll.
+ */
+function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
+  const now = Date.now();
+  const eventById = new Map(allEvents.map((e) => [e.id, e]));
+  const put = (row: Omit<typeof history.$inferInsert, "createdAt"> & { createdAt?: number }) => {
+    db.insert(history)
+      .values({ createdAt: now, ...row })
+      .onConflictDoNothing()
+      .run();
+  };
+  const upsert = (
+    row: Omit<typeof history.$inferInsert, "createdAt"> & { createdAt?: number }
+  ) => {
+    const existing = db.select().from(history).where(eq(history.dedupe, row.dedupe)).get();
+    if (existing) {
+      db.update(history)
+        .set({
+          title: row.title,
+          detail: row.detail ?? null,
+          amount: row.amount ?? null,
+          eventId: row.eventId ?? null,
+          betId: row.betId ?? null,
+          ...(row.createdAt != null ? { createdAt: row.createdAt } : {}),
+        })
+        .where(eq(history.dedupe, row.dedupe))
+        .run();
+    } else {
+      put(row);
+    }
+  };
+
+  for (const event of allEvents) {
+    if (event.status === "upcoming") continue;
+    if (event.source === "sim") continue;
+
+    if (event.sport === "horse_racing") {
+      const race = parseRaceResults(event.goals);
+      const title = formatRacingEventTitle(event);
+      if (event.status === "finished" && race) {
+        upsert({
+          dedupe: event.externalId ? `ft:racing:${event.externalId}` : `ft:${event.id}`,
+          kind: "full_time",
+          eventId: event.id,
+          title: "Result",
+          detail: `${title} — won by ${race.winner}`,
+          createdAt: event.startTime,
+        });
+      }
+      continue;
+    }
+
+    const name = `${event.homeTeam} v ${event.awayTeam}`;
+
+    put({
+      dedupe: `ko:${event.id}`,
+      kind: "kickoff",
+      eventId: event.id,
+      minute: 0,
+      title: "Kick-off",
+      detail: name,
+      createdAt: event.startTime,
+    });
+
+    const goals: GoalEvent[] = event.goals ? JSON.parse(event.goals) : [];
+    let h = 0;
+    let a = 0;
+    goals.forEach((goal, i) => {
+      if (goal.side === "home") h++;
+      else a++;
+      const scorer = goal.player ?? (goal.side === "home" ? event.homeTeam : event.awayTeam);
+      const flags = [
+        i === 0 && !goal.og ? "1st goalscorer" : null,
+        goal.og ? "own goal" : null,
+      ].filter(Boolean);
+      put({
+        dedupe: `goal:${event.id}:${i}`,
+        kind: "goal",
+        eventId: event.id,
+        minute: goal.minute,
+        title: scorer,
+        detail: `${flags.length ? flags.join(" · ") + " — " : ""}${event.homeTeam} ${h}-${a} ${event.awayTeam}`,
+      });
+    });
+    // API events without a scorer feed: log score changes generically so the
+    // feed never goes quiet just because no player trigger is watching.
+    if (goals.length < event.homeScore + event.awayScore && event.homeScore + event.awayScore > 0) {
+      put({
+        dedupe: `score:${event.id}:${event.homeScore}-${event.awayScore}`,
+        kind: "goal",
+        eventId: event.id,
+        minute: event.minute,
+        title: "Goal",
+        detail: `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`,
+      });
+    }
+
+    if (event.homeLed2) {
+      put({
+        dedupe: `2up:${event.id}:home`,
+        kind: "two_up",
+        eventId: event.id,
+        minute: event.minute,
+        title: "2UP triggered",
+        detail: `${event.homeTeam} went 2 goals ahead`,
+      });
+    }
+    if (event.awayLed2) {
+      put({
+        dedupe: `2up:${event.id}:away`,
+        kind: "two_up",
+        eventId: event.id,
+        minute: event.minute,
+        title: "2UP triggered",
+        detail: `${event.awayTeam} went 2 goals ahead`,
+      });
+    }
+
+    if (event.status === "finished") {
+      put({
+        dedupe: `ft:${event.id}`,
+        kind: "full_time",
+        eventId: event.id,
+        minute: event.minute || 90,
+        title: "Full time",
+        detail: `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`,
+        createdAt: event.startTime + (event.minute || 90) * 60 * 1000,
+      });
+    }
+  }
+
+  const promoAwards = getPromoAwardsByBetId();
+
+  for (const bet of allBets) {
+    const linkedEvent = bet.eventId ? eventById.get(bet.eventId) : undefined;
+    upsert({
+      dedupe: `bet-placed:${bet.id}`,
+      kind: "bet_placed",
+      betId: bet.id,
+      eventId: bet.eventId,
+      title:
+        bet.betType === "free_snr" || bet.betType === "free_sr"
+          ? "Free bet placed"
+          : "Bet placed",
+      detail: bet.label,
+      createdAt: bet.createdAt,
+    });
+
+    if (bet.status === "open" || !bet.settledAt) continue;
+    const promo = promoAwards[bet.id];
+    const title =
+      bet.status === "won"
+        ? "Bet won"
+        : bet.status === "lost"
+          ? promo
+            ? "Bet lost · Free bet won!"
+            : "Bet lost"
+          : bet.status === "early_payout"
+            ? "2UP paid early"
+            : "Bet void";
+    let detail = bet.label;
+    if (promo) {
+      detail = `${bet.label} · ${formatPromoTooltip(promo.amount, promo.reason)}`;
+    }
+    const settlementTime =
+      linkedEvent?.sport === "horse_racing" && linkedEvent.startTime
+        ? linkedEvent.startTime
+        : bet.settledAt;
+    upsert({
+      dedupe: `bet:${bet.id}:${bet.settledAt}`,
+      kind: "settlement",
+      betId: bet.id,
+      eventId: bet.eventId,
+      title,
+      detail,
+      amount: bet.status === "void" ? null : bet.actualProfit,
+      createdAt: settlementTime,
+    });
+  }
+}
+
+/** "If it ended right now" value of an open trigger bet. */
+function triggerProvisional(bet: BetRow, rule: TriggerRule, event: EventRow): number | null {
+  const wouldWin = triggerIfEndedNow(rule, toTriggerContext(event));
+  if (wouldWin === null) return null;
+  return settleFromOutcome(toSettleable(bet), wouldWin).profit;
+}
+
+export interface LivePosition {
+  betId: number;
+  label: string;
+  eventName: string;
+  eventSport?: string;
+  /** Sport-aware status line — score for football, race state for racing */
+  eventStatusLabel: string;
+  minute: number;
+  /** @deprecated use eventStatusLabel */
+  score: string;
+  provisional: number | null;
+  /** Score-snapshot value if match ended now */
+  snapshotProvisional: number | null;
+  /** model = Dixon-Coles live EV; snapshot = current score */
+  valuationMode: "model" | "snapshot";
+  expected: number | null;
+  /** Live "wins IF" status, e.g. "wins IF Harry Kane scores first — no goals yet" */
+  triggerNote: string | null;
+}
+
+export interface RacingAutopilotNotice {
+  id: number;
+  message: string;
+}
+
+export interface AppState {
+  events: EventRow[];
+  bets: BetRow[];
+  settledProfit: number;
+  provisionalProfit: number;
+  livePositions: LivePosition[];
+  /** Cumulative settled P&L over time, for charting */
+  series: { time: number; value: number }[];
+  /** Latest commentary entries, newest first */
+  history: HistoryRow[];
+  /** Free bet promo credits by bet id */
+  promoAwards: Record<number, { amount: number; reason: string }>;
+  apiConfigured: boolean;
+  racingApiConfigured: boolean;
+  exchangeProvider: string;
+  exchangeName: string;
+  exchangeStatus: ExchangeProviderStatus;
+  exchangeProviders: ExchangeProviderStatus[];
+  /** Racing results synced this poll — client shows toasts once per id */
+  racingAutopilot: RacingAutopilotNotice[];
+  settings: AppSettings;
+  balances: BalanceSummary;
+  offers: OfferSummary[];
+}
+
+export async function getAppState(): Promise<AppState> {
+  tickSimulations();
+  await refreshApiEvents();
+  const racingSync = await refreshRacingApiEvents();
+  settleTriggers();
+  autoSettle();
+  processAiEffects();
+  syncOfferStatuses();
+  backfillOffersFromBets();
+
+  const allEvents = db.select().from(events).all();
+  const allBets = db.select().from(bets).all();
+  const eventById = new Map(allEvents.map((e) => [e.id, e]));
+
+  syncHistory(allEvents, allBets);
+
+  const racingAutopilot: RacingAutopilotNotice[] = [];
+  let noticeId = Date.now();
+  for (const label of racingSync.settledLabels) {
+    racingAutopilot.push({ id: noticeId++, message: `Race settled: ${label}` });
+  }
+
+  const settled = allBets
+    .filter((b) => b.status !== "open" && b.status !== "void" && b.actualProfit != null)
+    .sort((a, b) => (a.settledAt ?? a.createdAt) - (b.settledAt ?? b.createdAt));
+
+  let running = 0;
+  const series = settled.map((b) => {
+    running += b.actualProfit!;
+    return { time: b.settledAt ?? b.createdAt, value: running };
+  });
+
+  const livePositions: LivePosition[] = [];
+  let provisionalTotal = 0;
+  for (const bet of allBets.filter((b) => b.status === "open")) {
+    const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
+    if (!event || event.status !== "live") continue;
+    const rule = parseRule(bet);
+    const snapshotProvisional = rule
+      ? triggerProvisional(bet, rule, event)
+      : provisionalProfit(toSettleable(bet), toMatchResult(event));
+
+    let provisional = snapshotProvisional;
+    let valuationMode: LivePosition["valuationMode"] = "snapshot";
+
+    if (!rule && event.sport === "football") {
+      const valuation = livePositionValuation(bet, event);
+      provisional = valuation.value;
+      valuationMode = valuation.mode;
+    }
+
+    if (provisional != null) provisionalTotal += provisional;
+    const triggerNote =
+      rule && bet.triggerText
+        ? `wins IF ${bet.triggerText} — ${evaluateTrigger(rule, toTriggerContext(event)).reason}`
+        : bet.triggerText
+          ? `wins IF ${bet.triggerText} (manual settle)`
+          : null;
+    const eventStatusLabel =
+      event.sport === "horse_racing"
+        ? racingEventStatusDetail(event.goals)
+        : `${event.homeScore}-${event.awayScore}`;
+    livePositions.push({
+      betId: bet.id,
+      label: bet.label,
+      eventName: event ? formatEventTitle(event) : "—",
+      eventSport: event.sport ?? undefined,
+      eventStatusLabel,
+      minute: event.minute,
+      score: eventStatusLabel,
+      provisional,
+      snapshotProvisional,
+      valuationMode,
+      expected: bet.expectedProfit,
+      triggerNote,
+    });
+  }
+
+  const promoAwards = getPromoAwardsByBetId();
+  const { entries: historyRows } = getHistoryFeed({ limit: 40 });
+
+  return {
+    events: allEvents.sort((a, b) => a.startTime - b.startTime),
+    bets: allBets.sort((a, b) => b.createdAt - a.createdAt),
+    settledProfit: running,
+    provisionalProfit: provisionalTotal,
+    livePositions,
+    series,
+    history: historyRows,
+    promoAwards,
+    apiConfigured: hasApiKey(),
+    racingApiConfigured: hasRacingApiKey(),
+    exchangeProvider: getDefaultExchangeProvider(),
+    exchangeName: getDefaultExchangeName(),
+    exchangeStatus: getExchangeProviderStatus(getDefaultExchangeProvider()),
+    exchangeProviders: getAllExchangeProviderStatuses(),
+    racingAutopilot,
+    settings: getAppSettings(),
+    balances: getBalanceSummary(),
+    offers: listOfferSummaries(),
+  };
+}

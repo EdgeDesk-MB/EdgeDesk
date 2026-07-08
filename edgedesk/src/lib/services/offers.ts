@@ -1,0 +1,277 @@
+import { eq } from "drizzle-orm";
+import { db, bets, offers, type BetRow, type OfferRow } from "@/lib/db";
+import { getPromoAwardsByBetId } from "@/lib/services/balances";
+
+export type FreeBetStage =
+  | "none"
+  | "awaiting_result"
+  | "not_awarded"
+  | "awarded"
+  | "in_use"
+  | "settled";
+
+export interface OfferProfitBreakdown {
+  /** Sum of settled qualifying / risk-free bet P&L */
+  qualifyingProfit: number;
+  qualifyingSettledCount: number;
+  qualifyingOpenCount: number;
+  /** Whether a promo free bet was credited on a qualifying bet */
+  freeBetAwarded: boolean;
+  freeBetAwardAmount: number | null;
+  freeBetAwardReason: string | null;
+  freeBetStage: FreeBetStage;
+  /** Settled SNR/SR free-bet conversion P&L */
+  freeBetProfit: number;
+  freeBetOpenCount: number;
+  freeBetSettledCount: number;
+  /** qualifying + free bet usage */
+  totalProfit: number;
+}
+
+export interface OfferSummary extends OfferRow {
+  betCount: number;
+  openBets: number;
+  actualProfit: number;
+  expectedFromBets: number;
+  profit: OfferProfitBreakdown;
+}
+
+function isQualifyingBet(bet: BetRow): boolean {
+  return bet.betType === "qualifying" || bet.betType === "risk_free";
+}
+
+function isFreeBetUsage(bet: BetRow): boolean {
+  return bet.betType === "free_snr" || bet.betType === "free_sr";
+}
+
+function settledProfit(bets: BetRow[]): number {
+  return bets
+    .filter((b) => b.status !== "open" && b.status !== "void" && b.actualProfit != null)
+    .reduce((a, b) => a + (b.actualProfit ?? 0), 0);
+}
+
+export function computeOfferProfitBreakdown(
+  linked: BetRow[],
+  promoAwards: Record<number, { amount: number; reason: string }> = getPromoAwardsByBetId()
+): OfferProfitBreakdown {
+  const qualifying = linked.filter(isQualifyingBet);
+  const freeBetBets = linked.filter(isFreeBetUsage);
+
+  const qualifyingSettled = qualifying.filter((b) => b.status !== "open" && b.status !== "void");
+  const qualifyingOpen = qualifying.filter((b) => b.status === "open");
+  const qualifyingProfit = settledProfit(qualifying);
+
+  const freeBetSettled = freeBetBets.filter((b) => b.status !== "open" && b.status !== "void");
+  const freeBetOpen = freeBetBets.filter((b) => b.status === "open");
+  const freeBetProfit = settledProfit(freeBetBets);
+
+  let freeBetAwarded = false;
+  let freeBetAwardAmount: number | null = null;
+  let freeBetAwardReason: string | null = null;
+
+  for (const bet of qualifying) {
+    const promo = promoAwards[bet.id];
+    if (!promo) continue;
+    freeBetAwarded = true;
+    freeBetAwardAmount = promo.amount;
+    freeBetAwardReason = promo.reason;
+    break;
+  }
+
+  let freeBetStage: FreeBetStage = "none";
+  const hasTriggerOffer = qualifying.some((b) => b.triggerText?.trim() || b.triggerRule?.trim());
+
+  if (freeBetSettled.length > 0) {
+    freeBetStage = "settled";
+  } else if (freeBetOpen.length > 0) {
+    freeBetStage = "in_use";
+  } else if (freeBetAwarded) {
+    freeBetStage = "awarded";
+  } else if (hasTriggerOffer && qualifyingOpen.length > 0) {
+    freeBetStage = "awaiting_result";
+  } else if (hasTriggerOffer && qualifyingSettled.length > 0) {
+    freeBetStage = "not_awarded";
+  }
+
+  return {
+    qualifyingProfit,
+    qualifyingSettledCount: qualifyingSettled.length,
+    qualifyingOpenCount: qualifyingOpen.length,
+    freeBetAwarded,
+    freeBetAwardAmount,
+    freeBetAwardReason,
+    freeBetStage,
+    freeBetProfit,
+    freeBetOpenCount: freeBetOpen.length,
+    freeBetSettledCount: freeBetSettled.length,
+    totalProfit: qualifyingProfit + freeBetProfit,
+  };
+}
+
+/** Detect offer-like text from label or AI trigger field. */
+export function inferOfferTitle(label: string, triggerText?: string | null): string | null {
+  const raw = (triggerText?.trim() || label.trim()).replace(/\s+/g, " ");
+  if (!raw) return null;
+  if (/\b(get|gives?|award|free bet|fb\b|refund|money back|2nd|3rd|4th|place)\b/i.test(raw)) {
+    return raw.length > 120 ? `${raw.slice(0, 117)}…` : raw;
+  }
+  if (/\bbet\s+£?\d+/i.test(raw) && /\b(get|£)\s*£?\d+/i.test(raw)) return raw;
+  return null;
+}
+
+export function resolveOfferForBet(input: {
+  offerId?: number | null;
+  label: string;
+  triggerText?: string | null;
+  bookmaker?: string | null;
+  expectedProfit?: number | null;
+}): number | null {
+  if (input.offerId != null && input.offerId > 0) {
+    const existing = db.select().from(offers).where(eq(offers.id, input.offerId)).get();
+    if (existing) return existing.id;
+  }
+
+  const title = inferOfferTitle(input.label, input.triggerText);
+  if (!title) return null;
+
+  const now = Date.now();
+  const inserted = db
+    .insert(offers)
+    .values({
+      bookmaker: input.bookmaker?.trim() || null,
+      title,
+      description: input.triggerText?.trim() || input.label.trim() || null,
+      expectedProfit: input.expectedProfit ?? null,
+      status: "active",
+      createdAt: now,
+    })
+    .returning()
+    .get();
+  return inserted.id;
+}
+
+/** Link SNR/SR conversion bets to an offer that already awarded a free bet. */
+export function resolveOfferForFreeBetUsage(input: {
+  offerId?: number | null;
+  betType: string;
+  bookmaker?: string | null;
+}): number | null {
+  if (input.offerId != null && input.offerId > 0) return input.offerId;
+  if (input.betType !== "free_snr" && input.betType !== "free_sr") return null;
+
+  const bookie = input.bookmaker?.trim().toLowerCase();
+  if (!bookie) return null;
+
+  const promoAwards = getPromoAwardsByBetId();
+  const allOffers = db.select().from(offers).all();
+  const allBets = db.select().from(bets).all();
+
+  const candidates = allOffers
+    .filter(
+      (o) =>
+        (o.status === "active" || o.status === "completed") &&
+        o.bookmaker?.trim().toLowerCase() === bookie
+    )
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  for (const offer of candidates) {
+    const linked = allBets.filter((b) => b.offerId === offer.id);
+    const breakdown = computeOfferProfitBreakdown(linked, promoAwards);
+    if (breakdown.freeBetAwarded && breakdown.freeBetStage === "awarded") {
+      return offer.id;
+    }
+  }
+  return null;
+}
+
+export function summariseOffer(
+  offer: OfferRow,
+  linked: BetRow[],
+  promoAwards: Record<number, { amount: number; reason: string }> = getPromoAwardsByBetId()
+): OfferSummary {
+  const openBets = linked.filter((b) => b.status === "open").length;
+  const profit = computeOfferProfitBreakdown(linked, promoAwards);
+  const expectedFromBets = linked.reduce((a, b) => a + (b.expectedProfit ?? 0), 0);
+
+  return {
+    ...offer,
+    betCount: linked.length,
+    openBets,
+    actualProfit: profit.totalProfit,
+    expectedFromBets,
+    profit,
+  };
+}
+
+export function listOfferSummaries(): OfferSummary[] {
+  const allOffers = db.select().from(offers).all();
+  const allBets = db.select().from(bets).all();
+  return allOffers
+    .map((o) => summariseOffer(o, allBets.filter((b) => b.offerId === o.id)))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Mark offers completed when all linked bets are settled; expire past deadline. */
+export function syncOfferStatuses(): void {
+  const now = Date.now();
+  const allOffers = db.select().from(offers).all();
+  const allBets = db.select().from(bets).all();
+
+  for (const offer of allOffers) {
+    if (offer.status === "completed" || offer.status === "expired") continue;
+
+    const linkedBets = allBets.filter((b) => b.offerId === offer.id);
+
+    if (offer.status === "planned" && linkedBets.length > 0) {
+      db.update(offers).set({ status: "active" }).where(eq(offers.id, offer.id)).run();
+      continue;
+    }
+
+    if (offer.expiresAt != null && offer.expiresAt < now) {
+      db.update(offers).set({ status: "expired" }).where(eq(offers.id, offer.id)).run();
+      continue;
+    }
+
+    if (linkedBets.length === 0) continue;
+
+    const allDone = linkedBets.every((b) => b.status !== "open");
+    if (allDone) {
+      db.update(offers)
+        .set({ status: "completed", completedAt: now })
+        .where(eq(offers.id, offer.id))
+        .run();
+    }
+  }
+}
+
+/** Backfill offers for existing bets that look like promos but have no offer_id. */
+export function backfillOffersFromBets(): number {
+  const allBets = db.select().from(bets).all();
+  let updated = 0;
+
+  for (const bet of allBets.filter((b) => b.offerId == null)) {
+    const offerId = resolveOfferForBet({
+      label: bet.label,
+      triggerText: bet.triggerText,
+      bookmaker: bet.bookmaker,
+      expectedProfit: bet.expectedProfit,
+    });
+    if (offerId != null) {
+      db.update(bets).set({ offerId }).where(eq(bets.id, bet.id)).run();
+      updated += 1;
+    }
+  }
+
+  for (const bet of allBets.filter((b) => b.offerId == null)) {
+    const offerId = resolveOfferForFreeBetUsage({
+      betType: bet.betType,
+      bookmaker: bet.bookmaker,
+    });
+    if (offerId != null) {
+      db.update(bets).set({ offerId }).where(eq(bets.id, bet.id)).run();
+      updated += 1;
+    }
+  }
+
+  return updated;
+}

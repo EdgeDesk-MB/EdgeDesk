@@ -1,0 +1,135 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { APP_VERSION_LABEL } from "@/lib/app-version";
+import {
+  Calculator,
+  Gift,
+  Key,
+  LayoutDashboard,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
+
+const STEPS = [
+  {
+    icon: Sparkles,
+    title: "Welcome to EdgeDesk",
+    body: "A local-first matched betting command centre. Calculators, live events, offer tracking and a real-time P&L dashboard — your edge surfaced on every screen.",
+  },
+  {
+    icon: Key,
+    title: "Demo mode or API keys",
+    body: "Everything works without keys: calculators, tracker, offers and the football simulator. Add optional API keys in .env.local for live fixtures, real lay odds and auto settlement. See Settings → Data & API for status.",
+  },
+  {
+    icon: LayoutDashboard,
+    title: "The 60-second demo loop",
+    body: "Tracked Events → Simulate match → “2UP drama”. Calculators → Dutching → 2UP dutch → Add to tracker. Link the bet, then watch the Live Dashboard move as goals go in.",
+  },
+  {
+    icon: Trophy,
+    title: "Racing Desk for offers",
+    body: "Add a place-refund offer, open Racing Desk, and use Intelligence to find qualifying races. Lay button opens the matched calculator; proxy odds are estimates — verify on the bookie before placing.",
+  },
+] as const;
+
+interface WelcomeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onComplete: () => void;
+}
+
+export function WelcomeDialog({ open, onOpenChange, onComplete }: WelcomeDialogProps) {
+  const [step, setStep] = useState(0);
+  const current = STEPS[step];
+  const Icon = current.icon;
+  const isLast = step === STEPS.length - 1;
+
+  useEffect(() => {
+    if (open) setStep(0);
+  }, [open]);
+
+  const finish = useCallback(
+    (dontShowAgain: boolean) => {
+      if (dontShowAgain) onComplete();
+      onOpenChange(false);
+    },
+    [onComplete, onOpenChange]
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Icon className="size-5" />
+            </div>
+            <div>
+              <DialogTitle>{current.title}</DialogTitle>
+              <DialogDescription className="text-xs">
+                {APP_VERSION_LABEL} · Step {step + 1} of {STEPS.length}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+        <p className="text-sm leading-relaxed text-muted-foreground">{current.body}</p>
+        <div className="flex justify-center gap-1.5">
+          {STEPS.map((_, i) => (
+            <span
+              key={i}
+              className={`size-1.5 rounded-full transition-colors ${
+                i === step ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
+            />
+          ))}
+        </div>
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+          <Button variant="ghost" size="sm" onClick={() => finish(false)}>
+            Skip for now
+          </Button>
+          <div className="flex gap-2">
+            {step > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setStep((s) => s - 1)}>
+                Back
+              </Button>
+            )}
+            {isLast ? (
+              <>
+                <Button size="sm" onClick={() => finish(true)}>
+                  Get started
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" onClick={() => setStep((s) => s + 1)}>
+                Next
+              </Button>
+            )}
+          </div>
+        </DialogFooter>
+        {isLast && (
+          <div className="flex flex-wrap gap-2 border-t pt-3 text-xs text-muted-foreground">
+            <Link href="/help" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <Calculator className="size-3" /> Help guides
+            </Link>
+            <span>·</span>
+            <Link href="/offers" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <Gift className="size-3" /> Add an offer
+            </Link>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
