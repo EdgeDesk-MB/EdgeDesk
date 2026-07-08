@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, bets, offers, type BetRow, type OfferRow } from "@/lib/db";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
+import { aiEffectsForBet, isPlaceFreeBetEffect } from "@/lib/calc/ai-triggers";
 
 export type FreeBetStage =
   | "none"
@@ -50,6 +51,23 @@ function settledProfit(bets: BetRow[]): number {
     .reduce((a, b) => a + (b.actualProfit ?? 0), 0);
 }
 
+/** Free-bet award amount implied by label/trigger (even if wallet credit failed). */
+export function expectedFreeBetAmountFromBet(bet: BetRow): number | null {
+  const effects = aiEffectsForBet(bet.triggerRule, bet.label);
+  const award = effects.find((e) => e.kind === "free_bet_award");
+  return award && award.amount > 0 ? award.amount : null;
+}
+
+function betHasPlaceFreeBetTrigger(bet: BetRow): boolean {
+  return aiEffectsForBet(bet.triggerRule, bet.label).some(isPlaceFreeBetEffect);
+}
+
+function betHasUnconditionalFreeBet(bet: BetRow): boolean {
+  return aiEffectsForBet(bet.triggerRule, bet.label).some(
+    (e) => e.kind === "free_bet_award" && e.positions.length === 0
+  );
+}
+
 export function computeOfferProfitBreakdown(
   linked: BetRow[],
   promoAwards: Record<number, { amount: number; reason: string }> = getPromoAwardsByBetId()
@@ -78,8 +96,23 @@ export function computeOfferProfitBreakdown(
     break;
   }
 
+  // Unconditional "Bet £X get £Y FB" — treat as awarded once qualifying settles,
+  // even if the bookie wallet credit never landed (missing account, etc.).
+  if (!freeBetAwarded && freeBetSettled.length === 0 && freeBetOpen.length === 0) {
+    for (const bet of qualifyingSettled) {
+      if (!betHasUnconditionalFreeBet(bet)) continue;
+      const amount = expectedFreeBetAmountFromBet(bet);
+      if (amount == null) continue;
+      freeBetAwarded = true;
+      freeBetAwardAmount = amount;
+      freeBetAwardReason = "Offer unlocked";
+      break;
+    }
+  }
+
   let freeBetStage: FreeBetStage = "none";
-  const hasTriggerOffer = qualifying.some((b) => b.triggerText?.trim() || b.triggerRule?.trim());
+  const hasPlaceTrigger = qualifying.some(betHasPlaceFreeBetTrigger);
+  const hasAnyFreeBetTrigger = qualifying.some((b) => expectedFreeBetAmountFromBet(b) != null);
 
   if (freeBetSettled.length > 0) {
     freeBetStage = "settled";
@@ -87,10 +120,12 @@ export function computeOfferProfitBreakdown(
     freeBetStage = "in_use";
   } else if (freeBetAwarded) {
     freeBetStage = "awarded";
-  } else if (hasTriggerOffer && qualifyingOpen.length > 0) {
+  } else if (hasPlaceTrigger && qualifyingOpen.length > 0) {
     freeBetStage = "awaiting_result";
-  } else if (hasTriggerOffer && qualifyingSettled.length > 0) {
+  } else if (hasPlaceTrigger && qualifyingSettled.length > 0) {
     freeBetStage = "not_awarded";
+  } else if (hasAnyFreeBetTrigger && qualifyingOpen.length > 0) {
+    freeBetStage = "awaiting_result";
   }
 
   return {
@@ -211,16 +246,53 @@ export function listOfferSummaries(): OfferSummary[] {
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** Mark offers completed when all linked bets are settled; expire past deadline. */
+/**
+ * True when the campaign has nothing left to do — including free-bet conversion.
+ * Qualifying-only settlement is NOT enough when a free bet is awarded or still in use.
+ */
+export function isOfferCampaignComplete(
+  linkedBets: BetRow[],
+  profit: OfferProfitBreakdown
+): boolean {
+  if (linkedBets.length === 0) return false;
+  if (linkedBets.some((b) => b.status === "open")) return false;
+
+  // Free bet sitting unused, or conversion legs still open — keep campaign active.
+  if (profit.freeBetStage === "awarded" || profit.freeBetStage === "in_use") {
+    return false;
+  }
+  if (profit.freeBetStage === "awaiting_result") return false;
+
+  return true;
+}
+
+/** Mark offers completed when the full campaign is done; reopen if free bet still pending. */
 export function syncOfferStatuses(): void {
   const now = Date.now();
   const allOffers = db.select().from(offers).all();
   const allBets = db.select().from(bets).all();
+  const promoAwards = getPromoAwardsByBetId();
 
   for (const offer of allOffers) {
-    if (offer.status === "completed" || offer.status === "expired") continue;
+    if (offer.status === "expired") continue;
 
     const linkedBets = allBets.filter((b) => b.offerId === offer.id);
+    const profit = computeOfferProfitBreakdown(linkedBets, promoAwards);
+
+    // Repair: completed too early (qualifying settled, free bet never converted).
+    if (offer.status === "completed") {
+      if (
+        profit.freeBetStage === "awarded" ||
+        profit.freeBetStage === "in_use" ||
+        profit.freeBetStage === "awaiting_result"
+      ) {
+        db.update(offers)
+          .set({ status: "active", completedAt: null })
+          .where(eq(offers.id, offer.id))
+          .run();
+      }
+      continue;
+    }
 
     if (offer.status === "planned" && linkedBets.length > 0) {
       db.update(offers).set({ status: "active" }).where(eq(offers.id, offer.id)).run();
@@ -232,10 +304,7 @@ export function syncOfferStatuses(): void {
       continue;
     }
 
-    if (linkedBets.length === 0) continue;
-
-    const allDone = linkedBets.every((b) => b.status !== "open");
-    if (allDone) {
+    if (isOfferCampaignComplete(linkedBets, profit)) {
       db.update(offers)
         .set({ status: "completed", completedAt: now })
         .where(eq(offers.id, offer.id))

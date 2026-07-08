@@ -42,10 +42,24 @@ EdgeDesk answers three questions every day:
 - Expected retained value ranking across active offers
 - “Best next” callout on Home (above Next actions)
 
-## Phase B — Close the loop (next)
+## Operator context (Sam)
+
+- **Offer sources:** Matched Betting Blog primarily — no Oddsmonkey / Outplayed. Prefer paste/import + templates over scraping closed platforms.
+- **Bookie access:** Many accounts gubbed — track *available* bookies explicitly; don’t assume full UK bookie set.
+- **Core play:** Dutch 2UP offers — hope a team goes 2 clear then fails to win. EP Desk EV has been sobering vs gut feel; lean into model honesty, not optimism.
+- **Calendar preference:** Day-split lists (Today / Tomorrow / weekday), not month grids.
+
+## Phase B — Close the loop
 - Settlement inbox
-- Balance-aware placement
+- Balance-aware placement + available-bookie filter
 - Month-end / export polish
+- Offer capture from MBB-style paste / templates
+- 2UP dutch campaign workflow polish (EP Desk ↔ tracker handoff)
+
+## Phase A+ fixes
+- ✅ Don’t auto-complete offers while free bet still needs converting
+- ✅ Reopen wrongly completed campaigns on sync
+- ✅ Day-split offer calendar (14-day horizon)
 
 ## Design rules (keep consistent)
 

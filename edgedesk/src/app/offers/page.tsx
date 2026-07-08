@@ -41,6 +41,7 @@ import { filterPillState } from "@/lib/ui/surface-styles";
 import { formatPillLabel, offerStatusBadgeVariant } from "@/lib/ui/status-badges";
 import { listOfferNextActions, offerNextActionLabel } from "@/lib/offers/next-actions";
 import { OfferPipelineStrip } from "@/components/offers/offer-pipeline-strip";
+import { OfferDayCalendar } from "@/components/offers/offer-day-calendar";
 import { Gift, Pencil, Plus, Tag, Trash2, Trophy, X } from "lucide-react";
 
 export default function OffersPage() {
@@ -64,18 +65,6 @@ export default function OffersPage() {
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-
-  const expiringSoon = useMemo(() => {
-    const now = Date.now();
-    return offers
-      .filter(
-        (o) =>
-          o.expiresAt != null &&
-          o.expiresAt > now &&
-          (o.status === "active" || o.status === "planned")
-      )
-      .sort((a, b) => (a.expiresAt ?? 0) - (b.expiresAt ?? 0));
-  }, [offers]);
 
   const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
   const needsActionIds = useMemo(
@@ -254,35 +243,7 @@ export default function OffersPage() {
         }
       />
 
-      {expiringSoon.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle section>Offer calendar</CardTitle>
-            <CardDescription>Upcoming expiry dates — reminders fire from Settings.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {expiringSoon.slice(0, 8).map((offer) => {
-              const days = Math.ceil(((offer.expiresAt ?? 0) - Date.now()) / 86_400_000);
-              return (
-                <div
-                  key={offer.id}
-                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-selection-subtle"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{offer.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {offer.bookmaker ?? "Any bookie"} · {offer.status}
-                    </p>
-                  </div>
-                  <Badge variant={days <= 3 ? "destructive" : "secondary"} className="shrink-0 tabular-nums">
-                    {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`}
-                  </Badge>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+      <OfferDayCalendar offers={offers} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1" id="offer-form">

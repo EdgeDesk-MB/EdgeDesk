@@ -104,12 +104,18 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         title: "Advantage ranking (expected retained value)",
         status: "done",
       },
+      { id: "off-calendar", title: "Offer calendar with reminders", status: "done" },
       {
         id: "off-templates",
         title: "Offer template import / terms parser",
+        description: "Paste from Matched Betting Blog / promo emails",
         status: "planned",
       },
-      { id: "off-calendar", title: "Offer calendar with reminders", status: "future" },
+      {
+        id: "off-available-bookies",
+        title: "Available bookies (gubbed-aware)",
+        status: "planned",
+      },
     ],
   },
   {
@@ -132,6 +138,12 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       {
         id: "trk-settle-inbox",
         title: "Settlement inbox",
+        status: "planned",
+      },
+      {
+        id: "trk-2up-dutch",
+        title: "2UP dutch campaign workflow",
+        description: "EP Desk EV honesty + dutch handoff for gubbed-friendly play",
         status: "planned",
       },
     ],
