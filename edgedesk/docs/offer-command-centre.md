@@ -21,16 +21,17 @@ EdgeDesk answers three questions every day:
 
 ## Phase A scope
 
-### A1 — Next-action engine ✅ (this pass)
+### A1 — Next-action engine ✅
 - Derive a single **next action** per active/planned offer from profit stage + expiry
 - Rank actions for Home
 - Surface on Home as “Next actions”
 - Badge Offers in side nav when actions are waiting
+- Offers page: **Needs action** filter + action chip on cards
 
-### A2 — Offer pipeline UX
-- Stage chips on Offers page (Planned → Qualifying → Awarded → Converting → Settled)
-- Campaign P&L header per offer
+### A2 — Offer pipeline UX ✅ (strip) / next: campaign P&L polish
+- Stage chips on Offers cards (Planned → Qualifying → Awaiting → Awarded → Converting → Settled)
 - Filter by “needs action”
+- Next: richer campaign P&L header per offer
 
 ### A3 — Bet Desk queues
 - Tracker views: Open · Needs lay · Linked to offer · Orphans
