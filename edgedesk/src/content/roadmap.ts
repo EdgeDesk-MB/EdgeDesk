@@ -91,18 +91,18 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         id: "off-next-actions",
         title: "Next-action engine + Home queue",
         description: "Ranked next steps per offer campaign on Home and Offers nav badge",
-        status: "in_progress",
+        status: "done",
       },
       {
         id: "off-pipeline",
         title: "Offer pipeline stages UX",
         description: "Planned → Qualifying → Awarded → Converting → Settled",
-        status: "in_progress",
+        status: "done",
       },
       {
         id: "off-advantage",
         title: "Advantage ranking (expected retained value)",
-        status: "in_progress",
+        status: "done",
       },
       {
         id: "off-templates",
@@ -127,7 +127,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         id: "trk-campaigns",
         title: "Bet campaigns & offer queues",
         description: "Group bets by offer; Open / Needs lay / Orphans views",
-        status: "in_progress",
+        status: "done",
       },
       {
         id: "trk-settle-inbox",
