@@ -22,7 +22,6 @@ function ctaLabelForAction(
   if (action?.kind === "place_qualifying" || action?.kind === "review_expiry") {
     return "Place qualifying bet";
   }
-  if (betType === "free_snr") return "Convert free bet";
   return "Place qualifying bet";
 }
 

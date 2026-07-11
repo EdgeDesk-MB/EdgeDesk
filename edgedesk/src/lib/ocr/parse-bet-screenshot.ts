@@ -123,7 +123,7 @@ function parseTripletValues(
 ): { odds?: number; stake?: number; returns?: number } | undefined {
   const stake = parseMoneyValue(stakeRaw);
   const returns = parseMoneyValue(returnsRaw);
-  let odds = parseOddsValue(oddsRaw.replace(/^£/, ""));
+  const odds = parseOddsValue(oddsRaw.replace(/^£/, ""));
 
   if (stake == null && returns == null && odds == null) return undefined;
 

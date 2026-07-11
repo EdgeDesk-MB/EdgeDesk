@@ -212,7 +212,7 @@ export function accaLayerScenarios(
   });
 
   for (let failAt = 0; failAt < legs.length; failAt++) {
-    let backProfit = -backStake;
+    const backProfit = -backStake;
     let exchangeProfit = 0;
     for (let i = 0; i < lays.length; i++) {
       const lay = lays[i];

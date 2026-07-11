@@ -16,6 +16,7 @@ import type {
   ExchangeRaceOdds,
 } from "./types";
 import { chunkMarketIds } from "./format-exchange-error";
+import { matchHorsesByName } from "./horse-match";
 
 const IDENTITY_URL = "https://identitysso.betfair.com/api/login";
 const BETTING_URL = "https://api.betfair.com/exchange/betting/rest/v1.0";
@@ -308,7 +309,7 @@ export async function fetchBetfairLayOdds(
   }));
 
   const marketIds = [...new Set(matched.map((m) => m.market?.marketId).filter(Boolean))] as string[];
-  let books: MarketBookRow[] = [];
+  const books: MarketBookRow[] = [];
 
   if (marketIds.length > 0) {
     try {

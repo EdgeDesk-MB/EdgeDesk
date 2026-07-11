@@ -357,7 +357,7 @@ export async function getRacingDesk(
   const settingsStatus = getExchangeProviderStatus(settingsProvider);
 
   const upcomingCards = cards.filter((c) => c.status !== "finished");
-  let exchangeLayByRace = new Map<
+  const exchangeLayByRace = new Map<
     string,
     Map<string, { layDecimal: number; laySize?: number }>
   >();

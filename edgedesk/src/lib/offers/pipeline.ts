@@ -34,8 +34,12 @@ export function pipelineProgressIndex(stage: OfferPipelineStage): number {
   return idx >= 0 ? idx : 0;
 }
 
+export type TerminalPipelineStage = "completed" | "settled";
+
 /** Terminal stages — no progress bar; show status chip instead. */
-export function isTerminalPipelineStage(stage: OfferPipelineStage): boolean {
+export function isTerminalPipelineStage(
+  stage: OfferPipelineStage
+): stage is TerminalPipelineStage {
   return stage === "completed" || stage === "settled";
 }
 
@@ -56,7 +60,7 @@ export function deriveOfferPipelineStage(offer: OfferSummary): OfferPipelineStag
   if (profit.freeBetStage === "awaiting_result") return "awaiting";
   if (profit.qualifyingOpenCount > 0) return "qualifying";
   if (profit.qualifyingSettledCount > 0 && profit.freeBetStage === "not_awarded") {
-    return offer.status === "completed" ? "completed" : "awaiting";
+    return "awaiting";
   }
   if (profit.qualifyingSettledCount > 0 || profit.qualifyingOpenCount > 0) {
     return "qualifying";

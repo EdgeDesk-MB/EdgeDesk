@@ -409,8 +409,8 @@ export function spreadOverlappingAnnotations(
 
   for (let i = 0; i < sorted.length; i++) {
     const current = sorted[i]!;
-    let y = current.y;
-    let cluster = [current];
+    const y = current.y;
+    const cluster = [current];
 
     while (
       i + 1 < sorted.length &&
