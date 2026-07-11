@@ -151,7 +151,7 @@ describe("listFreeBetLots", () => {
     expect(lots[0].remaining).toBeCloseTo(50);
   });
 
-  it("sumFreeBetLotBalance reflects open lots when net ledger sum is zero", () => {
+  it("sumFreeBetLotBalance keeps a fresh award open after historical credits/debits cancel", () => {
     const bookie = db
       .insert(accounts)
       .values({
@@ -205,6 +205,15 @@ describe("listFreeBetLots", () => {
         },
       ])
       .run();
+
+    const historicalNet = db
+      .select()
+      .from(balanceTransactions)
+      .all()
+      .filter((t) => t.accountId === bookie.id && t.category === "free_bet")
+      .reduce((s, t) => s + t.amount, 0);
+    expect(historicalNet).toBeCloseTo(0);
+
     // …then a fresh promo award is the only open lot.
     db.insert(balanceTransactions)
       .values({
@@ -217,14 +226,6 @@ describe("listFreeBetLots", () => {
         pending: 0,
       })
       .run();
-
-    const net = db
-      .select()
-      .from(balanceTransactions)
-      .all()
-      .filter((t) => t.accountId === bookie.id && t.category === "free_bet")
-      .reduce((s, t) => s + t.amount, 0);
-    expect(net).toBeCloseTo(0);
 
     expect(sumFreeBetLotBalance(bookie.id)).toBeCloseTo(50);
     expect(listFreeBetLots(bookie.id)).toHaveLength(1);
