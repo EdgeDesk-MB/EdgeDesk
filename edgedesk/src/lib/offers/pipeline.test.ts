@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
-import type { OfferSummary } from "@/lib/services/offers";
+import {
+  deriveOfferPipelineStage,
+  OFFER_PIPELINE_PROGRESS_STAGES,
+  offerPipelineHasStarted,
+  pipelineProgressIndex,
+} from "@/lib/offers/pipeline";
+import type { OfferSummary } from "@/lib/services/offers.types";
 
 function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">): OfferSummary {
   const { profit: profitPartial, ...rest } = partial;
@@ -15,6 +20,8 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     offerType: null,
     rules: null,
     scopeCourse: null,
+    scopeRaceId: null,
+    scopeRaceLabel: null,
     eventDate: null,
     expiresAt: null,
     completedAt: null,
@@ -34,6 +41,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
       freeBetProfit: 0,
       freeBetOpenCount: 0,
       freeBetSettledCount: 0,
+      openExpectedProfit: 0,
       totalProfit: 0,
       ...profitPartial,
     },
@@ -58,6 +66,7 @@ describe("deriveOfferPipelineStage", () => {
             freeBetProfit: 0,
             freeBetOpenCount: 0,
             freeBetSettledCount: 0,
+            openExpectedProfit: 0,
             totalProfit: -1,
           },
         })
@@ -71,9 +80,71 @@ describe("deriveOfferPipelineStage", () => {
     ).toBe("planned");
   });
 
-  it("maps completed offers to settled", () => {
+  it("maps completed offers to completed until bets settle", () => {
     expect(
       deriveOfferPipelineStage(offer({ id: 3, title: "Done", status: "completed" }))
+    ).toBe("completed");
+  });
+
+  it("maps financially settled offers to settled", () => {
+    expect(
+      deriveOfferPipelineStage(
+        offer({
+          id: 6,
+          title: "Settled FB",
+          status: "completed",
+          profit: {
+            qualifyingSettledCount: 1,
+            freeBetSettledCount: 1,
+            freeBetStage: "settled",
+          },
+        })
+      )
     ).toBe("settled");
+  });
+});
+
+describe("offer pipeline progress", () => {
+  it("excludes planned from visible progress steps", () => {
+    expect(OFFER_PIPELINE_PROGRESS_STAGES).toHaveLength(6);
+    expect(OFFER_PIPELINE_PROGRESS_STAGES.map((s) => s.id)).toEqual([
+      "qualifying",
+      "awaiting",
+      "awarded",
+      "converting",
+      "completed",
+      "settled",
+    ]);
+  });
+
+  it("qualifying is step 1 of 6 once started", () => {
+    expect(pipelineProgressIndex("qualifying")).toBe(0);
+  });
+
+  it("completed is step 5 of 6", () => {
+    expect(pipelineProgressIndex("completed")).toBe(4);
+  });
+
+  it("settled is step 6 of 6", () => {
+    expect(pipelineProgressIndex("settled")).toBe(5);
+  });
+
+  it("treats unstarted offers as not started", () => {
+    expect(
+      offerPipelineHasStarted(offer({ id: 4, title: "New", status: "planned", betCount: 0 }))
+    ).toBe(false);
+  });
+
+  it("treats qualifying offers as started", () => {
+    expect(
+      offerPipelineHasStarted(
+        offer({
+          id: 5,
+          title: "Started",
+          betCount: 1,
+          profit: { qualifyingOpenCount: 1 },
+        })
+      )
+    ).toBe(true);
   });
 });

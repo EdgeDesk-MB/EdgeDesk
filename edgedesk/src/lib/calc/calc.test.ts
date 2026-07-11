@@ -14,6 +14,8 @@ import {
   matchedBet,
   noVig,
   settleBet,
+  settleFromOutcome,
+  settlePartialOutcome,
   twoUp,
   twoUpDutchScenarios,
   deriveOutcomes,
@@ -72,6 +74,76 @@ describe("matched betting calculator", () => {
     });
     expect(Math.abs(r.profitIfBackWins - r.profitIfLayWins)).toBeLessThan(0.02);
     expect(r.guaranteed).toBeGreaterThan(0); // risk-free bets are +EV both sides at close odds
+  });
+
+  it("special bonus: free bet on lose equalises with retention", () => {
+    const r = matchedBet({
+      mode: "qualifying",
+      backStake: 10,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      specialBonus: { kind: "free_bet_on_lose", amount: 10, freeBetRetention: 0.7 },
+    });
+    expect(Math.abs(r.profitIfBackWins - r.profitIfLayWins)).toBeLessThan(0.02);
+    // Same as risk_free at 70% retention
+    const rf = matchedBet({
+      mode: "risk_free",
+      backStake: 10,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      refundAmount: 10,
+      refundRetention: 0.7,
+    });
+    expect(r.layStake).toBeCloseTo(rf.layStake, 2);
+    expect(r.guaranteed).toBeCloseTo(rf.guaranteed, 2);
+  });
+
+  it("special bonus: double winnings increases lay stake", () => {
+    const base = matchedBet({
+      mode: "qualifying",
+      backStake: 10,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+    });
+    const doubled = matchedBet({
+      mode: "qualifying",
+      backStake: 10,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      specialBonus: { kind: "double_winnings" },
+    });
+    expect(doubled.layStake).toBeGreaterThan(base.layStake);
+    expect(Math.abs(doubled.profitIfBackWins - doubled.profitIfLayWins)).toBeLessThan(0.02);
+  });
+});
+
+describe("partial settlement (Ultimatcher Pending)", () => {
+  const base = {
+    market: "match_odds" as const,
+    selection: "home",
+    betType: "qualifying" as const,
+    backStake: 10,
+    backOdds: 3,
+    layStake: 9.74,
+    layOdds: 3.1,
+    commission: 0.02,
+  };
+
+  it("push and void are flat", () => {
+    expect(settlePartialOutcome(base, "push").profit).toBe(0);
+    expect(settlePartialOutcome(base, "void").status).toBe("void");
+  });
+
+  it("half win averages win and lose P&L", () => {
+    const half = settlePartialOutcome(base, "half_win");
+    const win = settleFromOutcome(base, true).profit;
+    const lose = settleFromOutcome(base, false).profit;
+    expect(half.profit).toBeCloseTo((win + lose) / 2, 4);
+    expect(half.status).toBe("half_win");
   });
 });
 

@@ -23,7 +23,7 @@ const patchSchema = z.object({
       })
     )
     .optional(),
-  /** Record a goal with optional scorer — increments the score and the goal timeline */
+  /** Record a goal with optional scorer - increments the score and the goal timeline */
   addGoal: z
     .object({
       side: z.enum(["home", "away"]),

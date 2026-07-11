@@ -1,4 +1,4 @@
-# EdgeDesk — Matched Betting Command Centre
+# EdgeDesk - Matched Betting Command Centre
 
 Local-first matched betting toolkit: calculators, live events, result-driven auto-settlement
 and a real-time P&L dashboard. See `PLAN.md` for the full MVP scope and phased roadmap.
@@ -15,12 +15,12 @@ Open http://localhost:3000.
 ## Live football data (optional)
 
 Without a key the app runs on demo fixtures plus the built-in match simulator
-(Events → Simulate match), which plays a full 90 minutes in ~3 real minutes —
+(Events → Simulate match), which plays a full 90 minutes in ~3 real minutes -
 including the classic 2UP scenario (2-0 up, pegged back to 2-2).
 
 ### Free tier setup (API-Football)
 
-1. Sign up at [dashboard.api-football.com](https://dashboard.api-football.com/register) —
+1. Sign up at [dashboard.api-football.com](https://dashboard.api-football.com/register) -
    the **Free plan** needs no card and gives **100 requests/day** with live scores for
    1,100+ competitions.
 2. Copy your key from the dashboard (Account → My Access).
@@ -35,7 +35,7 @@ simultaneous kickoffs are fine; back-to-back matches will run the budget out.
 
 If you outgrow it, the Pro tier (~$19/mo, 7,500 req/day) removes the constraint without any
 code changes. Alternative free option: [football-data.org](https://www.football-data.org)
-(10 req/min free, forever) — better rate limits but only ~a dozen major competitions and
+(10 req/min free, forever) - better rate limits but only ~a dozen major competitions and
 no lower-league coverage; the app would need a second client written for it, so start with
 API-Football.
 
@@ -55,22 +55,22 @@ With an API key, steps 1–3 collapse into one: the EP Edge Desk and 2UP calcula
 The Matched Betting Calculator and Tracker → Add bet both have an **Advanced** switch on
 the lay side. It adds:
 
-- **Part lays** — record lays already matched at other prices; the app solves the
+- **Part lays** - record lays already matched at other prices; the app solves the
   *remaining* lay stake at current odds and collapses the whole position into one
   equivalent lay for tracking.
-- **Underlay / Standard / Overlay** — quick-snap buttons plus a slider (with editable
+- **Underlay / Standard / Overlay** - quick-snap buttons plus a slider (with editable
   min/max). *Underlay* solves for £0.00 net if the bookie bet loses (all profit rides on
-  the bookie win — the boosted-odds play); *Overlay* solves for £0.00 if the bookie bet
+  the bookie win - the boosted-odds play); *Overlay* solves for £0.00 if the bookie bet
   wins. Rounded to the penny, so the "no loss" side may land at ±£0.01.
 
 The Add bet form defaults to **Betdaq** (0% commission); pick any exchange from the
-dropdown — commission shows beside the label and the inputs re-skin in that exchange's
+dropdown - commission shows beside the label and the inputs re-skin in that exchange's
 colours. Exchanges and rates are managed in Settings.
 
 ## Live Dashboard History feed
 
 A Flashscore-style commentary column next to Live positions: kick-offs, every goal (scorer,
-minute, running score, 1st-goalscorer and own-goal flags), 2UP triggers, full-time results —
+minute, running score, 1st-goalscorer and own-goal flags), 2UP triggers, full-time results -
 and when a bet settles and leaves Live positions, its realised P&L lands here highlighted
 green or red.
 
@@ -78,7 +78,7 @@ green or red.
 
 Bets whose outcome isn't a simple score market (boosted first-goalscorer offers, player
 props, combos) can carry a plain-English trigger. In **Tracker → Add bet**, type the
-condition under *The bet wins IF* — e.g.
+condition under *The bet wins IF* - e.g.
 
 - `Harry Kane scores first` · `Kane scores a brace` · `last goalscorer Kane`
 - `Mexico wins to nil` · `England scores first` · `over 2.5 goals` · `BTTS` · `2-1`
@@ -86,19 +86,19 @@ condition under *The bet wins IF* — e.g.
 
 The interpretation is shown back to you instantly (green tick = understood). Once the bet
 is linked to an event, the trigger engine watches the goal timeline and settles the bet
-**the moment the outcome is irreversible** — a first-goalscorer bet wins or dies at the
+**the moment the outcome is irreversible** - a first-goalscorer bet wins or dies at the
 first goal, not at full time. Underlays behave exactly as expected: bookie win pays out,
 bookie loss nets ~£0.
 
 Goal timelines come from three places:
 
-- **API events** — scorer feed from API-Football (`/fixtures/events`, one request per
+- **API events** - scorer feed from API-Football (`/fixtures/events`, one request per
   poll, only spent when a live match actually has an open player trigger on it).
-- **Simulations** — name a "star striker" when kicking off a sim and they score their
+- **Simulations** - name a "star striker" when kicking off a sim and they score their
   side's first goal, perfect for testing a goalscorer trigger end to end.
-- **Manual events** — use the *Goal* button on the Events page to record scorer names.
+- **Manual events** - use the *Goal* button on the Events page to record scorer names.
 
-Unrecognised phrasing is kept as a note and the bet just falls back to manual settlement —
+Unrecognised phrasing is kept as a note and the bet just falls back to manual settlement -
 a trigger can never mis-settle on a condition it didn't understand.
 
 ## Stack
@@ -106,7 +106,7 @@ a trigger can never mis-settle on a condition it didn't understand.
 - Next.js (App Router) + TypeScript
 - shadcn/ui (blue primary) · [NumberFlow](https://number-flow.barvian.me) for every changing number ·
   [Liveline](https://benji.org/liveline) for live charts
-- SQLite via better-sqlite3 + Drizzle — your data stays in `data/edgedesk.db`
+- SQLite via better-sqlite3 + Drizzle - your data stays in `data/edgedesk.db`
 - Calculation engine: pure TypeScript in `src/lib/calc`, unit-tested with Vitest (`npm test`)
 
 ## Tests

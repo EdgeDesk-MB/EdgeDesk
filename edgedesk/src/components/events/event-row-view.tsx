@@ -24,26 +24,47 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import type { GoalEvent } from "@/lib/calc";
 import type { BetRow, EventRow } from "@/lib/db/schema";
-import { parseRaceResults } from "@/lib/racing";
+import {
+  parseRaceResults,
+  isRaceResultIncomplete,
+} from "@/lib/racing";
 import { betRaceOutcome, type PromoAwardsByBetId } from "@/lib/bet-outcomes";
 import { effectiveEventStatus, formatEventStatus, formatRacingEventTitle } from "@/lib/events";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import { SportEventBlock } from "@/components/sport-icon";
 import { formatPillLabel } from "@/lib/ui/status-badges";
-import { Goal, Minus, Plus, Radio } from "lucide-react";
+import {
+  placingsTriggerLabel,
+  RacingPlacingsDialog,
+} from "@/components/racing/racing-placings-dialog";
+import {
+  Goal,
+  Minus,
+  Plus,
+  Radio,
+  RefreshCw,
+} from "lucide-react";
 
 export function EventRowView({
   event,
   linkedBets,
   promoAwards,
+  liveModel,
   onPatch,
   onDelete,
+  onFetchResults,
+  fetchingResults,
 }: {
   event: EventRow;
   linkedBets: BetRow[];
   promoAwards: PromoAwardsByBetId;
+  /** Dixon-Coles live 1X2 when in play */
+  liveModel?: { marketsLabel: string } | null;
   onPatch: (id: number, json: Record<string, unknown>) => void;
   onDelete: (id: number) => void;
+  /** Manual Racing API results pull (force overwrite) */
+  onFetchResults?: (id: number) => void;
+  fetchingResults?: boolean;
 }) {
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
@@ -73,6 +94,11 @@ export function EventRowView({
                 {event.competition ?? event.sport}
                 {event.source === "sim" && " · simulated"}
                 {event.source === "api" && " · live feed"}
+                {live && liveModel?.marketsLabel ? (
+                  <span className="mt-0.5 block tabular-nums text-foreground/80">
+                    Model · {liveModel.marketsLabel}
+                  </span>
+                ) : null}
               </>
             )}
           </div>
@@ -138,7 +164,7 @@ export function EventRowView({
             {raceResult ? (
               <>Won by {raceResult.winner}</>
             ) : event.status === "finished" ? (
-              "—"
+              "-"
             ) : (
               "Awaiting result"
             )}
@@ -165,21 +191,51 @@ export function EventRowView({
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">
         {isRacing ? (
-          "—"
+          "-"
         ) : (
           <>
             {event.homeLed2 ? "Home led by 2 " : ""}
             {event.awayLed2 ? "Away led by 2" : ""}
-            {!event.homeLed2 && !event.awayLed2 && "—"}
+            {!event.homeLed2 && !event.awayLed2 && "-"}
           </>
         )}
       </TableCell>
       <TableCell>
         <div className="flex justify-end gap-1">
-          {isRacing && !raceResult && (
-            <RacingWinnerDialog
-              onRecord={(winner) => onPatch(event.id, { raceWinner: winner, status: "finished" })}
+          {isRacing && (
+            <RacingPlacingsDialog
+              event={event}
+              linkedBets={linkedBets}
+              incomplete={!!raceResult && isRaceResultIncomplete(raceResult)}
+              onRecord={(payload) =>
+                onPatch(event.id, {
+                  raceWinner: payload.winner,
+                  raceRunners: payload.runners,
+                  status: "finished",
+                })
+              }
+              trigger={
+                <Button variant="outline" size="sm" className="text-xs">
+                  {placingsTriggerLabel(
+                    event,
+                    !!raceResult && isRaceResultIncomplete(raceResult)
+                  )}
+                </Button>
+              }
             />
+          )}
+          {isRacing && event.externalId && onFetchResults && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs text-muted-foreground"
+              disabled={fetchingResults}
+              title="Optional - try The Racing API if your plan includes results"
+              onClick={() => onFetchResults(event.id)}
+            >
+              <RefreshCw className={fetchingResults ? "size-3 animate-spin" : "size-3"} />
+              API
+            </Button>
           )}
           {!isRacing && isManual && event.status !== "finished" && (
             <GoalDialog event={event} onRecord={(goal) => onPatch(event.id, { addGoal: goal })} />
@@ -200,45 +256,6 @@ export function EventRowView({
         </div>
       </TableCell>
     </TableRow>
-  );
-}
-
-function RacingWinnerDialog({ onRecord }: { onRecord: (winner: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [winner, setWinner] = useState("");
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-xs">
-          Set winner
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Race result</DialogTitle>
-          <DialogDescription>Enter the winning horse to settle linked Winner bets.</DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-2">
-          <Label>Winner</Label>
-          <Input
-            value={winner}
-            onChange={(e) => setWinner(e.target.value)}
-            placeholder="e.g. Constitution Hill"
-          />
-        </div>
-        <Button
-          className="mt-2"
-          disabled={!winner.trim()}
-          onClick={() => {
-            onRecord(winner.trim());
-            setOpen(false);
-            setWinner("");
-          }}
-        >
-          Save result
-        </Button>
-      </DialogContent>
-    </Dialog>
   );
 }
 

@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-/** Native time input — same shell and behaviour as the date field (`type="date"`). */
+/** Native time input - same shell and behaviour as the date field (`type="date"`). */
 export function EventTimeInput({
   value,
   onChange,

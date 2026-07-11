@@ -1,5 +1,5 @@
 /**
- * Accumulator / full-cover bet maths — back returns and layered lay stakes.
+ * Accumulator / full-cover bet maths - back returns and layered lay stakes.
  */
 
 export type AccaStructureType =

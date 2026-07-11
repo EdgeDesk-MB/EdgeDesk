@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** Cloth number badge — shows silk image when URL available. */
+/** Cloth number badge - shows silk image when URL available. */
 export function RunnerCloth({
   number,
   silkUrl,

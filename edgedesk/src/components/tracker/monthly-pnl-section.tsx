@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { MoneyFlow } from "@/components/money-flow";
 import { SectionHeader } from "@/components/page-shell";
 import { useAppState } from "@/hooks/use-app-state";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/pnl/monthly-breakdown";
 import { tableBodyCell, tableHeaderCell, sectionTitle, selectionSubtle } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
+import { Download } from "lucide-react";
 
 export function MonthlyPnlSection({
   compact = false,
@@ -172,6 +174,13 @@ export function MonthlyPnlSection({
       <SectionHeader
         title="Monthly P&L"
         description="Settled profit rolled up by calendar month and by bookmaker / exchange."
+        action={
+          <Button variant="outline" size="sm" className="gap-1.5" asChild>
+            <a href="/api/export/csv?type=monthly" download>
+              <Download className="size-3.5" /> Export
+            </a>
+          </Button>
+        }
       />
       <CardContent className="pt-4">{body}</CardContent>
     </Card>

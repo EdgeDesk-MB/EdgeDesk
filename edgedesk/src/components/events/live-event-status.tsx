@@ -17,7 +17,7 @@ type LiveEventLike = {
   goals?: string | null;
 };
 
-/** Right-hand status for a live or in-play tracked event — sport-aware. */
+/** Right-hand status for a live or in-play tracked event - sport-aware. */
 export function LiveEventStatusPanel({
   event,
   compact,
@@ -90,7 +90,7 @@ export function LiveEventStatusPanel({
   );
 }
 
-/** Inline label for bet forms and subtitles — never football scores on racing. */
+/** Inline label for bet forms and subtitles - never football scores on racing. */
 export function liveEventInlineLabel(event: LiveEventLike): string {
   if (event.sport === "horse_racing") {
     const raceResult = parseRaceResults(event.goals);

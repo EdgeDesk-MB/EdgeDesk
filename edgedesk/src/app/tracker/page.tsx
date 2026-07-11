@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AddBetDialog } from "@/components/add-bet-dialog";
+import { useAddBet } from "@/components/add-bet-provider";
 import { PAGE_SHELL_CLASS, PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { EmptyState } from "@/components/help/empty-state";
 import { api, useAppState } from "@/hooks/use-app-state";
 import type { BetRow } from "@/lib/db/schema";
+import type { BetMode } from "@/lib/calc";
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
@@ -54,14 +56,17 @@ export default function TrackerPage() {
 function TrackerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { openAddBet } = useAddBet();
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "pnl" ? "pnl" : "bets";
   const deskQueue = parseDeskQueue(searchParams.get("queue"));
   const offerFilterParam = searchParams.get("offer");
   const offerFilterId = offerFilterParam != null ? Number(offerFilterParam) : null;
   const highlightParam = searchParams.get("highlight");
+  const actionParam = searchParams.get("action");
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [editingBet, setEditingBet] = useState<BetRow | null>(null);
+  const actionApplied = useRef(false);
 
   const { state, refresh } = useAppState(2000);
   const bets = useMemo(() => state?.bets ?? [], [state]);
@@ -78,8 +83,8 @@ function TrackerContent() {
     if (offerFilterId != null && Number.isFinite(offerFilterId)) {
       list = list.filter((b) => b.offerId === offerFilterId);
     }
-    return filterBetsByDeskQueue(list, deskQueue);
-  }, [bets, deskQueue, offerFilterId]);
+    return filterBetsByDeskQueue(list, deskQueue, eventById);
+  }, [bets, deskQueue, offerFilterId, eventById]);
 
   const campaignGroups = useMemo(
     () =>
@@ -115,9 +120,34 @@ function TrackerContent() {
     router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
     const fadeTimer = window.setTimeout(() => setHighlightId(null), 2000);
     return () => clearTimeout(fadeTimer);
-    // Only react to highlight changes — avoid replace loops from searchParams identity.
+    // Only react to highlight changes - avoid replace loops from searchParams identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightParam, router]);
+
+  // Best next / Offers: /tracker?offer=&action=convert|qualify → open Add bet
+  useEffect(() => {
+    if (actionApplied.current) return;
+    if (actionParam !== "convert" && actionParam !== "qualify") return;
+    if (offerFilterId == null || !Number.isFinite(offerFilterId)) return;
+    const offer = state?.offers?.find((o) => o.id === offerFilterId);
+    if (!offer && state?.offers == null) return; // still loading
+    actionApplied.current = true;
+    const betType: BetMode = actionParam === "convert" ? "free_snr" : "qualifying";
+    openAddBet({
+      offerId: offerFilterId,
+      betType,
+      bookmaker: offer?.bookmaker ?? undefined,
+      labelSuggestion:
+        actionParam === "convert"
+          ? `Convert FB · ${offer?.bookmaker ?? offer?.title ?? "offer"}`
+          : `Qualify · ${offer?.bookmaker ?? offer?.title ?? "offer"}`,
+    });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("action");
+    const qs = params.toString();
+    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionParam, offerFilterId, state?.offers, openAddBet, router]);
 
   useEffect(() => {
     if (highlightId == null) return;
@@ -158,7 +188,7 @@ function TrackerContent() {
       <PageHeader
         helpId="tracker"
         title="Profit Tracker"
-        description="Bet Desk — organise positions by queue and offer campaign. Results settle derived markets automatically."
+        description="Bet Desk - organise positions by queue and offer campaign. Results settle derived markets automatically."
         action={
           <>
             <Button variant="outline" {...pageSecondaryButtonProps} asChild>
@@ -251,7 +281,8 @@ function TrackerContent() {
                   offerFilterId != null && Number.isFinite(offerFilterId)
                     ? bets.filter((b) => b.offerId === offerFilterId)
                     : bets,
-                  q.id
+                  q.id,
+                  eventById
                 );
                 return (
                   <button

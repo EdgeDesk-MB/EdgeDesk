@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { localCalendarDate } from "@/lib/events";
 
 describe("theracingapi tier access", () => {
   beforeEach(() => {
@@ -20,7 +21,7 @@ describe("theracingapi tier access", () => {
     );
     expect(
       isRacingTierAccessError(
-        new Error("Racing API auth failed — check plan tier for this endpoint")
+        new Error("Racing API auth failed - check plan tier for this endpoint")
       )
     ).toBe(true);
     expect(isRacingTierAccessError(new Error("Racing API 500"))).toBe(false);
@@ -40,6 +41,7 @@ describe("theracingapi tier access", () => {
   });
 
   it("uses free racecards when standard tier is unavailable", async () => {
+    const today = localCalendarDate();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -56,7 +58,7 @@ describe("theracingapi tier access", () => {
               course: "Ascot",
               race_name: "Free Handicap",
               off_time: "14:30",
-              date: new Date().toISOString().slice(0, 10),
+              date: today,
               field_size: 1,
               runners: [{ horse_id: "h1", horse: "Demo Runner", number: 1 }],
             },
@@ -67,11 +69,60 @@ describe("theracingapi tier access", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { racecardsByDate } = await import("./theracingapi");
-    const today = new Date().toISOString().slice(0, 10);
     const { cards, oddsTier } = await racecardsByDate(today);
 
     expect(oddsTier).toBe("free");
     expect(cards).toHaveLength(1);
     expect(cards[0]?.externalId).toBe("race-1");
+  });
+
+  it("returns empty map with tierBlocked when results require Basic plan", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 403,
+        ok: false,
+      })
+    );
+
+    const { resultsToday } = await import("./theracingapi");
+    const payload = await resultsToday();
+    expect(payload.tierBlocked).toBe(true);
+    expect(payload.tier).toBe("free");
+    expect(payload.results.size).toBe(0);
+  });
+
+  it("marks Basic tier when results endpoint succeeds", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              race_id: "race-win",
+              course: "Ascot",
+              date: new Date().toISOString().slice(0, 10),
+              field_size: 2,
+              runners: [
+                { horse_id: "h1", horse: "Winner", position: 1 },
+                { horse_id: "h2", horse: "Second", position: 2 },
+              ],
+            },
+          ],
+        }),
+      })
+    );
+
+    const { resultsToday, resultsForRaceIds } = await import("./theracingapi");
+    const payload = await resultsToday();
+    expect(payload.tier).toBe("basic");
+    expect(payload.tierBlocked).toBe(false);
+    expect(payload.results.get("race-win")?.winner).toBe("Winner");
+
+    const filtered = await resultsForRaceIds(["race-win", "missing"]);
+    expect(filtered.tier).toBe("basic");
+    expect(filtered.results.size).toBe(1);
   });
 });

@@ -6,9 +6,9 @@
  * rule, shown back to the user for confirmation, and then evaluated against the live
  * match state on every tick. The evaluator is deliberately conservative: it only
  * returns "won" or "lost" once the outcome is IRREVERSIBLE (a first-goalscorer bet is
- * decided the moment the first goal goes in — not at full time), otherwise "pending".
+ * decided the moment the first goal goes in - not at full time), otherwise "pending".
  *
- * Parsing is deterministic keyword grammar — no network, no LLM — so the same text
+ * Parsing is deterministic keyword grammar - no network, no LLM - so the same text
  * always produces the same rule and the interpretation can be previewed instantly.
  */
 
@@ -18,7 +18,7 @@ export interface GoalEvent {
   minute: number;
   side: Side;
   player?: string;
-  /** Own goal — ignored by goalscorer markets, still counts for team/total goals */
+  /** Own goal - ignored by goalscorer markets, still counts for team/total goals */
   og?: boolean;
 }
 
@@ -46,7 +46,7 @@ export type TriggerRule =
 
 export interface ParsedTrigger {
   rule: TriggerRule;
-  /** Human-readable readback, e.g. "First goalscorer — Harry Kane" */
+  /** Human-readable readback, e.g. "First goalscorer - Harry Kane" */
   description: string;
 }
 
@@ -153,16 +153,16 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
     const away = parseInt(m[2], 10);
     return {
       rule: { kind: "correct_score", home, away },
-      description: `Correct score — ${home}-${away}`,
+      description: `Correct score - ${home}-${away}`,
     };
   }
 
   // BTTS
   if (/^(?:btts(?: yes)?|both teams (?:to )?score)$/i.test(c)) {
-    return { rule: { kind: "btts", yes: true }, description: "Both teams to score — yes" };
+    return { rule: { kind: "btts", yes: true }, description: "Both teams to score - yes" };
   }
   if (/^(?:btts no|no btts|both teams (?:do not|don'?t|not to) score)$/i.test(c)) {
-    return { rule: { kind: "btts", yes: false }, description: "Both teams to score — no" };
+    return { rule: { kind: "btts", yes: false }, description: "Both teams to score - no" };
   }
 
   // Over/under: "over 2.5 goals", "under 3.5", "3+ goals"
@@ -187,7 +187,7 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
 
   // Draw
   if (/^(?:(?:the )?draw|(?:match|game|it) ends? (?:in a |all )?(?:draw|level))$/i.test(c)) {
-    return { rule: { kind: "team_result", result: "draw" }, description: "Result — draw" };
+    return { rule: { kind: "team_result", result: "draw" }, description: "Result - draw" };
   }
 
   // Win to nil: "Mexico wins to nil"
@@ -210,7 +210,7 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
     if (side) {
       return {
         rule: { kind: "team_result", result: side },
-        description: `Result — ${sideName(side, teams)} win`,
+        description: `Result - ${sideName(side, teams)} win`,
       };
     }
     return null;
@@ -233,7 +233,7 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
     }
     return {
       rule: { kind: "first_goalscorer", player: firstSubject },
-      description: `First goalscorer — ${firstSubject}`,
+      description: `First goalscorer - ${firstSubject}`,
     };
   }
 
@@ -246,7 +246,7 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
   if (lastSubject && !resolveSide(lastSubject, teams)) {
     return {
       rule: { kind: "last_goalscorer", player: lastSubject },
-      description: `Last goalscorer — ${lastSubject}`,
+      description: `Last goalscorer - ${lastSubject}`,
     };
   }
 
@@ -294,7 +294,7 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
     }
     return {
       rule: { kind: "player_scores", player: m[1], count: 1 },
-      description: `Anytime goalscorer — ${m[1]}`,
+      description: `Anytime goalscorer - ${m[1]}`,
     };
   }
 
@@ -302,8 +302,8 @@ function parseClause(raw: string, teams: Teams): ParsedTrigger | null {
 }
 
 /**
- * Parse a full trigger phrase. Tries splitting on "and" first — every clause must
- * parse for the combo to stand — then falls back to the whole text, so team names
+ * Parse a full trigger phrase. Tries splitting on "and" first - every clause must
+ * parse for the combo to stand - then falls back to the whole text, so team names
  * containing "and" (Brighton and Hove Albion) still work as a single clause.
  */
 export function parseTrigger(text: string, teams: Teams): ParsedTrigger | null {
@@ -345,7 +345,7 @@ export function evaluateTrigger(rule: TriggerRule, ctx: TriggerContext): Trigger
       if (!first.player) {
         return {
           status: "pending",
-          reason: `First goal at ${first.minute}' — scorer not recorded, settle manually`,
+          reason: `First goal at ${first.minute}' - scorer not recorded, settle manually`,
         };
       }
       return playerMatches(rule.player, first.player)
@@ -361,7 +361,7 @@ export function evaluateTrigger(rule: TriggerRule, ctx: TriggerContext): Trigger
       if (!last.player) {
         return {
           status: "pending",
-          reason: `Last goal at ${last.minute}' — scorer not recorded, settle manually`,
+          reason: `Last goal at ${last.minute}' - scorer not recorded, settle manually`,
         };
       }
       return playerMatches(rule.player, last.player)
@@ -384,9 +384,9 @@ export function evaluateTrigger(rule: TriggerRule, ctx: TriggerContext): Trigger
           reason: `${scored.length}/${rule.count} goal${rule.count > 1 ? "s" : ""} so far`,
         };
       }
-      // Finished — but if some scorers weren't recorded we can't be sure it lost
+      // Finished - but if some scorers weren't recorded we can't be sure it lost
       if (goals.some((g) => !g.player)) {
-        return { status: "pending", reason: "Some scorers not recorded — settle manually" };
+        return { status: "pending", reason: "Some scorers not recorded - settle manually" };
       }
       return { status: "lost", reason: `Scored ${scored.length} of ${rule.count} needed` };
     }
@@ -465,7 +465,7 @@ export function evaluateTrigger(rule: TriggerRule, ctx: TriggerContext): Trigger
           ? { status: "won", reason: `FT ${ctx.homeScore}-${ctx.awayScore}` }
           : { status: "lost", reason: `FT ${ctx.homeScore}-${ctx.awayScore}` };
       }
-      // Scores only go up — once either side passes the target the bet is dead
+      // Scores only go up - once either side passes the target the bet is dead
       if (ctx.homeScore > rule.home || ctx.awayScore > rule.away) {
         return { status: "lost", reason: `Score already ${ctx.homeScore}-${ctx.awayScore}` };
       }
@@ -486,7 +486,7 @@ export function evaluateTrigger(rule: TriggerRule, ctx: TriggerContext): Trigger
 }
 
 /**
- * "If the match ended right now" verdict — used for provisional live P&L on
+ * "If the match ended right now" verdict - used for provisional live P&L on
  * pending trigger bets. Returns null when even a finished match wouldn't
  * settle it (e.g. scorers not recorded).
  */

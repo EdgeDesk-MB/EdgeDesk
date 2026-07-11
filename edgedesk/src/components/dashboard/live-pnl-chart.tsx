@@ -1,14 +1,21 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
-import { TrendingUp } from "lucide-react";
+import { Radio, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoneyFlow } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
-import { dashboardPanelFillBody, dashboardSection } from "@/lib/ui/dashboard-layout";
+import { dashboardSection } from "@/lib/ui/dashboard-layout";
+import { cardInsetX } from "@/lib/ui/layout-spacing";
+import { ChartBetMarkersOverlay } from "@/components/dashboard/chart-bet-markers-overlay";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
+import type { BetRow } from "@/lib/db/schema";
+import {
+  PNL_CHART_PADDING_DEFAULT,
+  PNL_CHART_PADDING_PANEL,
+} from "@/lib/pnl/chart-bet-markers";
 import { filterPillState } from "@/lib/ui/surface-styles";
 
 export interface LivePnlPoint {
@@ -16,16 +23,55 @@ export interface LivePnlPoint {
   value: number;
 }
 
+const ALL_WINDOW_SECS = 0;
+
 const CHART_WINDOWS = [
   { label: "5m", secs: 300 },
   { label: "1hr", secs: 3600 },
   { label: "24h", secs: 86_400 },
   { label: "This week", secs: 604_800 },
   { label: "This month", secs: 2_592_000 },
-  { label: "All", secs: 31_536_000 },
+  { label: "All", secs: ALL_WINDOW_SECS },
 ] as const;
 
-const DEFAULT_CHART_WINDOW = CHART_WINDOWS[0].secs;
+const DEFAULT_CHART_WINDOW = ALL_WINDOW_SECS;
+
+/** Liveline draws y-axis labels at `w - pad.right + 8` (11px mono). */
+const PANEL_CHART_PADDING = { left: 16, right: 72 } as const;
+/** Liveline shifts the time window right by `window * buffer` for the live tip. */
+const LIVELINE_TIME_BUFFER = 0.015;
+/** Keep the first point inset from the left fade (~40px) so it stays visible. */
+const LIVELINE_LEFT_EDGE_MARGIN = 0.06;
+
+/**
+ * Matches MoneyFlow / Profit pill greens & reds.
+ * Liveline only parses hex/rgb - CSS vars fall back to grey.
+ */
+const PNL_CHART_COLORS = {
+  light: { profit: "#059669", loss: "#e7000b" },
+  dark: { profit: "#34d399", loss: "#ff8d8b" },
+} as const;
+
+function pnlChartColor(value: number, dark: boolean): string {
+  const palette = dark ? PNL_CHART_COLORS.dark : PNL_CHART_COLORS.light;
+  return value < -0.004 ? palette.loss : palette.profit;
+}
+
+/** Span from first data point through now (All), padded so the first point clears Liveline's left fade. */
+function allTimeWindowSecs(points: LivePnlPoint[], nowSec = Date.now() / 1000): number {
+  const first = points[0]?.time;
+  if (first == null) return 86_400;
+  const dataSpan = Math.max(300, Math.ceil(nowSec - first) + 120);
+  return Math.ceil(dataSpan / (1 - LIVELINE_TIME_BUFFER - LIVELINE_LEFT_EDGE_MARGIN));
+}
+
+/** Ensure the plotted series starts at £0 before the first non-zero point. */
+function anchorSeriesAtZero(points: LivePnlPoint[], nowSec: number): LivePnlPoint[] {
+  if (points.length === 0) return [{ time: nowSec, value: 0 }];
+  const first = points[0]!;
+  if (first.value <= 0.004) return points;
+  return [{ time: first.time - 1, value: 0 }, ...points];
+}
 
 function formatChartTime(secs: number, t: number): string {
   const d = new Date(t * 1000);
@@ -53,18 +99,26 @@ function formatChartTime(secs: number, t: number): string {
 export const LivePnlChart = memo(function LivePnlChart({
   liveTotal,
   historicSeries,
+  bets = [],
   compact = true,
   mini = false,
   panel = false,
+  /** Pulsing live dot + momentum arrows - off when nothing is in-play */
+  liveInPlay = true,
+  /** Live event in play - switches header to Live Chart + green Radio icon */
+  hasLiveEvent = false,
   className,
 }: {
   liveTotal: number;
   historicSeries: Array<{ time: number; value: number }>;
+  bets?: BetRow[];
   compact?: boolean;
-  /** Shorter chart for dashboard — sits below the live panels */
+  /** Shorter chart for dashboard - sits below the live panels */
   mini?: boolean;
-  /** Fills grid cell — pairs with live tabs in dashboard row */
+  /** Fills grid cell - pairs with live tabs in dashboard row */
   panel?: boolean;
+  liveInPlay?: boolean;
+  hasLiveEvent?: boolean;
   className?: string;
 }) {
   const { resolvedTheme } = useTheme();
@@ -86,27 +140,55 @@ export const LivePnlChart = memo(function LivePnlChart({
       const lastHistTime = historic.at(-1)?.time ?? 0;
       const liveTail = prev.filter((p) => p.time > lastHistTime + 0.5);
       const tail = [...liveTail, { time: nowSec, value: liveTotal }].slice(-3600);
-      return [...historic, ...tail];
+      return anchorSeriesAtZero([...historic, ...tail], nowSec);
     });
   }, [historicSeries, liveTotal]);
+
+  const isDark = resolvedTheme === "dark";
+  const chartColor = useMemo(
+    () => pnlChartColor(liveTotal, isDark),
+    [liveTotal, isDark]
+  );
+
+  const effectiveWindowSecs = useMemo(() => {
+    if (chartWindowSecs !== ALL_WINDOW_SECS) return chartWindowSecs;
+    return allTimeWindowSecs(livePoints);
+  }, [chartWindowSecs, livePoints]);
+
+  const livelineWindows = useMemo(
+    () =>
+      CHART_WINDOWS.map((w) =>
+        w.secs === ALL_WINDOW_SECS ? { label: w.label, secs: effectiveWindowSecs } : { ...w }
+      ),
+    [effectiveWindowSecs]
+  );
+
+  const isAllSelected = chartWindowSecs === ALL_WINDOW_SECS;
+  const markerPadding = panel ? PNL_CHART_PADDING_PANEL : PNL_CHART_PADDING_DEFAULT;
 
   const body = (
     <>
       {panel ? (
         <>
           <DashboardSectionHeader
-            icon={TrendingUp}
-            title="Running profit"
-            description="Live P&L while tracked events are in play."
+            prominent
+            icon={hasLiveEvent ? Radio : undefined}
+            iconClassName={
+              hasLiveEvent ? "animate-pulse text-emerald-600" : undefined
+            }
+            title={hasLiveEvent ? "Live Chart" : "Chart"}
+            description="P&L streams while tracked events are in play."
           />
-          <div className="shrink-0 border-b border-border/60 px-[var(--layout-card-x)]">
-            <div className="flex gap-1 overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
+            <div className="flex justify-end gap-1 overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {CHART_WINDOWS.map((w) => (
                 <button
-                  key={w.secs}
+                  key={w.label}
                   type="button"
                   className={cn(
-                    filterPillState(chartWindowSecs === w.secs),
+                    filterPillState(
+                      w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs
+                    ),
                     "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
                   )}
                   onClick={() => setChartWindowSecs(w.secs)}
@@ -132,7 +214,7 @@ export const LivePnlChart = memo(function LivePnlChart({
               </CardTitle>
               {!mini && (
                 <CardDescription compact className="mt-0.5">
-                  Live while tracked events are in play — 2UP swings show here instantly.
+                  Live while tracked events are in play - 2UP swings show here instantly.
                 </CardDescription>
               )}
             </div>
@@ -153,42 +235,65 @@ export const LivePnlChart = memo(function LivePnlChart({
         className={cn(
           "pb-3",
           (compact || mini || panel) && "pt-0",
-          panel && cn(dashboardPanelFillBody, "px-[var(--layout-card-x)]"),
+          panel && "flex min-h-0 flex-1 flex-col !px-0",
           !panel && "px-[var(--layout-card-x)]"
         )}
       >
         <div
           className={cn(
-            panel && "live-pnl-chart-host live-pnl-chart-host--no-windows min-h-0 flex-1",
+            panel &&
+              "live-pnl-chart-host live-pnl-chart-host--no-windows min-h-0 flex-1",
             mini && "h-[6.5rem] max-h-[6.5rem]",
             !panel && !mini && compact && "h-[11rem] max-h-[11rem]",
             !panel && !mini && !compact && "h-[min(22rem,40vh)] max-h-[min(22rem,40vh)] min-h-[12rem]"
           )}
         >
-          {mounted ? (
-            <Liveline
-              key={resolvedTheme}
-              data={livePoints}
-              value={liveTotal}
-              theme={resolvedTheme === "dark" ? "dark" : "light"}
-              color="var(--primary)"
-              momentum
-              showValue={false}
-              window={chartWindowSecs}
-              {...(!panel && {
-                windows: [...CHART_WINDOWS],
-                onWindowChange: setChartWindowSecs,
-                windowStyle: "rounded" as const,
-              })}
-              emptyText="Profit updates appear here as bets settle and events go live."
-              formatValue={(v) => `£${v.toFixed(2)}`}
-              formatTime={(t) => formatChartTime(chartWindowSecs, t)}
-            />
-          ) : (
-            <div className="flex h-full min-h-[8rem] items-center justify-center rounded-md bg-muted/30 text-xs text-muted-foreground">
-              Loading chart…
-            </div>
-          )}
+          <div className={cn("relative isolate min-h-0 flex-1", !panel && "h-full")}>
+            {mounted ? (
+              <Liveline
+                key={resolvedTheme}
+                data={livePoints}
+                value={liveTotal}
+                theme={isDark ? "dark" : "light"}
+                color={chartColor}
+                momentum={liveInPlay}
+                pulse={liveInPlay}
+                badge={panel ? false : undefined}
+                showValue={false}
+                window={effectiveWindowSecs}
+                padding={panel ? PANEL_CHART_PADDING : undefined}
+                className={panel ? "w-full" : undefined}
+                {...(!panel && {
+                  windows: livelineWindows,
+                  onWindowChange: (secs: number) => {
+                    const known = CHART_WINDOWS.find(
+                      (w) => w.secs === secs && w.secs !== ALL_WINDOW_SECS
+                    );
+                    setChartWindowSecs(known ? known.secs : ALL_WINDOW_SECS);
+                  },
+                  windowStyle: "rounded" as const,
+                })}
+                referenceLine={{ value: 0 }}
+                emptyText="Profit updates appear here as bets settle and events go live."
+                formatValue={(v) => `£${v.toFixed(2)}`}
+                formatTime={(t) => formatChartTime(effectiveWindowSecs, t)}
+              />
+            ) : (
+              <div className="flex h-full min-h-[8rem] items-center justify-center rounded-md bg-muted/30 text-xs text-muted-foreground">
+                Loading chart…
+              </div>
+            )}
+            {mounted && bets.length > 0 ? (
+              <ChartBetMarkersOverlay
+                bets={bets}
+                livePoints={livePoints}
+                liveValue={liveTotal}
+                windowSecs={effectiveWindowSecs}
+                showBadge={!panel}
+                padding={markerPadding}
+              />
+            ) : null}
+          </div>
         </div>
       </CardContent>
     </>
@@ -196,7 +301,7 @@ export const LivePnlChart = memo(function LivePnlChart({
 
   if (panel) {
     return (
-      <section className={cn(dashboardSection, className)}>
+      <section className={cn(dashboardSection, "min-h-0 flex-1", className)}>
         {body}
       </section>
     );

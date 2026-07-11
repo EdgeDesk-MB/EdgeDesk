@@ -12,7 +12,7 @@ interface EdgePanelProps {
 }
 
 /**
- * "Your Edge" — shown on every calculator. Uses the exchange price as the closest
+ * "Your Edge" - shown on every calculator. Uses the exchange price as the closest
  * proxy for fair value and expresses the bookie price as EV against it.
  */
 export function EdgePanel({ backOdds, layOdds, stake }: EdgePanelProps) {
@@ -31,23 +31,23 @@ export function EdgePanel({ backOdds, layOdds, stake }: EdgePanelProps) {
         <div>
           <div className="text-xs text-muted-foreground">Implied prob (bookie)</div>
           <div className="font-semibold">
-            {valid ? <PercentFlow value={(1 / backOdds) * 100} digits={1} /> : "—"}
+            {valid ? <PercentFlow value={(1 / backOdds) * 100} digits={1} /> : "-"}
           </div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Fair prob (exchange)</div>
           <div className="font-semibold">
-            {valid ? <PercentFlow value={trueP * 100} digits={1} /> : "—"}
+            {valid ? <PercentFlow value={trueP * 100} digits={1} /> : "-"}
           </div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Fair odds</div>
-          <div className="font-semibold">{valid ? <NumFlow value={1 / trueP} /> : "—"}</div>
+          <div className="font-semibold">{valid ? <NumFlow value={1 / trueP} /> : "-"}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">EV of back stake</div>
           <div className="font-semibold">
-            {ev ? <MoneyFlow value={ev.evForStake} signColor signDisplay /> : "—"}
+            {ev ? <MoneyFlow value={ev.evForStake} signColor signDisplay /> : "-"}
           </div>
         </div>
         <p className="col-span-2 pt-1 text-[11px] leading-relaxed text-muted-foreground lg:col-span-4">

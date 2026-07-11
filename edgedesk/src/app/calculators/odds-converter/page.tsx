@@ -90,7 +90,7 @@ export default function OddsConverterPage() {
           <div>
             <div className="text-sm font-medium text-primary">Implied probability</div>
             <div className="text-xs text-muted-foreground">
-              The chance the price says this outcome has — including the margin.
+              The chance the price says this outcome has - including the margin.
             </div>
           </div>
           <div className="text-3xl font-semibold">

@@ -2,6 +2,7 @@ export { DeskPageHeader } from "./desk-page-header";
 export {
   PageHeaderActions,
   PageHeaderStat,
+  outlineButtonGroup,
   pagePrimaryButtonProps,
   pageSecondaryButtonProps,
 } from "./page-header-actions";

@@ -1,5 +1,5 @@
 /**
- * Unified exchange lay-odds feed — respects Settings default exchange.
+ * Unified exchange lay-odds feed - respects Settings default exchange.
  */
 import { db, exchanges } from "@/lib/db";
 import {
@@ -37,26 +37,113 @@ export { betfairConfigured, resetBetfairSession, testBetfairConnection } from ".
 export { betdaqConfigured } from "./betdaq";
 
 /** Map Settings exchange name → API provider id. */
-export function exchangeNameToProvider(name: string): ExchangeProvider | null {
-  const n = name.trim().toLowerCase();
-  if (n.includes("betfair")) return "betfair";
-  if (n.includes("betdaq")) return "betdaq";
-  if (n.includes("matchbook")) return "matchbook";
-  if (n.includes("smarkets")) return "smarkets";
-  return null;
-}
+export { exchangeNameToProvider } from "./client";
+import { exchangeNameToProvider } from "./client";
 
 export function getDefaultExchangeProvider(): ExchangeProvider {
   const rows = db.select().from(exchanges).all();
   const def = rows.find((e) => e.isDefault) ?? rows[0];
-  if (!def) return "betdaq";
+  if (!def) return "betfair";
   return exchangeNameToProvider(def.name) ?? "betfair";
 }
 
 export function getDefaultExchangeName(): string {
   const rows = db.select().from(exchanges).all();
   const def = rows.find((e) => e.isDefault) ?? rows[0];
-  return def?.name ?? "Betdaq";
+  return def?.name ?? "Betfair";
+}
+
+/**
+ * Provider used for live lay odds.
+ * @param overrideProvider - Racing Desk page override (Settings default still used app-wide).
+ * When override is set, use it if connected; otherwise fall back to Settings default /
+ * first connected feed (Betfair delayed is the usual free path).
+ */
+export function resolveLiveExchangeProvider(overrideProvider?: ExchangeProvider | null): {
+  provider: ExchangeProvider;
+  name: string;
+  status: ExchangeProviderStatus;
+  /** True when Desk override is active (even if we fell back for connectivity). */
+  deskOverride?: ExchangeProvider | null;
+} {
+  const settingsDefault = getDefaultExchangeProvider();
+  const preferred = overrideProvider ?? settingsDefault;
+
+  const preferredStatus = getExchangeProviderStatus(preferred);
+  if (preferredStatus.status === "connected") {
+    return {
+      provider: preferred,
+      name: providerDisplayName(preferred),
+      status: preferredStatus,
+      deskOverride: overrideProvider ?? null,
+    };
+  }
+
+  // If Desk asked for a specific feed that isn't connected, don't silently swap
+  // unless there's no override (Settings path may fall back to Betfair).
+  if (overrideProvider) {
+    return {
+      provider: preferred,
+      name: providerDisplayName(preferred),
+      status: preferredStatus,
+      deskOverride: overrideProvider,
+    };
+  }
+
+  const fallbackOrder: ExchangeProvider[] = ["betfair", "betdaq", "matchbook", "smarkets"];
+  for (const provider of fallbackOrder) {
+    if (provider === preferred) continue;
+    const status = getExchangeProviderStatus(provider);
+    if (status.status === "connected") {
+      return {
+        provider,
+        name: providerDisplayName(provider),
+        status,
+        deskOverride: null,
+      };
+    }
+  }
+
+  return {
+    provider: preferred,
+    name: getDefaultExchangeName(),
+    status: preferredStatus,
+    deskOverride: null,
+  };
+}
+
+function providerDisplayName(provider: ExchangeProvider): string {
+  const rows = db.select().from(exchanges).all();
+  const match = rows.find((e) => exchangeNameToProvider(e.name) === provider);
+  if (match) return match.name;
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+/** Brand colours for an exchange provider (Desk override or Settings default). */
+export function getExchangeColors(provider?: ExchangeProvider | null): {
+  backColor: string;
+  layColor: string;
+  brandColor: string;
+} {
+  const rows = db.select().from(exchanges).all();
+  const match = provider
+    ? rows.find((e) => exchangeNameToProvider(e.name) === provider)
+    : undefined;
+  const def = match ?? rows.find((e) => e.isDefault) ?? rows[0];
+  return {
+    backColor: def?.backColor ?? "#a6d8ff",
+    layColor: def?.layColor ?? "#fac9d1",
+    brandColor: def?.brandColor ?? "#ffb80c",
+  };
+}
+
+/** @deprecated Prefer getExchangeColors - kept for callers that mean Settings default. */
+export function getDefaultExchangeColors(): {
+  backColor: string;
+  layColor: string;
+  brandColor: string;
+} {
+  return getExchangeColors(null);
 }
 
 export function getExchangeProviderStatus(provider: ExchangeProvider): ExchangeProviderStatus {
@@ -80,8 +167,8 @@ export function getExchangeProviderStatus(provider: ExchangeProvider): ExchangeP
         status,
         message:
           status === "not_configured"
-            ? "Betdaq requires partner API access — configure BETDAQ_API_KEY when available"
-            : "Betdaq partner API not yet integrated — use Betfair",
+            ? "Betdaq requires partner API access - configure BETDAQ_API_KEY when available"
+            : "Betdaq partner API not yet integrated - use Betfair",
       };
     }
     default:

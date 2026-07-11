@@ -1,5 +1,5 @@
 /**
- * Extra place offers — bookie pays more places than the exchange place market.
+ * Extra place offers - bookie pays more places than the exchange place market.
  * Lay stakes match standard each-way; profit lands when the horse finishes in the extra zone.
  */
 

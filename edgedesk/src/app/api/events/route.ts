@@ -24,7 +24,7 @@ const createSchema = z.object({
   minute: z.number().optional(),
   /** For sim events */
   simPreset: z.enum(["two_up_drama", "random", "btts_thriller", "bore_draw"]).optional(),
-  /** Named strikers for sim goalscorer triggers — each scores their side's first goal */
+  /** Named strikers for sim goalscorer triggers - each scores their side's first goal */
   simStars: z.object({ homeStar: z.string().optional(), awayStar: z.string().optional() }).optional(),
 });
 

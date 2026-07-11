@@ -1,5 +1,5 @@
 /**
- * Horse racing settlement — derives win/place/extra-place from RaceResult stored on the event.
+ * Horse racing settlement - derives win/place/extra-place from RaceResult stored on the event.
  */
 
 import type { EachWayBetMeta } from "@/lib/bets/ew-meta";
@@ -57,16 +57,16 @@ function settleDualLayEachWay(
   let explanation: string;
   switch (outcomeKey) {
     case "win":
-      explanation = `Horse won — bookie win+place paid, both lays lost`;
+      explanation = `Horse won - bookie win+place paid, both lays lost`;
       break;
     case "standard_place":
-      explanation = `Finished in standard place (${position}) — place back paid, win lay won, place lay lost`;
+      explanation = `Finished in standard place (${position}) - place back paid, win lay won, place lay lost`;
       break;
     case "extra_place":
-      explanation = `Extra place (${position} of ${bookiePlaces}) — place back paid, both lays won`;
+      explanation = `Extra place (${position} of ${bookiePlaces}) - place back paid, both lays won`;
       break;
     default:
-      explanation = `Unplaced — both back parts lost, both lays won`;
+      explanation = `Unplaced - both back parts lost, both lays won`;
   }
 
   explanation += ` · place odds ${placeOdds.toFixed(2)}`;

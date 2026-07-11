@@ -1,16 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatDecimalOdds, formatWeightStones } from "@/lib/racing/odds";
 import { formatHeadgear } from "@/lib/racing/runner-display";
 import type { RacingDeskRace, RacingRunnerDetail } from "@/lib/racing-desk/types";
 import { PriceMovementArrow, PriceMovementBadge } from "@/components/racing/price-movement-badge";
 import { RacingOfferGuide } from "@/components/racing/racing-offer-guide";
 import { RunnerCloth } from "@/components/racing/runner-cloth";
-import { Calculator, Gift, NotebookPen, Pin, TrendingDown } from "lucide-react";
+import { RegionFlag } from "@/components/region-flag";
+import { Calculator, Gift, NotebookPen, Pin, RotateCcw, TrendingDown } from "lucide-react";
+import { formatExchangeMatchError } from "@/lib/services/exchange/format-exchange-error";
 import { cn } from "@/lib/utils";
+import { darken, lighten } from "@/lib/brands/exchanges";
+import { racingRegionLabel } from "@/lib/geo/region";
+import { qualifyingOfferTags } from "@/lib/racing/offer-tags";
 import {
   listPillState,
   listRow,
@@ -27,16 +33,29 @@ export interface FlashscoreRacecardProps {
   bookiePlaces: number;
   exchangePlaces: number;
   onTrack: (race: RacingDeskRace) => void;
-  onBet: (race: RacingDeskRace, runner: string, mode: "win" | "extra_place" | "place_refund" | "lay") => void;
+  onBet: (
+    race: RacingDeskRace,
+    runner: string,
+    mode: "win" | "extra_place" | "place_refund" | "lay",
+    offerId?: number
+  ) => void;
+  /** Paste real bookie odds over proxy estimates (Free tier). */
+  onOddsOverride?: (
+    raceId: string,
+    horseId: string,
+    bookieDecimal: number | null
+  ) => Promise<void>;
+  /** Exchange panel colours from Settings default exchange */
+  backColor?: string;
+  layColor?: string;
   /** Show movement, spread %, expanded offer intel */
   advancedMode?: boolean;
   /** Guided place-refund workflow on qualifying races */
   showOfferGuide?: boolean;
-}
-
-function regionLabel(region?: string): string {
-  if (region?.toUpperCase() === "IRE") return "IRELAND";
-  return "UK";
+  /** Soft-refresh status shown on the card (avoids page-level layout jump) */
+  refreshLabel?: string;
+  refreshing?: boolean;
+  exchangeStatusLabel?: string;
 }
 
 function spreadTone(spreadPct?: number): string {
@@ -46,6 +65,162 @@ function spreadTone(spreadPct?: number): string {
   return "text-muted-foreground";
 }
 
+function formatLaySize(size?: number): string | null {
+  if (size == null || !(size > 0)) return null;
+  if (size >= 1000) return `£${(size / 1000).toFixed(size >= 10000 ? 0 : 1)}k`;
+  return `£${Math.round(size)}`;
+}
+
+/**
+ * Exchange-branded odds cell - same lighten/darken pattern as calculator Back/Lay panels.
+ * Light mode: pastel tint. Dark mode: deep panel tint (0.72) so cells match the calc, not washed mid-tones.
+ */
+function oddsCellStyle(hex?: string): CSSProperties | undefined {
+  if (!hex) return undefined;
+  return {
+    "--odds-cell": lighten(hex, 0.72),
+    "--odds-cell-dark": darken(hex, 0.72),
+  } as CSSProperties;
+}
+
+const oddsCellClass =
+  "bg-[var(--odds-cell)] text-black/85 dark:bg-[var(--odds-cell-dark)] dark:text-white/95";
+
+function BookieOddsCell({
+  runner,
+  raceId,
+  onOddsOverride,
+  backColor,
+}: {
+  runner: RacingRunnerDetail;
+  raceId: string;
+  onOddsOverride?: FlashscoreRacecardProps["onOddsOverride"];
+  backColor?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const isProxy = runner.oddsSource === "proxy";
+  const isManual = runner.oddsSource === "manual" || runner.oddsOverridden;
+  const cellStyle = oddsCellStyle(backColor);
+
+  async function commit() {
+    if (!onOddsOverride) {
+      setEditing(false);
+      return;
+    }
+    const trimmed = draft.trim();
+    setSaving(true);
+    try {
+      if (!trimmed) {
+        await onOddsOverride(raceId, runner.horseId, null);
+      } else {
+        const n = parseFloat(trimmed);
+        if (!Number.isFinite(n) || n <= 1) {
+          setEditing(false);
+          return;
+        }
+        await onOddsOverride(raceId, runner.horseId, n);
+      }
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  }
+
+  async function clearOverride(e: MouseEvent) {
+    e.stopPropagation();
+    if (!onOddsOverride || !isManual) return;
+    setSaving(true);
+    try {
+      await onOddsOverride(raceId, runner.horseId, null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing && onOddsOverride) {
+    return (
+      <td className={cn("w-[4.5rem] px-1 py-1.5 text-right", cellStyle && oddsCellClass)} style={cellStyle}>
+        <Input
+          autoFocus
+          type="text"
+          inputMode="decimal"
+          className="h-7 w-14 px-1 text-right text-xs tabular-nums"
+          value={draft}
+          disabled={saving}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void commit();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          aria-label={`Override bookie odds for ${runner.name}`}
+        />
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={cn("w-[4.5rem] px-1.5 py-2.5 text-right", cellStyle && oddsCellClass)}
+      style={cellStyle}
+    >
+      <div className="flex items-start justify-end gap-0.5">
+        <button
+          type="button"
+          className={cn(
+            "min-w-0 flex-1 text-right",
+            onOddsOverride && "cursor-text rounded hover:bg-black/5 dark:hover:bg-white/10"
+          )}
+          title={
+            onOddsOverride
+              ? isManual
+                ? "Click to edit · empty or reset clears override"
+                : "Click to paste real bookie odds"
+              : undefined
+          }
+          disabled={!onOddsOverride}
+          onClick={() => {
+            if (!onOddsOverride) return;
+            setDraft(
+              runner.bookieDecimal != null && runner.bookieDecimal > 1
+                ? String(runner.bookieDecimal)
+                : ""
+            );
+            setEditing(true);
+          }}
+        >
+          <div className="flex items-center justify-end gap-0.5 font-bold tabular-nums">
+            <PriceMovementArrow movement={runner.movement} />
+            {formatDecimalOdds(runner.bookieDecimal)}
+          </div>
+          {isManual ? (
+            <div className="text-[9px] font-medium text-sky-700 dark:text-sky-300">manual</div>
+          ) : isProxy ? (
+            <div className="text-[9px] text-amber-700/90 dark:text-amber-300">est.</div>
+          ) : runner.bookieDecimal == null && onOddsOverride ? (
+            <div className="text-[9px] text-muted-foreground">paste</div>
+          ) : null}
+        </button>
+        {isManual && onOddsOverride && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-sky-700 hover:text-sky-900 dark:text-sky-300"
+            title="Reset to API / proxy odds"
+            disabled={saving}
+            onClick={(e) => void clearOverride(e)}
+          >
+            <RotateCcw className="size-3" />
+          </Button>
+        )}
+      </div>
+    </td>
+  );
+}
+
 function RunnerRow({
   runner,
   race,
@@ -53,6 +228,9 @@ function RunnerRow({
   bookiePlaces,
   exchangePlaces,
   onBet,
+  onOddsOverride,
+  backColor,
+  layColor,
   advancedMode = false,
 }: {
   runner: RacingRunnerDetail;
@@ -61,14 +239,21 @@ function RunnerRow({
   bookiePlaces: number;
   exchangePlaces: number;
   onBet: FlashscoreRacecardProps["onBet"];
+  onOddsOverride?: FlashscoreRacecardProps["onOddsOverride"];
+  backColor?: string;
+  layColor?: string;
   advancedMode: boolean;
 }) {
   const isSteamer = runner.movement?.change != null && runner.movement.change < -0.05;
   const isDrifter = runner.movement?.change != null && runner.movement.change > 0.05;
   const hasSnapshots = (runner.movement?.snapshotCount ?? 0) >= 2;
-  const isProxy = runner.oddsSource === "proxy";
   const isOfferTarget = (runner.offerTargetScore ?? 0) >= 35;
   const isLiveExchange = runner.exchangeSource === "live";
+  const layStyle = oddsCellStyle(layColor);
+  const laySizeLabel = formatLaySize(runner.exchangeLaySize);
+  const exchMove = runner.exchangeMovement;
+  const exchSteamer = exchMove?.change != null && exchMove.change < -0.05;
+  const exchDrifter = exchMove?.change != null && exchMove.change > 0.05;
 
   return (
     <tr
@@ -90,9 +275,7 @@ function RunnerRow({
       </td>
       <td className="min-w-[10rem] px-2 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
-            {race.region?.toUpperCase() === "IRE" ? "IRE" : "GB"}
-          </span>
+          <RegionFlag code={race.region} className="opacity-90" />
           <span className="font-semibold leading-tight">{runner.name}</span>
           {isSteamer && (
             <Badge variant="outline" className="border-emerald-500/40 text-[9px] text-emerald-600">
@@ -119,7 +302,7 @@ function RunnerRow({
             </Badge>
           )}
         </div>
-        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{runner.form ?? "—"}</p>
+        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{runner.form ?? "-"}</p>
       </td>
       <td className="hidden px-2 py-2.5 text-sm text-muted-foreground md:table-cell">
         <span className="block truncate">{runner.jockey}</span>
@@ -131,28 +314,46 @@ function RunnerRow({
         </span>
       </td>
       <td className="hidden w-10 px-2 py-2.5 text-center tabular-nums sm:table-cell">
-        {runner.age ?? "—"}
+        {runner.age ?? "-"}
       </td>
       <td className="hidden w-12 px-2 py-2.5 text-center tabular-nums sm:table-cell">
-        {runner.weightLbs ? formatWeightStones(runner.weightLbs) : runner.weight ?? "—"}
+        {runner.weightLbs ? formatWeightStones(runner.weightLbs) : runner.weight ?? "-"}
       </td>
-      <td className="w-16 px-2 py-2.5 text-right">
-        <div className="flex items-center justify-end gap-0.5 font-bold tabular-nums">
-          <PriceMovementArrow movement={runner.movement} />
-          {formatDecimalOdds(runner.bookieDecimal)}
-        </div>
-        {isProxy && (
-          <div className="text-[9px] text-amber-600 dark:text-amber-400">est.</div>
+      <BookieOddsCell
+        runner={runner}
+        raceId={race.externalId}
+        onOddsOverride={onOddsOverride}
+        backColor={backColor}
+      />
+      <td
+        className={cn(
+          "hidden w-20 px-2 py-2.5 text-right sm:table-cell",
+          layStyle && oddsCellClass
         )}
-      </td>
-      <td className="hidden w-16 px-2 py-2.5 text-right sm:table-cell">
-        <div className="font-semibold tabular-nums text-muted-foreground">
-          {formatDecimalOdds(runner.exchangeDecimal)}
+        style={layStyle}
+      >
+        <div className="flex items-center justify-end gap-0.5">
+          {isLiveExchange && (exchSteamer || exchDrifter) && (
+            <PriceMovementArrow movement={exchMove} />
+          )}
+          <span className="font-semibold tabular-nums">
+            {formatDecimalOdds(runner.exchangeDecimal)}
+          </span>
         </div>
+        {laySizeLabel && isLiveExchange && (
+          <div
+            className="text-[9px] tabular-nums text-muted-foreground dark:text-white/70"
+            title="Available at best lay"
+          >
+            {laySizeLabel}
+          </div>
+        )}
         {isLiveExchange ? (
-          <div className="text-[9px] text-emerald-600 dark:text-emerald-400">live lay</div>
-        ) : runner.exchangeSource === "estimated" && advancedMode ? (
-          <div className="text-[9px] text-amber-600 dark:text-amber-400">est. +3%</div>
+          <div className="text-[9px] font-medium text-emerald-700 dark:text-emerald-300">live lay</div>
+        ) : runner.exchangeSource === "estimated" ? (
+          <div className="text-[9px] text-amber-700/90 dark:text-amber-300">est. +3%</div>
+        ) : runner.exchangeDecimal != null ? (
+          <div className="text-[9px] text-muted-foreground">exch.</div>
         ) : null}
         {advancedMode && runner.spreadPct != null && (
           <div className={cn("text-[9px] tabular-nums", spreadTone(runner.spreadPct))}>
@@ -220,8 +421,14 @@ export function FlashscoreRacecard({
   exchangePlaces,
   onTrack,
   onBet,
+  onOddsOverride,
+  backColor,
+  layColor,
   advancedMode = false,
   showOfferGuide = true,
+  refreshLabel,
+  refreshing = false,
+  exchangeStatusLabel,
 }: FlashscoreRacecardProps) {
   const activeCourse = selected?.course ?? courses[0]?.[0] ?? "";
   const courseRaces = courses.find(([c]) => c === activeCourse)?.[1] ?? [];
@@ -230,8 +437,9 @@ export function FlashscoreRacecard({
     if (!selected) return [];
     return [...selected.runners].sort((a, b) => {
       if (a.nonRunner !== b.nonRunner) return a.nonRunner ? 1 : -1;
-      const pa = a.bookieDecimal ?? a.spDecimal ?? Infinity;
-      const pb = b.bookieDecimal ?? b.spDecimal ?? Infinity;
+      // Favourite first by live exchange lay (bookie often blank on Free tier)
+      const pa = a.exchangeDecimal ?? a.bookieDecimal ?? a.spDecimal ?? Infinity;
+      const pb = b.exchangeDecimal ?? b.bookieDecimal ?? b.spDecimal ?? Infinity;
       return pa - pb;
     });
   }, [selected]);
@@ -256,22 +464,42 @@ export function FlashscoreRacecard({
     <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none">
       <div className={cn(sectionBar, "text-foreground")}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className={sectionTitle}>
-            {regionLabel(selected.region)}: {activeCourse.toUpperCase()}
+          <p className={cn(sectionTitle, "flex items-center gap-1.5")}>
+            <RegionFlag code={selected.region} size="md" />
+            <span>
+              {racingRegionLabel(selected.region).toUpperCase()}: {activeCourse.toUpperCase()}
+            </span>
           </p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 border-border bg-card text-foreground hover:bg-selection-subtle"
-            onClick={() => onTrack(selected)}
-          >
-            Track race
-          </Button>
+          <div className="flex items-center gap-2">
+            {(refreshLabel || exchangeStatusLabel) && (
+              <p
+                className="hidden max-w-[16rem] truncate text-[10px] tabular-nums text-muted-foreground sm:block"
+                title={[refreshLabel, exchangeStatusLabel].filter(Boolean).join(" · ")}
+              >
+                {refreshing ? (
+                  <span className="text-foreground/80">Updating…</span>
+                ) : (
+                  refreshLabel
+                )}
+                {exchangeStatusLabel ? (
+                  <span className="text-muted-foreground/80"> · {exchangeStatusLabel}</span>
+                ) : null}
+              </p>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 border-border bg-card text-foreground hover:bg-selection-subtle"
+              onClick={() => onTrack(selected)}
+            >
+              Track race
+            </Button>
+          </div>
         </div>
         <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
           {courseRaces.map((race) => {
             const active = race.externalId === selectedId;
-            const qualifies = race.offerTags.some((t) => t.qualifies);
+            const offerCount = qualifyingOfferTags(race).length;
             return (
               <button
                 key={race.externalId}
@@ -279,9 +507,14 @@ export function FlashscoreRacecard({
                 onClick={() => onSelectRace(race.externalId)}
                 className={listPillState(active)}
               >
-                {race.offTime || "—"}
-                {qualifies && (
-                  <span className="ml-1 inline-block size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+                {race.offTime || "-"}
+                {offerCount > 0 && (
+                  <span
+                    className="ml-1 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"
+                    title={`${offerCount} qualifying offer${offerCount === 1 ? "" : "s"}`}
+                  >
+                    {offerCount}
+                  </span>
                 )}
               </button>
             );
@@ -308,8 +541,25 @@ export function FlashscoreRacecard({
                 {selected.fieldSize} runners · {selected.standardPlaces} places
               </span>
               {selected.oddsSource === "proxy" && (
-                <span className="text-amber-600 dark:text-amber-400">Est. prices (OFR)</span>
+                <span className="text-amber-600 dark:text-amber-400">Est. bookie (OFR)</span>
               )}
+              {selected.oddsSource === "manual" && (
+                <span className="text-sky-600 dark:text-sky-400">Manual bookie odds</span>
+              )}
+              {(selected.liveLayCount ?? 0) > 0 ? (
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  Betfair lays · {selected.liveLayCount}/{selected.runners.filter((r) => !r.nonRunner).length}
+                </span>
+              ) : selected.exchangeMatchError ? (
+                <span
+                  className="text-amber-600 dark:text-amber-400"
+                  title={selected.exchangeMatchError}
+                >
+                  Exchange est. (+3%) · {formatExchangeMatchError(selected.exchangeMatchError)}
+                </span>
+              ) : selected.exchangeSource === "estimated" ? (
+                <span className="text-amber-600 dark:text-amber-400">Exchange est. (+3%)</span>
+              ) : null}
             </div>
           </div>
           <p className="shrink-0 text-[11px] text-muted-foreground">Start {startLabel}</p>
@@ -317,57 +567,39 @@ export function FlashscoreRacecard({
         {hasPlaceOffer && showOfferGuide && (
           <RacingOfferGuide
             race={selected}
-            onBack={(runner) => onBet(selected, runner, "place_refund")}
-            onLay={(runner) => onBet(selected, runner, "lay")}
+            onBack={(runner, offerId) => onBet(selected, runner, "place_refund", offerId)}
+            onLay={(runner, offerId) => onBet(selected, runner, "lay", offerId)}
             onTrack={() => onTrack(selected)}
           />
         )}
-        {hasPlaceOffer && (
-          <div className="mt-2 space-y-0.5">
-            {selected.offerTags
-              .filter((t) => t.qualifies)
-              .slice(0, advancedMode ? undefined : 1)
-              .map((t) => (
-                <p key={t.offerId} className="text-xs text-emerald-600 dark:text-emerald-400">
-                  ✓ {t.offerTitle}
-                  {advancedMode && t.score != null ? ` · score ${t.score} — ${t.summary}` : ""}
-                  {!advancedMode && t.suggestedRunners?.[0] && (
-                    <span className="text-foreground">
-                      {" "}
-                      · pick <span className="font-semibold">{t.suggestedRunners[0].name}</span>
-                    </span>
-                  )}
-                </p>
-              ))}
-            {advancedMode &&
-              selected.offerTags
+        {hasPlaceOffer &&
+          advancedMode &&
+          selected.offerTags
+            .flatMap((t) => t.suggestedRunners ?? [])
+            .filter((r, i, arr) => arr.findIndex((x) => x.horseId === r.horseId) === i)
+            .sort((a, b) => (b.totalEv ?? b.score) - (a.totalEv ?? a.score))
+            .slice(0, 3)
+            .length > 0 && (
+            <div className="mt-2 rounded border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                Offer targets
+              </p>
+              {selected.offerTags
                 .flatMap((t) => t.suggestedRunners ?? [])
                 .filter((r, i, arr) => arr.findIndex((x) => x.horseId === r.horseId) === i)
                 .sort((a, b) => (b.totalEv ?? b.score) - (a.totalEv ?? a.score))
                 .slice(0, 3)
-                .length > 0 && (
-                <div className="mt-1.5 rounded border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                    Offer targets
+                .map((r) => (
+                  <p key={r.horseId} className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{r.name}</span>
+                    {r.totalEv != null && (
+                      <span className="tabular-nums"> · EV £{r.totalEv.toFixed(2)}</span>
+                    )}
+                    {` · ${r.summary}`}
                   </p>
-                  {selected.offerTags
-                    .flatMap((t) => t.suggestedRunners ?? [])
-                    .filter((r, i, arr) => arr.findIndex((x) => x.horseId === r.horseId) === i)
-                    .sort((a, b) => (b.totalEv ?? b.score) - (a.totalEv ?? a.score))
-                    .slice(0, 3)
-                    .map((r) => (
-                      <p key={r.horseId} className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{r.name}</span>
-                        {r.totalEv != null && (
-                          <span className="tabular-nums"> · EV £{r.totalEv.toFixed(2)}</span>
-                        )}
-                        {advancedMode && ` · ${r.summary}`}
-                      </p>
-                    ))}
-                </div>
-              )}
-          </div>
-        )}
+                ))}
+            </div>
+          )}
       </div>
 
       <div className="overflow-x-auto">
@@ -395,6 +627,9 @@ export function FlashscoreRacecard({
                 bookiePlaces={bookiePlaces}
                 exchangePlaces={exchangePlaces}
                 onBet={onBet}
+                onOddsOverride={onOddsOverride}
+                backColor={backColor}
+                layColor={layColor}
                 advancedMode={advancedMode}
               />
             ))}

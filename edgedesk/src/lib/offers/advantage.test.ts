@@ -4,7 +4,7 @@ import {
   estimateOfferRemainingEv,
   rankOfferAdvantages,
 } from "@/lib/offers/advantage";
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
 
 function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">): OfferSummary {
   const { profit: profitPartial, ...rest } = partial;
@@ -19,6 +19,8 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     offerType: rest.offerType ?? null,
     rules: rest.rules ?? null,
     scopeCourse: null,
+    scopeRaceId: null,
+    scopeRaceLabel: null,
     eventDate: null,
     expiresAt: rest.expiresAt ?? null,
     completedAt: null,
@@ -38,6 +40,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
       freeBetProfit: 0,
       freeBetOpenCount: 0,
       freeBetSettledCount: 0,
+      openExpectedProfit: 0,
       totalProfit: 0,
       ...profitPartial,
     },
@@ -61,6 +64,7 @@ describe("estimateOfferRemainingEv", () => {
           freeBetProfit: 0,
           freeBetOpenCount: 0,
           freeBetSettledCount: 0,
+          openExpectedProfit: 0,
           totalProfit: -2,
         },
       })
@@ -91,6 +95,7 @@ describe("rankOfferAdvantages", () => {
             freeBetProfit: 0,
             freeBetOpenCount: 0,
             freeBetSettledCount: 0,
+            openExpectedProfit: 0,
             totalProfit: -1,
           },
         }),
@@ -116,11 +121,48 @@ describe("rankOfferAdvantages", () => {
             freeBetProfit: 0,
             freeBetOpenCount: 0,
             freeBetSettledCount: 0,
+            openExpectedProfit: 0,
             totalProfit: -1,
           },
         }),
       ],
       now
     )?.offerId).toBe(2);
+  });
+
+  it("does not promote in-progress conversion over a real qualify to-do", () => {
+    const ranked = rankOfferAdvantages(
+      [
+        offer({
+          id: 1,
+          title: "Bet £10 get £10 free bet - Cricket",
+          betCount: 0,
+          status: "active",
+        }),
+        offer({
+          id: 2,
+          title: "Bet £50 get £50 free bet (3rd, 4th)",
+          betCount: 2,
+          expectedFromBets: 39.47,
+          profit: {
+            qualifyingProfit: -3.39,
+            qualifyingSettledCount: 1,
+            qualifyingOpenCount: 0,
+            freeBetAwarded: true,
+            freeBetAwardAmount: 50,
+            freeBetAwardReason: "Finished 2nd",
+            freeBetStage: "in_use",
+            freeBetProfit: 0,
+            freeBetOpenCount: 1,
+            freeBetSettledCount: 0,
+            openExpectedProfit: 39.47,
+            totalProfit: 36.08,
+          },
+        }),
+      ],
+      now
+    );
+    expect(ranked.map((r) => r.offerId)).toEqual([1]);
+    expect(ranked[0]?.nextAction?.kind).toBe("place_qualifying");
   });
 });

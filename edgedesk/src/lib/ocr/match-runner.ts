@@ -17,6 +17,16 @@ function runnerScore(ocr: string, runner: string): number {
   const nr = norm(runner);
   if (!no || !nr) return 0;
   if (no === nr) return 100;
+  // OCR often glues words: "dickothelegend" vs "dicko the legend"
+  const noCompact = no.replace(/\s+/g, "");
+  const nrCompact = nr.replace(/\s+/g, "");
+  if (noCompact === nrCompact) return 95;
+  if (nrCompact.includes(noCompact) || noCompact.includes(nrCompact)) {
+    const ratio =
+      Math.min(noCompact.length, nrCompact.length) /
+      Math.max(noCompact.length, nrCompact.length);
+    if (ratio >= 0.7) return 85;
+  }
   if (horseNamesMatch(ocr, runner)) {
     if (nr.includes(no) || no.includes(nr)) return 80;
     return 60;

@@ -27,7 +27,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "What is EdgeDesk?",
         paragraphs: [
-          "EdgeDesk is a local-first matched betting command centre. Calculators, profit tracking, live events and a real-time P&L dashboard — with your edge surfaced on every screen.",
+          "EdgeDesk is a local-first matched betting command centre. Calculators, profit tracking, live events and a real-time P&L dashboard - with your edge surfaced on every screen.",
           "Your data lives in SQLite at data/edgedesk.db. Nothing leaves your machine unless you add API keys for live feeds.",
         ],
       },
@@ -54,9 +54,9 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Recommended free stack (£0/month)",
         bullets: [
-          "The Racing API (free) — today + tomorrow racecards, proxy odds",
-          "Betfair delayed app key (free at developer.betfair.com) — real lay prices",
-          "API-Football free (optional) — ~one live football track per day",
+          "The Racing API (free) - today + tomorrow racecards, proxy odds",
+          "Betfair delayed app key (free at developer.betfair.com) - real lay prices",
+          "API-Football free (optional) - ~one live football track per day",
         ],
       },
       {
@@ -72,7 +72,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Result-centric settlement",
         paragraphs: [
-          "EdgeDesk is result-centric, not bet-centric. Record what happened (a 2-1 score) and the app derives every market outcome — BTTS, Over 2.5, Home Win, 2UP triggered — and settles all linked bets automatically.",
+          "EdgeDesk is result-centric, not bet-centric. Record what happened (a 2-1 score) and the app derives every market outcome - BTTS, Over 2.5, Home Win, 2UP triggered - and settles all linked bets automatically.",
         ],
       },
     ],
@@ -91,9 +91,9 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Proxy vs live odds",
         bullets: [
-          "Proxy bookie odds — estimated from ORF ratings on the free Racing API tier. Labelled “proxy” in the UI. Good for ranking runners, not for final stake decisions.",
-          "Exchange lay odds — real from Betfair when connected (delayed key is fine). Otherwise +3% spread estimates.",
-          "Live bookie odds — require Racing API Standard tier. Until then, check the bookie site and enter odds in the Lay calculator.",
+          "Proxy bookie odds - estimated from ORF ratings on the free Racing API tier. Labelled “proxy” in the UI. Good for ranking runners, not for final stake decisions.",
+          "Exchange lay odds - real from Betfair when connected (delayed key is fine). Otherwise +3% spread estimates.",
+          "Live bookie odds - require Racing API Standard tier. Until then, check the bookie site and enter odds in the Lay calculator.",
         ],
       },
       {
@@ -103,9 +103,9 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
         bullets: [
           "Higher score = better fit, not a guarantee. A 70+ score is worth investigating; below 40 is usually a pass.",
-          "Qualifying loss — the small cost if your horse doesn’t place. Compare to the free bet value.",
-          "EV estimate — expected profit if you convert the free bet efficiently. Marked as estimate when using proxy odds.",
-          "Proxy confidence — how reliable the ORF estimate is for this runner. Low confidence = verify odds manually.",
+          "Qualifying loss - the small cost if your horse doesn’t place. Compare to the free bet value.",
+          "EV estimate - expected profit if you convert the free bet efficiently. Marked as estimate when using proxy odds.",
+          "Proxy confidence - how reliable the ORF estimate is for this runner. Low confidence = verify odds manually.",
         ],
       },
       {
@@ -121,7 +121,8 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Free tier limitations",
         bullets: [
           "Racecards: today and tomorrow only",
-          "No auto race settlement — use Set winner or upgrade Racing API Basic",
+          "Auto race settlement needs Racing API Basic (Free = Set winner manually)",
+          "Bookie odds are estimates - click a price on Racing Desk to paste the real odds",
           "No silks images on free racecards",
           "Steamer/drifter indicators use local snapshot polling, not premium odds history",
         ],
@@ -140,9 +141,18 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
+        heading: "Paste from MBB",
+        bullets: [
+          "Offers → Paste offer (header or form card)",
+          "Paste a Matched Betting Blog blurb or promo email",
+          "Review the preview (bookie, stakes, places, expiry) then Apply to form and save",
+          "Works best for place-refund “Bet £X get £Y if 2nd–4th” and simple sign-up free bets",
+        ],
+      },
+      {
         heading: "Place-refund (bet & get free)",
         bullets: [
-          "Create under Offers → Racing category",
+          "Create under Offers → Racing category (or paste)",
           "Set min runners (usually 8+), regions (GB/IRE), stake and free bet amount",
           "Qualifying places are 2nd–4th by default",
           "Racing Desk highlights qualifying races and suggests runners via Intelligence",
@@ -153,7 +163,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         bullets: [
           "Use the Each Way & Extra Place calculator for the lay maths",
           "Set bookie places vs exchange places on the Racing Desk EP panel",
-          "Worst-case profit shown before you commit — that's your qualifying cost",
+          "Worst-case profit shown before you commit - that's your qualifying cost",
         ],
       },
       {
@@ -176,43 +186,43 @@ export const HELP_GUIDES: HelpGuide[] = [
     description: "When to use which calculator in the matched betting workflow.",
     sections: [
       {
-        heading: "Core — everyday matched betting",
+        heading: "Core - everyday matched betting",
         bullets: [
-          "Matched Betting — qualifiers, free bets (SNR/SR), risk-free. The workhorse.",
-          "Dutching — equal-profit across outcomes. Use 2UP dutch mode for early-payout windfalls.",
-          "Early Payout (2UP) — back a 2UP bookie, lay the exchange, see windfall scenarios.",
-          "Each Way & Extra Place — standard EW arbs and extra-place offers.",
-          "Sequential Lay — part lays at earlier odds, finish at current market.",
-          "Refund-If — money-back-if-you-lose with free-bet or cash retention.",
-          "Accumulator — doubles through Lucky 63 with layered lays.",
+          "Matched Betting - qualifiers, free bets (SNR/SR), risk-free. The workhorse.",
+          "Dutching - equal-profit across outcomes. Use 2UP dutch mode for early-payout windfalls.",
+          "Early Payout (2UP) - back a 2UP bookie, lay the exchange, see windfall scenarios.",
+          "Each Way & Extra Place - standard EW arbs and extra-place offers.",
+          "Sequential Lay - part lays at earlier odds, finish at current market.",
+          "Refund-If - money-back-if-you-lose with free-bet or cash retention.",
+          "Accumulator - doubles through Lucky 63 with layered lays.",
         ],
       },
       {
         heading: "Pro",
         bullets: [
-          "EP Edge Desk — full 2UP/1UP modelling with Dixon-Coles probabilities, offer scoring and live settlement. Use when you want model-driven EV, not just snapshot maths.",
+          "2UP Desk - full 2UP/1UP modelling with Dixon-Coles probabilities, dutch vs lay ranking, mixed thresholds and live settlement. Use when you want model-driven EV, not just snapshot maths.",
         ],
       },
       {
-        heading: "Tools — quick reference",
+        heading: "Tools - quick reference",
         bullets: [
-          "Odds Converter — decimal ↔ fractional ↔ american ↔ implied probability",
-          "EV & No-Vig — expected value, edge % and fair odds",
-          "Rule 4 — adjusted winnings after a deduction",
+          "Odds Converter - decimal ↔ fractional ↔ american ↔ implied probability",
+          "EV & No-Vig - expected value, edge % and fair odds",
+          "Rule 4 - adjusted winnings after a deduction",
         ],
       },
       {
         heading: "Add to tracker",
         paragraphs: [
-          "Core and Pro calculators have an “Add to tracker” button. Numbers pre-fill the Add bet dialog — review, link an event, and save. With API keys, EP Desk and 2UP can find-or-create the real fixture automatically.",
+          "Core and Pro calculators have an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, and save. With API keys, 2UP Desk and 2UP can find-or-create the real fixture automatically.",
         ],
       },
       {
         heading: "Advanced lay mode",
         bullets: [
-          "Part lays — record lays already matched; app solves remaining stake",
-          "Underlay — £0 net if bookie loses (all profit on bookie win)",
-          "Overlay — £0 net if bookie wins",
+          "Part lays - record lays already matched; app solves remaining stake",
+          "Underlay - £0 net if bookie loses (all profit on bookie win)",
+          "Overlay - £0 net if bookie wins",
         ],
       },
     ],
@@ -235,7 +245,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
-        heading: "Betfair delayed key — is it enough?",
+        heading: "Betfair delayed key - is it enough?",
         paragraphs: [
           "Yes for pre-race matched betting. Prices are 1–3 minutes behind live but fine for place-refund workflows. A live app key (~£499) is only needed for in-play tight spreads.",
         ],
@@ -259,7 +269,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "What triggers auto-settlement?",
         bullets: [
           "Football: live score from API-Football or simulator drives derived markets",
-          "Racing: manual Set winner on free tier; Racing API Basic for auto results",
+          "Racing: Racing API Basic auto-settles while the app is open; Free tier uses Set winner",
           "Goalscorer triggers: settle at the decisive goal, not full time",
         ],
       },

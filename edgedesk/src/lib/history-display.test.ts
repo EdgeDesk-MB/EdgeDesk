@@ -4,10 +4,12 @@ import {
   formatHistoryTimeBadge,
   formatHistoryTimeBadgeParts,
   historyEntryTitle,
+  historyEntryHref,
   historyOccurredAt,
   historyUsesMinuteBadge,
   isFreeBetHistoryEntry,
   isFreeBetPlacedHistoryEntry,
+  sortHistoryEntries,
 } from "@/lib/history-display";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 
@@ -236,5 +238,212 @@ describe("formatHistoryTimeBadge", () => {
 
     expect(historyUsesMinuteBadge(entry, ctx)).toBe(true);
     expect(formatHistoryTimeBadge(entry, ctx)).toBe("23'");
+  });
+});
+
+describe("sortHistoryEntries", () => {
+  const raceTime = new Date("2026-07-10T16:30:00").getTime();
+  const event: EventRow = {
+    id: 9,
+    sport: "horse_racing",
+    externalId: "york-1",
+    competition: "York",
+    homeTeam: "Race",
+    awayTeam: "",
+    startTime: raceTime,
+    status: "finished",
+    homeScore: 0,
+    awayScore: 0,
+    minute: 0,
+    homeLed2: 0,
+    awayLed2: 0,
+    source: "api",
+    goals: JSON.stringify({ winner: "Dark Moon Rising", places: [] }),
+    simScript: null,
+    simStartedAt: null,
+    createdAt: raceTime,
+  };
+  const bet: BetRow = {
+    id: 32,
+    eventId: 9,
+    label: "Kahin",
+    market: "win",
+    selection: "Kahin",
+    betType: "qualifying",
+    bookmaker: "Betfair Sportsbook",
+    exchangeId: 1,
+    backStake: 50,
+    backOdds: 5,
+    layStake: 40,
+    layOdds: 5.2,
+    commission: 0.02,
+    earlyPayout: 0,
+    refundAmount: null,
+    refundRetention: null,
+    legs: null,
+    triggerText: "Bet £50 get £50 FB if 2nd, 3rd, 4th",
+    triggerRule: null,
+    status: "lost",
+    expectedProfit: 0,
+    actualProfit: -2.7,
+    notes: null,
+    balanceLedgered: 1,
+    balanceSettled: 1,
+    createdAt: raceTime,
+    settledAt: raceTime + 60_000,
+    offerId: null,
+  };
+  const ctx = buildHistoryContext([event], [bet], {
+    32: { amount: 50, reason: "Finished 2nd" },
+  });
+
+  it("orders settlement, then result, then bet placed when times match", () => {
+    const placed = row({
+      id: 1,
+      kind: "bet_placed",
+      title: "Bet placed",
+      betId: 32,
+      eventId: 9,
+      createdAt: raceTime,
+    });
+    const result = row({
+      id: 2,
+      kind: "full_time",
+      title: "Result",
+      eventId: 9,
+      betId: undefined,
+      createdAt: raceTime,
+    });
+    const settlement = row({
+      id: 3,
+      kind: "settlement",
+      title: "Bet lost · Free bet won!",
+      betId: 32,
+      eventId: 9,
+      createdAt: raceTime,
+      amount: -2.7,
+    });
+
+    const sorted = sortHistoryEntries([settlement, result, placed], ctx).map((e) => e.kind);
+    expect(sorted).toEqual(["settlement", "full_time", "bet_placed"]);
+  });
+
+  it("keeps bet placed last when createdAt is after the race", () => {
+    const lateBet: BetRow = { ...bet, createdAt: raceTime + 120_000 };
+    const lateCtx = buildHistoryContext([event], [lateBet], {
+      32: { amount: 50, reason: "Finished 2nd" },
+    });
+    const placed = row({
+      id: 1,
+      kind: "bet_placed",
+      title: "Bet placed",
+      betId: 32,
+      eventId: 9,
+      createdAt: raceTime + 120_000,
+    });
+    const result = row({
+      id: 2,
+      kind: "full_time",
+      title: "Result",
+      eventId: 9,
+      createdAt: raceTime,
+    });
+    const settlement = row({
+      id: 3,
+      kind: "settlement",
+      title: "Bet lost · Free bet won!",
+      betId: 32,
+      eventId: 9,
+      createdAt: raceTime,
+      amount: -2.7,
+    });
+
+    const sorted = sortHistoryEntries([placed, settlement, result], lateCtx).map((e) => e.kind);
+    expect(sorted).toEqual(["settlement", "full_time", "bet_placed"]);
+  });
+});
+
+describe("historyEntryHref", () => {
+  const raceTime = new Date("2026-07-10T16:30:00").getTime();
+  const event: EventRow = {
+    id: 9,
+    sport: "horse_racing",
+    externalId: "york-1",
+    competition: "York",
+    homeTeam: "Race",
+    awayTeam: "",
+    startTime: raceTime,
+    status: "finished",
+    homeScore: 0,
+    awayScore: 0,
+    minute: 0,
+    homeLed2: 0,
+    awayLed2: 0,
+    source: "api",
+    goals: JSON.stringify({ winner: "Dark Moon Rising", places: [] }),
+    simScript: null,
+    simStartedAt: null,
+    createdAt: raceTime,
+  };
+  const bet: BetRow = {
+    id: 32,
+    eventId: 9,
+    label: "Kahin",
+    market: "win",
+    selection: "Kahin",
+    betType: "qualifying",
+    bookmaker: "Betfair Sportsbook",
+    exchangeId: 1,
+    backStake: 50,
+    backOdds: 5,
+    layStake: 40,
+    layOdds: 5.2,
+    commission: 0.02,
+    earlyPayout: 0,
+    refundAmount: null,
+    refundRetention: null,
+    legs: null,
+    triggerText: "Bet £50 get £50 FB if 2nd, 3rd, 4th",
+    triggerRule: null,
+    status: "lost",
+    expectedProfit: 0,
+    actualProfit: -2.7,
+    notes: null,
+    balanceLedgered: 1,
+    balanceSettled: 1,
+    createdAt: raceTime,
+    settledAt: raceTime + 60_000,
+    offerId: null,
+  };
+  const ctx = buildHistoryContext([event], [bet]);
+
+  it("links bet rows to the tracker with highlight", () => {
+    expect(
+      historyEntryHref(row({ kind: "bet_placed", title: "Bet placed", betId: 32 }), ctx)
+    ).toBe("/tracker?highlight=32");
+    expect(
+      historyEntryHref(row({ kind: "settlement", title: "Bet lost", betId: 32 }), ctx)
+    ).toBe("/tracker?highlight=32");
+  });
+
+  it("links event-only moments to tracked events", () => {
+    expect(
+      historyEntryHref(
+        row({ kind: "full_time", title: "Result", eventId: 9, betId: undefined }),
+        ctx
+      )
+    ).toBe("/tracked-events");
+    expect(
+      historyEntryHref(
+        row({ kind: "goal", title: "Goal", eventId: 9, betId: undefined, minute: 12 }),
+        ctx
+      )
+    ).toBe("/tracked-events");
+  });
+
+  it("prefers tracker when an event moment is tied to a bet", () => {
+    expect(
+      historyEntryHref(row({ kind: "goal", title: "Goal", eventId: 9, betId: 32, minute: 12 }), ctx)
+    ).toBe("/tracker?highlight=32");
   });
 });

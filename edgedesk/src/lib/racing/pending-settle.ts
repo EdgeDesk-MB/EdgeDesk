@@ -1,4 +1,4 @@
-import { parseRaceResults } from "@/lib/racing";
+import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
 import type { RacingDeskRace } from "@/lib/racing-desk/types";
 
 export interface PendingSettleRace {
@@ -9,7 +9,7 @@ export interface PendingSettleRace {
   trackedEventId?: number;
 }
 
-/** Tracked event passed off time without a stored race result. */
+/** Tracked event passed off without a full race result (missing or winner-only). */
 export function isEventPendingSettle(event: {
   sport: string;
   startTime: number;
@@ -17,7 +17,9 @@ export function isEventPendingSettle(event: {
 }): boolean {
   if (event.sport !== "horse_racing") return false;
   if (event.startTime > Date.now()) return false;
-  return parseRaceResults(event.goals) == null;
+  const result = parseRaceResults(event.goals);
+  if (result == null) return true;
+  return isRaceResultIncomplete(result);
 }
 
 /** Racing Desk race is tracked and past off without a finished result. */

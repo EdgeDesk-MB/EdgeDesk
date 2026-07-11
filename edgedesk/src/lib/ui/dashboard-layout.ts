@@ -1,4 +1,4 @@
-/** Dashboard — single white page, sections split by grey dividers (no per-section borders). */
+/** Dashboard - single white page, sections split by grey dividers (no per-section borders). */
 
 export const dashboardPage =
   "flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent";
@@ -10,7 +10,7 @@ export const dashboardSection =
 /** Scrollable panel body (history, tab lists) */
 export const dashboardPanelBody = "app-scroll-nested min-h-0 flex-1 overflow-y-auto";
 
-/** Chart body — must not grow with chart content */
+/** Chart body - must not grow with chart content */
 export const dashboardPanelFillBody =
   "flex min-h-0 flex-1 flex-col overflow-hidden";
 

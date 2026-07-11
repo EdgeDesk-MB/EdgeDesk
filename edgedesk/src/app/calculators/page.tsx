@@ -9,7 +9,7 @@ const sections = [
   {
     id: "core",
     title: "Core",
-    description: "Everyday matched betting — back/lay, dutching and offer types. All push to the profit tracker.",
+    description: "Everyday matched betting - back/lay, dutching and offer types. All push to the profit tracker.",
     calculators: [
       {
         href: "/calculators/matched",
@@ -19,7 +19,7 @@ const sections = [
       {
         href: "/calculators/dutching",
         title: "Dutching",
-        description: "Split a stake across outcomes for equal profit — includes 2UP dutch mode.",
+        description: "Split a stake across outcomes for equal profit - includes 2UP dutch mode.",
       },
       {
         href: "/calculators/two-up",
@@ -29,17 +29,17 @@ const sections = [
       {
         href: "/calculators/accumulator",
         title: "Accumulator",
-        description: "Doubles through Lucky 63 — layered lays on standard accas, full-cover returns.",
+        description: "Doubles through Lucky 63 - layered lays on standard accas, full-cover returns.",
       },
       {
         href: "/calculators/each-way",
         title: "Each Way & Extra Place",
-        description: "Lay win and place separately — standard each-way arbs and extra-place offers.",
+        description: "Lay win and place separately - standard each-way arbs and extra-place offers.",
       },
       {
         href: "/calculators/sequential-lay",
         title: "Sequential Lay",
-        description: "Part lays at earlier odds, then finish at the current market — underlay or standard.",
+        description: "Part lays at earlier odds, then finish at the current market - underlay or standard.",
       },
       {
         href: "/calculators/refund-if",
@@ -51,7 +51,7 @@ const sections = [
   {
     id: "tools",
     title: "Tools",
-    description: "Quick reference calculators — no tracker hand-off needed.",
+    description: "Quick reference calculators - no tracker hand-off needed.",
     calculators: [
       {
         href: "/calculators/odds-converter",
@@ -86,7 +86,7 @@ export default function CalculatorsPage() {
         helpId="calculators"
         icon={Calculator}
         title="Calculators"
-        description="The matched betting toolkit. Core calculators open the profit tracker with your numbers pre-filled — review, link an event, and save."
+        description="The matched betting toolkit. Core calculators open the profit tracker with your numbers pre-filled - review, link an event, and save."
       />
 
       {sections.map((section) => (

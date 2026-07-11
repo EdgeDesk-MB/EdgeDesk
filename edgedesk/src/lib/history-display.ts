@@ -53,7 +53,7 @@ export function resolveHistoryEvent(
   return undefined;
 }
 
-/** When the moment happened — used for sorting and the time column. */
+/** When the moment happened - used for sorting and the time column. */
 export function historyOccurredAt(entry: HistoryRow, ctx: HistoryContext): number {
   const event = resolveHistoryEvent(entry, ctx);
   const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
@@ -118,7 +118,7 @@ export function historyUsesMinuteBadge(entry: HistoryRow, ctx: HistoryContext): 
   );
 }
 
-/** Left-column time badge parts — two lines for yesterday and older. */
+/** Left-column time badge parts - two lines for yesterday and older. */
 export interface HistoryTimeBadgeParts {
   primary: string;
   secondary?: string;
@@ -152,7 +152,7 @@ export function formatHistoryTimeBadgeParts(
   };
 }
 
-/** Left-column time badge — aligned to event/race time where possible. */
+/** Left-column time badge - aligned to event/race time where possible. */
 export function formatHistoryTimeBadge(entry: HistoryRow, ctx: HistoryContext): string {
   const { primary, secondary } = formatHistoryTimeBadgeParts(entry, ctx);
   return secondary ? `${primary}, ${secondary}` : primary;
@@ -206,10 +206,50 @@ export function isFreeBetPlacedHistoryEntry(entry: HistoryRow, ctx: HistoryConte
   return bet != null && isFreeBetBetType(bet.betType);
 }
 
-/** Display title — upgrades legacy "Bet placed" rows when the bet is a free bet. */
+/** Display title - upgrades legacy "Bet placed" rows when the bet is a free bet. */
 export function historyEntryTitle(entry: HistoryRow, ctx: HistoryContext): string {
   if (isFreeBetPlacedHistoryEntry(entry, ctx)) return "Free bet placed";
   return entry.title;
+}
+
+/** Where a feed row should navigate when clicked. */
+export function historyEntryHref(entry: HistoryRow, ctx: HistoryContext): string {
+  const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
+
+  if (
+    entry.kind === "bet_placed" ||
+    entry.kind === "settlement" ||
+    entry.kind === "free_bet_promo"
+  ) {
+    return bet ? `/tracker?highlight=${bet.id}` : "/tracker";
+  }
+
+  if (
+    entry.kind === "kickoff" ||
+    entry.kind === "goal" ||
+    entry.kind === "two_up" ||
+    entry.kind === "full_time"
+  ) {
+    if (bet) return `/tracker?highlight=${bet.id}`;
+    return "/tracked-events";
+  }
+
+  return "/history";
+}
+
+/** Screen-reader label for a clickable feed row. */
+export function historyEntryLinkLabel(entry: HistoryRow, ctx: HistoryContext): string {
+  const href = historyEntryHref(entry, ctx);
+  const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
+  const event = resolveHistoryEvent(entry, ctx);
+
+  if (href.startsWith("/tracker")) {
+    return bet ? `Open ${bet.label} in tracker` : "Open profit tracker";
+  }
+  if (href.startsWith("/tracked-events")) {
+    return event ? `Open ${formatEventTitle(event)} in tracked events` : "Open tracked events";
+  }
+  return "Open history";
 }
 
 export function isFreeBetHistoryEntry(entry: HistoryRow, ctx: HistoryContext): boolean {
@@ -256,16 +296,55 @@ export function matchesHistoryFilter(
   }
 }
 
+/** Sort key - groups bet story rows on the same moment so tie ranks apply. */
+function historySortAt(entry: HistoryRow, ctx: HistoryContext): number {
+  const event = resolveHistoryEvent(entry, ctx);
+
+  if (event?.startTime != null) {
+    if (event.sport === "horse_racing") {
+      if (
+        entry.kind === "bet_placed" ||
+        entry.kind === "full_time" ||
+        entry.kind === "settlement"
+      ) {
+        return event.startTime;
+      }
+    }
+    if (entry.kind === "settlement") {
+      return event.startTime + (entry.minute ?? 90) * 60 * 1000;
+    }
+  }
+
+  return historyOccurredAt(entry, ctx);
+}
+
 export function sortHistoryEntries(
   rows: HistoryRow[],
   ctx: HistoryContext
 ): HistoryRow[] {
   return [...rows].sort((a, b) => {
-    const ta = historyOccurredAt(a, ctx);
-    const tb = historyOccurredAt(b, ctx);
+    const ta = historySortAt(a, ctx);
+    const tb = historySortAt(b, ctx);
     if (tb !== ta) return tb - ta;
+    const ra = historyKindTieRank(a.kind);
+    const rb = historyKindTieRank(b.kind);
+    if (ra !== rb) return rb - ra;
     return b.id - a.id;
   });
+}
+
+/** When timestamps match, newest-first story: settlement → result → bet placed. */
+function historyKindTieRank(kind: HistoryRow["kind"]): number {
+  switch (kind) {
+    case "bet_placed":
+      return 0;
+    case "full_time":
+      return 1;
+    case "settlement":
+      return 2;
+    default:
+      return 10;
+  }
 }
 
 export function historyKindLabel(kind: HistoryRow["kind"]): string {
@@ -328,7 +407,7 @@ export function formatHistoryEventLine(
   return formatEventTitle(event);
 }
 
-/** Header subtitle — omit when the bet card already shows the same text. */
+/** Header subtitle - omit when the bet card already shows the same text. */
 export function historyEntrySubtitle(
   entry: HistoryRow,
   bet: BetRow | undefined,
@@ -358,18 +437,18 @@ export function showHistoryTriggerField(bet: BetRow): boolean {
   return !bet.label.includes(trigger);
 }
 
-/** Promo line for history cards — dedupes amount already embedded in reason. */
+/** Promo line for history cards - dedupes amount already embedded in reason. */
 export function formatHistoryPromoLine(promo: { amount: number; reason: string }): string {
   return formatPromoTooltip(promo.amount, promo.reason);
 }
 
-/** Promo awards apply at settlement — not on the original bet-placed entry. */
+/** Promo awards apply at settlement - not on the original bet-placed entry. */
 export function showHistoryPromoField(entry: HistoryRow, promo?: { amount: number; reason: string }): boolean {
   if (!promo) return false;
   return entry.kind === "settlement" || entry.kind === "free_bet_promo";
 }
 
-/** Bet label row — skip when it only repeats the selection (e.g. "Winner Kit Gabriel"). */
+/** Bet label row - skip when it only repeats the selection (e.g. "Winner Kit Gabriel"). */
 export function showHistoryBetLabel(bet: BetRow): boolean {
   const label = bet.label.trim();
   const sel = bet.selection?.trim();

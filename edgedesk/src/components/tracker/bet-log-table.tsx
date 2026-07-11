@@ -30,10 +30,10 @@ import { NumField } from "@/components/calc/num-field";
 import { MoneyFlow } from "@/components/money-flow";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import type { BetRow, EventRow } from "@/lib/db/schema";
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
 import { formatEventStatus, formatEventTitle } from "@/lib/events";
 import { SportEventBlock, SportIcon } from "@/components/sport-icon";
-import { previewAiTriggers } from "@/lib/calc";
+import { previewAiTriggers, settlePartialOutcome, type SettledBetStatus } from "@/lib/calc";
 import { betRaceOutcome, type PromoAwardsByBetId } from "@/lib/bet-outcomes";
 import { parseRaceResults } from "@/lib/racing";
 import {
@@ -43,6 +43,11 @@ import {
   MARKET_LABELS,
 } from "@/lib/markets";
 import { formatGbp } from "@/lib/format-money";
+import {
+  isBetCancelled,
+  isOfferExpired,
+  offerInactiveFigureClass,
+} from "@/lib/offers/offer-inactive-ui";
 import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { betStatusBadgeVariant, formatPillLabel } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
@@ -73,6 +78,20 @@ export function BetLogTable({
   onEdit: (bet: BetRow) => void;
   onPatch: (id: number, json: Record<string, unknown>, message: string) => void;
 }) {
+  const linkableOffers = [...offerById.values()]
+    .filter(
+      (o) =>
+        o.status === "active" ||
+        o.status === "planned" ||
+        o.profit.freeBetStage === "awarded"
+    )
+    .sort((a, b) => {
+      const aAward = a.profit.freeBetStage === "awarded" ? 0 : 1;
+      const bAward = b.profit.freeBetStage === "awarded" ? 0 : 1;
+      if (aAward !== bAward) return aAward - bAward;
+      return b.createdAt - a.createdAt;
+    });
+
   return (
     <Table className="min-w-[720px] table-fixed">
       <TableHeader>
@@ -92,6 +111,9 @@ export function BetLogTable({
           const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
           const raceOutcome = betRaceOutcome(bet, event, promoAwards);
           const offer = bet.offerId != null ? offerById.get(bet.offerId) : undefined;
+          const inactiveFigure = offerInactiveFigureClass(
+            isBetCancelled(bet) || (offer != null && isOfferExpired(offer))
+          );
           const triggers = previewAiTriggers({
             label: bet.label,
             triggerText: bet.triggerText ?? "",
@@ -117,6 +139,16 @@ export function BetLogTable({
                     </>
                   )}
                 </div>
+                {bet.offerId == null && linkableOffers.length > 0 && (
+                  <div className="mt-1">
+                    <LinkOfferSelect
+                      offers={linkableOffers}
+                      onLink={(offerId) =>
+                        onPatch(bet.id, { offerId }, "Linked to offer campaign")
+                      }
+                    />
+                  </div>
+                )}
                 {(bet.triggerText || triggers.length > 0) && (
                   <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
                     <Sparkles className="mr-0.5 inline size-3 shrink-0 text-violet-500" />
@@ -175,11 +207,17 @@ export function BetLogTable({
                 </div>
               </TableCell>
 
-              <TableCell className={cn(tableBodyCell, "whitespace-normal align-top text-right text-xs tabular-nums")}>
+              <TableCell
+                className={cn(
+                  tableBodyCell,
+                  "whitespace-normal align-top text-right text-xs tabular-nums",
+                  inactiveFigure
+                )}
+              >
                 {bet.backStake > 0 ? (
                   <div>{formatGbp(bet.backStake)} @ {bet.backOdds.toFixed(2)}</div>
                 ) : (
-                  <div className="text-muted-foreground">—</div>
+                  <div className="text-muted-foreground">-</div>
                 )}
                 {bet.layStake > 0 ? (
                   <div className="mt-0.5 text-muted-foreground">
@@ -190,17 +228,28 @@ export function BetLogTable({
 
               <TableCell className={cn(tableBodyCell, "whitespace-normal align-top")}>
                 <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[10px]">
-                  {bet.status === "early_payout" ? "2UP paid" : formatPillLabel(bet.status)}
+                  {bet.status === "early_payout"
+                    ? "2UP paid"
+                    : bet.status === "half_win"
+                      ? "½ win"
+                      : bet.status === "half_lose"
+                        ? "½ lose"
+                        : formatPillLabel(bet.status)}
                 </Badge>
-                <div className="mt-1.5 font-medium tabular-nums">
+                <div className={cn("mt-1.5 font-medium tabular-nums", inactiveFigure)}>
                   {bet.actualProfit != null ? (
-                    <MoneyFlow value={bet.actualProfit} signColor signDisplay className="text-sm" />
+                    <MoneyFlow
+                      value={bet.actualProfit}
+                      signColor={!isBetCancelled(bet)}
+                      signDisplay
+                      className="text-sm"
+                    />
                   ) : bet.expectedProfit != null ? (
                     <span className="text-xs text-muted-foreground">
                       exp. {formatGbp(bet.expectedProfit)}
                     </span>
                   ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
+                    <span className="text-xs text-muted-foreground">-</span>
                   )}
                 </div>
               </TableCell>
@@ -230,12 +279,9 @@ export function BetLogTable({
                       bet.market
                     ) && (
                       <ManualSettleDialog
-                        onSettle={(profit, won) =>
-                          onPatch(
-                            bet.id,
-                            { status: won ? "won" : "lost", actualProfit: profit },
-                            "Bet settled"
-                          )
+                        bet={bet}
+                        onSettle={(status, profit) =>
+                          onPatch(bet.id, { status, actualProfit: profit }, "Bet settled")
                         }
                       />
                     )}
@@ -257,6 +303,41 @@ export function BetLogTable({
         })}
       </TableBody>
     </Table>
+  );
+}
+
+function LinkOfferSelect({
+  offers,
+  onLink,
+}: {
+  offers: OfferSummary[];
+  onLink: (offerId: number) => void;
+}) {
+  return (
+    <Select onValueChange={(v) => onLink(Number(v))}>
+      <SelectTrigger size="sm" className="h-7 w-full max-w-[11rem] text-[11px]">
+        <span className="flex items-center gap-1 text-primary">
+          <Link2 className="size-3 shrink-0" /> Link to offer
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        {offers.map((o) => (
+          <SelectItem key={o.id} value={String(o.id)}>
+            <span className="flex flex-col gap-0.5 text-left">
+              <span className="truncate font-medium">
+                {o.title.length > 36 ? `${o.title.slice(0, 33)}…` : o.title}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {o.bookmaker ?? "No bookie"}
+                {o.profit.freeBetStage === "awarded" && o.profit.freeBetAwardAmount != null
+                  ? ` · £${o.profit.freeBetAwardAmount.toFixed(0)} FB ready`
+                  : ` · ${o.status}`}
+              </span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -295,9 +376,39 @@ function LinkEventSelect({
   );
 }
 
-function ManualSettleDialog({ onSettle }: { onSettle: (profit: number, won: boolean) => void }) {
+function ManualSettleDialog({
+  bet,
+  onSettle,
+}: {
+  bet: BetRow;
+  onSettle: (status: SettledBetStatus, profit: number) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [profit, setProfit] = useState(0);
+
+  const settleable = {
+    market: bet.market as "other",
+    selection: bet.selection,
+    betType: (bet.betType as "qualifying") ?? "qualifying",
+    backStake: bet.backStake,
+    backOdds: bet.backOdds,
+    layStake: bet.layStake,
+    layOdds: bet.layOdds,
+    commission: bet.commission,
+    refundAmount: bet.refundAmount ?? undefined,
+    refundRetention: bet.refundRetention ?? undefined,
+  };
+
+  function apply(kind: SettledBetStatus) {
+    if (kind === "won" || kind === "lost" || kind === "early_payout") {
+      onSettle(kind, profit);
+    } else {
+      const outcome = settlePartialOutcome(settleable, kind);
+      onSettle(outcome.status, Number(outcome.profit.toFixed(2)));
+    }
+    setOpen(false);
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -309,27 +420,29 @@ function ManualSettleDialog({ onSettle }: { onSettle: (profit: number, won: bool
         <DialogHeader>
           <DialogTitle>Settle manually</DialogTitle>
           <DialogDescription>
-            For markets the result engine can&apos;t derive — enter the net profit or loss.
+            Full win/lose: enter net P&amp;L. Half / push / void: profit is calculated for you
+            (Ultimatcher-style).
           </DialogDescription>
         </DialogHeader>
-        <NumField label="Net profit (negative for a loss)" prefix="£" value={profit} onChange={setProfit} />
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              onSettle(profit, false);
-              setOpen(false);
-            }}
-          >
-            Mark lost
+        <NumField label="Net profit (for won / lost)" prefix="£" value={profit} onChange={setProfit} />
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={() => apply("lost")}>
+            Lost
           </Button>
-          <Button
-            onClick={() => {
-              onSettle(profit, true);
-              setOpen(false);
-            }}
-          >
-            Mark won
+          <Button onClick={() => apply("won")}>Won</Button>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+          <Button variant="secondary" size="sm" onClick={() => apply("half_win")}>
+            ½ win
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => apply("half_lose")}>
+            ½ lose
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => apply("push")}>
+            Push
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => apply("void")}>
+            Void
           </Button>
         </div>
       </DialogContent>

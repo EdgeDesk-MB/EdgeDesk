@@ -1,6 +1,7 @@
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
 import { deriveOfferNextAction, type OfferNextAction } from "@/lib/offers/next-actions";
 import { parseOfferRules } from "@/lib/offers/racing-offer-rules";
+import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 
 /** Typical cash retention when converting an SNR free bet. */
 const DEFAULT_FREE_BET_RETENTION = 0.8;
@@ -52,17 +53,10 @@ export function estimateOfferRemainingEv(offer: OfferSummary): {
   }
 
   if (profit.freeBetStage === "in_use") {
-    const openEv = offer.expectedFromBets;
-    const fromOpen = Math.max(0, openEv);
-    if (fromOpen > 0.01) {
-      return {
-        remainingEv: fromOpen,
-        reason: `£${fromOpen.toFixed(2)} expected on open free-bet legs`,
-      };
-    }
+    // Conversion already placed - remaining EV is locked in, not a to-do.
     return {
-      remainingEv: 5,
-      reason: "Free-bet conversion in progress",
+      remainingEv: 0,
+      reason: "Free-bet conversion open - waiting on result",
     };
   }
 
@@ -100,7 +94,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary): {
       reason:
         openExpected > 0.01
           ? `£${openExpected.toFixed(2)} expected on open legs`
-          : "Open legs — EV not set",
+          : "Open legs - EV not set",
     };
   }
 
@@ -111,7 +105,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary): {
       reason:
         planned > 0
           ? `£${planned.toFixed(2)} expected if started`
-          : "Planned — set expected profit to rank this",
+          : "Planned - set expected profit to rank this",
     };
   }
 
@@ -125,13 +119,15 @@ export function scoreOfferAdvantage(
   if (offer.status === "completed" || offer.status === "expired") return null;
 
   const nextAction = deriveOfferNextAction(offer, now);
-  const { remainingEv, reason } = estimateOfferRemainingEv(offer);
-  const urgency = urgencyFromExpiry(offer.expiresAt, now);
+  // Waiting on a result is not a "Best next" candidate - user already did the work.
+  if (nextAction?.kind === "await_result") return null;
 
-  // Stage multipliers — cash sitting as awarded FB is highest leverage
+  const { remainingEv, reason } = estimateOfferRemainingEv(offer);
+  const urgency = urgencyFromExpiry(effectiveOfferExpiryMs(offer), now);
+
+  // Stage multipliers - cash sitting as awarded FB is highest leverage
   let stageBoost = 1;
   if (offer.profit.freeBetStage === "awarded") stageBoost = 1.45;
-  else if (offer.profit.freeBetStage === "in_use") stageBoost = 1.2;
   else if (nextAction?.kind === "place_qualifying" || nextAction?.kind === "start_planned") {
     stageBoost = 1.05;
   }

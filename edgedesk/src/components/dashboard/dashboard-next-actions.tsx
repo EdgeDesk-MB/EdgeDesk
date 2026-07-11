@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import {
@@ -8,7 +9,13 @@ import {
   offerNextActionLabel,
   type OfferNextAction,
 } from "@/lib/offers/next-actions";
-import type { OfferSummary } from "@/lib/services/offers";
+import {
+  availableBookieNames,
+  offerMatchesAvailableBookies,
+} from "@/lib/accounts/available-bookies";
+import type { OfferSummary } from "@/lib/services/offers.types";
+import type { AccountBalance } from "@/lib/services/balances.types";
+import { VenueBadge } from "@/components/venue-badge";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Gift, ListChecks } from "lucide-react";
 
@@ -18,7 +25,6 @@ function actionTone(kind: OfferNextAction["kind"]): string {
       return "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300";
     case "review_expiry":
       return "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300";
-    case "finish_conversion":
     case "place_qualifying":
     case "start_planned":
       return "border-primary/30 bg-primary/10 text-primary";
@@ -29,12 +35,25 @@ function actionTone(kind: OfferNextAction["kind"]): string {
 
 export function DashboardNextActions({
   offers,
+  accounts,
   className,
 }: {
   offers: OfferSummary[];
+  accounts?: AccountBalance[];
   className?: string;
 }) {
-  const actions = listOfferNextActions(offers).slice(0, 5);
+  const available = useMemo(
+    () => availableBookieNames(accounts ?? []),
+    [accounts]
+  );
+  const scoped = useMemo(
+    () =>
+      available.size === 0
+        ? offers
+        : offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available)),
+    [offers, available]
+  );
+  const actions = listOfferNextActions(scoped).slice(0, 5);
   if (actions.length === 0) return null;
 
   return (
@@ -45,9 +64,10 @@ export function DashboardNextActions({
       )}
     >
       <DashboardSectionHeader
+        prominent
         icon={ListChecks}
         title="Next actions"
-        description="What to do next across your open offers."
+        description="Open actions across your offers."
         action={
           <Link
             href="/offers"
@@ -74,20 +94,16 @@ export function DashboardNextActions({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
+                  {action.bookmaker ? <VenueBadge name={action.bookmaker} /> : null}
                   <Badge variant="outline" className="text-[10px] font-semibold uppercase">
                     {offerNextActionLabel(action.kind)}
                   </Badge>
                   <span className="truncate text-[13px] font-medium text-foreground">
                     {action.title}
                   </span>
-                  {action.bookmaker ? (
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {action.bookmaker}
-                    </span>
-                  ) : null}
                 </span>
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                  {action.offerTitle} — {action.detail}
+                  {action.offerTitle} - {action.detail}
                 </span>
               </span>
               <ArrowRight

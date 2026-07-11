@@ -1,5 +1,5 @@
 /**
- * Shared each-way / extra-place outcome maths — bookie EW back vs separate win & place lays.
+ * Shared each-way / extra-place outcome maths - bookie EW back vs separate win & place lays.
  */
 
 export type EachWayRaceOutcome = "win" | "standard_place" | "extra_place" | "unplaced";

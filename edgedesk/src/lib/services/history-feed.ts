@@ -8,6 +8,7 @@ import {
   type HistoryFilter,
   matchesHistoryFilter,
 } from "@/lib/history-display";
+import { isChartAnnotationEntry } from "@/lib/pnl/chart-bet-markers";
 
 /** Remove all commentary feed rows tied to a bet (placed + settlement lines). */
 export function purgeHistoryForBet(betId: number): number {
@@ -90,4 +91,15 @@ export function getHistoryFeed(options?: {
   entries = entries.slice(0, limit);
 
   return { entries, events: allEvents, bets: allBets, context, promoAwards };
+}
+
+/** All feed rows that qualify as chart money-position annotations (not limited to feed page size). */
+export function getChartAnnotationHistory(
+  allEvents: EventRow[],
+  allBets: BetRow[],
+  promoAwards: Record<number, { amount: number; reason: string }>
+): HistoryRow[] {
+  const context = buildHistoryContext(allEvents, allBets, promoAwards);
+  const rows = db.select().from(history).all();
+  return rows.filter((entry) => isChartAnnotationEntry(entry, context));
 }

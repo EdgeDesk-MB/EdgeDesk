@@ -24,8 +24,8 @@ interface PanelProps {
 
 /**
  * Coloured bet panel. Input/button tints are derived from the panel colour
- * (lightened in light mode, darkened in dark mode) so any exchange theme —
- * Betdaq yellow/green, Betfair blue/pink, etc. — stays coherent.
+ * (lightened in light mode, darkened in dark mode) so any exchange theme -
+ * Betdaq yellow/green, Betfair blue/pink, etc. - stays coherent.
  */
 function Panel({ title, children, className, color, chip }: PanelProps) {
   const base = color ?? BACK_LIGHT;
@@ -69,7 +69,7 @@ export function LayPanel({
 }
 
 /**
- * Input styled to sit on a coloured panel — MBB look: big, bold numbers on a
+ * Input styled to sit on a coloured panel - MBB look: big, bold numbers on a
  * lighter tint of the panel colour (inherited via CSS vars from <Panel>).
  */
 export function PanelInput({
@@ -136,7 +136,7 @@ export function PanelInput({
   );
 }
 
-/** Text input on a coloured panel — same height as PanelInput. */
+/** Text input on a coloured panel - same height as PanelInput. */
 export function PanelTextInput({
   label,
   value,
@@ -167,7 +167,7 @@ export function PanelTextInput({
   );
 }
 
-/** Bookmaker name field — uses panel tint CSS vars from the parent BackPanel. */
+/** Bookmaker name field - uses panel tint CSS vars from the parent BackPanel. */
 export function PanelBookieInput({
   label = "Bookmaker (optional)",
   value,
@@ -195,7 +195,7 @@ export function PanelBookieInput({
   );
 }
 
-/** Select on a coloured panel — same height as PanelInput. */
+/** Select on a coloured panel - same height as PanelInput. */
 export function PanelSelect({
   label,
   value,
@@ -229,7 +229,7 @@ export function PanelSelect({
   );
 }
 
-/** Editable lay stake — always shows 2 dp when not being typed in. */
+/** Editable lay stake - always shows 2 dp when not being typed in. */
 function LayStakeInput({
   label,
   value,
@@ -292,12 +292,12 @@ function LayStakeInput({
         const n = parseFloat(next.replace(/,/g, ""));
         if (Number.isFinite(n) && n >= 0) onChange(n);
       }}
-      className="h-10 w-full rounded-md border-0 bg-white/10 pr-3 pl-8 text-lg font-extrabold tabular-nums text-white outline-none ring-primary/40 placeholder:text-white/30 focus:ring-2"
+      className="h-10 w-full rounded-md border border-white/20 bg-white/10 pr-3 pl-8 text-lg font-extrabold tabular-nums text-white outline-none ring-primary/40 placeholder:text-white/30 focus:ring-2"
     />
   );
 }
 
-/** Dark lay-stake strip — read-only with optional liability, or editable with copy. */
+/** Dark lay-stake strip - read-only with optional liability, or editable with copy. */
 export function LayStakeBanner({
   label = "Lay stake",
   value,
@@ -306,7 +306,7 @@ export function LayStakeBanner({
 }: {
   label?: string;
   value: number;
-  /** Exchange liability — read-only banner only (omitted in Add bet) */
+  /** Exchange liability - read-only banner only (omitted in Add bet) */
   liability?: number;
   /** When set, renders an editable input; typing updates the slider above */
   onChange?: (v: number) => void;
@@ -339,7 +339,7 @@ export function LayStakeBanner({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-800 px-4 py-3 text-sm text-white dark:bg-slate-700">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/20 bg-slate-800 px-4 py-3 text-sm text-white dark:bg-slate-700">
       <span className="flex items-center gap-2">
         <span>
           {label}: <MoneyFlow value={value} className="text-lg font-extrabold" />

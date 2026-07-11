@@ -3,15 +3,23 @@
  * auto-settles bets on finished events, and computes the live P&L picture.
  */
 import { eq, inArray } from "drizzle-orm";
+import "server-only";
 import { db, events, bets, history, type EventRow, type BetRow, type HistoryRow } from "@/lib/db";
-import { ledgerFromSettledBet, getBalanceSummary, getPromoAwardsByBetId, ledgerPromoAward, type BalanceSummary } from "@/lib/services/balances";
+import { ledgerFromSettledBet, getBalanceSummary, getPromoAwardsByBetId, ledgerPromoAward } from "@/lib/services/balances";
+import type { BalanceSummary } from "@/lib/services/balances.types";
 import { simStateAt, type SimGoal } from "./sim";
-import { fixtureGoalEvents, fixturesByIds, hasApiKey } from "./apifootball";
+import { fixtureGoalEvents, fixturesByIds, hasApiKey, apiUsageToday } from "./apifootball";
 import {
   syncRacingResultsForOpenBets,
   syncRecentTrackedRacingResults,
 } from "@/lib/services/sync-racing-results";
-import { hasRacingApiKey } from "@/lib/services/theracingapi";
+import {
+  getCachedRacingResultsTier,
+  hasRacingApiKey,
+  racingApiUsageToday,
+  resolveRacingResultsTier,
+  type RacingResultsTier,
+} from "@/lib/services/theracingapi";
 import {
   getAllExchangeProviderStatuses,
   getDefaultExchangeName,
@@ -19,6 +27,7 @@ import {
   getExchangeProviderStatus,
 } from "@/lib/services/exchange";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
+import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
 import {
   aiEffectsForBet,
   betWinRuleForBet,
@@ -43,10 +52,29 @@ import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes"
 import { formatRacingEventTitle } from "@/lib/events";
 import { formatEventTitle } from "@/lib/events";
 import { livePositionValuation } from "@/lib/calc/ep/live-pnl";
-import { getHistoryFeed } from "@/lib/services/history-feed";
+import {
+  formatLiveMarkets,
+  liveModelForEvent,
+} from "@/lib/calc/ep/live-model";
+import { getHistoryFeed, getChartAnnotationHistory } from "@/lib/services/history-feed";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
-import { backfillOffersFromBets, listOfferSummaries, syncOfferStatuses, type OfferSummary } from "@/lib/services/offers";
+import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
+
+export type {
+  AppState,
+  LiveEventModel,
+  LivePosition,
+  RacingAutopilotNotice,
+  RacingResultsTier,
+} from "@/lib/services/state.types";
+import type {
+  AppState,
+  LiveEventModel,
+  LivePosition,
+  RacingAutopilotNotice,
+} from "@/lib/services/state.types";
 
 export function toSettleable(bet: BetRow): SettleableBet {
   return {
@@ -157,7 +185,7 @@ async function refreshApiEvents(): Promise<void> {
     );
   if (apiEvents.length === 0) return;
 
-  // Goal timeline is expensive — only fetch for open trigger bets that need scorers.
+  // Goal timeline is expensive - only fetch for open trigger bets that need scorers.
   const openTriggerBets = db
     .select()
     .from(bets)
@@ -221,7 +249,7 @@ async function refreshRacingApiEvents(): Promise<{ updated: number; settledLabel
 }
 
 /**
- * Settle "The bet wins IF" trigger bets in REAL TIME — the moment the outcome is
+ * Settle "The bet wins IF" trigger bets in REAL TIME - the moment the outcome is
  * irreversible (e.g. the first goal goes in), not just at full time.
  */
 function settleTriggers(): void {
@@ -246,7 +274,7 @@ function settleTriggers(): void {
     if (verdict.status === "pending") continue;
 
     const outcome = settleFromOutcome(toSettleable(bet), verdict.status === "won");
-    const explanation = `Trigger ${verdict.status}: ${verdict.reason} — ${outcome.explanation}`;
+    const explanation = `Trigger ${verdict.status}: ${verdict.reason} - ${outcome.explanation}`;
     db.update(bets)
       .set({
         status: outcome.status,
@@ -349,8 +377,8 @@ function processAiEffects(): void {
 
 /**
  * Live commentary feed (Flashscore-style): kick-offs, goals with scorers, 2UP
- * triggers, full times, and bet settlements. Entries are written idempotently —
- * every fact has a natural dedupe key — so this can run on every poll.
+ * triggers, full times, and bet settlements. Entries are written idempotently -
+ * every fact has a natural dedupe key - so this can run on every poll.
  */
 function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
   const now = Date.now();
@@ -395,7 +423,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
           kind: "full_time",
           eventId: event.id,
           title: "Result",
-          detail: `${title} — won by ${race.winner}`,
+          detail: `${title} - won by ${race.winner}`,
           createdAt: event.startTime,
         });
       }
@@ -431,7 +459,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
         eventId: event.id,
         minute: goal.minute,
         title: scorer,
-        detail: `${flags.length ? flags.join(" · ") + " — " : ""}${event.homeTeam} ${h}-${a} ${event.awayTeam}`,
+        detail: `${flags.length ? flags.join(" · ") + " - " : ""}${event.homeTeam} ${h}-${a} ${event.awayTeam}`,
       });
     });
     // API events without a scorer feed: log score changes generically so the
@@ -509,7 +537,13 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
             : "Bet lost"
           : bet.status === "early_payout"
             ? "2UP paid early"
-            : "Bet void";
+            : bet.status === "half_win"
+              ? "Bet half won"
+              : bet.status === "half_lose"
+                ? "Bet half lost"
+                : bet.status === "push"
+                  ? "Bet push"
+                  : "Bet void";
     let detail = bet.label;
     if (promo) {
       detail = `${bet.label} · ${formatPromoTooltip(promo.amount, promo.reason)}`;
@@ -525,7 +559,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
       eventId: bet.eventId,
       title,
       detail,
-      amount: bet.status === "void" ? null : bet.actualProfit,
+      amount: bet.status === "void" || bet.status === "push" ? null : bet.actualProfit,
       createdAt: settlementTime,
     });
   }
@@ -538,63 +572,17 @@ function triggerProvisional(bet: BetRow, rule: TriggerRule, event: EventRow): nu
   return settleFromOutcome(toSettleable(bet), wouldWin).profit;
 }
 
-export interface LivePosition {
-  betId: number;
-  label: string;
-  eventName: string;
-  eventSport?: string;
-  /** Sport-aware status line — score for football, race state for racing */
-  eventStatusLabel: string;
-  minute: number;
-  /** @deprecated use eventStatusLabel */
-  score: string;
-  provisional: number | null;
-  /** Score-snapshot value if match ended now */
-  snapshotProvisional: number | null;
-  /** model = Dixon-Coles live EV; snapshot = current score */
-  valuationMode: "model" | "snapshot";
-  expected: number | null;
-  /** Live "wins IF" status, e.g. "wins IF Harry Kane scores first — no goals yet" */
-  triggerNote: string | null;
-}
-
-export interface RacingAutopilotNotice {
-  id: number;
-  message: string;
-}
-
-export interface AppState {
-  events: EventRow[];
-  bets: BetRow[];
-  settledProfit: number;
-  provisionalProfit: number;
-  livePositions: LivePosition[];
-  /** Cumulative settled P&L over time, for charting */
-  series: { time: number; value: number }[];
-  /** Latest commentary entries, newest first */
-  history: HistoryRow[];
-  /** Free bet promo credits by bet id */
-  promoAwards: Record<number, { amount: number; reason: string }>;
-  apiConfigured: boolean;
-  racingApiConfigured: boolean;
-  exchangeProvider: string;
-  exchangeName: string;
-  exchangeStatus: ExchangeProviderStatus;
-  exchangeProviders: ExchangeProviderStatus[];
-  /** Racing results synced this poll — client shows toasts once per id */
-  racingAutopilot: RacingAutopilotNotice[];
-  settings: AppSettings;
-  balances: BalanceSummary;
-  offers: OfferSummary[];
-}
-
 export async function getAppState(): Promise<AppState> {
   tickSimulations();
   await refreshApiEvents();
   const racingSync = await refreshRacingApiEvents();
+  const racingResultsTier = hasRacingApiKey()
+    ? await resolveRacingResultsTier().catch(() => getCachedRacingResultsTier())
+    : ("none" as const);
   settleTriggers();
   autoSettle();
   processAiEffects();
+  syncOfferSeriesInstances();
   syncOfferStatuses();
   backfillOffersFromBets();
 
@@ -622,6 +610,8 @@ export async function getAppState(): Promise<AppState> {
 
   const livePositions: LivePosition[] = [];
   let provisionalTotal = 0;
+  const liveValuedBetIds = new Set<number>();
+
   for (const bet of allBets.filter((b) => b.status === "open")) {
     const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
     if (!event || event.status !== "live") continue;
@@ -639,10 +629,16 @@ export async function getAppState(): Promise<AppState> {
       valuationMode = valuation.mode;
     }
 
-    if (provisional != null) provisionalTotal += provisional;
+    // Prefer live valuation; fall back to worst-case expected when live can't price it.
+    if (provisional == null) provisional = openBetExpectedProfit(bet);
+
+    if (provisional != null) {
+      provisionalTotal += provisional;
+      liveValuedBetIds.add(bet.id);
+    }
     const triggerNote =
       rule && bet.triggerText
-        ? `wins IF ${bet.triggerText} — ${evaluateTrigger(rule, toTriggerContext(event)).reason}`
+        ? `wins IF ${bet.triggerText} - ${evaluateTrigger(rule, toTriggerContext(event)).reason}`
         : bet.triggerText
           ? `wins IF ${bet.triggerText} (manual settle)`
           : null;
@@ -653,7 +649,7 @@ export async function getAppState(): Promise<AppState> {
     livePositions.push({
       betId: bet.id,
       label: bet.label,
-      eventName: event ? formatEventTitle(event) : "—",
+      eventName: event ? formatEventTitle(event) : "-",
       eventSport: event.sport ?? undefined,
       eventStatusLabel,
       minute: event.minute,
@@ -666,8 +662,31 @@ export async function getAppState(): Promise<AppState> {
     });
   }
 
+  // Pre-result open bets: count worst-case guaranteed (e.g. free-bet conversion).
+  for (const bet of allBets.filter((b) => b.status === "open")) {
+    if (liveValuedBetIds.has(bet.id)) continue;
+    const expected = openBetExpectedProfit(bet);
+    if (expected != null) provisionalTotal += expected;
+  }
+  provisionalTotal = Math.round(provisionalTotal * 100) / 100;
+
   const promoAwards = getPromoAwardsByBetId();
   const { entries: historyRows } = getHistoryFeed({ limit: 40 });
+  const chartHistory = getChartAnnotationHistory(allEvents, allBets, promoAwards);
+
+  const liveEventModels: LiveEventModel[] = [];
+  for (const event of allEvents) {
+    if (event.sport !== "football" || event.status !== "live") continue;
+    const model = liveModelForEvent(event);
+    if (!model) continue;
+    liveEventModels.push({
+      eventId: event.id,
+      marketsLabel: formatLiveMarkets(model.markets),
+      homeWin: model.markets.H,
+      draw: model.markets.D,
+      awayWin: model.markets.A,
+    });
+  }
 
   return {
     events: allEvents.sort((a, b) => a.startTime - b.startTime),
@@ -675,11 +694,16 @@ export async function getAppState(): Promise<AppState> {
     settledProfit: running,
     provisionalProfit: provisionalTotal,
     livePositions,
+    liveEventModels,
     series,
     history: historyRows,
+    chartHistory,
     promoAwards,
     apiConfigured: hasApiKey(),
     racingApiConfigured: hasRacingApiKey(),
+    racingResultsTier,
+    apiUsage: apiUsageToday(),
+    racingApiUsage: racingApiUsageToday(),
     exchangeProvider: getDefaultExchangeProvider(),
     exchangeName: getDefaultExchangeName(),
     exchangeStatus: getExchangeProviderStatus(getDefaultExchangeProvider()),

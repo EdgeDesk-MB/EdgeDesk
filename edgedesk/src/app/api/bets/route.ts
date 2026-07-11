@@ -35,7 +35,7 @@ const createSchema = z.object({
   refundAmount: z.number().optional(),
   refundRetention: z.number().optional(),
   legs: z.array(legSchema).optional(),
-  /** "The bet wins IF …" — parsed server-side into a structured rule */
+  /** "The bet wins IF …" - parsed server-side into a structured rule */
   triggerText: z.string().optional(),
   expectedProfit: z.number().optional(),
   notes: z.string().optional(),
@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
       offerId: resolvedOfferId ?? input.offerId,
       betType: input.betType,
       bookmaker: input.bookmaker,
+      backStake: input.backStake,
     }) ?? resolvedOfferId;
 
   const inserted = db

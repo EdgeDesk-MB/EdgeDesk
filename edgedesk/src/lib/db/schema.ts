@@ -19,7 +19,7 @@ export const events = sqliteTable("events", {
   source: text("source", { enum: ["api", "manual", "sim"] })
     .notNull()
     .default("manual"),
-  /** Goal timeline: JSON array of {minute, side, player?, og?} — feeds trigger settlement */
+  /** Goal timeline: JSON array of {minute, side, player?, og?} - feeds trigger settlement */
   goals: text("goals"),
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
@@ -58,11 +58,13 @@ export const bets = sqliteTable("bets", {
   refundRetention: real("refund_retention"),
   /** Dutch bets: JSON array of DutchLegRecord */
   legs: text("legs"),
-  /** "The bet wins IF …" — raw condition as typed by the user */
+  /** "The bet wins IF …" - raw condition as typed by the user */
   triggerText: text("trigger_text"),
   /** Parsed TriggerRule JSON; when present the trigger engine settles this bet */
   triggerRule: text("trigger_rule"),
-  status: text("status", { enum: ["open", "won", "lost", "void", "early_payout"] })
+  status: text("status", {
+    enum: ["open", "won", "lost", "void", "early_payout", "half_win", "half_lose", "push"],
+  })
     .notNull()
     .default("open"),
   expectedProfit: real("expected_profit"),
@@ -88,30 +90,86 @@ export const offers = sqliteTable("offers", {
   expiresAt: integer("expires_at"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
-  /** horse_racing for racing promos; null = generic offer */
+  /** horse_racing | football | sports | casino; null = general */
   sport: text("sport"),
-  /** e.g. bet_get_free_place */
+  /** e.g. bet_get_free_place | promo_terms */
   offerType: text("offer_type"),
   /** all courses when null or 'all'; else specific course name */
   scopeCourse: text("scope_course"),
   /** YYYY-MM-DD racing day scope */
   eventDate: text("event_date"),
-  /** JSON rules payload — see lib/offers/racing-offer-rules */
+  /** Racing API race_id when offer is locked to one race */
+  scopeRaceId: text("scope_race_id"),
+  /** Display label e.g. "15:00 · Bahrain Trophy" */
+  scopeRaceLabel: text("scope_race_label"),
+  /** JSON rules - racing place-refund and/or important promo terms */
   rules: text("rules"),
+  /** FK when this row is one occurrence of a recurring series */
+  seriesId: integer("series_id"),
+  /** YYYY-MM-DD occurrence date for recurring instances */
+  instanceDate: text("instance_date"),
 });
 
-/** Bookie or exchange wallet for bankroll tracking */
+/** Recurring offer template - instances are materialised as separate offer rows */
+export const offerSeries = sqliteTable("offer_series", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  recurrenceEnabled: integer("recurrence_enabled").notNull().default(1),
+  /** No new instances on/after this date (YYYY-MM-DD) when recurrence stopped */
+  recurrenceStoppedFrom: text("recurrence_stopped_from"),
+  ruleJson: text("rule_json").notNull(),
+  /** Reference expiry used to derive each instance deadline (time-of-day) */
+  templateExpiresAt: integer("template_expires_at"),
+  horizonDays: integer("horizon_days").notNull().default(14),
+  bookmaker: text("bookmaker"),
+  title: text("title").notNull(),
+  description: text("description"),
+  expectedProfit: real("expected_profit"),
+  sport: text("sport"),
+  offerType: text("offer_type"),
+  scopeCourse: text("scope_course"),
+  scopeRaceId: text("scope_race_id"),
+  scopeRaceLabel: text("scope_race_label"),
+  rules: text("rules"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/** Bookie, exchange, or bank wallet for bankroll tracking */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  type: text("type", { enum: ["bookie", "exchange"] }).notNull(),
+  type: text("type", { enum: ["bookie", "exchange", "bank"] }).notNull(),
   exchangeId: integer("exchange_id"),
+  /** Bookie/exchange: which bank usually funds this wallet */
+  fundedByAccountId: integer("funded_by_account_id"),
   brandColor: text("brand_color"),
   isActive: integer("is_active").notNull().default(1),
+  /**
+   * Bookie access status:
+   * available - can place offers
+   * gubbed - restricted / limited (still may have balance)
+   * closed - account shut
+   */
+  accessStatus: text("access_status", {
+    enum: ["available", "gubbed", "closed"],
+  })
+    .notNull()
+    .default("available"),
+  notes: text("notes"),
+  /** Outstanding wagering requirement (£ remaining) */
+  wrRemaining: real("wr_remaining").notNull().default(0),
+  /** Min decimal odds for a bet to count toward WR */
+  wrMinOdds: real("wr_min_odds"),
+  /**
+   * How much of a cash bet counts toward WR:
+   * stake - full back stake
+   * risk_win - min(stake, potential winnings) e.g. Pinnacle-style
+   */
+  wrType: text("wr_type", { enum: ["stake", "risk_win"] }).notNull().default("stake"),
   createdAt: integer("created_at").notNull(),
 });
 
-/** Ledger of top-ups, withdrawals, bet stakes and settlement payouts */
+/** Ledger of top-ups, withdrawals, bet stakes, settlements, transfers and fees */
 export const balanceTransactions = sqliteTable("balance_transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   accountId: integer("account_id").notNull(),
@@ -124,11 +182,18 @@ export const balanceTransactions = sqliteTable("balance_transactions", {
       "bet_stake",
       "bet_settlement",
       "free_bet",
+      "transfer",
+      "fee",
     ],
   }).notNull(),
   betId: integer("bet_id"),
+  /** Links paired transfer legs (and optional fee) */
+  transferGroupId: text("transfer_group_id"),
+  /** 1 = awaiting statement confirmation (Ultimatcher pending bank credit) */
+  pending: integer("pending").notNull().default(0),
   note: text("note"),
   createdAt: integer("created_at").notNull(),
+  confirmedAt: integer("confirmed_at"),
 });
 
 /**
@@ -157,14 +222,29 @@ export const appSettings = sqliteTable("app_settings", {
   value: text("value").notNull(),
 });
 
-/** SP snapshots polled from racecards — steamer/drifter on Racing Desk */
+/** SP snapshots polled from racecards - steamer/drifter on Racing Desk */
 export const racingOddsSnapshots = sqliteTable("racing_odds_snapshots", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   raceId: text("race_id").notNull(),
   horseId: text("horse_id").notNull(),
   horse: text("horse").notNull(),
   spDecimal: real("sp_decimal").notNull(),
+  /** bookie = back/SP movement; exchange = live lay movement */
+  kind: text("kind").notNull().default("bookie"),
   capturedAt: integer("captured_at").notNull(),
+});
+
+/**
+ * Manual odds pasted over proxy/API prices on Racing Desk.
+ * Free-tier workaround for live bookie odds without Racing API Standard.
+ */
+export const racingOddsOverrides = sqliteTable("racing_odds_overrides", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  raceId: text("race_id").notNull(),
+  horseId: text("horse_id").notNull(),
+  bookieDecimal: real("bookie_decimal"),
+  exchangeDecimal: real("exchange_decimal"),
+  updatedAt: integer("updated_at").notNull(),
 });
 
 export type EventRow = typeof events.$inferSelect;
@@ -180,3 +260,4 @@ export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
+export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;

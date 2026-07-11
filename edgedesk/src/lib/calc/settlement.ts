@@ -30,7 +30,7 @@ export interface MatchResult {
   /** Was the home side ever 2+ goals ahead (tracked from live score progression)? */
   homeLed2: boolean;
   awayLed2: boolean;
-  /** True while the match is still in play — settlement is then provisional */
+  /** True while the match is still in play - settlement is then provisional */
   inPlay?: boolean;
 }
 
@@ -99,11 +99,51 @@ export interface SettleableBet {
   ewMeta?: EachWayBetMeta;
 }
 
+export type SettledBetStatus =
+  | "won"
+  | "lost"
+  | "early_payout"
+  | "void"
+  | "half_win"
+  | "half_lose"
+  | "push";
+
 export interface SettlementOutcome {
-  status: "won" | "lost" | "early_payout" | "void";
+  status: SettledBetStatus;
   profit: number;
   /** Human readable explanation of how the number was reached */
   explanation: string;
+}
+
+/**
+ * Ultimatcher Pending-sheet partials: ½ win, ½ lose, push.
+ * Half outcomes average the full win and full lose P&L (dead-heat style).
+ */
+export function settlePartialOutcome(
+  bet: SettleableBet,
+  kind: "half_win" | "half_lose" | "push" | "void"
+): SettlementOutcome {
+  if (kind === "push" || kind === "void") {
+    return {
+      status: kind,
+      profit: 0,
+      explanation:
+        kind === "push"
+          ? "Push - stakes returned both sides"
+          : "Void - stakes returned both sides",
+    };
+  }
+  const win = settleFromOutcome(bet, true);
+  const lose = settleFromOutcome(bet, false);
+  const profit = (win.profit + lose.profit) / 2;
+  return {
+    status: kind,
+    profit,
+    explanation:
+      kind === "half_win"
+        ? `Half win (dead heat) - avg of win (£${win.profit.toFixed(2)}) and lose (£${lose.profit.toFixed(2)})`
+        : `Half lose - avg of win (£${win.profit.toFixed(2)}) and lose (£${lose.profit.toFixed(2)})`,
+  };
 }
 
 function selectionWon(market: Market, selection: string, outcomes: DerivedOutcomes): boolean | null {
@@ -155,7 +195,7 @@ function backSidePaid(bet: SettleableBet, outcomes: DerivedOutcomes): { paid: bo
 }
 
 /**
- * Settle a back+lay position from a known win/lose outcome — the shared leg maths
+ * Settle a back+lay position from a known win/lose outcome - the shared leg maths
  * used both by the result engine and by "The bet wins IF" trigger settlement.
  * `paid` covers 2UP early payouts where the bookie pays despite the selection losing.
  */
@@ -292,7 +332,7 @@ export function settleBet(bet: SettleableBet, result: MatchResult): SettlementOu
   const won = selectionWon(bet.market, bet.selection, outcomes);
   if (won === null) {
     if (bet.market === "draw_no_bet" && outcomes.matchOdds === "draw") {
-      return { status: "void", profit: 0, explanation: "Draw — draw no bet void (stakes returned)" };
+      return { status: "void", profit: 0, explanation: "Draw - draw no bet void (stakes returned)" };
     }
     return null;
   }
@@ -302,7 +342,7 @@ export function settleBet(bet: SettleableBet, result: MatchResult): SettlementOu
 }
 
 /**
- * Provisional value of an open bet given the CURRENT live score —
+ * Provisional value of an open bet given the CURRENT live score -
  * i.e. "what would I make if the match ended right now".
  */
 export function provisionalProfit(bet: SettleableBet, live: MatchResult): number | null {

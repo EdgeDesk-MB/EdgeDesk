@@ -4,6 +4,10 @@
  * through a "The bet wins IF …" trigger.
  */
 
+import { SPORTS, type SportValue } from "@/lib/sports";
+
+export { SPORTS };
+
 export interface MarketDef {
   value: string;
   label: string;
@@ -13,42 +17,98 @@ export interface MarketDef {
   options?: string[];
 }
 
-export const SPORTS = [
-  { value: "football", label: "Football" },
-  { value: "horse_racing", label: "Horse racing" },
-  { value: "tennis", label: "Tennis" },
+const TWO_WAY_MATCH: MarketDef[] = [
+  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
+  { value: "handicap", label: "Handicap" },
+  { value: "over_under", label: "Over/Under" },
   { value: "other", label: "Other" },
-] as const;
+];
 
-export const MARKETS: Record<string, MarketDef[]> = {
-  football: [
-    { value: "match_odds", label: "Match odds", auto: true, options: ["home", "draw", "away"] },
-    { value: "btts", label: "Both teams to score", auto: true, options: ["yes", "no"] },
-    { value: "over_under_1_5", label: "Over/Under 1.5 goals", auto: true, options: ["over", "under"] },
-    { value: "over_under_2_5", label: "Over/Under 2.5 goals", auto: true, options: ["over", "under"] },
-    { value: "over_under_3_5", label: "Over/Under 3.5 goals", auto: true, options: ["over", "under"] },
-    { value: "correct_score", label: "Correct score", auto: true },
-    { value: "first_goalscorer", label: "First goalscorer" },
-    { value: "anytime_goalscorer", label: "Anytime goalscorer" },
-    { value: "draw_no_bet", label: "Draw no bet", auto: true, options: ["home", "away"] },
-    { value: "double_chance", label: "Double chance", auto: true, options: ["home/draw", "home/away", "draw/away"] },
-    { value: "half_time_full_time", label: "Half time / Full time" },
-    { value: "other", label: "Other" },
-  ],
-  horse_racing: [
-    { value: "win", label: "Winner", auto: true },
-    { value: "each_way", label: "Each way" },
-    { value: "extra_place", label: "Extra place" },
-    { value: "place", label: "Place", auto: true },
-    { value: "other", label: "Other" },
-  ],
-  tennis: [
-    { value: "match_winner", label: "Match winner", options: ["home", "away"] },
-    { value: "set_betting", label: "Set betting" },
-    { value: "other", label: "Other" },
-  ],
+const OUTRIGHT: MarketDef[] = [
+  { value: "outright", label: "Outright / winner" },
+  { value: "top_finish", label: "Top finish" },
+  { value: "other", label: "Other" },
+];
+
+const RACING_STYLE: MarketDef[] = [
+  { value: "win", label: "Winner" },
+  { value: "place", label: "Place" },
+  { value: "other", label: "Other" },
+];
+
+const FOOTBALL_MARKETS: MarketDef[] = [
+  { value: "match_odds", label: "Match odds", auto: true, options: ["home", "draw", "away"] },
+  { value: "btts", label: "Both teams to score", auto: true, options: ["yes", "no"] },
+  { value: "over_under_1_5", label: "Over/Under 1.5 goals", auto: true, options: ["over", "under"] },
+  { value: "over_under_2_5", label: "Over/Under 2.5 goals", auto: true, options: ["over", "under"] },
+  { value: "over_under_3_5", label: "Over/Under 3.5 goals", auto: true, options: ["over", "under"] },
+  { value: "correct_score", label: "Correct score", auto: true },
+  { value: "first_goalscorer", label: "First goalscorer" },
+  { value: "anytime_goalscorer", label: "Anytime goalscorer" },
+  { value: "draw_no_bet", label: "Draw no bet", auto: true, options: ["home", "away"] },
+  { value: "double_chance", label: "Double chance", auto: true, options: ["home/draw", "home/away", "draw/away"] },
+  { value: "half_time_full_time", label: "Half time / Full time" },
+  { value: "other", label: "Other" },
+];
+
+const HORSE_RACING_MARKETS_LIST: MarketDef[] = [
+  { value: "win", label: "Winner", auto: true },
+  { value: "each_way", label: "Each way" },
+  { value: "extra_place", label: "Extra place" },
+  { value: "place", label: "Place", auto: true },
+  { value: "other", label: "Other" },
+];
+
+const TENNIS_MARKETS_LIST: MarketDef[] = [
+  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
+  { value: "set_betting", label: "Set betting" },
+  { value: "other", label: "Other" },
+];
+
+const CRICKET_MARKETS: MarketDef[] = [
+  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
+  { value: "top_batsman", label: "Top batsman" },
+  { value: "top_bowler", label: "Top bowler" },
+  { value: "other", label: "Other" },
+];
+
+const DARTS_MARKETS: MarketDef[] = [
+  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
+  { value: "correct_score", label: "Correct score" },
+  { value: "other", label: "Other" },
+];
+
+const SPORT_MARKET_OVERRIDES: Partial<Record<SportValue, MarketDef[]>> = {
+  football: FOOTBALL_MARKETS,
+  horse_racing: HORSE_RACING_MARKETS_LIST,
+  tennis: TENNIS_MARKETS_LIST,
+  cricket: CRICKET_MARKETS,
+  golf: OUTRIGHT,
+  darts: DARTS_MARKETS,
+  greyhounds: RACING_STYLE,
+  motorsport: OUTRIGHT,
+  cycling: OUTRIGHT,
+  rugby_union: TWO_WAY_MATCH,
+  rugby_league: TWO_WAY_MATCH,
+  basketball: TWO_WAY_MATCH,
+  american_football: TWO_WAY_MATCH,
+  boxing: TWO_WAY_MATCH,
+  mma: TWO_WAY_MATCH,
+  snooker: TWO_WAY_MATCH,
+  ice_hockey: TWO_WAY_MATCH,
+  volleyball: TWO_WAY_MATCH,
+  baseball: TWO_WAY_MATCH,
+  esports: TWO_WAY_MATCH,
   other: [{ value: "other", label: "Other" }],
 };
+
+function marketsForSport(sport: SportValue): MarketDef[] {
+  return SPORT_MARKET_OVERRIDES[sport] ?? TWO_WAY_MATCH;
+}
+
+export const MARKETS: Record<string, MarketDef[]> = Object.fromEntries(
+  SPORTS.map((s) => [s.value, marketsForSport(s.value)])
+);
 
 /** Flat market label lookup across all sports (for display in the bet log). */
 export const MARKET_LABELS: Record<string, string> = Object.fromEntries(
@@ -69,6 +129,7 @@ export function isAutoSettleMarket(sport: string, market: string): boolean {
 
 const HORSE_RACING_MARKETS = new Set(["win", "place", "each_way", "extra_place"]);
 const TENNIS_MARKETS = new Set(["match_winner", "set_betting"]);
+const OUTRIGHT_MARKETS = new Set(["outright", "top_finish"]);
 
 /** Infer sport from a stored market when the linked event is missing or not loaded yet. */
 export function inferSportFromBet(
@@ -78,6 +139,7 @@ export function inferSportFromBet(
   if (eventSport) return eventSport;
   if (HORSE_RACING_MARKETS.has(market)) return "horse_racing";
   if (TENNIS_MARKETS.has(market)) return "tennis";
+  if (OUTRIGHT_MARKETS.has(market)) return "golf";
   return "football";
 }
 

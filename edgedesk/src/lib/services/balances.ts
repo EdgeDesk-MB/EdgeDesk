@@ -2,35 +2,25 @@
  * Bankroll ledger: accounts, top-ups, and automatic bet stake / settlement flows.
  */
 import { eq, sql } from "drizzle-orm";
+import "server-only";
 import {
   accounts,
   balanceTransactions,
   bets,
   db,
+  exchanges,
   type AccountRow,
   type BetRow,
 } from "@/lib/db";
+import { ensureVenueAccount } from "@/lib/accounts/ensure-venue";
+import { sumFreeBetLotBalance } from "@/lib/accounts/free-bet-lot-balance";
+import { applyWageringRequirement } from "@/lib/accounts/wagering";
 
-export interface AccountBalance extends AccountRow {
-  balance: number;
-  freeBets: number;
-}
-
-export interface BalanceSummary {
-  total: number;
-  bookies: number;
-  exchanges: number;
-  accounts: AccountBalance[];
-}
+export type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
+import type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
 
 function accountFreeBetBalance(accountId: number): number {
-  return db
-    .select()
-    .from(balanceTransactions)
-    .where(eq(balanceTransactions.accountId, accountId))
-    .all()
-    .filter((t) => t.category === "free_bet")
-    .reduce((s, t) => s + t.amount, 0);
+  return sumFreeBetLotBalance(accountId);
 }
 
 function accountCashBalance(accountId: number): number {
@@ -39,7 +29,17 @@ function accountCashBalance(accountId: number): number {
     .from(balanceTransactions)
     .where(eq(balanceTransactions.accountId, accountId))
     .all()
-    .filter((t) => t.category !== "free_bet")
+    .filter((t) => t.category !== "free_bet" && !t.pending)
+    .reduce((s, t) => s + t.amount, 0);
+}
+
+function accountPendingIn(accountId: number): number {
+  return db
+    .select()
+    .from(balanceTransactions)
+    .where(eq(balanceTransactions.accountId, accountId))
+    .all()
+    .filter((t) => t.pending && t.amount > 0)
     .reduce((s, t) => s + t.amount, 0);
 }
 
@@ -63,9 +63,35 @@ export function getSettingsBookies(): AccountBalance[] {
     .from(accounts)
     .where(eq(accounts.type, "bookie"))
     .all()
-    .map((a) => ({ ...a, balance: accountBalance(a.id), freeBets: accountFreeBetBalance(a.id) }))
+    .map((a) => ({
+      ...a,
+      balance: accountBalance(a.id),
+      freeBets: accountFreeBetBalance(a.id),
+      pendingIn: accountPendingIn(a.id),
+    }))
     .filter((a) => a.isActive || a.balance !== 0 || accountHasLedger(a.id))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Cash locked by a single open ledgered bet (back stake + lay liability). */
+export function openBetInBetsAmount(
+  bet: Pick<BetRow, "status" | "balanceLedgered" | "betType" | "backStake" | "layStake" | "layOdds">
+): number {
+  if (bet.status !== "open" || !bet.balanceLedgered) return 0;
+  const isFree = bet.betType === "free_snr" || bet.betType === "free_sr";
+  const backLocked = isFree || bet.backStake <= 0 ? 0 : bet.backStake;
+  const liability =
+    bet.layStake > 0 && bet.layOdds > 1 ? bet.layStake * (bet.layOdds - 1) : 0;
+  return backLocked + liability;
+}
+
+/** Cash currently locked in open positions (Ultimatcher “In bets”). */
+export function getOpenInBetsTotal(): number {
+  return db
+    .select()
+    .from(bets)
+    .all()
+    .reduce((sum, bet) => sum + openBetInBetsAmount(bet), 0);
 }
 
 export function getBalanceSummary(): BalanceSummary {
@@ -74,25 +100,45 @@ export function getBalanceSummary(): BalanceSummary {
     .from(accounts)
     .where(eq(accounts.isActive, 1))
     .all()
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const order = { bank: 0, bookie: 1, exchange: 2 } as const;
+      const ao = order[a.type as keyof typeof order] ?? 9;
+      const bo = order[b.type as keyof typeof order] ?? 9;
+      if (ao !== bo) return ao - bo;
+      return a.name.localeCompare(b.name);
+    });
 
   const withBalances: AccountBalance[] = allAccounts.map((a) => ({
     ...a,
     balance: accountBalance(a.id),
     freeBets: accountFreeBetBalance(a.id),
+    pendingIn: accountPendingIn(a.id),
   }));
 
   const bookies = withBalances
     .filter((a) => a.type === "bookie")
     .reduce((s, a) => s + a.balance, 0);
-  const exchanges = withBalances
+  const exchangesTotal = withBalances
     .filter((a) => a.type === "exchange")
     .reduce((s, a) => s + a.balance, 0);
+  const banks = withBalances
+    .filter((a) => a.type === "bank")
+    .reduce((s, a) => s + a.balance, 0);
+  const pendingBankCredits = withBalances
+    .filter((a) => a.type === "bank")
+    .reduce((s, a) => s + a.pendingIn, 0);
+
+  const liquid = bookies + exchangesTotal + banks;
+  const inBets = getOpenInBetsTotal();
 
   return {
-    total: bookies + exchanges,
+    total: liquid,
     bookies,
-    exchanges,
+    exchanges: exchangesTotal,
+    banks,
+    pendingBankCredits,
+    inBets: Math.round(inBets * 100) / 100,
+    bankroll: Math.round((liquid + inBets) * 100) / 100,
     accounts: withBalances,
   };
 }
@@ -118,12 +164,25 @@ export function findExchangeAccount(exchangeId: number | null | undefined): Acco
     .find((a) => a.type === "exchange" && a.exchangeId === exchangeId);
 }
 
+/** Create exchange wallet from Settings exchange id when missing. */
+export function ensureExchangeAccountForBet(
+  exchangeId: number | null | undefined
+): AccountRow | undefined {
+  if (!exchangeId) return undefined;
+  const existing = findExchangeAccount(exchangeId);
+  if (existing) return existing;
+  const ex = db.select().from(exchanges).where(eq(exchanges.id, exchangeId)).get();
+  if (!ex) return undefined;
+  return ensureVenueAccount(ex.name, "exchange").account;
+}
+
 function insertTx(
   accountId: number,
   amount: number,
   category: (typeof balanceTransactions.$inferInsert)["category"],
   note: string,
-  betId?: number
+  betId?: number,
+  opts?: { transferGroupId?: string; pending?: boolean; confirmedAt?: number | null }
 ) {
   db.insert(balanceTransactions)
     .values({
@@ -131,8 +190,11 @@ function insertTx(
       amount,
       category,
       betId,
+      transferGroupId: opts?.transferGroupId ?? null,
+      pending: opts?.pending ? 1 : 0,
       note,
       createdAt: Date.now(),
+      confirmedAt: opts?.confirmedAt ?? null,
     })
     .run();
 }
@@ -147,12 +209,127 @@ export function recordManualTransaction(
   insertTx(accountId, amount, category, note ?? category.replace("_", " "));
 }
 
+export type TransferDirection = "to_venue" | "to_bank";
+
+/**
+ * Move cash between a bank and a bookie/exchange.
+ * Withdrawals to bank can leave the bank credit pending until statement confirmation.
+ */
+export function transferBetweenAccounts(input: {
+  bankAccountId: number;
+  venueAccountId: number;
+  amount: number;
+  /** to_venue = deposit into bookie/exchange; to_bank = withdraw to bank */
+  direction: TransferDirection;
+  fee?: number;
+  note?: string;
+  /** When withdrawing to bank, hold bank credit until confirmed (default true) */
+  pendingBankCredit?: boolean;
+}): { transferGroupId: string } {
+  const amount = Math.abs(input.amount);
+  if (!(amount > 0)) throw new Error("Amount must be positive");
+
+  const bank = db.select().from(accounts).where(eq(accounts.id, input.bankAccountId)).get();
+  const venue = db.select().from(accounts).where(eq(accounts.id, input.venueAccountId)).get();
+  if (!bank || !bank.isActive || bank.type !== "bank") {
+    throw new Error("Bank account not found");
+  }
+  if (!venue || !venue.isActive || (venue.type !== "bookie" && venue.type !== "exchange")) {
+    throw new Error("Bookie/exchange account not found");
+  }
+
+  const fee = Math.max(0, input.fee ?? 0);
+  if (fee >= amount && input.direction === "to_bank") {
+    throw new Error("Fee must be less than withdrawal amount");
+  }
+
+  const groupId = `xfer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const noteBase = input.note?.trim();
+
+  if (input.direction === "to_venue") {
+    // Bank → venue: bank loses amount (+ optional fee), venue gains amount
+    insertTx(
+      bank.id,
+      -amount,
+      "transfer",
+      noteBase ?? `Deposit to ${venue.name}`,
+      undefined,
+      { transferGroupId: groupId }
+    );
+    if (fee > 0) {
+      insertTx(bank.id, -fee, "fee", `Deposit fee`, undefined, {
+        transferGroupId: groupId,
+      });
+    }
+    insertTx(
+      venue.id,
+      amount,
+      "transfer",
+      noteBase ?? `Deposit from ${bank.name}`,
+      undefined,
+      { transferGroupId: groupId }
+    );
+  } else {
+    // Venue → bank: venue loses amount; bank gains amount−fee (optionally pending)
+    const pending = input.pendingBankCredit !== false;
+    const net = amount - fee;
+    insertTx(
+      venue.id,
+      -amount,
+      "transfer",
+      noteBase ?? `Withdraw to ${bank.name}`,
+      undefined,
+      { transferGroupId: groupId }
+    );
+    insertTx(
+      bank.id,
+      net,
+      "transfer",
+      noteBase
+        ? `${noteBase}${fee > 0 ? ` (−£${fee.toFixed(2)} fee)` : ""}`
+        : `Withdraw from ${venue.name}${fee > 0 ? ` (−£${fee.toFixed(2)} fee)` : ""}`,
+      undefined,
+      { transferGroupId: groupId, pending }
+    );
+  }
+
+  return { transferGroupId: groupId };
+}
+
+/** Confirm a pending bank credit (statement date received). */
+export function confirmPendingTransaction(txId: number): boolean {
+  const tx = db
+    .select()
+    .from(balanceTransactions)
+    .where(eq(balanceTransactions.id, txId))
+    .get();
+  if (!tx || !tx.pending) return false;
+  db.update(balanceTransactions)
+    .set({ pending: 0, confirmedAt: Date.now() })
+    .where(eq(balanceTransactions.id, txId))
+    .run();
+  return true;
+}
+
+export function listPendingTransactions(limit = 50) {
+  return db
+    .select()
+    .from(balanceTransactions)
+    .all()
+    .filter((t) => t.pending)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, limit);
+}
+
 /** Debit back stake and lay liability when a bet is saved. */
 export function ledgerBetPlacement(bet: BetRow): boolean {
   if (bet.balanceLedgered) return false;
 
-  const bookie = findBookieAccount(bet.bookmaker);
-  const exchange = findExchangeAccount(bet.exchangeId);
+  // First-use: create wallets so tracked bets always move money (Ultimatcher-style).
+  const bookie = bet.bookmaker?.trim()
+    ? ensureVenueAccount(bet.bookmaker, "bookie").account
+    : undefined;
+  const exchange = ensureExchangeAccountForBet(bet.exchangeId);
   if (!bookie && !exchange) return false;
 
   const liability = bet.layStake * (bet.layOdds - 1);
@@ -163,7 +340,7 @@ export function ledgerBetPlacement(bet: BetRow): boolean {
       bookie.id,
       -bet.backStake,
       "free_bet",
-      `Free bet used — ${bet.label}`,
+      `Free bet used - ${bet.label}`,
       bet.id
     );
   }
@@ -172,16 +349,17 @@ export function ledgerBetPlacement(bet: BetRow): boolean {
       bookie.id,
       -bet.backStake,
       "bet_stake",
-      `Back stake — ${bet.label}`,
+      `Back stake - ${bet.label}`,
       bet.id
     );
+    applyWageringRequirement(bet, bookie.id);
   }
   if (exchange && liability > 0) {
     insertTx(
       exchange.id,
       -liability,
       "bet_stake",
-      `Lay liability — ${bet.label}`,
+      `Lay liability - ${bet.label}`,
       bet.id
     );
   }
@@ -196,25 +374,47 @@ export function ledgerBetPlacement(bet: BetRow): boolean {
  */
 export function ledgerBetSettlement(bet: BetRow): boolean {
   if (bet.balanceSettled || !bet.balanceLedgered) return false;
-  if (bet.status === "void") {
-    db.update(bets).set({ balanceSettled: 1 }).where(eq(bets.id, bet.id)).run();
-    return false;
-  }
 
-  const bookie = findBookieAccount(bet.bookmaker);
-  const exchange = findExchangeAccount(bet.exchangeId);
+  const bookie = bet.bookmaker?.trim()
+    ? ensureVenueAccount(bet.bookmaker, "bookie").account
+    : findBookieAccount(bet.bookmaker);
+  const exchange =
+    ensureExchangeAccountForBet(bet.exchangeId) ?? findExchangeAccount(bet.exchangeId);
   if (!bookie && !exchange) return false;
 
   const liability = bet.layStake * (bet.layOdds - 1);
   const layWinnings = bet.layStake * (1 - bet.commission);
+  const isFree = bet.betType === "free_snr" || bet.betType === "free_sr";
 
-  const paid =
-    bet.status === "won" || bet.status === "early_payout";
+  if (bet.status === "void" || bet.status === "push") {
+    if (bookie && bet.backStake > 0) {
+      insertTx(
+        bookie.id,
+        bet.backStake,
+        isFree ? "free_bet" : "bet_settlement",
+        `${bet.status === "push" ? "Push" : "Void"} - stake returned - ${bet.label}`,
+        bet.id
+      );
+    }
+    if (exchange && liability > 0) {
+      insertTx(
+        exchange.id,
+        liability,
+        "bet_settlement",
+        `${bet.status === "push" ? "Push" : "Void"} - liability returned - ${bet.label}`,
+        bet.id
+      );
+    }
+    db.update(bets).set({ balanceSettled: 1 }).where(eq(bets.id, bet.id)).run();
+    return true;
+  }
+
   const early = bet.status === "early_payout";
-  const backWon = paid;
-  const layLoses = backWon;
+  const half = bet.status === "half_win" || bet.status === "half_lose";
+  const paid = bet.status === "won" || early;
+  const bookieFactor = half ? 0.5 : paid ? 1 : 0;
 
-  if (bookie && paid) {
+  if (bookie && bookieFactor > 0) {
     let payout = 0;
     switch (bet.betType) {
       case "free_snr":
@@ -227,23 +427,32 @@ export function ledgerBetSettlement(bet: BetRow): boolean {
         payout = bet.backStake * bet.backOdds;
         break;
     }
+    payout *= bookieFactor;
     if (payout > 0) {
+      const label = half
+        ? bet.status === "half_win"
+          ? "half win"
+          : "half lose"
+        : early
+          ? "2UP"
+          : "back won";
       insertTx(
         bookie.id,
         payout,
         "bet_settlement",
-        `Bookie payout (${early ? "2UP" : "back won"}) — ${bet.label}`,
+        `Bookie payout (${label}) - ${bet.label}`,
         bet.id
       );
     }
   }
 
-  if (exchange && !layLoses && bet.layStake > 0) {
+  const layCreditFactor = half ? 0.5 : paid ? 0 : 1;
+  if (exchange && layCreditFactor > 0 && bet.layStake > 0) {
     insertTx(
       exchange.id,
-      liability + layWinnings,
+      (liability + layWinnings) * layCreditFactor,
       "bet_settlement",
-      `Lay won — ${bet.label}`,
+      half ? `Lay half settled - ${bet.label}` : `Lay won - ${bet.label}`,
       bet.id
     );
   }
@@ -255,8 +464,8 @@ export function ledgerBetSettlement(bet: BetRow): boolean {
 /** Credit a promotional free-bet award to the bookie wallet. */
 export function ledgerPromoAward(bet: BetRow, amount: number, reason: string): boolean {
   if (amount <= 0) return false;
-  const bookie = findBookieAccount(bet.bookmaker);
-  if (!bookie) return false;
+  if (!bet.bookmaker?.trim()) return false;
+  const bookie = ensureVenueAccount(bet.bookmaker, "bookie").account;
 
   const existing = db
     .select()
@@ -270,7 +479,7 @@ export function ledgerPromoAward(bet: BetRow, amount: number, reason: string): b
     bookie.id,
     amount,
     "free_bet",
-    `Free bet promo — ${reason} (${bet.label})`,
+    `Free bet promo - ${reason} (${bet.label})`,
     bet.id
   );
   return true;
@@ -278,7 +487,7 @@ export function ledgerPromoAward(bet: BetRow, amount: number, reason: string): b
 
 /** Apply ledger when a bet moves to a settled status. */
 export function ledgerFromSettledBet(bet: BetRow): void {
-  if (bet.status === "open" || bet.status === "void" || bet.balanceSettled) return;
+  if (bet.status === "open" || bet.balanceSettled) return;
   ledgerBetSettlement(bet);
 }
 
@@ -298,7 +507,7 @@ export function getPromoAwardsByBetId(): Record<number, { amount: number; reason
   for (const tx of db.select().from(balanceTransactions).all()) {
     if (tx.category !== "free_bet" || tx.betId == null || tx.amount <= 0) continue;
     if (map[tx.betId]) continue;
-    const reasonMatch = tx.note?.match(/Free bet promo — (.+?) \(/);
+    const reasonMatch = tx.note?.match(/Free bet promo - (.+?) \(/);
     map[tx.betId] = {
       amount: tx.amount,
       reason: reasonMatch?.[1]?.trim() ?? "Free bet awarded",

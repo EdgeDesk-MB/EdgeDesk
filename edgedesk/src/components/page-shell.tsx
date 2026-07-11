@@ -9,20 +9,24 @@ export function PageShell({
   children,
   className,
   fullHeight,
+  compact,
 }: {
   children: React.ReactNode;
   className?: string;
   /** Fill the centred page panel height (Live Dashboard) */
   fullHeight?: boolean;
+  /** @deprecated Alias for `fullHeight` */
+  compact?: boolean;
 }) {
+  const useCompact = compact ?? fullHeight;
   return (
     <div
       className={cn(
         PAGE_SHELL_CLASS,
-        fullHeight ? pageShellCompact : pageShell,
-        fullHeight &&
+        useCompact ? pageShellCompact : pageShell,
+        useCompact &&
           "flex h-[var(--layout-page-min-h)] min-h-[var(--layout-page-min-h)] flex-col overflow-hidden",
-        !fullHeight && "w-full",
+        !useCompact && "w-full",
         className
       )}
     >
@@ -46,7 +50,7 @@ export function PageBody({
   );
 }
 
-/** 5-column grid — main 3/5, side 2/5 at lg+ */
+/** 5-column grid - main 3/5, side 2/5 at lg+ */
 export function PageGrid({
   children,
   className,

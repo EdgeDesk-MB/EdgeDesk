@@ -1,10 +1,11 @@
-import type { BetRow } from "@/lib/db/schema";
-import type { OfferSummary } from "@/lib/services/offers";
+import type { BetRow, EventRow } from "@/lib/db/schema";
+import type { OfferSummary } from "@/lib/services/offers.types";
 
 export type BetDeskQueue =
   | "all"
   | "open"
   | "needs_lay"
+  | "settle"
   | "offers"
   | "orphans";
 
@@ -12,6 +13,7 @@ export const BET_DESK_QUEUES: { id: BetDeskQueue; label: string }[] = [
   { id: "all", label: "All" },
   { id: "open", label: "Open" },
   { id: "needs_lay", label: "Needs lay" },
+  { id: "settle", label: "Settle" },
   { id: "offers", label: "Offer campaigns" },
   { id: "orphans", label: "Orphans" },
 ];
@@ -21,7 +23,20 @@ export function betNeedsLay(bet: BetRow): boolean {
   return bet.status === "open" && bet.backStake > 0 && !(bet.layStake > 0);
 }
 
-export function betMatchesDeskQueue(bet: BetRow, queue: BetDeskQueue): boolean {
+/** Open bet on a finished event - waiting for manual / API settlement. */
+export function betNeedsSettlement(
+  bet: BetRow,
+  eventById: Map<number, Pick<EventRow, "status">>
+): boolean {
+  if (bet.status !== "open" || bet.eventId == null) return false;
+  return eventById.get(bet.eventId)?.status === "finished";
+}
+
+export function betMatchesDeskQueue(
+  bet: BetRow,
+  queue: BetDeskQueue,
+  eventById?: Map<number, Pick<EventRow, "status">>
+): boolean {
   switch (queue) {
     case "all":
       return true;
@@ -29,6 +44,8 @@ export function betMatchesDeskQueue(bet: BetRow, queue: BetDeskQueue): boolean {
       return bet.status === "open";
     case "needs_lay":
       return betNeedsLay(bet);
+    case "settle":
+      return eventById != null && betNeedsSettlement(bet, eventById);
     case "offers":
       return bet.offerId != null;
     case "orphans":
@@ -38,12 +55,20 @@ export function betMatchesDeskQueue(bet: BetRow, queue: BetDeskQueue): boolean {
   }
 }
 
-export function filterBetsByDeskQueue(bets: BetRow[], queue: BetDeskQueue): BetRow[] {
-  return bets.filter((b) => betMatchesDeskQueue(b, queue));
+export function filterBetsByDeskQueue(
+  bets: BetRow[],
+  queue: BetDeskQueue,
+  eventById?: Map<number, Pick<EventRow, "status">>
+): BetRow[] {
+  return bets.filter((b) => betMatchesDeskQueue(b, queue, eventById));
 }
 
-export function countDeskQueue(bets: BetRow[], queue: BetDeskQueue): number {
-  return filterBetsByDeskQueue(bets, queue).length;
+export function countDeskQueue(
+  bets: BetRow[],
+  queue: BetDeskQueue,
+  eventById?: Map<number, Pick<EventRow, "status">>
+): number {
+  return filterBetsByDeskQueue(bets, queue, eventById).length;
 }
 
 export interface BetCampaignGroup {
@@ -127,12 +152,17 @@ export function deskQueueEmptyCopy(queue: BetDeskQueue): {
     case "open":
       return {
         title: "No open bets",
-        description: "Everything is settled — or add a new position to track.",
+        description: "Everything is settled - or add a new position to track.",
       };
     case "needs_lay":
       return {
         title: "No unmatched backs",
         description: "Every open back already has a lay stake logged.",
+      };
+    case "settle":
+      return {
+        title: "Nothing waiting to settle",
+        description: "No open bets on finished events - results are clear or still in play.",
       };
     case "offers":
       return {

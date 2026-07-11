@@ -1,16 +1,21 @@
 /**
- * Betfair Exchange API — session login + listMarketCatalogue / listMarketBook.
+ * Betfair Exchange API - session login + listMarketCatalogue / listMarketBook.
  *
  * Free dev: request a **Delayed Application Key** at developer.betfair.com.
  * Delayed keys return prices ~1–3 minutes behind live (fine for offer scouting).
  * Live prices require a paid Application Key and may need vendor approval.
+ *
+ * Accounts with 2FA: set BETFAIR_TOTP_SECRET (authenticator base32 secret) so
+ * EdgeDesk can append the current code to the password on login.
  */
+import { TOTP } from "otpauth";
 import type {
   ExchangeConnectionStatus,
   ExchangeLayQuote,
   ExchangeRaceContext,
   ExchangeRaceOdds,
 } from "./types";
+import { chunkMarketIds } from "./format-exchange-error";
 
 const IDENTITY_URL = "https://identitysso.betfair.com/api/login";
 const BETTING_URL = "https://api.betfair.com/exchange/betting/rest/v1.0";
@@ -19,12 +24,18 @@ const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
 let cachedToken: { token: string; at: number } | null = null;
 
-function credentials(): { appKey: string; username: string; password: string } | null {
+function credentials(): {
+  appKey: string;
+  username: string;
+  password: string;
+  totpSecret: string | null;
+} | null {
   const appKey = process.env.BETFAIR_APP_KEY?.trim();
   const username = process.env.BETFAIR_USERNAME?.trim();
   const password = process.env.BETFAIR_PASSWORD?.trim();
+  const totpSecret = process.env.BETFAIR_TOTP_SECRET?.trim() || null;
   if (!appKey || !username || !password) return null;
-  return { appKey, username, password };
+  return { appKey, username, password, totpSecret };
 }
 
 export function betfairConfigured(): boolean {
@@ -33,12 +44,49 @@ export function betfairConfigured(): boolean {
 
 export function betfairFeedType(): "live" | "delayed" {
   const key = process.env.BETFAIR_APP_KEY?.trim().toLowerCase() ?? "";
-  return key.includes("delay") ? "delayed" : "live";
+  // Delayed keys are often labelled in the developer portal; the key string itself
+  // may not contain "delay". Prefer env hint, then key substring.
+  const hint = process.env.BETFAIR_FEED_TYPE?.trim().toLowerCase();
+  if (hint === "delayed" || hint === "live") return hint;
+  return key.includes("delay") ? "delayed" : "delayed";
 }
 
 export function betfairConnectionStatus(): ExchangeConnectionStatus {
   if (!credentials()) return "not_configured";
   return "connected";
+}
+
+function currentTotpCode(secret: string): string {
+  const totp = new TOTP({
+    secret: secret.replace(/\s+/g, "").toUpperCase(),
+    digits: 6,
+    period: 30,
+    algorithm: "SHA1",
+  });
+  return totp.generate();
+}
+
+function loginPassword(creds: {
+  password: string;
+  totpSecret: string | null;
+}): string {
+  if (!creds.totpSecret) return creds.password;
+  return `${creds.password}${currentTotpCode(creds.totpSecret)}`;
+}
+
+function formatLoginError(status?: string, error?: string): string {
+  const code = (error ?? status ?? "").toUpperCase();
+  if (code.includes("STRONG_AUTH_CODE_REQUIRED")) {
+    return (
+      "Betfair requires 2FA. Add BETFAIR_TOTP_SECRET to .env.local " +
+      "(the base32 secret from your Authenticator app setup - not the 6-digit code), " +
+      "then restart the server and test again."
+    );
+  }
+  if (code.includes("CERT_AUTH_REQUIRED")) {
+    return "Betfair wants certificate login - interactive username/password login should work with a delayed key; check app key and credentials.";
+  }
+  return error ?? status ?? "Betfair login failed";
 }
 
 export async function testBetfairConnection(): Promise<{
@@ -58,11 +106,12 @@ export async function testBetfairConnection(): Promise<{
   try {
     await login();
     const feedType = betfairFeedType();
+    const hasTotp = !!credentials()?.totpSecret;
     return {
       ok: true,
       status: "connected",
       feedType,
-      message: `Betfair login successful (${feedType} feed)`,
+      message: `Betfair login successful (${feedType} feed${hasTotp ? ", 2FA" : ""})`,
     };
   } catch (e) {
     cachedToken = null;
@@ -70,7 +119,7 @@ export async function testBetfairConnection(): Promise<{
       ok: false,
       status: "disconnected",
       feedType: betfairFeedType(),
-      message: String(e),
+      message: String(e).replace(/^Error:\s*/, ""),
     };
   }
 }
@@ -90,15 +139,6 @@ function normCourse(course: string): string {
     .replace(/\s+park$/, "");
 }
 
-function horseMatch(a: string, b: string): boolean {
-  const na = normName(a);
-  const nb = normName(b);
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  const strip = (s: string) => s.replace(/\s*\(.*\)$/, "").trim();
-  return strip(na) === strip(nb);
-}
-
 async function login(): Promise<string> {
   const creds = credentials();
   if (!creds) throw new Error("Betfair credentials not configured");
@@ -107,7 +147,10 @@ async function login(): Promise<string> {
     return cachedToken.token;
   }
 
-  const body = new URLSearchParams({ username: creds.username, password: creds.password });
+  const body = new URLSearchParams({
+    username: creds.username,
+    password: loginPassword(creds),
+  });
   const res = await fetch(IDENTITY_URL, {
     method: "POST",
     headers: {
@@ -121,7 +164,7 @@ async function login(): Promise<string> {
   const data = (await res.json()) as { token?: string; status?: string; error?: string };
   if (!res.ok || !data.token) {
     cachedToken = null;
-    throw new Error(data.error ?? data.status ?? `Betfair login failed (${res.status})`);
+    throw new Error(formatLoginError(data.status, data.error) || `Betfair login failed (${res.status})`);
   }
 
   cachedToken = { token: data.token, at: Date.now() };
@@ -181,19 +224,36 @@ function matchMarket(
 ): MarketCatalogueRow | undefined {
   const course = normCourse(race.course);
   const raceStart = race.startTime;
-  const toleranceMs = 5 * 60 * 1000;
+  // UK off times vs Betfair UTC can drift; also allow offTime string match.
+  const toleranceMs = 20 * 60 * 1000;
+  const raceOff = (race.offTime ?? "").trim().replace(/^0/, "");
 
   const candidates = markets.filter((m) => {
-    const eventName = normName(m.event?.name ?? m.marketName ?? "");
+    const eventName = normName(m.event?.name ?? "");
+    const marketName = normName(m.marketName ?? "");
     const courseHit =
       eventName.includes(course) ||
       course.includes(eventName.split(" ")[0] ?? "") ||
-      normCourse(eventName).includes(course);
+      normCourse(eventName).includes(course) ||
+      marketName.includes(course);
     if (!courseHit) return false;
 
     const marketTime = new Date(m.marketStartTime ?? m.event?.openDate ?? 0).getTime();
     if (!Number.isFinite(marketTime)) return false;
-    return Math.abs(marketTime - raceStart) <= toleranceMs;
+
+    if (Math.abs(marketTime - raceStart) <= toleranceMs) return true;
+
+    if (raceOff) {
+      const londonOff = new Date(marketTime).toLocaleTimeString("en-GB", {
+        timeZone: "Europe/London",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: false,
+      });
+      const normOff = (s: string) => s.replace(/^0/, "").replace(/\s/g, "");
+      if (normOff(londonOff) === normOff(raceOff)) return true;
+    }
+    return false;
   });
 
   if (candidates.length === 0) return undefined;
@@ -230,7 +290,7 @@ export async function fetchBetfairLayOdds(
         marketStartTime: window,
       },
       marketProjection: ["RUNNER_DESCRIPTION", "EVENT", "MARKET_START_TIME"],
-      maxResults: 200,
+      maxResults: 400,
       sort: "FIRST_TO_START",
     });
   } catch (e) {
@@ -252,10 +312,13 @@ export async function fetchBetfairLayOdds(
 
   if (marketIds.length > 0) {
     try {
-      books = await betfairPost<MarketBookRow[]>("listMarketBook", {
-        marketIds,
-        priceProjection: { priceData: ["EX_BEST_OFFERS"] },
-      });
+      for (const batch of chunkMarketIds(marketIds)) {
+        const batchBooks = await betfairPost<MarketBookRow[]>("listMarketBook", {
+          marketIds: batch,
+          priceProjection: { priceData: ["EX_BEST_OFFERS"] },
+        });
+        books.push(...batchBooks);
+      }
     } catch (e) {
       return races.map((r) => ({
         externalId: r.externalId,
@@ -283,21 +346,38 @@ export async function fetchBetfairLayOdds(
       (market.runners ?? []).map((r) => [r.selectionId, r.runnerName])
     );
 
-    const quotes: ExchangeLayQuote[] = [];
+    const activeLays: Array<{
+      exchangeName: string;
+      layDecimal: number;
+      laySize: number;
+    }> = [];
     for (const bookRunner of book?.runners ?? []) {
       if (bookRunner.status !== "ACTIVE") continue;
       const lay = bookRunner.ex?.availableToLay?.[0];
       if (!lay || lay.price <= 1) continue;
+      const exchangeName = runnerNameById.get(bookRunner.selectionId) ?? "";
+      if (!exchangeName) continue;
+      activeLays.push({
+        exchangeName,
+        layDecimal: Math.round(lay.price * 100) / 100,
+        laySize: lay.size,
+      });
+    }
 
-      const horseName = runnerNameById.get(bookRunner.selectionId) ?? "";
-      const matchedRunner = race.runners.find((r) => horseMatch(r.name, horseName));
+    const nameToRunner = matchHorsesByName(
+      race.runners,
+      activeLays.map((l) => l.exchangeName)
+    );
+
+    const quotes: ExchangeLayQuote[] = [];
+    for (const lay of activeLays) {
+      const matchedRunner = nameToRunner.get(lay.exchangeName);
       if (!matchedRunner) continue;
-
       quotes.push({
         horseId: matchedRunner.horseId,
         horseName: matchedRunner.name,
-        layDecimal: Math.round(lay.price * 100) / 100,
-        laySize: lay.size,
+        layDecimal: lay.layDecimal,
+        laySize: lay.laySize,
         source: "live",
       });
     }
@@ -312,7 +392,7 @@ export async function fetchBetfairLayOdds(
   });
 }
 
-/** Reset cached session — for tests */
+/** Reset cached session - for tests */
 export function resetBetfairSession(): void {
   cachedToken = null;
 }

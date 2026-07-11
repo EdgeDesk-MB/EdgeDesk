@@ -6,7 +6,7 @@ import {
   groupBetsByCampaign,
 } from "@/lib/bets/desk-queues";
 import type { BetRow } from "@/lib/db/schema";
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
 
 function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
   return {
@@ -60,10 +60,22 @@ describe("filterBetsByDeskQueue", () => {
     bet({ id: 4, offerId: null, layStake: 0 }),
   ];
 
-  it("counts open and needs_lay", () => {
+  it("counts open, needs_lay, and settle inbox", () => {
     expect(countDeskQueue(bets, "open")).toBe(3);
     expect(countDeskQueue(bets, "needs_lay")).toBe(2);
     expect(filterBetsByDeskQueue(bets, "orphans").map((b) => b.id)).toEqual([3, 4]);
+
+    const withEvent = [
+      bet({ id: 10, eventId: 1, status: "open" }),
+      bet({ id: 11, eventId: 2, status: "open" }),
+      bet({ id: 12, eventId: 1, status: "won" }),
+    ];
+    const events = new Map([
+      [1, { status: "finished" as const }],
+      [2, { status: "live" as const }],
+    ]);
+    expect(countDeskQueue(withEvent, "settle", events)).toBe(1);
+    expect(filterBetsByDeskQueue(withEvent, "settle", events).map((b) => b.id)).toEqual([10]);
   });
 });
 
@@ -83,6 +95,8 @@ describe("groupBetsByCampaign", () => {
           offerType: null,
           rules: null,
           scopeCourse: null,
+    scopeRaceId: null,
+    scopeRaceLabel: null,
           eventDate: null,
           expiresAt: null,
           completedAt: null,
@@ -102,6 +116,7 @@ describe("groupBetsByCampaign", () => {
             freeBetProfit: 0,
             freeBetOpenCount: 0,
             freeBetSettledCount: 0,
+            openExpectedProfit: 0,
             totalProfit: 0,
           },
         },

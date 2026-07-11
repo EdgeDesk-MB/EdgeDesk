@@ -60,7 +60,7 @@ export function DeskPageHeader({
   }
 
   return (
-    <div className={cn("surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none", className)}>
+    <div className={cn("surface-lift overflow-hidden rounded-[var(--layout-page-radius)] ring-1 ring-border/50 dark:shadow-none", className)}>
       {band}
     </div>
   );

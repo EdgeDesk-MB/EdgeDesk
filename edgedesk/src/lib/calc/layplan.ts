@@ -5,18 +5,19 @@
  * odds, and one further lay to be placed at the current market odds. The three
  * named targets solve for that remaining lay stake:
  *
- * - standard  — equalise profit whichever side wins (classic matched bet)
- * - underlay  — zero net P&L when the BOOKIE bet LOSES (all profit rides on the
+ * - standard  - equalise profit whichever side wins (classic matched bet)
+ * - underlay  - zero net P&L when the BOOKIE bet LOSES (all profit rides on the
  *               bookie win; the user's boosted-odds play)
- * - overlay   — zero net P&L when the BOOKIE bet WINS (all profit lands on the
+ * - overlay   - zero net P&L when the BOOKIE bet WINS (all profit lands on the
  *               exchange side)
  *
  * Commission is charged on lay winnings; part lays are assumed to be at the same
  * exchange (same commission) as the remaining lay.
  */
 
-import type { BetMode } from "./matched";
+import { matchedBackReturns, type BetMode } from "./matched";
 import { roundPence } from "./money";
+import type { SpecialBonus } from "./special-bonus";
 
 export interface PartLay {
   odds: number;
@@ -33,23 +34,12 @@ export interface LayPlanInput {
   partLays?: PartLay[];
   refundAmount?: number;
   refundRetention?: number;
+  specialBonus?: SpecialBonus;
 }
 
 /** Bookie-side profit for each outcome, independent of any laying. */
 export function backReturns(input: LayPlanInput): { win: number; lose: number } {
-  const { mode, backStake, backOdds } = input;
-  switch (mode) {
-    case "qualifying":
-      return { win: backStake * (backOdds - 1), lose: -backStake };
-    case "free_snr":
-      return { win: backStake * (backOdds - 1), lose: 0 };
-    case "free_sr":
-      return { win: backStake * backOdds, lose: 0 };
-    case "risk_free": {
-      const refund = (input.refundAmount ?? backStake) * (input.refundRetention ?? 0.7);
-      return { win: backStake * (backOdds - 1), lose: -backStake + refund };
-    }
-  }
+  return matchedBackReturns(input);
 }
 
 export interface LayBounds {
@@ -80,7 +70,7 @@ export function layBounds(input: LayPlanInput): LayBounds {
   return { standard: clamp0(standard), underlay: clamp0(underlay), overlay: clamp0(overlay) };
 }
 
-/** Lay stake rounded to the nearest penny — what you can actually place on-exchange. */
+/** Lay stake rounded to the nearest penny - what you can actually place on-exchange. */
 export function executableLayStake(input: LayPlanInput, override?: number | null): number {
   if (override != null && Number.isFinite(override)) return roundPence(override);
   return roundPence(layBounds(input).standard);

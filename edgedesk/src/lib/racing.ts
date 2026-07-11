@@ -1,5 +1,5 @@
 /**
- * Horse racing helpers — name matching, place terms, results stored in events.goals.
+ * Horse racing helpers - name matching, place terms, results stored in events.goals.
  */
 
 export interface RaceRunnerResult {
@@ -56,6 +56,16 @@ export function parseRaceResults(goals: string | null | undefined): RaceResult |
     /* football goal timeline or legacy data */
   }
   return null;
+}
+
+/**
+ * Winner-only results (e.g. manual "Set winner") lack 2nd/3rd/4th placings -
+ * place-refund free bets cannot be evaluated until full API results land.
+ */
+export function isRaceResultIncomplete(result: RaceResult | null | undefined): boolean {
+  if (!result) return true;
+  const placed = result.runners.filter((r) => r.position > 0);
+  return placed.length <= 1;
 }
 
 export function serializeRaceResults(result: Omit<RaceResult, "kind">): string {

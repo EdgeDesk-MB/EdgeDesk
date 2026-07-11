@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
   const { homeTeam, awayTeam, sport, startTime, competition } = parsed.data;
 
-  // 1. An event we're already tracking (don't duplicate) — fuzzy team match
+  // 1. An event we're already tracking (don't duplicate) - fuzzy team match
   const existing = db
     .select()
     .from(events)
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ event: inserted, mode: "api" });
   }
 
-  // 3. Manual event — scores updated by hand on the Events page
+  // 3. Manual event - scores updated by hand on the Events page
   const inserted = db
     .insert(events)
     .values({

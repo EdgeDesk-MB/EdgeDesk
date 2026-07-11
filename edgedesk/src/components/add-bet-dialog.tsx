@@ -23,8 +23,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { AdvancedLaySection } from "@/components/calc/advanced-lay";
-import { BackBookieBalanceStrip, isFreeBetBetType } from "@/components/add-bet/back-bookie-balance-strip";
+import { BackBookieBalanceStrip, bookieFreeBetBalance, bookieNeedsCashFunding, isFreeBetBetType } from "@/components/add-bet/back-bookie-balance-strip";
 import { BookmakerSelect } from "@/components/calc/bookmaker-select";
+import { VenueBadge } from "@/components/venue-badge";
 import {
   BackPanel,
   LayPanel,
@@ -38,7 +39,16 @@ import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { api } from "@/hooks/use-app-state";
 import { useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { layBounds, layPlanOutcome, executableLayStake, previewAiTriggersFromInput, type BetMode, type PartLay } from "@/lib/calc";
+import {
+  layBounds,
+  layPlanOutcome,
+  executableLayStake,
+  offerTriggerDetectedInLabel,
+  offerTriggerFromLabel,
+  previewAiTriggersFromInput,
+  type BetMode,
+  type PartLay,
+} from "@/lib/calc";
 import { contrastText } from "@/lib/brands/exchanges";
 import { defaultSelection, formatCorrectScore, inferSportFromBet, marketDef, MARKETS, parseCorrectScore, SPORTS, teamSelectionLabel } from "@/lib/markets";
 import type { BetRow, ExchangeRow } from "@/lib/db/schema";
@@ -56,12 +66,22 @@ import {
   teamsMatch,
   type TrackedEventLike,
 } from "@/lib/events";
+import {
+  offerMatchesBetContext,
+  parseOfferRules,
+  placeRefundTriggerText,
+} from "@/lib/offers/racing-offer-rules";
+import {
+  bookmakerFromOfferPrefs,
+  stakeFromOfferPrefs,
+} from "@/lib/services/settings-shared";
 import { liveEventInlineLabel } from "@/components/events/live-event-status";
 import { EventTimeInput } from "@/components/event-time-input";
 import { SportIcon, SportLabel } from "@/components/sport-icon";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { cn } from "@/lib/utils";
-import { CircleAlert, CircleCheck, Sparkles, Trash2, Zap } from "lucide-react";
+import { BetOfferTriggerField } from "@/components/add-bet/bet-offer-trigger-field";
+import { Gift, Sparkles, Trash2, Zap } from "lucide-react";
 import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
 import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
@@ -86,6 +106,7 @@ export interface EventLite extends TrackedEventLike {
   sport?: string;
   competition?: string | null;
   startTime: number;
+  externalId?: string | null;
   homeScore?: number;
   awayScore?: number;
   minute?: number;
@@ -142,7 +163,7 @@ function exchangeFromNotes(notes: string | null | undefined, exchanges: Exchange
 }
 
 /**
- * The app-wide Add bet dialog — MBB-style back/lay panels themed to the chosen
+ * The app-wide Add bet dialog - MBB-style back/lay panels themed to the chosen
  * exchange, per-sport markets, advanced lay controls and a live outcomes table.
  *
  * Controlled (`open`/`onOpenChange`, used by the calculators with a `prefill`)
@@ -175,7 +196,7 @@ export function AddBetDialog({
   toastOnSave?: boolean;
 }) {
   const { exchanges } = useExchanges();
-  const { state: appState } = useAppState(10_000);
+  const { state: appState, refresh: refreshAppState } = useAppState(10_000);
   const appSettings = appState?.settings;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
@@ -209,9 +230,12 @@ export function AddBetDialog({
   const [partLays, setPartLays] = useState<PartLay[]>([]);
   const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
   const [triggerText, setTriggerText] = useState("");
+  const [triggerLinkedFromLabel, setTriggerLinkedFromLabel] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dutchLegs, setDutchLegs] = useState<AddBetPrefill["dutchLegs"]>(undefined);
+  const [addBalance, setAddBalance] = useState(false);
+  const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
   /** Prevents async re-fetches (events/exchanges) from resetting user-edited fields. */
   const hydratedKeyRef = useRef<string | null>(null);
 
@@ -238,8 +262,11 @@ export function AddBetDialog({
     setPartLays([]);
     setLayStakeOverride(null);
     setTriggerText("");
+    setTriggerLinkedFromLabel(false);
     setManualEntry(false);
     setDutchLegs(undefined);
+    setAddBalance(false);
+    setSelectedOfferId(null);
   }
 
   // Refresh tracked-events list and default date/time when the dialog opens
@@ -292,6 +319,8 @@ export function AddBetDialog({
       setAdvanced(false);
       setPartLays([]);
       setLayStakeOverride(editBet.layStake);
+      setSelectedOfferId(editBet.offerId ?? null);
+      setAddBalance(false);
 
       if (ev) {
         applyTrackedEvent(ev, resolvedSport);
@@ -326,6 +355,7 @@ export function AddBetDialog({
     hydratedKeyRef.current = key;
 
     queueMicrotask(() => {
+      if (prefill.labelSuggestion && !prefill.label) setLabel(prefill.labelSuggestion);
       if (prefill.label !== undefined) setLabel(prefill.label);
       if (prefill.betType) setBetType(prefill.betType);
       if (prefill.backStake !== undefined) setBackStake(prefill.backStake);
@@ -349,6 +379,33 @@ export function AddBetDialog({
       if (prefill.bookmaker) setBookmaker(prefill.bookmaker);
       if (prefill.eventId !== undefined) setEventId(String(prefill.eventId));
       if (prefill.triggerText) setTriggerText(prefill.triggerText);
+      if (prefill.offerId != null) {
+        setSelectedOfferId(prefill.offerId);
+        // Apply stake/bookie prefs from the offer (same as clicking the offer chip)
+        const offer = appState?.offers?.find((o) => o.id === prefill.offerId);
+        if (offer && !prefill.backStake && !prefill.bookmaker) {
+          const rules = parseOfferRules(offer);
+          const prefs = appSettings?.offerBetPrefs ?? {};
+          const stake = stakeFromOfferPrefs(
+            prefs,
+            offer.id,
+            rules?.betStake,
+            appSettings?.defaultBackStake ?? 10
+          );
+          const bookie = bookmakerFromOfferPrefs(
+            prefs,
+            offer.id,
+            offer.bookmaker,
+            ""
+          );
+          if (stake > 0) setBackStake(stake);
+          if (bookie) setBookmaker(bookie);
+          if (rules) {
+            setTriggerText(placeRefundTriggerText(rules));
+            setTriggerLinkedFromLabel(false);
+          }
+        }
+      }
       if (prefill.exchangeId !== undefined) {
         const ex = exchanges.find((e) => e.id === prefill.exchangeId);
         if (ex) setExchange(ex);
@@ -375,14 +432,13 @@ export function AddBetDialog({
     }
   }, [open, editBet, exchanges, exchange]);
 
-  // Betdaq by default (the user's exchange of choice), else the Settings default
+  // Prefer Settings default exchange (or prefill); fall back to first listed
   useEffect(() => {
     if (exchange || exchanges.length === 0 || editBet) return;
     const preferred =
       (prefill?.exchangeId !== undefined
         ? exchanges.find((e) => e.id === prefill.exchangeId)
         : undefined) ??
-      exchanges.find((e) => e.name.toLowerCase().includes("betdaq")) ??
       exchanges.find((e) => e.isDefault) ??
       exchanges[0];
     queueMicrotask(() => setExchange(preferred));
@@ -446,6 +502,83 @@ export function AddBetDialog({
   const selectedEvent = events.find((e) => String(e.id) === eventId);
   const effectiveHome = homeTeam.trim() || selectedEvent?.homeTeam || "";
   const effectiveAway = awayTeam.trim() || selectedEvent?.awayTeam || "";
+
+  const raceCourseForOffers = useMemo(() => {
+    if (sport !== "horse_racing") return "";
+    return (
+      parseRacingCourseFromEventName(eventName) ||
+      selectedEvent?.competition?.trim() ||
+      homeTeam.trim() ||
+      ""
+    );
+  }, [sport, eventName, selectedEvent?.competition, homeTeam]);
+
+  const matchingOffers = useMemo(() => {
+    if (sport !== "horse_racing") return [];
+    const offers = appState?.offers ?? [];
+    const course = raceCourseForOffers || null;
+    const raceExternalId = selectedEvent?.externalId ?? null;
+    const offTime = eventTime.trim() || null;
+    return offers.filter((o) =>
+      offerMatchesBetContext(o, {
+        date: eventDate,
+        course,
+        raceExternalId,
+        offTime,
+        bookmaker: bookmaker || null,
+      })
+    );
+  }, [
+    sport,
+    appState?.offers,
+    raceCourseForOffers,
+    selectedEvent?.externalId,
+    eventDate,
+    eventTime,
+    bookmaker,
+  ]);
+
+  const needsAddBalance =
+    !isFreeBetBetType(betType) &&
+    bookieNeedsCashFunding(appState?.balances?.accounts, bookmaker, backStake);
+
+  const bookieFbAvailable = bookieFreeBetBalance(
+    appState?.balances?.accounts,
+    bookmaker
+  );
+
+  useEffect(() => {
+    if (!needsAddBalance && addBalance) setAddBalance(false);
+  }, [needsAddBalance, addBalance]);
+
+  function applySelectedOffer(offerId: number | null) {
+    setSelectedOfferId(offerId);
+    if (offerId == null) return;
+    const offer = (appState?.offers ?? []).find((o) => o.id === offerId);
+    if (!offer) return;
+    const rules = parseOfferRules(offer);
+    const prefs = appSettings?.offerBetPrefs ?? {};
+    const stake = stakeFromOfferPrefs(
+      prefs,
+      offerId,
+      rules?.betStake,
+      appSettings?.defaultBackStake ?? 10
+    );
+    const bookie = bookmakerFromOfferPrefs(
+      prefs,
+      offerId,
+      offer.bookmaker,
+      bookmaker
+    );
+    if (stake > 0) setBackStake(stake);
+    if (bookie) setBookmaker(bookie);
+    if (rules) {
+      setTriggerText(placeRefundTriggerText(rules));
+      setTriggerLinkedFromLabel(false);
+    }
+    if (betType !== "qualifying" && betType !== "risk_free") setBetType("qualifying");
+  }
+
   const csParsed = parseCorrectScore(selection);
   const aiTriggerPreview = useMemo(
     () =>
@@ -456,6 +589,28 @@ export function AddBetDialog({
       }),
     [triggerText, effectiveHome, effectiveAway]
   );
+
+  const labelOfferTrigger = useMemo(() => offerTriggerFromLabel(label), [label]);
+  const labelHasOfferTrigger = useMemo(() => offerTriggerDetectedInLabel(label), [label]);
+
+  useEffect(() => {
+    if (!labelOfferTrigger) return;
+    if (!triggerText.trim() || triggerLinkedFromLabel) {
+      setTriggerText(labelOfferTrigger);
+      setTriggerLinkedFromLabel(true);
+    }
+  }, [labelOfferTrigger, triggerText, triggerLinkedFromLabel]);
+
+  function handleTriggerTextChange(value: string) {
+    setTriggerLinkedFromLabel(false);
+    setTriggerText(value);
+  }
+
+  function applyLabelOfferTrigger() {
+    if (!labelOfferTrigger) return;
+    setTriggerText(labelOfferTrigger);
+    setTriggerLinkedFromLabel(true);
+  }
 
   /** Black attention ring on unfilled fields (calculator hand-off) */
   const ring = (empty: boolean) =>
@@ -603,7 +758,7 @@ export function AddBetDialog({
           description:
             matched.confidence === "high"
               ? "Matched from screenshot"
-              : "Possible match — confirm event",
+              : "Possible match - confirm event",
         });
 
         if (
@@ -622,7 +777,7 @@ export function AddBetDialog({
                 description:
                   runnerMatch.confidence === "high"
                     ? "Matched from racecard"
-                    : "Possible runner — confirm selection",
+                    : "Possible runner - confirm selection",
               });
             }
           } catch {
@@ -647,6 +802,48 @@ export function AddBetDialog({
     },
     [market, exchanges, events, appSettings?.ocrAutoMatchEvents]
   );
+
+  async function rememberOfferBetPref(offerId: number | undefined, stake: number, bookie: string) {
+    if (offerId == null || !(stake > 0)) return;
+    try {
+      await api("/api/settings", {
+        method: "PATCH",
+        json: {
+          offerBetPref: {
+            offerId,
+            stake,
+            bookmaker: bookie.trim(),
+          },
+        },
+      });
+      await refreshAppState();
+    } catch {
+      /* non-fatal - bet already saved */
+    }
+  }
+
+  async function creditBackStakeIfNeeded(bookie: string, stake: number) {
+    if (!addBalance || !(stake > 0) || !bookie.trim()) return;
+    if (isFreeBetBetType(betType)) return;
+    const ensured = await api<{ account: { id: number } }>("/api/accounts/ensure", {
+      method: "POST",
+      json: { name: bookie.trim(), kind: "bookie" },
+    });
+    await api("/api/balances", {
+      method: "POST",
+      json: {
+        entries: [
+          {
+            accountId: ensured.account.id,
+            amount: stake,
+            category: "top_up",
+            note: "Add balance from Add bet",
+          },
+        ],
+      },
+    });
+    await refreshAppState();
+  }
 
   async function save() {
     if (dutchLegs?.length) {
@@ -756,6 +953,12 @@ export function AddBetDialog({
         }
       }
 
+      const resolvedBookmaker = bookmaker || prefill?.bookmaker || "";
+      const resolvedOfferId =
+        selectedOfferId ?? prefill?.offerId ?? editBet?.offerId ?? undefined;
+
+      await creditBackStakeIfNeeded(resolvedBookmaker, backStake);
+
       const payload = {
         label:
           label ||
@@ -765,7 +968,7 @@ export function AddBetDialog({
         market,
         selection,
         betType,
-        bookmaker: bookmaker || prefill?.bookmaker || undefined,
+        bookmaker: resolvedBookmaker || undefined,
         exchangeId: exchange?.id ?? null,
         homeTeam: sport === "football" ? effectiveHome || undefined : undefined,
         awayTeam: sport === "football" ? effectiveAway || undefined : undefined,
@@ -778,7 +981,7 @@ export function AddBetDialog({
         triggerText: triggerText.trim() || prefill?.triggerText || undefined,
         expectedProfit: Number(preview.guaranteed.toFixed(2)),
         notes: prefill?.notes ?? (exchange ? `Exchange: ${exchange.name}` : undefined),
-        offerId: prefill?.offerId,
+        offerId: resolvedOfferId,
       };
 
       if (editBet) {
@@ -786,6 +989,7 @@ export function AddBetDialog({
           method: "PATCH",
           json: payload,
         });
+        await rememberOfferBetPref(resolvedOfferId, backStake, resolvedBookmaker);
         setOpen(false);
         onSaved?.(bet.id);
         if (toastOnSave) {
@@ -796,6 +1000,7 @@ export function AddBetDialog({
           method: "POST",
           json: { ...payload, eventId: resolvedEventId },
         });
+        await rememberOfferBetPref(resolvedOfferId, backStake, resolvedBookmaker);
         setOpen(false);
         onSaved?.(bet.id);
         if (toastOnSave) {
@@ -845,16 +1050,39 @@ export function AddBetDialog({
         </DialogHeader>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto sm:grid-cols-2 sm:divide-x">
-          {/* Left — event & market details */}
+          {/* Left - event & market details */}
           <div className="flex flex-col gap-3 p-6">
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Label</Label>
-              <Input
-                placeholder={prefill?.labelSuggestion ?? "e.g. Bet365 £10 free bet"}
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                className={ring(!label.trim())}
-              />
+              <div className="relative">
+                <Input
+                  placeholder={prefill?.labelSuggestion ?? "e.g. Bet365 £10 free bet"}
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  className={cn(ring(!label.trim()), labelHasOfferTrigger && "pr-9")}
+                />
+                {labelHasOfferTrigger ? (
+                  <button
+                    type="button"
+                    onClick={applyLabelOfferTrigger}
+                    className={cn(
+                      "absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 transition-colors",
+                      triggerLinkedFromLabel && triggerText === labelOfferTrigger
+                        ? "text-violet-600 dark:text-violet-400"
+                        : "text-violet-500/70 hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400"
+                    )}
+                    title="Offer detected in label — click to apply to Offer trigger"
+                    aria-label="Apply offer trigger from label"
+                  >
+                    <Sparkles className="size-4" />
+                  </button>
+                ) : null}
+              </div>
+              {labelHasOfferTrigger && !triggerText.trim() ? (
+                <p className="text-[10px] text-violet-700 dark:text-violet-300">
+                  Offer phrase detected — applying to Offer trigger.
+                </p>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
@@ -873,15 +1101,56 @@ export function AddBetDialog({
                 </Select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs text-muted-foreground">Bet type</Label>
+                <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  Bet type
+                  {bookieFbAvailable > 0.001 ? (
+                    <span
+                      className="inline-flex items-center gap-0.5 rounded bg-violet-600/15 px-1 py-0.5 text-[10px] font-semibold text-violet-800 dark:text-violet-200"
+                      title={`£${bookieFbAvailable.toFixed(2)} free bet on ${bookmaker || "this bookie"}`}
+                    >
+                      <Gift className="size-3" aria-hidden />
+                      £{bookieFbAvailable.toFixed(0)}
+                    </span>
+                  ) : null}
+                </Label>
                 <Select value={betType} onValueChange={(v) => setBetType(v as BetMode)}>
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>
+                      <span className="flex items-center gap-1.5">
+                        {isFreeBetBetType(betType) || bookieFbAvailable > 0.001 ? (
+                          <Gift
+                            className={cn(
+                              "size-3.5 shrink-0",
+                              isFreeBetBetType(betType)
+                                ? "text-violet-600 dark:text-violet-400"
+                                : "text-violet-600/70 dark:text-violet-400/70"
+                            )}
+                            aria-hidden
+                          />
+                        ) : null}
+                        {betTypeLabels[betType]}
+                      </span>
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {(Object.keys(betTypeLabels) as BetMode[]).map((m) => (
                       <SelectItem key={m} value={m}>
-                        {betTypeLabels[m]}
+                        <span className="flex items-center gap-1.5">
+                          {(m === "free_snr" || m === "free_sr") &&
+                          bookieFbAvailable > 0.001 ? (
+                            <Gift
+                              className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400"
+                              aria-hidden
+                            />
+                          ) : null}
+                          {betTypeLabels[m]}
+                          {(m === "free_snr" || m === "free_sr") &&
+                          bookieFbAvailable > 0.001 ? (
+                            <span className="text-[10px] font-semibold tabular-nums text-violet-700 dark:text-violet-300">
+                              £{bookieFbAvailable.toFixed(2)}
+                            </span>
+                          ) : null}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -908,7 +1177,7 @@ export function AddBetDialog({
               </Select>
               {trackedEvents.length === 0 && (
                 <span className="text-[10px] leading-tight text-muted-foreground">
-                  No tracked events — track one on Tracked Events, or enter details below.
+                  No tracked events - track one on Tracked Events, or enter details below.
                 </span>
               )}
               {selectedEvent && effectiveEventStatus(selectedEvent) === "live" && (
@@ -920,7 +1189,7 @@ export function AddBetDialog({
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Event name</Label>
               <Input
-                placeholder="e.g. Premier League · Arsenal v Liverpool"
+                placeholder={sport === "football" ? "e.g. World Cup" : "e.g. Premier League · Arsenal v Liverpool"}
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
                 className={ring(!!highlightEmpty && !eventName.trim() && eventId === "none")}
@@ -951,6 +1220,52 @@ export function AddBetDialog({
                 />
               </div>
             </div>
+            {sport === "horse_racing" && matchingOffers.length > 0 && (
+              <div className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2.5 dark:bg-input/25">
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <Gift className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <Label className="text-xs font-semibold text-foreground">
+                    Qualifying offer
+                    {matchingOffers.length > 1 ? "s" : ""}
+                  </Label>
+                </div>
+                <p className="mb-2 text-[10px] leading-snug text-muted-foreground">
+                  Race matches {matchingOffers.length === 1 ? "an offer" : "offers"}
+                  {bookmaker.trim() ? ` for ${bookmaker}` : ""} - select to set stake & trigger.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {matchingOffers.map((offer) => {
+                    const rules = parseOfferRules(offer);
+                    const selected = selectedOfferId === offer.id;
+                    return (
+                      <button
+                        key={offer.id}
+                        type="button"
+                        onClick={() =>
+                          applySelectedOffer(selected ? null : offer.id)
+                        }
+                        className={cn(
+                          "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-left text-[11px] font-semibold transition-colors",
+                          selected
+                            ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200"
+                            : "border-border/80 bg-card text-foreground hover:border-foreground/25"
+                        )}
+                      >
+                        {offer.bookmaker ? (
+                          <VenueBadge name={offer.bookmaker} className="scale-90" />
+                        ) : null}
+                        <span className="min-w-0 truncate">{offer.title}</span>
+                        {rules?.betStake != null ? (
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            £{rules.betStake}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {sport === "football" && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
@@ -998,7 +1313,7 @@ export function AddBetDialog({
             )}
           </div>
 
-          {/* Right — back/lay & triggers */}
+          {/* Right - back/lay & triggers */}
           <div className="flex flex-col gap-3 p-6">
             <BackPanel
               title="Back Bet"
@@ -1093,7 +1408,25 @@ export function AddBetDialog({
                 betType={betType}
                 backStake={backStake}
                 accounts={appState?.balances?.accounts}
+                addBalance={addBalance}
+                onAddBalanceChange={needsAddBalance ? setAddBalance : undefined}
+                onUseFreeBet={(amount) => {
+                  setBetType("free_snr");
+                  setBackStake(amount);
+                  setAddBalance(false);
+                }}
               />
+              {isFreeBetBetType(betType) && bookieFbAvailable > 0.001 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setBackStake(bookieFbAvailable)}
+                    className="rounded-full border border-violet-500/35 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold text-violet-900 dark:text-violet-200"
+                  >
+                    Use £{bookieFbAvailable.toFixed(2)} available
+                  </button>
+                </div>
+              ) : null}
               <div className="grid grid-cols-2 gap-3">
                 <PanelInput
                   label={isFreeBetBetType(betType) ? "Free bet stake" : "Back stake"}
@@ -1206,59 +1539,22 @@ export function AddBetDialog({
               </div>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Sparkles className="size-3 text-violet-500" /> AI Triggers{" "}
-                <span className="font-normal">(optional)</span>
-              </Label>
-              <Input
-                placeholder="e.g. Bet £50 get £50"
-                value={triggerText}
-                onChange={(e) => setTriggerText(e.target.value)}
-              />
-              <p className="text-[10px] leading-snug text-muted-foreground">
-                Describe an offer or trigger — e.g.{" "}
-                <span className="text-foreground/80">Bet £50 get £50</span> for a straight free bet, or{" "}
-                <span className="text-foreground/80">Bet £50 get £50 FB if 2nd, 3rd, 4th</span>{" "}
-                for a place offer.
-              </p>
-              {triggerText.trim() &&
-                (aiTriggerPreview.recognised ? (
-                  <div className="flex flex-col gap-1">
-                    {aiTriggerPreview.lines.map((line) => (
-                      <div
-                        key={line}
-                        className="flex items-start gap-1.5 text-xs text-emerald-600 dark:text-emerald-500"
-                      >
-                        <CircleCheck className="mt-0.5 size-3.5 shrink-0" />
-                        <span>{line}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-500">
-                    <CircleAlert className="size-3.5 shrink-0" />
-                    <span>
-                      Couldn&apos;t interpret that — saved as a note only.
-                    </span>
-                  </div>
-                ))}
-              {aiTriggerPreview.recognised &&
+            <BetOfferTriggerField
+              value={triggerText}
+              onChange={handleTriggerTextChange}
+              preview={aiTriggerPreview}
+              needsEventLink={
+                aiTriggerPreview.recognised &&
                 aiTriggerPreview.lines.some((l) => l.includes("if selection finishes")) &&
                 eventId === "none" &&
-                !selection.trim() && (
-                  <div className="text-xs text-muted-foreground">
-                    Link an event and enter your selection so place triggers can run at result.
-                  </div>
-                )}
-              {aiTriggerPreview.lines.some((l) => l.includes("settles the bet")) &&
+                !selection.trim()
+              }
+              needsTeamNames={
+                aiTriggerPreview.lines.some((l) => l.includes("settles the bet")) &&
                 eventId === "none" &&
-                !effectiveHome && (
-                  <div className="text-xs text-muted-foreground">
-                    Enter team names or link an event so the trigger can watch the match.
-                  </div>
-                )}
-            </div>
+                !effectiveHome
+              }
+            />
           </div>
         </div>
 

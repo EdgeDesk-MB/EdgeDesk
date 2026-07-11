@@ -1,21 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { MoneyFlow } from "@/components/money-flow";
 import { bestOfferAdvantage } from "@/lib/offers/advantage";
 import { offerNextActionLabel } from "@/lib/offers/next-actions";
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
+import type { AccountBalance } from "@/lib/services/balances.types";
+import {
+  availableBookieNames,
+  offerMatchesAvailableBookies,
+} from "@/lib/accounts/available-bookies";
+import { VenueBadge } from "@/components/venue-badge";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export function DashboardBestAdvantage({
   offers,
+  accounts,
   className,
 }: {
   offers: OfferSummary[];
+  accounts?: AccountBalance[];
   className?: string;
 }) {
-  const best = bestOfferAdvantage(offers);
+  const scoped = useMemo(() => {
+    const available = availableBookieNames(accounts ?? []);
+    if (available.size === 0) return offers;
+    return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
+  }, [offers, accounts]);
+
+  const best = bestOfferAdvantage(scoped);
   if (!best || best.score < 0.5) return null;
 
   const href = best.nextAction?.href ?? `/offers?highlight=${best.offerId}`;
@@ -39,21 +54,19 @@ export function DashboardBestAdvantage({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
+            {best.bookmaker ? <VenueBadge name={best.bookmaker} /> : null}
             <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
               Best next
             </span>
             <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
               {actionLabel}
             </span>
-            {best.bookmaker ? (
-              <span className="text-[11px] text-muted-foreground">{best.bookmaker}</span>
-            ) : null}
           </span>
           <span className="mt-0.5 block truncate text-[13px] font-semibold text-foreground">
             {best.nextAction?.title ?? best.offerTitle}
           </span>
           <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-            {best.offerTitle} — {best.reason}
+            {best.offerTitle} - {best.reason}
           </span>
         </span>
         {best.remainingEv > 0.01 ? (

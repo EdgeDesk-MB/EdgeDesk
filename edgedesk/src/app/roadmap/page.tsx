@@ -29,8 +29,8 @@ export default function RoadmapPage() {
           <CardDescription>
             EdgeDesk is at{" "}
             <Badge variant="secondary">{ROADMAP_VERSION.currentLabel}</Badge> today.{" "}
-            <Badge>{ROADMAP_VERSION.targetLabel}</Badge> targets the core workflow polish —
-            guided racing, settle prompts, help system and offer P&L — not every Phase 2 calculator.
+            <Badge>{ROADMAP_VERSION.targetLabel}</Badge> targets the core workflow polish -
+            guided racing, settle prompts, help system and offer P&L - not every Phase 2 calculator.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -96,7 +96,7 @@ export default function RoadmapPage() {
       <Card className="border-dashed">
         <CardContent className="py-4 text-sm text-muted-foreground">
           Roadmap data lives in{" "}
-          <code className="rounded bg-muted px-1 text-xs">src/content/roadmap.ts</code> — update on
+          <code className="rounded bg-muted px-1 text-xs">src/content/roadmap.ts</code> - update on
           each release. Full product vision in{" "}
           <Link href="/help?guide=getting-started" className="text-primary hover:underline">
             Help → Getting started

@@ -109,15 +109,15 @@
   --selection-subdued: oklch(0.935 0.003 250);
   --selection-subtle-border: oklch(0.91 0 0);
   --selection-subdued-border: oklch(0.875 0 0);
-  --topbar: oklch(0.18 0.02 250);
+  --topbar: oklch(0.14 0 0);
   --topbar-foreground: oklch(0.98 0 0);
   --topbar-muted: oklch(0.98 0 0 / 55%);
   --topbar-border: oklch(1 0 0 / 10%);
   --topbar-accent: oklch(1 0 0 / 8%);
-  /* Layout spacing — page shell, cards, section bands */
+  /* Layout spacing - page shell, cards, section bands */
   --layout-page-x: 1.25rem;
   --layout-shell-gap: 0.25rem;
-  --layout-page-margin-right: 1rem;
+  --layout-page-radius: calc(var(--radius) * 2);
   --layout-stack-gap: 1.25rem;
   --layout-stack-gap-compact: 0.75rem;
   --layout-card-x: 1rem;
@@ -127,9 +127,13 @@
   --layout-page-min-h: calc(
     100dvh - var(--layout-header-h) - 2 * var(--layout-page-x) - 0.5rem
   );
-  /* Segmented control — 2px track inset, 32px segments */
+  /* Segmented control - 2px vertical / 1px horizontal track inset, 32px segments */
   --segmented-track-pad: 2px;
-  --segmented-radius: calc(var(--radius-lg) - var(--segmented-track-pad));
+  --segmented-track-pad-x: 1px;
+  --segmented-radius: 9999px;
+  --offer-card-details-fade: color-mix(in oklch, var(--muted) 6%, var(--card));
+  --offer-card-details: color-mix(in oklch, var(--muted) 22%, var(--card));
+  --offer-card-footer-soft: color-mix(in oklch, var(--muted) 16%, var(--card));
 }
 
 @media (min-width: 1024px) {
@@ -160,7 +164,7 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  /* Negative P&L text — lighter red for dark backgrounds */
+  /* Negative P&L text - lighter red for dark backgrounds */
   --negative: oklch(0.78 0.15 22.216);
   --success: oklch(0.62 0.14 150);
   --warning: oklch(0.72 0.13 75);
@@ -184,11 +188,15 @@
   --selection-subdued: oklch(0.28 0 0);
   --selection-subtle-border: oklch(1 0 0 / 12%);
   --selection-subdued-border: oklch(1 0 0 / 18%);
-  --topbar: oklch(0.12 0.015 250);
+  --topbar: oklch(0.1 0 0);
   --topbar-foreground: oklch(0.98 0 0);
   --topbar-muted: oklch(0.98 0 0 / 55%);
   --topbar-border: oklch(1 0 0 / 10%);
   --topbar-accent: oklch(1 0 0 / 8%);
+  --offer-card-details-fade: color-mix(in oklch, var(--muted) 28%, var(--card));
+  --offer-card-details: color-mix(in oklch, var(--muted) 48%, var(--card));
+  --offer-card-footer-soft: color-mix(in oklch, var(--muted) 20%, var(--card));
+  --offer-card-footer-end: color-mix(in oklch, var(--canvas) 30%, var(--card));
 }
 
 @layer base {
@@ -212,7 +220,7 @@
 }
 
 @layer utilities {
-  /** Page-level scroll — sticky header + full page panel move under it */
+  /** Page-level scroll - sticky header + full page panel move under it */
   .app-scroll {
     overflow-y: auto;
     overscroll-behavior: none;
@@ -246,10 +254,16 @@
     background-color: oklch(0.72 0 0 / 0.3);
   }
 
-  /** Nested panels — overlay thumb only (no extra gutter) */
+  /**
+   * Nested panels - never reserve a classic scrollbar gutter.
+   * Classic thin scrollbars steal ~11px on the right only and make
+   * full-bleed rows (e.g. History tints) look right-heavy.
+   * Overlay via transparent track; thumb appears on hover when supported.
+   */
   .app-scroll-nested {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+    scrollbar-gutter: auto;
   }
   .app-scroll-nested:hover {
     scrollbar-color: oklch(0.52 0 0 / 0.38) transparent;
@@ -258,6 +272,10 @@
     scrollbar-color: oklch(0.72 0 0 / 0.34) transparent;
   }
   .app-scroll-nested::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  .app-scroll-nested:hover::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
@@ -276,12 +294,32 @@
   .dark .app-scroll-nested:hover::-webkit-scrollbar-thumb {
     background-color: oklch(0.72 0 0 / 0.3);
   }
+
+  /** Force no reserved gutter (wins over .app-scroll-nested). */
+  .app-scroll-overlay {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scrollbar-gutter: auto;
+  }
+  .app-scroll-overlay::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none;
+  }
+
+  /** Sonner toasts — UI chrome, not selectable copy */
+  [data-sonner-toast],
+  [data-sonner-toast] * {
+    user-select: none;
+    -webkit-user-select: none;
+  }
 }
 
 @layer utilities {
   .page-panel {
     background-color: var(--page);
     box-shadow: var(--page-shadow);
+    border-radius: var(--layout-page-radius);
   }
   .dark .page-panel {
     box-shadow: none;
@@ -295,7 +333,7 @@
     box-shadow: none;
   }
 
-  /* Liveline renders window controls + chart as fragment siblings — cap total height */
+  /* Liveline renders window controls + chart as fragment siblings - cap total height */
   .live-pnl-chart-host {
     display: flex;
     max-height: 100%;
@@ -308,34 +346,212 @@
     flex: 1 1 0%;
     overflow: hidden;
   }
+  .live-pnl-chart-host--no-windows > div:last-child {
+    margin-left: 0;
+  }
   /* Hide Liveline's built-in window bar when we render pills in the card header */
   .live-pnl-chart-host--no-windows > div:first-child:not(:last-child) {
     display: none;
   }
 
-  /** Settlement rows — green/red tint strongest at top-right, fading to 3% opacity minimum */
+  /**
+   * Settlement dots on the P&L chart — mirrors Liveline live tip (white halo, coloured core).
+   * Plain CSS so marker styling is not dependent on Tailwind class generation.
+   */
+  .chart-bet-marker-layer {
+    z-index: 5;
+  }
+
+  .chart-bet-marker {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    text-decoration: none;
+    transition: transform 0.15s ease;
+  }
+
+  .chart-bet-marker:hover {
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+
+  .dark .chart-bet-marker {
+    background: rgba(40, 40, 40, 0.95);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  .chart-bet-marker__inner {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .chart-bet-marker--win .chart-bet-marker__inner {
+    background-color: #059669;
+  }
+
+  .dark .chart-bet-marker--win .chart-bet-marker__inner {
+    background-color: #34d399;
+  }
+
+  .chart-bet-marker--loss .chart-bet-marker__inner {
+    background-color: #e7000b;
+  }
+
+  .dark .chart-bet-marker--loss .chart-bet-marker__inner {
+    background-color: #ff8d8b;
+  }
+
+  .chart-bet-marker--neutral .chart-bet-marker__inner {
+    background-color: #94a3b8;
+  }
+
+  /** Settlement rows - even tint across the full row so left/right insets read equal */
   .history-settlement-tint-win {
-    background-image:
-      radial-gradient(90% 80% at 100% 0%, rgb(255 255 255 / 0.05) 0%, transparent 100%),
-      linear-gradient(270deg, rgb(16 185 129 / 0.2) 0%, rgb(16 185 129 / 0.03) 58%);
+    background-color: rgb(16 185 129 / 0.1);
   }
 
   .history-settlement-tint-loss {
-    background-image:
-      radial-gradient(90% 80% at 100% 0%, rgb(255 255 255 / 0.05) 0%, transparent 100%),
-      linear-gradient(270deg, rgb(239 68 68 / 0.2) 0%, rgb(239 68 68 / 0.03) 58%);
+    background-color: rgb(239 68 68 / 0.1);
   }
 
   .dark .history-settlement-tint-win {
-    background-image:
-      radial-gradient(90% 80% at 100% 0%, rgb(255 255 255 / 0.05) 0%, transparent 100%),
-      linear-gradient(270deg, rgb(52 211 153 / 0.2) 0%, rgb(52 211 153 / 0.03) 58%);
+    background-color: rgb(52 211 153 / 0.12);
   }
 
   .dark .history-settlement-tint-loss {
-    background-image:
-      radial-gradient(90% 80% at 100% 0%, rgb(255 255 255 / 0.05) 0%, transparent 100%),
-      linear-gradient(270deg, rgb(248 113 113 / 0.2) 0%, rgb(248 113 113 / 0.03) 58%);
+    background-color: rgb(248 113 113 / 0.12);
+  }
+
+  /**
+   * Top-right profit tint - 30° sweep, transparent by ~⅓ in from the right edge.
+   * Matches Home History settlement greens/reds.
+   */
+  .offer-header-tint-win {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      30deg,
+      transparent 0%,
+      transparent 67%,
+      rgb(16 185 129 / 0.1) 100%
+    );
+  }
+
+  .offer-header-tint-loss {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      30deg,
+      transparent 0%,
+      transparent 67%,
+      rgb(239 68 68 / 0.1) 100%
+    );
+  }
+
+  .dark .offer-header-tint-win {
+    background-image: linear-gradient(
+      30deg,
+      transparent 0%,
+      transparent 67%,
+      rgb(52 211 153 / 0.12) 100%
+    );
+  }
+
+  .dark .offer-header-tint-loss {
+    background-image: linear-gradient(
+      30deg,
+      transparent 0%,
+      transparent 67%,
+      rgb(248 113 113 / 0.12) 100%
+    );
+  }
+
+  .offer-header-tint-expired {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      30deg,
+      transparent 0%,
+      transparent 67%,
+      rgb(148 163 184 / 0.14) 100%
+    );
+  }
+
+  .dark .offer-header-tint-expired {
+    background-image: linear-gradient(
+      30deg,
+      transparent 0%,
+      transparent 67%,
+      rgb(148 163 184 / 0.18) 100%
+    );
+  }
+
+  .offer-inactive-figure {
+    color: var(--muted-foreground);
+    text-decoration-line: line-through;
+    text-decoration-color: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+  }
+
+  /** Offer campaign cards - outer ring + 1px white inset line */
+  .offer-campaign-card {
+    position: relative;
+  }
+
+  .offer-campaign-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px #fff;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .dark .offer-campaign-card::after {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  }
+
+  /** Calendar cards - white inset skips the priority bar column */
+  .offer-calendar-card::after {
+    inset: 0 0 0 0.25rem;
+  }
+
+  .dark .offer-calendar-card::after {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  }
+
+  /** Offer campaign cards - details band: pale grey→mid grey (left half), solid mid grey (right half) */
+  .offer-card-details {
+    background: linear-gradient(
+      to right,
+      var(--offer-card-details-fade) 0,
+      var(--offer-card-details) 50%,
+      var(--offer-card-details) 100%
+    );
+  }
+
+  .offer-card-footer {
+    background: linear-gradient(
+      to bottom,
+      var(--offer-card-footer-soft) 0%,
+      var(--offer-card-footer-soft) 35%,
+      var(--card) 100%
+    );
+  }
+
+  .dark .offer-card-footer {
+    background: linear-gradient(
+      to bottom,
+      var(--offer-card-footer-end) 0%,
+      var(--offer-card-footer-end) 28%,
+      var(--card) 100%
+    );
   }
 }
 
@@ -365,22 +581,78 @@
   animation: bet-row-highlight-fade 2s ease-out forwards;
 }
 
-/* Compact FilePond zones inside Add bet */
-.bet-screenshot-pond .filepond--root {
-  font-size: 11px;
-  margin-bottom: 0;
+/* Page-primary CTA - monochrome button with hover shine (Adjust balance, Add offer, etc.) */
+@keyframes btn-page-primary-shine {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(280%) skewX(-18deg);
+  }
 }
-.bet-screenshot-pond .filepond--panel-root {
-  background-color: transparent;
-  border-radius: 0.375rem;
+
+[data-variant="pagePrimary"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgb(255 255 255 / 0.22) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
 }
-.bet-screenshot-pond .filepond--drop-label {
-  min-height: 4.5rem;
-  color: hsl(var(--muted-foreground));
+
+[data-variant="pagePrimary"]:hover::after {
+  animation: btn-page-primary-shine 0.75s ease;
 }
-.bet-screenshot-pond .filepond--drop-label label {
-  cursor: pointer;
+
+.dark [data-variant="pagePrimary"]::after {
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgb(0 0 0 / 0.07) 50%,
+    transparent 60%,
+    transparent 100%
+  );
 }
-.bet-screenshot-pond .filepond--item-panel {
-  background-color: hsl(var(--muted));
+
+[data-variant="pagePrimary"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Side-nav expandable group - 150ms springy open/close */
+.nav-sub-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 150ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.nav-sub-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.nav-sub-panel > .nav-sub-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.nav-sub-panel[data-open="true"] > .nav-sub-panel-inner {
+  overflow: visible;
+}
+
+/**
+ * Stacking: toasts (40) < top bar (45) < modals/overlays (50+).
+ * Top offset uses --layout-header-h + 16px via Toaster offset prop.
+ * Sonner defaults to z-index: 999999999 — unlayered + !important required.
+ */
+[data-sonner-toaster] {
+  z-index: 40 !important;
 }

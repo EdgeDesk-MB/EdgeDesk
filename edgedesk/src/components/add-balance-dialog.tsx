@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import type { AccountBalance } from "@/lib/services/balances";
+import type { AccountBalance } from "@/lib/services/balances.types";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { BookieNamePicker, EXCHANGE_CUSTOM } from "@/components/bookie-name-picker";
 import { formatGbp, roundMoney } from "@/lib/format-money";
@@ -55,7 +55,7 @@ export function AddBalanceDialog({
   const [saving, setSaving] = useState(false);
 
   const [showAddAccount, setShowAddAccount] = useState(false);
-  const [newType, setNewType] = useState<"bookie" | "exchange">("bookie");
+  const [newType, setNewType] = useState<"bookie" | "exchange" | "bank">("bookie");
   const [newName, setNewName] = useState("");
   const [newExchangeId, setNewExchangeId] = useState<string>("");
   const [exchangeCustom, setExchangeCustom] = useState(false);
@@ -105,7 +105,7 @@ export function AddBalanceDialog({
   const signedAmount = (amount: number) =>
     mode === "withdrawal" ? -Math.abs(amount) : amount;
 
-  /** In adjustment mode, row.amount is the target balance — return ledger delta. */
+  /** In adjustment mode, row.amount is the target balance - return ledger delta. */
   function rowLedgerAmount(row: TopUpRow): number {
     if (mode === "adjustment") {
       const account = accounts.find((a) => a.id === row.accountId);
@@ -236,7 +236,7 @@ export function AddBalanceDialog({
       <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[780px]">
         <DialogHeader className="border-b px-6 pb-4 pt-7">
           <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            Add balance
+            Adjust balance
           </DialogTitle>
           <DialogDescription>
             Top up cash balance or free bets, withdraw, or adjust across your bookie and exchange
@@ -244,7 +244,7 @@ export function AddBalanceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 overflow-y-auto p-6">
+        <div className="app-scroll-nested flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-6">
           <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
             <TabsList>
               <TabsTrigger value="top_up">Top up</TabsTrigger>
@@ -255,7 +255,7 @@ export function AddBalanceDialog({
 
           {accounts.length === 0 && !showAddAccount && (
             <p className="text-sm text-muted-foreground">
-              No accounts yet — add a bookie or exchange wallet first.
+              No accounts yet - add a bookie or exchange wallet first.
             </p>
           )}
 
@@ -437,6 +437,7 @@ export function AddBalanceDialog({
                     <SelectContent>
                       <SelectItem value="bookie">Bookie</SelectItem>
                       <SelectItem value="exchange">Exchange</SelectItem>
+                      <SelectItem value="bank">Bank</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -446,6 +447,15 @@ export function AddBalanceDialog({
                     onChange={setNewName}
                     className="sm:col-span-1"
                   />
+                ) : newType === "bank" ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs text-muted-foreground">Bank name</Label>
+                    <Input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="e.g. Monzo · Betting"
+                    />
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-xs text-muted-foreground">Exchange</Label>

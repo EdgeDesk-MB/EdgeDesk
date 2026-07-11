@@ -1,39 +1,81 @@
 /**
- * Pull race results from The Racing API for tracked events missing `goals`.
+ * Pull race results from The Racing API for tracked events missing (or incomplete) `goals`.
  */
 import { eq } from "drizzle-orm";
 import { db, bets, events, type EventRow } from "@/lib/db";
 import { formatRacingEventTitle } from "@/lib/events";
-import { parseRaceResults } from "@/lib/racing";
+import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
 import {
+  clearRacingResultsCache,
+  getCachedRacingResultsTier,
   hasRacingApiKey,
   raceResultToGoals,
   resultsForRaceIds,
+  type RacingResultsTier,
 } from "@/lib/services/theracingapi";
 
 export interface RacingSyncResult {
   updated: number;
   pending: number;
   settledLabels: string[];
+  /** True when credentials exist but Free tier blocks `/v1/results/today`. */
+  tierBlocked: boolean;
+  tier: RacingResultsTier;
 }
 
-export function eventNeedsRaceResult(event: EventRow): boolean {
+export interface SyncRacingOptions {
+  /**
+   * Re-fetch even when a result already exists (overwrite winner-only / wrong placings).
+   * Also skips the 6-hour sync window so older races can be corrected.
+   */
+  force?: boolean;
+  /** Bypass the 90s results cache (manual Fetch results). */
+  skipCache?: boolean;
+}
+
+function emptySync(tier: RacingResultsTier = getCachedRacingResultsTier()): RacingSyncResult {
+  return {
+    updated: 0,
+    pending: 0,
+    settledLabels: [],
+    tierBlocked: tier === "free",
+    tier,
+  };
+}
+
+/** Missing result, or winner-only (manual Set winner) - needs full API placings. */
+export function eventNeedsRaceResult(event: EventRow, force = false): boolean {
   if (event.sport !== "horse_racing" || !event.externalId?.trim()) return false;
-  return !parseRaceResults(event.goals);
+  if (force) return true;
+  const parsed = parseRaceResults(event.goals);
+  if (!parsed) return true;
+  return isRaceResultIncomplete(parsed);
 }
 
-/** True when the race should have started — autopilot polls these windows. */
-export function eventInRacingSyncWindow(event: EventRow, now = Date.now()): boolean {
-  if (!eventNeedsRaceResult(event)) return false;
+/** True when the race should have started - autopilot polls these windows. */
+export function eventInRacingSyncWindow(
+  event: EventRow,
+  now = Date.now(),
+  force = false
+): boolean {
+  if (!eventNeedsRaceResult(event, force)) return false;
+  if (force) {
+    // Manual fetch: allow races from today-ish (up to 36h after off)
+    return event.startTime <= now + 2 * 60 * 1000 && event.startTime > now - 36 * 60 * 60 * 1000;
+  }
   // Poll from 2 min before off until 6 hours after (results can lag)
   return event.startTime <= now + 2 * 60 * 1000 && event.startTime > now - 6 * 60 * 60 * 1000;
 }
 
 /** Fetch API results for the given events (or all pending if omitted). */
 export async function syncRacingResultsForEvents(
-  eventIds?: number[]
+  eventIds?: number[],
+  options: SyncRacingOptions = {}
 ): Promise<RacingSyncResult> {
-  if (!hasRacingApiKey()) return { updated: 0, pending: 0, settledLabels: [] };
+  if (!hasRacingApiKey()) return emptySync("none");
+
+  const { force = false, skipCache = false } = options;
+  if (skipCache || force) clearRacingResultsCache();
 
   const now = Date.now();
   const idSet = eventIds ? new Set(eventIds) : null;
@@ -43,20 +85,33 @@ export async function syncRacingResultsForEvents(
     .from(events)
     .all()
     .filter((e) => {
-      if (!eventNeedsRaceResult(e)) return false;
+      if (!eventNeedsRaceResult(e, force)) return false;
       if (idSet && !idSet.has(e.id)) return false;
-      if (!eventInRacingSyncWindow(e, now)) return false;
+      if (!eventInRacingSyncWindow(e, now, force)) return false;
       return true;
     });
 
-  if (candidates.length === 0) return { updated: 0, pending: 0, settledLabels: [] };
+  if (candidates.length === 0) return emptySync();
 
   let updated = 0;
   let pending = 0;
   const settledLabels: string[] = [];
 
   try {
-    const results = await resultsForRaceIds(candidates.map((e) => e.externalId!));
+    const { results, tierBlocked, tier } = await resultsForRaceIds(
+      candidates.map((e) => e.externalId!)
+    );
+
+    if (tierBlocked) {
+      return {
+        updated: 0,
+        pending: candidates.length,
+        settledLabels: [],
+        tierBlocked: true,
+        tier,
+      };
+    }
+
     for (const event of candidates) {
       const result = results.get(event.externalId!);
       if (!result) {
@@ -64,6 +119,16 @@ export async function syncRacingResultsForEvents(
         if (event.startTime <= now && event.status === "upcoming") {
           db.update(events).set({ status: "live" }).where(eq(events.id, event.id)).run();
         }
+        continue;
+      }
+      // Don't overwrite a complete result with a thinner API payload unless forced
+      const existing = parseRaceResults(event.goals);
+      if (
+        !force &&
+        existing &&
+        !isRaceResultIncomplete(existing) &&
+        isRaceResultIncomplete(result)
+      ) {
         continue;
       }
       db.update(events)
@@ -78,11 +143,17 @@ export async function syncRacingResultsForEvents(
       updated += 1;
       settledLabels.push(formatRacingEventTitle(event));
     }
-  } catch {
-    pending = candidates.length;
-  }
 
-  return { updated, pending, settledLabels };
+    return { updated, pending, settledLabels, tierBlocked: false, tier };
+  } catch {
+    return {
+      updated: 0,
+      pending: candidates.length,
+      settledLabels: [],
+      tierBlocked: false,
+      tier: getCachedRacingResultsTier(),
+    };
+  }
 }
 
 /** Sync results for every horse-racing event linked to an open bet. */
@@ -98,7 +169,7 @@ export async function syncRacingResultsForOpenBets(): Promise<RacingSyncResult> 
         .filter((id): id is number => id != null)
     ),
   ];
-  if (eventIds.length === 0) return { updated: 0, pending: 0, settledLabels: [] };
+  if (eventIds.length === 0) return emptySync();
   return syncRacingResultsForEvents(eventIds);
 }
 
@@ -126,6 +197,6 @@ export async function syncRecentTrackedRacingResults(): Promise<RacingSyncResult
     )
     .map((e) => e.id);
 
-  if (ids.length === 0) return { updated: 0, pending: 0, settledLabels: [] };
+  if (ids.length === 0) return emptySync();
   return syncRacingResultsForEvents(ids);
 }

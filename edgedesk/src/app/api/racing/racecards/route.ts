@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { localCalendarDate } from "@/lib/events";
 import {
   demoRacecards,
   hasRacingApiKey,
@@ -22,8 +23,8 @@ async function loadRacecardsForDate(date: string): Promise<{
     if (!isRacingTierAccessError(error)) throw error;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const today = localCalendarDate();
+  const tomorrow = localCalendarDate(new Date(Date.now() + 86400000));
   if (date === today) return { racecards: await racecardsFree("today"), oddsTier: "free" };
   if (date === tomorrow) return { racecards: await racecardsFree("tomorrow"), oddsTier: "free" };
   return { racecards: [], oddsTier: "free" };
@@ -31,7 +32,7 @@ async function loadRacecardsForDate(date: string): Promise<{
 
 export async function GET(req: NextRequest) {
   const date =
-    req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+    req.nextUrl.searchParams.get("date") ?? localCalendarDate();
 
   if (!hasRacingApiKey()) {
     return NextResponse.json({ source: "demo", racecards: demoRacecards() });
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
   try {
     const { racecards, oddsTier } = await loadRacecardsForDate(date);
 
-    const results = await resultsToday();
+    const { results } = await resultsToday();
     const enriched = racecards.map((card) => {
       const result = results.get(card.externalId);
       if (!result) return card;

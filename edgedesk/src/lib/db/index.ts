@@ -1,3 +1,5 @@
+import "server-only";
+
 import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import fs from "node:fs";
@@ -8,18 +10,31 @@ type DB = BetterSQLite3Database<typeof schema>;
 
 let instance: DB | null = null;
 
-/** Lazy singleton — nothing touches the SQLite file until the first query at request time. */
+/**
+ * Resolve the SQLite file path.
+ * Production/dev: `data/edgedesk.db` under cwd.
+ * Tests: set `EDGEDESK_DB_PATH` (vitest sets a temp file) so unit tests never
+ * write into the live profit-history database.
+ */
+export function resolveDbPath(): string {
+  const override = process.env.EDGEDESK_DB_PATH?.trim();
+  if (override) return path.resolve(override);
+  return path.join(process.cwd(), "data", "edgedesk.db");
+}
+
+/** Lazy singleton - nothing touches the SQLite file until the first query at request time. */
 function getDb(): DB {
   if (instance) return instance;
 
-  const dataDir = path.join(process.cwd(), "data");
+  const dbPath = resolveDbPath();
+  const dataDir = path.dirname(dbPath);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-  const sqlite = new Database(path.join(dataDir, "edgedesk.db"));
+  const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("busy_timeout = 5000");
 
-  // Simple idempotent bootstrap — no migration tooling needed at MVP stage
+  // Simple idempotent bootstrap - no migration tooling needed at MVP stage
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +106,75 @@ CREATE TABLE IF NOT EXISTS exchanges (
 );
 `);
 
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS offers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bookmaker TEXT,
+  title TEXT NOT NULL,
+  description TEXT,
+  expected_profit REAL,
+  status TEXT NOT NULL DEFAULT 'active',
+  expires_at INTEGER,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
+`);
+
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  exchange_id INTEGER,
+  funded_by_account_id INTEGER,
+  brand_color TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  access_status TEXT NOT NULL DEFAULT 'available',
+  notes TEXT,
+  wr_remaining REAL NOT NULL DEFAULT 0,
+  wr_min_odds REAL,
+  wr_type TEXT NOT NULL DEFAULT 'stake',
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS balance_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  amount REAL NOT NULL,
+  category TEXT NOT NULL,
+  bet_id INTEGER,
+  transfer_group_id TEXT,
+  pending INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  confirmed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  race_id TEXT NOT NULL,
+  horse_id TEXT NOT NULL,
+  horse TEXT NOT NULL,
+  sp_decimal REAL NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'bookie',
+  captured_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_racing_odds_race_horse ON racing_odds_snapshots(race_id, horse_id, captured_at);
+CREATE INDEX IF NOT EXISTS idx_racing_odds_race_horse_kind ON racing_odds_snapshots(race_id, horse_id, kind, captured_at);
+CREATE TABLE IF NOT EXISTS racing_odds_overrides (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  race_id TEXT NOT NULL,
+  horse_id TEXT NOT NULL,
+  bookie_decimal REAL,
+  exchange_decimal REAL,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_racing_odds_override_race_horse
+  ON racing_odds_overrides(race_id, horse_id);
+`);
+
   // Additive migrations for databases created before these columns existed
   const addColumn = (table: string, ddl: string) => {
     try {
@@ -110,65 +194,51 @@ CREATE TABLE IF NOT EXISTS exchanges (
   addColumn("offers", "offer_type TEXT");
   addColumn("offers", "scope_course TEXT");
   addColumn("offers", "event_date TEXT");
+  addColumn("offers", "scope_race_id TEXT");
+  addColumn("offers", "scope_race_label TEXT");
   addColumn("offers", "rules TEXT");
-
+  addColumn("offers", "series_id INTEGER");
+  addColumn("offers", "instance_date TEXT");
   sqlite.exec(`
-CREATE TABLE IF NOT EXISTS offers (
+CREATE TABLE IF NOT EXISTS offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  recurrence_enabled INTEGER NOT NULL DEFAULT 1,
+  recurrence_stopped_from TEXT,
+  rule_json TEXT NOT NULL,
+  template_expires_at INTEGER,
+  horizon_days INTEGER NOT NULL DEFAULT 14,
   bookmaker TEXT,
   title TEXT NOT NULL,
   description TEXT,
   expected_profit REAL,
-  status TEXT NOT NULL DEFAULT 'active',
-  expires_at INTEGER,
+  sport TEXT,
+  offer_type TEXT,
+  scope_course TEXT,
+  scope_race_id TEXT,
+  scope_race_label TEXT,
+  rules TEXT,
   created_at INTEGER NOT NULL,
-  completed_at INTEGER
+  updated_at INTEGER NOT NULL
 );
 `);
+  addColumn("accounts", "access_status TEXT NOT NULL DEFAULT 'available'");
+  addColumn("accounts", "notes TEXT");
+  addColumn("accounts", "funded_by_account_id INTEGER");
+  addColumn("accounts", "wr_remaining REAL NOT NULL DEFAULT 0");
+  addColumn("accounts", "wr_min_odds REAL");
+  addColumn("accounts", "wr_type TEXT NOT NULL DEFAULT 'stake'");
+  addColumn("balance_transactions", "transfer_group_id TEXT");
+  addColumn("balance_transactions", "pending INTEGER NOT NULL DEFAULT 0");
+  addColumn("balance_transactions", "confirmed_at INTEGER");
+  addColumn("racing_odds_snapshots", "kind TEXT NOT NULL DEFAULT 'bookie'");
 
-  // Legacy promo rows — settlement title already carries free-bet info
+  // Data migrations - only after tables exist (fresh DBs / vitest temp files)
   sqlite.exec(`DELETE FROM history WHERE kind = 'free_bet_promo'`);
-
-  // Reclassify promo / manual free-bet credits that were stored as cash top-ups
   sqlite.exec(`
 UPDATE balance_transactions
 SET category = 'free_bet'
 WHERE category = 'top_up'
   AND note LIKE '%Free bet%';
-`);
-
-  sqlite.exec(`
-CREATE TABLE IF NOT EXISTS accounts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL,
-  exchange_id INTEGER,
-  brand_color TEXT,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS balance_transactions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  account_id INTEGER NOT NULL,
-  amount REAL NOT NULL,
-  category TEXT NOT NULL,
-  bet_id INTEGER,
-  note TEXT,
-  created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS app_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  race_id TEXT NOT NULL,
-  horse_id TEXT NOT NULL,
-  horse TEXT NOT NULL,
-  sp_decimal REAL NOT NULL,
-  captured_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_racing_odds_race_horse ON racing_odds_snapshots(race_id, horse_id, captured_at);
 `);
 
   // Seed the well-known exchanges on first run so the pickers aren't empty
@@ -179,8 +249,8 @@ CREATE INDEX IF NOT EXISTS idx_racing_odds_race_horse ON racing_odds_snapshots(r
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
     const now = Date.now();
-    insert.run("Betfair", 5, "#ffb80c", "#a6d8ff", "#fac9d1", 0, now);
-    insert.run("Betdaq", 2, "#7b2d8b", "#fce38f", "#b5e5c4", 1, now);
+    insert.run("Betfair", 5, "#ffb80c", "#a6d8ff", "#fac9d1", 1, now);
+    insert.run("Betdaq", 2, "#7b2d8b", "#fce38f", "#b5e5c4", 0, now);
     insert.run("Smarkets", 2, "#0f1b2b", "#bfe8d4", "#c7dcf5", 0, now);
     insert.run("Matchbook", 4, "#16344f", "#b8dff5", "#f7bac2", 0, now);
   }

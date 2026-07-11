@@ -13,7 +13,7 @@ function isMatchCommentaryRow(row: HistoryRow, eventById: Map<number, { sport: s
   if ((MATCH_EVENT_KINDS as readonly string[]).includes(row.kind)) return true;
   if (row.kind !== "full_time") return false;
   const ev = row.eventId != null ? eventById.get(row.eventId) : undefined;
-  // Orphaned or football full-time — keep horse-racing results only.
+  // Orphaned or football full-time - keep horse-racing results only.
   return !ev || ev.sport !== "horse_racing";
 }
 

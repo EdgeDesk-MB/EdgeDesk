@@ -1,10 +1,10 @@
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
+import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 
 export type OfferNextActionKind =
   | "place_qualifying"
   | "await_result"
   | "convert_free_bet"
-  | "finish_conversion"
   | "review_expiry"
   | "start_planned";
 
@@ -27,6 +27,11 @@ function daysUntil(expiresAt: number | null, now: number): number | null {
   return (expiresAt - now) / DAY_MS;
 }
 
+/** True when the user can act now (not waiting on a result). */
+export function isActionableOfferNext(kind: OfferNextActionKind): boolean {
+  return kind !== "await_result";
+}
+
 /**
  * Derive the single most useful next step for an offer campaign.
  * Priority is lower = more urgent (sorted ascending).
@@ -40,7 +45,7 @@ export function deriveOfferNextAction(
   const profit = offer.profit;
   const bookmaker = offer.bookmaker;
   const offerTitle = offer.title;
-  const expiresAt = offer.expiresAt;
+  const expiresAt = effectiveOfferExpiryMs(offer);
   const days = daysUntil(expiresAt, now);
   const expiringSoon = days != null && days >= 0 && days <= 3;
 
@@ -59,7 +64,7 @@ export function deriveOfferNextAction(
       priority: expiringSoon ? 15 : 40,
       title: "Start this offer",
       detail: expiringSoon
-        ? `Expires soon — place the qualifying bet${bookmaker ? ` at ${bookmaker}` : ""}.`
+        ? `Expires soon - place the qualifying bet${bookmaker ? ` at ${bookmaker}` : ""}.`
         : `Log the qualifying bet to move this from planned to active.`,
     };
   }
@@ -70,7 +75,7 @@ export function deriveOfferNextAction(
       kind: "await_result",
       priority: 50,
       title: "Awaiting result",
-      detail: "Qualifying bet is open — free bet awards when the result lands.",
+      detail: "Qualifying bet is open - free bet awards when the result lands.",
     };
   }
 
@@ -80,7 +85,7 @@ export function deriveOfferNextAction(
       kind: "await_result",
       priority: 55,
       title: "Qualifying in play",
-      detail: `${profit.qualifyingOpenCount} open qualifying bet${profit.qualifyingOpenCount === 1 ? "" : "s"} — settle when the event finishes.`,
+      detail: `${profit.qualifyingOpenCount} open qualifying bet${profit.qualifyingOpenCount === 1 ? "" : "s"} - settle when the event finishes.`,
     };
   }
 
@@ -92,19 +97,23 @@ export function deriveOfferNextAction(
       title: "Convert free bet",
       detail:
         profit.freeBetAwardAmount != null
-          ? `£${profit.freeBetAwardAmount.toFixed(2)} free bet ready — place SNR/SR conversion.`
-          : "Free bet awarded — place the conversion bet.",
+          ? `£${profit.freeBetAwardAmount.toFixed(2)} free bet ready - place SNR/SR conversion.`
+          : "Free bet awarded - place the conversion bet.",
       href: `/tracker?offer=${offer.id}&queue=offers&action=convert`,
     };
   }
 
+  // Conversion already logged - nothing to do until the race settles.
   if (profit.freeBetStage === "in_use") {
     return {
       ...base,
-      kind: "finish_conversion",
-      priority: 20,
-      title: "Finish conversion",
-      detail: `${profit.freeBetOpenCount} free-bet leg${profit.freeBetOpenCount === 1 ? "" : "s"} still open.`,
+      kind: "await_result",
+      priority: 52,
+      title: "Conversion in play",
+      detail:
+        profit.freeBetOpenCount === 1
+          ? "Free-bet conversion is open - P&L finalises when the result lands."
+          : `${profit.freeBetOpenCount} free-bet legs open - P&L finalises when results land.`,
       href: `/tracker?offer=${offer.id}&queue=offers`,
     };
   }
@@ -121,8 +130,8 @@ export function deriveOfferNextAction(
       priority: expiringSoon ? 8 : 30,
       title: "Place qualifying bet",
       detail: bookmaker
-        ? `No bets linked yet — start the qualifying leg at ${bookmaker}.`
-        : "No bets linked yet — start the qualifying leg.",
+        ? `No bets linked yet - start the qualifying leg at ${bookmaker}.`
+        : "No bets linked yet - start the qualifying leg.",
       href: `/tracker?offer=${offer.id}&queue=offers&action=qualify`,
     };
   }
@@ -135,7 +144,7 @@ export function deriveOfferNextAction(
       title: "Review before expiry",
       detail:
         days != null && days < 1
-          ? "Expires today — check open legs and free-bet balance."
+          ? "Expires today - check open legs and free-bet balance."
           : `Expires in ${Math.ceil(days ?? 0)} day${Math.ceil(days ?? 0) === 1 ? "" : "s"}.`,
     };
   }
@@ -143,13 +152,17 @@ export function deriveOfferNextAction(
   return null;
 }
 
+/**
+ * Actionable next steps only (excludes waiting-on-result).
+ * Use for Best Next, Next actions, and nav badges.
+ */
 export function listOfferNextActions(
   offers: OfferSummary[],
   now = Date.now()
 ): OfferNextAction[] {
   return offers
     .map((o) => deriveOfferNextAction(o, now))
-    .filter((a): a is OfferNextAction => a != null)
+    .filter((a): a is OfferNextAction => a != null && isActionableOfferNext(a.kind))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
       const ae = a.expiresAt ?? Number.POSITIVE_INFINITY;
@@ -167,8 +180,6 @@ export function offerNextActionLabel(kind: OfferNextActionKind): string {
       return "Waiting";
     case "convert_free_bet":
       return "Convert";
-    case "finish_conversion":
-      return "Finish";
     case "review_expiry":
       return "Expiring";
     case "start_planned":

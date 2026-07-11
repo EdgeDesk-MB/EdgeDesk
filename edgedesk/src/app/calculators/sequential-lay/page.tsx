@@ -93,7 +93,7 @@ export default function SequentialLayCalculatorPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Sequential Lay Calculator</h1>
         <p className="text-sm text-muted-foreground">
-          Lay in stages as the market moves — add part lays already matched, then work out the
+          Lay in stages as the market moves - add part lays already matched, then work out the
           remaining lay at current odds. Standard equalises profit; underlay keeps all upside on
           the bookie win (boosted-odds play).
         </p>

@@ -1,4 +1,4 @@
-/** Exchange API providers — aligned with Settings default exchange names. */
+/** Exchange API providers - aligned with Settings default exchange names. */
 
 export type ExchangeProvider = "betfair" | "betdaq" | "matchbook" | "smarkets";
 
@@ -40,7 +40,7 @@ export interface ExchangeRaceOdds {
 export interface ExchangeOddsResult {
   provider: ExchangeProvider;
   status: ExchangeConnectionStatus;
-  /** Delayed vs live — Betfair delayed app key is free for dev */
+  /** Delayed vs live - Betfair delayed app key is free for dev */
   feedType?: "live" | "delayed";
   races: ExchangeRaceOdds[];
   error?: string;

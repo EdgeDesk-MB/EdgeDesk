@@ -15,18 +15,18 @@ export function fractionalToDecimal(raw: string | null | undefined): number | un
 
 /** Format decimal odds for display (always 2 dp, e.g. 4.50 or 2.00). */
 export function formatDecimalOdds(decimal: number | null | undefined): string {
-  if (decimal == null || !Number.isFinite(decimal) || decimal <= 1) return "—";
+  if (decimal == null || !Number.isFinite(decimal) || decimal <= 1) return "-";
   return decimal.toFixed(2);
 }
 
 export function formatWeightStones(lbs: number | null | undefined): string {
-  if (lbs == null || !Number.isFinite(lbs) || lbs <= 0) return "—";
+  if (lbs == null || !Number.isFinite(lbs) || lbs <= 0) return "-";
   const stone = Math.floor(lbs / 14);
   const rem = Math.round(lbs % 14);
   return `${stone}-${rem}`;
 }
 
-export type OddsSource = "live" | "snapshot" | "proxy" | "unavailable";
+export type OddsSource = "live" | "snapshot" | "proxy" | "manual" | "unavailable";
 
 const EXCHANGE_NAMES = ["betfair exchange", "betdaq", "matchbook", "smarkets"];
 const BOOKIE_NAMES = ["betfair sportsbook", "bet365", "william hill", "coral", "ladbrokes", "paddy power", "sky bet"];

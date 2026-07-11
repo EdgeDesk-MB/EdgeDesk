@@ -7,7 +7,10 @@ import {
   formatBetMeta,
   formatHistoryEventLine,
   formatHistoryPromoLine,
+  formatHistoryTimeBadge,
   formatHistoryTimeBadgeParts,
+  historyEntryHref,
+  historyEntryLinkLabel,
   historyEntrySubtitle,
   historyEntryTitle,
   historyKindLabel,
@@ -21,18 +24,9 @@ import {
   type HistoryContext,
 } from "@/lib/history-display";
 import { SportIcon } from "@/components/sport-icon";
+import { HistoryEntryIcon } from "@/components/history/history-entry-icon";
 import { cn } from "@/lib/utils";
-import {
-  CircleCheck,
-  CircleX,
-  Flag,
-  Gift,
-  Goal,
-  NotebookPen,
-  Play,
-  PlusCircle,
-  Zap,
-} from "lucide-react";
+import { Gift } from "lucide-react";
 
 const freeBetIconClass = "text-violet-600 dark:text-violet-400";
 const freeBetTextClass = "text-violet-700 dark:text-violet-300";
@@ -57,23 +51,37 @@ function HistoryEntryTitleDisplay({
   if (freeBetWon) {
     const marker = "Free bet won!";
     const idx = title.indexOf(marker);
+    /** Inline nowrap unit - same text baseline as "Bet lost ·", gift stays on the line. */
+    const wonBadge = (
+      <span className={cn("whitespace-nowrap", freeBetTextClass)}>
+        {marker}
+        <Gift
+          className={cn("ml-1 inline size-3.5 align-[-0.125em]", freeBetIconClass)}
+          aria-hidden
+        />
+      </span>
+    );
     if (idx >= 0) {
       const before = title.slice(0, idx);
       const after = title.slice(idx + marker.length);
       return (
-        <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1", className)}>
-          {before ? <span className="truncate">{before}</span> : null}
-          <span className={cn("shrink-0", freeBetTextClass)}>{marker}</span>
-          {after ? <span className="truncate">{after}</span> : null}
-          <Gift className={cn("size-3.5 shrink-0", freeBetIconClass)} aria-hidden />
+        <span className={cn("min-w-0 max-w-full", className)}>
+          {before}
+          {wonBadge}
+          {after}
         </span>
       );
     }
 
     return (
-      <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1", className)}>
-        <span className={cn("truncate", freeBetTextClass)}>{title}</span>
-        <Gift className={cn("size-3.5 shrink-0", freeBetIconClass)} aria-hidden />
+      <span className={cn("min-w-0 max-w-full", className)}>
+        <span className={cn("whitespace-nowrap", freeBetTextClass)}>
+          {title}
+          <Gift
+            className={cn("ml-1 inline size-3.5 align-[-0.125em]", freeBetIconClass)}
+            aria-hidden
+          />
+        </span>
       </span>
     );
   }
@@ -86,13 +94,24 @@ function HistoryTimeBadgeDisplay({
   ctx,
   className,
   spanSubtitleRow = false,
+  /** Single-line "Yesterday, 20:43" - History page. Home keeps the stacked two-line badge. */
+  inline = false,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   className?: string;
   /** When the row already has a subtitle line, stack the date/time in that space. */
   spanSubtitleRow?: boolean;
+  inline?: boolean;
 }) {
+  if (inline) {
+    return (
+      <span className={cn("whitespace-nowrap tabular-nums", className)}>
+        {formatHistoryTimeBadge(entry, ctx)}
+      </span>
+    );
+  }
+
   const { primary, secondary } = formatHistoryTimeBadgeParts(entry, ctx);
 
   if (!secondary) {
@@ -120,24 +139,6 @@ function HistoryTimeBadgeDisplay({
   );
 }
 
-function historyIcon(entry: HistoryRow, ctx: HistoryContext) {
-  const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
-  const win = (entry.amount ?? 0) > 0.004;
-  const loss = (entry.amount ?? 0) < -0.004;
-
-  if (entry.kind === "bet_placed") {
-    if (freeBetPlaced) return <PlusCircle className={cn("size-3.5", freeBetIconClass)} />;
-    return <PlusCircle className="size-3.5 text-primary" />;
-  }
-  if (entry.kind === "goal") return <Goal className="size-3.5 text-emerald-600 dark:text-emerald-400" />;
-  if (entry.kind === "kickoff") return <Play className="size-3.5 text-primary" />;
-  if (entry.kind === "full_time") return <Flag className="size-3.5 text-sky-600 dark:text-sky-400" />;
-  if (entry.kind === "two_up") return <Zap className="size-3.5 text-amber-500" />;
-  if (win) return <CircleCheck className="size-3.5 text-emerald-600" />;
-  if (loss || isFreeBetWonHistoryEntry(entry)) return <CircleX className="size-3.5 text-negative" />;
-  return <CircleCheck className="size-3.5 text-muted-foreground" />;
-}
-
 function entryTint(entry: HistoryRow) {
   const isSettlement = entry.kind === "settlement";
   const win = (entry.amount ?? 0) > 0.004;
@@ -146,6 +147,23 @@ function entryTint(entry: HistoryRow) {
   if (win) return "history-settlement-tint-win";
   if (loss || isFreeBetWonHistoryEntry(entry)) return "history-settlement-tint-loss";
   return "";
+}
+
+/** Top-right gradient tint - same 30° sweep as offer campaign cards */
+function historyHeaderTint(entry: HistoryRow): string | null {
+  if (entry.kind !== "settlement") return null;
+  const amount = entry.amount ?? 0;
+  if (amount > 0.004) return "offer-header-tint-win";
+  if (amount < -0.004 || isFreeBetWonHistoryEntry(entry)) return "offer-header-tint-loss";
+  return null;
+}
+
+function historyRowShellClass(entry: HistoryRow, compact: boolean) {
+  return cn(
+    "flex w-full min-w-0 items-start gap-2 rounded-md border border-transparent transition-colors hover:border-border/60 hover:bg-selection-subtle cursor-pointer",
+    compact ? "box-border max-w-full px-2 py-2" : "self-stretch px-2 py-1.5",
+    entryTint(entry)
+  );
 }
 
 export function HistoryEntryRow({
@@ -168,60 +186,56 @@ export function HistoryEntryRow({
   const title = historyEntryTitle(entry, ctx);
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
+  const href = historyEntryHref(entry, ctx);
+  const linkLabel = historyEntryLinkLabel(entry, ctx);
 
   if (compact) {
     return (
-      <div
-        className={cn(
-          "grid grid-cols-[minmax(4.75rem,auto)_1rem_minmax(0,1fr)_4.5rem] grid-rows-[auto_auto] items-start gap-x-2 gap-y-0.5 rounded-md border border-transparent py-2 pl-2 pr-[calc(0.5rem+0.5rem)] transition-colors hover:border-border/60 hover:bg-selection-subtle",
-          entryTint(entry)
-        )}
-      >
+      <Link href={href} className={historyRowShellClass(entry, true)} aria-label={linkLabel}>
         <HistoryTimeBadgeDisplay
           entry={entry}
           ctx={ctx}
           spanSubtitleRow={Boolean(compactDescription)}
           className={cn(
-            "row-start-1 shrink-0 self-start text-left text-[11px] font-semibold text-muted-foreground",
-            compactDescription && "row-span-2 self-center"
+            "w-[4.75rem] shrink-0 self-start text-left text-[11px] font-semibold text-muted-foreground",
+            compactDescription && "self-center"
           )}
         />
-        <div className="row-start-1 flex w-4 shrink-0 justify-center self-start pt-0.5">
-          {historyIcon(entry, ctx)}
+        <div className="flex w-4 shrink-0 justify-center self-start pt-0.5">
+          <HistoryEntryIcon entry={entry} ctx={ctx} />
         </div>
-        <HistoryEntryTitleDisplay
-          title={title}
-          freeBetPlaced={freeBetPlaced}
-          freeBetWon={freeBetWon}
-          className="col-start-3 row-start-1 self-start text-left text-[13px] font-medium leading-snug"
-        />
-        <span className="col-start-4 row-start-1 shrink-0 self-start text-right text-[13px] font-semibold tabular-nums">
-          {isSettlement && entry.amount != null ? (
-            <MoneyFlow value={entry.amount} signColor signDisplay />
+        <div className="min-w-0 flex-1 text-left">
+          <HistoryEntryTitleDisplay
+            title={title}
+            freeBetPlaced={freeBetPlaced}
+            freeBetWon={freeBetWon}
+            className="block text-[13px] font-medium leading-snug"
+          />
+          {compactDescription ? (
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {compactDescription}
+            </span>
           ) : null}
-        </span>
-        {compactDescription ? (
-          <span className="col-start-3 col-end-5 row-start-2 min-w-0 truncate text-left text-xs text-muted-foreground">
-            {compactDescription}
+        </div>
+        {isSettlement && entry.amount != null ? (
+          <span className="ml-auto shrink-0 self-start text-right text-[13px] font-semibold tabular-nums">
+            <MoneyFlow value={entry.amount} signColor signDisplay />
           </span>
         ) : null}
-      </div>
+      </Link>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "flex items-start gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors hover:border-border/60 hover:bg-selection-subtle",
-        entryTint(entry)
-      )}
-    >
+    <Link href={href} className={historyRowShellClass(entry, false)} aria-label={linkLabel}>
       <HistoryTimeBadgeDisplay
         entry={entry}
         ctx={ctx}
         className="w-[4.5rem] shrink-0 pt-0.5 text-left text-[11px] font-semibold text-muted-foreground"
       />
-      <div className="flex w-4 shrink-0 justify-center pt-0.5">{historyIcon(entry, ctx)}</div>
+      <div className="flex w-4 shrink-0 justify-center pt-0.5">
+        <HistoryEntryIcon entry={entry} ctx={ctx} />
+      </div>
       <span className="min-w-0 flex-1 text-left">
         <HistoryEntryTitleDisplay
           title={title}
@@ -261,16 +275,7 @@ export function HistoryEntryRow({
           <MoneyFlow value={entry.amount} signColor signDisplay />
         </span>
       )}
-      {bet && (
-        <Link
-          href={`/tracker?highlight=${bet.id}`}
-          className="shrink-0 pt-0.5 text-muted-foreground transition-colors hover:text-primary"
-          aria-label="Open bet in tracker"
-        >
-          <NotebookPen className="size-3.5" />
-        </Link>
-      )}
-    </div>
+    </Link>
   );
 }
 
@@ -278,10 +283,13 @@ export function HistoryEntryCard({
   entry,
   ctx,
   bet,
+  collapsed = false,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   bet?: BetRow;
+  /** Hide bet details band — header summary only */
+  collapsed?: boolean;
 }) {
   const settledNote = historySettledNote(entry, ctx);
   const promo = entry.betId != null ? ctx.promoByBetId[entry.betId] : undefined;
@@ -295,97 +303,139 @@ export function HistoryEntryCard({
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
 
   return (
-    <article className={cn("rounded-lg p-4 ring-1 ring-border/50", entryTint(entry))}>
-      <div className="flex items-start gap-3">
-        <div className="flex w-4 shrink-0 flex-col items-center gap-1 pt-1">
-          {historyIcon(entry, ctx)}
-          {event && <SportIcon sport={event.sport} size={16} className="text-muted-foreground" />}
-        </div>
-
-        <div className="min-w-0 flex-1 text-left">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {historyKindLabel(entry.kind)}
-                </span>
-                <HistoryTimeBadgeDisplay
-                  entry={entry}
-                  ctx={ctx}
-                  className="text-xs text-muted-foreground"
-                />
-              </div>
-              <h3 className="mt-0.5 text-base font-bold leading-snug">
-                <HistoryEntryTitleDisplay
-                  title={title}
-                  freeBetPlaced={freeBetPlaced}
-                  freeBetWon={freeBetWon}
-                />
-              </h3>
-              {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
-              {eventLine && <p className="mt-1 text-sm text-foreground/80">{eventLine}</p>}
-              {settledNote && <p className="mt-1 text-xs text-muted-foreground">{settledNote}</p>}
-            </div>
-            {entry.kind === "settlement" && entry.amount != null && (
-              <MoneyFlow value={entry.amount} signColor signDisplay className="shrink-0 text-xl font-bold" />
+    <article className="offer-campaign-card overflow-hidden rounded-lg ring-1 ring-border/50 dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100">
+      <div
+        className={cn(
+          collapsed ? "px-3 py-2.5" : "px-4 pt-4 pb-3",
+          historyHeaderTint(entry) ?? "bg-card"
+        )}
+      >
+        <div className={cn("flex items-start", collapsed ? "gap-2" : "gap-3")}>
+          <div
+            className={cn(
+              "flex w-4 shrink-0 flex-col items-center pt-0.5",
+              collapsed ? "gap-0.5" : "gap-1 pt-1"
             )}
+          >
+            <HistoryEntryIcon entry={entry} ctx={ctx} />
+            {event && !collapsed ? (
+              <SportIcon sport={event.sport} size={16} className="text-muted-foreground" />
+            ) : null}
           </div>
 
-          {bet && (
-            <dl className="mt-4 flex flex-col gap-2 border-t pt-3 text-sm">
-              {showHistoryBetLabel(bet) && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">Bet</dt>
-                  <dd className="font-medium">{bet.label}</dd>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {historyKindLabel(entry.kind)}
+                  </span>
+                  <HistoryTimeBadgeDisplay
+                    entry={entry}
+                    ctx={ctx}
+                    inline
+                    className="text-[11px] text-muted-foreground"
+                  />
                 </div>
+                <h3
+                  className={cn(
+                    "mt-0.5 font-bold leading-snug",
+                    collapsed ? "text-sm" : "text-base"
+                  )}
+                >
+                  <HistoryEntryTitleDisplay
+                    title={title}
+                    freeBetPlaced={freeBetPlaced}
+                    freeBetWon={freeBetWon}
+                  />
+                </h3>
+                {!collapsed && subtitle ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+                ) : null}
+                {!collapsed && eventLine ? (
+                  <p className="mt-1 text-sm text-foreground/80">{eventLine}</p>
+                ) : null}
+                {!collapsed && settledNote ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{settledNote}</p>
+                ) : null}
+                {collapsed && eventLine ? (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{eventLine}</p>
+                ) : null}
+              </div>
+              {entry.kind === "settlement" && entry.amount != null && (
+                <MoneyFlow
+                  value={entry.amount}
+                  signColor
+                  signDisplay
+                  className={cn(
+                    "shrink-0 font-bold tabular-nums",
+                    collapsed ? "text-base" : "text-xl"
+                  )}
+                />
               )}
-              {bet.bookmaker && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">Bookie</dt>
-                  <dd>{bet.bookmaker}</dd>
-                </div>
-              )}
-              {bet.selection && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">Selection</dt>
-                  <dd>{bet.selection}</dd>
-                </div>
-              )}
-              {bet.expectedProfit != null && entry.kind === "bet_placed" && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">Expected</dt>
-                  <dd>
-                    <MoneyFlow value={bet.expectedProfit} signColor signDisplay />
-                  </dd>
-                </div>
-              )}
-              {showHistoryPromoField(entry, promo) && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">Promo</dt>
-                  <dd className="text-violet-700 dark:text-violet-300">{formatHistoryPromoLine(promo!)}</dd>
-                </div>
-              )}
-              {showHistoryTriggerField(bet) && (
-                <div>
-                  <dt className="text-xs text-muted-foreground">Trigger</dt>
-                  <dd className="text-amber-700 dark:text-amber-400">{bet.triggerText}</dd>
-                </div>
-              )}
-            </dl>
-          )}
-
-          {bet && (
-            <div className="mt-3 flex justify-end">
-              <Link
-                href={`/tracker?highlight=${bet.id}`}
-                className="text-xs font-medium text-primary underline-offset-2 hover:underline"
-              >
-                View in tracker →
-              </Link>
             </div>
-          )}
+          </div>
         </div>
       </div>
+
+      {!collapsed && bet ? (
+        <div className="border-t border-border/50 bg-card px-4 py-3">
+          <div className="flex items-start gap-3">
+            <div className="w-4 shrink-0" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <dl className="flex flex-col gap-2 text-sm">
+                {showHistoryBetLabel(bet) && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Bet</dt>
+                    <dd className="font-medium">{bet.label}</dd>
+                  </div>
+                )}
+                {bet.bookmaker && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Bookie</dt>
+                    <dd>{bet.bookmaker}</dd>
+                  </div>
+                )}
+                {bet.selection && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Selection</dt>
+                    <dd>{bet.selection}</dd>
+                  </div>
+                )}
+                {bet.expectedProfit != null && entry.kind === "bet_placed" && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Expected</dt>
+                    <dd>
+                      <MoneyFlow value={bet.expectedProfit} signColor signDisplay />
+                    </dd>
+                  </div>
+                )}
+                {showHistoryPromoField(entry, promo) && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Promo</dt>
+                    <dd className="text-violet-700 dark:text-violet-300">{formatHistoryPromoLine(promo!)}</dd>
+                  </div>
+                )}
+                {showHistoryTriggerField(bet) && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Trigger</dt>
+                    <dd className="text-amber-700 dark:text-amber-400">{bet.triggerText}</dd>
+                  </div>
+                )}
+              </dl>
+
+              <div className="mt-3 flex justify-end">
+                <Link
+                  href={`/tracker?highlight=${bet.id}`}
+                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  View in tracker →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -394,7 +444,7 @@ export function HistoryFeed({
   entries,
   ctx,
   compact = false,
-  emptyMessage = "Nothing yet — key match moments and bet results land here in real time.",
+  emptyMessage = "Nothing yet - key match moments and bet results land here in real time.",
 }: {
   entries: HistoryRow[];
   ctx: HistoryContext;
@@ -402,10 +452,20 @@ export function HistoryFeed({
   emptyMessage?: string;
 }) {
   if (entries.length === 0) {
-    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+    return (
+      <p className={cn("text-sm text-muted-foreground", compact && "px-[var(--layout-card-x)] pt-2")}>
+        {emptyMessage}
+      </p>
+    );
   }
   return (
-    <div className={cn("flex flex-col", compact ? "mt-2 gap-1.5 px-[var(--layout-card-x)]" : "gap-3")}>
+    <div
+      className={cn(
+        "box-border flex w-full max-w-full min-w-0 flex-col",
+        /* Compact Home: horizontal inset lives on the scrollport so rows can be 100% of the content box. */
+        compact ? "mt-2 gap-1.5" : "gap-3"
+      )}
+    >
       {entries.map((entry) => (
         <HistoryEntryRow key={entry.id} entry={entry} ctx={ctx} compact={compact} />
       ))}
