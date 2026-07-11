@@ -1,5 +1,6 @@
 import { offerCategoryById } from "@/lib/offers/offer-categories";
 import { formatQualifyingPlacesPhrase } from "@/lib/offers/offer-odds-text";
+import { formatClockTime } from "@/lib/time-format";
 import type {
   ArchetypeMatch,
   OfferArchetype,
@@ -294,13 +295,12 @@ export function buildImportantHints(
   }
 
   if (ctx.expiresAt != null) {
-    const when = new Date(ctx.expiresAt).toLocaleString("en-GB", {
+    const d = new Date(ctx.expiresAt);
+    const when = `${d.toLocaleDateString("en-GB", {
       weekday: "short",
       day: "numeric",
       month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    })}, ${formatClockTime(d)}`;
     hints.push(`Expires ${when}`);
   }
 

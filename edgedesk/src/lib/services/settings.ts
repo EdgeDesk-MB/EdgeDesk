@@ -12,6 +12,7 @@ import {
   type OfferBetPref,
 } from "./settings-shared";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
+import { normalizeTimeFormat, setDisplayTimeFormat } from "@/lib/time-format";
 
 export type { AppSettings, OfferBetPref };
 export {
@@ -73,7 +74,7 @@ export function getAppSettings(): AppSettings {
       ? betType
       : DEFAULT_SETTINGS.defaultBetType;
 
-  return {
+  const settings: AppSettings = {
     defaultBackStake: Number.isFinite(stake) && stake > 0 ? stake : DEFAULT_SETTINGS.defaultBackStake,
     defaultBetType: validBetType,
     defaultBookmaker: readRaw("defaultBookmaker") ?? DEFAULT_SETTINGS.defaultBookmaker,
@@ -86,7 +87,12 @@ export function getAppSettings(): AppSettings {
         ? poll
         : DEFAULT_SETTINGS.dashboardPollMs,
     displayTimezone: normalizeDisplayTimezone(readRaw("displayTimezone")),
+    timeFormat: normalizeTimeFormat(readRaw("timeFormat")),
   };
+  // Server-side display helpers (history labels, sync toasts) read the
+  // process-wide format; keep it in step with the persisted preference.
+  setDisplayTimeFormat(settings.timeFormat);
+  return settings;
 }
 
 export function getOfferBetPref(offerId: number): OfferBetPref | undefined {
@@ -162,6 +168,9 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   if (patch.dashboardPollMs != null) writeRaw("dashboardPollMs", String(patch.dashboardPollMs));
   if (patch.displayTimezone != null) {
     writeRaw("displayTimezone", normalizeDisplayTimezone(patch.displayTimezone));
+  }
+  if (patch.timeFormat != null) {
+    writeRaw("timeFormat", normalizeTimeFormat(patch.timeFormat));
   }
   return getAppSettings();
 }

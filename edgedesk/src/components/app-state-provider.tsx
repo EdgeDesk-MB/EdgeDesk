@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AppState } from "@/lib/services/state.types";
+import { setDisplayTimeFormat } from "@/lib/time-format";
 
 const FALLBACK_POLL_MS = 3000;
 
@@ -35,7 +36,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch("/api/state", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        setState(await res.json());
+        const next = (await res.json()) as AppState;
+        setDisplayTimeFormat(next.settings?.timeFormat);
+        setState(next);
         setError(null);
       } catch (e) {
         setError(String(e));

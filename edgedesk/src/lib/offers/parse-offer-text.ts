@@ -4,6 +4,7 @@
  */
 import { inferAiEffectsFromText, parsePlacePositions } from "@/lib/calc/ai-triggers";
 import { matchBookmakerFromText } from "@/lib/bookmakers";
+import { formatClockTime } from "@/lib/time-format";
 import type { OfferCategoryId } from "@/lib/offers/offer-categories";
 import { offerCategoryById } from "@/lib/offers/offer-categories";
 import type { SportValue } from "@/lib/sports";
@@ -1092,14 +1093,13 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
     notes.push(`→ ${step}`);
   }
   if (expiresAt != null) {
+    const d = new Date(expiresAt);
     notes.push(
-      `Expires ${new Date(expiresAt).toLocaleString("en-GB", {
+      `Expires ${d.toLocaleDateString("en-GB", {
         day: "numeric",
         month: "short",
         year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`
+      })}, ${formatClockTime(d)}`
     );
   }
   const importantSummary = formatImportantTermsSummary(enrichedImportant);

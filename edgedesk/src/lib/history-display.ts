@@ -2,6 +2,7 @@ import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import { formatGbp } from "@/lib/format-money";
 import { formatPromoTooltip } from "@/lib/bet-outcomes";
 import { formatEventTitle, racingVenueLabel } from "@/lib/events";
+import { formatClockTime } from "@/lib/time-format";
 import { MARKET_LABELS } from "@/lib/markets";
 
 export type HistoryFilter =
@@ -102,7 +103,7 @@ function isYesterday(when: Date, now: Date): boolean {
 }
 
 function formatHistoryClock(when: Date): string {
-  return when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return formatClockTime(when);
 }
 
 /** True when the badge should show a live minute (e.g. 23') instead of a clock time. */
@@ -179,12 +180,11 @@ export function historySettledNote(entry: HistoryRow, ctx: HistoryContext): stri
   const event = resolveHistoryEvent(entry, ctx);
   if (!bet?.settledAt || !event?.startTime) return undefined;
   if (bet.settledAt <= event.startTime + 60_000) return undefined;
-  return `Settled ${new Date(bet.settledAt).toLocaleString("en-GB", {
+  const settled = new Date(bet.settledAt);
+  return `Settled ${settled.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  })}, ${formatClockTime(settled)}`;
 }
 
 export function isRacingHistoryEntry(entry: HistoryRow, ctx: HistoryContext): boolean {

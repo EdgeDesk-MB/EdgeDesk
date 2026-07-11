@@ -1,6 +1,7 @@
 /** Shared helpers for tracked events in bet entry and the Events page. */
 
 import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
+import { formatClockString, formatClockTime } from "@/lib/time-format";
 
 /** Default fixture/event timezone (London). Prefer settings.displayTimezone in UI code. */
 export const FIXTURE_TIMEZONE = DEFAULT_DISPLAY_TIMEZONE;
@@ -63,12 +64,7 @@ export function formatFixtureKickoff(
   timeZone = DEFAULT_DISPLAY_TIMEZONE
 ): string {
   const d = new Date(startTime);
-  const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
+  const time = formatClockTime(d, { timeZone });
 
   const dayKey = (ms: number, tz: string) => localCalendarDate(new Date(ms), tz);
   if (dayKey(startTime, timeZone) !== dayKey(now, timeZone)) {
@@ -214,7 +210,7 @@ export function formatRacingEventTitle(ev: {
       : ev.awayTeam?.trim()
         ? normalizeEventTimeInput(ev.awayTeam)
         : "";
-  return time ? `${venue} · ${time}` : venue;
+  return time ? `${venue} · ${formatClockString(time)}` : venue;
 }
 
 /** Status line for racing events - never football scores. */
@@ -304,7 +300,7 @@ export function formatTrackedEventOption(ev: TrackedEventLike): string {
     ev.status === "live" ? " · LIVE" : ev.status === "finished" ? " · FT" : "";
   const when =
     ev.startTime != null
-      ? ` · ${formatEventDate(ev.startTime)} ${formatEventTime(ev.startTime)}`
+      ? ` · ${formatEventDate(ev.startTime)} ${formatClockString(formatEventTime(ev.startTime))}`
       : "";
   return `${ev.homeTeam} v ${ev.awayTeam}${when}${status}`;
 }

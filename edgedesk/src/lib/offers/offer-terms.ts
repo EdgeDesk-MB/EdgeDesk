@@ -4,6 +4,7 @@
  */
 
 import type { OfferRow } from "@/lib/db/schema";
+import { formatClockTime } from "@/lib/time-format";
 import type { BetGetFreePlaceRules } from "@/lib/offers/racing-offer-rules";
 
 export interface PromoTermsRules {
@@ -130,11 +131,10 @@ export function fromDatetimeLocalValue(value: string): number | null {
 
 export function formatOfferExpiry(ms: number | null | undefined): string {
   if (ms == null) return "";
-  return new Date(ms).toLocaleString("en-GB", {
+  const d = new Date(ms);
+  return `${d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  })}, ${formatClockTime(d)}`;
 }

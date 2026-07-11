@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PendingSettleRace } from "@/lib/racing/pending-settle";
+import { formatClockString } from "@/lib/time-format";
 import { AlertCircle, X } from "lucide-react";
 
 const DISMISS_KEY = "edgedesk:settle-prompt-dismissed";
@@ -90,7 +91,7 @@ export function RacingSettlePrompt({
           {visible.length === 1 ? "Race awaiting result" : `${visible.length} races awaiting results`}
         </p>
         <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-200/90">
-          <span className="font-medium">{primary.course}</span> ({primary.offTime}) passed off without a
+          <span className="font-medium">{primary.course}</span> ({formatClockString(primary.offTime)}) passed off without a
           winner. {tierHint}
           set the winner on{" "}
           <Link href="/tracked-events" className="font-medium underline underline-offset-2">

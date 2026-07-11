@@ -293,6 +293,7 @@ function buildSuggestedRaces(races: RacingDeskRace[]): SuggestedRace[] {
         externalId: race.externalId,
         course: race.course,
         raceName: race.raceName,
+        startTime: race.startTime,
         offTime: race.offTime,
         region: race.region,
         offerId: tag.offerId,

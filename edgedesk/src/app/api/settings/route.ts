@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAppSettings, patchAppSettings, type AppSettingsPatch } from "@/lib/services/settings";
+import { normalizeTimeFormat } from "@/lib/time-format";
 
 export async function GET() {
   return NextResponse.json(getAppSettings());
@@ -25,6 +26,7 @@ export async function PATCH(req: Request) {
   }
   if (typeof body.dashboardPollMs === "number") patch.dashboardPollMs = body.dashboardPollMs;
   if (typeof body.displayTimezone === "string") patch.displayTimezone = body.displayTimezone;
+  if (typeof body.timeFormat === "string") patch.timeFormat = normalizeTimeFormat(body.timeFormat);
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

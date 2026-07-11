@@ -12,6 +12,7 @@ import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { ChartBetMarkersOverlay } from "@/components/dashboard/chart-bet-markers-overlay";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import type { BetRow } from "@/lib/db/schema";
+import { formatClockTime } from "@/lib/time-format";
 import {
   PNL_CHART_PADDING_DEFAULT,
   PNL_CHART_PADDING_PANEL,
@@ -79,21 +80,15 @@ function formatChartTime(secs: number, t: number): string {
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   }
   if (secs >= 86_400) {
-    return d.toLocaleDateString("en-GB", {
+    return `${d.toLocaleDateString("en-GB", {
       weekday: "short",
       day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    })}, ${formatClockTime(d)}`;
   }
   if (secs >= 3600) {
-    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    return formatClockTime(d);
   }
-  return d.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  return formatClockTime(d, { withSeconds: true });
 }
 
 export const LivePnlChart = memo(function LivePnlChart({

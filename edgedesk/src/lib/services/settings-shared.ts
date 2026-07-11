@@ -3,6 +3,8 @@
  * Server persistence lives in `settings.ts`.
  */
 
+import { DEFAULT_TIME_FORMAT, type TimeFormatPreference } from "@/lib/time-format";
+
 export interface OfferBetPref {
   stake: number;
   bookmaker: string;
@@ -20,6 +22,8 @@ export interface AppSettings {
   dashboardPollMs: number;
   /** IANA timezone for fixture kickoffs and event times in the UI. */
   displayTimezone: string;
+  /** Clock format for every displayed time of day (inputs stay HH:mm). */
+  timeFormat: TimeFormatPreference;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -32,6 +36,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ocrAutoMatchEvents: true,
   dashboardPollMs: 3000,
   displayTimezone: "Europe/London",
+  timeFormat: DEFAULT_TIME_FORMAT,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

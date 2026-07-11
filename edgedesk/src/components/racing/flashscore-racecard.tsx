@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDecimalOdds, formatWeightStones } from "@/lib/racing/odds";
 import { formatHeadgear } from "@/lib/racing/runner-display";
+import { formatClockTime } from "@/lib/time-format";
 import type { RacingDeskRace, RacingRunnerDetail } from "@/lib/racing-desk/types";
 import { PriceMovementArrow, PriceMovementBadge } from "@/components/racing/price-movement-badge";
 import { RacingOfferGuide } from "@/components/racing/racing-offer-guide";
@@ -453,12 +454,11 @@ export function FlashscoreRacecard({
   }
 
   const hasPlaceOffer = selected.offerTags.some((t) => t.qualifies);
-  const startLabel = new Date(selected.startTime).toLocaleString("en-GB", {
+  const startDate = new Date(selected.startTime);
+  const startLabel = `${startDate.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  })}, ${formatClockTime(startDate)}`;
 
   return (
     <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none">
@@ -507,7 +507,7 @@ export function FlashscoreRacecard({
                 onClick={() => onSelectRace(race.externalId)}
                 className={listPillState(active)}
               >
-                {race.offTime || "-"}
+                {race.startTime ? formatClockTime(race.startTime) : race.offTime || "-"}
                 {offerCount > 0 && (
                   <span
                     className="ml-1 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"

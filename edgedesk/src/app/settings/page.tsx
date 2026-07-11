@@ -28,6 +28,7 @@ import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
 import { Download, Bell, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
+import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
 export default function SettingsPage() {
   const { resetAndOpenWelcome } = useOnboarding();
@@ -300,14 +301,14 @@ function PreferencesPanel({
       <Card className="lg:col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="size-4" /> Timezone
+            <Globe className="size-4" /> Time &amp; timezone
           </CardTitle>
           <CardDescription>
             Fixture kickoffs and race off-times are shown in this timezone. Defaults to London.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-1.5 max-w-sm">
+        <CardContent className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex flex-col gap-1.5 w-full max-w-sm">
             <Label htmlFor="display-timezone">Display timezone</Label>
             <Select
               value={settings.displayTimezone}
@@ -324,6 +325,27 @@ function PreferencesPanel({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex flex-col gap-1.5 w-full max-w-sm">
+            <Label htmlFor="time-format">Time format</Label>
+            <Select
+              value={settings.timeFormat}
+              onValueChange={(v) => onPatch({ timeFormat: normalizeTimeFormat(v) })}
+            >
+              <SelectTrigger id="time-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_FORMAT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Applies to every time shown in the app. Manual time entry stays HH:MM.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -150,6 +150,7 @@ export interface SuggestedRace {
   externalId: string;
   course: string;
   raceName: string;
+  startTime: number;
   offTime: string;
   /** The Racing API region (GB / IRE) */
   region?: string;

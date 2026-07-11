@@ -19,6 +19,7 @@ import {
   type OfferConfidence,
 } from "@/lib/offers/place-refund-ev";
 import { formatDecimalOdds } from "@/lib/racing/odds";
+import { formatClockTime } from "@/lib/time-format";
 import type { SuggestedRace, SuggestedRunner } from "@/lib/racing-desk/types";
 import { RegionFlag } from "@/components/region-flag";
 import { filterPillState, listRowInteractive } from "@/lib/ui/surface-styles";
@@ -120,7 +121,9 @@ function SuggestionRow({
             className={cn("w-full text-left", listRowInteractive, "-mx-1 rounded-md px-1 py-0.5")}
           >
             <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold tabular-nums">{suggestion.offTime}</span>
+              <span className="font-semibold tabular-nums">
+                {suggestion.startTime ? formatClockTime(suggestion.startTime) : suggestion.offTime}
+              </span>
               <span className="inline-flex items-center gap-1.5 font-medium">
                 <RegionFlag code={suggestion.region} />
                 {suggestion.course}

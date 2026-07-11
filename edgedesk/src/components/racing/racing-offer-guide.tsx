@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RaceOfferTag, RacingDeskRace } from "@/lib/racing-desk/types";
 import { findOfferTag, offerTagBestEv, qualifyingOfferTags } from "@/lib/racing/offer-tags";
+import { formatClockTime } from "@/lib/time-format";
 import { VenueBadge } from "@/components/venue-badge";
 import { useAppState } from "@/hooks/use-app-state";
 import {
@@ -191,7 +192,7 @@ function OfferWorkflowBody({
         done
         active={nextStep === "pick"}
         label="Pick race"
-        detail={`${race.course} ${race.offTime} - qualifying for ${offerTag.bookmaker ?? "your offer"}`}
+        detail={`${race.course} ${race.startTime ? formatClockTime(race.startTime) : race.offTime} - qualifying for ${offerTag.bookmaker ?? "your offer"}`}
       />
       <StepRow
         done={steps[1].done}
