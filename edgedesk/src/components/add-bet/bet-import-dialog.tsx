@@ -51,12 +51,12 @@ export function BetImportDialog({
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 self-start">
           <ScanLine className="size-3.5" aria-hidden />
-          Import bet slip
+          Paste slip
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Import bet slip</DialogTitle>
+          <DialogTitle>Paste slip</DialogTitle>
           <DialogDescription>
             Paste a screenshot or confirmation text to pre-fill bet details. Always check before saving.
           </DialogDescription>
