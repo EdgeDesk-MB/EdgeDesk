@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDoNextItems, sortDoNextItems, sumActionableEv } from "./do-next";
+import { buildDoNextItems, sortDoNextItems, sumActionableEv, type BookieBalanceMap } from "./do-next";
 import type { DoNextItem } from "./do-next";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
 
@@ -273,5 +273,65 @@ describe("sumActionableEv", () => {
     const { total, weakestBasis } = sumActionableEv([]);
     expect(total).toBe(0);
     expect(weakestBasis).toBe("heuristic");
+  });
+});
+
+describe("buildDoNextItems — bankroll-aware funding (B3)", () => {
+  const qualifyOffer = offer({
+    id: 100,
+    title: "Qualify £10",
+    bookmaker: "Bet365",
+    betCount: 0,
+    expectedProfit: 8,
+    rules: JSON.stringify({ betStake: 10, type: "bet_get_free_place", minRunners: 8, regions: ["GB"], qualifyingPlaces: [], freeBetAmount: 10 }),
+  });
+
+  it("sets funding.short when account balance is insufficient", () => {
+    const balances: BookieBalanceMap = new Map([["bet365", 4.5]]);
+    const items = buildDoNextItems([qualifyOffer], [], Date.now(), undefined, balances);
+    const item = items.find((i) => i.offerId === 100);
+    expect(item?.funding?.short).toBeCloseTo(5.5); // 10 - 4.5
+    expect(item?.funding?.needed).toBe(10);
+    expect(item?.funding?.available).toBeCloseTo(4.5);
+  });
+
+  it("does not set funding when account is fully funded", () => {
+    const balances: BookieBalanceMap = new Map([["bet365", 50]]);
+    const items = buildDoNextItems([qualifyOffer], [], Date.now(), undefined, balances);
+    const item = items.find((i) => i.offerId === 100);
+    expect(item?.funding).toBeUndefined();
+  });
+
+  it("does not set funding when bookmaker is unmatched", () => {
+    const balances: BookieBalanceMap = new Map([["paddy power", 0]]);
+    const items = buildDoNextItems([qualifyOffer], [], Date.now(), undefined, balances);
+    const item = items.find((i) => i.offerId === 100);
+    expect(item?.funding).toBeUndefined();
+  });
+
+  it("adds a synthetic fund_account item for each shortfall account", () => {
+    const balances: BookieBalanceMap = new Map([["bet365", 2]]);
+    const items = buildDoNextItems([qualifyOffer], [], Date.now(), undefined, balances);
+    const fundItem = items.find((i) => i.kind === "fund_account");
+    expect(fundItem).toBeDefined();
+    expect(fundItem?.bookmaker).toBe("Bet365");
+    expect(fundItem?.href).toBe("/balances");
+    expect(fundItem?.remainingEv).toBeGreaterThan(0);
+  });
+
+  it("sums EV across multiple blocked offers on the same account", () => {
+    const offer2 = offer({
+      id: 101,
+      title: "Second at Bet365",
+      bookmaker: "Bet365",
+      betCount: 0,
+      expectedProfit: 12,
+      rules: JSON.stringify({ betStake: 10, type: "bet_get_free_place", minRunners: 8, regions: ["GB"], qualifyingPlaces: [], freeBetAmount: 15 }),
+    });
+    const balances: BookieBalanceMap = new Map([["bet365", 0]]);
+    const items = buildDoNextItems([qualifyOffer, offer2], [], Date.now(), undefined, balances);
+    const fundItems = items.filter((i) => i.kind === "fund_account");
+    expect(fundItems).toHaveLength(1); // one per account
+    expect(fundItems[0]?.remainingEv).toBeGreaterThan(0); // sum of both blocked EVs
   });
 });

@@ -19,6 +19,9 @@ import {
 
 export type DoNextSort = "priority" | "edge" | "rate";
 
+/** Normalised bookmaker name → cash balance available */
+export type BookieBalanceMap = Map<string, number>;
+
 /** Estimated effort in minutes per action kind — tune over time. */
 export const EFFORT_MINUTES: Record<OfferNextActionKind | "orphan_free_bet", number> = {
   start_planned: 10,
@@ -38,9 +41,15 @@ export type FreeBetLotInput = {
   createdAt: number;
 };
 
+export interface DoNextFunding {
+  needed: number;
+  available: number;
+  short: number;
+}
+
 export type DoNextItem = {
   id: string;
-  kind: OfferNextActionKind | "orphan_free_bet";
+  kind: OfferNextActionKind | "orphan_free_bet" | "fund_account";
   title: string;
   detail: string;
   bookmaker: string | null;
@@ -66,7 +75,21 @@ export type DoNextItem = {
     remaining: number;
     labelSuggestion: string;
   };
+  /** Set when the bookie account can't fund the required stake */
+  funding?: DoNextFunding;
 };
+
+/** Parse bet stake from offer rules JSON; null when absent. */
+function rulesStake(offer: OfferSummary): number | null {
+  if (!offer.rules) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed: any = JSON.parse(offer.rules);
+    return typeof parsed?.betStake === "number" && parsed.betStake > 0 ? parsed.betStake : null;
+  } catch {
+    return null;
+  }
+}
 
 function normVenue(name: string): string {
   return name.trim().toLowerCase();
@@ -80,12 +103,14 @@ function lotMatchesOffer(lot: FreeBetLotInput, offer: OfferSummary): boolean {
 /**
  * Build a single ranked list of things to do next.
  * Offer convert actions absorb matching free-bet lots; leftover lots become orphan cards.
+ * bookieBalances: normalised-name → cash balance for funding checks (B3).
  */
 export function buildDoNextItems(
   offers: OfferSummary[],
   lots: FreeBetLotInput[],
   now = Date.now(),
-  opts?: AdvantageOpts
+  opts?: AdvantageOpts,
+  bookieBalances?: BookieBalanceMap
 ): DoNextItem[] {
   const actions = listOfferNextActions(offers, now);
   const claimedLotIds = new Set<number>();
@@ -117,6 +142,20 @@ export function buildDoNextItems(
 
     const itemEv = advantage?.remainingEv ?? remainingEv;
     const effortMin = EFFORT_MINUTES[action.kind];
+
+    let funding: DoNextFunding | undefined;
+    if (
+      bookieBalances &&
+      action.bookmaker &&
+      (action.kind === "place_qualifying" || action.kind === "start_planned")
+    ) {
+      const needed = rulesStake(offer) ?? 10;
+      const available = bookieBalances.get(normVenue(action.bookmaker)) ?? -1;
+      if (available >= 0 && available < needed) {
+        funding = { needed, available, short: needed - available };
+      }
+    }
+
     items.push({
       id: `offer-${action.offerId}-${action.kind}`,
       kind: action.kind,
@@ -134,6 +173,7 @@ export function buildDoNextItems(
       daysLeft,
       expiryLabel,
       convertLot,
+      funding,
     });
   }
 
@@ -167,6 +207,45 @@ export function buildDoNextItems(
         labelSuggestion: `Convert FB · ${lot.accountName}`,
       },
     });
+  }
+
+  // Synthetic fund_account items: one per shortfall account, carrying unlocked EV sum
+  if (bookieBalances) {
+    const shortfallByAccount = new Map<string, { name: string; evSum: number; short: number }>();
+    for (const item of items) {
+      if (!item.funding || item.funding.short <= 0 || !item.bookmaker) continue;
+      const key = normVenue(item.bookmaker);
+      const existing = shortfallByAccount.get(key);
+      if (existing) {
+        existing.evSum += item.remainingEv;
+        existing.short = Math.max(existing.short, item.funding.short);
+      } else {
+        shortfallByAccount.set(key, {
+          name: item.bookmaker,
+          evSum: item.remainingEv,
+          short: item.funding.short,
+        });
+      }
+    }
+    for (const { name, evSum, short } of shortfallByAccount.values()) {
+      items.push({
+        id: `fund-${normVenue(name)}`,
+        kind: "fund_account",
+        title: `Fund ${name}`,
+        detail: `£${short.toFixed(2)} needed to unlock £${evSum.toFixed(2)} edge`,
+        bookmaker: name,
+        offerTitle: null,
+        offerId: null,
+        href: "/balances",
+        remainingEv: evSum,
+        basis: "estimated",
+        priority: 20,
+        edgeScore: 0,
+        rateScore: 0,
+        daysLeft: null,
+        expiryLabel: null,
+      });
+    }
   }
 
   return items;
@@ -228,6 +307,8 @@ export function doNextBarClass(kind: DoNextItem["kind"]): string {
     case "place_qualifying":
     case "start_planned":
       return "bg-sky-500";
+    case "fund_account":
+      return "bg-orange-400";
     default:
       return "bg-muted-foreground/50";
   }
@@ -243,6 +324,8 @@ export function doNextKindBadgeClass(kind: DoNextItem["kind"]): string {
     case "place_qualifying":
     case "start_planned":
       return "border-sky-500/35 bg-sky-500/10 text-sky-800 dark:text-sky-300";
+    case "fund_account":
+      return "border-orange-400/35 bg-orange-400/10 text-orange-800 dark:text-orange-300";
     default:
       return "border-border/60 bg-muted/40 text-muted-foreground";
   }

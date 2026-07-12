@@ -18,6 +18,7 @@ import {
   buildDoNextItems,
   doNextBarClass,
   sortDoNextItems,
+  type BookieBalanceMap,
   type DoNextItem,
   type DoNextSort,
   type FreeBetLotInput,
@@ -113,6 +114,11 @@ function DoNextCard({
               {item.expiryLabel}
             </p>
           ) : null}
+          {item.funding && item.funding.short > 0 ? (
+            <p className="mt-0.5 text-[10px] font-medium tabular-nums text-orange-700 dark:text-orange-300">
+              £{item.funding.short.toFixed(2)} short at {item.bookmaker}
+            </p>
+          ) : null}
           {item.kind !== "place_qualifying" ? (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.detail}</p>
           ) : null}
@@ -197,8 +203,16 @@ export function DashboardDoNext({ className }: { className?: string }) {
     ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
     : undefined;
 
+  const bookieBalances = useMemo<BookieBalanceMap>(() => {
+    const map: BookieBalanceMap = new Map();
+    for (const a of accounts ?? []) {
+      if (a.type === "bookie") map.set(a.name.trim().toLowerCase(), a.balance ?? 0);
+    }
+    return map;
+  }, [accounts]);
+
   const allItems = useMemo(() => {
-    return buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts);
+    return buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts, bookieBalances);
   // retentionOpts is stable per render; retention.rate change triggers this via state deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedOffers, lots, retention?.rate]);
