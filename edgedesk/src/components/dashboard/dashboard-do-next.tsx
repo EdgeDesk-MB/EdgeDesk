@@ -255,11 +255,6 @@ export function DashboardDoNext({ className }: { className?: string }) {
     viewOffer(offer);
   }
 
-  const retentionCaption =
-    retention && retention.sampleSize >= 5
-      ? `Your retention: ${Math.round(retention.rate * 100)}% · ${retention.sampleSize} conversions`
-      : "Using 80% default retention";
-
   if (allItems.length === 0) return null;
 
   return (
@@ -296,7 +291,6 @@ export function DashboardDoNext({ className }: { className?: string }) {
       />
 
       <div className="px-[var(--layout-page-x)] py-[calc(0.75rem+12px)]">
-        <p className="mb-2.5 text-[10px] text-muted-foreground/70">{retentionCaption}</p>
         <div
           className={cn(
             "flex gap-3 overflow-x-auto overflow-y-visible",

@@ -1043,7 +1043,10 @@ export function AddBetDialog({
           {/* Left - event & market details */}
           <div className="flex flex-col gap-3 p-6">
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Label</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs text-muted-foreground">Label</Label>
+                {!dutchLegs?.length && <BetImportDialog onApply={applyOcrFields} />}
+              </div>
               <div className="relative">
                 <Input
                   placeholder={prefill?.labelSuggestion ?? "e.g. Bet365 £10 free bet"}
@@ -1298,9 +1301,6 @@ export function AddBetDialog({
                   : "Manual settle, or use a win trigger below"}
               </span>
             </div>
-            {!dutchLegs?.length && (
-              <BetImportDialog onApply={applyOcrFields} />
-            )}
           </div>
 
           {/* Right - back/lay & triggers */}
