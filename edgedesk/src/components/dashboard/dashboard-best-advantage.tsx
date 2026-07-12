@@ -18,10 +18,12 @@ import { ArrowRight, Sparkles } from "lucide-react";
 export function DashboardBestAdvantage({
   offers,
   accounts,
+  retention,
   className,
 }: {
   offers: OfferSummary[];
   accounts?: AccountBalance[];
+  retention?: { rate: number; sampleSize: number };
   className?: string;
 }) {
   const scoped = useMemo(() => {
@@ -30,7 +32,8 @@ export function DashboardBestAdvantage({
     return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
   }, [offers, accounts]);
 
-  const best = bestOfferAdvantage(scoped);
+  const retentionOpts = retention ? { retention: retention.rate } : undefined;
+  const best = bestOfferAdvantage(scoped, Date.now(), retentionOpts);
   if (!best || best.score < 0.5) return null;
 
   const href = best.nextAction?.href ?? `/offers?highlight=${best.offerId}`;

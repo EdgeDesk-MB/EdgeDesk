@@ -61,6 +61,7 @@ import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import { getRealizedRetention } from "@/lib/services/retention";
 
 export type {
   AppState,
@@ -728,11 +729,14 @@ export async function getAppState(): Promise<AppState> {
     });
   }
 
+  const retentionData = getRealizedRetention();
+
   return {
     events: allEvents.sort((a, b) => a.startTime - b.startTime),
     bets: allBets.sort((a, b) => b.createdAt - a.createdAt),
     settledProfit: running,
     provisionalProfit: provisionalTotal,
+    retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     livePositions,
     liveEventModels,
     series,

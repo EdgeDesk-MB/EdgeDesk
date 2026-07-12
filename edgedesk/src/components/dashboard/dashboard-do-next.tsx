@@ -178,6 +178,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
 
   const offers = state?.offers ?? [];
   const accounts = state?.balances?.accounts;
+  const retention = state?.retention;
   const freeBetTotal = accounts
     ?.filter((a) => a.type === "bookie")
     .reduce((s, a) => s + (a.freeBets ?? 0), 0);
@@ -194,10 +195,14 @@ export function DashboardDoNext({ className }: { className?: string }) {
     return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
   }, [offers, accounts]);
 
+  const retentionOpts = retention ? { retention: retention.rate } : undefined;
+
   const items = useMemo(() => {
-    const built = buildDoNextItems(scopedOffers, lots);
+    const built = buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts);
     return sortDoNextItems(built, sort).slice(0, 8);
-  }, [scopedOffers, lots, sort]);
+  // retentionOpts is stable per render; retention.rate change triggers this via state deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedOffers, lots, sort, retention?.rate]);
 
   function onConvert(item: DoNextItem) {
     const lot = item.convertLot;
@@ -219,6 +224,11 @@ export function DashboardDoNext({ className }: { className?: string }) {
     if (!offer) return;
     viewOffer(offer);
   }
+
+  const retentionCaption =
+    retention && retention.sampleSize >= 5
+      ? `Your retention: ${Math.round(retention.rate * 100)}% · ${retention.sampleSize} conversions`
+      : "Using 80% default retention";
 
   if (items.length === 0) return null;
 
@@ -251,6 +261,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
       />
 
       <div className="px-[var(--layout-page-x)] py-[calc(0.75rem+12px)]">
+        <p className="mb-2.5 text-[10px] text-muted-foreground/70">{retentionCaption}</p>
         <div
           className={cn(
             "flex gap-3 overflow-x-auto overflow-y-visible",

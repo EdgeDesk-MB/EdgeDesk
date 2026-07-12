@@ -38,11 +38,17 @@ export interface LiveEventModel {
   awayWin: number;
 }
 
+export interface RetentionState {
+  rate: number;
+  sampleSize: number;
+}
+
 export interface AppState {
   events: EventRow[];
   bets: BetRow[];
   settledProfit: number;
   provisionalProfit: number;
+  retention: RetentionState;
   livePositions: LivePosition[];
   liveEventModels: LiveEventModel[];
   series: { time: number; value: number }[];

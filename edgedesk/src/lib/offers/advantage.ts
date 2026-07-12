@@ -3,8 +3,13 @@ import { deriveOfferNextAction, type OfferNextAction } from "@/lib/offers/next-a
 import { parseOfferRules } from "@/lib/offers/racing-offer-rules";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 
-/** Typical cash retention when converting an SNR free bet. */
+/** Typical cash retention when converting an SNR free bet (fallback when no measured rate). */
 const DEFAULT_FREE_BET_RETENTION = 0.8;
+
+export interface AdvantageOpts {
+  /** Measured (or blended) free-bet retention rate. Defaults to 0.8. */
+  retention?: number;
+}
 
 export interface OfferAdvantageScore {
   offerId: number;
@@ -38,14 +43,15 @@ function urgencyFromExpiry(expiresAt: number | null, now: number): number {
  * Estimate remaining expected value still available on this offer campaign.
  * Uses free-bet award amount, racing rules, expectedProfit, or open bet EV.
  */
-export function estimateOfferRemainingEv(offer: OfferSummary): {
+export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOpts): {
   remainingEv: number;
   reason: string;
 } {
+  const retention = opts?.retention ?? DEFAULT_FREE_BET_RETENTION;
   const { profit } = offer;
 
   if (profit.freeBetStage === "awarded" && profit.freeBetAwardAmount != null) {
-    const ev = profit.freeBetAwardAmount * DEFAULT_FREE_BET_RETENTION;
+    const ev = profit.freeBetAwardAmount * retention;
     return {
       remainingEv: ev,
       reason: `~£${ev.toFixed(0)} retained from £${profit.freeBetAwardAmount.toFixed(0)} free bet`,
@@ -62,7 +68,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary): {
 
   const rules = parseOfferRules(offer);
   if (rules && profit.freeBetStage === "none" && profit.qualifyingSettledCount === 0) {
-    const rough = rules.freeBetAmount * DEFAULT_FREE_BET_RETENTION * 0.35 + (offer.expectedProfit ?? 0);
+    const rough = rules.freeBetAmount * retention * 0.35 + (offer.expectedProfit ?? 0);
     // Place-refund: partial probability of award; prefer explicit expectedProfit when set
     const remainingEv =
       offer.expectedProfit != null && Math.abs(offer.expectedProfit) > 0.01
@@ -114,7 +120,8 @@ export function estimateOfferRemainingEv(offer: OfferSummary): {
 
 export function scoreOfferAdvantage(
   offer: OfferSummary,
-  now = Date.now()
+  now = Date.now(),
+  opts?: AdvantageOpts
 ): OfferAdvantageScore | null {
   if (offer.status === "completed" || offer.status === "expired") return null;
 
@@ -122,7 +129,7 @@ export function scoreOfferAdvantage(
   // Waiting on a result is not a "Best next" candidate - user already did the work.
   if (nextAction?.kind === "await_result") return null;
 
-  const { remainingEv, reason } = estimateOfferRemainingEv(offer);
+  const { remainingEv, reason } = estimateOfferRemainingEv(offer, opts);
   const urgency = urgencyFromExpiry(effectiveOfferExpiryMs(offer), now);
 
   // Stage multipliers - cash sitting as awarded FB is highest leverage
@@ -151,10 +158,11 @@ export function scoreOfferAdvantage(
 
 export function rankOfferAdvantages(
   offers: OfferSummary[],
-  now = Date.now()
+  now = Date.now(),
+  opts?: AdvantageOpts
 ): OfferAdvantageScore[] {
   return offers
-    .map((o) => scoreOfferAdvantage(o, now))
+    .map((o) => scoreOfferAdvantage(o, now, opts))
     .filter((s): s is OfferAdvantageScore => s != null)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
@@ -164,7 +172,8 @@ export function rankOfferAdvantages(
 
 export function bestOfferAdvantage(
   offers: OfferSummary[],
-  now = Date.now()
+  now = Date.now(),
+  opts?: AdvantageOpts
 ): OfferAdvantageScore | null {
-  return rankOfferAdvantages(offers, now)[0] ?? null;
+  return rankOfferAdvantages(offers, now, opts)[0] ?? null;
 }

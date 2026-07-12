@@ -48,7 +48,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
 }
 
 describe("estimateOfferRemainingEv", () => {
-  it("values awarded free bets at retention", () => {
+  it("values awarded free bets at default 0.8 retention", () => {
     const { remainingEv } = estimateOfferRemainingEv(
       offer({
         id: 1,
@@ -70,6 +70,32 @@ describe("estimateOfferRemainingEv", () => {
       })
     );
     expect(remainingEv).toBeCloseTo(40, 5);
+  });
+
+  it("uses measured retention when opts.retention is supplied", () => {
+    const { remainingEv } = estimateOfferRemainingEv(
+      offer({
+        id: 2,
+        title: "FB measured",
+        profit: {
+          qualifyingProfit: -2,
+          qualifyingSettledCount: 1,
+          qualifyingOpenCount: 0,
+          freeBetAwarded: true,
+          freeBetAwardAmount: 50,
+          freeBetAwardReason: null,
+          freeBetStage: "awarded",
+          freeBetProfit: 0,
+          freeBetOpenCount: 0,
+          freeBetSettledCount: 0,
+          openExpectedProfit: 0,
+          totalProfit: -2,
+        },
+      }),
+      { retention: 0.72 }
+    );
+    // 50 * 0.72 = 36
+    expect(remainingEv).toBeCloseTo(36, 5);
   });
 });
 

@@ -11,7 +11,7 @@ import {
   type OfferNextAction,
   type OfferNextActionKind,
 } from "@/lib/offers/next-actions";
-import { estimateOfferRemainingEv, scoreOfferAdvantage } from "@/lib/offers/advantage";
+import { estimateOfferRemainingEv, scoreOfferAdvantage, type AdvantageOpts } from "@/lib/offers/advantage";
 import {
   formatOfferDaysLeftLabel,
   offerExpiryDaysLeft,
@@ -71,7 +71,8 @@ function lotMatchesOffer(lot: FreeBetLotInput, offer: OfferSummary): boolean {
 export function buildDoNextItems(
   offers: OfferSummary[],
   lots: FreeBetLotInput[],
-  now = Date.now()
+  now = Date.now(),
+  opts?: AdvantageOpts
 ): DoNextItem[] {
   const actions = listOfferNextActions(offers, now);
   const claimedLotIds = new Set<number>();
@@ -81,8 +82,8 @@ export function buildDoNextItems(
     const offer = offers.find((o) => o.id === action.offerId);
     if (!offer) continue;
 
-    const advantage = scoreOfferAdvantage(offer, now);
-    const { remainingEv } = estimateOfferRemainingEv(offer);
+    const advantage = scoreOfferAdvantage(offer, now, opts);
+    const { remainingEv } = estimateOfferRemainingEv(offer, opts);
     const daysLeft = offerExpiryDaysLeft(offer, now);
     const expiryLabel = formatOfferDaysLeftLabel(daysLeft);
 
@@ -125,7 +126,7 @@ export function buildDoNextItems(
 
     const note =
       lot.note?.replace(/^Free bet promo - /, "").trim() || "Free bet credit";
-    const ev = lot.remaining * 0.8;
+    const ev = lot.remaining * (opts?.retention ?? 0.8);
 
     items.push({
       id: `lot-${lot.id}`,
