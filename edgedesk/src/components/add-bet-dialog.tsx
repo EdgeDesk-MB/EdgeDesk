@@ -1043,18 +1043,16 @@ export function AddBetDialog({
           {/* Left - event & market details */}
           <div className="flex flex-col gap-3 p-6">
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs text-muted-foreground">Label</Label>
-                {!dutchLegs?.length && <BetImportDialog onApply={applyOcrFields} />}
-              </div>
-              <div className="relative">
-                <Input
-                  placeholder={prefill?.labelSuggestion ?? "e.g. Bet365 £10 free bet"}
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  className={cn(ring(!label.trim()), labelHasOfferTrigger && "pr-9")}
-                />
-                {labelHasOfferTrigger ? (
+              <Label className="text-xs text-muted-foreground">Label</Label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder={prefill?.labelSuggestion ?? "e.g. Bet365 £10 free bet"}
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    className={cn(ring(!label.trim()), labelHasOfferTrigger && "pr-9")}
+                  />
+                  {labelHasOfferTrigger ? (
                   <button
                     type="button"
                     onClick={applyLabelOfferTrigger}
@@ -1069,7 +1067,9 @@ export function AddBetDialog({
                   >
                     <Sparkles className="size-4" />
                   </button>
-                ) : null}
+                  ) : null}
+                </div>
+                {!dutchLegs?.length && <BetImportDialog onApply={applyOcrFields} />}
               </div>
               {labelHasOfferTrigger && !triggerText.trim() ? (
                 <p className="text-[10px] text-violet-700 dark:text-violet-300">
