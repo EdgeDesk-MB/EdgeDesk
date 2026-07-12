@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -86,22 +85,7 @@ import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
 import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
 
-import { BetTextImport } from "@/components/add-bet/bet-text-import";
-
-const BetScreenshotImport = dynamic(
-  () =>
-    import("@/components/add-bet/bet-screenshot-import").then((m) => ({
-      default: m.BetScreenshotImport,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 px-3 py-4 text-center text-[11px] text-muted-foreground">
-        Loading screenshot import…
-      </div>
-    ),
-  }
-);
+import { BetImportDialog } from "@/components/add-bet/bet-import-dialog";
 
 export interface EventLite extends TrackedEventLike {
   status: string;
@@ -1315,12 +1299,7 @@ export function AddBetDialog({
               </span>
             </div>
             {!dutchLegs?.length && (
-              <>
-                <BetScreenshotImport open={open} onApply={applyOcrFields} />
-                <BetTextImport
-                  onApply={(fields: BetOcrFields) => void applyOcrFields(fields, "bookie")}
-                />
-              </>
+              <BetImportDialog onApply={applyOcrFields} />
             )}
           </div>
 

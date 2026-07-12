@@ -101,6 +101,8 @@ export function DashboardSectionHeader({
   titleHref,
   iconClassName,
   descriptionAriaLabel,
+  /** Chip/badge rendered inline after the title with a 24 px gap — use for EV totals, counts, etc. */
+  titleBadge,
 }: {
   icon?: LucideIcon;
   title: string;
@@ -113,6 +115,7 @@ export function DashboardSectionHeader({
   prominent?: boolean;
   titleHref?: string;
   iconClassName?: string;
+  titleBadge?: React.ReactNode;
 }) {
   return (
     <div
@@ -143,6 +146,7 @@ export function DashboardSectionHeader({
               />
             ) : null}
             <SectionTitle title={title} prominent={prominent} titleHref={titleHref} />
+            {titleBadge ? <div className="ml-4 flex items-center">{titleBadge}</div> : null}
           </div>
           {!prominent ? (
             <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{description}</p>

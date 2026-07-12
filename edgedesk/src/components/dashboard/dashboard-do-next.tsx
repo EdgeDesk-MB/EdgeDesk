@@ -18,6 +18,7 @@ import {
   buildDoNextItems,
   doNextBarClass,
   sortDoNextItems,
+  sumActionableEv,
   type BookieBalanceMap,
   type DoNextItem,
   type DoNextSort,
@@ -28,7 +29,6 @@ import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ListChecks, ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
-import { DashboardEdgeHero } from "@/components/dashboard/dashboard-edge-hero";
 import type { EvBasis } from "@/lib/offers/advantage";
 
 /** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
@@ -222,6 +222,18 @@ export function DashboardDoNext({ className }: { className?: string }) {
     [allItems, sort]
   );
 
+  const evChip = useMemo(() => {
+    const { total, weakestBasis } = sumActionableEv(allItems);
+    if (total < 1) return null;
+    const amount = total >= 10 ? total.toFixed(0) : total.toFixed(2);
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+        +£{amount}
+        <EvBasisBadge basis={weakestBasis} />
+      </span>
+    );
+  }, [allItems]);
+
   function onConvert(item: DoNextItem) {
     const lot = item.convertLot;
     if (!lot) return;
@@ -262,6 +274,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
           "Best first - same cards, different sort.\n\nPriority: expiring offers and open actions first.\nEdge: highest estimated remaining EV first.\nRate: highest £/hr estimated value first."
         }
         descriptionAriaLabel="Best first. Priority sorts by urgency. Edge sorts by estimated remaining EV. Rate sorts by EV per hour of effort."
+        titleBadge={evChip}
         action={
           <Tabs value={sort} onValueChange={(v) => setSort(v as DoNextSort)}>
             <TabsList variant="segmented">
@@ -281,8 +294,6 @@ export function DashboardDoNext({ className }: { className?: string }) {
           </Tabs>
         }
       />
-
-      <DashboardEdgeHero items={allItems} />
 
       <div className="px-[var(--layout-page-x)] py-[calc(0.75rem+12px)]">
         <p className="mb-2.5 text-[10px] text-muted-foreground/70">{retentionCaption}</p>
