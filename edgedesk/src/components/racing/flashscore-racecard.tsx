@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDecimalOdds, formatWeightStones } from "@/lib/racing/odds";
+import { raceFairOdds, type RunnerFairOdds } from "@/lib/racing/fair-odds";
 import { formatHeadgear } from "@/lib/racing/runner-display";
 import { formatClockTime } from "@/lib/time-format";
 import type { RacingDeskRace, RacingRunnerDetail } from "@/lib/racing-desk/types";
@@ -94,11 +95,13 @@ function BookieOddsCell({
   raceId,
   onOddsOverride,
   backColor,
+  fairOdds,
 }: {
   runner: RacingRunnerDetail;
   raceId: string;
   onOddsOverride?: FlashscoreRacecardProps["onOddsOverride"];
   backColor?: string;
+  fairOdds?: RunnerFairOdds | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -205,6 +208,20 @@ function BookieOddsCell({
           ) : runner.bookieDecimal == null && onOddsOverride ? (
             <div className="text-[9px] text-muted-foreground">paste</div>
           ) : null}
+          {fairOdds != null && runner.bookieDecimal != null && !runner.nonRunner && (
+            <div
+              className={cn(
+                "text-[9px] tabular-nums",
+                fairOdds.overPct > 0
+                  ? "font-medium text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground/70"
+              )}
+              title={`Fair odds: ${fairOdds.fair.toFixed(2)} · ${fairOdds.overPct > 0 ? "above" : "below"} fair`}
+            >
+              {fairOdds.overPct > 0 ? "+" : ""}
+              {fairOdds.overPct.toFixed(1)}%
+            </div>
+          )}
         </button>
         {isManual && onOddsOverride && (
           <Button
@@ -235,6 +252,7 @@ function RunnerRow({
   backColor,
   layColor,
   advancedMode = false,
+  fairOdds,
 }: {
   runner: RacingRunnerDetail;
   race: RacingDeskRace;
@@ -246,6 +264,7 @@ function RunnerRow({
   backColor?: string;
   layColor?: string;
   advancedMode: boolean;
+  fairOdds?: RunnerFairOdds | null;
 }) {
   const isSteamer = runner.movement?.change != null && runner.movement.change < -0.05;
   const isDrifter = runner.movement?.change != null && runner.movement.change > 0.05;
@@ -327,6 +346,7 @@ function RunnerRow({
         raceId={race.externalId}
         onOddsOverride={onOddsOverride}
         backColor={backColor}
+        fairOdds={fairOdds}
       />
       <td
         className={cn(
@@ -447,6 +467,11 @@ export function FlashscoreRacecard({
       return pa - pb;
     });
   }, [selected]);
+
+  const fairOddsMap = useMemo(
+    () => (selected ? raceFairOdds(selected.runners) : null),
+    [selected]
+  );
 
   if (!selected) {
     return (
@@ -661,6 +686,7 @@ export function FlashscoreRacecard({
                 backColor={backColor}
                 layColor={layColor}
                 advancedMode={advancedMode}
+                fairOdds={fairOddsMap?.get(runner.horseId) ?? null}
               />
             ))}
           </tbody>
