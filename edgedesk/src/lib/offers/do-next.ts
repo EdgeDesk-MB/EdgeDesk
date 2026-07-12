@@ -11,7 +11,7 @@ import {
   type OfferNextAction,
   type OfferNextActionKind,
 } from "@/lib/offers/next-actions";
-import { estimateOfferRemainingEv, scoreOfferAdvantage, type AdvantageOpts } from "@/lib/offers/advantage";
+import { estimateOfferRemainingEv, scoreOfferAdvantage, type AdvantageOpts, type EvBasis } from "@/lib/offers/advantage";
 import {
   formatOfferDaysLeftLabel,
   offerExpiryDaysLeft,
@@ -39,6 +39,7 @@ export type DoNextItem = {
   /** Tracker / offers href - null for orphan lots (use Add bet CTA) */
   href: string | null;
   remainingEv: number;
+  basis: EvBasis;
   /** Lower = more urgent (priority sort) */
   priority: number;
   /** Higher = better edge (edge sort) */
@@ -83,7 +84,7 @@ export function buildDoNextItems(
     if (!offer) continue;
 
     const advantage = scoreOfferAdvantage(offer, now, opts);
-    const { remainingEv } = estimateOfferRemainingEv(offer, opts);
+    const { remainingEv, basis } = estimateOfferRemainingEv(offer, opts);
     const daysLeft = offerExpiryDaysLeft(offer, now);
     const expiryLabel = formatOfferDaysLeftLabel(daysLeft);
 
@@ -112,6 +113,7 @@ export function buildDoNextItems(
       offerId: action.offerId,
       href: action.href,
       remainingEv: advantage?.remainingEv ?? remainingEv,
+      basis: advantage?.basis ?? basis,
       priority: action.priority,
       edgeScore: advantage?.score ?? remainingEv,
       daysLeft,
@@ -138,6 +140,7 @@ export function buildDoNextItems(
       offerId: null,
       href: null,
       remainingEv: ev,
+      basis: (opts?.retentionSampleSize ?? 0) >= 5 ? "estimated" : "heuristic",
       priority: 11,
       edgeScore: ev * 1.2,
       daysLeft: null,

@@ -47,55 +47,79 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
   };
 }
 
+const awardedFbOffer = offer({
+  id: 1,
+  title: "FB ready",
+  profit: {
+    qualifyingProfit: -2,
+    qualifyingSettledCount: 1,
+    qualifyingOpenCount: 0,
+    freeBetAwarded: true,
+    freeBetAwardAmount: 50,
+    freeBetAwardReason: null,
+    freeBetStage: "awarded",
+    freeBetProfit: 0,
+    freeBetOpenCount: 0,
+    freeBetSettledCount: 0,
+    openExpectedProfit: 0,
+    totalProfit: -2,
+  },
+});
+
 describe("estimateOfferRemainingEv", () => {
   it("values awarded free bets at default 0.8 retention", () => {
-    const { remainingEv } = estimateOfferRemainingEv(
+    const { remainingEv, basis } = estimateOfferRemainingEv(awardedFbOffer);
+    expect(remainingEv).toBeCloseTo(40, 5);
+    expect(basis).toBe("heuristic");
+  });
+
+  it("uses measured retention and upgrades basis when sampleSize >= 5", () => {
+    const { remainingEv, basis } = estimateOfferRemainingEv(awardedFbOffer, {
+      retention: 0.72,
+      retentionSampleSize: 10,
+    });
+    expect(remainingEv).toBeCloseTo(36, 5);
+    expect(basis).toBe("estimated");
+  });
+
+  it("stays heuristic when sampleSize < 5 even with custom retention", () => {
+    const { basis } = estimateOfferRemainingEv(awardedFbOffer, {
+      retention: 0.72,
+      retentionSampleSize: 3,
+    });
+    expect(basis).toBe("heuristic");
+  });
+
+  it("returns estimated basis for explicit expectedProfit", () => {
+    const { basis } = estimateOfferRemainingEv(
+      offer({ id: 3, title: "Planned", expectedProfit: 10, betCount: 0, status: "planned" })
+    );
+    expect(basis).toBe("estimated");
+  });
+
+  it("returns estimated basis for open legs EV", () => {
+    const { basis } = estimateOfferRemainingEv(
       offer({
-        id: 1,
-        title: "FB ready",
+        id: 4,
+        title: "Open legs",
+        expectedFromBets: 5,
         profit: {
           qualifyingProfit: -2,
           qualifyingSettledCount: 1,
-          qualifyingOpenCount: 0,
-          freeBetAwarded: true,
-          freeBetAwardAmount: 50,
+          qualifyingOpenCount: 1,
+          freeBetAwarded: false,
+          freeBetAwardAmount: null,
           freeBetAwardReason: null,
-          freeBetStage: "awarded",
+          freeBetStage: "none",
           freeBetProfit: 0,
           freeBetOpenCount: 0,
           freeBetSettledCount: 0,
-          openExpectedProfit: 0,
+          openExpectedProfit: 5,
           totalProfit: -2,
         },
       })
     );
-    expect(remainingEv).toBeCloseTo(40, 5);
-  });
-
-  it("uses measured retention when opts.retention is supplied", () => {
-    const { remainingEv } = estimateOfferRemainingEv(
-      offer({
-        id: 2,
-        title: "FB measured",
-        profit: {
-          qualifyingProfit: -2,
-          qualifyingSettledCount: 1,
-          qualifyingOpenCount: 0,
-          freeBetAwarded: true,
-          freeBetAwardAmount: 50,
-          freeBetAwardReason: null,
-          freeBetStage: "awarded",
-          freeBetProfit: 0,
-          freeBetOpenCount: 0,
-          freeBetSettledCount: 0,
-          openExpectedProfit: 0,
-          totalProfit: -2,
-        },
-      }),
-      { retention: 0.72 }
-    );
-    // 50 * 0.72 = 36
-    expect(remainingEv).toBeCloseTo(36, 5);
+    expect(basis).toBe("estimated");
   });
 });
 

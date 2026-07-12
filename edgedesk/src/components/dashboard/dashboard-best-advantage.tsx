@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { MoneyFlow } from "@/components/money-flow";
 import { bestOfferAdvantage } from "@/lib/offers/advantage";
+import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { offerNextActionLabel } from "@/lib/offers/next-actions";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { AccountBalance } from "@/lib/services/balances.types";
@@ -32,7 +33,9 @@ export function DashboardBestAdvantage({
     return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
   }, [offers, accounts]);
 
-  const retentionOpts = retention ? { retention: retention.rate } : undefined;
+  const retentionOpts = retention
+    ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
+    : undefined;
   const best = bestOfferAdvantage(scoped, Date.now(), retentionOpts);
   if (!best || best.score < 0.5) return null;
 
@@ -74,7 +77,7 @@ export function DashboardBestAdvantage({
         </span>
         {best.remainingEv > 0.01 ? (
           <span className="shrink-0 text-right">
-            <span className="block text-[10px] uppercase text-muted-foreground">Est. edge</span>
+            <EvBasisBadge basis={best.basis} className="mb-0.5 justify-end" />
             <MoneyFlow
               value={best.remainingEv}
               signColor

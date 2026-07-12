@@ -26,19 +26,16 @@ import type { OfferSummary } from "@/lib/services/offers.types";
 import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ListChecks, ListOrdered, Sparkles } from "lucide-react";
+import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
+import type { EvBasis } from "@/lib/offers/advantage";
 
 /** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
-function DoNextEvCorner({ remainingEv }: { remainingEv: number }) {
+function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: EvBasis }) {
   if (remainingEv <= 0.5) return null;
   const amount = remainingEv >= 10 ? remainingEv.toFixed(0) : remainingEv.toFixed(1);
   return (
-    <div
-      className="shrink-0 text-right"
-      title="Estimated remaining expected value on this offer"
-    >
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        Est.
-      </p>
+    <div className="shrink-0 text-right">
+      <EvBasisBadge basis={basis} className="mb-0.5 justify-end" />
       <p className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
         £{amount}
       </p>
@@ -102,7 +99,7 @@ function DoNextCard({
               </span>
             ) : null}
           </div>
-          <DoNextEvCorner remainingEv={item.remainingEv} />
+          <DoNextEvCorner remainingEv={item.remainingEv} basis={item.basis} />
         </div>
 
         <div className="flex flex-1 flex-col px-3 pb-3">
@@ -195,7 +192,9 @@ export function DashboardDoNext({ className }: { className?: string }) {
     return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
   }, [offers, accounts]);
 
-  const retentionOpts = retention ? { retention: retention.rate } : undefined;
+  const retentionOpts = retention
+    ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
+    : undefined;
 
   const items = useMemo(() => {
     const built = buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts);

@@ -6,9 +6,13 @@ import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 /** Typical cash retention when converting an SNR free bet (fallback when no measured rate). */
 const DEFAULT_FREE_BET_RETENTION = 0.8;
 
+export type EvBasis = "live" | "estimated" | "heuristic";
+
 export interface AdvantageOpts {
   /** Measured (or blended) free-bet retention rate. Defaults to 0.8. */
   retention?: number;
+  /** Number of conversion bets behind the retention rate (≥5 upgrades basis to "estimated"). */
+  retentionSampleSize?: number;
 }
 
 export interface OfferAdvantageScore {
@@ -17,6 +21,8 @@ export interface OfferAdvantageScore {
   bookmaker: string | null;
   /** Estimated remaining £ edge still on the table */
   remainingEv: number;
+  /** How the EV was derived */
+  basis: EvBasis;
   /** Urgency boost 0–1 from expiry proximity */
   urgency: number;
   /** Combined rank score (higher = better to do next) */
@@ -42,12 +48,15 @@ function urgencyFromExpiry(expiresAt: number | null, now: number): number {
 /**
  * Estimate remaining expected value still available on this offer campaign.
  * Uses free-bet award amount, racing rules, expectedProfit, or open bet EV.
+ * Returns a `basis` field indicating how confident the estimate is.
  */
 export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOpts): {
   remainingEv: number;
   reason: string;
+  basis: EvBasis;
 } {
   const retention = opts?.retention ?? DEFAULT_FREE_BET_RETENTION;
+  const isMeasured = (opts?.retentionSampleSize ?? 0) >= 5;
   const { profit } = offer;
 
   if (profit.freeBetStage === "awarded" && profit.freeBetAwardAmount != null) {
@@ -55,6 +64,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOp
     return {
       remainingEv: ev,
       reason: `~£${ev.toFixed(0)} retained from £${profit.freeBetAwardAmount.toFixed(0)} free bet`,
+      basis: isMeasured ? "estimated" : "heuristic",
     };
   }
 
@@ -63,6 +73,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOp
     return {
       remainingEv: 0,
       reason: "Free-bet conversion open - waiting on result",
+      basis: "estimated",
     };
   }
 
@@ -80,6 +91,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOp
         offer.expectedProfit != null
           ? `£${offer.expectedProfit.toFixed(2)} expected on campaign`
           : `~£${remainingEv.toFixed(0)} est. from £${rules.freeBetAmount} place-refund FB`,
+      basis: offer.expectedProfit != null ? "estimated" : "heuristic",
     };
   }
 
@@ -89,6 +101,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOp
       return {
         remainingEv: remaining,
         reason: `£${remaining.toFixed(2)} of £${offer.expectedProfit.toFixed(2)} expected still open`,
+        basis: "estimated",
       };
     }
   }
@@ -101,6 +114,7 @@ export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOp
         openExpected > 0.01
           ? `£${openExpected.toFixed(2)} expected on open legs`
           : "Open legs - EV not set",
+      basis: "estimated",
     };
   }
 
@@ -112,10 +126,11 @@ export function estimateOfferRemainingEv(offer: OfferSummary, opts?: AdvantageOp
         planned > 0
           ? `£${planned.toFixed(2)} expected if started`
           : "Planned - set expected profit to rank this",
+      basis: planned > 0 ? "estimated" : "heuristic",
     };
   }
 
-  return { remainingEv: 0, reason: "No remaining EV estimate" };
+  return { remainingEv: 0, reason: "No remaining EV estimate", basis: "heuristic" };
 }
 
 export function scoreOfferAdvantage(
@@ -129,7 +144,7 @@ export function scoreOfferAdvantage(
   // Waiting on a result is not a "Best next" candidate - user already did the work.
   if (nextAction?.kind === "await_result") return null;
 
-  const { remainingEv, reason } = estimateOfferRemainingEv(offer, opts);
+  const { remainingEv, reason, basis } = estimateOfferRemainingEv(offer, opts);
   const urgency = urgencyFromExpiry(effectiveOfferExpiryMs(offer), now);
 
   // Stage multipliers - cash sitting as awarded FB is highest leverage
@@ -149,6 +164,7 @@ export function scoreOfferAdvantage(
     offerTitle: offer.title,
     bookmaker: offer.bookmaker,
     remainingEv,
+    basis,
     urgency,
     score,
     reason,
