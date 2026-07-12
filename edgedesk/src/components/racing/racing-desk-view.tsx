@@ -79,7 +79,7 @@ function readDeskExchangeOverride(): ExchangeProvider | null {
 export function RacingDeskView() {
   const { openAddBet } = useAddBet();
   const { openMatchedCalculator } = useMatchedCalculator();
-  const { openOffer } = useOfferDialog();
+  const { openOffer, viewOffer } = useOfferDialog();
   const { defaultExchange, exchanges } = useExchanges();
   const { state } = useAppState();
   const offerBetPrefs = state?.settings?.offerBetPrefs ?? {};
@@ -125,6 +125,14 @@ export function RacingDeskView() {
       null
     );
   }, [activeDeskProvider, defaultExchange, exchanges]);
+
+  const bookmakerColors = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const account of state?.balances?.accounts ?? []) {
+      if (account.name && account.brandColor) map.set(account.name, account.brandColor);
+    }
+    return map;
+  }, [state?.balances?.accounts]);
 
   const load = useCallback(async (opts?: { soft?: boolean }) => {
     // Soft whenever we already have a card - avoids full-page height jump on 60s polls.
@@ -602,7 +610,15 @@ export function RacingDeskView() {
                   <button
                     key={course}
                     type="button"
-                    onClick={() => setSelectedId(races[0]?.externalId ?? null)}
+                    onClick={() => {
+                      const now = Date.now();
+                      const nextRace =
+                        races.find((r) => r.status === "live") ??
+                        races.find((r) => r.status === "upcoming" && r.startTime > now) ??
+                        races.find((r) => r.status === "upcoming") ??
+                        races[races.length - 1];
+                      setSelectedId(nextRace?.externalId ?? null);
+                    }}
                     className={cn(
                       "flex w-full items-center justify-between px-2.5 py-2 text-left text-sm",
                       listRowSelected(active)
@@ -641,20 +657,28 @@ export function RacingDeskView() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-1.5">
-                {payload!.activeOffers.map((offer) => (
-                  <div key={offer.id} className="rounded-md border px-2.5 py-2 text-xs">
-                    <p className="font-medium leading-snug">{offer.title}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
-                      {offer.bookmaker ? (
-                        <VenueBadge name={offer.bookmaker} />
-                      ) : (
-                        <span>Any bookie</span>
-                      )}
-                      <span>·</span>
-                      <span>{formatOfferScopeLabel(offer.scopeCourse, offer.scopeRaceLabel)}</span>
-                    </div>
-                  </div>
-                ))}
+                {payload!.activeOffers.map((offer) => {
+                  const offerSummary = (state?.offers ?? []).find((o) => o.id === offer.id);
+                  return (
+                    <button
+                      key={offer.id}
+                      type="button"
+                      className="w-full rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:bg-selection-subtle"
+                      onClick={() => offerSummary && viewOffer(offerSummary)}
+                    >
+                      <p className="font-medium leading-snug">{offer.title}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                        {offer.bookmaker ? (
+                          <VenueBadge name={offer.bookmaker} />
+                        ) : (
+                          <span>Any bookie</span>
+                        )}
+                        <span>·</span>
+                        <span>{formatOfferScopeLabel(offer.scopeCourse, offer.scopeRaceLabel)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -743,6 +767,7 @@ export function RacingDeskView() {
             refreshLabel={refreshLabel}
             refreshing={refreshing}
             exchangeStatusLabel={exchangeStatusLabel}
+            bookmakerColors={bookmakerColors}
           />
         </div>
       </div>

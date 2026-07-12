@@ -18,6 +18,7 @@ import type {
 } from "@/lib/racing-desk/types";
 import {
   formatBetGetFreePlaceSummary,
+  isRegionalScope,
   parseOfferRules,
   placeRefundTriggerText,
   raceQualifiesForOffer,
@@ -49,6 +50,7 @@ import {
   resolveLiveExchangeProvider,
   type ExchangeProvider,
 } from "@/lib/services/exchange";
+import { syncCourseOfferExpiryFromRaces } from "@/lib/offers/course-offer-sync";
 
 function startOfTodayMs(): number {
   const d = new Date();
@@ -255,6 +257,10 @@ function evaluateOfferTags(
       bookmaker: offer.bookmaker,
       triggerText: rules ? placeRefundTriggerText(rules) : undefined,
       suggestedRunners,
+      minRunners:
+        offer.scopeCourse?.trim() && !isRegionalScope(offer.scopeCourse)
+          ? (rules?.minRunners ?? null)
+          : null,
     };
   });
 }
@@ -332,6 +338,8 @@ export async function getRacingDesk(
 
   cards.sort((a, b) => a.startTime - b.startTime);
 
+  syncCourseOfferExpiryFromRaces(cards, date);
+
   const allEvents = db.select().from(events).all();
   const eventByExternal = new Map(
     allEvents.filter((e) => e.externalId).map((e) => [e.externalId!, e])
@@ -347,7 +355,17 @@ export async function getRacingDesk(
 
   const isDemo = source === "demo" && !hasRacingApiKey();
   const useProxyOdds = !isDemo && apiOddsTier === "free";
-  const activeOffers = loadActiveRacingOffers(date);
+
+  // Only show offers that haven't had a qualifying bet placed yet (planned stage).
+  // Offers with open bets are at "awaiting" or beyond — suppress from the desk.
+  const offerIdsWithOpenBets = new Set(
+    allBets
+      .filter((b) => b.status === "open" && b.offerId != null)
+      .map((b) => b.offerId as number)
+  );
+  const activeOffers = loadActiveRacingOffers(date).filter(
+    (o) => !offerIdsWithOpenBets.has(o.id)
+  );
   const primaryBookmaker = activeOffers[0]?.bookmaker ?? null;
 
   const settingsProvider = getDefaultExchangeProvider();

@@ -26,7 +26,13 @@ import {
 } from "@/lib/offers/offer-categories";
 import { formatOfferExpiry } from "@/lib/offers/offer-terms";
 import { buildCampaignDetailsContext } from "@/lib/offers/offer-campaign-details";
-import { offerIssueStatusLabel, effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+import {
+  offerIssueStatusLabel,
+  effectiveOfferExpiryMs,
+  daysUntilOfferExpiry,
+  formatOfferDaysLeftLabel,
+  offerExpiryUrgency,
+} from "@/lib/offers/offer-expiry";
 import { formatGbp } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { offerStatusBadgeVariant } from "@/lib/ui/status-badges";
@@ -36,6 +42,8 @@ import {
   isOfferExpired,
   offerInactiveFigureClass,
 } from "@/lib/offers/offer-inactive-ui";
+import { isRegionalScope, parseOfferRules } from "@/lib/offers/racing-offer-rules";
+import { CourseRaceTimes } from "@/components/offers/course-race-times";
 import { VenueBadge } from "@/components/venue-badge";
 import {
   offerFreeBetAmount,
@@ -70,12 +78,16 @@ export function OfferCampaignCard({
     uniqueImportant,
     scopeLine,
   } = buildCampaignDetailsContext(offer);
+  const racingRules = offer.sport === "horse_racing" ? parseOfferRules(offer) : null;
+  const minRunners = racingRules?.minRunners ?? null;
   const categoryId = offerCategoryFromSport(offer.sport);
   const categoryLabel = offerCategoryLabel(offer.sport);
   const hasFreeBet = offerHasFreeBetReward(offer);
   const freeBetAmt = offerFreeBetAmount(offer);
 
   const expiryMs = effectiveOfferExpiryMs(offer);
+  const expiryDaysLeft = expiryMs != null ? daysUntilOfferExpiry(expiryMs) : null;
+  const expiryUrgency = offerExpiryUrgency(expiryDaysLeft);
 
   const hasProfitLines = (() => {
     const p = offer.profit;
@@ -320,6 +332,15 @@ export function OfferCampaignCard({
               {scopeLine ? (
                 <p className="text-[11px] text-muted-foreground">{scopeLine}</p>
               ) : null}
+              {offer.sport === "horse_racing" &&
+                !isRegionalScope(offer.scopeCourse) &&
+                offer.eventDate ? (
+                  <CourseRaceTimes
+                    scopeCourse={offer.scopeCourse!}
+                    eventDate={offer.eventDate}
+                    minRunners={minRunners}
+                  />
+                ) : null}
               <OfferProfitLines profit={offer.profit} inactive={isExpired} />
             </div>
           ) : null}
@@ -334,7 +355,13 @@ export function OfferCampaignCard({
         <span className="text-xs text-muted-foreground">
           {offer.betCount} bet{offer.betCount === 1 ? "" : "s"}
           {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
-          {expiryMs ? ` · expires ${formatOfferExpiry(expiryMs)}` : ""}
+          {expiryMs != null && expiryUrgency === "today" ? (
+            <>{" · "}<span className="font-medium text-rose-600 dark:text-rose-400">{formatOfferDaysLeftLabel(expiryDaysLeft)}</span></>
+          ) : expiryMs != null && expiryUrgency === "tomorrow" ? (
+            <>{" · "}<span className="font-medium text-orange-600 dark:text-orange-400">{formatOfferDaysLeftLabel(expiryDaysLeft)}</span></>
+          ) : expiryMs != null ? (
+            ` · expires ${formatOfferExpiry(expiryMs)}`
+          ) : null}
         </span>
         <div className="flex flex-wrap gap-1.5">
           {(offer.status === "active" || offer.status === "planned") && (

@@ -134,6 +134,8 @@ export interface RaceOfferTag {
   bookmaker?: string | null;
   triggerText?: string;
   suggestedRunners?: SuggestedRunner[];
+  /** Minimum runners required by the offer rules (qualifying tags only) */
+  minRunners?: number | null;
 }
 
 export interface RacingDeskActiveOffer {

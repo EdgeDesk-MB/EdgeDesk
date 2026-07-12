@@ -13,6 +13,7 @@ import {
   Goal,
   Play,
   PlusCircle,
+  SlidersHorizontal,
   Zap,
 } from "lucide-react";
 
@@ -52,6 +53,21 @@ export function HistoryEntryIcon({
   }
   if (entry.kind === "free_bet_promo") {
     return <Gift className={cn("size-3.5", freeBetIconClass, className)} />;
+  }
+  if (entry.kind === "balance_adjustment") {
+    const isCredit = (entry.amount ?? 0) > 0.004;
+    const isDebit = (entry.amount ?? 0) < -0.004;
+    return (
+      <SlidersHorizontal
+        className={cn(
+          "size-3.5",
+          isCredit && "text-emerald-600",
+          isDebit && "text-negative",
+          !isCredit && !isDebit && "text-muted-foreground",
+          className
+        )}
+      />
+    );
   }
   if (win) return <CircleCheck className={cn("size-3.5 text-emerald-600", className)} />;
   if (loss || isFreeBetWonHistoryEntry(entry)) {

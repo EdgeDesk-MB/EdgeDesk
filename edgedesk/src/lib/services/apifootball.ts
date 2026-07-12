@@ -19,6 +19,11 @@ export interface Fixture {
   homeScore: number;
   awayScore: number;
   minute: number;
+  /** 90-minute score — only set when matchEnding is "aet" or "pen" */
+  ftHomeScore?: number | null;
+  ftAwayScore?: number | null;
+  /** How the match ended; null while live or unknown */
+  matchEnding?: "ft" | "aet" | "pen" | null;
   /** Club crest or national team badge URL from API-Football */
   homeLogo?: string | null;
   awayLogo?: string | null;
@@ -75,6 +80,10 @@ function mapFixture(item: any): Fixture {
   const liveStatuses = ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"];
   const finishedStatuses = ["FT", "AET", "PEN"];
   const elapsed = item.fixture?.status?.elapsed;
+  const isAet = shortStatus === "AET";
+  const isPen = shortStatus === "PEN";
+  // 90-minute score is in score.fulltime; goals.home/away is the full final (including ET)
+  const ftScore = item.score?.fulltime;
   return {
     externalId: String(item.fixture?.id ?? ""),
     sport: "football",
@@ -90,6 +99,9 @@ function mapFixture(item: any): Fixture {
     homeScore: item.goals?.home ?? 0,
     awayScore: item.goals?.away ?? 0,
     minute: elapsed ?? (shortStatus === "HT" ? 45 : 0),
+    ftHomeScore: (isAet || isPen) ? (ftScore?.home ?? null) : null,
+    ftAwayScore: (isAet || isPen) ? (ftScore?.away ?? null) : null,
+    matchEnding: isAet ? "aet" : isPen ? "pen" : shortStatus === "FT" ? "ft" : null,
     homeLogo: item.teams?.home?.logo ? String(item.teams.home.logo) : null,
     awayLogo: item.teams?.away?.logo ? String(item.teams.away.logo) : null,
     leagueCountry: item.league?.country ? String(item.league.country) : null,

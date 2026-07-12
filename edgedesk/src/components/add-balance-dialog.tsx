@@ -52,6 +52,7 @@ export function AddBalanceDialog({
   const { exchanges } = useExchanges();
   const [mode, setMode] = useState<"top_up" | "withdrawal" | "adjustment">("top_up");
   const [rows, setRows] = useState<TopUpRow[]>([]);
+  const [affectPnl, setAffectPnl] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [showAddAccount, setShowAddAccount] = useState(false);
@@ -67,6 +68,7 @@ export function AddBalanceDialog({
       setRows([]);
       setShowAddAccount(false);
       setMode("top_up");
+      setAffectPnl(false);
       setExchangeCustom(false);
       prevModeRef.current = "top_up";
     }
@@ -139,6 +141,7 @@ export function AddBalanceDialog({
               : categoryForRow(r) === "adjustment"
                 ? `Balance set to ${formatGbp(r.amount)}`
                 : undefined),
+          ...(mode === "adjustment" && affectPnl ? { affectPnl: true } : {}),
         };
       })
       .filter((e): e is NonNullable<typeof e> => e != null);
@@ -393,6 +396,21 @@ export function AddBalanceDialog({
               </div>
             );
           })}
+
+          {mode === "adjustment" && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 rounded accent-primary"
+                checked={affectPnl}
+                onChange={(e) => setAffectPnl(e.target.checked)}
+              />
+              <span>Include in P&amp;L</span>
+              <span className="text-xs text-muted-foreground">
+                — records this correction in your profit &amp; loss history
+              </span>
+            </label>
+          )}
 
           <div className="flex gap-2">
             <Button

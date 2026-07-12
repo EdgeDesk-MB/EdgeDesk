@@ -16,7 +16,6 @@ import {
   Calculator,
   CalendarDays,
   CalendarSearch,
-  ChevronDown,
   Gift,
   History,
   NotebookPen,
@@ -31,6 +30,7 @@ import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
+import { useOfferDialog } from "@/components/offers/offer-provider";
 import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
@@ -164,6 +164,7 @@ export function AppNav() {
   const { openAddBet } = useAddBet();
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openTrackFixture } = useTrackFixture();
+  const { openOffer } = useOfferDialog();
   const { state } = useAppState(5000);
   const liveTrackedCount = useMemo(
     () => (state?.events ?? []).filter((e) => effectiveEventStatus(e) === "live").length,
@@ -300,17 +301,17 @@ export function AppNav() {
               <ActionBadge count={offerActionCount} />
             </span>
           </Link>
-          <span
-            className={cn(navTrailingSlot, "pointer-events-none text-muted-foreground")}
-            aria-hidden
+          <button
+            type="button"
+            className={cn(
+              navTrailingSlot,
+              "rounded-md text-muted-foreground transition-colors hover:text-foreground"
+            )}
+            aria-label="New offer"
+            onClick={() => openOffer()}
           >
-            <ChevronDown
-              className={cn(
-                "size-3.5 transition-transform duration-150 ease-[cubic-bezier(0.34,1.4,0.64,1)]",
-                expanded && "rotate-180"
-              )}
-            />
-          </span>
+            <Plus className="size-3.5" />
+          </button>
         </div>
 
         <div className="nav-sub-panel" data-open={expanded ? "true" : "false"}>

@@ -109,6 +109,11 @@ function formatHistoryClock(when: Date): string {
 /** True when the badge should show a live minute (e.g. 23') instead of a clock time. */
 export function historyUsesMinuteBadge(entry: HistoryRow, ctx: HistoryContext): boolean {
   const event = resolveHistoryEvent(entry, ctx);
+  // AET/extra-time full_time entries show the match minute ("120'") not the wall clock
+  // so they read consistently alongside AET goals at the same minute.
+  if (entry.kind === "full_time" && (entry.minute ?? 90) > 90 && event?.sport !== "horse_racing") {
+    return true;
+  }
   return (
     entry.minute != null &&
     event?.sport !== "horse_racing" &&
@@ -333,15 +338,24 @@ export function sortHistoryEntries(
   });
 }
 
-/** When timestamps match, newest-first story: settlement → result → bet placed. */
+/**
+ * When two entries share the same timestamp, sort descending by this rank so the
+ * newest-first feed tells a coherent story:
+ *   settlement (15) → full_time (12) → goal/kickoff/two_up (10) → bet_placed (0)
+ *
+ * The default 10 covers goal, kickoff, two_up and must be BELOW full_time (12)
+ * so that a goal at minute 120 and the AET full-time whistle at the same clock
+ * second display in the right order: full time on top, the goal that triggered
+ * it below.
+ */
 function historyKindTieRank(kind: HistoryRow["kind"]): number {
   switch (kind) {
     case "bet_placed":
       return 0;
     case "full_time":
-      return 1;
+      return 12;
     case "settlement":
-      return 2;
+      return 15;
     default:
       return 10;
   }
@@ -363,6 +377,8 @@ export function historyKindLabel(kind: HistoryRow["kind"]): string {
       return "Full time";
     case "free_bet_promo":
       return "Free bet";
+    case "balance_adjustment":
+      return "Balance correction";
     default:
       return kind;
   }

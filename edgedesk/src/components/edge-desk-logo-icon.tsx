@@ -1,11 +1,19 @@
 import { cn } from "@/lib/utils";
-import { Icon } from "@iconify/react";
 
 export function EdgeDeskLogoIcon({ className }: { className?: string }) {
   return (
-    <span className={cn("flex items-center gap-2 text-2xl font-bold", className)}>
-      <Icon icon="mdi:home" className="size-6" />
-      EdgeDesk
-    </span>
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn("size-[18px] shrink-0", className)}
+      aria-hidden
+    >
+      {/* Geometric "E" mark — vertical spine + three horizontal arms */}
+      <rect x="2" y="2" width="3.5" height="16" rx="1.75" />
+      <rect x="2" y="2" width="15" height="3.5" rx="1.75" />
+      <rect x="2" y="8.25" width="11" height="3.5" rx="1.75" />
+      <rect x="2" y="14.5" width="15" height="3.5" rx="1.75" />
+    </svg>
   );
 }

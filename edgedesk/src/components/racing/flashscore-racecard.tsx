@@ -57,6 +57,8 @@ export interface FlashscoreRacecardProps {
   refreshLabel?: string;
   refreshing?: boolean;
   exchangeStatusLabel?: string;
+  /** Bookmaker name → brand hex color for near-minimum runner dots */
+  bookmakerColors?: Map<string, string>;
 }
 
 function spreadTone(spreadPct?: number): string {
@@ -430,6 +432,7 @@ export function FlashscoreRacecard({
   refreshLabel,
   refreshing = false,
   exchangeStatusLabel,
+  bookmakerColors,
 }: FlashscoreRacecardProps) {
   const activeCourse = selected?.course ?? courses[0]?.[0] ?? "";
   const courseRaces = courses.find(([c]) => c === activeCourse)?.[1] ?? [];
@@ -499,23 +502,50 @@ export function FlashscoreRacecard({
         <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
           {courseRaces.map((race) => {
             const active = race.externalId === selectedId;
+            const isFinished =
+              race.status === "finished" ||
+              (race.status === "upcoming" && race.startTime < Date.now());
             const offerCount = qualifyingOfferTags(race).length;
+            const nearMinTags = race.offerTags.filter(
+              (t) =>
+                t.qualifies &&
+                t.minRunners != null &&
+                race.fieldSize >= t.minRunners &&
+                race.fieldSize <= t.minRunners + 2
+            );
             return (
               <button
                 key={race.externalId}
                 type="button"
                 onClick={() => onSelectRace(race.externalId)}
-                className={listPillState(active)}
+                className={cn(
+                  listPillState(active),
+                  isFinished && !active && "text-muted-foreground/50"
+                )}
               >
                 {race.startTime ? formatClockTime(race.startTime) : race.offTime || "-"}
                 {offerCount > 0 && (
                   <span
-                    className="ml-1 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"
+                    className="ml-1 inline-flex min-w-[1rem] translate-y-[-1px] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"
                     title={`${offerCount} qualifying offer${offerCount === 1 ? "" : "s"}`}
                   >
                     {offerCount}
                   </span>
                 )}
+                {nearMinTags.map((tag) => {
+                  const color = tag.bookmaker ? (bookmakerColors?.get(tag.bookmaker) ?? null) : null;
+                  return (
+                    <span
+                      key={tag.offerId}
+                      className="inline-block size-1.5 shrink-0 translate-y-[-1px] rounded-full"
+                      style={{
+                        marginLeft: "6px",
+                        ...(color ? { backgroundColor: color } : { backgroundColor: "currentColor", opacity: 0.5 }),
+                      }}
+                      title={`${tag.bookmaker ?? "Offer"}: ${race.fieldSize} runners (near min. ${tag.minRunners})`}
+                    />
+                  );
+                })}
               </button>
             );
           })}

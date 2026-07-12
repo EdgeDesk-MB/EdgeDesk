@@ -21,6 +21,11 @@ export const events = sqliteTable("events", {
     .default("manual"),
   /** Goal timeline: JSON array of {minute, side, player?, og?} - feeds trigger settlement */
   goals: text("goals"),
+  /** 90-minute score for AET/PEN matches (homeScore/awayScore stores the full final) */
+  ftHomeScore: integer("ft_home_score"),
+  ftAwayScore: integer("ft_away_score"),
+  /** How the match ended: "ft" | "aet" | "pen" | null (null = unknown / not yet finished) */
+  matchEnding: text("match_ending"),
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
@@ -194,6 +199,8 @@ export const balanceTransactions = sqliteTable("balance_transactions", {
   note: text("note"),
   createdAt: integer("created_at").notNull(),
   confirmedAt: integer("confirmed_at"),
+  /** 1 = this adjustment should be included in the P&L chart and settledProfit total */
+  affectPnl: integer("affect_pnl").notNull().default(0),
 });
 
 /**
@@ -204,7 +211,7 @@ export const history = sqliteTable("history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   dedupe: text("dedupe").notNull().unique(),
   kind: text("kind", {
-    enum: ["kickoff", "goal", "two_up", "full_time", "settlement", "free_bet_promo", "bet_placed"],
+    enum: ["kickoff", "goal", "two_up", "full_time", "settlement", "free_bet_promo", "bet_placed", "balance_adjustment"],
   }).notNull(),
   eventId: integer("event_id"),
   betId: integer("bet_id"),

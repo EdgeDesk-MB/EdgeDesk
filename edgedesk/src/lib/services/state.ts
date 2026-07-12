@@ -95,9 +95,14 @@ export function toSettleable(bet: BetRow): SettleableBet {
 }
 
 export function toMatchResult(event: EventRow): MatchResult {
+  // Bets settle at 90 minutes (FT). Use the stored 90-min score for AET/PEN matches.
+  const usesFtScore =
+    (event.matchEnding === "aet" || event.matchEnding === "pen") &&
+    event.ftHomeScore != null &&
+    event.ftAwayScore != null;
   return {
-    homeScore: event.homeScore,
-    awayScore: event.awayScore,
+    homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
+    awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
     homeLed2: !!event.homeLed2,
     awayLed2: !!event.awayLed2,
     inPlay: event.status === "live",
@@ -105,11 +110,15 @@ export function toMatchResult(event: EventRow): MatchResult {
 }
 
 export function toTriggerContext(event: EventRow): TriggerContext {
+  const usesFtScore =
+    (event.matchEnding === "aet" || event.matchEnding === "pen") &&
+    event.ftHomeScore != null &&
+    event.ftAwayScore != null;
   return {
     homeTeam: event.homeTeam,
     awayTeam: event.awayTeam,
-    homeScore: event.homeScore,
-    awayScore: event.awayScore,
+    homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
+    awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
     finished: event.status === "finished",
     goals: event.goals ? (JSON.parse(event.goals) as GoalEvent[]) : [],
   };
@@ -228,6 +237,13 @@ async function refreshApiEvents(): Promise<void> {
           homeLed2,
           awayLed2,
           goals,
+          ...(fixture.matchEnding != null
+            ? {
+                matchEnding: fixture.matchEnding,
+                ftHomeScore: fixture.ftHomeScore ?? null,
+                ftAwayScore: fixture.ftAwayScore ?? null,
+              }
+            : {}),
         })
         .where(eq(events.id, event.id))
         .run();
@@ -497,13 +513,25 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
     }
 
     if (event.status === "finished") {
-      put({
+      const ending = event.matchEnding;
+      const titleSuffix = ending === "aet" ? " (AET)" : ending === "pen" ? " (Pens)" : "";
+      let scoreDetail: string;
+      const hasFtScore = event.ftHomeScore != null && event.ftAwayScore != null;
+      if (ending === "aet" && hasFtScore) {
+        // Show AET final score; 90-min score in brackets for clarity
+        scoreDetail = `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam} (FT: ${event.ftHomeScore}-${event.ftAwayScore})`;
+      } else if (ending === "pen" && hasFtScore) {
+        scoreDetail = `${event.homeTeam} ${event.ftHomeScore}-${event.ftAwayScore} ${event.awayTeam} (Pens)`;
+      } else {
+        scoreDetail = `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`;
+      }
+      upsert({
         dedupe: `ft:${event.id}`,
         kind: "full_time",
         eventId: event.id,
         minute: event.minute || 90,
-        title: "Full time",
-        detail: `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`,
+        title: `Full time${titleSuffix}`,
+        detail: scoreDetail,
         createdAt: event.startTime + (event.minute || 90) * 60 * 1000,
       });
     }
@@ -602,10 +630,22 @@ export async function getAppState(): Promise<AppState> {
     .filter((b) => b.status !== "open" && b.status !== "void" && b.actualProfit != null)
     .sort((a, b) => (a.settledAt ?? a.createdAt) - (b.settledAt ?? b.createdAt));
 
+  const balanceAdjustments = db
+    .select()
+    .from(history)
+    .where(eq(history.kind, "balance_adjustment"))
+    .all();
+
+  type PnlPoint = { time: number; profit: number };
+  const allPnlPoints: PnlPoint[] = [
+    ...settled.map((b) => ({ time: b.settledAt ?? b.createdAt, profit: b.actualProfit! })),
+    ...balanceAdjustments.filter((h) => h.amount != null).map((h) => ({ time: h.createdAt, profit: h.amount! })),
+  ].sort((a, b) => a.time - b.time);
+
   let running = 0;
-  const series = settled.map((b) => {
-    running += b.actualProfit!;
-    return { time: b.settledAt ?? b.createdAt, value: running };
+  const series = allPnlPoints.map((p) => {
+    running += p.profit;
+    return { time: p.time, value: running };
   });
 
   const livePositions: LivePosition[] = [];

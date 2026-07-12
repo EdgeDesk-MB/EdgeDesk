@@ -7,6 +7,7 @@ import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
 import { getOfferRecurrenceMeta, syncOfferSeriesInstances } from "@/lib/offers/offer-recurrence";
 import { localYmd } from "@/lib/offers/offer-recurrence-shared";
+import { ensureCourseOfferSiblings } from "@/lib/offers/course-offer-sync";
 
 export type {
   FreeBetStage,
@@ -520,6 +521,8 @@ export function syncOfferStatuses(): void {
         .run();
     }
   }
+
+  ensureCourseOfferSiblings(allOffers, allBets);
 }
 
 /** Backfill offers for existing bets that look like promos but have no offer_id. */

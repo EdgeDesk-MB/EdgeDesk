@@ -969,12 +969,21 @@ function extractQualifyingPlaces(text: string, awardPositions: number[]): number
     }
   }
 
-  // "if … 2nd or 3rd" with words between ("if your horse finishes 2nd or 3rd")
+  // "if … 2nd or 3rd" — handles "if your horse finishes", "if you finish", "if selection finishes"
   const ifClause = text.match(
-    /\bif\s+(?:your\s+)?(?:horse\s+)?(?:finishes?|comes?|places?)?\s*((?:\d+(?:st|nd|rd|th)?[\s,&+/]*(?:(?:and|or)\s+)?){1,6})/i
+    /\bif\s+(?:(?:you|your(?:\s+\w+)?)\s+)?(?:horse\s+)?(?:finishes?|finish|comes?\s*(?:in)?|places?)?\s*((?:\d+(?:st|nd|rd|th)?[\s,&+/]*(?:(?:and|or)\s+)?){1,6})/i
   );
   if (ifClause) {
     const places = parsePlacePositions(ifClause[1]).filter((n) => n <= 10);
+    if (places.length > 0) return places;
+  }
+
+  // "finish 2nd" / "finishes 2nd or 3rd" — catches "if you finish 2nd" and standalone usages
+  const finishNth = text.match(
+    /\bfinish(?:es|ed)?\s+((?:\d+(?:st|nd|rd|th)?(?:\s*(?:[,&+/]|and|or)\s*)?){1,6})/i
+  );
+  if (finishNth) {
+    const places = parsePlacePositions(finishNth[1]).filter((n) => n >= 1 && n <= 10);
     if (places.length > 0) return places;
   }
 

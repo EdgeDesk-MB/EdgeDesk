@@ -184,6 +184,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_racing_odds_override_race_horse
     }
   };
   addColumn("events", "goals TEXT");
+  addColumn("events", "ft_home_score INTEGER");
+  addColumn("events", "ft_away_score INTEGER");
+  addColumn("events", "match_ending TEXT");
   addColumn("bets", "trigger_text TEXT");
   addColumn("bets", "trigger_rule TEXT");
   addColumn("bets", "exchange_id INTEGER");
@@ -230,6 +233,7 @@ CREATE TABLE IF NOT EXISTS offer_series (
   addColumn("balance_transactions", "transfer_group_id TEXT");
   addColumn("balance_transactions", "pending INTEGER NOT NULL DEFAULT 0");
   addColumn("balance_transactions", "confirmed_at INTEGER");
+  addColumn("balance_transactions", "affect_pnl INTEGER NOT NULL DEFAULT 0");
   addColumn("racing_odds_snapshots", "kind TEXT NOT NULL DEFAULT 'bookie'");
 
   // Data migrations - only after tables exist (fresh DBs / vitest temp files)

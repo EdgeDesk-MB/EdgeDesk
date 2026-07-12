@@ -43,6 +43,7 @@ import {
   Plus,
   Radio,
   RefreshCw,
+  TriangleAlert,
 } from "lucide-react";
 
 export function EventRowView({
@@ -250,6 +251,9 @@ export function EventRowView({
               Full time
             </Button>
           )}
+          {!isRacing && status === "finished" && (
+            <CorrectResultDialog event={event} onCorrect={(payload) => onPatch(event.id, { correctResult: payload })} />
+          )}
           <Button variant="ghost" size="sm" className="text-xs" onClick={() => onDelete(event.id)}>
             Remove
           </Button>
@@ -318,6 +322,123 @@ function GoalDialog({
             }}
           >
             Record goal
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CorrectResultDialog({
+  event,
+  onCorrect,
+}: {
+  event: EventRow;
+  onCorrect: (payload: {
+    ftHomeScore: number;
+    ftAwayScore: number;
+    matchEnding: "ft" | "aet" | "pen";
+    homeLed2?: boolean;
+    awayLed2?: boolean;
+  }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [matchEnding, setMatchEnding] = useState<"ft" | "aet" | "pen">(
+    (event.matchEnding as "ft" | "aet" | "pen" | null) ?? "aet"
+  );
+  const [ftHome, setFtHome] = useState(
+    event.ftHomeScore ?? event.homeScore
+  );
+  const [ftAway, setFtAway] = useState(
+    event.ftAwayScore ?? event.awayScore
+  );
+  const [homeLed2, setHomeLed2] = useState(!!event.homeLed2);
+  const [awayLed2, setAwayLed2] = useState(!!event.awayLed2);
+
+  const needsFtScore = matchEnding === "aet" || matchEnding === "pen";
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+          <TriangleAlert className="size-3" /> Correct
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Correct match result</DialogTitle>
+          <DialogDescription>
+            Update how the match ended and the 90-minute score. Settled bets will be
+            re-opened and re-settled at the corrected full-time result.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">How did the match end?</Label>
+            <Select value={matchEnding} onValueChange={(v) => setMatchEnding(v as typeof matchEnding)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ft">Full time (90 min)</SelectItem>
+                <SelectItem value="aet">After extra time (AET)</SelectItem>
+                <SelectItem value="pen">Penalty shootout</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {needsFtScore && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">
+                90-minute score (bets settle here)
+              </Label>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 text-right text-sm font-medium">{event.homeTeam}</span>
+                <Input
+                  type="number"
+                  min={0}
+                  className="w-14 text-center"
+                  value={ftHome}
+                  onChange={(e) => setFtHome(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+                <span className="text-muted-foreground">–</span>
+                <Input
+                  type="number"
+                  min={0}
+                  className="w-14 text-center"
+                  value={ftAway}
+                  onChange={(e) => setFtAway(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+                <span className="min-w-0 flex-1 text-sm font-medium">{event.awayTeam}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs text-muted-foreground">2UP flags (did a team lead by 2+ goals in 90 min?)</Label>
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <span className="text-sm">{event.homeTeam} went 2 ahead</span>
+              <Switch checked={homeLed2} onCheckedChange={setHomeLed2} />
+            </div>
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <span className="text-sm">{event.awayTeam} went 2 ahead</span>
+              <Switch checked={awayLed2} onCheckedChange={setAwayLed2} />
+            </div>
+          </div>
+
+          <Button
+            onClick={() => {
+              onCorrect({
+                ftHomeScore: needsFtScore ? ftHome : event.homeScore,
+                ftAwayScore: needsFtScore ? ftAway : event.awayScore,
+                matchEnding,
+                homeLed2,
+                awayLed2,
+              });
+              setOpen(false);
+            }}
+          >
+            Apply correction
           </Button>
         </div>
       </DialogContent>

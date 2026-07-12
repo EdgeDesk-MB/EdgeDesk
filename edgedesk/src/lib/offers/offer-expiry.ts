@@ -92,13 +92,22 @@ export function daysUntilOfferExpiry(
   return (expiresAt - now) / DAY_MS;
 }
 
-/** Calendar-style urgency copy — "Ends today", "1 day left", etc. */
+/** Calendar-style urgency copy — "Ends today", "Ends tomorrow", etc. */
 export function formatOfferDaysLeftLabel(daysLeft: number | null): string | null {
   if (daysLeft == null) return null;
   if (daysLeft < 0) return "Expired";
   if (daysLeft < 1) return "Ends today";
-  if (daysLeft < 2) return "1 day left";
+  if (daysLeft < 2) return "Ends tomorrow";
   return `${Math.ceil(daysLeft)} days left`;
+}
+
+export function offerExpiryUrgency(
+  daysLeft: number | null
+): "today" | "tomorrow" | "normal" {
+  if (daysLeft == null) return "normal";
+  if (daysLeft < 1) return "today";
+  if (daysLeft < 2) return "tomorrow";
+  return "normal";
 }
 
 export function offerExpiryDaysLeft(

@@ -1,7 +1,7 @@
 /**
  * Bankroll ledger: accounts, top-ups, and automatic bet stake / settlement flows.
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import "server-only";
 import {
   accounts,
@@ -9,6 +9,7 @@ import {
   bets,
   db,
   exchanges,
+  history,
   type AccountRow,
   type BetRow,
 } from "@/lib/db";
@@ -23,14 +24,97 @@ function accountFreeBetBalance(accountId: number): number {
   return sumFreeBetLotBalance(accountId);
 }
 
+/**
+ * When multiple lay bets cover different outcomes of the same market the
+ * exchange only locks the worst-case net liability, not the sum of all
+ * individual liabilities (only one outcome can win).
+ *
+ * Returns the excess that was debited vs what actually needs to be reserved,
+ * so it can be added back to the displayed balance.
+ *
+ * Example: lay Norway @4.8 (liability 75.69) + lay England @1.88 (liability
+ * 176.00) on the same match. Sum deducted = 251.69, worst case (England wins)
+ * = -176.00 + 19.52 winnings = -156.08. Return = 95.61.
+ */
+function sharedLiabilityReturn(accountId: number): number {
+  // Which bets had their liability ledgered to this account?
+  const betIdRows = db
+    .select({ betId: balanceTransactions.betId })
+    .from(balanceTransactions)
+    .where(
+      and(
+        eq(balanceTransactions.accountId, accountId),
+        eq(balanceTransactions.category, "bet_stake"),
+        isNotNull(balanceTransactions.betId)
+      )
+    )
+    .all();
+
+  if (betIdRows.length === 0) return 0;
+  const betIds = betIdRows.map((r) => r.betId as number);
+
+  // Among those bets, which are still open lay bets on a known event?
+  const openLayBets = db
+    .select()
+    .from(bets)
+    .where(inArray(bets.id, betIds))
+    .all()
+    .filter(
+      (b) =>
+        b.status === "open" &&
+        b.balanceLedgered === 1 &&
+        b.layStake > 0 &&
+        b.layOdds > 1 &&
+        b.eventId != null
+    );
+
+  // Group by event (= market)
+  const byEvent = new Map<number, typeof openLayBets>();
+  for (const bet of openLayBets) {
+    const group = byEvent.get(bet.eventId!) ?? [];
+    group.push(bet);
+    byEvent.set(bet.eventId!, group);
+  }
+
+  let totalReturn = 0;
+
+  for (const groupBets of byEvent.values()) {
+    if (groupBets.length < 2) continue; // Single lay: no shared-liability benefit
+
+    const totalLiability = groupBets.reduce(
+      (sum, b) => sum + b.layStake * (b.layOdds - 1),
+      0
+    );
+
+    // Simulate each scenario: one selection wins the market (that lay loses),
+    // all others win.  Take the worst outcome.
+    let worstCase = Infinity;
+    for (const loser of groupBets) {
+      const loserLiability = loser.layStake * (loser.layOdds - 1);
+      const otherWinnings = groupBets
+        .filter((b) => b.id !== loser.id)
+        .reduce((sum, b) => sum + b.layStake * (1 - b.commission), 0);
+      const netOutcome = -loserLiability + otherWinnings;
+      if (netOutcome < worstCase) worstCase = netOutcome;
+    }
+
+    // Reserve only the worst-case loss (0 if all outcomes are profitable)
+    const shouldReserve = worstCase < 0 ? -worstCase : 0;
+    totalReturn += totalLiability - shouldReserve;
+  }
+
+  return Math.max(0, totalReturn);
+}
+
 function accountCashBalance(accountId: number): number {
-  return db
+  const raw = db
     .select()
     .from(balanceTransactions)
     .where(eq(balanceTransactions.accountId, accountId))
     .all()
     .filter((t) => t.category !== "free_bet" && !t.pending)
     .reduce((s, t) => s + t.amount, 0);
+  return raw + sharedLiabilityReturn(accountId);
 }
 
 function accountPendingIn(accountId: number): number {
@@ -85,13 +169,25 @@ export function openBetInBetsAmount(
   return backLocked + liability;
 }
 
-/** Cash currently locked in open positions (Ultimatcher “In bets”). */
+/** Cash currently locked in open positions (Ultimatcher "In bets"). */
 export function getOpenInBetsTotal(): number {
-  return db
+  const raw = db
     .select()
     .from(bets)
     .all()
     .reduce((sum, bet) => sum + openBetInBetsAmount(bet), 0);
+
+  // Subtract the shared-liability return across all exchange accounts so that
+  // bankroll (liquid + inBets) doesn't double-count the freed liability that
+  // is already reflected in the corrected exchange balances.
+  const sharedReturn = db
+    .select()
+    .from(accounts)
+    .all()
+    .filter((a) => a.type === "exchange")
+    .reduce((sum, a) => sum + sharedLiabilityReturn(a.id), 0);
+
+  return Math.max(0, raw - sharedReturn);
 }
 
 export function getBalanceSummary(): BalanceSummary {
@@ -182,7 +278,7 @@ function insertTx(
   category: (typeof balanceTransactions.$inferInsert)["category"],
   note: string,
   betId?: number,
-  opts?: { transferGroupId?: string; pending?: boolean; confirmedAt?: number | null }
+  opts?: { transferGroupId?: string; pending?: boolean; confirmedAt?: number | null; affectPnl?: boolean }
 ) {
   db.insert(balanceTransactions)
     .values({
@@ -195,6 +291,7 @@ function insertTx(
       note,
       createdAt: Date.now(),
       confirmedAt: opts?.confirmedAt ?? null,
+      affectPnl: opts?.affectPnl ? 1 : 0,
     })
     .run();
 }
@@ -204,9 +301,30 @@ export function recordManualTransaction(
   accountId: number,
   amount: number,
   category: "top_up" | "withdrawal" | "adjustment" | "free_bet",
-  note?: string
+  note?: string,
+  opts?: { affectPnl?: boolean }
 ) {
-  insertTx(accountId, amount, category, note ?? category.replace("_", " "));
+  const now = Date.now();
+  insertTx(accountId, amount, category, note ?? category.replace("_", " "), undefined, {
+    affectPnl: opts?.affectPnl,
+  });
+
+  if (opts?.affectPnl && category === "adjustment" && amount !== 0) {
+    const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
+    const accountName = account?.name ?? "Account";
+    const sign = amount > 0 ? "+" : "";
+    const formattedAmount = `${sign}GBP ${Math.abs(amount).toFixed(2)}`;
+    db.insert(history)
+      .values({
+        dedupe: `adj:${accountId}:${now}`,
+        kind: "balance_adjustment",
+        title: "Balance correction",
+        detail: `${accountName} - ${formattedAmount}`,
+        amount,
+        createdAt: now,
+      })
+      .run();
+  }
 }
 
 export type TransferDirection = "to_venue" | "to_bank";

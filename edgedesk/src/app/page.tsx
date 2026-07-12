@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageShell } from "@/components/page-shell";
 import { LivePnlChart } from "@/components/dashboard/live-pnl-chart";
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
@@ -22,7 +22,11 @@ import {
   dashboardSection,
 } from "@/lib/ui/dashboard-layout";
 import { cn } from "@/lib/utils";
+import { filterPillState } from "@/lib/ui/surface-styles";
+import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { TrendingUp } from "lucide-react";
+
+type FeedFilter = "all" | "bets";
 
 export default function DashboardPage() {
   const { state } = useAppState();
@@ -47,6 +51,8 @@ export default function DashboardPage() {
         : buildHistoryContext([], [], {}),
     [state]
   );
+
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
 
   const offers = state?.offers ?? [];
   const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
@@ -114,13 +120,39 @@ export default function DashboardPage() {
                     title="Feed"
                     description="Goals, results and settlements in real time."
                   />
+                  <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
+                    <div className="flex justify-end gap-1 py-2">
+                      <button
+                        type="button"
+                        className={cn(filterPillState(feedFilter === "all"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
+                        onClick={() => setFeedFilter("all")}
+                      >
+                        All events
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(filterPillState(feedFilter === "bets"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
+                        onClick={() => setFeedFilter("bets")}
+                      >
+                        Bets only
+                      </button>
+                    </div>
+                  </div>
                   <ScrollFadeEdges
                     scrollClassName={cn(
                       dashboardPanelBody,
                       "app-scroll-overlay px-[var(--layout-card-x)] pb-3 pt-0"
                     )}
                   >
-                    <HistoryFeed entries={state?.history ?? []} ctx={historyContext} compact />
+                    <HistoryFeed
+                      entries={
+                        feedFilter === "bets"
+                          ? (state?.history ?? []).filter((e) => e.kind === "settlement")
+                          : (state?.history ?? [])
+                      }
+                      ctx={historyContext}
+                      compact
+                    />
                   </ScrollFadeEdges>
                 </section>
               </div>

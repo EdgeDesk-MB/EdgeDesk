@@ -316,6 +316,7 @@ export function AddBetDialog({
       setSelection(editBet.selection);
       setEarlyPayout(!!editBet.earlyPayout);
       setTriggerText(editBet.triggerText ?? "");
+      setTriggerLinkedFromLabel(offerTriggerDetectedInLabel(editBet.label));
       setAdvanced(false);
       setPartLays([]);
       setLayStakeOverride(editBet.layStake);
@@ -378,7 +379,10 @@ export function AddBetDialog({
       if (prefill.awayTeam) setAwayTeam(prefill.awayTeam);
       if (prefill.bookmaker) setBookmaker(prefill.bookmaker);
       if (prefill.eventId !== undefined) setEventId(String(prefill.eventId));
-      if (prefill.triggerText) setTriggerText(prefill.triggerText);
+      if (prefill.triggerText) {
+        setTriggerText(prefill.triggerText);
+        setTriggerLinkedFromLabel(true);
+      }
       if (prefill.offerId != null) {
         setSelectedOfferId(prefill.offerId);
         // Apply stake/bookie prefs from the offer (same as clicking the offer chip)

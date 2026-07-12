@@ -291,9 +291,11 @@ function CalendarItemCard({
             <p
               className={cn(
                 "text-[10px] font-medium tabular-nums",
-                item.daysLeft != null && item.daysLeft <= 2
+                item.daysLeft != null && item.daysLeft < 1
                   ? "text-rose-700 dark:text-rose-300"
-                  : "text-muted-foreground"
+                  : item.daysLeft != null && item.daysLeft < 2
+                    ? "text-orange-600 dark:text-orange-400"
+                    : "text-muted-foreground"
               )}
             >
               {expiry}

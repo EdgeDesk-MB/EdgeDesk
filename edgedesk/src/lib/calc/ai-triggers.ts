@@ -87,8 +87,19 @@ function parsePlacePositionsFromText(text: string): number[] {
 
   // Only scan the place clause - stop before runners / expiry noise
   const clause = placePart.split(/[·•|]|\brunners?\b|\bexpires?\b|\bmin\b/i)[0] ?? placePart;
-  const fromOrdinals = parsePlacePositions(clause).filter((n) => n >= 1 && n <= 10);
-  if (fromOrdinals.length > 0) return fromOrdinals;
+  if (ifMatch) {
+    // Within an explicit "if …" clause bare numbers are valid place positions
+    const fromOrdinals = parsePlacePositions(clause).filter((n) => n >= 1 && n <= 10);
+    if (fromOrdinals.length > 0) return fromOrdinals;
+  } else {
+    // Without an "if" clause, require the ordinal suffix (st/nd/rd/th) to avoid
+    // capturing stake amounts like "£10" as position 10.
+    const ordinalMatches = clause.match(/\b(\d+)(?:st|nd|rd|th)\b/gi) ?? [];
+    const fromOrdinals = [
+      ...new Set(ordinalMatches.map((m) => parseInt(m, 10)).filter((n) => n >= 1 && n <= 10)),
+    ].sort((a, b) => a - b);
+    if (fromOrdinals.length > 0) return fromOrdinals;
+  }
 
   return [];
 }
