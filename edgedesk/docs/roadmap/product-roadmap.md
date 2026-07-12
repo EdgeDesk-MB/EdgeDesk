@@ -9,7 +9,7 @@
 > Companion docs: `docs/api-dependencies-and-tiers.md` (API cost/tier detail),
 > `docs/offer-command-centre.md` (offer pipeline spec), `docs/design-system.md`.
 
-Last updated: 2026-07-12
+Last updated: 2026-07-12 (status updated)
 
 ---
 
@@ -61,7 +61,7 @@ honest about how confident each EV number is.
 Theme: **the app estimates where it could measure, and shows EV without showing confidence.**
 These are ordered; each unlocks the next.
 
-### A1. Measured free-bet retention (replaces hardcoded 0.8)
+### A1. Measured free-bet retention (replaces hardcoded 0.8) ✅ DONE
 
 - **What:** `advantage.ts` uses `DEFAULT_FREE_BET_RETENTION = 0.8` and a `0.35` pre-qualification
   fudge. Compute the user's *actual* retention from settled free-bet conversions (award amount vs
@@ -74,7 +74,7 @@ These are ordered; each unlocks the next.
   3. Thread through `estimateOfferRemainingEv`; display "Your retention: 78% (23 conversions)" on Home and in offer detail.
 - **Acceptance:** Do Next EV figures change when retention history changes; badge shows sample size; unit tests for the blend.
 
-### A2. EV provenance badges app-wide
+### A2. EV provenance badges app-wide ✅ DONE
 
 - **What:** Racing Desk already tags EV with `confidence` + `oddsSource`. Extend a `basis:
   "live" | "estimated" | "heuristic"` field through `OfferAdvantageScore` and `DoNextItem`; render
@@ -103,7 +103,7 @@ These are ordered; each unlocks the next.
   with a visible "re-locked" marker, and capture is measured against the latest lock. Never
   silently mutate.
 
-### A4. "Edge on the table" as the Home hero
+### A4. "Edge on the table" as the Home hero ✅ DONE
 
 - **What:** Home currently leads with balances/P&L. Lead instead with one number: **"£47 of edge
   available today"** = sum of `remainingEv` across actionable Do Next items, with the queue as its
@@ -112,7 +112,7 @@ These are ordered; each unlocks the next.
 - **How:** Mostly re-layout; the sum already exists in `do-next.ts`. Add a small sparkline of
   "edge captured this week" once A3 lands.
 
-### A5. No-vig fair odds in the visible UI
+### A5. No-vig fair odds in the visible UI ✅ DONE
 
 - **What:** `ev.ts#noVig()` is well-tested but invisible. Show overround/fair-odds context in the
   calculators and on Racing Desk runners ("2.5% over fair").
@@ -134,17 +134,17 @@ widget in the morning.
 every state poll; completed/impossible slots collapse rather than reorder, so the user's mental
 model isn't shuffled mid-session.
 
-**B2. EV per minute (£/hr sort).**
+**B2. EV per minute (£/hr sort). ✅ DONE**
 A £2 offer taking 90 seconds beats a £5 offer needing 20 minutes of racecard study. Assign rough
 effort weights per `OfferNextActionKind` (config map, user-tunable later), expose "£/hr" as a
 third sort in `do-next.ts` alongside priority/edge.
 
-**B3. Bankroll-aware ranking.**
+**B3. Bankroll-aware ranking. ✅ DONE**
 Balances per bookmaker/exchange are tracked. Flag Do Next items the user cannot fund ("needs £25
 in Betfair — £14 short"), and synthesize the transfer/deposit as its own queue item with the
 downstream EV attached ("unlocks £11 edge").
 
-**B4. Paste-to-plan (extend the parser).**
+**B4. Paste-to-plan (extend the parser). ✅ DONE**
 `parse-offer-text.ts` already turns pasted T&Cs into structured offers. Extend the same pattern to
 bet-confirmation text pasted from bookie apps → prefilled bet log. This is the backbone of mobile
 quick-logging (§4): on the phone, you paste, confirm, done — three taps.
@@ -253,14 +253,14 @@ multi-tenant version swaps in a real push backend without touching alert logic.
 
 Personal-product-first (D1) ordering. Each phase is shippable and personally useful.
 
-| Phase | Contents | Exit criteria |
-|-------|----------|---------------|
-| **1. EV truth** | A1 retention, A2 provenance, A3 EV lock + capture, A4 hero, A5 no-vig UI | Every £-EV on screen has a basis badge; settled offers show capture %; Home leads with edge-on-the-table |
-| **2. Daily driver** | B1 Daily Plan, B2 £/hr, B3 bankroll-aware, B10 retained-P&L audit | A full offer day can be run start-to-finish from the plan view alone |
-| **3. Mobile** | §4 swipe deck, quick-log (+B4 parser), collapsed variants, PWA install + local alerts | Log a bet in ≤3 taps on a phone; Home usable one-handed |
-| **4. Guardian** | B5 naked-exposure, B6 2UP sentinel, push alerts | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |
-| **5. Coach** | B7 mistake ledger, B8 Edge Report, B9 league table | Monthly report renders from ≥1 month of real captured data |
-| **6. Business gate** | §6 — only if gate criteria met | See §6.1 |
+| Phase | Contents | Status | Exit criteria |
+|-------|----------|--------|---------------|
+| **1. EV truth** | ✅ A1 retention, ✅ A2 provenance, ⬜ A3 EV lock + capture, ✅ A4 hero, ✅ A5 no-vig UI | **In progress** — A3 remaining | Every £-EV on screen has a basis badge; settled offers show capture %; Home leads with edge-on-the-table |
+| **2. Daily driver** | ⬜ B1 Daily Plan, ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ⬜ B10 retained-P&L audit | **In progress** — B1, B10 remaining | A full offer day can be run start-to-finish from the plan view alone |
+| **3. Mobile** | ⬜ §4 swipe deck, quick-log (+B4 parser), collapsed variants, PWA install + local alerts | Not started | Log a bet in ≤3 taps on a phone; Home usable one-handed |
+| **4. Guardian** | ⬜ B5 naked-exposure, ⬜ B6 2UP sentinel, push alerts | Not started | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |
+| **5. Coach** | ⬜ B7 mistake ledger, ⬜ B8 Edge Report, ⬜ B9 league table | Not started | Monthly report renders from ≥1 month of real captured data |
+| **6. Business gate** | §6 — only if gate criteria met | Not started | See §6.1 |
 
 Phases 1–2 are pure lib/UI work on existing data — ideal for local-model iteration (small,
 well-tested pure functions). Phase 3 is UI-heavy. Phases 4+ touch polling/notifications.

@@ -10,7 +10,7 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-07-12
+Last updated: 2026-07-12 (status updated)
 
 ---
 
@@ -20,7 +20,7 @@ Last updated: 2026-07-12
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 376 tests / 60 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 445 tests / 65 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -65,7 +65,7 @@ Last updated: 2026-07-12
 
 # PHASE 1 — EV TRUTH
 
-## A1. Measured free-bet retention `[strong]`
+## A1. Measured free-bet retention `[strong]` ✅ DONE
 
 **Objective.** Replace the hardcoded `DEFAULT_FREE_BET_RETENTION = 0.8`
 (`src/lib/offers/advantage.ts:7`) with the user's measured conversion retention, with a Bayesian
@@ -115,7 +115,7 @@ Do Next EV visibly shifts when a conversion settles.
 
 ---
 
-## A2. EV provenance badges `[local]` — depends on A1 signature change
+## A2. EV provenance badges `[local]` ✅ DONE
 
 **Objective.** Every £-EV shown carries a `basis: "live" | "estimated" | "heuristic"` and the UI
 shows it as a small badge.
@@ -209,7 +209,7 @@ tests for the div-by-zero and expired cases. UI shows the post-mortem line.
 
 ---
 
-## A4. "Edge on the table" Home hero `[local]` `[design-first]` — after A1/A2
+## A4. "Edge on the table" Home hero `[local]` ✅ DONE
 
 **Objective.** Home leads with one number: the sum of `remainingEv` over actionable
 (`isActionableOfferNext`) Do Next items, with provenance-aware styling and the queue beneath.
@@ -230,7 +230,7 @@ Visual check desktop + 390px width.
 
 ---
 
-## A5. No-vig fair odds in the UI `[local]`
+## A5. No-vig fair odds in the UI `[local]` ✅ DONE
 
 **Objective.** Surface `noVig()` / `expectedValue()` from `src/lib/calc/ev.ts` (already tested)
 in the calculators and Racing Desk runner rows.
@@ -280,7 +280,7 @@ doesn't remount on refresh. Timezone: epochs only; display layer handles zone/fo
 **Acceptance.** Pure-lib tests: ordering (timed asc, anytime last), done-collapse rules, stable
 ids across rebuilds. Manual: a real offer day renders a coherent morning-to-night sheet.
 
-## B2. £/hr sort `[local]`
+## B2. £/hr sort `[local]` ✅ DONE
 
 **Objective.** Third Do Next sort: EV per estimated effort-minute.
 
@@ -293,7 +293,7 @@ settings surface). `rateScore = remainingEv / max(minutes, 1) * 60` (£/hr). Sor
 
 **Acceptance.** Unit test: a £2/90-second item outranks a £5/20-minute item under "rate".
 
-## B3. Bankroll-aware ranking `[strong]`
+## B3. Bankroll-aware ranking `[strong]` ✅ DONE
 
 **Objective.** Flag Do Next items the user cannot fund; synthesize a transfer/deposit item
 carrying the unlocked EV.
@@ -313,7 +313,7 @@ normalisation; unmatched bookmaker → no funding info (never a false "short" fl
 **Acceptance.** Unit tests with a fake balance map: funded, short, unmatched-bookie cases; the
 synthetic fund item sums EV across multiple blocked offers on the same account.
 
-## B4. Paste-to-log (bet confirmations) `[strong]`
+## B4. Paste-to-log (bet confirmations) `[strong]` ✅ DONE
 
 **Objective.** Paste bookie bet-confirmation text → prefilled Add Bet. The mobile quick-log
 backbone (C3).
@@ -483,7 +483,7 @@ B9 (after A1; feeds advantage scoring)
 
 ## Standing acceptance bar for every brief
 
-1. `npx vitest run` fully green (currently 376/376 — new code adds tests, breaks none).
+1. `npx vitest run` fully green (currently 445/445 — new code adds tests, breaks none).
 2. `npm run build` green.
 3. Times rendered via `time-format.ts`; money/idiom consistent with neighbours.
 4. New EV figures ALWAYS carry a basis (post-A2 this is a hard rule).
