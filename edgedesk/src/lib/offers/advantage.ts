@@ -1,0 +1,170 @@
+import type { OfferSummary } from "@/lib/services/offers.types";
+import { deriveOfferNextAction, type OfferNextAction } from "@/lib/offers/next-actions";
+import { parseOfferRules } from "@/lib/offers/racing-offer-rules";
+import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+
+/** Typical cash retention when converting an SNR free bet. */
+const DEFAULT_FREE_BET_RETENTION = 0.8;
+
+export interface OfferAdvantageScore {
+  offerId: number;
+  offerTitle: string;
+  bookmaker: string | null;
+  /** Estimated remaining £ edge still on the table */
+  remainingEv: number;
+  /** Urgency boost 0–1 from expiry proximity */
+  urgency: number;
+  /** Combined rank score (higher = better to do next) */
+  score: number;
+  reason: string;
+  nextAction: OfferNextAction | null;
+}
+
+function daysUntil(expiresAt: number | null, now: number): number | null {
+  if (expiresAt == null) return null;
+  return (expiresAt - now) / (24 * 60 * 60 * 1000);
+}
+
+function urgencyFromExpiry(expiresAt: number | null, now: number): number {
+  const days = daysUntil(expiresAt, now);
+  if (days == null || days < 0) return 0;
+  if (days <= 1) return 1;
+  if (days <= 3) return 0.7;
+  if (days <= 7) return 0.35;
+  return 0.1;
+}
+
+/**
+ * Estimate remaining expected value still available on this offer campaign.
+ * Uses free-bet award amount, racing rules, expectedProfit, or open bet EV.
+ */
+export function estimateOfferRemainingEv(offer: OfferSummary): {
+  remainingEv: number;
+  reason: string;
+} {
+  const { profit } = offer;
+
+  if (profit.freeBetStage === "awarded" && profit.freeBetAwardAmount != null) {
+    const ev = profit.freeBetAwardAmount * DEFAULT_FREE_BET_RETENTION;
+    return {
+      remainingEv: ev,
+      reason: `~£${ev.toFixed(0)} retained from £${profit.freeBetAwardAmount.toFixed(0)} free bet`,
+    };
+  }
+
+  if (profit.freeBetStage === "in_use") {
+    // Conversion already placed - remaining EV is locked in, not a to-do.
+    return {
+      remainingEv: 0,
+      reason: "Free-bet conversion open - waiting on result",
+    };
+  }
+
+  const rules = parseOfferRules(offer);
+  if (rules && profit.freeBetStage === "none" && profit.qualifyingSettledCount === 0) {
+    const rough = rules.freeBetAmount * DEFAULT_FREE_BET_RETENTION * 0.35 + (offer.expectedProfit ?? 0);
+    // Place-refund: partial probability of award; prefer explicit expectedProfit when set
+    const remainingEv =
+      offer.expectedProfit != null && Math.abs(offer.expectedProfit) > 0.01
+        ? offer.expectedProfit
+        : Math.max(rough, 0);
+    return {
+      remainingEv,
+      reason:
+        offer.expectedProfit != null
+          ? `£${offer.expectedProfit.toFixed(2)} expected on campaign`
+          : `~£${remainingEv.toFixed(0)} est. from £${rules.freeBetAmount} place-refund FB`,
+    };
+  }
+
+  if (offer.expectedProfit != null && Math.abs(offer.expectedProfit) > 0.01) {
+    const remaining = offer.expectedProfit - profit.totalProfit;
+    if (remaining > 0.01) {
+      return {
+        remainingEv: remaining,
+        reason: `£${remaining.toFixed(2)} of £${offer.expectedProfit.toFixed(2)} expected still open`,
+      };
+    }
+  }
+
+  const openExpected = offer.expectedFromBets;
+  if (profit.qualifyingOpenCount > 0 || profit.freeBetOpenCount > 0) {
+    return {
+      remainingEv: Math.max(openExpected, 0),
+      reason:
+        openExpected > 0.01
+          ? `£${openExpected.toFixed(2)} expected on open legs`
+          : "Open legs - EV not set",
+    };
+  }
+
+  if (offer.status === "planned" || offer.betCount === 0) {
+    const planned = offer.expectedProfit ?? 0;
+    return {
+      remainingEv: Math.max(planned, 0),
+      reason:
+        planned > 0
+          ? `£${planned.toFixed(2)} expected if started`
+          : "Planned - set expected profit to rank this",
+    };
+  }
+
+  return { remainingEv: 0, reason: "No remaining EV estimate" };
+}
+
+export function scoreOfferAdvantage(
+  offer: OfferSummary,
+  now = Date.now()
+): OfferAdvantageScore | null {
+  if (offer.status === "completed" || offer.status === "expired") return null;
+
+  const nextAction = deriveOfferNextAction(offer, now);
+  // Waiting on a result is not a "Best next" candidate - user already did the work.
+  if (nextAction?.kind === "await_result") return null;
+
+  const { remainingEv, reason } = estimateOfferRemainingEv(offer);
+  const urgency = urgencyFromExpiry(effectiveOfferExpiryMs(offer), now);
+
+  // Stage multipliers - cash sitting as awarded FB is highest leverage
+  let stageBoost = 1;
+  if (offer.profit.freeBetStage === "awarded") stageBoost = 1.45;
+  else if (nextAction?.kind === "place_qualifying" || nextAction?.kind === "start_planned") {
+    stageBoost = 1.05;
+  }
+
+  const score = remainingEv * stageBoost * (1 + urgency * 0.5);
+
+  // Skip noise with no action and no EV
+  if (score < 0.01 && nextAction == null) return null;
+
+  return {
+    offerId: offer.id,
+    offerTitle: offer.title,
+    bookmaker: offer.bookmaker,
+    remainingEv,
+    urgency,
+    score,
+    reason,
+    nextAction,
+  };
+}
+
+export function rankOfferAdvantages(
+  offers: OfferSummary[],
+  now = Date.now()
+): OfferAdvantageScore[] {
+  return offers
+    .map((o) => scoreOfferAdvantage(o, now))
+    .filter((s): s is OfferAdvantageScore => s != null)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.offerTitle.localeCompare(b.offerTitle);
+    });
+}
+
+export function bestOfferAdvantage(
+  offers: OfferSummary[],
+  now = Date.now()
+): OfferAdvantageScore | null {
+  return rankOfferAdvantages(offers, now)[0] ?? null;
+}

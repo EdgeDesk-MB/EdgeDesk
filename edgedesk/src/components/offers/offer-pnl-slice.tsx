@@ -4,8 +4,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoneyFlow } from "@/components/money-flow";
-import type { OfferSummary } from "@/lib/services/offers";
+import { VenueBadge } from "@/components/venue-badge";
+import type { OfferSummary } from "@/lib/services/offers.types";
 import { formatGbp } from "@/lib/format-money";
+import { isOfferExpired, offerInactiveFigureClass } from "@/lib/offers/offer-inactive-ui";
 import { cn } from "@/lib/utils";
 import {
   listRow,
@@ -15,11 +17,24 @@ import {
 } from "@/lib/ui/surface-styles";
 import { Gift, Tag } from "lucide-react";
 
-function RetentionStat({ awarded, amount }: { awarded: boolean; amount: number | null }) {
-  if (!awarded) return <span className="text-muted-foreground">—</span>;
+function RetentionStat({
+  awarded,
+  amount,
+  inactive,
+}: {
+  awarded: boolean;
+  amount: number | null;
+  inactive?: boolean;
+}) {
+  if (!awarded) return <span className="text-muted-foreground">-</span>;
   return (
-    <span className="font-medium text-violet-700 dark:text-violet-300 tabular-nums">
-      {amount != null ? formatGbp(amount) : "—"} retained
+    <span
+      className={cn(
+        "font-medium text-violet-700 dark:text-violet-300 tabular-nums",
+        offerInactiveFigureClass(inactive)
+      )}
+    >
+      {amount != null ? formatGbp(amount) : "-"} retained
     </span>
   );
 }
@@ -33,6 +48,8 @@ function OfferPnlRow({
 }) {
   const { profit } = offer;
   const isRacing = offer.sport === "horse_racing";
+  const inactive = isOfferExpired(offer);
+  const inactiveFigure = offerInactiveFigureClass(inactive);
 
   return (
     <div
@@ -50,9 +67,12 @@ function OfferPnlRow({
             </Badge>
           )}
         </div>
-        <p className="mt-0.5 text-muted-foreground">
-          {offer.bookmaker ?? "Any bookie"} · {offer.betCount} bet{offer.betCount === 1 ? "" : "s"}
-          {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+          {offer.bookmaker ? <VenueBadge name={offer.bookmaker} /> : <span>Any bookie</span>}
+          <span>
+            · {offer.betCount} bet{offer.betCount === 1 ? "" : "s"}
+            {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
+          </span>
         </p>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
           {(profit.qualifyingSettledCount > 0 || profit.qualifyingOpenCount > 0) && (
@@ -61,7 +81,11 @@ function OfferPnlRow({
               {profit.qualifyingOpenCount > 0 && profit.qualifyingSettledCount === 0 ? (
                 <span className="text-muted-foreground">open</span>
               ) : (
-                <MoneyFlow value={profit.qualifyingProfit} signColor className="inline font-medium" />
+                <MoneyFlow
+                  value={profit.qualifyingProfit}
+                  signColor={!inactive}
+                  className={cn("inline font-medium", inactiveFigure)}
+                />
               )}
             </span>
           )}
@@ -71,24 +95,36 @@ function OfferPnlRow({
               {profit.freeBetStage === "awaiting_result" ? (
                 <span className="text-muted-foreground">awaiting</span>
               ) : profit.freeBetAwarded ? (
-                <RetentionStat awarded amount={profit.freeBetAwardAmount} />
+                <RetentionStat
+                  awarded
+                  amount={profit.freeBetAwardAmount}
+                  inactive={inactive}
+                />
               ) : profit.freeBetStage === "not_awarded" ? (
                 <span className="text-muted-foreground">not triggered</span>
               ) : (
-                <span className="text-muted-foreground">—</span>
+                <span className="text-muted-foreground">-</span>
               )}
             </span>
           )}
           {profit.freeBetSettledCount > 0 && (
             <span>
               <span className="text-muted-foreground">FB P&amp;L </span>
-              <MoneyFlow value={profit.freeBetProfit} signColor className="inline font-medium" />
+              <MoneyFlow
+                value={profit.freeBetProfit}
+                signColor={!inactive}
+                className={cn("inline font-medium", inactiveFigure)}
+              />
             </span>
           )}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <MoneyFlow value={profit.totalProfit} signColor className="text-sm font-semibold" />
+        <MoneyFlow
+          value={profit.totalProfit}
+          signColor={!inactive}
+          className={cn("text-sm font-semibold", inactiveFigure)}
+        />
       </div>
     </div>
   );
@@ -103,7 +139,7 @@ export function OfferPnlSlice({
   offers: OfferSummary[];
   className?: string;
   compact?: boolean;
-  /** Flat layout for dashboard dialog — no nested card/header */
+  /** Flat layout for dashboard dialog - no nested card/header */
   variant?: "card" | "plain";
 }) {
   const active = offers.filter((o) => o.status === "active" || o.betCount > 0);
@@ -197,7 +233,9 @@ export function OfferPnlSlice({
                   key={bookie}
                   className={cn("flex items-center justify-between gap-2 px-3 py-2 text-xs", listRow)}
                 >
-                  <span className="font-medium">{bookie}</span>
+                  <span className="font-medium">
+                    {bookie === "Any bookie" ? bookie : <VenueBadge name={bookie} />}
+                  </span>
                   <span className="flex items-center gap-3 tabular-nums">
                     <span className="text-muted-foreground">
                       qual <MoneyFlow value={stats.qual} signColor className="inline" />
@@ -250,7 +288,9 @@ export function OfferPnlSlice({
                   key={bookie}
                   className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-xs"
                 >
-                  <span className="font-medium">{bookie}</span>
+                  <span className="font-medium">
+                    {bookie === "Any bookie" ? bookie : <VenueBadge name={bookie} />}
+                  </span>
                   <span className="flex items-center gap-3 tabular-nums">
                     <span className="text-muted-foreground">
                       qual <MoneyFlow value={stats.qual} signColor className="inline" />

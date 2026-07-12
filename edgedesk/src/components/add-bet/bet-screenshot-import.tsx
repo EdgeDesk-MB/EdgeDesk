@@ -1,17 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FilePond, registerPlugin } from "react-filepond";
 import { toast } from "sonner";
-import { Label } from "@/components/ui/label";
 import { ocrBetScreenshot } from "@/lib/ocr/extract-text";
 import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
+import { filterPillGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Loader2, ScanLine } from "lucide-react";
-
-import "filepond/dist/filepond.min.css";
-
-registerPlugin();
+import { ClipboardPaste, Loader2, ScanLine } from "lucide-react";
 
 interface BetScreenshotImportProps {
   open: boolean;
@@ -19,58 +14,25 @@ interface BetScreenshotImportProps {
   className?: string;
 }
 
-function ScreenshotDrop({
-  label,
-  hint,
-  source,
-  active,
-  onHover,
-  onFile,
-  processing,
-}: {
-  label: string;
-  hint: string;
-  source: ScreenshotSource;
-  active: boolean;
-  onHover: () => void;
-  onFile: (file: File, source: ScreenshotSource) => void;
-  processing: boolean;
-}) {
-  const pondRef = useRef<{ removeFiles: () => void } | null>(null);
+const SOURCE_LABEL: Record<ScreenshotSource, string> = {
+  bookie: "Bookie slip",
+  exchange: "Exchange slip",
+};
 
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-1.5 rounded-lg border border-dashed p-2 transition-colors",
-        active ? "border-primary/50 bg-primary/5" : "border-muted-foreground/25 bg-muted/20"
-      )}
-      onMouseEnter={onHover}
-    >
-      <div className="flex items-center justify-between gap-2 px-1">
-        <Label className="text-[11px] font-medium text-muted-foreground">{label}</Label>
-        {processing && active && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
-      </div>
-      <FilePond
-        ref={pondRef as never}
-        allowMultiple={false}
-        maxFiles={1}
-        allowReplace
-        acceptedFileTypes={["image/png", "image/jpeg", "image/webp", "image/gif"]}
-        labelIdle={hint}
-        credits={false}
-        className="bet-screenshot-pond"
-        onaddfile={(_err, fileItem) => {
-          const file = fileItem.file;
-          if (file instanceof File) onFile(file, source);
-          pondRef.current?.removeFiles();
-        }}
-      />
-    </div>
+/** Softer than page-level filterPillState — lifted pill on the muted track, tinted to match paste zone. */
+function slipTabState(active: boolean, source: ScreenshotSource) {
+  return cn(
+    "inline-flex w-full items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+    active
+      ? source === "bookie"
+        ? "bg-card text-foreground shadow-sm ring-1 ring-amber-500/30"
+        : "bg-card text-foreground shadow-sm ring-1 ring-emerald-500/30"
+      : "text-muted-foreground hover:text-foreground"
   );
 }
 
 /**
- * Drag-and-drop / paste screenshot import for bookie + exchange slips.
+ * Paste-only screenshot import for bookie + exchange slips.
  * Uses free client-side OCR (Tesseract.js) — results are best-effort hints.
  */
 export function BetScreenshotImport({ open, onApply, className }: BetScreenshotImportProps) {
@@ -85,9 +47,9 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
       try {
         const result = await ocrBetScreenshot(file, source);
         if (result.summary.length === 0) {
-          toast.warning("Could not read much from that screenshot", {
+          toast.warning("Couldn't read much from that screenshot", {
             description:
-              "Try a clearer crop of the bet slip. OCR works best on sharp, high-contrast images.",
+              "Try a sharper crop of the slip. High-contrast PNG or JPEG works best.",
           });
           return;
         }
@@ -98,8 +60,10 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
             description: result.summary.join(" · "),
           }
         );
-      } catch (e) {
-        toast.error("OCR failed", { description: String(e) });
+      } catch {
+        toast.error("Couldn't read that screenshot", {
+          description: "Try a clearer crop, or enter the bet details manually.",
+        });
       } finally {
         setProcessing(null);
       }
@@ -107,7 +71,7 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
     [onApply]
   );
 
-  /** Paste into the active zone while the modal is open (skip text fields). */
+  /** Paste into the active slip zone while the modal is open (skip text fields). */
   useEffect(() => {
     if (!open) return;
     const onPaste = (e: ClipboardEvent) => {
@@ -134,34 +98,71 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
     return () => window.removeEventListener("paste", onPaste);
   }, [open, processFile]);
 
+  const busy = processing != null;
+
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ScanLine className="size-3.5 shrink-0" />
-        <span>
-          Drop or paste screenshots — reads labelled fields (Odds, Stake, Matched Stake/Odds,
-          Win · time · course). Returns are ignored for odds. Always check values.
-        </span>
+    <div
+      className={cn(
+        "flex w-full flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 p-3",
+        className
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <ScanLine className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-foreground">Import from screenshot</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            Paste a slip image to fill odds, stake and event hints. Returns are ignored —
+            always check values before saving.
+          </p>
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <ScreenshotDrop
-          label="1 · Bookie"
-          hint='Drop or paste <span class="filepond--label-action">bookie slip</span>'
-          source="bookie"
-          active={activeSource === "bookie"}
-          onHover={() => setActiveSource("bookie")}
-          onFile={processFile}
-          processing={processing === "bookie"}
-        />
-        <ScreenshotDrop
-          label="2 · Exchange"
-          hint='Drop or paste <span class="filepond--label-action">exchange slip</span>'
-          source="exchange"
-          active={activeSource === "exchange"}
-          onHover={() => setActiveSource("exchange")}
-          onFile={processFile}
-          processing={processing === "exchange"}
-        />
+
+      <div
+        className={cn(filterPillGroup, "grid w-full grid-cols-2 gap-0.5 p-0.5")}
+        role="tablist"
+        aria-label="Screenshot target"
+      >
+        {(["bookie", "exchange"] as const).map((source) => (
+          <button
+            key={source}
+            type="button"
+            role="tab"
+            aria-selected={activeSource === source}
+            disabled={busy}
+            onClick={() => setActiveSource(source)}
+            className={cn(
+              slipTabState(activeSource === source, source),
+              "disabled:opacity-50"
+            )}
+          >
+            {SOURCE_LABEL[source]}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className={cn(
+          "flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-center transition-colors",
+          activeSource === "bookie"
+            ? "border-amber-500/30 bg-amber-500/5"
+            : "border-emerald-500/30 bg-emerald-500/5",
+          busy && "pointer-events-none opacity-70"
+        )}
+      >
+        {busy ? (
+          <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+        ) : (
+          <ClipboardPaste className="size-5 text-muted-foreground" aria-hidden />
+        )}
+        <p className="text-xs text-muted-foreground">
+          {busy
+            ? `Reading ${SOURCE_LABEL[processing!].toLowerCase()}…`
+            : `Paste ${SOURCE_LABEL[activeSource].toLowerCase()} (⌘V / Ctrl+V)`}
+        </p>
+        <p className="text-[10px] leading-snug text-muted-foreground/80">
+          Odds · stake · matched stake/odds · win · time · course
+        </p>
       </div>
     </div>
   );

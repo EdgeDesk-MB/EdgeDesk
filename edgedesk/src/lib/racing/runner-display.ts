@@ -34,5 +34,5 @@ export function parseJockeyName(raw: string): { name: string; claimLbs?: number 
   if (m) {
     return { name: m[1].trim(), claimLbs: parseInt(m[2], 10) };
   }
-  return { name: raw.trim() || "—" };
+  return { name: raw.trim() || "-" };
 }

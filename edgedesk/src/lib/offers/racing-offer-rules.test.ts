@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OfferRow } from "@/lib/db";
+import type { OfferRow } from "@/lib/db/schema";
 import {
   formatBetGetFreePlaceSummary,
   formatOfferScopeLabel,
@@ -22,6 +22,8 @@ const baseOffer: OfferRow = {
   sport: "horse_racing",
   offerType: "bet_get_free_place",
   scopeCourse: "all",
+  scopeRaceId: null,
+  scopeRaceLabel: null,
   eventDate: "2026-07-08",
   rules: JSON.stringify({
     type: "bet_get_free_place",
@@ -54,7 +56,13 @@ describe("formatBetGetFreePlaceSummary", () => {
 });
 
 describe("raceQualifiesForOffer", () => {
-  const race = { course: "Catterick", fieldSize: 10, region: "GB" };
+  const race = {
+    course: "Catterick",
+    fieldSize: 10,
+    region: "GB",
+    externalId: "race-catt-1",
+    offTime: "15:00",
+  };
 
   it("qualifies when all rules pass", () => {
     const result = raceQualifiesForOffer(baseOffer, race, "2026-07-08");
@@ -80,11 +88,40 @@ describe("raceQualifiesForOffer", () => {
     expect(formatOfferScopeLabel(baseOffer.scopeCourse)).toBe("UK & Ireland");
   });
 
+  it("treats parser junk scopeCourse any as UK & Ireland", () => {
+    const junk = { ...baseOffer, scopeCourse: "any" };
+    expect(formatOfferScopeLabel(junk.scopeCourse)).toBe("UK & Ireland");
+    expect(raceQualifiesForOffer(junk, race, "2026-07-08").qualifies).toBe(true);
+  });
+
   it("rejects scoped course mismatch", () => {
     const scoped = { ...baseOffer, scopeCourse: "Lingfield" };
     const result = raceQualifiesForOffer(scoped, race, "2026-07-08");
     expect(result.qualifies).toBe(false);
     expect(result.reasons[0]).toContain("Catterick");
+  });
+
+  it("rejects when locked to a different race", () => {
+    const locked = {
+      ...baseOffer,
+      scopeCourse: "Catterick",
+      scopeRaceId: "other-race",
+      scopeRaceLabel: "14:30 · Other",
+    };
+    const result = raceQualifiesForOffer(locked, race, "2026-07-08");
+    expect(result.qualifies).toBe(false);
+    expect(result.reasons[0]).toMatch(/scoped race/i);
+  });
+
+  it("qualifies when locked to this race", () => {
+    const locked = {
+      ...baseOffer,
+      scopeCourse: "Catterick",
+      scopeRaceId: "race-catt-1",
+      scopeRaceLabel: "15:00 · Feature",
+    };
+    const result = raceQualifiesForOffer(locked, race, "2026-07-08");
+    expect(result.qualifies).toBe(true);
   });
 
   it("rejects small fields", () => {

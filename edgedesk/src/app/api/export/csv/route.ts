@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, bets, balanceTransactions, accounts, events } from "@/lib/db";
+import { db, bets, balanceTransactions, accounts, events, offers } from "@/lib/db";
 import { formatEventTitle } from "@/lib/events";
 import { MARKET_LABELS } from "@/lib/markets";
+import { computeMonthlyBreakdown, computeAccountBreakdown } from "@/lib/pnl/monthly-breakdown";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,52 @@ export async function GET(req: NextRequest) {
       ),
     ];
     return csvResponse("edgedesk-balances.csv", lines.join("\n"));
+  }
+
+  if (type === "monthly") {
+    const allBets = db.select().from(bets).all();
+    const monthly = computeMonthlyBreakdown(allBets);
+    const byAccount = computeAccountBreakdown(allBets);
+    const lines = [
+      row(["Section", "Name", "Bets", "Profit"]),
+      ...monthly.map((m) => row(["Month", m.label, m.betCount, m.profit.toFixed(2)])),
+      ...byAccount.map((a) =>
+        row(["Account", `${a.name} (${a.kind})`, a.betCount, a.profit.toFixed(2)])
+      ),
+    ];
+    const stamp = new Date().toISOString().slice(0, 7);
+    return csvResponse(`edgedesk-monthly-pnl-${stamp}.csv`, lines.join("\n"));
+  }
+
+  if (type === "offers") {
+    const allOffers = db.select().from(offers).all();
+    const lines = [
+      row([
+        "ID",
+        "Title",
+        "Bookmaker",
+        "Status",
+        "Sport",
+        "Expected",
+        "Created",
+        "Expires",
+        "Completed",
+      ]),
+      ...allOffers.map((o) =>
+        row([
+          o.id,
+          o.title,
+          o.bookmaker,
+          o.status,
+          o.sport,
+          o.expectedProfit?.toFixed(2),
+          new Date(o.createdAt).toISOString(),
+          o.expiresAt != null ? new Date(o.expiresAt).toISOString() : "",
+          o.completedAt != null ? new Date(o.completedAt).toISOString() : "",
+        ])
+      ),
+    ];
+    return csvResponse("edgedesk-offers.csv", lines.join("\n"));
   }
 
   const eventById = new Map(db.select().from(events).all().map((e) => [e.id, e]));

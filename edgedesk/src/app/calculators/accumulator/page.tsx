@@ -105,8 +105,8 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
           <CardTitle className="text-base">Structure</CardTitle>
           <CardDescription>
             {mode === "standard"
-              ? "Single accumulator — layered lay stakes on each leg."
-              : "Full-cover bets — unit stake is per constituent bet."}
+              ? "Single accumulator - layered lay stakes on each leg."
+              : "Full-cover bets - unit stake is per constituent bet."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -211,7 +211,7 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
                           {result?.layerLays[i] ? (
                             <MoneyFlow value={result.layerLays[i].layStake} />
                           ) : (
-                            "—"
+                            "-"
                           )}
                         </TableCell>
                       )}
@@ -220,7 +220,7 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
                           {layMatrix.lays[i] ? (
                             <MoneyFlow value={layMatrix.lays[i].layStake} />
                           ) : (
-                            "—"
+                            "-"
                           )}
                         </TableCell>
                       )}
@@ -303,7 +303,7 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Lay matrix</CardTitle>
                   <CardDescription>
-                    All leg win/loss combinations — total lay stake{" "}
+                    All leg win/loss combinations - total lay stake{" "}
                     <MoneyFlow
                       value={layMatrix.lays.reduce((a, l) => a + l.layStake, 0)}
                       className="font-semibold"
@@ -378,7 +378,7 @@ export default function AccumulatorCalculatorPage() {
     <CalculatorShell wide>
       <CalculatorPageHeader
         title="Accumulator Calculator"
-        description="Doubles through Lucky 63 — back returns for full-cover bets and layered lays for standard accumulators."
+        description="Doubles through Lucky 63 - back returns for full-cover bets and layered lays for standard accumulators."
       />
       <Tabs defaultValue="standard">
         <TabsList>

@@ -12,13 +12,13 @@ import { cn } from "@/lib/utils";
 interface FreeBetAwardBadgeProps {
   amount: number;
   reason?: string;
-  /** Position/reason already shown beside the icon — tooltip is amount-only. */
+  /** Position/reason already shown beside the icon - tooltip is amount-only. */
   compact?: boolean;
   className?: string;
   iconClassName?: string;
 }
 
-/** Violet gift icon — hover shows free bet value and trigger reason. */
+/** Violet gift icon - hover shows free bet value and trigger reason. */
 export function FreeBetAwardBadge({
   amount,
   reason,
@@ -41,7 +41,7 @@ export function FreeBetAwardBadge({
           <Gift className={cn("size-3.5", iconClassName)} />
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs text-xs">
+      <TooltipContent side="top" align="center" sideOffset={6} className="max-w-[14rem] py-2">
         {label}
       </TooltipContent>
     </Tooltip>

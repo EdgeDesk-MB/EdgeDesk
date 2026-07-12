@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { db, events } from "@/lib/db";
+import { db, events, bets, balanceTransactions, history } from "@/lib/db";
 import type { GoalEvent } from "@/lib/calc";
 import { serializeRaceResults } from "@/lib/racing";
 
@@ -23,12 +23,26 @@ const patchSchema = z.object({
       })
     )
     .optional(),
-  /** Record a goal with optional scorer — increments the score and the goal timeline */
+  /** Record a goal with optional scorer - increments the score and the goal timeline */
   addGoal: z
     .object({
       side: z.enum(["home", "away"]),
       player: z.string().optional(),
       og: z.boolean().optional(),
+    })
+    .optional(),
+  /**
+   * Retroactively correct a finished football match that went to AET or pens.
+   * Sets the 90-minute score, re-opens settled bets, and reverses their ledger entries
+   * so the next state poll can re-settle at the correct full-time result.
+   */
+  correctResult: z
+    .object({
+      ftHomeScore: z.number().int().min(0),
+      ftAwayScore: z.number().int().min(0),
+      matchEnding: z.enum(["ft", "aet", "pen"]),
+      homeLed2: z.boolean().optional(),
+      awayLed2: z.boolean().optional(),
     })
     .optional(),
 });
@@ -44,6 +58,55 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const p = parsed.data;
   let goals: GoalEvent[] | string | null = existing.goals;
+
+  if (p.correctResult) {
+    const { ftHomeScore, ftAwayScore, matchEnding } = p.correctResult;
+    const newHomeLed2 = p.correctResult.homeLed2;
+    const newAwayLed2 = p.correctResult.awayLed2;
+
+    const updated = db
+      .update(events)
+      .set({
+        matchEnding,
+        ftHomeScore,
+        ftAwayScore,
+        ...(newHomeLed2 !== undefined ? { homeLed2: newHomeLed2 ? 1 : 0 } : {}),
+        ...(newAwayLed2 !== undefined ? { awayLed2: newAwayLed2 ? 1 : 0 } : {}),
+      })
+      .where(eq(events.id, Number(id)))
+      .returning()
+      .get();
+
+    // Re-open all settled bets for this event so they re-settle at the corrected 90-min score
+    const settledBets = db
+      .select()
+      .from(bets)
+      .where(eq(bets.eventId, Number(id)))
+      .all()
+      .filter((b) => b.status !== "open");
+
+    for (const bet of settledBets) {
+      if (bet.balanceSettled === 1) {
+        db.delete(balanceTransactions)
+          .where(
+            and(
+              eq(balanceTransactions.betId, bet.id),
+              eq(balanceTransactions.category, "bet_settlement")
+            )
+          )
+          .run();
+      }
+      db.delete(history)
+        .where(and(eq(history.betId, bet.id), eq(history.kind, "settlement")))
+        .run();
+      db.update(bets)
+        .set({ status: "open", settledAt: null, actualProfit: null, balanceSettled: 0 })
+        .where(eq(bets.id, bet.id))
+        .run();
+    }
+
+    return NextResponse.json({ event: updated, resetBets: settledBets.length });
+  }
 
   if (existing.sport === "horse_racing" && p.raceWinner?.trim()) {
     const winner = p.raceWinner.trim();

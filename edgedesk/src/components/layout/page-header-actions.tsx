@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** Stats + buttons in a page header — 16px gap, vertically centred */
+/** Stats + buttons in a page header - 8px gap, vertically centred */
 export function PageHeaderActions({
   children,
   className,
@@ -9,7 +9,7 @@ export function PageHeaderActions({
   className?: string;
 }) {
   return (
-    <div className={cn("flex shrink-0 flex-wrap items-center gap-4", className)}>
+    <div className={cn("flex shrink-0 flex-wrap items-center gap-2", className)}>
       {children}
     </div>
   );
@@ -33,8 +33,17 @@ export function PageHeaderStat({
   );
 }
 
-/** Primary page CTA — larger than default toolbar buttons */
-export const pagePrimaryButtonProps = { size: "lg" as const };
+/** Primary page CTA - larger than default toolbar buttons; monochrome with shine */
+export const pagePrimaryButtonProps = {
+  size: "lg" as const,
+  variant: "pagePrimary" as const,
+};
 
 /** Secondary page action (outline, export, etc.) */
 export const pageSecondaryButtonProps = { size: "default" as const };
+
+/**
+ * Cluster for two or more outline (non-ghost) action buttons.
+ * Uses gap-2.5 (10px) — 4px more than the default inline action gap (gap-1.5 / 6px).
+ */
+export const outlineButtonGroup = "flex flex-wrap items-center gap-2.5";

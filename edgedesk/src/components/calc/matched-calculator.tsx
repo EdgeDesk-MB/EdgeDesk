@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdvancedLaySection } from "@/components/calc/advanced-lay";
 import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
 import {
@@ -17,9 +16,28 @@ import {
 import { EdgePanel } from "@/components/calc/edge-panel";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { PercentFlow } from "@/components/money-flow";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { layBounds, layPlanOutcome, executableLayStake, type BetMode, type PartLay } from "@/lib/calc";
+import {
+  layBounds,
+  layPlanOutcome,
+  executableLayStake,
+  specialBonusExtras,
+  SPECIAL_BONUS_HINTS,
+  SPECIAL_BONUS_LABELS,
+  type BetMode,
+  type PartLay,
+  type SpecialBonus,
+  type SpecialBonusKind,
+} from "@/lib/calc";
 import type { ExchangeRow } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 import type { MatchedCalculatorPrefill } from "@/components/matched-calculator-provider";
@@ -33,10 +51,12 @@ const modeLabels: Record<BetMode, string> = {
 
 const modeHints: Record<BetMode, string> = {
   qualifying: "Placing a bet to qualify for a free bet or bonus.",
-  free_snr: "Converting a free bet into cash — stake not returned.",
+  free_snr: "Converting a free bet into cash - stake not returned.",
   free_sr: "Free bet where the stake IS returned on a win.",
   risk_free: "Losing stakes are refunded (usually as a free bet).",
 };
+
+const BONUS_KINDS = Object.keys(SPECIAL_BONUS_LABELS) as SpecialBonusKind[];
 
 export function MatchedCalculator({
   className,
@@ -57,6 +77,11 @@ export function MatchedCalculator({
   const [commission, setCommission] = useState(2);
   const [refundAmount, setRefundAmount] = useState(10);
   const [refundRetention, setRefundRetention] = useState(70);
+  const [bonusKind, setBonusKind] = useState<SpecialBonusKind>("none");
+  const [bonusAmount, setBonusAmount] = useState(10);
+  const [bonusMaxStake, setBonusMaxStake] = useState(10);
+  const [bonusMaxReturn, setBonusMaxReturn] = useState(NaN);
+  const [bonusFbRetention, setBonusFbRetention] = useState(70);
   const [advanced, setAdvanced] = useState(false);
   const [partLays, setPartLays] = useState<PartLay[]>([]);
   const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
@@ -94,6 +119,29 @@ export function MatchedCalculator({
     if (prefill.commission !== undefined) setCommission(prefill.commission);
   }, [open, prefill, exchanges]);
 
+  useEffect(() => {
+    setBonusMaxStake(backStake);
+    if (bonusKind === "free_bet_on_win" || bonusKind === "free_bet_on_lose" ||
+        bonusKind === "bonus_cash_on_win" || bonusKind === "bonus_cash_on_lose") {
+      setBonusAmount((a) => (a === 10 || !Number.isFinite(a) ? backStake : a));
+    }
+  }, [backStake, bonusKind]);
+
+  const specialBonus: SpecialBonus | undefined = useMemo(() => {
+    if (mode !== "qualifying" || bonusKind === "none") return undefined;
+    const base: SpecialBonus = { kind: bonusKind };
+    if (bonusKind === "double_winnings" || bonusKind === "double_return") {
+      base.maxStake = bonusMaxStake > 0 ? bonusMaxStake : backStake;
+      if (Number.isFinite(bonusMaxReturn) && bonusMaxReturn > 0) base.maxReturn = bonusMaxReturn;
+    } else {
+      base.amount = bonusAmount > 0 ? bonusAmount : 0;
+      if (bonusKind === "free_bet_on_win" || bonusKind === "free_bet_on_lose") {
+        base.freeBetRetention = bonusFbRetention / 100;
+      }
+    }
+    return base;
+  }, [mode, bonusKind, bonusAmount, bonusMaxStake, bonusMaxReturn, bonusFbRetention, backStake]);
+
   const planInput = useMemo(() => {
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
     return {
@@ -105,8 +153,20 @@ export function MatchedCalculator({
       partLays: advanced ? partLays.filter((p) => p.odds > 1 && p.stake > 0) : [],
       refundAmount,
       refundRetention: refundRetention / 100,
+      specialBonus,
     };
-  }, [mode, backStake, backOdds, layOdds, commission, advanced, partLays, refundAmount, refundRetention]);
+  }, [
+    mode,
+    backStake,
+    backOdds,
+    layOdds,
+    commission,
+    advanced,
+    partLays,
+    refundAmount,
+    refundRetention,
+    specialBonus,
+  ]);
 
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
 
@@ -119,6 +179,11 @@ export function MatchedCalculator({
   const result = useMemo(
     () => (planInput ? layPlanOutcome({ ...planInput, layStake }) : null),
     [planInput, layStake]
+  );
+
+  const bonusExtras = useMemo(
+    () => specialBonusExtras(backStake, backOdds, specialBonus),
+    [backStake, backOdds, specialBonus]
   );
 
   const rows = useMemo(() => {
@@ -139,20 +204,114 @@ export function MatchedCalculator({
     ];
   }, [result]);
 
+  const showBonus = mode === "qualifying";
+
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       <div className="rounded-xl border bg-card p-4">
-        <div className="mb-2 text-sm font-semibold">Select bet type</div>
-        <Tabs value={mode} onValueChange={(v) => setMode(v as BetMode)}>
-          <TabsList className="h-auto flex-wrap">
-            {(Object.keys(modeLabels) as BetMode[]).map((m) => (
-              <TabsTrigger key={m} value={m}>
-                {modeLabels[m]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <p className="pt-2 text-xs text-muted-foreground">{modeHints[mode]}</p>
+        <div className={cn("grid gap-3", showBonus ? "sm:grid-cols-2" : "grid-cols-1")}>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Bet type</Label>
+            <Select value={mode} onValueChange={(v) => setMode(v as BetMode)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(modeLabels) as BetMode[]).map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {modeLabels[m]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{modeHints[mode]}</p>
+          </div>
+          {showBonus ? (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Special bonus</Label>
+              <Select
+                value={bonusKind}
+                onValueChange={(v) => setBonusKind(v as SpecialBonusKind)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BONUS_KINDS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {SPECIAL_BONUS_LABELS[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{SPECIAL_BONUS_HINTS[bonusKind]}</p>
+            </div>
+          ) : null}
+        </div>
+        {showBonus && (bonusKind === "double_winnings" || bonusKind === "double_return") ? (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <PanelInput
+              label="Max stake for offer"
+              prefix="£"
+              value={bonusMaxStake}
+              onChange={setBonusMaxStake}
+              min={0}
+            />
+            <PanelInput
+              label="Max extra payout (optional)"
+              prefix="£"
+              value={bonusMaxReturn}
+              onChange={setBonusMaxReturn}
+              min={0}
+            />
+          </div>
+        ) : null}
+        {showBonus &&
+        (bonusKind === "free_bet_on_win" || bonusKind === "free_bet_on_lose") ? (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <PanelInput
+              label="Free bet value"
+              prefix="£"
+              value={bonusAmount}
+              onChange={setBonusAmount}
+              min={0}
+            />
+            <PanelInput
+              label="FB retention"
+              suffix="%"
+              value={bonusFbRetention}
+              onChange={setBonusFbRetention}
+              min={0}
+              step={5}
+            />
+          </div>
+        ) : null}
+        {showBonus &&
+        (bonusKind === "bonus_cash_on_win" || bonusKind === "bonus_cash_on_lose") ? (
+          <div className="mt-3">
+            <PanelInput
+              label="Bonus amount"
+              prefix="£"
+              value={bonusAmount}
+              onChange={setBonusAmount}
+              min={0}
+            />
+          </div>
+        ) : null}
+        {showBonus &&
+        bonusKind !== "none" &&
+        (bonusExtras.onWin > 0 || bonusExtras.onLose > 0) ? (
+          <p className="mt-3 text-xs font-medium text-muted-foreground">
+            Bonus value in calc:{" "}
+            {bonusExtras.onWin > 0 && (
+              <span className="text-foreground">+£{bonusExtras.onWin.toFixed(2)} on win</span>
+            )}
+            {bonusExtras.onWin > 0 && bonusExtras.onLose > 0 && " · "}
+            {bonusExtras.onLose > 0 && (
+              <span className="text-foreground">+£{bonusExtras.onLose.toFixed(2)} on lose</span>
+            )}
+          </p>
+        ) : null}
       </div>
 
       <BackPanel title="Back Bet" exchange={exchange}>
@@ -258,7 +417,7 @@ export function MatchedCalculator({
         rows={rows}
         guaranteed={result?.guaranteed ?? 0}
         exchange={exchange}
-        totalLabel={mode === "qualifying" ? "Qualifying loss" : "Total profit"}
+        totalLabel={mode === "qualifying" && bonusKind === "none" ? "Qualifying loss" : "Total profit"}
       />
 
       {(mode === "free_snr" || mode === "free_sr") && result && (
@@ -275,7 +434,9 @@ export function MatchedCalculator({
         disabled={!result}
         className="self-center px-8"
         prefill={{
-          labelSuggestion: `${bookmaker ? bookmaker + " " : ""}${modeLabels[mode]} @ ${backOdds}`,
+          labelSuggestion: `${bookmaker ? bookmaker + " " : ""}${
+            bonusKind !== "none" ? SPECIAL_BONUS_LABELS[bonusKind] : modeLabels[mode]
+          } @ ${backOdds}`,
           betType: mode,
           backStake,
           backOdds,

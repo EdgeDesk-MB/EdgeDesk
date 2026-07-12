@@ -47,7 +47,7 @@ describe("playerMatches", () => {
 describe("parseTrigger", () => {
   const parse = (t: string) => parseTrigger(t, teams);
 
-  it("first goalscorer — the headline example", () => {
+  it("first goalscorer - the headline example", () => {
     expect(parse("Harry Kane scores first")?.rule).toEqual({
       kind: "first_goalscorer",
       player: "Harry Kane",
@@ -130,14 +130,14 @@ describe("parseTrigger", () => {
   });
 });
 
-describe("evaluateTrigger — real-time, irreversible settlement", () => {
+describe("evaluateTrigger - real-time, irreversible settlement", () => {
   const fgsKane: TriggerRule = { kind: "first_goalscorer", player: "Harry Kane" };
 
   it("FGS pending before any goal", () => {
     expect(evaluateTrigger(fgsKane, ctx([])).status).toBe("pending");
   });
 
-  it("FGS wins THE MOMENT Kane scores first — mid-match", () => {
+  it("FGS wins THE MOMENT Kane scores first - mid-match", () => {
     const v = evaluateTrigger(fgsKane, ctx([kane(23)]));
     expect(v.status).toBe("won");
     expect(v.reason).toContain("Kane");
@@ -205,7 +205,7 @@ describe("evaluateTrigger — real-time, irreversible settlement", () => {
     expect(evaluateTrigger(cs, ctx([mex(10)], { finished: true })).status).toBe("won");
   });
 
-  it("AND — loses fast, wins only when every leg is in", () => {
+  it("AND - loses fast, wins only when every leg is in", () => {
     const rule: TriggerRule = {
       kind: "and",
       rules: [

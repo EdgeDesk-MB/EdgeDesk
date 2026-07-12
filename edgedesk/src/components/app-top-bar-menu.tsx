@@ -27,7 +27,7 @@ export function AppTopBarMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="relative flex size-8 shrink-0 items-center justify-center overflow-visible rounded-lg bg-white text-topbar shadow-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="relative z-[45] flex size-8 shrink-0 items-center justify-center overflow-visible rounded-md bg-white text-topbar shadow-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           aria-label="Open menu"
         >
           <Menu className="size-4 shrink-0" strokeWidth={2.25} />
@@ -44,6 +44,20 @@ export function AppTopBarMenu() {
         >
           <BookOpen className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
           <span className="flex-1">Help</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+        <Link
+          href="/offers/calendar"
+          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60 md:hidden"
+        >
+          <span className="flex-1">Offers · Calendar</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+        <Link
+          href="/offers"
+          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60 md:hidden"
+        >
+          <span className="flex-1">Offers · Campaigns</span>
           <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
         <Link

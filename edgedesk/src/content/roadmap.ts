@@ -14,12 +14,12 @@ export interface RoadmapCategory {
 }
 
 export const ROADMAP_VERSION = {
-  current: "1.0.0-rc.1",
-  currentLabel: "v1.0 RC",
-  target: "1.0.0",
-  targetLabel: "v1.0",
+  current: "1.1.0-dev",
+  currentLabel: "v1.1 Offer Command",
+  target: "1.1.0",
+  targetLabel: "v1.1",
   targetNote:
-    "Design system pass complete — Flashscore-style desk headers, stat strips, and condensed tables across all pages. Monthly P&L, Lucky 31/63 lay matrix, and calculator polish shipped. v1.0 release candidate; Tauri packaging and paid-tier auto features remain post-v1.0.",
+    "Offer Command Centre - next-action engine on Home, offer pipeline stages, bet campaigns, and advantage ranking. v1.0 RC remains the recoverable baseline on main / backup/pre-offer-command-centre.",
 } as const;
 
 export const ROADMAP_STATUS_LABELS: Record<RoadmapStatus, string> = {
@@ -40,7 +40,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "calc-ew", title: "Each Way & Extra Place", status: "done" },
       { id: "calc-acca", title: "Accumulator family", status: "done" },
       { id: "calc-seq-lay", title: "Sequential lay", status: "done" },
-      { id: "calc-ep-desk", title: "EP Edge Desk (Dixon-Coles model)", status: "done" },
+      { id: "calc-ep-desk", title: "2UP Desk (Dixon-Coles + dutch/lay ranker)", status: "done" },
       { id: "calc-refund-if", title: "Refund-If calculator", status: "done" },
       { id: "calc-rule4", title: "Rule 4 calculator", status: "done" },
       { id: "calc-ev", title: "EV / odds converter tools", status: "done" },
@@ -55,13 +55,41 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
     items: [
       { id: "race-desk", title: "Racing Desk with racecards", status: "done" },
       { id: "race-intel", title: "Intelligence modal & offer targeting", status: "done" },
-      { id: "race-proxy", title: "ORF proxy odds + Betfair lay integration", status: "done" },
+      { id: "race-proxy", title: "Betfair lay integration (no invented bookie prices)", status: "done" },
       { id: "race-workflow", title: "Guided offer workflow (pick → back → lay → log)", status: "done" },
       { id: "race-settle", title: "Settle prompts for finished races", status: "done" },
       { id: "race-steamer", title: "Local steamer/drifter from snapshot polling", status: "done" },
       { id: "race-intel-v3", title: "Intelligence confidence tiers (live / proxy / demo)", status: "done" },
-      { id: "race-results", title: "Auto race settlement (Racing API Basic)", status: "planned" },
-      { id: "race-live-odds", title: "Live bookie odds (Racing API Standard)", status: "planned" },
+      { id: "race-results", title: "Auto race settlement (Racing API Basic)", status: "done" },
+      {
+        id: "race-odds-override",
+        title: "Manual odds override on Racing Desk",
+        description: "Paste real bookie prices - Free tier has no live bookie feed",
+        status: "done",
+      },
+      {
+        id: "race-desk-exchange",
+        title: "Racing Desk exchange override + lay size / movement",
+        description: "Settings default persists app-wide; Desk can override; liquidity + exchange steamer",
+        status: "done",
+      },
+      {
+        id: "race-sort-lay",
+        title: "Sort racecard by exchange lay (favourite first)",
+        status: "done",
+      },
+      {
+        id: "race-live-odds",
+        title: "Live bookie odds (Racing API Standard)",
+        description: "Paid upgrade path - not required for personal free stack",
+        status: "planned",
+      },
+      {
+        id: "race-oddsmatcher",
+        title: "Oddsmatcher / best-price across bookies",
+        description: "v2 paid product direction - needs commercial odds feed",
+        status: "future",
+      },
       { id: "race-silks", title: "Silks images on racecards", status: "future" },
     ],
   },
@@ -74,8 +102,13 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "fb-dashboard", title: "Live dashboard with Liveline P&L chart", status: "done" },
       { id: "fb-triggers", title: "Goalscorer & combo trigger engine", status: "done" },
       { id: "fb-history", title: "Flashscore-style history feed", status: "done" },
-      { id: "fb-model", title: "Live in-play probability model", status: "planned" },
-      { id: "fb-ep-live", title: "Real-time EP Edge Desk in-play EV", status: "future" },
+      { id: "fb-model", title: "Live in-play probability model", status: "done" },
+      {
+        id: "fb-ep-live",
+        title: "Real-time EP Edge Desk in-play EV",
+        description: "2UP Desk Live tab - minute + Dixon-Coles model EV vs snapshot",
+        status: "done",
+      },
     ],
   },
   {
@@ -87,7 +120,42 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "off-link", title: "Auto-link bets to offers", status: "done" },
       { id: "off-pnl", title: "Per-offer P&L slice on dashboard", status: "done" },
       { id: "off-checklist", title: "Offer checklist / step tracker", status: "done" },
-      { id: "off-calendar", title: "Offer calendar with reminders", status: "future" },
+      {
+        id: "off-next-actions",
+        title: "Next-action engine + Home queue",
+        description: "Ranked next steps per offer campaign on Home and Offers nav badge",
+        status: "done",
+      },
+      {
+        id: "off-pipeline",
+        title: "Offer pipeline stages UX",
+        description: "Planned → Qualifying → Awarded → Converting → Settled",
+        status: "done",
+      },
+      {
+        id: "off-advantage",
+        title: "Advantage ranking (expected retained value)",
+        status: "done",
+      },
+      { id: "off-calendar", title: "Offer calendar with reminders", status: "done" },
+      {
+        id: "off-templates",
+        title: "Offer template import / terms parser",
+        description: "Paste from Matched Betting Blog / promo emails",
+        status: "done",
+      },
+      {
+        id: "off-available-bookies",
+        title: "Available bookies (gubbed-aware)",
+        description: "Offers filter + pickers prefer Available wallets; gubbed flagged",
+        status: "done",
+      },
+      {
+        id: "off-bet-memory",
+        title: "Remember last stake/bookie per offer",
+        description: "Place-refund and lay prefills reuse your last stake and bookie for that offer",
+        status: "done",
+      },
     ],
   },
   {
@@ -98,9 +166,49 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "trk-settle", title: "Result-centric auto-settlement", status: "done" },
       { id: "trk-ocr", title: "OCR bet screenshot import", status: "done" },
       { id: "trk-adv-lay", title: "Advanced lay (part lays, underlay/overlay)", status: "done" },
-      { id: "trk-balances", title: "Balances & bookmaker wallets", status: "done" },
+      { id: "trk-balances", title: "Accounts (bookie / exchange wallets)", status: "done" },
+      { id: "trk-accounts-p0", title: "Accounts P0: ensure-on-bet, rename cascade, Accounts nav", status: "done" },
+      { id: "trk-accounts-p1", title: "Accounts P1: banks, transfers, pending credits, funded-by", status: "done" },
+      { id: "trk-accounts-p2", title: "Accounts P2: wagering requirements + free-bet distribution", status: "done" },
+      {
+        id: "trk-accounts-p3",
+        title: "Accounts P3: special-bonus calc (double win/return, FB/cash on win/lose)",
+        description: "Ultimatcher matrix on Matched calculator; Refund-IF stays on its dedicated calc",
+        status: "done",
+      },
+      {
+        id: "trk-partial-settle",
+        title: "Half-win / half-lose / push settlement",
+        description: "Ultimatcher Pending-sheet partials + void returns stakes to ledger",
+        status: "done",
+      },
       { id: "trk-export", title: "CSV export", status: "done" },
       { id: "trk-monthly", title: "Monthly breakdown & per-bookie P&L", status: "done" },
+      {
+        id: "trk-campaigns",
+        title: "Bet campaigns & offer queues",
+        description: "Group bets by offer; Open / Needs lay / Orphans views",
+        status: "done",
+      },
+      {
+        id: "trk-settle-inbox",
+        title: "Settlement inbox",
+        description: "Tracker Settle queue - open bets on finished events",
+        status: "done",
+      },
+      {
+        id: "trk-2up-dutch",
+        title: "2UP dutch campaign workflow",
+        description: "Fixtures → 2UP Desk EV → gubbed-aware books → one-click dutch log",
+        status: "done",
+      },
+      {
+        id: "trk-tonight-polish",
+        title: "Tonight polish: France–Morocco path + Offers deep-links",
+        description:
+          "Demo WC fixture, EP odds reset, Log dutch on verdict, convert/qualify + offers highlight, settle badge",
+        status: "done",
+      },
     ],
   },
   {
@@ -112,7 +220,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "int-football", title: "API-Football with budget guard", status: "done" },
       { id: "int-betdaq", title: "Betdaq partner API", status: "future" },
       { id: "int-matchbook", title: "Matchbook / Smarkets APIs", status: "future" },
-      { id: "int-tauri", title: "Tauri macOS .app packaging", status: "planned" },
+      { id: "int-tauri", title: "Tauri macOS .app packaging", description: "After 1.0 - not before product is settled", status: "future" },
     ],
   },
   {

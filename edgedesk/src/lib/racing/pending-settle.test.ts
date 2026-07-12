@@ -16,12 +16,36 @@ describe("isEventPendingSettle", () => {
     ).toBe(true);
   });
 
-  it("returns false when result is stored", () => {
+  it("returns true when only a winner is stored (incomplete placings)", () => {
     expect(
       isEventPendingSettle({
         sport: "horse_racing",
         startTime: Date.now() - 60_000,
-        goals: JSON.stringify({ kind: "horse_racing", winner: "Horse A", runners: [], fieldSize: 8 }),
+        goals: JSON.stringify({
+          kind: "horse_racing",
+          winner: "Horse A",
+          runners: [{ horse: "Horse A", position: 1 }],
+          fieldSize: 1,
+        }),
+      })
+    ).toBe(true);
+  });
+
+  it("returns false when full placings are stored", () => {
+    expect(
+      isEventPendingSettle({
+        sport: "horse_racing",
+        startTime: Date.now() - 60_000,
+        goals: JSON.stringify({
+          kind: "horse_racing",
+          winner: "Horse A",
+          runners: [
+            { horse: "Horse A", position: 1 },
+            { horse: "Horse B", position: 2 },
+            { horse: "Horse C", position: 3 },
+          ],
+          fieldSize: 8,
+        }),
       })
     ).toBe(false);
   });

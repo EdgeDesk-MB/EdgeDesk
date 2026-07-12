@@ -1,12 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { MoneyFlow } from "@/components/money-flow";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
@@ -21,12 +28,21 @@ import {
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
-import { api } from "@/hooks/use-app-state";
+import { useOfferDialog } from "@/components/offers/offer-provider";
+import { VenueBadge } from "@/components/venue-badge";
+import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
   formatOfferScopeLabel,
 } from "@/lib/offers/racing-offer-rules";
+import { findOfferTag } from "@/lib/racing/offer-tags";
+import {
+  bookmakerFromOfferPrefs,
+  stakeFromOfferPrefs,
+} from "@/lib/services/settings-shared";
 import type { RacingDeskPayload, RacingDeskRace } from "@/lib/racing-desk/types";
+import type { ExchangeProvider } from "@/lib/services/exchange/types";
+import { exchangeNameToProvider } from "@/lib/services/exchange/client";
 import { extraPlace } from "@/lib/calc";
 import { serializeEwMeta } from "@/lib/bets/ew-meta";
 import {
@@ -38,6 +54,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
+import { RegionFlag } from "@/components/region-flag";
 import { cn } from "@/lib/utils";
 import { listRowSelected } from "@/lib/ui/surface-styles";
 import {
@@ -45,39 +62,178 @@ import {
   isDeskRacePendingSettle,
 } from "@/lib/racing/pending-settle";
 
+const DESK_EXCHANGE_KEY = "edgedesk:racing-desk-exchange";
+
+function readDeskExchangeOverride(): ExchangeProvider | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DESK_EXCHANGE_KEY);
+    if (raw === "betfair" || raw === "betdaq" || raw === "matchbook" || raw === "smarkets") {
+      return raw;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 export function RacingDeskView() {
   const { openAddBet } = useAddBet();
   const { openMatchedCalculator } = useMatchedCalculator();
-  const { defaultExchange } = useExchanges();
+  const { openOffer, viewOffer } = useOfferDialog();
+  const { defaultExchange, exchanges } = useExchanges();
+  const { state } = useAppState();
+  const offerBetPrefs = state?.settings?.offerBetPrefs ?? {};
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payload, setPayload] = useState<RacingDeskPayload | null>(null);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  /** True only on first load - soft polls must not blank the page. */
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const hasPayloadRef = useRef(false);
   const [bookiePlaces, setBookiePlaces] = useState(4);
   const [exchangePlaces, setExchangePlaces] = useState(3);
   const [epStake, setEpStake] = useState(10);
   const [intelligenceOpen, setIntelligenceOpen] = useState(false);
   const [qualifyingOnly, setQualifyingOnly] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
+  const [deskExchange, setDeskExchange] = useState<ExchangeProvider | "default">("default");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => {
+    const stored = readDeskExchangeOverride();
+    if (stored) setDeskExchange(stored);
+  }, []);
+
+  useEffect(() => {
+    const def = state?.settings?.defaultBackStake;
+    if (def != null && def > 0) setEpStake(def);
+  }, [state?.settings?.defaultBackStake]);
+
+  const activeDeskProvider: ExchangeProvider | null =
+    deskExchange === "default" ? null : deskExchange;
+
+  const deskExchangeRow = useMemo(() => {
+    const provider =
+      activeDeskProvider ??
+      (defaultExchange ? exchangeNameToProvider(defaultExchange.name) : null) ??
+      "betfair";
+    return (
+      exchanges.find((e) => exchangeNameToProvider(e.name) === provider) ??
+      defaultExchange ??
+      exchanges[0] ??
+      null
+    );
+  }, [activeDeskProvider, defaultExchange, exchanges]);
+
+  const bookmakerColors = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const account of state?.balances?.accounts ?? []) {
+      if (account.name && account.brandColor) map.set(account.name, account.brandColor);
+    }
+    return map;
+  }, [state?.balances?.accounts]);
+
+  const load = useCallback(async (opts?: { soft?: boolean }) => {
+    // Soft whenever we already have a card - avoids full-page height jump on 60s polls.
+    const soft = opts?.soft === true || (opts?.soft !== false && hasPayloadRef.current);
+    if (soft) setRefreshing(true);
+    else setLoading(true);
     try {
-      const res = await api<RacingDeskPayload>(`/api/racing/desk?date=${date}`);
+      const qs = new URLSearchParams({ date });
+      if (activeDeskProvider) qs.set("exchange", activeDeskProvider);
+      const res = await api<RacingDeskPayload>(`/api/racing/desk?${qs}`);
+      hasPayloadRef.current = true;
       setPayload(res);
-      setSelectedId((prev) => prev ?? res.races[0]?.externalId ?? null);
+      setLoadedAt(Date.now());
+      setSelectedId((prev) => {
+        if (prev && res.races.some((r) => r.externalId === prev)) return prev;
+        return res.races[0]?.externalId ?? null;
+      });
     } catch (e) {
       toast.error("Could not load racing desk", { description: String(e) });
     } finally {
-      setLoading(false);
+      if (soft) setRefreshing(false);
+      else setLoading(false);
     }
-  }, [date]);
+  }, [date, activeDeskProvider]);
 
   useEffect(() => {
-    queueMicrotask(load);
-    const timer = setInterval(load, 60_000);
+    hasPayloadRef.current = false;
+    queueMicrotask(() => void load({ soft: false }));
+  }, [date]); // eslint-disable-line react-hooks/exhaustive-deps -- hard reload on date only
+
+  useEffect(() => {
+    if (!hasPayloadRef.current) return;
+    queueMicrotask(() => void load({ soft: true }));
+  }, [activeDeskProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timer = setInterval(() => void load({ soft: true }), 60_000);
     return () => clearInterval(timer);
   }, [load]);
+
+  const racingOfferKey = useMemo(
+    () =>
+      (state?.offers ?? [])
+        .filter((o) => o.sport === "horse_racing" && (o.status === "active" || o.status === "planned"))
+        .map((o) => `${o.id}:${o.status}`)
+        .join("|"),
+    [state?.offers]
+  );
+  useEffect(() => {
+    if (!hasPayloadRef.current) return;
+    void load({ soft: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [racingOfferKey]);
+
+  function onDeskExchangeChange(value: string) {
+    if (value === "default") {
+      setDeskExchange("default");
+      try {
+        localStorage.removeItem(DESK_EXCHANGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    if (value === "betfair" || value === "betdaq" || value === "matchbook" || value === "smarkets") {
+      setDeskExchange(value);
+      try {
+        localStorage.setItem(DESK_EXCHANGE_KEY, value);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  const saveOddsOverride = useCallback(
+    async (raceId: string, horseId: string, bookieDecimal: number | null) => {
+      try {
+        if (bookieDecimal == null) {
+          await api(
+            `/api/racing/overrides?raceId=${encodeURIComponent(raceId)}&horseId=${encodeURIComponent(horseId)}`,
+            { method: "DELETE" }
+          );
+          toast.success("Cleared manual odds");
+        } else {
+          await api("/api/racing/overrides", {
+            method: "POST",
+            json: { raceId, horseId, bookieDecimal },
+          });
+          toast.success("Saved bookie odds");
+        }
+        await load({ soft: true });
+      } catch (e) {
+        toast.error("Could not save odds", { description: String(e) });
+      }
+    },
+    [load]
+  );
+
+  useEffect(() => {
+    const tick = setInterval(() => setNowTick(Date.now()), 15_000);
+    return () => clearInterval(tick);
+  }, []);
 
   const selected = useMemo(
     () => payload?.races.find((r) => r.externalId === selectedId) ?? null,
@@ -141,24 +297,32 @@ export function RacingDeskView() {
   async function openBetForRunner(
     race: RacingDeskRace,
     runnerName: string,
-    mode: "win" | "extra_place" | "place_refund" | "lay"
+    mode: "win" | "extra_place" | "place_refund" | "lay",
+    offerId?: number
   ) {
     const runner = race.runners.find((r) => r.name === runnerName);
     const winOdds = runner?.bookieDecimal ?? runner?.spDecimal ?? 8;
     const layOdds = runner?.exchangeDecimal ?? winOdds * 1.03;
+    const offerTag = findOfferTag(race, offerId);
 
     if (mode === "lay") {
-      const offerTag = race.offerTags
-        .filter((t) => t.qualifies)
-        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
       openMatchedCalculator({
         mode: "qualifying",
-        bookmaker: offerTag?.bookmaker ?? undefined,
-        backStake: offerTag?.betStake ?? epStake,
+        bookmaker: bookmakerFromOfferPrefs(
+          offerBetPrefs,
+          offerTag?.offerId,
+          offerTag?.bookmaker
+        ) || undefined,
+        backStake: stakeFromOfferPrefs(
+          offerBetPrefs,
+          offerTag?.offerId,
+          offerTag?.betStake,
+          epStake
+        ),
         backOdds: winOdds,
         layOdds,
-        exchangeId: defaultExchange?.id,
-        commission: defaultExchange?.commissionPct,
+        exchangeId: deskExchangeRow?.id,
+        commission: deskExchangeRow?.commissionPct,
       });
       return;
     }
@@ -169,9 +333,6 @@ export function RacingDeskView() {
     }
 
     if (mode === "place_refund") {
-      const offerTag = race.offerTags
-        .filter((t) => t.qualifies)
-        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
       if (!offerTag) {
         toast.error("No qualifying offer for this race");
         return;
@@ -184,8 +345,15 @@ export function RacingDeskView() {
         awayTeam: race.offTime,
         eventId,
         backOdds: winOdds,
-        backStake: offerTag.betStake ?? epStake,
-        bookmaker: offerTag.bookmaker ?? undefined,
+        backStake: stakeFromOfferPrefs(
+          offerBetPrefs,
+          offerTag.offerId,
+          offerTag.betStake,
+          epStake
+        ),
+        bookmaker:
+          bookmakerFromOfferPrefs(offerBetPrefs, offerTag.offerId, offerTag.bookmaker) ||
+          undefined,
         offerId: offerTag.offerId,
         triggerText: offerTag.triggerText,
         labelSuggestion: `${race.course} · ${runnerName} · ${offerTag.offerTitle}`,
@@ -247,6 +415,24 @@ export function RacingDeskView() {
   const suggestions = payload?.suggestedRaces ?? [];
   const topSuggestionScore = suggestions[0]?.score;
 
+  const refreshLabel = useMemo(() => {
+    if (loadedAt == null) return undefined;
+    const secs = Math.max(0, Math.round((nowTick - loadedAt) / 1000));
+    if (secs < 5) return "Updated just now";
+    if (secs < 60) return `Updated ${secs}s ago`;
+    return `Updated ${Math.floor(secs / 60)}m ago`;
+  }, [loadedAt, nowTick]);
+
+  const exchangeStatusLabel = useMemo(() => {
+    if (!summary) return undefined;
+    if (summary.exchangeStatus === "connected") {
+      const delay = summary.exchangeFeedType === "delayed" ? "delayed" : "live";
+      return `${summary.exchangeName ?? "Exchange"} ${delay}`;
+    }
+    if (summary.exchangeStatus === "not_configured") return "No exchange feed";
+    return summary.exchangeNote ? "Exchange unmatched" : undefined;
+  }, [summary]);
+
   const pendingSettleRaces = useMemo(
     () => (payload?.races ?? []).filter(isDeskRacePendingSettle).map(deskRaceToPendingSettle),
     [payload?.races]
@@ -257,7 +443,7 @@ export function RacingDeskView() {
       <PageHeader
         helpId="racing"
         title="Racing Desk"
-        description="Racecards, live lay odds, and offer-aware targeting for UK & IRE."
+        description="UK & IRE racecards with live exchange lays."
         action={
           <>
             <RacingIntelligenceTrigger
@@ -273,14 +459,48 @@ export function RacingDeskView() {
                 </Link>
               </Button>
             )}
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="desk-exchange" className="sr-only">
+                Desk exchange
+              </Label>
+              <Select
+                value={deskExchange}
+                onValueChange={onDeskExchangeChange}
+              >
+                <SelectTrigger id="desk-exchange" size="sm" className="h-9 w-[9.5rem]">
+                  <SelectValue placeholder="Exchange" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">
+                    Default
+                    {defaultExchange ? ` (${defaultExchange.name})` : ""}
+                  </SelectItem>
+                  {exchanges.map((ex) => {
+                    const provider = exchangeNameToProvider(ex.name);
+                    if (!provider) return null;
+                    return (
+                      <SelectItem key={ex.id} value={provider}>
+                        {ex.name}
+                        {ex.isDefault ? " · app default" : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
             <Input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="h-9 w-36"
             />
-            <Button variant="outline" size="icon-lg" onClick={() => load()} disabled={loading}>
-              <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+            <Button
+              variant="outline"
+              size="icon-lg"
+              onClick={() => void load({ soft: !!payload })}
+              disabled={loading || refreshing}
+            >
+              <RefreshCw className={cn("size-4", (loading || refreshing) && "animate-spin")} />
             </Button>
           </>
         }
@@ -291,9 +511,9 @@ export function RacingDeskView() {
         onOpenChange={setIntelligenceOpen}
         suggestions={suggestions}
         onSelectRace={setSelectedId}
-        onBackRunner={(raceId, runnerName) => {
+        onBackRunner={(raceId, runnerName, offerId) => {
           const race = payload?.races.find((r) => r.externalId === raceId);
-          if (race) void openBetForRunner(race, runnerName, "place_refund");
+          if (race) void openBetForRunner(race, runnerName, "place_refund", offerId);
         }}
         dateLabel={new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
           weekday: "short",
@@ -306,7 +526,7 @@ export function RacingDeskView() {
       {pendingSettleRaces.length > 0 && (
         <RacingSettlePrompt
           races={pendingSettleRaces}
-          racingApiConfigured={summary?.premiumOddsApi}
+          resultsTier={summary?.resultsTier}
         />
       )}
 
@@ -324,33 +544,9 @@ export function RacingDeskView() {
         </StatStrip>
       )}
 
-      {(summary?.oddsNote ||
-        (summary?.exchangeNote && summary.exchangeStatus !== "connected") ||
-        summary?.exchangeStatus === "connected") && (
-        <div className="flex flex-col gap-1.5 rounded-lg border px-3 py-2 text-xs">
-          {summary?.oddsNote && (
-            <p className="text-amber-800 dark:text-amber-200">{summary.oddsNote}</p>
-          )}
-          {summary?.exchangeNote && summary.exchangeStatus !== "connected" && (
-            <p className="text-muted-foreground">
-              Connect {summary.exchangeName ?? "your exchange"} in{" "}
-              <Link href="/settings" className="font-medium underline underline-offset-2">
-                Settings → Data &amp; API
-              </Link>{" "}
-              for live lay odds. {summary.exchangeNote}
-            </p>
-          )}
-          {summary?.exchangeStatus === "connected" && summary.exchangeFeedType && (
-            <p className="text-emerald-700 dark:text-emerald-300">
-              Live {summary.exchangeName} lay odds ({summary.exchangeFeedType} feed)
-            </p>
-          )}
-        </div>
-      )}
-
       {payload?.error && (
         <p className="text-sm text-amber-600 dark:text-amber-400">
-          API note: {payload.error} — showing fallback data.
+          API note: {payload.error} - showing fallback data.
         </p>
       )}
 
@@ -363,28 +559,12 @@ export function RacingDeskView() {
               ? "Add Racing API credentials in .env.local for real UK & IRE racecards, or add an active place-refund offer to see Intelligence in action."
               : "Try today's date, check your Racing API key in Settings, or add a place-refund offer."
           }
-          action={{ label: "Add racing offer", href: "/offers" }}
+          action={{
+            label: "Add racing offer",
+            onClick: () => openOffer({ category: "horse_racing", eventDate: date }),
+          }}
           secondaryAction={{ label: "Racing Desk guide", href: "/help?guide=racing-desk" }}
         />
-      )}
-
-      {payload && payload.activeOffers.length === 0 && !loading && (payload.races.length ?? 0) > 0 && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div>
-              <p className="text-sm font-medium">No active racing offers for {date}</p>
-              <p className="text-xs text-muted-foreground">
-                Add a place-refund offer to unlock Intelligence suggestions.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/offers">
-                <Plus className="size-3.5" />
-                Add offer
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
       )}
 
       <DeskFilterPills
@@ -392,6 +572,16 @@ export function RacingDeskView() {
         onQualifyingOnlyChange={setQualifyingOnly}
         advancedMode={advancedMode}
         onAdvancedModeChange={setAdvancedMode}
+        trailing={
+          <button
+            type="button"
+            onClick={() => openOffer({ category: "horse_racing", eventDate: date })}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-border/80 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+          >
+            <Plus className="size-3" />
+            Add racing offer
+          </button>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-12">
@@ -412,22 +602,41 @@ export function RacingDeskView() {
               )}
               {visibleCourses.map(([course, races]) => {
                 const active = selected?.course === course;
-                const offerCount = races.filter((r) => r.offerTags.some((t) => t.qualifies)).length;
+                const region = races[0]?.region;
+                const qualifyingRaceCount = races.filter((r) =>
+                  r.offerTags.some((t) => t.qualifies)
+                ).length;
                 return (
                   <button
                     key={course}
                     type="button"
-                    onClick={() => setSelectedId(races[0]?.externalId ?? null)}
+                    onClick={() => {
+                      const now = Date.now();
+                      const nextRace =
+                        races.find((r) => r.status === "live") ??
+                        races.find((r) => r.status === "upcoming" && r.startTime > now) ??
+                        races.find((r) => r.status === "upcoming") ??
+                        races[races.length - 1];
+                      setSelectedId(nextRace?.externalId ?? null);
+                    }}
                     className={cn(
                       "flex w-full items-center justify-between px-2.5 py-2 text-left text-sm",
                       listRowSelected(active)
                     )}
                   >
-                    <span className="font-medium">{course}</span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-1.5 font-medium">
+                      <RegionFlag code={region} />
+                      <span className="truncate">{course}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {races.length}
-                      {offerCount > 0 && (
-                        <span className="size-1.5 rounded-full bg-emerald-500" title="Qualifying races" />
+                      {qualifyingRaceCount > 0 && (
+                        <span
+                          className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"
+                          title={`${qualifyingRaceCount} race${qualifyingRaceCount === 1 ? "" : "s"} with offers`}
+                        >
+                          {qualifyingRaceCount}
+                        </span>
                       )}
                     </span>
                   </button>
@@ -448,14 +657,28 @@ export function RacingDeskView() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-1.5">
-                {payload!.activeOffers.map((offer) => (
-                  <div key={offer.id} className="rounded-md border px-2.5 py-2 text-xs">
-                    <p className="font-medium leading-snug">{offer.title}</p>
-                    <p className="mt-0.5 text-muted-foreground">
-                      {offer.bookmaker ?? "Any bookie"} · {formatOfferScopeLabel(offer.scopeCourse)}
-                    </p>
-                  </div>
-                ))}
+                {payload!.activeOffers.map((offer) => {
+                  const offerSummary = (state?.offers ?? []).find((o) => o.id === offer.id);
+                  return (
+                    <button
+                      key={offer.id}
+                      type="button"
+                      className="w-full rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:bg-selection-subtle"
+                      onClick={() => offerSummary && viewOffer(offerSummary)}
+                    >
+                      <p className="font-medium leading-snug">{offer.title}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                        {offer.bookmaker ? (
+                          <VenueBadge name={offer.bookmaker} />
+                        ) : (
+                          <span>Any bookie</span>
+                        )}
+                        <span>·</span>
+                        <span>{formatOfferScopeLabel(offer.scopeCourse, offer.scopeRaceLabel)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -537,7 +760,14 @@ export function RacingDeskView() {
             exchangePlaces={exchangePlaces}
             onTrack={trackRace}
             onBet={openBetForRunner}
+            onOddsOverride={saveOddsOverride}
+            backColor={summary?.backColor ?? deskExchangeRow?.backColor}
+            layColor={summary?.layColor ?? deskExchangeRow?.layColor}
             advancedMode={advancedMode}
+            refreshLabel={refreshLabel}
+            refreshing={refreshing}
+            exchangeStatusLabel={exchangeStatusLabel}
+            bookmakerColors={bookmakerColors}
           />
         </div>
       </div>

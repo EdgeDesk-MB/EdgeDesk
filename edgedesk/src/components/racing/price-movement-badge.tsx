@@ -51,7 +51,7 @@ export function PriceMovementBadge({
   compact?: boolean;
 }) {
   if (!movement?.current) {
-    return <span className={cn("text-xs text-muted-foreground", className)}>—</span>;
+    return <span className={cn("text-xs text-muted-foreground", className)}>-</span>;
   }
 
   const change = movement.change;

@@ -13,7 +13,7 @@ import {
 import { MoneyFlow } from "@/components/money-flow";
 import { OfferPnlSlice } from "@/components/offers/offer-pnl-slice";
 import { MonthlyPnlSection } from "@/components/tracker/monthly-pnl-section";
-import type { OfferSummary } from "@/lib/services/offers";
+import type { OfferSummary } from "@/lib/services/offers.types";
 import type { BetRow } from "@/lib/db/schema";
 import { computeMonthlyBreakdown } from "@/lib/pnl/monthly-breakdown";
 import { sectionBar } from "@/lib/ui/surface-styles";

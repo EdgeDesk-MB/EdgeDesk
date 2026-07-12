@@ -39,7 +39,7 @@ describe("formatDecimalOdds", () => {
   it("formats to 2 decimal places", () => {
     expect(formatDecimalOdds(4.5)).toBe("4.50");
     expect(formatDecimalOdds(2)).toBe("2.00");
-    expect(formatDecimalOdds(undefined)).toBe("—");
+    expect(formatDecimalOdds(undefined)).toBe("-");
   });
 });
 

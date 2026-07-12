@@ -81,7 +81,7 @@ export function stepExchangeOdds(odds: number, direction: ExchangeOddsDirection)
   return roundExchangeOdds(next);
 }
 
-/** Arrow-key handler for lay odds inputs — only intercepts ArrowUp/ArrowDown. */
+/** Arrow-key handler for lay odds inputs - only intercepts ArrowUp/ArrowDown. */
 export function handleExchangeOddsKeyDown(
   e: { key: string; preventDefault: () => void },
   value: number,
@@ -96,7 +96,7 @@ export function handleExchangeOddsKeyDown(
   }
 }
 
-/** Scroll-wheel handler — scroll down lowers odds, scroll up raises (exchange ladder). */
+/** Scroll-wheel handler - scroll down lowers odds, scroll up raises (exchange ladder). */
 export function handleExchangeOddsWheel(
   e: { deltaY: number; preventDefault: () => void },
   value: number,

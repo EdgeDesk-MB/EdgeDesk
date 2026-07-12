@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   inferAiEffectsFromText,
+  offerTriggerDetectedInLabel,
+  offerTriggerFromLabel,
   previewAiTriggersFromInput,
 } from "./ai-triggers";
 
@@ -35,6 +37,19 @@ describe("inferAiEffectsFromText", () => {
   });
 });
 
+describe("offerTriggerFromLabel", () => {
+  it("detects bet-get-free patterns in labels", () => {
+    expect(offerTriggerDetectedInLabel("Bet £50 get £50 free bet if 2nd")).toBe(true);
+    expect(offerTriggerFromLabel("Bet £50 get £50 free bet if 2nd")).toBe(
+      "Bet £50 get £50 free bet if 2nd"
+    );
+  });
+
+  it("ignores plain bet labels", () => {
+    expect(offerTriggerDetectedInLabel("Newmarket · 3:00 Handicap")).toBe(false);
+    expect(offerTriggerFromLabel("Newmarket · 3:00 Handicap")).toBeNull();
+  });
+});
 describe("previewAiTriggersFromInput", () => {
   it("does not parse from label leakage", () => {
     const preview = previewAiTriggersFromInput({ triggerText: "Bet £50 get £50" });

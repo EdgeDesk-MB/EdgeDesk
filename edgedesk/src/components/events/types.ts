@@ -9,6 +9,13 @@ export interface Fixture {
   homeScore: number;
   awayScore: number;
   minute: number;
+  /** API-Football team logo URLs (club crest or national badge) */
+  homeLogo?: string | null;
+  awayLogo?: string | null;
+  /** League country from API-Football (e.g. "England", "World") */
+  leagueCountry?: string | null;
+  /** Country flag image URL from API-Football */
+  leagueFlag?: string | null;
 }
 
 export interface RacingFixture {
@@ -23,11 +30,13 @@ export interface RacingFixture {
   offTime: string;
   runners: string[];
   winner?: string;
+  /** The Racing API region: GB / IRE */
+  region?: string;
 }
 
 export const FIXTURE_SPORTS = [
   { id: "football" as const, label: "Football" },
-  { id: "horse_racing" as const, label: "Horse racing" },
+  { id: "horse_racing" as const, label: "Racing" },
 ];
 
 export const simPresets = [

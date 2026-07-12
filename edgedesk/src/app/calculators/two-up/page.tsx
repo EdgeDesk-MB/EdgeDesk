@@ -69,7 +69,7 @@ export default function TwoUpCalculatorPage() {
             loss, big windfall when the payout triggers and the result flips. For the full
             model-driven desk, see the{" "}
             <Link href="/calculators/ep-desk" className="text-primary underline-offset-2 hover:underline">
-              EP Desk
+              2UP Desk
             </Link>
             .
           </>
@@ -79,7 +79,7 @@ export default function TwoUpCalculatorPage() {
       <div className="rounded-xl border bg-card p-4">
         <div className="mb-1 text-sm font-semibold">Match (optional)</div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Name the match and the profit tracker will link it — the windfall settles itself the
+          Name the match and the profit tracker will link it - the windfall settles itself the
           moment your team goes 2 up and the result flips.
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -163,7 +163,7 @@ export default function TwoUpCalculatorPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Outcomes</CardTitle>
-          <CardDescription>Windfall highlighted — the reason this offer is played.</CardDescription>
+          <CardDescription>Windfall highlighted - the reason this offer is played.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {(result?.scenarios ?? []).map((scenario) => (

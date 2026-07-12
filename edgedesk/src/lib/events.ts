@@ -1,5 +1,88 @@
 /** Shared helpers for tracked events in bet entry and the Events page. */
 
+import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
+import { formatClockString, formatClockTime } from "@/lib/time-format";
+
+/** Default fixture/event timezone (London). Prefer settings.displayTimezone in UI code. */
+export const FIXTURE_TIMEZONE = DEFAULT_DISPLAY_TIMEZONE;
+
+export function localCalendarDate(d = new Date(), timeZone = DEFAULT_DISPLAY_TIMEZONE): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** UK calendar date + HH:MM → UTC epoch ms. */
+export function londonWallToUtcMs(date: string, time: string): number | null {
+  const m = time.match(/^(\d{1,2}):(\d{2})/);
+  if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const base = Date.parse(`${date}T${hm}:00Z`);
+  if (Number.isNaN(base)) return null;
+  for (const offsetHours of [0, 1, -1, 2, -2]) {
+    const candidate = base - offsetHours * 3600_000;
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: FIXTURE_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(candidate));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    const ymd = `${get("year")}-${get("month")}-${get("day")}`;
+    if (ymd === date && `${get("hour")}:${get("minute")}` === hm) {
+      return candidate;
+    }
+  }
+  return base;
+}
+
+/** Next occurrence of a UK wall-clock kickoff (today, else tomorrow). */
+export function wallClockKickoffMs(hour: number, minute = 0, now = Date.now()): number {
+  const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const today = localCalendarDate(new Date(now));
+  const todayMs = londonWallToUtcMs(today, hm);
+  if (todayMs != null && todayMs > now) return todayMs;
+  const noon = londonWallToUtcMs(today, "12:00") ?? now;
+  const tomorrow = localCalendarDate(new Date(noon + 86400000));
+  return londonWallToUtcMs(tomorrow, hm) ?? todayMs ?? now + 3600000;
+}
+
+/** HH:MM in the chosen timezone for fixture rows; prefixes weekday when not today. */
+export function formatFixtureKickoff(
+  startTime: number,
+  now = Date.now(),
+  timeZone = DEFAULT_DISPLAY_TIMEZONE
+): string {
+  const d = new Date(startTime);
+  const time = formatClockTime(d, { timeZone });
+
+  const dayKey = (ms: number, tz: string) => localCalendarDate(new Date(ms), tz);
+  if (dayKey(startTime, timeZone) !== dayKey(now, timeZone)) {
+    const dayLabel = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      weekday: "short",
+    }).format(d);
+    return `${dayLabel} ${time}`;
+  }
+  return time;
+}
+
+/** Normalise Racing API off_time ("2:35") to HH:MM for display. */
+export function formatRacingOffTime(offTime: string): string {
+  const normalised = normalizeEventTimeInput(offTime.trim());
+  return normalised || offTime.trim();
+}
+
 export interface TrackedEventLike {
   id: number;
   sport?: string;
@@ -9,6 +92,7 @@ export interface TrackedEventLike {
   startTime?: number;
   status?: string;
   source?: string | null;
+  externalId?: string | null;
 }
 
 const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -105,7 +189,7 @@ export function racingVenueLabel(competition?: string | null): string {
   return trimmed.replace(/\s*\([^)]+\)\s*$/, "").trim() || trimmed;
 }
 
-/** Parse course from event name field — "Wolverhampton · 17:10" or "Wolverhampton". */
+/** Parse course from event name field - "Wolverhampton · 17:10" or "Wolverhampton". */
 export function parseRacingCourseFromEventName(eventName: string): string {
   const trimmed = eventName.trim();
   if (!trimmed) return "";
@@ -126,10 +210,10 @@ export function formatRacingEventTitle(ev: {
       : ev.awayTeam?.trim()
         ? normalizeEventTimeInput(ev.awayTeam)
         : "";
-  return time ? `${venue} · ${time}` : venue;
+  return time ? `${venue} · ${formatClockString(time)}` : venue;
 }
 
-/** Status line for racing events — never football scores. */
+/** Status line for racing events - never football scores. */
 export function formatRacingEventStatus(
   ev: { status: string },
   raceResult?: { winner: string } | null
@@ -216,7 +300,7 @@ export function formatTrackedEventOption(ev: TrackedEventLike): string {
     ev.status === "live" ? " · LIVE" : ev.status === "finished" ? " · FT" : "";
   const when =
     ev.startTime != null
-      ? ` · ${formatEventDate(ev.startTime)} ${formatEventTime(ev.startTime)}`
+      ? ` · ${formatEventDate(ev.startTime)} ${formatClockString(formatEventTime(ev.startTime))}`
       : "";
   return `${ev.homeTeam} v ${ev.awayTeam}${when}${status}`;
 }
@@ -246,7 +330,7 @@ export function sortTrackedEvents<T extends TrackedEventLike>(events: T[], now =
   });
 }
 
-/** Live or not yet finished — for the Fixtures browser. */
+/** Live or not yet finished - for the Fixtures browser. */
 export function isCurrentOrFutureFixture(status: string): boolean {
   return status === "live" || status === "upcoming";
 }

@@ -10,7 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { AppState } from "@/lib/services/state";
+import type { AppState } from "@/lib/services/state.types";
+import { setDisplayTimeFormat } from "@/lib/time-format";
 
 const FALLBACK_POLL_MS = 3000;
 
@@ -22,7 +23,7 @@ type AppStateContextValue = {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
-/** One poll loop for the whole app — avoids N duplicate /api/state fetches per page. */
+/** One poll loop for the whole app - avoids N duplicate /api/state fetches per page. */
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +36,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch("/api/state", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        setState(await res.json());
+        const next = (await res.json()) as AppState;
+        setDisplayTimeFormat(next.settings?.timeFormat);
+        setState(next);
         setError(null);
       } catch (e) {
         setError(String(e));
@@ -64,7 +67,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
 
-/** @param _intervalMs Ignored — poll interval comes from Settings → dashboard poll (shared). */
+/** @param _intervalMs Ignored - poll interval comes from Settings → dashboard poll (shared). */
 export function useAppStateContext(_intervalMs?: number): AppStateContextValue {
   const ctx = useContext(AppStateContext);
   if (!ctx) {

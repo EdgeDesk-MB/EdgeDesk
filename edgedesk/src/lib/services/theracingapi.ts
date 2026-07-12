@@ -1,10 +1,10 @@
 /**
- * The Racing API (https://www.theracingapi.com) — UK & Irish horse racing.
+ * The Racing API (https://www.theracingapi.com) - UK & Irish horse racing.
  *
  * Free plan: `/v1/racecards/free` (today + tomorrow racecards).
  * Basic plan: `/v1/results/today` (live results for auto-settlement).
  *
- * Auth: HTTP Basic — username + password from your dashboard.
+ * Auth: HTTP Basic - username + password from your dashboard.
  */
 
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/lib/racing";
 import type { RacingRunnerDetail } from "@/lib/racing-desk/types";
 import { parseJockeyName } from "@/lib/racing/runner-display";
+import { localCalendarDate, londonWallToUtcMs } from "@/lib/events";
 
 const BASE = "https://api.theracingapi.com";
 
@@ -46,6 +47,11 @@ interface CacheEntry<T> {
 const cache = new Map<string, CacheEntry<unknown>>();
 const RACECARDS_TTL = 15 * 60 * 1000;
 const RESULTS_TTL = 90 * 1000;
+
+/** Drop cached `/v1/results/today` so a manual Fetch results hits the API. */
+export function clearRacingResultsCache(): void {
+  cache.delete("results:today");
+}
 
 const DAILY_BUDGET = 200;
 let budgetDay = "";
@@ -85,6 +91,8 @@ function parseOffTime(offDt: string | undefined, offTime: string | undefined, da
     if (!Number.isNaN(ms)) return ms;
   }
   const time = (offTime ?? "12:00").trim();
+  const londonMs = londonWallToUtcMs(date, time);
+  if (londonMs != null) return londonMs;
   const ms = Date.parse(`${date}T${time}:00`);
   return Number.isNaN(ms) ? Date.now() : ms;
 }
@@ -95,7 +103,7 @@ function mapRunner(r: any, index: number): RacingRunnerDetail {
   const spRaw = r.sp ?? r.sp_fraction;
   const lbsNum = parseInt(String(r.lbs ?? r.weight_lbs ?? ""), 10);
   const lbs = Number.isFinite(lbsNum) && lbsNum > 0 ? lbsNum : undefined;
-  const jockeyRaw = String(r.jockey ?? r.jockey_name ?? "—");
+  const jockeyRaw = String(r.jockey ?? r.jockey_name ?? "-");
   const { name: jockey, claimLbs: jockeyClaim } = parseJockeyName(jockeyRaw);
   const drawRaw = r.draw ?? r.stall;
   const draw =
@@ -113,7 +121,7 @@ function mapRunner(r: any, index: number): RacingRunnerDetail {
     draw,
     jockey,
     jockeyClaim,
-    trainer: String(r.trainer ?? r.trainer_name ?? "—"),
+    trainer: String(r.trainer ?? r.trainer_name ?? "-"),
     age: r.age != null ? String(r.age) : undefined,
     weight: lbs != null ? `${lbs}lbs` : r.weight != null ? String(r.weight) : undefined,
     weightLbs: lbs,
@@ -191,7 +199,7 @@ function mapResult(item: any): { raceId: string; result: RaceResult } | null {
 
 export class RacingApiTierError extends Error {
   constructor(status: number, path: string) {
-    super(`Racing API ${status} on ${path} — plan tier may not include this endpoint`);
+    super(`Racing API ${status} on ${path} - plan tier may not include this endpoint`);
     this.name = "RacingApiTierError";
   }
 }
@@ -226,7 +234,7 @@ async function apiGet(path: string): Promise<any> {
   return res.json();
 }
 
-/** Free tier — today and tomorrow basic racecards. */
+/** Free tier - today and tomorrow basic racecards. */
 export async function racecardsFree(day: "today" | "tomorrow" = "today"): Promise<RacingRacecard[]> {
   const cacheKey = `racecards:free:${day}`;
   const hit = cache.get(cacheKey) as CacheEntry<RacingRacecard[]> | undefined;
@@ -239,7 +247,7 @@ export async function racecardsFree(day: "today" | "tomorrow" = "today"): Promis
   return cards;
 }
 
-/** Standard tier — today/tomorrow racecards with bookmaker odds. Falls back to free on 401/403. */
+/** Standard tier - today/tomorrow racecards with bookmaker odds. Falls back to free on 401/403. */
 export async function racecardsStandard(
   day: "today" | "tomorrow" = "today"
 ): Promise<RacingRacecard[] | null> {
@@ -261,23 +269,88 @@ export async function racecardsStandard(
   }
 }
 
-/** Basic tier — today's results with finishing positions. Returns [] if plan lacks access. */
-export async function resultsToday(): Promise<Map<string, RaceResult>> {
+/** Racing API access for `/v1/results/today` (Basic tier). */
+export type RacingResultsTier = "basic" | "free" | "none";
+
+export interface ResultsTodayPayload {
+  results: Map<string, RaceResult>;
+  /** True when credentials exist but the plan cannot call results (Free tier). */
+  tierBlocked: boolean;
+  tier: RacingResultsTier;
+}
+
+interface ResultsCacheData {
+  results: Map<string, RaceResult>;
+  tierBlocked: boolean;
+  tier: RacingResultsTier;
+}
+
+const TIER_TTL = 30 * 60 * 1000;
+let resultsTierCache: { at: number; tier: RacingResultsTier } | null = null;
+
+function rememberResultsTier(tier: RacingResultsTier) {
+  resultsTierCache = { at: Date.now(), tier };
+}
+
+/** Last known results-tier status (sync). Prefer `resolveRacingResultsTier` when a probe is OK. */
+export function getCachedRacingResultsTier(): RacingResultsTier {
+  if (!hasRacingApiKey()) return "none";
+  return resultsTierCache?.tier ?? "free";
+}
+
+/**
+ * Resolve whether the configured Racing API plan includes results (Basic).
+ * Cached for 30 minutes after a successful probe.
+ */
+export async function resolveRacingResultsTier(): Promise<RacingResultsTier> {
+  if (!hasRacingApiKey()) return "none";
+  if (resultsTierCache && Date.now() - resultsTierCache.at < TIER_TTL) {
+    return resultsTierCache.tier;
+  }
+  const payload = await resultsToday();
+  return payload.tier;
+}
+
+/** Basic tier - today's results with finishing positions. */
+export async function resultsToday(): Promise<ResultsTodayPayload> {
   const cacheKey = "results:today";
-  const hit = cache.get(cacheKey) as CacheEntry<Map<string, RaceResult>> | undefined;
-  if (hit && Date.now() - hit.at < RESULTS_TTL) return hit.data;
+  const hit = cache.get(cacheKey) as CacheEntry<ResultsCacheData> | undefined;
+  if (hit && Date.now() - hit.at < RESULTS_TTL) {
+    rememberResultsTier(hit.data.tier);
+    return {
+      results: hit.data.results,
+      tierBlocked: hit.data.tierBlocked,
+      tier: hit.data.tier,
+    };
+  }
+
+  if (!hasRacingApiKey()) {
+    rememberResultsTier("none");
+    return { results: new Map(), tierBlocked: false, tier: "none" };
+  }
 
   try {
-    const json = await apiGet("/v1/results/today?region=gb&region=ire&limit=50");
+    const json = await apiGet("/v1/results/today?region=gb&region=ire&limit=200");
     const map = new Map<string, RaceResult>();
     for (const item of json.results ?? []) {
       const mapped = mapResult(item);
       if (mapped) map.set(mapped.raceId, mapped.result);
     }
-    cache.set(cacheKey, { at: Date.now(), data: map });
-    return map;
+    const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
+    cache.set(cacheKey, { at: Date.now(), data });
+    rememberResultsTier("basic");
+    return { results: map, tierBlocked: false, tier: "basic" };
   } catch (e) {
-    if (isRacingTierAccessError(e)) return new Map();
+    if (isRacingTierAccessError(e)) {
+      const data: ResultsCacheData = {
+        results: new Map(),
+        tierBlocked: true,
+        tier: "free",
+      };
+      cache.set(cacheKey, { at: Date.now(), data });
+      rememberResultsTier("free");
+      return { results: new Map(), tierBlocked: true, tier: "free" };
+    }
     throw e;
   }
 }
@@ -285,8 +358,8 @@ export async function resultsToday(): Promise<Map<string, RaceResult>> {
 export async function racecardsByDate(
   date: string
 ): Promise<{ cards: RacingRacecard[]; oddsTier: "free" | "standard" }> {
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const today = localCalendarDate();
+  const tomorrow = localCalendarDate(new Date(Date.now() + 86400000));
   const cards: RacingRacecard[] = [];
   let oddsTier: "free" | "standard" = "free";
 
@@ -309,20 +382,25 @@ export async function racecardsByDate(
   }
 
   return {
-    cards: cards.filter((c) => new Date(c.startTime).toISOString().slice(0, 10) === date),
+    cards: cards.filter((c) => localCalendarDate(new Date(c.startTime)) === date),
     oddsTier,
   };
 }
 
-export async function resultsForRaceIds(raceIds: string[]): Promise<Map<string, RaceResult>> {
-  if (raceIds.length === 0) return new Map();
+export async function resultsForRaceIds(
+  raceIds: string[]
+): Promise<{ results: Map<string, RaceResult>; tierBlocked: boolean; tier: RacingResultsTier }> {
+  if (raceIds.length === 0) {
+    const tier = getCachedRacingResultsTier();
+    return { results: new Map(), tierBlocked: tier === "free", tier };
+  }
   const today = await resultsToday();
   const out = new Map<string, RaceResult>();
   for (const id of raceIds) {
-    const hit = today.get(id);
+    const hit = today.results.get(id);
     if (hit) out.set(id, hit);
   }
-  return out;
+  return { results: out, tierBlocked: today.tierBlocked, tier: today.tier };
 }
 
 /** Optional premium odds history from The Racing API. */

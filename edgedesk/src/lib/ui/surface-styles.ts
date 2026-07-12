@@ -5,18 +5,21 @@ export const surfaceLift = cn(
   "surface-lift bg-card text-card-foreground ring-1 ring-border/50 dark:ring-border/60"
 );
 
-/** Main centred page panel — grey-blue, sits on the canvas shell */
+/** Main centred page panel - grey-blue, sits on the canvas shell */
 export const pagePanel = cn(
   "page-panel bg-page text-foreground ring-1 ring-border/50 dark:ring-border/60"
 );
 
-/** Nested full-width panel on the page — white lifted block */
-export const pageSurface = cn(surfaceLift, "overflow-hidden rounded-lg");
+/** Nested full-width panel on the page - white lifted block */
+export const pageSurface = cn(
+  surfaceLift,
+  "overflow-hidden rounded-[var(--layout-page-radius)]"
+);
 
-/** Lighter grey — hover states, secondary bars, section headers on white */
+/** Lighter grey - hover states, secondary bars, section headers on white */
 export const selectionSubtle = "bg-selection-subtle";
 
-/** Stronger grey — selected / active items */
+/** Stronger grey - selected / active items */
 export const selectionSubdued = "bg-selection-subdued";
 
 export const pageTitle = "text-xl font-bold tracking-tight text-foreground";
@@ -63,7 +66,8 @@ export function listPillState(active: boolean) {
 export { sectionBar, sectionMeta } from "@/lib/ui/layout-spacing";
 
 export const navLink = cn(
-  "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+  "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+  "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
 );
 
 export function navLinkState(active: boolean) {
@@ -75,12 +79,28 @@ export function navLinkState(active: boolean) {
   );
 }
 
-/** Flashscore-style filter / tab pills */
+/** Monochrome accent - matches page-primary CTAs (#111 light, white dark) */
+export const monoAccentActive =
+  "bg-[#111] text-white shadow-sm dark:bg-white dark:text-[#111]";
+
+/** Flashscore-style filter / tab pills — inactive pills are transparent inside grouped containers */
 export function filterPillState(active: boolean) {
   return cn(
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
     active
-      ? "bg-primary text-primary-foreground shadow-sm"
-      : "bg-muted text-muted-foreground hover:text-foreground"
+      ? monoAccentActive
+      : "text-muted-foreground hover:text-foreground"
   );
 }
+
+/** Fully rounded track wrapping filterPillState buttons */
+export const filterPillGroup = cn(
+  "inline-flex flex-wrap items-center gap-1 rounded-full bg-muted/60 p-0.5 dark:bg-input/30"
+);
+
+/** Offer calendar / do-next cards — outer ring + white inset via .offer-campaign-card::after */
+export const offerCalendarCardShell = cn(
+  "offer-campaign-card offer-calendar-card group relative flex overflow-hidden rounded-lg bg-card text-left transition-colors",
+  "ring-1 ring-border/50 dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100",
+  "hover:brightness-[0.98] dark:hover:brightness-110"
+);

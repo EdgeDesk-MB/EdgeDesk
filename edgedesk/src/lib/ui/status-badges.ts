@@ -31,10 +31,13 @@ export function betStatusBadgeVariant(status: string): StatusBadgeVariant {
       return "active";
     case "won":
     case "early_payout":
+    case "half_win":
       return "success";
     case "lost":
+    case "half_lose":
       return "destructive";
     case "void":
+    case "push":
       return "secondary";
     default:
       return "outline";

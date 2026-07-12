@@ -3,8 +3,9 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAppState } from "@/hooks/use-app-state";
+import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 
-/** Toast when offers are approaching expiry. */
+/** Toast when offers are approaching expiry (explicit or scoped race/event). */
 export function OfferReminderListener() {
   const { state } = useAppState(5000);
   const seen = useRef(new Set<string>());
@@ -17,8 +18,9 @@ export function OfferReminderListener() {
 
     for (const offer of state.offers) {
       if (offer.status !== "active" && offer.status !== "planned") continue;
-      if (offer.expiresAt == null) continue;
-      const daysLeft = Math.ceil((offer.expiresAt - now) / msDay);
+      const deadline = effectiveOfferExpiryMs(offer);
+      if (deadline == null) continue;
+      const daysLeft = Math.ceil((deadline - now) / msDay);
       if (daysLeft < 0) continue;
 
       for (const threshold of settings.offerReminderDays) {

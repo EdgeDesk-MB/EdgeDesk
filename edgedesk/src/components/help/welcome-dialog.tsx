@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { APP_VERSION_LABEL } from "@/lib/app-version";
 import {
   Calculator,
@@ -25,7 +27,7 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Welcome to EdgeDesk",
-    body: "A local-first matched betting command centre. Calculators, live events, offer tracking and a real-time P&L dashboard — your edge surfaced on every screen.",
+    body: "A local-first matched betting command centre. Calculators, live events, offer tracking and a real-time P&L dashboard - your edge surfaced on every screen.",
   },
   {
     icon: Key,
@@ -40,7 +42,7 @@ const STEPS = [
   {
     icon: Trophy,
     title: "Racing Desk for offers",
-    body: "Add a place-refund offer, open Racing Desk, and use Intelligence to find qualifying races. Lay button opens the matched calculator; proxy odds are estimates — verify on the bookie before placing.",
+    body: "Add a place-refund offer, open Racing Desk, and use Intelligence to find qualifying races. Lay button opens the matched calculator; proxy odds are estimates - verify on the bookie before placing.",
   },
 ] as const;
 
@@ -52,24 +54,31 @@ interface WelcomeDialogProps {
 
 export function WelcomeDialog({ open, onOpenChange, onComplete }: WelcomeDialogProps) {
   const [step, setStep] = useState(0);
+  const [dontShowAgain, setDontShowAgain] = useState(true);
   const current = STEPS[step];
   const Icon = current.icon;
   const isLast = step === STEPS.length - 1;
 
   useEffect(() => {
-    if (open) setStep(0);
+    if (open) {
+      setStep(0);
+      setDontShowAgain(true);
+    }
   }, [open]);
 
-  const finish = useCallback(
-    (dontShowAgain: boolean) => {
-      if (dontShowAgain) onComplete();
-      onOpenChange(false);
-    },
-    [onComplete, onOpenChange]
-  );
+  const finish = useCallback(() => {
+    if (dontShowAgain) onComplete();
+    onOpenChange(false);
+  }, [dontShowAgain, onComplete, onOpenChange]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && dontShowAgain) onComplete();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -95,9 +104,19 @@ export function WelcomeDialog({ open, onOpenChange, onComplete }: WelcomeDialogP
             />
           ))}
         </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <Label htmlFor="welcome-dont-show" className="text-xs font-normal text-muted-foreground">
+            Don&apos;t show this welcome tour again
+          </Label>
+          <Switch
+            id="welcome-dont-show"
+            checked={dontShowAgain}
+            onCheckedChange={setDontShowAgain}
+          />
+        </div>
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-          <Button variant="ghost" size="sm" onClick={() => finish(false)}>
-            Skip for now
+          <Button variant="ghost" size="sm" onClick={finish}>
+            Skip
           </Button>
           <div className="flex gap-2">
             {step > 0 && (
@@ -106,11 +125,9 @@ export function WelcomeDialog({ open, onOpenChange, onComplete }: WelcomeDialogP
               </Button>
             )}
             {isLast ? (
-              <>
-                <Button size="sm" onClick={() => finish(true)}>
-                  Get started
-                </Button>
-              </>
+              <Button size="sm" onClick={finish}>
+                Get started
+              </Button>
             ) : (
               <Button size="sm" onClick={() => setStep((s) => s + 1)}>
                 Next

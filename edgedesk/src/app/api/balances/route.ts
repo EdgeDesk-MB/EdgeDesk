@@ -14,6 +14,7 @@ const txSchema = z.object({
         amount: z.number(),
         category: z.enum(["top_up", "withdrawal", "adjustment", "free_bet"]),
         note: z.string().optional(),
+        affectPnl: z.boolean().optional(),
       })
     )
     .min(1),
@@ -39,7 +40,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Account ${entry.accountId} not found` }, { status: 400 });
     }
     if (entry.amount === 0) continue;
-    recordManualTransaction(entry.accountId, entry.amount, entry.category, entry.note);
+    recordManualTransaction(entry.accountId, entry.amount, entry.category, entry.note, {
+      affectPnl: entry.affectPnl,
+    });
   }
 
   return NextResponse.json(getBalanceSummary());

@@ -4,6 +4,7 @@
  */
 
 import { roundPence } from "./money";
+import { applySpecialBonus, type SpecialBonus } from "./special-bonus";
 
 export type BetMode = "qualifying" | "free_snr" | "free_sr" | "risk_free";
 
@@ -17,6 +18,8 @@ export interface MatchedInput {
   refundAmount?: number;
   /** risk_free only: what fraction of the refund you can extract as cash (e.g. 0.7 for a free-bet refund) */
   refundRetention?: number;
+  /** Ultimatcher-style bookie bonus overlay (usually with qualifying) */
+  specialBonus?: SpecialBonus;
   /** Optional lay stake override (overlay/underlay). If omitted, the optimal stake is used. */
   layStakeOverride?: number;
 }
@@ -32,61 +35,68 @@ export interface MatchedResult {
   qualifyingLossPct: number;
 }
 
-export function optimalLayStake(input: Omit<MatchedInput, "layStakeOverride">): number {
-  const { mode, backStake, backOdds, layOdds, commission } = input;
-  const denom = layOdds - commission;
-  if (denom <= 0) return 0;
+/** Bookie-side P&L before any lay (shared with layplan). */
+export function matchedBackReturns(input: {
+  mode: BetMode;
+  backStake: number;
+  backOdds: number;
+  refundAmount?: number;
+  refundRetention?: number;
+  specialBonus?: SpecialBonus;
+}): { win: number; lose: number } {
+  const { mode, backStake, backOdds } = input;
+  let win: number;
+  let lose: number;
   switch (mode) {
     case "qualifying":
-    case "free_sr":
-      return (backStake * backOdds) / denom;
+      win = backStake * (backOdds - 1);
+      lose = -backStake;
+      break;
     case "free_snr":
-      return (backStake * (backOdds - 1)) / denom;
+      win = backStake * (backOdds - 1);
+      lose = 0;
+      break;
+    case "free_sr":
+      win = backStake * backOdds;
+      lose = 0;
+      break;
     case "risk_free": {
       const refund = (input.refundAmount ?? backStake) * (input.refundRetention ?? 0.7);
-      return (backStake * backOdds - refund) / denom;
+      win = backStake * (backOdds - 1);
+      lose = -backStake + refund;
+      break;
     }
   }
+  return applySpecialBonus(win, lose, backStake, backOdds, input.specialBonus);
+}
+
+export function optimalLayStake(input: Omit<MatchedInput, "layStakeOverride">): number {
+  const { layOdds, commission } = input;
+  const denom = layOdds - commission;
+  if (denom <= 0) return 0;
+  const { win, lose } = matchedBackReturns(input);
+  // Equalise: win - L(Ol-1) = lose + L(1-c)  →  L = (win - lose) / (Ol - c)
+  return (win - lose) / denom;
 }
 
 export function matchedBet(input: MatchedInput): MatchedResult {
-  const { mode, backStake, backOdds, layOdds, commission } = input;
+  const { backStake, layOdds, commission } = input;
   const layStake = roundPence(input.layStakeOverride ?? optimalLayStake(input));
   const liability = layStake * (layOdds - 1);
   const layWinnings = layStake * (1 - commission);
+  const { win, lose } = matchedBackReturns(input);
 
-  let profitIfBackWins: number;
-  let profitIfLayWins: number;
-
-  switch (mode) {
-    case "qualifying":
-      profitIfBackWins = backStake * (backOdds - 1) - liability;
-      profitIfLayWins = layWinnings - backStake;
-      break;
-    case "free_snr":
-      profitIfBackWins = backStake * (backOdds - 1) - liability;
-      profitIfLayWins = layWinnings;
-      break;
-    case "free_sr":
-      profitIfBackWins = backStake * backOdds - liability;
-      profitIfLayWins = layWinnings;
-      break;
-    case "risk_free": {
-      const refund = (input.refundAmount ?? backStake) * (input.refundRetention ?? 0.7);
-      profitIfBackWins = backStake * (backOdds - 1) - liability;
-      profitIfLayWins = layWinnings - backStake + refund;
-      break;
-    }
-  }
-
+  const profitIfBackWins = win - liability;
+  const profitIfLayWins = lose + layWinnings;
   const guaranteed = Math.min(profitIfBackWins, profitIfLayWins);
-  const base = mode === "qualifying" || mode === "risk_free" ? backStake : backStake;
   return {
     layStake,
     liability,
     profitIfBackWins,
     profitIfLayWins,
     guaranteed,
-    qualifyingLossPct: base > 0 ? guaranteed / base : 0,
+    qualifyingLossPct: backStake > 0 ? guaranteed / backStake : 0,
   };
 }
+
+

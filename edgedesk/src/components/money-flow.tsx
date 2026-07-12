@@ -4,7 +4,7 @@ import NumberFlow from "@number-flow/react";
 import { cn } from "@/lib/utils";
 
 /**
- * Half of NumberFlow's defaults (900/450ms) — snappier live counters.
+ * Half of NumberFlow's defaults (900/450ms) - snappier live counters.
  */
 const timings = {
   transformTiming: { duration: 450, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
@@ -14,7 +14,7 @@ const timings = {
 
 /**
  * Price-ticker style number: only the digits AFTER the decimal point animate.
- * The integer part is plain text that swaps instantly — so £154.10 → £155.32
+ * The integer part is plain text that swaps instantly - so £154.10 → £155.32
  * ticks the pennies while the pounds just update, like a stock price.
  *
  * trend={0} on the animated fraction: each digit takes its own shortest path
@@ -84,13 +84,13 @@ interface MoneyFlowProps {
 }
 
 /**
- * Animated GBP amount — every changing money value in the app goes through this.
+ * Animated GBP amount - every changing money value in the app goes through this.
  * Pounds swap instantly; only the pence animate.
  */
 export function MoneyFlow({ value, className, signColor, signDisplay, compact }: MoneyFlowProps) {
   const safe = Number.isFinite(value) ? value : 0;
   if (compact) {
-    // Compact notation ("£1.2K") has no stable decimal part to isolate — no animation.
+    // Compact notation ("£1.2K") has no stable decimal part to isolate - no animation.
     return (
       <span
         className={cn(

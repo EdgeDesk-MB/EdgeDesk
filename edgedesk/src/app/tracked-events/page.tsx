@@ -27,6 +27,7 @@ import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { eventToPendingSettle, isEventPendingSettle } from "@/lib/racing/pending-settle";
+import { racingSyncToast } from "@/lib/racing/sync-toast";
 import { sortTrackedEvents } from "@/lib/events";
 import { RefreshCw, Radio } from "lucide-react";
 
@@ -34,13 +35,26 @@ export default function TrackedEventsPage() {
   const router = useRouter();
   const { state, refresh } = useAppState(2000);
   const [syncingRacing, setSyncingRacing] = useState(false);
+  const [fetchingEventId, setFetchingEventId] = useState<number | null>(null);
 
   const myEvents = state?.events ?? [];
   const linkedBets = state?.bets ?? [];
   const promoAwards = state?.promoAwards ?? {};
+  const liveModelsById = useMemo(
+    () => new Map((state?.liveEventModels ?? []).map((m) => [m.eventId, m])),
+    [state?.liveEventModels]
+  );
 
   const pendingRacingEvents = useMemo(
     () => myEvents.filter(isEventPendingSettle),
+    [myEvents]
+  );
+
+  const hasFetchableRacing = useMemo(
+    () =>
+      myEvents.some(
+        (e) => e.sport === "horse_racing" && !!e.externalId?.trim()
+      ),
     [myEvents]
   );
 
@@ -54,18 +68,20 @@ export default function TrackedEventsPage() {
   const syncRacingResults = useCallback(async () => {
     setSyncingRacing(true);
     try {
-      const result = await api<{ updated: number; pending: number }>("/api/racing/sync-results", {
+      const result = await api<{
+        updated: number;
+        pending: number;
+        tierBlocked?: boolean;
+        tier?: "basic" | "free" | "none";
+      }>("/api/racing/sync-results?force=1", {
         method: "POST",
       });
       await refresh();
-      if (result.updated > 0) {
-        toast.success(`Settled ${result.updated} race${result.updated === 1 ? "" : "s"} from API`);
-      } else if (result.pending > 0) {
-        toast.info("No API results yet", {
-          description: "Free tier — use Set winner, or upgrade Racing API for auto results.",
-        });
+      const msg = racingSyncToast(result);
+      if (msg.kind === "success") {
+        toast.success(msg.title, msg.description ? { description: msg.description } : undefined);
       } else {
-        toast.info("Nothing to sync");
+        toast.info(msg.title, msg.description ? { description: msg.description } : undefined);
       }
     } catch (e) {
       toast.error("Racing sync failed", { description: String(e) });
@@ -73,6 +89,37 @@ export default function TrackedEventsPage() {
       setSyncingRacing(false);
     }
   }, [refresh]);
+
+  const fetchEventResults = useCallback(
+    async (eventId: number) => {
+      setFetchingEventId(eventId);
+      try {
+        const result = await api<{
+          updated: number;
+          pending: number;
+          tierBlocked?: boolean;
+          tier?: "basic" | "free" | "none";
+        }>(`/api/racing/sync-results?eventId=${eventId}&force=1`, {
+          method: "POST",
+        });
+        await refresh();
+        const msg = racingSyncToast(result);
+        if (msg.kind === "success") {
+          toast.success(msg.title, {
+            description:
+              "Full placings saved - place-refund free bets will award if your horse finished 2nd–4th.",
+          });
+        } else {
+          toast.info(msg.title, msg.description ? { description: msg.description } : undefined);
+        }
+      } catch (e) {
+        toast.error("Could not fetch results", { description: String(e) });
+      } finally {
+        setFetchingEventId(null);
+      }
+    },
+    [refresh]
+  );
 
   async function startSim(preset: string, stars: { homeStar?: string; awayStar?: string }) {
     const names: Record<string, [string, string]> = {
@@ -128,7 +175,7 @@ export default function TrackedEventsPage() {
         title="Tracked Events"
         description={
           <>
-            Matches and races you&apos;re following — live scores refresh automatically (~once a
+            Matches and races you&apos;re following - live scores refresh automatically (~once a
             minute). Add more from the{" "}
             <Link href="/fixtures" className="text-primary underline-offset-2 hover:underline">
               Fixtures
@@ -147,7 +194,7 @@ export default function TrackedEventsPage() {
       {pendingSettleRaces.length > 0 && (
         <RacingSettlePrompt
           races={pendingSettleRaces}
-          racingApiConfigured={state?.racingApiConfigured}
+          resultsTier={state?.racingResultsTier}
         />
       )}
 
@@ -159,19 +206,20 @@ export default function TrackedEventsPage() {
               <CardDescription>
                 Live feed matches update score and minute from API-Football. Goal timelines only
                 fetch when you have an open trigger bet on the match.
-                {state?.racingApiConfigured ? (
+                {state?.racingResultsTier === "basic" ? (
                   <> Racing results sync automatically while the app is open.</>
                 ) : pendingRacingEvents.length > 0 ? (
                   <>
                     {" "}
                     {pendingRacingEvents.length} race
-                    {pendingRacingEvents.length === 1 ? "" : "s"} awaiting results — sync from API
-                    or set winner manually.
+                    {pendingRacingEvents.length === 1 ? "" : "s"} need placings - use{" "}
+                    <span className="font-medium text-foreground">Set placings</span> (1st–4th) for
+                    place-refund free bets. No paid API required.
                   </>
                 ) : null}
               </CardDescription>
             </div>
-            {pendingRacingEvents.length > 0 && (
+            {hasFetchableRacing && (
               <Button
                 variant="outline"
                 size="sm"
@@ -212,8 +260,11 @@ export default function TrackedEventsPage() {
                   event={event}
                   linkedBets={linkedBets.filter((b) => b.eventId === event.id)}
                   promoAwards={promoAwards}
+                  liveModel={liveModelsById.get(event.id) ?? null}
                   onPatch={patchEvent}
                   onDelete={deleteEvent}
+                  onFetchResults={fetchEventResults}
+                  fetchingResults={fetchingEventId === event.id}
                 />
               ))}
             </TableBody>

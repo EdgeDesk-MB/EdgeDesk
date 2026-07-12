@@ -174,7 +174,7 @@ export function AdvancedLaySection({
           />
         </label>
         <span className="font-semibold tabular-nums text-black/70 dark:text-white/80">
-          £ {Number.isFinite(layStake) ? layStake.toFixed(2) : "—"}
+          £ {Number.isFinite(layStake) ? layStake.toFixed(2) : "-"}
         </span>
         <label className="flex items-center gap-1.5">
           <span className="font-medium text-black/60 dark:text-white/60">Max £</span>

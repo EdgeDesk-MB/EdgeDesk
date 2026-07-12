@@ -6,6 +6,8 @@ import { AddBalanceProvider } from "@/components/add-balance-provider";
 import { AddBetProvider } from "@/components/add-bet-provider";
 import { TrackFixtureProvider } from "@/components/track-fixture-provider";
 import { MatchedCalculatorProvider } from "@/components/matched-calculator-provider";
+import { OfferProvider } from "@/components/offers/offer-provider";
+import { FreeBetsProvider } from "@/components/accounts/free-bets-convert-dialog";
 import { RacingAutopilotListener } from "@/components/racing-autopilot-listener";
 import { OfferReminderListener } from "@/components/offer-reminder-listener";
 import { AppNav } from "@/components/app-nav";
@@ -29,7 +31,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EdgeDesk — Matched Betting Command Centre",
+  title: "EdgeDesk - Matched Betting Command Centre",
   description: "Calculators, live events and real-time profit tracking for matched betting",
 };
 
@@ -52,31 +54,37 @@ export default function RootLayout({
                 <AddBetProvider>
                   <TrackFixtureProvider>
                     <MatchedCalculatorProvider>
-                      <div className="app-scroll h-dvh">
-                        <AppTopBar />
-                        <div
-                          className={cn(
-                            "flex w-full items-stretch",
-                            appShellPadding,
-                            appShellGap
-                          )}
-                        >
-                          <AppNav />
-                          <div className="flex min-w-0 flex-1 flex-col p-1">
-                            <main
-                              className={cn(
-                                pagePanel,
-                                "flex w-full flex-col rounded-lg dark:shadow-none"
-                              )}
-                            >
-                              {children}
-                            </main>
+                      <OfferProvider>
+                        <FreeBetsProvider>
+                          <div className="flex h-dvh flex-col overflow-hidden">
+                            <AppTopBar />
+                            <div className="app-scroll min-h-0 flex-1 overflow-y-auto">
+                              <div
+                                className={cn(
+                                  "flex w-full items-stretch",
+                                  appShellPadding,
+                                  appShellGap
+                                )}
+                              >
+                              <AppNav />
+                              <div className="flex min-w-0 flex-1 flex-col p-1">
+                                <main
+                                  className={cn(
+                                    pagePanel,
+                                    "flex w-full flex-col dark:shadow-none"
+                                  )}
+                                >
+                                  {children}
+                                </main>
+                              </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      <Toaster richColors position="top-right" />
-                      <RacingAutopilotListener />
-                      <OfferReminderListener />
+                          <Toaster richColors position="top-right" />
+                          <RacingAutopilotListener />
+                          <OfferReminderListener />
+                        </FreeBetsProvider>
+                      </OfferProvider>
                     </MatchedCalculatorProvider>
                   </TrackFixtureProvider>
                 </AddBetProvider>

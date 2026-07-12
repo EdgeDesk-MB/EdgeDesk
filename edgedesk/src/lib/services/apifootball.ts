@@ -4,6 +4,8 @@
  * when no key is configured.
  */
 
+import { localCalendarDate, wallClockKickoffMs } from "@/lib/events";
+
 const BASE = "https://v3.football.api-sports.io";
 
 export interface Fixture {
@@ -17,6 +19,18 @@ export interface Fixture {
   homeScore: number;
   awayScore: number;
   minute: number;
+  /** 90-minute score — only set when matchEnding is "aet" or "pen" */
+  ftHomeScore?: number | null;
+  ftAwayScore?: number | null;
+  /** How the match ended; null while live or unknown */
+  matchEnding?: "ft" | "aet" | "pen" | null;
+  /** Club crest or national team badge URL from API-Football */
+  homeLogo?: string | null;
+  awayLogo?: string | null;
+  /** League country name from API-Football */
+  leagueCountry?: string | null;
+  /** Country flag image URL from API-Football (`league.flag`) */
+  leagueFlag?: string | null;
 }
 
 interface CacheEntry {
@@ -26,7 +40,7 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const FIXTURES_TTL = 10 * 60 * 1000; // fixtures list: 10 min
-// Live scores at 60s keeps a full 90-min match around ~100 requests — the free
+// Live scores at 60s keeps a full 90-min match around ~100 requests - the free
 // tier's whole daily allowance. One live-tracked match per day fits; the budget
 // guard below stops us blowing past the cap if more are tracked.
 const LIVE_TTL = 60 * 1000;
@@ -66,6 +80,10 @@ function mapFixture(item: any): Fixture {
   const liveStatuses = ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"];
   const finishedStatuses = ["FT", "AET", "PEN"];
   const elapsed = item.fixture?.status?.elapsed;
+  const isAet = shortStatus === "AET";
+  const isPen = shortStatus === "PEN";
+  // 90-minute score is in score.fulltime; goals.home/away is the full final (including ET)
+  const ftScore = item.score?.fulltime;
   return {
     externalId: String(item.fixture?.id ?? ""),
     sport: "football",
@@ -81,6 +99,13 @@ function mapFixture(item: any): Fixture {
     homeScore: item.goals?.home ?? 0,
     awayScore: item.goals?.away ?? 0,
     minute: elapsed ?? (shortStatus === "HT" ? 45 : 0),
+    ftHomeScore: (isAet || isPen) ? (ftScore?.home ?? null) : null,
+    ftAwayScore: (isAet || isPen) ? (ftScore?.away ?? null) : null,
+    matchEnding: isAet ? "aet" : isPen ? "pen" : shortStatus === "FT" ? "ft" : null,
+    homeLogo: item.teams?.home?.logo ? String(item.teams.home.logo) : null,
+    awayLogo: item.teams?.away?.logo ? String(item.teams.away.logo) : null,
+    leagueCountry: item.league?.country ? String(item.league.country) : null,
+    leagueFlag: item.league?.flag ? String(item.league.flag) : null,
   };
 }
 
@@ -93,13 +118,40 @@ async function apiGet(pathAndQuery: string): Promise<any> {
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`API-Football ${res.status}`);
-  return res.json();
+  const json = await res.json();
+  const err = formatApiErrors(json?.errors);
+  if (err) throw new Error(err);
+  return json;
 }
+
+/** API-Football returns HTTP 200 with `errors` when rate-limited or invalid. */
+function formatApiErrors(errors: unknown): string | null {
+  if (errors == null) return null;
+  if (typeof errors === "string" && errors.trim()) return errors.trim();
+  if (Array.isArray(errors)) {
+    const parts = errors.map(String).filter(Boolean);
+    return parts.length ? parts.join("; ") : null;
+  }
+  if (typeof errors === "object") {
+    const parts = Object.values(errors as Record<string, unknown>)
+      .map(String)
+      .filter((s) => s && s !== "undefined");
+    return parts.length ? parts.join("; ") : null;
+  }
+  return null;
+}
+
+/** Calendar date in the operator's local timezone (API-Football dates are local-day oriented). */
+export { localCalendarDate } from "@/lib/events";
 
 export async function fixturesByDate(date: string): Promise<Fixture[]> {
   const cacheKey = `fixtures:${date}`;
   const hit = cache.get(cacheKey);
-  if (hit && Date.now() - hit.at < FIXTURES_TTL) return hit.data;
+  // Never trust an empty cache entry - rate-limit responses used to look like
+  // success with `response: []` and poisoned the list for FIXTURES_TTL.
+  if (hit && hit.data.length > 0 && Date.now() - hit.at < FIXTURES_TTL) {
+    return hit.data;
+  }
   const json = await apiGet(`/fixtures?date=${date}`);
   const data: Fixture[] = (json.response ?? []).map(mapFixture);
   cache.set(cacheKey, { at: Date.now(), data });
@@ -115,7 +167,7 @@ export async function liveFixtures(): Promise<Fixture[]> {
   return data;
 }
 
-/** Single fixture by id — works on the free API tier (`ids` batch is pro-only). */
+/** Single fixture by id - works on the free API tier (`ids` batch is pro-only). */
 export async function fixtureById(id: string): Promise<Fixture | null> {
   if (!id.trim()) return null;
   const cacheKey = `id:${id}`;
@@ -135,7 +187,7 @@ export interface FixtureGoal {
 }
 
 /**
- * Goal events (scorer, minute) for one fixture — powers "The bet wins IF" player
+ * Goal events (scorer, minute) for one fixture - powers "The bet wins IF" player
  * triggers. Costs one request per fixture per LIVE_TTL, so the state service only
  * calls this for live fixtures that actually have an open trigger bet on them.
  */
@@ -178,7 +230,7 @@ export async function fixturesByIds(ids: string[]): Promise<Fixture[]> {
       const fixture = await fixtureById(id);
       if (fixture) out.push(fixture);
     } catch {
-      // skip — next poll retries
+      // skip - next poll retries
     }
   }
   return out;
@@ -203,10 +255,9 @@ export async function searchFixtureByTeams(
   awayTeam: string
 ): Promise<Fixture | null> {
   if (!hasApiKey()) return null;
-  const dates = [0, 1].map((offset) => {
-    const d = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
-    return d.toISOString().slice(0, 10);
-  });
+  const dates = [0, 1].map((offset) =>
+    localCalendarDate(new Date(Date.now() + offset * 24 * 60 * 60 * 1000))
+  );
   for (const date of dates) {
     try {
       const fixtures = await fixturesByDate(date);
@@ -218,42 +269,45 @@ export async function searchFixtureByTeams(
       );
       if (hit) return hit;
     } catch {
-      // fall through — a failed search should never block manual tracking
+      // fall through - a failed search should never block manual tracking
     }
   }
   return null;
 }
 
-/** Demo fixtures used when no API key is configured — kickoffs relative to now. */
+/** Demo fixtures used when no API key is configured - realistic UK kickoff times. */
 export function demoFixtures(): Fixture[] {
-  const now = Date.now();
-  const hour = 60 * 60 * 1000;
+  const k = wallClockKickoffMs;
   const mk = (
     id: string,
     competition: string,
     home: string,
     away: string,
-    offsetHours: number
+    startTime: number
   ): Fixture => ({
     externalId: `demo-${id}`,
     sport: "football",
     competition,
     homeTeam: home,
     awayTeam: away,
-    startTime: now + offsetHours * hour,
+    startTime,
     status: "upcoming",
     homeScore: 0,
     awayScore: 0,
     minute: 0,
   });
   return [
-    mk("1", "Premier League", "Arsenal", "Liverpool", 2),
-    mk("2", "Premier League", "Man City", "Chelsea", 4),
-    mk("3", "Premier League", "Newcastle", "Spurs", 5),
-    mk("4", "Championship", "Leeds", "Sunderland", 3),
-    mk("5", "La Liga", "Barcelona", "Real Madrid", 6),
-    mk("6", "Serie A", "Inter", "Juventus", 7),
-    mk("7", "Bundesliga", "Bayern Munich", "Dortmund", 24),
-    mk("8", "Ligue 1", "PSG", "Marseille", 26),
+    mk("wc0", "FIFA World Cup", "France", "Morocco", k(17, 30)),
+    mk("wc1", "FIFA World Cup", "Mexico", "England", k(18, 0)),
+    mk("wc2", "FIFA World Cup", "Brazil", "Germany", k(19, 45)),
+    mk("wc3", "World Cup - Group Stage", "Spain", "France", k(20, 0)),
+    mk("1", "Premier League", "Arsenal", "Liverpool", k(12, 30)),
+    mk("2", "Premier League", "Man City", "Chelsea", k(15, 0)),
+    mk("3", "Premier League", "Newcastle", "Spurs", k(17, 30)),
+    mk("4", "Championship", "Leeds", "Sunderland", k(14, 0)),
+    mk("5", "La Liga", "Barcelona", "Real Madrid", k(20, 0)),
+    mk("6", "Serie A", "Inter", "Juventus", k(19, 45)),
+    mk("7", "Bundesliga", "Bayern Munich", "Dortmund", k(14, 30)),
+    mk("8", "Ligue 1", "PSG", "Marseille", k(20, 45)),
   ];
 }

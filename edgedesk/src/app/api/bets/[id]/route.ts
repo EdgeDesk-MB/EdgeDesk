@@ -10,7 +10,9 @@ import { resolveOfferForBet, syncOfferStatuses } from "@/lib/services/offers";
 export const dynamic = "force-dynamic";
 
 const patchSchema = z.object({
-  status: z.enum(["open", "won", "lost", "void", "early_payout"]).optional(),
+  status: z
+    .enum(["open", "won", "lost", "void", "early_payout", "half_win", "half_lose", "push"])
+    .optional(),
   actualProfit: z.number().optional(),
   label: z.string().min(1).optional(),
   betType: z.string().optional(),

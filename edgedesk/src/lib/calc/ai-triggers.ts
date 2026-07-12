@@ -1,5 +1,5 @@
 /**
- * AI Triggers — smart parsing of trigger text for conditional side-effects
+ * AI Triggers - smart parsing of trigger text for conditional side-effects
  * and bet-win rules. Deterministic grammar (no LLM).
  *
  * Examples:
@@ -52,9 +52,9 @@ function formatPositions(positions: number[]): string {
 export function describeAiEffect(effect: AiEffect): string {
   if (effect.kind !== "free_bet_award") return "";
   if (effect.positions.length === 0) {
-    return `${formatGbp(effect.amount)} free bet — credits bookie balance when this bet settles`;
+    return `${formatGbp(effect.amount)} free bet - credits bookie balance when this bet settles`;
   }
-  return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} — credits bookie balance`;
+  return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} - credits bookie balance`;
 }
 
 /** Parse "2nd, 3rd, 4th" or "2 3 4" into [2,3,4]. */
@@ -71,17 +71,35 @@ function parsePlacePositionsFromText(text: string): number[] {
   const ifMatch = trimmed.match(/\bif\s+(.+)$/i);
   const placePart = ifMatch?.[1]?.trim() ?? trimmed;
 
-  const rangeMatch = placePart.match(/(\d+)\s*[-–]\s*(\d+)/);
+  // "2nd-4th" / "2-4" / "2nd – 4th"
+  const rangeMatch = placePart.match(
+    /(\d+)(?:st|nd|rd|th)?\s*[-–]\s*(\d+)(?:st|nd|rd|th)?/i
+  );
   if (rangeMatch) {
     const a = Number(rangeMatch[1]);
     const b = Number(rangeMatch[2]);
-    const positions: number[] = [];
-    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) positions.push(i);
-    return positions;
+    if (a >= 1 && b <= 10 && Math.abs(b - a) <= 6) {
+      const positions: number[] = [];
+      for (let i = Math.min(a, b); i <= Math.max(a, b); i++) positions.push(i);
+      return positions;
+    }
   }
 
-  const fromOrdinals = parsePlacePositions(placePart);
-  if (fromOrdinals.length > 0) return fromOrdinals;
+  // Only scan the place clause - stop before runners / expiry noise
+  const clause = placePart.split(/[·•|]|\brunners?\b|\bexpires?\b|\bmin\b/i)[0] ?? placePart;
+  if (ifMatch) {
+    // Within an explicit "if …" clause bare numbers are valid place positions
+    const fromOrdinals = parsePlacePositions(clause).filter((n) => n >= 1 && n <= 10);
+    if (fromOrdinals.length > 0) return fromOrdinals;
+  } else {
+    // Without an "if" clause, require the ordinal suffix (st/nd/rd/th) to avoid
+    // capturing stake amounts like "£10" as position 10.
+    const ordinalMatches = clause.match(/\b(\d+)(?:st|nd|rd|th)\b/gi) ?? [];
+    const fromOrdinals = [
+      ...new Set(ordinalMatches.map((m) => parseInt(m, 10)).filter((n) => n >= 1 && n <= 10)),
+    ].sort((a, b) => a - b);
+    if (fromOrdinals.length > 0) return fromOrdinals;
+  }
 
   return [];
 }
@@ -134,6 +152,18 @@ export function inferAiEffectsFromLabel(label: string): AiEffect[] {
   return inferAiEffectsFromText(label);
 }
 
+/** True when the bet label looks like a promo / offer trigger phrase. */
+export function offerTriggerDetectedInLabel(label: string): boolean {
+  return inferAiEffectsFromText(label).length > 0;
+}
+
+/** Suggested offer-trigger text copied from a recognised label. */
+export function offerTriggerFromLabel(label: string): string | null {
+  const trimmed = label.trim();
+  if (!trimmed || !offerTriggerDetectedInLabel(trimmed)) return null;
+  return trimmed;
+}
+
 export function parseTriggerBundle(raw: string | null | undefined): TriggerBundle {
   if (!raw?.trim()) return { v: 2, betWin: null, effects: [] };
   try {
@@ -181,7 +211,7 @@ export function buildTriggerBundle(opts: {
     });
     if (football) {
       betWin = football.rule;
-      lines.push(`${football.description} — settles the bet in real time`);
+      lines.push(`${football.description} - settles the bet in real time`);
     }
   }
 
@@ -254,7 +284,7 @@ export function evaluateFreeBetAward(
   race: RaceResult
 ): { met: boolean; reason: string } {
   if (effect.positions.length === 0) {
-    return { met: false, reason: "Unconditional free bet — not a place trigger" };
+    return { met: false, reason: "Unconditional free bet - not a place trigger" };
   }
   const pos = selectionPosition(selection, race);
   if (pos <= 0) {
@@ -274,7 +304,7 @@ export function evaluateUnconditionalFreeBet(
   betStatus: string
 ): { met: boolean; reason: string } {
   if (effect.positions.length > 0) {
-    return { met: false, reason: "Place trigger — not unconditional" };
+    return { met: false, reason: "Place trigger - not unconditional" };
   }
   if (betStatus === "open" || betStatus === "void") {
     return { met: false, reason: "Bet not settled yet" };

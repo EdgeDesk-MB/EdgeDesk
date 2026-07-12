@@ -20,7 +20,7 @@ const gridFn = (lh: number, la: number, rho: number) => {
   return (nh: number, na: number) => (g[nh]?.[na] ?? 0);
 };
 
-describe("EP engine — spec §5 test vectors", () => {
+describe("EP engine - spec §5 test vectors", () => {
   it("A · Independent Poisson (Brazil/Japan): fit + EP probs", () => {
     const { probs } = stripMargin([1.666, 3.7, 5.0]);
     const fit = fitModel(probs[0], probs[1], probs[2]);
@@ -57,7 +57,7 @@ describe("EP engine — spec §5 test vectors", () => {
     expect(ep.pD).toBeCloseTo(0.2413, 3);
   });
 
-  it("C · EV identity (linearity) — Brazil/Japan dutch", () => {
+  it("C · EV identity (linearity) - Brazil/Japan dutch", () => {
     const { probs } = stripMargin([1.666, 3.7, 5.0]);
     const fit = fitModel(probs[0], probs[1], probs[2]);
     const wfn = gridFn(fit.lh, fit.la, fit.rho);
@@ -92,7 +92,7 @@ describe("EP engine — spec §5 test vectors", () => {
     expect(dist1.EV).toBeCloseTo(-11.6714, 3);
   });
 
-  it("D · Lay play — punitive and generous books", () => {
+  it("D · Lay play - punitive and generous books", () => {
     const { probs } = stripMargin([1.666, 3.7, 5.0]);
     const [tH, , tA] = probs;
     const fit = fitModel(probs[0], probs[1], probs[2]);
@@ -160,7 +160,7 @@ describe("EP engine — spec §5 test vectors", () => {
     expect(dist.total).toBeCloseTo(100, 6);
   });
 
-  it("F · Live settlement — Mexico–England", () => {
+  it("F · Live settlement - Mexico–England", () => {
     const stakes = equalizedStakes(3.0, 2.5, 3.15, "total", 100);
 
     // 2-2 with "Mexico 2UP triggered" (manual): home leg paid early + draw

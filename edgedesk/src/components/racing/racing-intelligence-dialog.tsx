@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,9 @@ import {
   type OfferConfidence,
 } from "@/lib/offers/place-refund-ev";
 import { formatDecimalOdds } from "@/lib/racing/odds";
+import { formatClockTime } from "@/lib/time-format";
 import type { SuggestedRace, SuggestedRunner } from "@/lib/racing-desk/types";
+import { RegionFlag } from "@/components/region-flag";
 import { filterPillState, listRowInteractive } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Gift, Sparkles } from "lucide-react";
@@ -119,8 +121,13 @@ function SuggestionRow({
             className={cn("w-full text-left", listRowInteractive, "-mx-1 rounded-md px-1 py-0.5")}
           >
             <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold tabular-nums">{suggestion.offTime}</span>
-              <span className="font-medium">{suggestion.course}</span>
+              <span className="font-semibold tabular-nums">
+                {suggestion.startTime ? formatClockTime(suggestion.startTime) : suggestion.offTime}
+              </span>
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <RegionFlag code={suggestion.region} />
+                {suggestion.course}
+              </span>
               <Badge variant="secondary" className="h-5 tabular-nums">
                 {suggestion.score}
               </Badge>
@@ -233,7 +240,7 @@ const CONFIDENCE_FILTERS: Array<{ id: ConfidenceFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "live", label: "Live odds" },
   { id: "mixed", label: "Partial" },
-  { id: "estimate", label: "Proxy est." },
+  { id: "estimate", label: "Estimated" },
 ];
 
 export function RacingIntelligenceDialog({
@@ -290,10 +297,10 @@ export function RacingIntelligenceDialog({
             <div>
               <DialogTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
                 <Sparkles className="size-4 text-violet-500" />
-                Racing intelligence
+                Race picks
               </DialogTitle>
               <DialogDescription className="text-[11px]">
-                {dateLabel} · ranked by offer value
+                Best qualifying races for your active offers on {dateLabel}
                 {dataSource === "demo" && (
                   <span className="ml-1 text-violet-600 dark:text-violet-400">· demo data</span>
                 )}
@@ -346,7 +353,7 @@ export function RacingIntelligenceDialog({
               <p className="mt-1 text-xs">
                 {suggestions.length === 0
                   ? "Add an active place-refund offer to unlock ranked picks."
-                  : "Try another confidence filter — proxy estimates still rank by EV."}
+                  : "Try another confidence filter - proxy estimates still rank by EV."}
               </p>
             </div>
           ) : (
@@ -390,7 +397,7 @@ export function RacingIntelligenceTrigger({
   return (
     <Button type="button" variant="outline" {...pageSecondaryButtonProps} className="gap-1.5" onClick={onClick}>
       <Sparkles className="size-4 text-violet-500" />
-      Intelligence
+      Race picks
       {count > 0 && (
         <Badge variant="secondary" className="h-5 min-w-5 px-1.5 tabular-nums">
           {count}
@@ -408,15 +415,17 @@ export function DeskFilterPills({
   onQualifyingOnlyChange,
   advancedMode,
   onAdvancedModeChange,
+  trailing,
 }: {
   qualifyingOnly: boolean;
   onQualifyingOnlyChange: (v: boolean) => void;
   advancedMode: boolean;
   onAdvancedModeChange: (v: boolean) => void;
+  trailing?: ReactNode;
 }) {
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 ring-1 ring-border/45">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => onQualifyingOnlyChange(false)}
@@ -431,6 +440,7 @@ export function DeskFilterPills({
         >
           Qualifying
         </button>
+        {trailing}
       </div>
       <div className="flex items-center gap-2">
         <Label htmlFor="desk-advanced-mode" className="text-xs font-medium text-muted-foreground">

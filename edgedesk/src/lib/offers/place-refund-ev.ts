@@ -32,6 +32,8 @@ export function resolveOfferConfidence(
   exchangeSource?: ExchangeOddsSource
 ): OfferConfidence {
   if (oddsSource === "proxy") return "estimate";
+  if (oddsSource === "manual" && exchangeSource === "live") return "mixed";
+  if (oddsSource === "manual") return "mixed";
   if (exchangeSource === "live" && oddsSource === "live") return "live";
   if (exchangeSource === "live" || oddsSource === "live") return "mixed";
   return "estimate";
@@ -105,6 +107,8 @@ export function formatOddsSourceLabel(
       return "Live odds";
     case "snapshot":
       return "Snapshot";
+    case "manual":
+      return "Manual override";
     case "proxy":
       return "Proxy estimate";
     default:

@@ -43,7 +43,7 @@ export function SimDialog({
         <DialogHeader>
           <DialogTitle>Start a simulated match</DialogTitle>
           <DialogDescription>
-            A full 90 minutes plays out in about 3 real minutes — perfect for testing bets and the
+            A full 90 minutes plays out in about 3 real minutes - perfect for testing bets and the
             live dashboard without waiting for a real kick-off.
           </DialogDescription>
         </DialogHeader>
@@ -78,7 +78,7 @@ export function SimDialog({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Name a striker and they&apos;ll score their side&apos;s first goal — ideal for testing a
+          Name a striker and they&apos;ll score their side&apos;s first goal - ideal for testing a
           &quot;wins IF&quot; goalscorer trigger.
         </p>
         <Button

@@ -15,7 +15,7 @@ export function ScrollFadeEdges({
   children: React.ReactNode;
   className?: string;
   scrollClassName?: string;
-  /** Gradient source colour — defaults to page panel background */
+  /** Gradient source colour - defaults to page panel background */
   fadeClassName?: string;
   fadeHeight?: number;
 }) {
@@ -53,8 +53,11 @@ export function ScrollFadeEdges({
   const fadeBase = fadeClassName ?? "from-page";
 
   return (
-    <div className={cn("relative min-h-0 flex-1 overflow-hidden", className)}>
-      <div ref={scrollRef} className={cn("h-full min-h-0 overflow-y-auto", scrollClassName)}>
+    <div className={cn("relative min-h-0 w-full min-w-0 flex-1 overflow-hidden", className)}>
+      <div
+        ref={scrollRef}
+        className={cn("box-border h-full min-h-0 w-full min-w-0 overflow-y-auto", scrollClassName)}
+      >
         {children}
       </div>
       {showTop ? (

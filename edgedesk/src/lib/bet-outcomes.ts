@@ -1,5 +1,5 @@
 /**
- * Bet-level race outcomes — finishing position and promo awards for UI.
+ * Bet-level race outcomes - finishing position and promo awards for UI.
  */
 import { formatGbp } from "@/lib/format-money";
 import type { BetRow, EventRow } from "@/lib/db/schema";
@@ -34,7 +34,7 @@ export function formatPromoTooltip(amount: number, reason?: string, compact = fa
   const amountLabel = `${formatGbp(amount)} free bet`;
   if (compact || !reason?.trim()) return amountLabel;
   const cleaned = reason
-    .replace(/\s*—\s*£[\d.]+\s*free bet\s*$/i, "")
+    .replace(/\s*-\s*£[\d.]+\s*free bet\s*$/i, "")
     .trim();
   if (!cleaned) return amountLabel;
   return `${amountLabel} · ${cleaned}`;

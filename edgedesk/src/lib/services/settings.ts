@@ -1,28 +1,25 @@
 /**
- * App-wide user preferences — stored as key/value in SQLite.
+ * App-wide user preferences - stored as key/value in SQLite (server-only).
+ * Client-safe types/helpers: `./settings-shared`.
  */
 import { eq } from "drizzle-orm";
 import { db, appSettings } from "@/lib/db";
+import {
+  DEFAULT_SETTINGS,
+  bookmakerFromOfferPrefs,
+  stakeFromOfferPrefs,
+  type AppSettings,
+  type OfferBetPref,
+} from "./settings-shared";
+import { normalizeDisplayTimezone } from "@/lib/display-timezone";
+import { normalizeTimeFormat, setDisplayTimeFormat } from "@/lib/time-format";
 
-export interface AppSettings {
-  defaultBackStake: number;
-  defaultBetType: "qualifying" | "free_snr" | "free_sr" | "risk_free";
-  defaultBookmaker: string;
-  offerRemindersEnabled: boolean;
-  offerReminderDays: number[];
-  ocrAutoMatchEvents: boolean;
-  dashboardPollMs: number;
-}
-
-export const DEFAULT_SETTINGS: AppSettings = {
-  defaultBackStake: 10,
-  defaultBetType: "qualifying",
-  defaultBookmaker: "",
-  offerRemindersEnabled: true,
-  offerReminderDays: [7, 3, 1],
-  ocrAutoMatchEvents: true,
-  dashboardPollMs: 3000,
-};
+export type { AppSettings, OfferBetPref };
+export {
+  DEFAULT_SETTINGS,
+  bookmakerFromOfferPrefs,
+  stakeFromOfferPrefs,
+} from "./settings-shared";
 
 function readRaw(key: string): string | undefined {
   return db.select().from(appSettings).where(eq(appSettings.key, key)).get()?.value;
@@ -34,6 +31,26 @@ function writeRaw(key: string, value: string): void {
     db.update(appSettings).set({ value }).where(eq(appSettings.key, key)).run();
   } else {
     db.insert(appSettings).values({ key, value }).run();
+  }
+}
+
+function parseOfferBetPrefs(raw: string | undefined): Record<string, OfferBetPref> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, OfferBetPref> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!value || typeof value !== "object") continue;
+      const row = value as Record<string, unknown>;
+      const stake = typeof row.stake === "number" ? row.stake : parseFloat(String(row.stake ?? ""));
+      const bookmaker = typeof row.bookmaker === "string" ? row.bookmaker.trim() : "";
+      if (!Number.isFinite(stake) || stake <= 0) continue;
+      out[key] = { stake, bookmaker };
+    }
+    return out;
+  } catch {
+    return {};
   }
 }
 
@@ -57,21 +74,75 @@ export function getAppSettings(): AppSettings {
       ? betType
       : DEFAULT_SETTINGS.defaultBetType;
 
-  return {
+  const settings: AppSettings = {
     defaultBackStake: Number.isFinite(stake) && stake > 0 ? stake : DEFAULT_SETTINGS.defaultBackStake,
     defaultBetType: validBetType,
     defaultBookmaker: readRaw("defaultBookmaker") ?? DEFAULT_SETTINGS.defaultBookmaker,
     offerRemindersEnabled: readRaw("offerRemindersEnabled") !== "false",
     offerReminderDays: reminderDays,
+    offerBetPrefs: parseOfferBetPrefs(readRaw("offerBetPrefs")),
     ocrAutoMatchEvents: readRaw("ocrAutoMatchEvents") !== "false",
     dashboardPollMs:
       Number.isFinite(poll) && poll >= 1000 && poll <= 60_000
         ? poll
         : DEFAULT_SETTINGS.dashboardPollMs,
+    displayTimezone: normalizeDisplayTimezone(readRaw("displayTimezone")),
+    timeFormat: normalizeTimeFormat(readRaw("timeFormat")),
   };
+  // Server-side display helpers (history labels, sync toasts) read the
+  // process-wide format; keep it in step with the persisted preference.
+  setDisplayTimeFormat(settings.timeFormat);
+  return settings;
 }
 
-export function patchAppSettings(patch: Partial<AppSettings>): AppSettings {
+export function getOfferBetPref(offerId: number): OfferBetPref | undefined {
+  return getAppSettings().offerBetPrefs[String(offerId)];
+}
+
+/** Merge one offer's remembered stake/bookie into settings. */
+export function setOfferBetPref(offerId: number, pref: OfferBetPref): AppSettings {
+  if (!Number.isFinite(offerId) || offerId <= 0) return getAppSettings();
+  if (!Number.isFinite(pref.stake) || pref.stake <= 0) return getAppSettings();
+  const prefs = { ...getAppSettings().offerBetPrefs };
+  prefs[String(offerId)] = {
+    stake: pref.stake,
+    bookmaker: pref.bookmaker.trim(),
+  };
+  writeRaw("offerBetPrefs", JSON.stringify(prefs));
+  return getAppSettings();
+}
+
+/**
+ * Resolve stake for an offer bet:
+ * remembered pref → offer rules stake → fallback (desk / default).
+ */
+export function resolveOfferStake(
+  offerId: number | undefined,
+  rulesStake: number | null | undefined,
+  fallback: number
+): number {
+  return stakeFromOfferPrefs(getAppSettings().offerBetPrefs, offerId, rulesStake, fallback);
+}
+
+export function resolveOfferBookmaker(
+  offerId: number | undefined,
+  rulesBookmaker: string | null | undefined,
+  fallback = ""
+): string {
+  return bookmakerFromOfferPrefs(
+    getAppSettings().offerBetPrefs,
+    offerId,
+    rulesBookmaker,
+    fallback
+  );
+}
+
+export type AppSettingsPatch = Partial<AppSettings> & {
+  /** Merge a single offer pref without replacing the whole map. */
+  offerBetPref?: { offerId: number; stake: number; bookmaker?: string };
+};
+
+export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   if (patch.defaultBackStake != null) writeRaw("defaultBackStake", String(patch.defaultBackStake));
   if (patch.defaultBetType != null) writeRaw("defaultBetType", patch.defaultBetType);
   if (patch.defaultBookmaker != null) writeRaw("defaultBookmaker", patch.defaultBookmaker);
@@ -81,9 +152,25 @@ export function patchAppSettings(patch: Partial<AppSettings>): AppSettings {
   if (patch.offerReminderDays != null) {
     writeRaw("offerReminderDays", JSON.stringify(patch.offerReminderDays));
   }
+  if (patch.offerBetPrefs != null) {
+    writeRaw("offerBetPrefs", JSON.stringify(patch.offerBetPrefs));
+  }
+  if (patch.offerBetPref != null) {
+    const { offerId, stake, bookmaker } = patch.offerBetPref;
+    setOfferBetPref(offerId, {
+      stake,
+      bookmaker: bookmaker ?? getOfferBetPref(offerId)?.bookmaker ?? "",
+    });
+  }
   if (patch.ocrAutoMatchEvents != null) {
     writeRaw("ocrAutoMatchEvents", patch.ocrAutoMatchEvents ? "true" : "false");
   }
   if (patch.dashboardPollMs != null) writeRaw("dashboardPollMs", String(patch.dashboardPollMs));
+  if (patch.displayTimezone != null) {
+    writeRaw("displayTimezone", normalizeDisplayTimezone(patch.displayTimezone));
+  }
+  if (patch.timeFormat != null) {
+    writeRaw("timeFormat", normalizeTimeFormat(patch.timeFormat));
+  }
   return getAppSettings();
 }

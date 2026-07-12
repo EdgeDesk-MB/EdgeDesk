@@ -42,7 +42,7 @@ export default function EvCalculatorPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Market (sharpest odds you can find)</CardTitle>
             <CardDescription>
-              Enter every outcome&apos;s price — e.g. the exchange&apos;s home/draw/away. Click an
+              Enter every outcome&apos;s price - e.g. the exchange&apos;s home/draw/away. Click an
               outcome to make it your selection.
             </CardDescription>
           </CardHeader>
@@ -70,7 +70,7 @@ export default function EvCalculatorPage() {
                   }
                 />
                 <div className="w-20 text-right text-sm text-muted-foreground">
-                  {fair ? <PercentFlow value={fair.fairProbabilities[i] * 100} digits={1} /> : "—"}
+                  {fair ? <PercentFlow value={fair.fairProbabilities[i] * 100} digits={1} /> : "-"}
                 </div>
                 <Button
                   variant="ghost"
@@ -117,7 +117,7 @@ export default function EvCalculatorPage() {
               <div className="rounded-lg border bg-muted/40 p-4">
                 <div className="text-xs text-muted-foreground">Fair odds (no vig)</div>
                 <div className="text-xl font-semibold">
-                  {trueP > 0 ? <NumFlow value={1 / trueP} /> : "—"}
+                  {trueP > 0 ? <NumFlow value={1 / trueP} /> : "-"}
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/40 p-4">

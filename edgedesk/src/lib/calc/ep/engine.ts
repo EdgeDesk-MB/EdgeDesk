@@ -1,5 +1,5 @@
 /**
- * Early-Payout Edge Desk engine — ported verbatim from EP_EDGE_DESK_BUILD_SPEC v6.
+ * Early-Payout Edge Desk engine - ported verbatim from EP_EDGE_DESK_BUILD_SPEC v6.
  * Pure functions, no React. Do NOT "optimise" the combinatorics or normalisation
  * without re-running the test vectors in engine.test.ts.
  */
@@ -183,7 +183,7 @@ export interface EpProbs {
 }
 
 /**
- * For each final score, every goal ordering is equally likely (uniform interleaving —
+ * For each final score, every goal ordering is equally likely (uniform interleaving -
  * exact for Poisson, assumed under DC). Enumerate orderings, track the running lead's
  * max/min to detect ≥1/≥2-ahead for each side. 2UP = ever-2-ahead OR win FT.
  */
@@ -248,7 +248,7 @@ export function epProbsW(wfn: WeightFn, maxg = 11, thresh = 1e-11): EpProbs {
   };
 }
 
-/** One row per distinct trigger-combo — powers the distribution/settlement calcs. */
+/** One row per distinct trigger-combo - powers the distribution/settlement calcs. */
 export interface Scenario {
   result: "H" | "D" | "A";
   He1: boolean;
@@ -373,6 +373,24 @@ export function dutchDist(
   SD: number,
   threshold: 1 | 2
 ): DutchDist {
+  return dutchDistMixed(scen, oH, oA, oD, SH, SA, SD, threshold, threshold);
+}
+
+/**
+ * Mixed-threshold dutch: home and away can use different EP rules
+ * (e.g. favourite 2UP + outsider 1UP - common when the dog rarely leads by 2).
+ */
+export function dutchDistMixed(
+  scen: Scenario[],
+  oH: number,
+  oA: number,
+  oD: number,
+  SH: number,
+  SA: number,
+  SD: number,
+  homeThreshold: 1 | 2,
+  awayThreshold: 1 | 2
+): DutchDist {
   const total = SH + SA + SD;
   let EV = 0,
     E2 = 0,
@@ -381,8 +399,10 @@ export function dutchDist(
     best = -Infinity;
   const buckets = new Map<string, DutchLadderRung>();
   for (const s of scen) {
-    const homeWin = (threshold === 2 ? s.He2 : s.He1) || s.result === "H";
-    const awayWin = (threshold === 2 ? s.Ae2 : s.Ae1) || s.result === "A";
+    const homeWin =
+      (homeThreshold === 2 ? s.He2 : s.He1) || s.result === "H";
+    const awayWin =
+      (awayThreshold === 2 ? s.Ae2 : s.Ae1) || s.result === "A";
     const ret =
       (homeWin ? SH * oH : 0) + (awayWin ? SA * oA : 0) + (s.result === "D" ? SD * oD : 0);
     const pl = ret - total;
@@ -392,8 +412,8 @@ export function dutchDist(
     if (pl < worst) worst = pl;
     if (pl > best) best = pl;
     const legs = [
-      homeWin ? `H${threshold}UP` : null,
-      awayWin ? `A${threshold}UP` : null,
+      homeWin ? `H${homeThreshold}UP` : null,
+      awayWin ? `A${awayThreshold}UP` : null,
       s.result === "D" ? "Draw" : null,
     ].filter(Boolean);
     const label = legs.length === 0 ? "All legs lose" : legs.join(" + ");
@@ -427,7 +447,7 @@ export interface LayPlayResult {
 
 /**
  * Back-EP + lay-exchange. Three regions: W team wins (hedged flat), G led-by-threshold
- * then failed to win (BOTH back and lay win — the bonus), N never led (hedged flat).
+ * then failed to win (BOTH back and lay win - the bonus), N never led (hedged flat).
  * `tW` must be the MODEL win prob (pWinH/pWinA), not the margin-stripped input.
  */
 export function layPlay(
@@ -468,8 +488,8 @@ export function layPlay(
 /* ---------------------------------- 4.6 EP-bonus decomposition ---------------------------------- */
 
 export interface EpDecomposition {
-  straight: number; // o·tW − 1 (negative — short odds)
-  bonus: number; // o·(pEP − tW) (positive — early-payout value)
+  straight: number; // o·tW − 1 (negative - short odds)
+  bonus: number; // o·(pEP − tW) (positive - early-payout value)
   total: number; // o·pEP − 1 = straight + bonus
   G: number; // pEP − tW: "led-then-didn't-win" probability
   fair: number; // 1/pEP

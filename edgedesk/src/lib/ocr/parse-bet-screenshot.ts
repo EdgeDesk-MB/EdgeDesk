@@ -65,7 +65,7 @@ const UK_COURSES = [
 const SKIP_LINE =
   /^(stake|odds|returns|total|status|reference|bet result|expiry|includes|re-use|singles|betslip|bet placed|bet details|detailed)/i;
 
-/** Normalise OCR quirks — keep newlines for label-on-next-line patterns. */
+/** Normalise OCR quirks - keep newlines for label-on-next-line patterns. */
 function normaliseRaw(raw: string): string {
   return raw
     .replace(/\r/g, "\n")
@@ -123,7 +123,7 @@ function parseTripletValues(
 ): { odds?: number; stake?: number; returns?: number } | undefined {
   const stake = parseMoneyValue(stakeRaw);
   const returns = parseMoneyValue(returnsRaw);
-  let odds = parseOddsValue(oddsRaw.replace(/^£/, ""));
+  const odds = parseOddsValue(oddsRaw.replace(/^£/, ""));
 
   if (stake == null && returns == null && odds == null) return undefined;
 
@@ -182,7 +182,7 @@ function parseOddsValue(raw: string): number | undefined {
 }
 
 /**
- * Find a value after a label — same line ("Odds 11") or next non-empty line ("Odds\n11").
+ * Find a value after a label - same line ("Odds 11") or next non-empty line ("Odds\n11").
  */
 function valueAfterLabel(
   text: string,
@@ -234,7 +234,7 @@ function parseLabelledMoney(text: string, labels: string[]): number | undefined 
   return undefined;
 }
 
-/** Fallback odds — never pick returns/payout/stake amounts. */
+/** Fallback odds - never pick returns/payout/stake amounts. */
 function parseOddsFallback(text: string): number | undefined {
   const blocked = new Set<number>();
   for (const label of [

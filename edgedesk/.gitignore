@@ -34,7 +34,7 @@ yarn-error.log*
 .env*
 !.env.example
 
-# local database (your profit history lives here — back it up!)
+# local database (your profit history lives here - back it up!)
 /data/
 
 # vercel

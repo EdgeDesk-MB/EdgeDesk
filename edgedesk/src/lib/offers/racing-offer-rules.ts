@@ -1,4 +1,4 @@
-import type { OfferRow } from "@/lib/db";
+import type { OfferRow } from "@/lib/db/schema";
 import type { OddsSource } from "@/lib/racing/odds";
 import type { RacingDeskRace, SuggestedRunner } from "@/lib/racing-desk/types";
 import type { ExchangeOddsSource } from "@/lib/services/exchange/types";
@@ -24,10 +24,17 @@ export function normalizeCourseName(name: string): string {
 /** All UK/IRE courses vs a single named track. */
 export function isRegionalScope(scopeCourse: string | null | undefined): boolean {
   const scope = scopeCourse?.trim().toLowerCase();
-  return !scope || scope === "all" || scope === "uk_ire";
+  return !scope || scope === "all" || scope === "uk_ire" || scope === "any";
 }
 
-export function formatOfferScopeLabel(scopeCourse: string | null | undefined): string {
+export function formatOfferScopeLabel(
+  scopeCourse: string | null | undefined,
+  scopeRaceLabel?: string | null
+): string {
+  if (scopeRaceLabel?.trim()) {
+    const course = !isRegionalScope(scopeCourse) ? scopeCourse!.trim() : null;
+    return course ? `${course} · ${scopeRaceLabel.trim()}` : scopeRaceLabel.trim();
+  }
   if (isRegionalScope(scopeCourse)) return "UK & Ireland";
   return scopeCourse!.trim();
 }
@@ -43,10 +50,19 @@ export function parseOfferRules(offer: OfferRow): BetGetFreePlaceRules | null {
   }
 }
 
-export function formatBetGetFreePlaceSummary(rules: BetGetFreePlaceRules): string {
+export function formatBetGetFreePlaceSummary(
+  rules: BetGetFreePlaceRules,
+  opts?: { includeRegions?: boolean }
+): string {
   const places = rules.qualifyingPlaces.join(", ");
-  const regions = rules.regions.join(" & ");
-  return `Bet £${rules.betStake} get £${rules.freeBetAmount} free if places ${places} · min ${rules.minRunners} runners · ${regions}`;
+  const parts = [
+    `Bet £${rules.betStake} get £${rules.freeBetAmount} free if places ${places}`,
+    `min ${rules.minRunners} runners`,
+  ];
+  if (opts?.includeRegions !== false) {
+    parts.push(rules.regions.join(" & "));
+  }
+  return parts.join(" · ");
 }
 
 export function placeRefundTriggerText(rules: BetGetFreePlaceRules): string {
@@ -56,7 +72,7 @@ export function placeRefundTriggerText(rules: BetGetFreePlaceRules): string {
 
 export function raceQualifiesForOffer(
   offer: OfferRow,
-  race: Pick<RacingDeskRace, "course" | "fieldSize" | "region">,
+  race: Pick<RacingDeskRace, "course" | "fieldSize" | "region" | "externalId" | "offTime">,
   date: string
 ): { qualifies: boolean; reasons: string[] } {
   const rules = parseOfferRules(offer);
@@ -68,10 +84,18 @@ export function raceQualifiesForOffer(
     reasons.push(`Offer is for ${offer.eventDate}, not ${date}`);
   }
 
-  const scope = offer.scopeCourse?.trim();
-  if (scope && !isRegionalScope(scope)) {
-    if (normalizeCourseName(race.course) !== normalizeCourseName(scope)) {
-      reasons.push(`Course ${race.course} not in scope (${scope})`);
+  // Specific race lock - must match Racing API id (or off-time fallback via label)
+  const raceId = offer.scopeRaceId?.trim();
+  if (raceId) {
+    if (race.externalId !== raceId) {
+      reasons.push(`Not the scoped race (${offer.scopeRaceLabel ?? raceId})`);
+    }
+  } else {
+    const scope = offer.scopeCourse?.trim();
+    if (scope && !isRegionalScope(scope)) {
+      if (normalizeCourseName(race.course) !== normalizeCourseName(scope)) {
+        reasons.push(`Course ${race.course} not in scope (${scope})`);
+      }
     }
   }
 
@@ -79,13 +103,74 @@ export function raceQualifiesForOffer(
     reasons.push(`Only ${race.fieldSize} runners (need ${rules.minRunners}+)`);
   }
 
-  const region = (race.region ?? "GB").toUpperCase();
-  const allowed = rules.regions.map((r) => r.toUpperCase());
-  if (!allowed.includes(region as "GB" | "IRE")) {
-    reasons.push(`Region ${region} not covered (${allowed.join(", ")})`);
+  // Region filter only for UK/IRE regional scope - course/race locks already pin the meeting
+  if (!raceId && isRegionalScope(offer.scopeCourse)) {
+    const region = (race.region ?? "GB").toUpperCase();
+    const allowed = rules.regions.map((r) => r.toUpperCase());
+    if (!allowed.includes(region as "GB" | "IRE")) {
+      reasons.push(`Region ${region} not covered (${allowed.join(", ")})`);
+    }
   }
 
   return { qualifies: reasons.length === 0, reasons };
+}
+
+/**
+ * Softer match for Add bet: course / race / date / bookie.
+ * Skips field-size (often unknown in the dialog).
+ */
+export function offerMatchesBetContext(
+  offer: Pick<
+    OfferRow,
+    | "sport"
+    | "status"
+    | "eventDate"
+    | "scopeCourse"
+    | "scopeRaceId"
+    | "scopeRaceLabel"
+    | "bookmaker"
+    | "offerType"
+    | "rules"
+  >,
+  ctx: {
+    date: string;
+    course?: string | null;
+    raceExternalId?: string | null;
+    offTime?: string | null;
+    bookmaker?: string | null;
+  }
+): boolean {
+  if (offer.sport !== "horse_racing") return false;
+  if (offer.status !== "active" && offer.status !== "planned") return false;
+  if (!parseOfferRules(offer as OfferRow)) return false;
+
+  if (offer.eventDate && offer.eventDate !== ctx.date) return false;
+
+  if (ctx.bookmaker?.trim() && offer.bookmaker?.trim()) {
+    if (offer.bookmaker.trim().toLowerCase() !== ctx.bookmaker.trim().toLowerCase()) {
+      return false;
+    }
+  }
+
+  const raceId = offer.scopeRaceId?.trim();
+  if (raceId) {
+    if (ctx.raceExternalId?.trim() && ctx.raceExternalId.trim() === raceId) return true;
+    // Off-time + course fallback when external id missing
+    const label = offer.scopeRaceLabel?.toLowerCase() ?? "";
+    const off = ctx.offTime?.trim().toLowerCase() ?? "";
+    const course = ctx.course?.trim() ? normalizeCourseName(ctx.course) : "";
+    if (off && label.includes(off) && course && label.includes(course)) return true;
+    return false;
+  }
+
+  const scope = offer.scopeCourse?.trim();
+  if (scope && !isRegionalScope(scope)) {
+    if (!ctx.course?.trim()) return false;
+    return normalizeCourseName(ctx.course) === normalizeCourseName(scope);
+  }
+
+  // Regional UK/IRE - any racing event that day qualifies for picker
+  return true;
 }
 
 /** Heuristic: predictable 2nd/3rd/4th when favourite is clear and place contenders cluster. */

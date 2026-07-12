@@ -1,10 +1,24 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CircleHelp, type LucideProps } from "lucide-react";
+import {
+  Bike,
+  Car,
+  CircleHelp,
+  Dog,
+  Flag,
+  Gamepad2,
+  HandMetal,
+  Shield,
+  Snowflake,
+  Target,
+  Trophy,
+  type LucideProps,
+} from "lucide-react";
+import { sportDisplayLabel } from "@/lib/sports";
 import { cn } from "@/lib/utils";
 
-export type SportId = "football" | "horse_racing" | "tennis" | "other" | (string & {});
+export type SportId = string;
 
 export function normalizeSport(sport?: string | null): string {
   const s = sport?.trim();
@@ -12,16 +26,7 @@ export function normalizeSport(sport?: string | null): string {
 }
 
 export function sportLabel(sport?: string | null): string {
-  switch (normalizeSport(sport)) {
-    case "horse_racing":
-      return "Horse racing";
-    case "tennis":
-      return "Tennis";
-    case "other":
-      return "Other";
-    default:
-      return "Football";
-  }
+  return sportDisplayLabel(sport);
 }
 
 type SvgIconProps = Pick<LucideProps, "className" | "size">;
@@ -42,7 +47,7 @@ function svgProps({ className, size = 16 }: SvgIconProps) {
   };
 }
 
-/** Soccer ball — stroke style matched to Lucide. */
+/** Soccer ball - stroke style matched to Lucide. */
 export function FootballIcon(props: SvgIconProps) {
   return (
     <svg {...svgProps(props)}>
@@ -53,7 +58,7 @@ export function FootballIcon(props: SvgIconProps) {
   );
 }
 
-/** Horse racing — side-profile horse. */
+/** Horse racing - side-profile horse. */
 function HorseRacingIcon(props: SvgIconProps) {
   return (
     <svg {...svgProps(props)}>
@@ -66,7 +71,7 @@ function HorseRacingIcon(props: SvgIconProps) {
   );
 }
 
-/** Tennis ball — circle with seam curves. */
+/** Tennis ball - circle with seam curves. */
 function TennisIcon(props: SvgIconProps) {
   return (
     <svg {...svgProps(props)}>
@@ -75,6 +80,14 @@ function TennisIcon(props: SvgIconProps) {
       <path d="M12 2c-2.8 2.5-4.5 6.2-4.5 10s1.7 7.5 4.5 10" />
     </svg>
   );
+}
+
+function LucideSportIcon({
+  icon: Icon,
+  ...props
+}: SvgIconProps & { icon: React.ComponentType<LucideProps> }) {
+  const { className, size = 16 } = props;
+  return <Icon className={cn("shrink-0", className)} size={size} aria-hidden />;
 }
 
 export function SportIcon({
@@ -99,8 +112,52 @@ export function SportIcon({
     case "tennis":
       icon = <TennisIcon {...props} />;
       break;
+    case "cricket":
+      icon = <LucideSportIcon icon={Trophy} {...props} />;
+      break;
+    case "rugby_union":
+    case "rugby_league":
+      icon = <LucideSportIcon icon={Shield} {...props} />;
+      break;
+    case "golf":
+      icon = <LucideSportIcon icon={Flag} {...props} />;
+      break;
+    case "darts":
+    case "snooker":
+      icon = <LucideSportIcon icon={Target} {...props} />;
+      break;
+    case "basketball":
+    case "volleyball":
+    case "baseball":
+      icon = <LucideSportIcon icon={Trophy} {...props} />;
+      break;
+    case "american_football":
+      icon = <LucideSportIcon icon={Trophy} {...props} />;
+      break;
+    case "boxing":
+    case "mma":
+      icon = <LucideSportIcon icon={HandMetal} {...props} />;
+      break;
+    case "greyhounds":
+      icon = <LucideSportIcon icon={Dog} {...props} />;
+      break;
+    case "motorsport":
+      icon = <LucideSportIcon icon={Car} {...props} />;
+      break;
+    case "cycling":
+      icon = <LucideSportIcon icon={Bike} {...props} />;
+      break;
+    case "ice_hockey":
+      icon = <LucideSportIcon icon={Snowflake} {...props} />;
+      break;
+    case "esports":
+      icon = <LucideSportIcon icon={Gamepad2} {...props} />;
+      break;
     case "other":
       icon = <CircleHelp className={cn("shrink-0", className)} size={size} aria-hidden />;
+      break;
+    case "football":
+      icon = <FootballIcon {...props} />;
       break;
     default:
       icon = <FootballIcon {...props} />;
@@ -139,7 +196,7 @@ export function SportLabel({
   );
 }
 
-/** Icon + stacked title/meta — single left edge for all lines. */
+/** Icon + stacked title/meta - single left edge for all lines. */
 export function SportEventBlock({
   sport,
   title,

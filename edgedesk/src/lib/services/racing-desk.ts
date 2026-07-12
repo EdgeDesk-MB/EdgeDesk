@@ -1,9 +1,8 @@
 /**
- * Assemble Racing Desk payload — racecards, movements, linked bets.
+ * Assemble Racing Desk payload - racecards, movements, linked bets.
  */
 import { db, bets, events, offers, type BetRow, type EventRow, type OfferRow } from "@/lib/db";
 import {
-  estimateDecimalsFromRatings,
   resolveRunnerOdds,
   type OddsSource,
 } from "@/lib/racing/odds";
@@ -19,6 +18,7 @@ import type {
 } from "@/lib/racing-desk/types";
 import {
   formatBetGetFreePlaceSummary,
+  isRegionalScope,
   parseOfferRules,
   placeRefundTriggerText,
   raceQualifiesForOffer,
@@ -31,8 +31,10 @@ import {
   priceMovementFor,
   recordOddsSnapshots,
 } from "@/lib/services/racing-odds-snapshots";
+import { listOverridesForRaces } from "@/lib/services/racing-odds-overrides";
 import {
   demoRacecards,
+  getCachedRacingResultsTier,
   hasRacingApiKey,
   racecardsByDate,
   racecardsFree,
@@ -44,7 +46,11 @@ import {
   getDefaultExchangeProvider,
   getExchangeOdds,
   getExchangeProviderStatus,
+  getExchangeColors,
+  resolveLiveExchangeProvider,
+  type ExchangeProvider,
 } from "@/lib/services/exchange";
+import { syncCourseOfferExpiryFromRaces } from "@/lib/offers/course-offer-sync";
 
 function startOfTodayMs(): number {
   const d = new Date();
@@ -92,7 +98,7 @@ async function loadRacecards(
     oddsTier = "free";
   }
 
-  const results = await resultsToday();
+  const { results } = await resultsToday();
   return {
     oddsTier,
     cards: cards.map((card) => {
@@ -109,45 +115,85 @@ function enrichRunners(
   idxSeed: number,
   preferredBookmaker?: string | null,
   forceProxy?: boolean,
-  exchangeLayByHorse?: Map<string, number>
+  exchangeLayByHorse?: Map<string, { layDecimal: number; laySize?: number }>,
+  overrides?: Map<string, { bookieDecimal: number | null; exchangeDecimal: number | null }>
 ): RacingRunnerDetail[] {
   const active = card.runnerDetails.filter((r) => !r.nonRunner);
-  const proxyMap =
-    forceProxy || active.every((r) => !r.spDecimal && !(r.oddsList?.length))
-      ? estimateDecimalsFromRatings(active)
-      : new Map<string, number>();
 
   return active.map((r, idx) => {
-    let movement = priceMovementFor(card.externalId, r.horseId);
+    let movement = priceMovementFor(card.externalId, r.horseId, "bookie");
     if (movement.snapshotCount === 0 && isDemo && r.spDecimal) {
       movement = demoMovement(r.spDecimal, idx + r.name.length);
     }
+    const exchangeMovement = priceMovementFor(card.externalId, r.horseId, "exchange");
 
+    const layQuote = exchangeLayByHorse?.get(r.horseId);
+    const override = overrides?.get(r.horseId);
+    const bookieOverride =
+      override?.bookieDecimal != null && override.bookieDecimal > 1
+        ? override.bookieDecimal
+        : null;
+    const exchangeOverride =
+      override?.exchangeDecimal != null && override.exchangeDecimal > 1
+        ? override.exchangeDecimal
+        : null;
+
+    // Free tier: never invent bookie prices. Show real API / snapshot / manual only.
+    // Proxy OFR ladder is unused for display - paste override is the free workflow.
     const resolved = resolveRunnerOdds({
-      spDecimal: r.spDecimal,
-      spFraction: r.spFraction,
-      oddsList: r.oddsList,
-      snapshotDecimal: movement.current,
-      proxyDecimal: proxyMap.get(r.horseId),
+      spDecimal: forceProxy ? undefined : r.spDecimal,
+      spFraction: forceProxy ? undefined : r.spFraction,
+      oddsList: forceProxy ? undefined : r.oddsList,
+      snapshotDecimal: forceProxy ? undefined : movement.current,
+      proxyDecimal: undefined,
       preferredBookmaker: preferredBookmaker ?? undefined,
-      exchangeLayDecimal: exchangeLayByHorse?.get(r.horseId),
+      exchangeLayDecimal: layQuote?.layDecimal,
     });
+
+    const bookieDecimal = bookieOverride ?? (forceProxy ? undefined : resolved.bookieDecimal);
+    const exchangeDecimal =
+      exchangeOverride ??
+      layQuote?.layDecimal ??
+      resolved.exchangeDecimal;
+    const oddsOverridden = bookieOverride != null || exchangeOverride != null;
+    const oddsSource: OddsSource = bookieOverride
+      ? "manual"
+      : forceProxy
+        ? "unavailable"
+        : resolved.source;
+    const spreadPct =
+      bookieDecimal != null &&
+      exchangeDecimal != null &&
+      bookieDecimal > 1 &&
+      exchangeDecimal > 1
+        ? ((exchangeDecimal - bookieDecimal) / bookieDecimal) * 100
+        : undefined;
 
     const { oddsList: _drop, ...rest } = r;
     return {
       ...rest,
-      movement,
-      bookieDecimal: resolved.bookieDecimal,
-      exchangeDecimal: resolved.exchangeDecimal,
-      exchangeSource: resolved.exchangeSource,
-      spreadPct: resolved.spreadPct,
-      oddsSource: resolved.source,
+      movement: oddsSource === "manual" || oddsSource === "live" || oddsSource === "snapshot"
+        ? movement
+        : undefined,
+      exchangeMovement,
+      bookieDecimal,
+      exchangeDecimal,
+      exchangeLaySize: exchangeOverride ? undefined : layQuote?.laySize,
+      exchangeSource: exchangeOverride
+        ? ("api" as const)
+        : layQuote?.layDecimal
+          ? ("live" as const)
+          : resolved.exchangeSource,
+      spreadPct,
+      oddsSource,
+      oddsOverridden,
     };
   });
 }
 
 function raceOddsSource(runners: RacingRunnerDetail[]): OddsSource {
   const sources = runners.map((r) => r.oddsSource).filter(Boolean);
+  if (sources.includes("manual")) return "manual";
   if (sources.includes("live")) return "live";
   if (sources.includes("snapshot")) return "snapshot";
   if (sources.includes("proxy")) return "proxy";
@@ -176,6 +222,7 @@ function buildActiveOfferSummaries(activeOffers: OfferRow[]): RacingDeskActiveOf
       title: offer.title,
       bookmaker: offer.bookmaker,
       scopeCourse: offer.scopeCourse,
+      scopeRaceLabel: offer.scopeRaceLabel,
       eventDate: offer.eventDate,
       rulesSummary,
     };
@@ -210,6 +257,10 @@ function evaluateOfferTags(
       bookmaker: offer.bookmaker,
       triggerText: rules ? placeRefundTriggerText(rules) : undefined,
       suggestedRunners,
+      minRunners:
+        offer.scopeCourse?.trim() && !isRegionalScope(offer.scopeCourse)
+          ? (rules?.minRunners ?? null)
+          : null,
     };
   });
 }
@@ -248,7 +299,9 @@ function buildSuggestedRaces(races: RacingDeskRace[]): SuggestedRace[] {
         externalId: race.externalId,
         course: race.course,
         raceName: race.raceName,
+        startTime: race.startTime,
         offTime: race.offTime,
+        region: race.region,
         offerId: tag.offerId,
         offerTitle: tag.offerTitle,
         score: tag.score,
@@ -264,7 +317,10 @@ function buildSuggestedRaces(races: RacingDeskRace[]): SuggestedRace[] {
   return suggestions.sort((a, b) => b.score - a.score).slice(0, 8);
 }
 
-export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
+export async function getRacingDesk(
+  date: string,
+  options?: { exchangeProvider?: ExchangeProvider | null }
+): Promise<RacingDeskPayload> {
   const source = hasRacingApiKey() ? "api" : "demo";
   let error: string | undefined;
 
@@ -282,17 +338,7 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
 
   cards.sort((a, b) => a.startTime - b.startTime);
 
-  const snapshotInputs = cards.flatMap((card) =>
-    card.runnerDetails
-      .filter((r) => !r.nonRunner)
-      .map((r) => ({
-        raceId: card.externalId,
-        horseId: r.horseId,
-        horse: r.name,
-        spDecimal: r.spDecimal,
-      }))
-  );
-  if (snapshotInputs.length > 0) recordOddsSnapshots(snapshotInputs);
+  syncCourseOfferExpiryFromRaces(cards, date);
 
   const allEvents = db.select().from(events).all();
   const eventByExternal = new Map(
@@ -309,19 +355,39 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
 
   const isDemo = source === "demo" && !hasRacingApiKey();
   const useProxyOdds = !isDemo && apiOddsTier === "free";
-  const activeOffers = loadActiveRacingOffers(date);
+
+  // Only show offers that haven't had a qualifying bet placed yet (planned stage).
+  // Offers with open bets are at "awaiting" or beyond — suppress from the desk.
+  const offerIdsWithOpenBets = new Set(
+    allBets
+      .filter((b) => b.status === "open" && b.offerId != null)
+      .map((b) => b.offerId as number)
+  );
+  const activeOffers = loadActiveRacingOffers(date).filter(
+    (o) => !offerIdsWithOpenBets.has(o.id)
+  );
   const primaryBookmaker = activeOffers[0]?.bookmaker ?? null;
 
-  const exchangeProvider = getDefaultExchangeProvider();
-  const exchangeName = getDefaultExchangeName();
-  const exchangeProviderStatus = getExchangeProviderStatus(exchangeProvider);
+  const settingsProvider = getDefaultExchangeProvider();
+  const settingsName = getDefaultExchangeName();
+  const deskOverride = options?.exchangeProvider ?? null;
+  const liveFeed = resolveLiveExchangeProvider(deskOverride);
+  const exchangeColors = getExchangeColors(liveFeed.provider);
+  const settingsStatus = getExchangeProviderStatus(settingsProvider);
 
   const upcomingCards = cards.filter((c) => c.status !== "finished");
-  let exchangeLayByRace = new Map<string, Map<string, number>>();
+  const exchangeLayByRace = new Map<
+    string,
+    Map<string, { layDecimal: number; laySize?: number }>
+  >();
+  const exchangeMetaByRace = new Map<
+    string,
+    { source: "live" | "estimated" | "api"; error?: string; quoteCount: number }
+  >();
 
-  if (exchangeProviderStatus.status === "connected" && upcomingCards.length > 0) {
+  if (liveFeed.status.status === "connected" && upcomingCards.length > 0) {
     const exchangeResult = await getExchangeOdds(
-      exchangeProvider,
+      liveFeed.provider,
       upcomingCards.map((card) => ({
         externalId: card.externalId,
         course: card.course,
@@ -337,13 +403,20 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
     );
 
     for (const raceOdds of exchangeResult.races) {
-      const byHorse = new Map<string, number>();
+      const byHorse = new Map<string, { layDecimal: number; laySize?: number }>();
       for (const q of raceOdds.quotes) {
-        byHorse.set(q.horseId, q.layDecimal);
+        byHorse.set(q.horseId, { layDecimal: q.layDecimal, laySize: q.laySize });
       }
       if (byHorse.size > 0) exchangeLayByRace.set(raceOdds.externalId, byHorse);
+      exchangeMetaByRace.set(raceOdds.externalId, {
+        source: raceOdds.source,
+        error: raceOdds.error,
+        quoteCount: raceOdds.quotes.length,
+      });
     }
   }
+
+  const overridesByRace = listOverridesForRaces(cards.map((c) => c.externalId));
 
   let races: RacingDeskRace[] = cards.map((card) => {
     const tracked = eventByExternal.get(card.externalId);
@@ -357,10 +430,13 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
       card.externalId.length,
       primaryBookmaker,
       useProxyOdds,
-      exchangeLayByRace.get(card.externalId)
+      exchangeLayByRace.get(card.externalId),
+      overridesByRace.get(card.externalId)
     );
     const pricedRunnerCount = runners.filter((r) => (r.bookieDecimal ?? 0) > 1).length;
     const oddsSource = raceOddsSource(runners);
+    const liveLayCount = runners.filter((r) => r.exchangeSource === "live").length;
+    const meta = exchangeMetaByRace.get(card.externalId);
 
     const baseRace = {
       externalId: card.externalId,
@@ -382,6 +458,9 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
       standardPlaces,
       oddsSource,
       pricedRunnerCount,
+      exchangeSource: liveLayCount > 0 ? ("live" as const) : meta?.source,
+      exchangeMatchError: liveLayCount > 0 ? undefined : meta?.error,
+      liveLayCount,
     };
 
     return {
@@ -391,6 +470,53 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
   });
 
   races = races.map(applyRunnerOfferTargets);
+
+  // Snapshot real bookie prices only (manual / live / API) - never Free-tier OFR proxies.
+  const bookieSnapshots = races.flatMap((race) =>
+    race.runners
+      .filter(
+        (r) =>
+          !r.nonRunner &&
+          (r.bookieDecimal ?? 0) > 1 &&
+          r.oddsSource !== "proxy" &&
+          r.oddsSource !== "unavailable"
+      )
+      .map((r) => ({
+        raceId: race.externalId,
+        horseId: r.horseId,
+        horse: r.name,
+        spDecimal: r.bookieDecimal,
+        kind: "bookie" as const,
+      }))
+  );
+  const exchangeSnapshots = races.flatMap((race) =>
+    race.runners
+      .filter(
+        (r) =>
+          !r.nonRunner &&
+          r.exchangeSource === "live" &&
+          (r.exchangeDecimal ?? 0) > 1
+      )
+      .map((r) => ({
+        raceId: race.externalId,
+        horseId: r.horseId,
+        horse: r.name,
+        spDecimal: r.exchangeDecimal,
+        kind: "exchange" as const,
+      }))
+  );
+  const snapshotInputs = [...bookieSnapshots, ...exchangeSnapshots];
+  if (snapshotInputs.length > 0) {
+    recordOddsSnapshots(snapshotInputs);
+    races = races.map((race) => ({
+      ...race,
+      runners: race.runners.map((r) => ({
+        ...r,
+        movement: priceMovementFor(race.externalId, r.horseId, "bookie"),
+        exchangeMovement: priceMovementFor(race.externalId, r.horseId, "exchange"),
+      })),
+    }));
+  }
 
   const activeOfferSummaries = buildActiveOfferSummaries(activeOffers);
   const suggestedRaces = buildSuggestedRaces(races);
@@ -404,12 +530,20 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
   );
 
   let exchangeNote: string | undefined;
-  if (exchangeProviderStatus.status === "not_configured") {
-    exchangeNote = `Connect ${exchangeName} in Settings → Data & API for live lay odds (Betfair delayed key is free for dev).`;
-  } else if (exchangeProviderStatus.status === "unsupported") {
-    exchangeNote = exchangeProviderStatus.message;
+  if (liveFeed.status.status === "not_configured") {
+    exchangeNote = deskOverride
+      ? `${liveFeed.name} is selected on Racing Desk but not connected. Configure keys in Settings → Data & API, or pick another exchange.`
+      : `Connect Betfair delayed key in Settings → Data & API for live lay odds (free). App default exchange is ${settingsName}.`;
+  } else if (liveFeed.status.status === "unsupported") {
+    exchangeNote = liveFeed.status.message;
   } else if (!hasLiveExchange) {
-    exchangeNote = `${exchangeName} configured but no live lay prices matched — using +3% estimates.`;
+    exchangeNote = `${liveFeed.name} connected but no markets matched this card - using +3% estimates. Check race times / course names.`;
+  } else if (
+    !deskOverride &&
+    liveFeed.provider !== settingsProvider &&
+    settingsStatus.status !== "connected"
+  ) {
+    exchangeNote = `Using ${liveFeed.name} for live lays (Settings default ${settingsName} has no API). Override on Racing Desk or set default to Betfair in Settings.`;
   }
 
   const summary: RacingDeskSummary = {
@@ -427,17 +561,27 @@ export async function getRacingDesk(date: string): Promise<RacingDeskPayload> {
     oddsSnapshotsEnabled: true,
     premiumOddsApi: hasRacingApiKey(),
     oddsTier: effectiveOddsTier,
+    resultsTier: hasRacingApiKey() ? getCachedRacingResultsTier() : "none",
     oddsNote:
       effectiveOddsTier === "free" || effectiveOddsTier === "proxy"
-        ? "Free Racing API plan — using rating-based price estimates. Standard plan unlocks live bookmaker & exchange odds."
+        ? "Free Racing API - no live bookie feed. Bookie column stays blank until you paste odds (click a cell). Betfair lays are live when connected."
         : effectiveOddsTier === "standard"
           ? "Live bookmaker odds from Racing API Standard."
           : undefined,
-    exchangeProvider,
-    exchangeName,
-    exchangeStatus: hasLiveExchange ? "connected" : exchangeProviderStatus.status,
-    exchangeFeedType: exchangeProviderStatus.feedType,
+    exchangeProvider: liveFeed.provider,
+    exchangeName: liveFeed.name,
+    settingsExchangeProvider: settingsProvider,
+    settingsExchangeName: settingsName,
+    deskExchangeOverride: deskOverride,
+    exchangeStatus: hasLiveExchange
+      ? "connected"
+      : liveFeed.status.status === "connected"
+        ? "disconnected"
+        : liveFeed.status.status,
+    exchangeFeedType: liveFeed.status.feedType,
     exchangeNote,
+    backColor: exchangeColors.backColor,
+    layColor: exchangeColors.layColor,
   };
 
   return { date, summary, races, activeOffers: activeOfferSummaries, suggestedRaces, error };

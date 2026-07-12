@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PendingSettleRace } from "@/lib/racing/pending-settle";
+import { formatClockString } from "@/lib/time-format";
 import { AlertCircle, X } from "lucide-react";
 
 const DISMISS_KEY = "edgedesk:settle-prompt-dismissed";
@@ -30,11 +31,12 @@ function saveDismissed(ids: Set<string>) {
 
 export function RacingSettlePrompt({
   races,
-  racingApiConfigured,
+  resultsTier,
   className,
 }: {
   races: PendingSettleRace[];
-  racingApiConfigured?: boolean;
+  /** basic = auto results available; free = racecards only; none = no key */
+  resultsTier?: "basic" | "free" | "none";
   className?: string;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
@@ -68,6 +70,12 @@ export function RacingSettlePrompt({
 
   const primary = visible[0];
   const moreCount = visible.length - 1;
+  const tierHint =
+    resultsTier === "basic"
+      ? "Results sync automatically while the app is open - or "
+      : resultsTier === "free"
+        ? "Free tier - upgrade Racing API Basic for auto results, or "
+        : "Set Racing API credentials for auto results, or ";
 
   return (
     <div
@@ -83,13 +91,8 @@ export function RacingSettlePrompt({
           {visible.length === 1 ? "Race awaiting result" : `${visible.length} races awaiting results`}
         </p>
         <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-200/90">
-          <span className="font-medium">{primary.course}</span> ({primary.offTime}) passed off without a
-          winner.
-          {racingApiConfigured ? (
-            <> Results sync when Racing API Basic tier is available — or </>
-          ) : (
-            <> Free tier — </>
-          )}
+          <span className="font-medium">{primary.course}</span> ({formatClockString(primary.offTime)}) passed off without a
+          winner. {tierHint}
           set the winner on{" "}
           <Link href="/tracked-events" className="font-medium underline underline-offset-2">
             Tracked Events

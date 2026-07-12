@@ -1,6 +1,6 @@
 /**
  * Exchange presets: brand identity + the back/lay trading colours their own UIs use.
- * Users can add custom exchanges and override commission and colours — these are
+ * Users can add custom exchanges and override commission and colours - these are
  * just well-known starting points.
  */
 
@@ -60,7 +60,7 @@ export function contrastText(hex: string): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#1a1a1a" : "#ffffff";
 }
 
-/** Darken a hex colour by a factor (0..1) — used to derive dark-mode panel tints. */
+/** Darken a hex colour by a factor (0..1) - used to derive dark-mode panel tints. */
 export function darken(hex: string, factor: number): string {
   const m = hex.replace("#", "");
   const full = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
@@ -71,7 +71,7 @@ export function darken(hex: string, factor: number): string {
   return `#${channel(0)}${channel(2)}${channel(4)}`;
 }
 
-/** Lighten a hex colour toward white by a factor (0..1) — derives input tints from panel colours. */
+/** Lighten a hex colour toward white by a factor (0..1) - derives input tints from panel colours. */
 export function lighten(hex: string, factor: number): string {
   const m = hex.replace("#", "");
   const full = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
@@ -82,4 +82,10 @@ export function lighten(hex: string, factor: number): string {
       .padStart(2, "0");
   };
   return `#${channel(0)}${channel(2)}${channel(4)}`;
+}
+
+/** Pill border ~20% darker than background — works with hex, hsl, and Settings overrides. */
+export function pillBorderColor(bg: string, darkenRatio = 0.2): string {
+  const mix = Math.round((1 - darkenRatio) * 100);
+  return `color-mix(in srgb, ${bg} ${mix}%, black)`;
 }

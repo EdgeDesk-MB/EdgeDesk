@@ -1,18 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,90 +14,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookieNamePicker } from "@/components/bookie-name-picker";
+import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookieNamePicker, ExchangeNamePicker } from "@/components/bookie-name-picker";
 import { Switch } from "@/components/ui/switch";
-import { MoneyFlow } from "@/components/money-flow";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import type { AppSettings } from "@/lib/services/settings";
-import type { AccountBalance } from "@/lib/services/balances";
-import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
-import { bookieBrandColor } from "@/lib/brands/bookies";
+import type { AppSettings } from "@/lib/services/settings-shared";
 import type { ExchangeRow } from "@/lib/db/schema";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Plus, Trash2, Download, Bell, SlidersHorizontal, BookOpen, Map, RotateCcw } from "lucide-react";
+import { Download, Bell, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
+import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
+import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
 export default function SettingsPage() {
   const { resetAndOpenWelcome } = useOnboarding();
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
   const settings = state?.settings;
-  const [bookies, setBookies] = useState<AccountBalance[]>([]);
-  const [accountsTab, setAccountsTab] = useState<"exchanges" | "bookies">("exchanges");
-  const [prefsTab, setPrefsTab] = useState<"accounts" | "preferences" | "data">("accounts");
+  const [prefsTab, setPrefsTab] = useState<"preferences" | "data">("preferences");
 
-  const loadBookies = useCallback(async () => {
+  async function setDefaultExchange(id: number) {
+    const name = exchanges.find((e) => e.id === id)?.name ?? "Exchange";
     try {
-      const res = await api<{ bookies: AccountBalance[] }>("/api/bookies");
-      setBookies(res.bookies);
-    } catch (e) {
-      toast.error("Could not load bookies", { description: String(e) });
-    }
-  }, []);
-
-  useEffect(() => {
-    queueMicrotask(loadBookies);
-  }, [loadBookies]);
-
-  async function patchExchange(id: number, json: Record<string, unknown>, message?: string) {
-    try {
-      await api(`/api/exchanges/${id}`, { method: "PATCH", json });
-      if (message) toast.success(message);
+      await api(`/api/exchanges/${id}`, { method: "PATCH", json: { isDefault: true } });
+      toast.success(`${name} is now default`);
       refreshExchanges();
     } catch (e) {
       toast.error("Update failed", { description: String(e) });
-    }
-  }
-
-  async function deleteExchange(id: number) {
-    try {
-      await api(`/api/exchanges/${id}`, { method: "DELETE" });
-      toast.success("Exchange removed");
-      refreshExchanges();
-    } catch (e) {
-      toast.error("Delete failed", { description: String(e) });
-    }
-  }
-
-  async function patchBookie(id: number, brandColor: string) {
-    try {
-      await api(`/api/accounts/${id}`, { method: "PATCH", json: { brandColor } });
-      loadBookies();
-    } catch (e) {
-      toast.error("Update failed", { description: String(e) });
-    }
-  }
-
-  async function archiveBookie(id: number) {
-    try {
-      await api(`/api/accounts/${id}`, { method: "DELETE" });
-      toast.success("Bookie archived");
-      loadBookies();
-    } catch (e) {
-      toast.error("Delete failed", { description: String(e) });
     }
   }
 
@@ -124,7 +63,7 @@ export default function SettingsPage() {
       <PageHeader
         helpId="settings"
         title="Settings"
-        description="Accounts, defaults, reminders and data — everything that shapes how EdgeDesk behaves."
+        description="Defaults, reminders and data - everything that shapes how EdgeDesk behaves."
       />
 
       <Card>
@@ -159,112 +98,46 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Tabs value={prefsTab} onValueChange={(v) => setPrefsTab(v as typeof prefsTab)}>
-        <TabsList variant="segmented">
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="data">Data &amp; API</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {prefsTab === "preferences" && settings && (
-        <PreferencesPanel settings={settings} onPatch={patchSettings} />
-      )}
-
-      {prefsTab === "data" && (
-        <DataApiPanel
-          apiConfigured={state?.apiConfigured}
-          racingApiConfigured={state?.racingApiConfigured}
-          exchangeName={state?.exchangeName}
-          exchangeStatus={state?.exchangeStatus}
-          exchangeProviders={state?.exchangeProviders}
-        />
-      )}
-
-      {prefsTab === "accounts" && (
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle section>My accounts</CardTitle>
-          <CardDescription>
-            Exchanges power calculator lay panels. Bookies listed here are wallets with a balance
-            or ledger history — set a brand colour for each.
-          </CardDescription>
+        <CardHeader className="pb-0">
           <Tabs
-            value={accountsTab}
-            onValueChange={(v) => setAccountsTab(v as typeof accountsTab)}
-            className="mt-3"
+            value={prefsTab}
+            onValueChange={(v) => setPrefsTab(v as typeof prefsTab)}
+            className="gap-0"
           >
-            <TabsList variant="segmented">
-              <TabsTrigger value="exchanges">Exchanges</TabsTrigger>
-              <TabsTrigger value="bookies">Bookies</TabsTrigger>
-            </TabsList>
+            <TabsLineBar bleed="card">
+              <TabsList variant="line" className="w-full justify-start">
+                <TabsTrigger value="preferences">Preferences</TabsTrigger>
+                <TabsTrigger value="data">Data &amp; API</TabsTrigger>
+              </TabsList>
+            </TabsLineBar>
           </Tabs>
         </CardHeader>
-        <CardContent>
-          {accountsTab === "exchanges" ? (
-            <>
-              <div className="mb-3 flex justify-end">
-                <AddExchangeDialog onSaved={refreshExchanges} />
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Exchange</TableHead>
-                    <TableHead className="w-40">Commission %</TableHead>
-                    <TableHead>Colours</TableHead>
-                    <TableHead className="w-28">Default</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {exchanges.map((exchange) => (
-                    <ExchangeEditRow
-                      key={exchange.id}
-                      exchange={exchange}
-                      onPatch={patchExchange}
-                      onDelete={deleteExchange}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </>
-          ) : (
-            <>
-              <div className="mb-3 flex justify-end">
-                <AddBookieDialog onSaved={loadBookies} />
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Bookie</TableHead>
-                    <TableHead className="w-36">Brand colour</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bookies.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
-                        No bookie wallets yet — add one here or via Add balance when topping up.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {bookies.map((bookie) => (
-                    <BookieEditRow
-                      key={bookie.id}
-                      bookie={bookie}
-                      onPatchColor={patchBookie}
-                      onArchive={archiveBookie}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </>
+        <CardContent className="pt-4">
+          {prefsTab === "preferences" && settings && (
+            <PreferencesPanel
+              settings={settings}
+              exchanges={exchanges}
+              onPatch={patchSettings}
+              onSetDefaultExchange={setDefaultExchange}
+            />
           )}
+
+          {prefsTab === "data" && (
+            <DataApiPanel
+              apiConfigured={state?.apiConfigured}
+              racingApiConfigured={state?.racingApiConfigured}
+              racingResultsTier={state?.racingResultsTier}
+              apiUsage={state?.apiUsage}
+              racingApiUsage={state?.racingApiUsage}
+              exchangeName={state?.exchangeName}
+              exchangeStatus={state?.exchangeStatus}
+              exchangeProviders={state?.exchangeProviders}
+            />
+          )}
+
         </CardContent>
       </Card>
-      )}
 
     </PageShell>
   );
@@ -272,18 +145,21 @@ export default function SettingsPage() {
 
 function PreferencesPanel({
   settings,
+  exchanges,
   onPatch,
+  onSetDefaultExchange,
 }: {
   settings: AppSettings;
+  exchanges: ExchangeRow[];
   onPatch: (patch: Partial<AppSettings>) => void;
+  onSetDefaultExchange: (id: number) => void;
 }) {
   const [stake, setStake] = useState(String(settings.defaultBackStake));
-  const [bookmaker, setBookmaker] = useState(settings.defaultBookmaker);
   const [pollMs, setPollMs] = useState(String(settings.dashboardPollMs));
+  const defaultExchange = exchanges.find((e) => e.isDefault) ?? exchanges[0] ?? null;
 
   useEffect(() => {
     setStake(String(settings.defaultBackStake));
-    setBookmaker(settings.defaultBookmaker);
     setPollMs(String(settings.dashboardPollMs));
   }, [settings]);
 
@@ -295,8 +171,7 @@ function PreferencesPanel({
             <SlidersHorizontal className="size-4" /> Bet defaults
           </CardTitle>
           <CardDescription>
-            Pre-fill Add bet when you open it from the nav. Default exchange is set on the Accounts
-            tab.
+            Pre-fill Add bet when you open it from the nav. Changes save as you pick them.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -334,16 +209,38 @@ function PreferencesPanel({
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Default bookmaker</Label>
-            <BookieNamePicker value={bookmaker} onChange={setBookmaker} />
-            <Button
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() => onPatch({ defaultBookmaker: bookmaker.trim() })}
-            >
-              Save bookmaker default
-            </Button>
+            <Label>Default bookie</Label>
+            <BookieNamePicker
+              label=""
+              value={settings.defaultBookmaker}
+              onChange={(v) => {
+                const trimmed = v.trim();
+                if (trimmed && trimmed !== settings.defaultBookmaker) {
+                  onPatch({ defaultBookmaker: trimmed });
+                }
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Default exchange</Label>
+            <ExchangeNamePicker
+              label=""
+              allowCustom={false}
+              value={defaultExchange?.name ?? ""}
+              onChange={(name) => {
+                const ex = exchanges.find(
+                  (e) => e.name.toLowerCase() === name.trim().toLowerCase()
+                );
+                if (ex && ex.id !== defaultExchange?.id) {
+                  onSetDefaultExchange(ex.id);
+                }
+              }}
+            />
+            {exchanges.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Add exchanges on the Accounts page first.
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -400,6 +297,58 @@ function PreferencesPanel({
           </div>
         </CardContent>
       </Card>
+
+      <Card className="lg:col-span-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Globe className="size-4" /> Time &amp; timezone
+          </CardTitle>
+          <CardDescription>
+            Fixture kickoffs and race off-times are shown in this timezone. Defaults to London.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex flex-col gap-1.5 w-full max-w-sm">
+            <Label htmlFor="display-timezone">Display timezone</Label>
+            <Select
+              value={settings.displayTimezone}
+              onValueChange={(v) => onPatch({ displayTimezone: v })}
+            >
+              <SelectTrigger id="display-timezone">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DISPLAY_TIMEZONE_OPTIONS.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5 w-full max-w-sm">
+            <Label htmlFor="time-format">Time format</Label>
+            <Select
+              value={settings.timeFormat}
+              onValueChange={(v) => onPatch({ timeFormat: normalizeTimeFormat(v) })}
+            >
+              <SelectTrigger id="time-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_FORMAT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Applies to every time shown in the app. Manual time entry stays HH:MM.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -407,17 +356,54 @@ function PreferencesPanel({
 function DataApiPanel({
   apiConfigured,
   racingApiConfigured,
+  racingResultsTier,
+  apiUsage,
+  racingApiUsage,
   exchangeName,
   exchangeStatus,
   exchangeProviders,
 }: {
   apiConfigured?: boolean;
   racingApiConfigured?: boolean;
+  racingResultsTier?: "basic" | "free" | "none";
+  apiUsage?: { used: number; budget: number };
+  racingApiUsage?: { used: number; budget: number };
   exchangeName?: string;
   exchangeStatus?: ExchangeProviderStatus;
   exchangeProviders?: ExchangeProviderStatus[];
 }) {
   const [testingExchange, setTestingExchange] = useState(false);
+  const [testingRacing, setTestingRacing] = useState(false);
+
+  async function testRacingApi() {
+    setTestingRacing(true);
+    try {
+      const res = await api<{
+        tier: "basic" | "free" | "none";
+        resultCount: number;
+        message?: string;
+      }>("/api/racing/test");
+      if (res.tier === "basic") {
+        toast.success("Racing API Basic", {
+          description: res.message ?? `${res.resultCount} results available today`,
+        });
+      } else if (res.tier === "free") {
+        toast.info("Racing API Free", {
+          description:
+            res.message ??
+            "Racecards work - upgrade to Basic for auto race settlement.",
+        });
+      } else {
+        toast.error("Racing API not configured", {
+          description: "Set RACING_API_USERNAME / RACING_API_PASSWORD in .env.local",
+        });
+      }
+    } catch (e) {
+      toast.error("Racing API test failed", { description: String(e) });
+    } finally {
+      setTestingRacing(false);
+    }
+  }
 
   async function testExchangeConnection() {
     setTestingExchange(true);
@@ -459,7 +445,109 @@ function DataApiPanel({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Your free stack (£0/mo)</CardTitle>
+          <CardDescription>
+            EdgeDesk is built to run on free API tiers for personal use. Paid upgrades are optional -
+            only buy them when the time saved is worth more than the subscription.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
+            <li>
+              <span className="text-foreground">Racing API Free</span> - today/tomorrow racecards;
+              paste real bookie odds on Racing Desk (click a price)
+            </li>
+            <li>
+              <span className="text-foreground">Betfair delayed key</span> - free at
+              developer.betfair.com; real lay prices (~1–3 min delay)
+            </li>
+            <li>
+              <span className="text-foreground">API-Football Free</span> - optional; ~100 req/day
+              (~1 live match)
+            </li>
+            <li>
+              <span className="text-foreground">Everything else</span> - calculators, offers,
+              tracker, OCR, simulator - fully local
+            </li>
+          </ul>
+          <div className="rounded-md border px-3 py-2 space-y-1.5 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">How often free data updates</p>
+            <p>
+              Racing cards: provider ~3 min (today) / ~15 min (tomorrow); EdgeDesk caches{" "}
+              <span className="text-foreground">15 min</span>. Desk UI reloads every 60s from cache.
+            </p>
+            <p>
+              Betfair delayed: prices{" "}
+              <span className="text-foreground">~1–3 min behind</span> live (fine pre-race).
+            </p>
+            <p>
+              Football: live scores ~<span className="text-foreground">60s</span>; fixtures list ~
+              <span className="text-foreground">10 min</span>; ~1 live match/day on free budget.
+            </p>
+            <p>Leave the app open during sessions - closing the tab pauses auto sync.</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            If you later open EdgeDesk to subscribers, API costs should be covered by plan pricing -
+            never by your personal free keys. See{" "}
+            <code className="rounded bg-muted px-1 text-[11px]">docs/api-dependencies-and-tiers.md</code>
+            .
+          </p>
+          <div className="rounded-md border px-3 py-2 space-y-2">
+            <p className="text-xs font-medium text-foreground">Setup checklist</p>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
+                <span>
+                  Racing API Free in{" "}
+                  <code className="rounded bg-muted px-1">.env.local</code>
+                  {racingApiConfigured ? (
+                    <span className="text-emerald-600 dark:text-emerald-400"> - done</span>
+                  ) : (
+                    <span> - set RACING_API_USERNAME / PASSWORD</span>
+                  )}
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
+                <span>
+                  API-Football Free (optional)
+                  {apiConfigured ? (
+                    <span className="text-emerald-600 dark:text-emerald-400"> - done</span>
+                  ) : (
+                    <span> - set API_FOOTBALL_KEY or use simulator</span>
+                  )}
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
+                <span>
+                  Betfair delayed key (free) - largest remaining free win
+                  {exchangeStatus?.status === "connected" ? (
+                    <span className="text-emerald-600 dark:text-emerald-400"> - connected</span>
+                  ) : (
+                    <span>
+                      {" "}
+                      - add BETFAIR_APP_KEY / USERNAME / PASSWORD, restart server, Test below
+                    </span>
+                  )}
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
+                <span>
+                  On Racing Desk: click a bookie price to paste real odds; place-refund remembers
+                  your last stake/bookie per offer
+                </span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Export</CardTitle>
@@ -469,8 +557,9 @@ function DataApiPanel({
           {(
             [
               ["bets", "Bets"],
-              ["settlements", "Settlements"],
-              ["balances", "Balances"],
+              ["monthly", "Monthly P&L"],
+              ["offers", "Offers"],
+              ["accounts", "Accounts"],
             ] as const
           ).map(([type, label]) => (
             <Button key={type} variant="outline" className="justify-start gap-2" asChild>
@@ -484,20 +573,61 @@ function DataApiPanel({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">API keys</CardTitle>
-          <CardDescription>Set in <code className="text-xs">.env.local</code> — restart the dev server after changes.</CardDescription>
+          <CardDescription>Set in <code className="text-xs">.env.local</code> - restart the dev server after changes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <span>API-Football</span>
-            <Badge variant={apiConfigured ? "default" : "outline"}>
-              {apiConfigured ? "Configured" : "Demo mode"}
-            </Badge>
+          <div className="rounded-md border px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span>API-Football</span>
+              <Badge variant={apiConfigured ? "default" : "outline"}>
+                {apiConfigured ? "Configured" : "Demo mode"}
+              </Badge>
+            </div>
+            {apiUsage && (
+              <p className="text-xs text-muted-foreground">
+                Today: {apiUsage.used}/{apiUsage.budget} requests (free ~100/day; EdgeDesk caps
+                below the limit)
+              </p>
+            )}
           </div>
-          <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <span>The Racing API</span>
-            <Badge variant={racingApiConfigured ? "default" : "outline"}>
-              {racingApiConfigured ? "Configured" : "Not set"}
-            </Badge>
+          <div className="rounded-md border px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span>The Racing API</span>
+              <Badge
+                variant={
+                  racingResultsTier === "basic"
+                    ? "default"
+                    : racingApiConfigured
+                      ? "secondary"
+                      : "outline"
+                }
+              >
+                {racingResultsTier === "basic"
+                  ? "Basic (auto settle)"
+                  : racingResultsTier === "free" || racingApiConfigured
+                    ? "Free (racecards)"
+                    : "Not set"}
+              </Badge>
+            </div>
+            {racingApiUsage && racingApiConfigured && (
+              <p className="text-xs text-muted-foreground">
+                Today: {racingApiUsage.used}/{racingApiUsage.budget} requests (local budget guard)
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Stay on Free for personal use. Paid Basic (~£25/mo ballpark) = auto settle; Standard
+              (higher) = live bookie odds - only if you outgrow paste-overrides.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={testingRacing || !racingApiConfigured}
+              onClick={testRacingApi}
+            >
+              {testingRacing ? "Testing…" : "Test Racing API"}
+            </Button>
           </div>
           <div className="rounded-md border px-3 py-2 space-y-2">
             <div className="flex items-center justify-between">
@@ -536,329 +666,19 @@ function DataApiPanel({
             {testingExchange ? "Testing…" : "Test Betfair connection"}
           </Button>
           <p className="text-xs text-muted-foreground pt-1">
-            <strong>Betfair:</strong> free delayed app key at developer.betfair.com — set{" "}
+            <strong>Betfair:</strong> free delayed app key at developer.betfair.com - set{" "}
             <code className="rounded bg-muted px-1">BETFAIR_APP_KEY</code>,{" "}
             <code className="rounded bg-muted px-1">BETFAIR_USERNAME</code>,{" "}
-            <code className="rounded bg-muted px-1">BETFAIR_PASSWORD</code>.{" "}
-            <strong>Betdaq:</strong> partner API only — placeholder until credentials available.
-            Racing Basic tier unlocks automatic result sync.
+            <code className="rounded bg-muted px-1">BETFAIR_PASSWORD</code>. If login says 2FA
+            required, also set{" "}
+            <code className="rounded bg-muted px-1">BETFAIR_TOTP_SECRET</code> (Authenticator
+            base32 secret). Restart after changes, then Test. Set your default exchange in
+            Preferences - Racing Desk can still override for that page only.{" "}
+            <strong>Betdaq:</strong> partner API only - placeholder until credentials available.
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
-  );
-}
-
-function BookieEditRow({
-  bookie,
-  onPatchColor,
-  onArchive,
-}: {
-  bookie: AccountBalance;
-  onPatchColor: (id: number, color: string) => void;
-  onArchive: (id: number) => void;
-}) {
-  const displayColor = bookieBrandColor(bookie.name, bookie.brandColor);
-  const [color, setColor] = useState(displayColor);
-
-  useEffect(() => {
-    setColor(bookieBrandColor(bookie.name, bookie.brandColor));
-  }, [bookie.id, bookie.brandColor, bookie.name]);
-
-  return (
-    <TableRow className={bookie.isActive ? undefined : "opacity-60"}>
-      <TableCell>
-        <span className="flex items-center gap-2 font-medium">
-          <span
-            className="inline-block size-3 shrink-0 rounded-full"
-            style={{ backgroundColor: displayColor }}
-          />
-          {bookie.name}
-          {!bookie.isActive && (
-            <Badge variant="outline" className="text-[10px] font-normal">
-              archived
-            </Badge>
-          )}
-        </span>
-      </TableCell>
-      <TableCell>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-          onBlur={() => {
-            if (color !== (bookie.brandColor ?? displayColor)) {
-              onPatchColor(bookie.id, color);
-            }
-          }}
-          className="h-9 w-full max-w-[120px] cursor-pointer rounded-md border bg-transparent"
-        />
-      </TableCell>
-      <TableCell className="text-right font-medium tabular-nums">
-        <MoneyFlow value={bookie.balance} />
-      </TableCell>
-      <TableCell>
-        {bookie.isActive ? (
-          <Button variant="ghost" size="icon" onClick={() => onArchive(bookie.id)}>
-            <Trash2 className="size-4" />
-          </Button>
-        ) : null}
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [brandColor, setBrandColor] = useState("#3f3f46");
-
-  useEffect(() => {
-    if (name.trim()) setBrandColor(bookieBrandColor(name.trim()));
-  }, [name]);
-
-  async function save() {
-    if (!name.trim()) {
-      toast.error("Enter a bookie name");
-      return;
-    }
-    try {
-      await api("/api/bookies", {
-        method: "POST",
-        json: { name: name.trim(), brandColor },
-      });
-      toast.success(`${name.trim()} added`);
-      setOpen(false);
-      setName("");
-      onSaved();
-    } catch (e) {
-      toast.error("Could not add bookie", { description: String(e) });
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="size-4" /> Add bookie
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Add bookie</DialogTitle>
-          <DialogDescription>
-            Pick from the list or enter a custom name. Brand colour defaults to the known palette.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <BookieNamePicker value={name} onChange={setName} />
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Brand colour</Label>
-            <input
-              type="color"
-              value={brandColor}
-              onChange={(e) => setBrandColor(e.target.value)}
-              className="h-9 w-full cursor-pointer rounded-md border bg-transparent"
-            />
-          </div>
-          <Button onClick={save}>Add bookie</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ExchangeEditRow({
-  exchange,
-  onPatch,
-  onDelete,
-}: {
-  exchange: ExchangeRow;
-  onPatch: (id: number, json: Record<string, unknown>, message?: string) => void;
-  onDelete: (id: number) => void;
-}) {
-  const [commission, setCommission] = useState(String(exchange.commissionPct));
-
-  return (
-    <TableRow>
-      <TableCell>
-        <span className="flex items-center gap-2 font-medium">
-          <span
-            className="inline-block size-3 rounded-full"
-            style={{ backgroundColor: exchange.brandColor }}
-          />
-          {exchange.name}
-        </span>
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            step={0.5}
-            min={0}
-            max={20}
-            className="h-8 w-20 tabular-nums"
-            value={commission}
-            onChange={(e) => setCommission(e.target.value)}
-            onBlur={() => {
-              const v = parseFloat(commission);
-              if (Number.isFinite(v) && v !== exchange.commissionPct) {
-                onPatch(exchange.id, { commissionPct: v }, `${exchange.name} set to ${v}%`);
-              }
-            }}
-          />
-          <span className="text-xs text-muted-foreground">%</span>
-        </div>
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1.5">
-          <span
-            className="rounded px-2 py-0.5 text-[10px] font-medium text-black/70"
-            style={{ backgroundColor: exchange.backColor }}
-          >
-            back
-          </span>
-          <span
-            className="rounded px-2 py-0.5 text-[10px] font-medium text-black/70"
-            style={{ backgroundColor: exchange.layColor }}
-          >
-            lay
-          </span>
-        </div>
-      </TableCell>
-      <TableCell>
-        {exchange.isDefault ? (
-          <Badge>default</Badge>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={() => onPatch(exchange.id, { isDefault: true }, `${exchange.name} is now default`)}
-          >
-            Make default
-          </Button>
-        )}
-      </TableCell>
-      <TableCell>
-        <Button variant="ghost" size="icon" onClick={() => onDelete(exchange.id)}>
-          <Trash2 className="size-4" />
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [preset, setPreset] = useState("custom");
-  const [name, setName] = useState("");
-  const [commission, setCommission] = useState(0);
-  const [brandColor, setBrandColor] = useState("#3f3f46");
-  const [backColor, setBackColor] = useState("#a6d8ff");
-  const [layColor, setLayColor] = useState("#fac9d1");
-
-  function applyPreset(value: string) {
-    setPreset(value);
-    const p = EXCHANGE_PRESETS.find((x) => x.name === value);
-    if (p) {
-      setName(p.name);
-      setCommission(p.commissionPct);
-      setBrandColor(p.brandColor);
-      setBackColor(p.backColor);
-      setLayColor(p.layColor);
-    }
-  }
-
-  async function save() {
-    if (!name.trim()) {
-      toast.error("Give the exchange a name");
-      return;
-    }
-    try {
-      await api("/api/exchanges", {
-        method: "POST",
-        json: { name, commissionPct: commission, brandColor, backColor, layColor },
-      });
-      toast.success(`${name} added`);
-      setOpen(false);
-      setName("");
-      setPreset("custom");
-      onSaved();
-    } catch (e) {
-      toast.error("Could not add exchange", { description: String(e) });
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="size-4" /> Add exchange
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Add exchange</DialogTitle>
-          <DialogDescription>
-            Pick a preset (colours included) and set the commission you actually pay.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Preset</Label>
-            <Select value={preset} onValueChange={applyPreset}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="custom">Custom…</SelectItem>
-                {EXCHANGE_PRESETS.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Betdaq" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Commission %</Label>
-            <Input
-              type="number"
-              step={0.5}
-              min={0}
-              max={20}
-              className="tabular-nums"
-              value={commission}
-              onChange={(e) => setCommission(parseFloat(e.target.value) || 0)}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {(
-              [
-                ["Brand", brandColor, setBrandColor],
-                ["Back", backColor, setBackColor],
-                ["Lay", layColor, setLayColor],
-              ] as const
-            ).map(([label, value, set]) => (
-              <div key={label} className="flex flex-col gap-1.5">
-                <Label className="text-xs text-muted-foreground">{label}</Label>
-                <input
-                  type="color"
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  className="h-9 w-full cursor-pointer rounded-md border bg-transparent"
-                />
-              </div>
-            ))}
-          </div>
-          <Button onClick={save}>Add exchange</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

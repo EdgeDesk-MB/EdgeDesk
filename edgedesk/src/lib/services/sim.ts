@@ -9,7 +9,7 @@ export const SIM_SECONDS_PER_MINUTE = 2; // full match plays out in 3 minutes
 export interface SimGoal {
   minute: number;
   side: "home" | "away";
-  /** Scorer name — lets "The bet wins IF" player triggers settle in simulations */
+  /** Scorer name - lets "The bet wins IF" player triggers settle in simulations */
   player?: string;
 }
 
@@ -82,7 +82,7 @@ export interface SimState {
   homeLed2: boolean;
   awayLed2: boolean;
   finished: boolean;
-  /** Goals scored so far, in order — the trigger engine's timeline */
+  /** Goals scored so far, in order - the trigger engine's timeline */
   goals: SimGoal[];
 }
 

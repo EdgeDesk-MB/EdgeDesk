@@ -7,7 +7,8 @@ export type PageHelpId =
   | "calculators"
   | "tracked-events"
   | "settings"
-  | "history";
+  | "history"
+  | "accounts";
 
 export interface PageHelpContent {
   title: string;
@@ -20,12 +21,12 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   dashboard: {
     title: "Live Dashboard",
     summary:
-      "Your command centre for running P&L. Settled profit plus every open live position, updated as scores change.",
+      "Your command centre for running P&L. Settled profit plus provisional value of open bets, updated as results land.",
     bullets: [
-      "Live P&L = settled profit + provisional value of open bets on in-play events.",
+      "Live P&L = settled profit + provisional open value (worst-case guaranteed until settle; live revaluation in-play).",
+      "Matched free bets and lays count their known worst outcome immediately - the figure updates when the result settles.",
       "The Liveline chart streams while tracked matches or races are live.",
       "History column shows goals, 2UP triggers and settlements in real time.",
-      "Link bets to events in the Tracker — score changes auto-settle derived markets.",
     ],
     guideSlug: "getting-started",
   },
@@ -45,8 +46,8 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary:
       "Racecards, offer-aware Intelligence, and one-click lay workflow for UK & IRE place-refund offers.",
     bullets: [
-      "Proxy odds are ORF estimates — labelled clearly. Use Lay to open the matched calculator with your real odds.",
-      "Intelligence scores races by offer fit, field size, and estimated EV — higher is better, not a guarantee.",
+      "Proxy odds are ORF estimates - labelled clearly. Use Lay to open the matched calculator with your real odds.",
+      "Intelligence scores races by offer fit, field size, and estimated EV - higher is better, not a guarantee.",
       "Qualifying loss is the small cost of unlocking a free bet; compare to expected value from the offer.",
       "Add a Betfair delayed key (free) for real exchange lay prices on runner rows.",
     ],
@@ -57,20 +58,21 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary: "Every position linked to real events. Results settle bets automatically.",
     bullets: [
       "Add bets manually, from calculators, or via OCR screenshot import.",
-      "Link an event once — score changes settle match odds, BTTS, O/U 2.5 and 2UP together.",
-      "Use “The bet wins IF …” for goalscorer and combo triggers — settles at the decisive moment.",
+      "Link an event once - score changes settle match odds, BTTS, O/U 2.5 and 2UP together.",
+      "Use “The bet wins IF …” for goalscorer and combo triggers - settles at the decisive moment.",
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
     ],
     guideSlug: "calculators",
   },
   offers: {
     title: "Offers",
-    summary: "Track sign-ups, reloads and racing place-refund promos. Bets auto-link when labels match.",
+    summary:
+      "Campaigns and calendar - track promos, next actions, and what to do today. Settled profit lives in the top bar.",
     bullets: [
-      "Racing offers drive Intelligence on the Racing Desk — add a place-refund offer first.",
-      "Expected profit is your estimate; actual comes from settled bets linked to the offer.",
-      "Expiry reminders fire at 7, 3 and 1 days before — toggle in Settings → Preferences.",
-      "Mark complete when done to keep P&L summaries accurate.",
+      "Campaigns: pipeline stages, filters, and edit/complete. Calendar: Today / This week / Later.",
+      "Racing offers drive Intelligence on the Racing Desk - add a place-refund offer first.",
+      "Expiry is the earlier of the Expires field or a scoped race/match time - missed windows show as Missed race / Missed match.",
+      "Expiry reminders fire at 7, 3 and 1 days before - toggle in Settings → Preferences.",
     ],
     guideSlug: "offers",
   },
@@ -78,9 +80,9 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     title: "Calculators",
     summary: "The matched betting toolkit. Core calculators push straight to the profit tracker.",
     bullets: [
-      "Matched Betting — qualifiers, free bets (SNR/SR) and risk-free offers.",
-      "Dutching — equal-profit splits; 2UP dutch mode for early-payout windfalls.",
-      "Each Way & Extra Place — lay win and place separately for extra-place offers.",
+      "Matched Betting - qualifiers, free bets (SNR/SR) and risk-free offers.",
+      "Dutching - equal-profit splits; 2UP dutch mode for early-payout windfalls.",
+      "Each Way & Extra Place - lay win and place separately for extra-place offers.",
     ],
     guideSlug: "calculators",
   },
@@ -88,21 +90,24 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     title: "Tracked Events",
     summary: "Matches and races you're following. Live scores refresh automatically.",
     bullets: [
-      "Simulate a 2UP match for the 60-second demo loop — no API keys needed.",
+      "Simulate a 2UP match for the 60-second demo loop - no API keys needed.",
       "Goal timelines fetch only when you have an open trigger bet on the match.",
-      "Racing: set winner manually on free tier, or upgrade Racing API Basic for auto results.",
+      "Racing: Basic tier auto-settles while the app is open; Free tier uses Set winner.",
       "Finished events stay here until you remove them.",
     ],
     guideSlug: "getting-started",
   },
   settings: {
     title: "Settings",
-    summary: "Accounts, defaults, API connections and data export.",
+    summary: "Defaults, API connections and data export.",
     bullets: [
-      "Exchanges power calculator lay panels — set commission and brand colours.",
+      "Default bookie and exchange are set in Preferences - saved as you pick them.",
+      "Exchanges and bookie status: Accounts → Manage venues.",
       "Data & API shows connection status for API-Football, Racing API and Betfair.",
       "Free stack: Racing API + Betfair delayed key + optional API-Football = £0/month.",
-      "Export bets, settlements and balances as CSV anytime.",
+      "Refresh rates: racing cards cached ~15 min; Betfair delayed ~1–3 min; football live ~60s.",
+      "Restart the dev server after changing .env.local keys.",
+      "Export bets, settlements and accounts as CSV anytime.",
     ],
     guideSlug: "faq",
   },
@@ -111,9 +116,24 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary: "Full timeline of bets, settlements, promos and live match moments.",
     bullets: [
       "Filter by sport, settlements, promos or match events.",
-      "Times align to when things happened — kick-off, goals, full time.",
+      "Times align to when things happened - kick-off, goals, full time.",
       "Settled bets leaving Live positions appear here with realised P&L highlighted.",
       "Builds automatically as you track events and log bets.",
+    ],
+    guideSlug: "getting-started",
+  },
+  accounts: {
+    title: "Accounts",
+    summary:
+      "Bookie and exchange wallets - balances, free bets, status and ledger. Top bar shows Exchange · In-bets · Total (Ultimatcher-style).",
+    bullets: [
+      "Banks fund deposits; Transfer moves cash to bookies (withdrawals can stay pending).",
+      "Manage venues: exchange commission, colours, bookie status and notes.",
+      "Set wagering requirements on a bookie - cash bets auto-burn WR when odds qualify.",
+      "Free bets show on Accounts and Home; Convert opens Add bet prefilled.",
+      "First bet at a new bookie creates the account automatically.",
+      "Rename a bookie to cascade the name across bets, offers and prefs.",
+      "Mark bookies Available, Gubbed or Closed to filter offer next-actions.",
     ],
     guideSlug: "getting-started",
   },

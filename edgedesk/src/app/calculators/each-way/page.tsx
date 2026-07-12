@@ -160,7 +160,7 @@ export default function EachWayCalculatorPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Each Way Calculator</h1>
         <p className="text-sm text-muted-foreground">
-          Lay the win and place parts separately — standard each-way arbs or extra-place offers when
+          Lay the win and place parts separately - standard each-way arbs or extra-place offers when
           the bookie pays more places than the exchange.
         </p>
       </div>
@@ -280,8 +280,8 @@ export default function EachWayCalculatorPage() {
             />
           </div>
           <PanelInput label="Lay commission" suffix="%" value={commission} onChange={setCommission} min={0} step={0.5} />
-          <PanelInput label="Lay odds — WIN market" value={layWinOdds} onChange={setLayWinOdds} min={1} exchangeOddsStepping />
-          <PanelInput label="Lay odds — PLACE market" value={layPlaceOdds} onChange={setLayPlaceOdds} min={1} exchangeOddsStepping />
+          <PanelInput label="Lay odds - WIN market" value={layWinOdds} onChange={setLayWinOdds} min={1} exchangeOddsStepping />
+          <PanelInput label="Lay odds - PLACE market" value={layPlaceOdds} onChange={setLayPlaceOdds} min={1} exchangeOddsStepping />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <LayStakeBanner label="Lay WIN stake" value={layWinStake} liability={active?.layWinLiability ?? 0} />

@@ -31,7 +31,7 @@ export default function DutchingCalculatorPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dutching Calculator</h1>
         <p className="text-sm text-muted-foreground">
-          Split one total stake across every outcome for the same profit whatever happens —
+          Split one total stake across every outcome for the same profit whatever happens -
           or run the 2UP dutch for early-payout windfalls.
         </p>
       </div>
@@ -160,7 +160,7 @@ function StandardDutch() {
             </div>
           </div>
           <p className="col-span-3 text-[11px] text-muted-foreground">
-            A negative overround means the combined prices imply less than 100% probability —
+            A negative overround means the combined prices imply less than 100% probability -
             a genuine arb. Anything positive is the margin you&apos;re paying for coverage.
           </p>
         </CardContent>
@@ -229,7 +229,7 @@ function TwoUpDutch() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Scenario matrix</CardTitle>
-            <CardDescription>Windfalls highlighted — the reason this offer is played.</CardDescription>
+            <CardDescription>Windfalls highlighted - the reason this offer is played.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-2">

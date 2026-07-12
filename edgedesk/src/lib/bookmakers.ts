@@ -67,3 +67,26 @@ export function filterBookmakers(query: string): string[] {
   if (!q) return [...UK_BOOKMAKERS];
   return UK_BOOKMAKERS.filter((b) => b.toLowerCase().includes(q));
 }
+
+/**
+ * Find the best UK bookmaker name mentioned in free text (headers, MBB paste).
+ * Prefers longer names so "Betfair Sportsbook" wins over "Betfair".
+ */
+export function matchBookmakerFromText(text: string): string | null {
+  const lower = text.toLowerCase();
+  let best: string | null = null;
+  for (const name of UK_BOOKMAKERS) {
+    const n = name.toLowerCase();
+    if (!lower.includes(n)) continue;
+    if (!best || name.length > best.length) best = name;
+  }
+  // Common aliases
+  if (!best) {
+    if (/\bbetfair\b/i.test(text)) return "Betfair Sportsbook";
+    if (/\bsky\s*bet\b/i.test(text)) return "Sky Bet";
+    if (/\bpaddy\b/i.test(text)) return "Paddy Power";
+    if (/\bwilliam\s*hill\b|\bwh\b/i.test(text)) return "William Hill";
+  }
+  return best;
+}
+

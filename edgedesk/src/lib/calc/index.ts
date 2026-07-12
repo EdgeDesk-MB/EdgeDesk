@@ -1,6 +1,7 @@
 export * from "./odds";
 export * from "./money";
 export * from "./matched";
+export * from "./special-bonus";
 export * from "./dutching";
 export * from "./twoup";
 export * from "./eachway";

@@ -25,6 +25,8 @@ import {
 import { api } from "@/hooks/use-app-state";
 import { toastAddedToTrackedEvents } from "@/components/events/track-toast";
 import { SportLabel } from "@/components/sport-icon";
+import { SPORTS } from "@/lib/markets";
+import { isRacingSport } from "@/lib/sports";
 
 export function ManualEventDialog({
   onSaved,
@@ -61,7 +63,7 @@ export function ManualEventDialog({
         json: { homeTeam, awayTeam, competition: competition || undefined, sport, source: "manual" },
       });
       const label =
-        sport === "horse_racing"
+        isRacingSport(sport)
           ? `${competition || "Race"} · ${homeTeam}`
           : `${homeTeam} v ${awayTeam}`;
       toastAddedToTrackedEvents(label, () => router.push("/tracked-events"));
@@ -97,15 +99,11 @@ export function ManualEventDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="football">
-                  <SportLabel sport="football" size={14} />
-                </SelectItem>
-                <SelectItem value="horse_racing">
-                  <SportLabel sport="horse_racing" size={14} />
-                </SelectItem>
-                <SelectItem value="other">
-                  <SportLabel sport="other" size={14} />
-                </SelectItem>
+                {SPORTS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    <SportLabel sport={s.value} size={14} />
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
