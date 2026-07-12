@@ -3,6 +3,10 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, bets, offers } from "@/lib/db";
 import { stopRecurrenceForOffer } from "@/lib/offers/offer-recurrence";
+import { summariseOffer } from "@/lib/services/offers";
+import { writeEvLock } from "@/lib/services/ev-snapshot";
+import { getPromoAwardsByBetId } from "@/lib/services/balances";
+import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +64,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .returning()
     .get();
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Re-lock EV snapshot when expectedProfit is edited on an active, non-settled offer
+  if (p.expectedProfit !== undefined) {
+    const linked = db.select().from(bets).where(eq(bets.offerId, offerId)).all();
+    const summary = summariseOffer(updated, linked, getPromoAwardsByBetId());
+    const stage = deriveOfferPipelineStage(summary);
+    if (stage !== "settled" && stage !== "expired") {
+      writeEvLock(summary, { expectedProfit: p.expectedProfit });
+    }
+  }
+
   return NextResponse.json({ offer: updated });
 }
 

@@ -2,6 +2,13 @@ import { eq } from "drizzle-orm";
 import "server-only";
 import { db, bets, offers, offerSeries, type BetRow, type OfferRow } from "@/lib/db";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
+import {
+  writeEvLock,
+  fillSettlementSnapshot,
+  getAllSnapshots,
+} from "@/lib/services/ev-snapshot";
+import { captureSummary, type EvSnapshotRow } from "@/lib/offers/ev-capture";
+import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
 import { aiEffectsForBet, isPlaceFreeBetEffect } from "@/lib/calc/ai-triggers";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
@@ -281,6 +288,11 @@ export function resolveOfferForBet(input: {
     })
     .returning()
     .get();
+
+  // Write EV lock v1 for the new active offer (minimal summary — no bets yet).
+  const minSummary = summariseOffer(inserted, []);
+  writeEvLock(minSummary, inserted.expectedProfit != null ? { expectedProfit: inserted.expectedProfit } : undefined);
+
   return inserted.id;
 }
 
@@ -380,12 +392,46 @@ export function listOfferSummaries(): OfferSummary[] {
   const allBets = db.select().from(bets).all();
   const seriesRows = db.select().from(offerSeries).all();
   const seriesById = new Map(seriesRows.map((s) => [s.id, s]));
+  const promoAwards = getPromoAwardsByBetId();
+
+  // Load all snapshots once and group by offerId
+  const allSnaps = getAllSnapshots() as EvSnapshotRow[];
+  const snapsByOffer = new Map<number, EvSnapshotRow[]>();
+  for (const s of allSnaps) {
+    const list = snapsByOffer.get(s.offerId) ?? [];
+    list.push(s);
+    snapsByOffer.set(s.offerId, list);
+  }
 
   return allOffers
     .map((o) => {
-      const summary = summariseOffer(o, allBets.filter((b) => b.offerId === o.id));
+      const linked = allBets.filter((b) => b.offerId === o.id);
+      const summary = summariseOffer(o, linked, promoAwards);
       const recurrence = getOfferRecurrenceMeta(o, seriesById.get(o.seriesId ?? -1) ?? null);
-      return { ...summary, recurrence };
+      const snaps = snapsByOffer.get(o.id) ?? [];
+
+      // Fill settlement data if the campaign just became settled
+      const stage = deriveOfferPipelineStage(summary);
+      if (stage === "settled" && snaps.length > 0) {
+        const latest = snaps.reduce((best, s) => (s.version > best.version ? s : best));
+        if (latest.settledAt == null) {
+          // Commission drag: sum layStake * commission for bets where back lost (lay won)
+          const drag = linked
+            .filter((b) => b.status === "lost" && b.layStake > 0)
+            .reduce((sum, b) => sum + b.layStake * b.commission, 0);
+          fillSettlementSnapshot(o.id, summary.profit.totalProfit, drag);
+          // Refresh the snapshot list so evLock reflects the fill
+          latest.realizedProfit = summary.profit.totalProfit;
+          latest.capturePct =
+            Math.abs(latest.expectedProfit) > 0.01
+              ? Math.min(summary.profit.totalProfit / latest.expectedProfit, 2)
+              : null;
+          latest.settledAt = Date.now();
+        }
+      }
+
+      const evLock = captureSummary(snaps);
+      return { ...summary, recurrence, evLock };
     })
     .sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -496,6 +542,9 @@ export function syncOfferStatuses(): void {
 
     if (offer.status === "planned" && linkedBets.length > 0) {
       db.update(offers).set({ status: "active" }).where(eq(offers.id, offer.id)).run();
+      // Write EV lock v1 for the newly-active offer (if not already locked).
+      const activeSummary = summariseOffer({ ...offer, status: "active" }, linkedBets, promoAwards);
+      writeEvLock(activeSummary);
       // Fall through - may also be past scoped race/expiry.
     }
 

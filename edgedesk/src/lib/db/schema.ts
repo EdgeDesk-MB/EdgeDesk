@@ -115,6 +115,22 @@ export const offers = sqliteTable("offers", {
   instanceDate: text("instance_date"),
 });
 
+/** Immutable EV baseline written when a campaign goes active; versioned on re-lock. */
+export const offerEvSnapshots = sqliteTable("offer_ev_snapshots", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  offerId: integer("offer_id").notNull(),
+  version: integer("version").notNull().default(1),
+  lockedAt: integer("locked_at").notNull(),
+  expectedProfit: real("expected_profit").notNull(),
+  basis: text("basis").notNull(), // "live" | "estimated" | "heuristic"
+  inputsJson: text("inputs_json"), // { autoLocked, retentionUsed?, freeBetAmount?, stake? }
+  // Settlement fill-in — null until settled:
+  realizedProfit: real("realized_profit"),
+  capturePct: real("capture_pct"),
+  commissionDrag: real("commission_drag"),
+  settledAt: integer("settled_at"),
+});
+
 /** Recurring offer template - instances are materialised as separate offer rows */
 export const offerSeries = sqliteTable("offer_series", {
   id: integer("id").primaryKey({ autoIncrement: true }),

@@ -235,6 +235,22 @@ CREATE TABLE IF NOT EXISTS offer_series (
   addColumn("balance_transactions", "confirmed_at INTEGER");
   addColumn("balance_transactions", "affect_pnl INTEGER NOT NULL DEFAULT 0");
   addColumn("racing_odds_snapshots", "kind TEXT NOT NULL DEFAULT 'bookie'");
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS offer_ev_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  offer_id INTEGER NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  locked_at INTEGER NOT NULL,
+  expected_profit REAL NOT NULL,
+  basis TEXT NOT NULL,
+  inputs_json TEXT,
+  realized_profit REAL,
+  capture_pct REAL,
+  commission_drag REAL,
+  settled_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_offer_ev_snapshots_offer ON offer_ev_snapshots(offer_id, version);
+`);
 
   // Data migrations - only after tables exist (fresh DBs / vitest temp files)
   sqlite.exec(`DELETE FROM history WHERE kind = 'free_bet_promo'`);

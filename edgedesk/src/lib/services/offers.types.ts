@@ -2,6 +2,7 @@
  * Client-safe offer types (no SQLite / server services).
  */
 import type { OfferRow } from "@/lib/db/schema";
+import type { EvBasis } from "@/lib/offers/advantage";
 
 export type FreeBetStage =
   | "none"
@@ -42,6 +43,17 @@ export interface OfferRecurrenceMeta {
   stoppedFrom: string | null;
 }
 
+export interface EvLockSummary {
+  expectedProfit: number;
+  basis: EvBasis;
+  version: number;
+  /** null until settled */
+  capturePct: number | null;
+  /** null until settled */
+  realizedProfit: number | null;
+  lockedAt: number;
+}
+
 export interface OfferSummary extends OfferRow {
   betCount: number;
   openBets: number;
@@ -49,4 +61,6 @@ export interface OfferSummary extends OfferRow {
   expectedFromBets: number;
   profit: OfferProfitBreakdown;
   recurrence?: OfferRecurrenceMeta | null;
+  /** Immutable EV baseline; populated once the campaign goes active. */
+  evLock?: EvLockSummary | null;
 }

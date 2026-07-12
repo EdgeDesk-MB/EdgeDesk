@@ -42,6 +42,8 @@ import {
   isOfferExpired,
   offerInactiveFigureClass,
 } from "@/lib/offers/offer-inactive-ui";
+import { formatCaptureLine } from "@/lib/offers/ev-capture";
+import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { isRegionalScope, parseOfferRules } from "@/lib/offers/racing-offer-rules";
 import { CourseRaceTimes } from "@/components/offers/course-race-times";
 import { VenueBadge } from "@/components/venue-badge";
@@ -286,6 +288,22 @@ export function OfferCampaignCard({
         </div>
 
         <OfferPipelineStrip offer={offer} className="mt-3" />
+
+        {offer.evLock ? (() => {
+          const captureLine = formatCaptureLine(offer.evLock);
+          if (!captureLine) return null;
+          return (
+            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5">
+              <EvBasisBadge basis={offer.evLock.basis} />
+              <span className="text-[11px] text-muted-foreground">{captureLine}</span>
+              {offer.evLock.version > 1 ? (
+                <span className="ml-auto shrink-0 rounded bg-border/60 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                  re-locked v{offer.evLock.version}
+                </span>
+              ) : null}
+            </div>
+          );
+        })() : null}
       </CardHeader>
 
       {hasDetails ? (
