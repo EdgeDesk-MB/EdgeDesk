@@ -25,8 +25,9 @@ import {
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { ListChecks, ListOrdered, Sparkles } from "lucide-react";
+import { ListChecks, ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
+import { DashboardEdgeHero } from "@/components/dashboard/dashboard-edge-hero";
 import type { EvBasis } from "@/lib/offers/advantage";
 
 /** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
@@ -196,12 +197,16 @@ export function DashboardDoNext({ className }: { className?: string }) {
     ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
     : undefined;
 
-  const items = useMemo(() => {
-    const built = buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts);
-    return sortDoNextItems(built, sort).slice(0, 8);
+  const allItems = useMemo(() => {
+    return buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts);
   // retentionOpts is stable per render; retention.rate change triggers this via state deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopedOffers, lots, sort, retention?.rate]);
+  }, [scopedOffers, lots, retention?.rate]);
+
+  const items = useMemo(
+    () => sortDoNextItems(allItems, sort).slice(0, 8),
+    [allItems, sort]
+  );
 
   function onConvert(item: DoNextItem) {
     const lot = item.convertLot;
@@ -229,7 +234,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
       ? `Your retention: ${Math.round(retention.rate * 100)}% · ${retention.sampleSize} conversions`
       : "Using 80% default retention";
 
-  if (items.length === 0) return null;
+  if (allItems.length === 0) return null;
 
   return (
     <section className={cn("shrink-0 border-b border-border/60", className)}>
@@ -240,9 +245,9 @@ export function DashboardDoNext({ className }: { className?: string }) {
         icon={ListChecks}
         title="Do next"
         description={
-          "Best first - same cards, different sort.\n\nPriority: expiring offers and open actions first.\nEdge: highest estimated remaining EV first."
+          "Best first - same cards, different sort.\n\nPriority: expiring offers and open actions first.\nEdge: highest estimated remaining EV first.\nRate: highest £/hr estimated value first."
         }
-        descriptionAriaLabel="Best first. Priority sorts by urgency. Edge sorts by estimated remaining EV."
+        descriptionAriaLabel="Best first. Priority sorts by urgency. Edge sorts by estimated remaining EV. Rate sorts by EV per hour of effort."
         action={
           <Tabs value={sort} onValueChange={(v) => setSort(v as DoNextSort)}>
             <TabsList variant="segmented">
@@ -254,10 +259,16 @@ export function DashboardDoNext({ className }: { className?: string }) {
                 <Sparkles className="size-3.5 shrink-0" aria-hidden />
                 Edge
               </TabsTrigger>
+              <TabsTrigger value="rate">
+                <Timer className="size-3.5 shrink-0" aria-hidden />
+                Rate
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         }
       />
+
+      <DashboardEdgeHero items={allItems} />
 
       <div className="px-[var(--layout-page-x)] py-[calc(0.75rem+12px)]">
         <p className="mb-2.5 text-[10px] text-muted-foreground/70">{retentionCaption}</p>

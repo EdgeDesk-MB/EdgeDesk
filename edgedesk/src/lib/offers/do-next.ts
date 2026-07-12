@@ -17,7 +17,17 @@ import {
   offerExpiryDaysLeft,
 } from "@/lib/offers/offer-expiry";
 
-export type DoNextSort = "priority" | "edge";
+export type DoNextSort = "priority" | "edge" | "rate";
+
+/** Estimated effort in minutes per action kind — tune over time. */
+export const EFFORT_MINUTES: Record<OfferNextActionKind | "orphan_free_bet", number> = {
+  start_planned: 10,
+  place_qualifying: 8,
+  convert_free_bet: 6,
+  review_expiry: 2,
+  await_result: 0,
+  orphan_free_bet: 6,
+};
 
 export type FreeBetLotInput = {
   id: number;
@@ -44,6 +54,8 @@ export type DoNextItem = {
   priority: number;
   /** Higher = better edge (edge sort) */
   edgeScore: number;
+  /** EV per hour of estimated effort (£/hr); used by "rate" sort */
+  rateScore: number;
   /** Days until offer expires — for urgency copy on cards */
   daysLeft: number | null;
   /** "Ends today", "1 day left", etc. */
@@ -103,6 +115,8 @@ export function buildDoNextItems(
       }
     }
 
+    const itemEv = advantage?.remainingEv ?? remainingEv;
+    const effortMin = EFFORT_MINUTES[action.kind];
     items.push({
       id: `offer-${action.offerId}-${action.kind}`,
       kind: action.kind,
@@ -112,10 +126,11 @@ export function buildDoNextItems(
       offerTitle: action.offerTitle,
       offerId: action.offerId,
       href: action.href,
-      remainingEv: advantage?.remainingEv ?? remainingEv,
+      remainingEv: itemEv,
       basis: advantage?.basis ?? basis,
       priority: action.priority,
       edgeScore: advantage?.score ?? remainingEv,
+      rateScore: (itemEv / Math.max(effortMin, 1)) * 60,
       daysLeft,
       expiryLabel,
       convertLot,
@@ -143,6 +158,7 @@ export function buildDoNextItems(
       basis: (opts?.retentionSampleSize ?? 0) >= 5 ? "estimated" : "heuristic",
       priority: 11,
       edgeScore: ev * 1.2,
+      rateScore: (ev / EFFORT_MINUTES.orphan_free_bet) * 60,
       daysLeft: null,
       expiryLabel: null,
       convertLot: {
@@ -165,11 +181,35 @@ export function sortDoNextItems(items: DoNextItem[], sort: DoNextSort): DoNextIt
       return (a.offerTitle ?? a.title).localeCompare(b.offerTitle ?? b.title);
     });
   }
+  if (sort === "rate") {
+    return copy.sort((a, b) => {
+      if (b.rateScore !== a.rateScore) return b.rateScore - a.rateScore;
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return (a.offerTitle ?? a.title).localeCompare(b.offerTitle ?? b.title);
+    });
+  }
   return copy.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     if (b.edgeScore !== a.edgeScore) return b.edgeScore - a.edgeScore;
     return (a.offerTitle ?? a.title).localeCompare(b.offerTitle ?? b.title);
   });
+}
+
+const BASIS_RANK: Record<EvBasis, number> = { live: 2, estimated: 1, heuristic: 0 };
+
+/**
+ * Total EV across all actionable (non-await) items with a positive EV,
+ * plus the weakest basis contributing to that total.
+ * Used by the Edge Hero to summarise what's on the table.
+ */
+export function sumActionableEv(items: DoNextItem[]): { total: number; weakestBasis: EvBasis } {
+  const actionable = items.filter((i) => i.kind !== "await_result" && i.remainingEv > 0);
+  const total = actionable.reduce((s, i) => s + i.remainingEv, 0);
+  const weakest = actionable.reduce<EvBasis | null>((w, i) => {
+    if (w === null || BASIS_RANK[i.basis] < BASIS_RANK[w]) return i.basis;
+    return w;
+  }, null);
+  return { total, weakestBasis: weakest ?? "heuristic" };
 }
 
 export function doNextActionLabel(kind: DoNextItem["kind"]): string {
