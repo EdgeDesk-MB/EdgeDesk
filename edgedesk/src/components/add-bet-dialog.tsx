@@ -86,6 +86,8 @@ import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
 import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
 
+import { BetTextImport } from "@/components/add-bet/bet-text-import";
+
 const BetScreenshotImport = dynamic(
   () =>
     import("@/components/add-bet/bet-screenshot-import").then((m) => ({
@@ -1313,7 +1315,12 @@ export function AddBetDialog({
               </span>
             </div>
             {!dutchLegs?.length && (
-              <BetScreenshotImport open={open} onApply={applyOcrFields} />
+              <>
+                <BetScreenshotImport open={open} onApply={applyOcrFields} />
+                <BetTextImport
+                  onApply={(fields: BetOcrFields) => void applyOcrFields(fields, "bookie")}
+                />
+              </>
             )}
           </div>
 
