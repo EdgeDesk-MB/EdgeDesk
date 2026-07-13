@@ -105,13 +105,14 @@ export function MobileHomeDeck({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
+      {/* Full-bleed: mobile uses the whole page, no desktop-style gutters. */}
       <div
         ref={scrollerRef}
         onScroll={onScroll}
         role="group"
         aria-roledescription="carousel"
         aria-label="Home widgets"
-        className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {cards.map((card, i) => (
           <div
@@ -119,7 +120,7 @@ export function MobileHomeDeck({
             role="group"
             aria-roledescription="slide"
             aria-label={`${card.label} (${i + 1} of ${cards.length})`}
-            className="flex w-[88vw] shrink-0 snap-center flex-col overflow-hidden rounded-lg border border-border/80 bg-card"
+            className="flex w-screen shrink-0 snap-center flex-col overflow-hidden bg-background"
           >
             <div className="app-scroll-nested min-h-0 flex-1 overflow-y-auto">
               {card.node}

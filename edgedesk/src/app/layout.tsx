@@ -67,11 +67,12 @@ export default function RootLayout({
                                 )}
                               >
                               <AppNav />
-                              <div className="flex min-w-0 flex-1 flex-col p-1">
+                              <div className="flex min-w-0 flex-1 flex-col p-0 sm:p-1">
                                 <main
                                   className={cn(
                                     pagePanel,
-                                    "flex w-full flex-col dark:shadow-none"
+                                    "flex w-full flex-col dark:shadow-none",
+                                    "max-sm:rounded-none max-sm:shadow-none max-sm:ring-0"
                                   )}
                                 >
                                   {children}

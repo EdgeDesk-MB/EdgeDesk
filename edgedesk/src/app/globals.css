@@ -143,6 +143,13 @@
   }
 }
 
+/* Mobile is full-bleed: no shell gutters, so the content area gets them back */
+@media (max-width: 639px) {
+  :root {
+    --layout-page-min-h: calc(100dvh - var(--layout-header-h));
+  }
+}
+
 .dark {
   --canvas: oklch(0.128 0.003 250);
   --page: oklch(0.158 0.004 250);
