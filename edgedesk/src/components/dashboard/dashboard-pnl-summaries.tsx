@@ -135,7 +135,7 @@ export function DashboardPnlSummaries({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {offerStats && (
           <SummaryChip
             label="Offer P&L"

@@ -37,7 +37,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
     <>
       <span
         className={cn(
-          "w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums",
+          "w-14 shrink-0 text-right text-sm font-semibold tabular-nums sm:w-12 sm:text-[11px]",
           urgent ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground",
           slot.done && "line-through opacity-70"
         )}
@@ -45,20 +45,20 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
         {timeLabel}
       </span>
       <span
-        className={cn("size-1.5 shrink-0 rounded-full", slotDotClass(slot))}
+        className={cn("size-2 shrink-0 rounded-full sm:size-1.5", slotDotClass(slot))}
         aria-hidden
       />
       <span className="min-w-0 flex-1">
         <span
           className={cn(
-            "block truncate text-xs font-medium",
+            "block truncate text-sm font-medium sm:text-xs",
             slot.done && "text-muted-foreground line-through"
           )}
         >
           {slot.title}
         </span>
         {slot.detail ? (
-          <span className="block truncate text-[11px] text-muted-foreground">
+          <span className="block truncate text-xs text-muted-foreground sm:text-[11px]">
             {slot.detail}
           </span>
         ) : null}
@@ -66,7 +66,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
       {slot.ev != null && slot.ev > 0.5 && !slot.done ? (
         <span className="flex shrink-0 items-center gap-1.5">
           {slot.basis ? <EvBasisBadge basis={slot.basis} /> : null}
-          <span className="text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xs">
             £{slot.ev >= 10 ? slot.ev.toFixed(0) : slot.ev.toFixed(1)}
           </span>
         </span>
@@ -75,7 +75,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
   );
 
   const rowClass = cn(
-    "flex items-center gap-2.5 rounded-md px-2 py-1.5",
+    "flex items-center gap-2.5 rounded-md px-2 py-3 sm:py-1.5",
     slot.done && "opacity-60",
     slot.href && "transition-colors hover:bg-selection-subtle"
   );
@@ -124,13 +124,21 @@ export function DailyPlan({ className }: { className?: string }) {
   const doneCount = slots.filter((s) => s.done).length;
 
   return (
-    <section className={cn(dashboardSection, "h-auto max-h-none shrink-0", className)}>
+    // Mobile (deck card): fill the viewport height; desktop: natural height above the Feed.
+    <section
+      className={cn(dashboardSection, "max-h-none shrink-0 sm:h-auto", className)}
+    >
       <DashboardSectionHeader
         prominent
         title="Today's plan"
         description="Deadlines, races and kick-offs in time order."
       />
-      <div className={cn("app-scroll-nested max-h-[17.5rem] overflow-y-auto py-1.5", cardInsetX)}>
+      <div
+        className={cn(
+          "app-scroll-nested min-h-0 flex-1 overflow-y-auto py-1.5 sm:max-h-[17.5rem] sm:flex-none",
+          cardInsetX
+        )}
+      >
         {timed.length > 0 ? (
           <ol className="flex flex-col">
             {timed.map((slot) => (

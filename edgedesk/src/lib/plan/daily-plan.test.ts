@@ -132,6 +132,24 @@ describe("buildDailyPlan ordering", () => {
     expect(slots).toHaveLength(0);
   });
 
+  it("skips recurring instances materialised for future days", () => {
+    const offers = [
+      offer({ id: 7, seriesId: 1, instanceDate: "2026-07-13" }), // today
+      offer({ id: 8, seriesId: 1, instanceDate: "2026-07-14" }), // tomorrow
+    ];
+    const slots = buildDailyPlan({
+      offers,
+      doNext: [
+        doNextItem({ id: "offer-7-start_planned", kind: "start_planned", offerId: 7 }),
+        doNextItem({ id: "offer-8-start_planned", kind: "start_planned", offerId: 8 }),
+      ],
+      races: [],
+      fixtures: [],
+      now: NOW,
+    });
+    expect(slots.map((s) => s.id)).toEqual(["offer-7-start_planned"]);
+  });
+
   it("skips await_result items", () => {
     const slots = buildDailyPlan({
       offers: [],

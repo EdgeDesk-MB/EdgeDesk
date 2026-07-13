@@ -48,18 +48,20 @@ function OverviewMetric({
 }) {
   const inner = (
     <>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">
         {label}
       </p>
       <div
         className={cn(
-          "mt-0.5 text-3xl tabular-nums leading-none tracking-tight",
+          "mt-0.5 text-4xl tabular-nums leading-none tracking-tight sm:text-3xl",
           muted ? "font-medium text-muted-foreground" : "font-bold"
         )}
       >
         {value}
       </div>
-      <p className="mt-[3px] min-h-[1rem] text-[11px] leading-snug text-muted-foreground">{sub}</p>
+      <p className="mt-[3px] min-h-[1rem] text-xs leading-snug text-muted-foreground sm:text-[11px]">
+        {sub}
+      </p>
     </>
   );
 
@@ -127,14 +129,15 @@ export function DashboardOverviewBar({
     );
 
   return (
-    <div className="shrink-0 overflow-hidden border-b border-border/60">
+    // min-h-full + flex column lets the mobile deck card stretch this to the viewport.
+    <div className="flex min-h-full shrink-0 flex-col overflow-hidden border-b border-border/60 sm:block sm:min-h-0">
       <div
         className={cn(
-          "flex flex-col gap-[var(--layout-section-y)] lg:flex-row lg:items-stretch lg:justify-between",
+          "flex flex-1 flex-col justify-evenly gap-[var(--layout-section-y)] sm:flex-none sm:justify-start lg:flex-row lg:items-stretch lg:justify-between",
           overviewInset
         )}
       >
-        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-stretch sm:gap-1.5 lg:gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-6 sm:flex-row sm:items-stretch sm:gap-1.5 lg:gap-2">
           <OverviewMetric
             label="Profit"
             value={<MoneyFlow value={liveTotal} signColor className="inline" />}
@@ -164,7 +167,7 @@ export function DashboardOverviewBar({
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <DashboardPnlSummaries offers={offers} bets={bets} />
         </div>
       </div>

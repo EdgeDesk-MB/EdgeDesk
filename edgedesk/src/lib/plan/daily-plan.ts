@@ -16,6 +16,7 @@ import {
   type OfferCalendarPriority,
 } from "@/lib/offers/offer-calendar";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+import { localYmd } from "@/lib/offers/offer-recurrence-shared";
 
 export type DailyPlanSlotKind = "offer_action" | "race" | "kickoff" | "anytime";
 
@@ -87,10 +88,16 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
   const offersById = new Map(offers.map((o) => [o.id, o]));
   const slots: DailyPlanSlot[] = [];
 
+  const todayKey = localYmd(new Date(now));
+
   for (const item of doNext) {
     if (item.kind === "await_result") continue;
 
     const offer = item.offerId != null ? offersById.get(item.offerId) : undefined;
+    // Today's sheet only: recurring instances materialised for future days
+    // would otherwise flood the anytime bucket with duplicates.
+    if (offer?.instanceDate && offer.instanceDate !== todayKey) continue;
+
     const deadline = offer ? effectiveOfferExpiryMs(offer) : null;
     const timed = deadline != null && deadline >= start && deadline < end;
     const priority = priorityFromSignals({
