@@ -152,40 +152,15 @@ export function deriveOfferNextAction(
   return null;
 }
 
-function isEarlierSeriesInstance(a: OfferSummary, b: OfferSummary): boolean {
-  const ad = a.instanceDate ?? "";
-  const bd = b.instanceDate ?? "";
-  if (ad !== bd) return ad < bd;
-  return a.id < b.id;
-}
-
-/**
- * Collapse recurring-series instances to the next one due: repeats beyond the
- * earliest live instance are never today's work, so they stay out of the queue.
- */
-function nextInstancePerSeries(offers: OfferSummary[]): OfferSummary[] {
-  const nextBySeries = new Map<number, OfferSummary>();
-  for (const offer of offers) {
-    if (offer.seriesId == null) continue;
-    if (offer.status === "completed" || offer.status === "expired") continue;
-    const current = nextBySeries.get(offer.seriesId);
-    if (!current || isEarlierSeriesInstance(offer, current)) {
-      nextBySeries.set(offer.seriesId, offer);
-    }
-  }
-  return offers.filter((o) => o.seriesId == null || nextBySeries.get(o.seriesId) === o);
-}
-
 /**
  * Actionable next steps only (excludes waiting-on-result).
  * Use for Best Next, Next actions, and nav badges.
- * Recurring campaigns contribute at most one action: their next instance due.
  */
 export function listOfferNextActions(
   offers: OfferSummary[],
   now = Date.now()
 ): OfferNextAction[] {
-  return nextInstancePerSeries(offers)
+  return offers
     .map((o) => deriveOfferNextAction(o, now))
     .filter((a): a is OfferNextAction => a != null && isActionableOfferNext(a.kind))
     .sort((a, b) => {

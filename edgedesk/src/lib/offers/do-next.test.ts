@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildDoNextItems, sortDoNextItems, sumActionableEv, type BookieBalanceMap } from "./do-next";
+import {
+  buildDoNextItems,
+  keepFirstRecurringInstance,
+  sortDoNextItems,
+  sumActionableEv,
+  type BookieBalanceMap,
+} from "./do-next";
 import type { DoNextItem } from "./do-next";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
 
@@ -182,6 +188,39 @@ describe("buildDoNextItems", () => {
     ];
     const byRate = sortDoNextItems(items, "rate");
     expect(byRate[0]?.id).toBe("b"); // higher rateScore wins
+  });
+});
+
+describe("keepFirstRecurringInstance", () => {
+  const recurring = [
+    offer({ id: 10, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-13", status: "active" }),
+    offer({ id: 11, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-14", status: "planned" }),
+    offer({ id: 12, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-15", status: "planned" }),
+    offer({ id: 20, title: "One-off", status: "active" }),
+  ];
+
+  it("keeps only the first instance of a repeating series", () => {
+    const items = buildDoNextItems(recurring, []);
+    expect(items.filter((i) => i.offerTitle === "Daily reload").length).toBeGreaterThan(1);
+
+    const deduped = keepFirstRecurringInstance(items, recurring);
+    expect(deduped.filter((i) => i.offerTitle === "Daily reload").map((i) => i.offerId)).toEqual([10]);
+    expect(deduped.some((i) => i.offerId === 20)).toBe(true);
+  });
+
+  it("keeps the earliest instance regardless of item order", () => {
+    const items = buildDoNextItems(recurring, []);
+    const deduped = keepFirstRecurringInstance([...items].reverse(), recurring);
+    expect(deduped.filter((i) => i.offerTitle === "Daily reload").map((i) => i.offerId)).toEqual([10]);
+  });
+
+  it("leaves items without an offer untouched", () => {
+    const lots = [
+      { id: 5, accountId: 1, accountName: "Sky Bet", remaining: 10, note: null, createdAt: 1 },
+    ];
+    const items = buildDoNextItems(recurring, lots);
+    const deduped = keepFirstRecurringInstance(items, recurring);
+    expect(deduped.some((i) => i.kind === "orphan_free_bet")).toBe(true);
   });
 });
 

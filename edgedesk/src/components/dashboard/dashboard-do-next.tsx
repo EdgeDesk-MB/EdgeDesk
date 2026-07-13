@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { isOfferExpired } from "@/lib/offers/offer-inactive-ui";
 import {
+  keepFirstRecurringInstance,
   sortDoNextItems,
   type DoNextItem,
   type DoNextSort,
@@ -169,11 +170,12 @@ export function DashboardDoNext({ className }: { className?: string }) {
   const { viewOffer } = useOfferDialog();
   const [sort, setSort] = useState<DoNextSort>("priority");
 
-  const offers = state?.offers ?? [];
+  const stateOffers = state?.offers;
+  const offers = useMemo(() => stateOffers ?? [], [stateOffers]);
 
   const items = useMemo(
-    () => sortDoNextItems(allItems, sort).slice(0, 8),
-    [allItems, sort]
+    () => sortDoNextItems(keepFirstRecurringInstance(allItems, offers), sort).slice(0, 8),
+    [allItems, offers, sort]
   );
 
   function onConvert(item: DoNextItem) {

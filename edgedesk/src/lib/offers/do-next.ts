@@ -251,6 +251,43 @@ export function buildDoNextItems(
   return items;
 }
 
+function isEarlierInstance(a: OfferSummary, b: OfferSummary): boolean {
+  const ad = a.instanceDate ?? "";
+  const bd = b.instanceDate ?? "";
+  if (ad !== bd) return ad < bd;
+  return a.id < b.id;
+}
+
+/**
+ * Home "Do next" only: a repeating campaign shows just its first listed
+ * instance. Later repeats keep appearing in the offers list and calendar.
+ */
+export function keepFirstRecurringInstance(
+  items: DoNextItem[],
+  offers: OfferSummary[]
+): DoNextItem[] {
+  const offersById = new Map(offers.map((o) => [o.id, o]));
+  const firstBySeries = new Map<number, DoNextItem>();
+
+  for (const item of items) {
+    if (item.offerId == null) continue;
+    const offer = offersById.get(item.offerId);
+    if (!offer || offer.seriesId == null) continue;
+    const current = firstBySeries.get(offer.seriesId);
+    const currentOffer = current?.offerId != null ? offersById.get(current.offerId) : undefined;
+    if (!currentOffer || isEarlierInstance(offer, currentOffer)) {
+      firstBySeries.set(offer.seriesId, item);
+    }
+  }
+
+  return items.filter((item) => {
+    if (item.offerId == null) return true;
+    const offer = offersById.get(item.offerId);
+    if (!offer || offer.seriesId == null) return true;
+    return firstBySeries.get(offer.seriesId) === item;
+  });
+}
+
 export function sortDoNextItems(items: DoNextItem[], sort: DoNextSort): DoNextItem[] {
   const copy = [...items];
   if (sort === "edge") {
