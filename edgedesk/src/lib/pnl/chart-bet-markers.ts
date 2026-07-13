@@ -208,17 +208,41 @@ export function buildChartBetMarkers(bets: BetRow[]): ChartBetMarker[] {
   return markers;
 }
 
+/**
+ * Value of the rendered line at a moment - last point at (or strictly before)
+ * `timeSec`. Null when the series hasn't started yet.
+ */
+export function seriesValueAt(
+  points: LivePnlPoint[],
+  timeSec: number,
+  opts?: { before?: boolean }
+): number | null {
+  let value: number | null = null;
+  for (const p of points) {
+    if (opts?.before ? p.time < timeSec : p.time <= timeSec) value = p.value;
+    else break;
+  }
+  return value;
+}
+
+/**
+ * `linePoints` is the series actually drawn (balance adjustments and the
+ * gross/retained basis included) - markers are anchored to it so they sit ON
+ * the line. The bets-only `cumulativeValue` is the fallback.
+ */
 export function projectBetMarkers(
   markers: ChartBetMarker[],
-  layout: PnlChartLayout
+  layout: PnlChartLayout,
+  linePoints?: LivePnlPoint[]
 ): ProjectedBetMarker[] {
   const { pad, chartW, chartH, leftEdge, rightEdge, toX, toY } = layout;
   const projected: ProjectedBetMarker[] = [];
 
   for (const marker of markers) {
     if (marker.settledAtSec < leftEdge || marker.settledAtSec > rightEdge) continue;
+    const lineValue = linePoints ? seriesValueAt(linePoints, marker.settledAtSec) : null;
     const x = toX(marker.settledAtSec);
-    const y = toY(marker.cumulativeValue);
+    const y = toY(lineValue ?? marker.cumulativeValue);
     if (x < pad.left - 6 || x > pad.left + chartW + 6) continue;
     if (y < pad.top - 6 || y > pad.top + chartH + 6) continue;
     projected.push({ marker, x, y });
@@ -380,15 +404,22 @@ export function computePnlChartLayout(opts: {
 
 export function projectChartAnnotations(
   annotations: ChartAnnotation[],
-  layout: PnlChartLayout
+  layout: PnlChartLayout,
+  linePoints?: LivePnlPoint[]
 ): ProjectedChartAnnotation[] {
   const { pad, chartW, chartH, leftEdge, rightEdge, toX, toY } = layout;
   const projected: ProjectedChartAnnotation[] = [];
 
   for (const annotation of annotations) {
     if (annotation.timeSec < leftEdge || annotation.timeSec > rightEdge) continue;
+    // Settlement icons sit at the foot of their own jump (strictly before).
+    const lineValue = linePoints
+      ? seriesValueAt(linePoints, annotation.timeSec, {
+          before: annotation.entry.kind === "settlement",
+        })
+      : null;
     const x = toX(annotation.timeSec);
-    const y = toY(annotation.value);
+    const y = toY(lineValue ?? annotation.value);
     if (x < pad.left - 8 || x > pad.left + chartW + 8) continue;
     if (y < pad.top - 8 || y > pad.top + chartH + 8) continue;
     projected.push({ annotation, x, y });

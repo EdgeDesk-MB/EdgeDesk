@@ -87,7 +87,7 @@ export const ChartFeedAnnotationsOverlay = memo(function ChartFeedAnnotationsOve
         livePoints,
         liveValue,
       });
-      setProjected(layout ? projectChartAnnotations(annotations, layout) : []);
+      setProjected(layout ? projectChartAnnotations(annotations, layout, livePoints) : []);
       raf = requestAnimationFrame(tick);
     };
 

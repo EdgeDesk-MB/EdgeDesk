@@ -10,6 +10,7 @@ import {
   markerToneForStatus,
   markerToneFromBet,
   projectBetMarkers,
+  seriesValueAt,
   spreadOverlappingAnnotations,
 } from "./chart-bet-markers";
 import { buildHistoryContext } from "@/lib/history-display";
@@ -204,6 +205,74 @@ describe("projectBetMarkers", () => {
     expect(projected).toHaveLength(1);
     expect(projected[0]?.marker.id).toBe(2);
     expect(projected[0]?.marker.settledAtSec).toBe(nowSec - 150);
+  });
+});
+
+describe("seriesValueAt", () => {
+  const points = [
+    { time: 700, value: 10 },
+    { time: 750, value: 30 },
+    { time: 800, value: 25 },
+  ];
+
+  it("returns the last value at or before the time", () => {
+    expect(seriesValueAt(points, 760)).toBe(30);
+    expect(seriesValueAt(points, 750)).toBe(30);
+    expect(seriesValueAt(points, 900)).toBe(25);
+  });
+
+  it("strictly-before excludes a point at the exact time", () => {
+    expect(seriesValueAt(points, 750, { before: true })).toBe(10);
+  });
+
+  it("returns null before the first point", () => {
+    expect(seriesValueAt(points, 699)).toBeNull();
+    expect(seriesValueAt([], 800)).toBeNull();
+  });
+});
+
+describe("projectBetMarkers with balance adjustments in the line", () => {
+  it("anchors markers to the rendered series, not the bets-only cumulative", () => {
+    const nowSec = 1_000;
+    // Bets: +10 at t=700, −5 at t=800, +2 at t=900 (bets-only cumulative 10, 5, 7).
+    // A +£20 P&L balance adjustment at t=750 shifts the rendered line:
+    // (700,10) (750,30) (800,25) (900,27).
+    const linePoints = [
+      { time: 700, value: 10 },
+      { time: 750, value: 30 },
+      { time: 800, value: 25 },
+      { time: 900, value: 27 },
+    ];
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs: 600,
+      showBadge: false,
+      livePoints: linePoints,
+      liveValue: 27,
+      nowSec,
+    });
+    expect(layout).not.toBeNull();
+
+    const bets = [
+      bet({ id: 1, status: "won", actualProfit: 10, settledAt: 700_000 }),
+      bet({ id: 2, status: "lost", actualProfit: -5, settledAt: 800_000 }),
+      bet({ id: 3, status: "won", actualProfit: 2, settledAt: 900_000 }),
+    ];
+    const markers = buildChartBetMarkers(bets);
+
+    // Without the line, marker 3 sits at the stale bets-only value (5).
+    const stale = projectBetMarkers(markers, layout!);
+    const staleM3 = stale.find((p) => p.marker.id === 3);
+    expect(staleM3?.y).toBeCloseTo(layout!.toY(5), 6);
+
+    // With the line, markers land ON the rendered series (adjustment included).
+    const aligned = projectBetMarkers(markers, layout!, linePoints);
+    const m2 = aligned.find((p) => p.marker.id === 2);
+    const m3 = aligned.find((p) => p.marker.id === 3);
+    expect(m2?.y).toBeCloseTo(layout!.toY(10), 6); // line at t=700 is 10
+    expect(m3?.y).toBeCloseTo(layout!.toY(25), 6); // line at t=800 is 25, not 5
   });
 });
 

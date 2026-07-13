@@ -74,7 +74,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
         livePoints,
         liveValue,
       });
-      const next = layout ? projectBetMarkers(markers, layout) : [];
+      const next = layout ? projectBetMarkers(markers, layout, livePoints) : [];
       const key = next.map((p) => `${p.marker.id}:${p.x.toFixed(1)}:${p.y.toFixed(1)}`).join("|");
       if (key !== lastKey) {
         lastKey = key;
