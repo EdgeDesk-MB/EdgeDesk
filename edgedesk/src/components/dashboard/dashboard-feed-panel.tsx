@@ -50,7 +50,7 @@ export function DashboardFeedPanel({
             type="button"
             className={cn(
               filterPillState(feedFilter === "bets"),
-              "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+              "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
             )}
             onClick={() => setFeedFilter("bets")}
           >
@@ -60,7 +60,7 @@ export function DashboardFeedPanel({
             type="button"
             className={cn(
               filterPillState(feedFilter === "all"),
-              "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+              "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
             )}
             onClick={() => setFeedFilter("all")}
           >

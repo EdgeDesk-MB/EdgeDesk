@@ -41,14 +41,19 @@ const PNL_BASES = [
 
 const ALL_WINDOW_SECS = 0;
 
-const CHART_WINDOWS = [
-  { label: "5m", secs: 300 },
+const CHART_WINDOWS: ReadonlyArray<{
+  label: string;
+  secs: number;
+  /** Hidden below the `sm` breakpoint to keep the mobile chip row tight. */
+  desktopOnly?: true;
+}> = [
+  { label: "5m", secs: 300, desktopOnly: true },
   { label: "1hr", secs: 3600 },
   { label: "24h", secs: 86_400 },
   { label: "This week", secs: 604_800 },
-  { label: "This month", secs: 2_592_000 },
+  { label: "This month", secs: 2_592_000, desktopOnly: true },
   { label: "All", secs: ALL_WINDOW_SECS },
-] as const;
+];
 
 const DEFAULT_CHART_WINDOW = ALL_WINDOW_SECS;
 
@@ -214,7 +219,7 @@ export const LivePnlChart = memo(function LivePnlChart({
                           type="button"
                           className={cn(
                             filterPillState(pnlBasis === b.key),
-                            "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+                            "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
                           )}
                           onClick={() => setPnlBasis(b.key)}
                         >
@@ -239,7 +244,8 @@ export const LivePnlChart = memo(function LivePnlChart({
                       filterPillState(
                         w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs
                       ),
-                      "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+                      "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none",
+                      w.desktopOnly && "hidden sm:inline-flex"
                     )}
                     onClick={() => setChartWindowSecs(w.secs)}
                   >
