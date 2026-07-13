@@ -368,7 +368,7 @@ function ClearAllBetsDialog({
           <Trash2 className="size-4" /> Clear all
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent mobile="center" className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Clear all bets?</DialogTitle>
           <DialogDescription>

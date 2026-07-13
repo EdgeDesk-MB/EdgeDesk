@@ -540,7 +540,7 @@ function DeleteOfferDialog({
           <Trash2 className="size-3.5" /> Delete
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent mobile="center" className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Delete offer?</DialogTitle>
           <DialogDescription>

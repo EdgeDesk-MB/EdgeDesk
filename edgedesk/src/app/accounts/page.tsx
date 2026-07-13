@@ -978,7 +978,7 @@ function ArchiveAccountButton({
         Archive
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent mobile="center" className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Archive account?</DialogTitle>
             <DialogDescription>
