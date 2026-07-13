@@ -11,6 +11,7 @@ import { DashboardFeedPanel } from "@/components/dashboard/dashboard-feed-panel"
 import { MobileHomeDeck } from "@/components/dashboard/mobile-home-deck";
 import { EmptyState } from "@/components/help/empty-state";
 import { useAppState } from "@/hooks/use-app-state";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { effectiveEventStatus } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
 import {
@@ -23,6 +24,9 @@ import { TrendingUp } from "lucide-react";
 
 export default function DashboardPage() {
   const { state } = useAppState();
+  // null on first paint (CSS classes handle visibility); afterwards only one
+  // container stays mounted so hidden copies don't poll or drift local state.
+  const isMobile = useIsMobile();
 
   const settled = state?.settledProfit ?? 0;
   const provisional = state?.provisionalProfit ?? 0;
@@ -83,9 +87,12 @@ export default function DashboardPage() {
   return (
     <PageShell fullHeight>
       <div className={dashboardPage}>
-        <div className="hidden sm:contents">{overviewBar}</div>
-
-        <DashboardDoNext className="hidden sm:block" />
+        {isMobile !== true ? (
+          <>
+            <div className="hidden sm:contents">{overviewBar}</div>
+            <DashboardDoNext className="hidden sm:block" />
+          </>
+        ) : null}
 
         {showEmptyCta ? (
           <EmptyState
@@ -98,7 +105,7 @@ export default function DashboardPage() {
           />
         ) : (
           <>
-            {state ? (
+            {state && isMobile === true ? (
               <MobileHomeDeck
                 cards={deckCards}
                 pin={state.settings.mobileDeckPin}
@@ -108,34 +115,38 @@ export default function DashboardPage() {
               />
             ) : null}
 
-            <div
-              className={cn(
-                dashboardMainGrid,
-                "hidden border-t border-border/60 sm:grid lg:grid-cols-2 xl:grid-cols-12"
-              )}
-            >
-              {showActivity && (
-                <div className={cn(dashboardPanelColumn, "xl:col-span-6")}>{pnlChart}</div>
-              )}
+            {isMobile !== true ? (
+              <>
+                <div
+                  className={cn(
+                    dashboardMainGrid,
+                    "hidden border-t border-border/60 sm:grid lg:grid-cols-2 xl:grid-cols-12"
+                  )}
+                >
+                  {showActivity && (
+                    <div className={cn(dashboardPanelColumn, "xl:col-span-6")}>{pnlChart}</div>
+                  )}
 
-              <div
-                className={cn(
-                  dashboardPanelColumn,
-                  showActivity
-                    ? "border-t border-border/60 lg:col-span-1 lg:border-t-0 xl:col-span-6"
-                    : "lg:col-span-2 xl:col-span-12"
+                  <div
+                    className={cn(
+                      dashboardPanelColumn,
+                      showActivity
+                        ? "border-t border-border/60 lg:col-span-1 lg:border-t-0 xl:col-span-6"
+                        : "lg:col-span-2 xl:col-span-12"
+                    )}
+                  >
+                    <DailyPlan className="border-b border-border/60" />
+                    <DashboardFeedPanel state={state} />
+                  </div>
+                </div>
+
+                {showLive && (
+                  <div className="hidden border-t border-border/60 sm:block">
+                    <DashboardLiveTabs state={state} />
+                  </div>
                 )}
-              >
-                <DailyPlan className="border-b border-border/60" />
-                <DashboardFeedPanel state={state} />
-              </div>
-            </div>
-
-            {showLive && (
-              <div className="hidden border-t border-border/60 sm:block">
-                <DashboardLiveTabs state={state} />
-              </div>
-            )}
+              </>
+            ) : null}
           </>
         )}
       </div>

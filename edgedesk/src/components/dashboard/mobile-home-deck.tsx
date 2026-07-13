@@ -108,13 +108,18 @@ export function MobileHomeDeck({
       <div
         ref={scrollerRef}
         onScroll={onScroll}
+        role="group"
+        aria-roledescription="carousel"
+        aria-label="Home widgets"
         className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {cards.map((card) => (
+        {cards.map((card, i) => (
           <div
             key={card.id}
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`${card.label} (${i + 1} of ${cards.length})`}
             className="flex w-[88vw] shrink-0 snap-center flex-col overflow-hidden rounded-lg border border-border/80 bg-card"
-            aria-label={card.label}
           >
             <div className="app-scroll-nested min-h-0 flex-1 overflow-y-auto">
               {card.node}
@@ -123,20 +128,24 @@ export function MobileHomeDeck({
         ))}
       </div>
 
-      <div className="flex shrink-0 items-center justify-center gap-1.5 pb-3 pt-1" role="tablist" aria-label="Home widgets">
+      <div className="flex shrink-0 items-center justify-center pb-1.5">
         {cards.map((card, i) => (
           <button
             key={card.id}
             type="button"
-            role="tab"
-            aria-selected={i === activeIndex}
-            aria-label={card.label}
-            className={cn(
-              "size-1.5 rounded-full transition-colors",
-              i === activeIndex ? "bg-primary" : "bg-muted-foreground/30"
-            )}
+            aria-label={`Go to ${card.label}`}
+            aria-current={i === activeIndex ? "true" : undefined}
+            className="flex size-8 items-center justify-center"
             onClick={() => scrollToIndex(i, true)}
-          />
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "size-1.5 rounded-full transition-colors",
+                i === activeIndex ? "bg-primary" : "bg-muted-foreground/30"
+              )}
+            />
+          </button>
         ))}
       </div>
     </div>
