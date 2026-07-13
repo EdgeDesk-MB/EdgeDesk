@@ -13,6 +13,7 @@ import { CalendarClock } from "lucide-react";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
+import { doNextBarClass } from "@/lib/offers/do-next";
 import {
   buildDailyPlan,
   mergePlanWithSeen,
@@ -23,15 +24,10 @@ import { dashboardSection } from "@/lib/ui/dashboard-layout";
 import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { cn } from "@/lib/utils";
 
-function slotDotClass(kind: DailyPlanSlot["kind"]): string {
-  switch (kind) {
-    case "race":
-      return "bg-emerald-500";
-    case "kickoff":
-      return "bg-amber-500";
-    default:
-      return "bg-sky-500";
-  }
+/** Offer slots reuse the Do Next accent palette; schedule markers stay neutral. */
+function slotDotClass(slot: DailyPlanSlot): string {
+  if (slot.doKind) return doNextBarClass(slot.doKind);
+  return "bg-muted-foreground/60";
 }
 
 function SlotRow({ slot }: { slot: DailyPlanSlot }) {
@@ -43,14 +39,14 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
       <span
         className={cn(
           "w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums",
-          urgent ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
+          urgent ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground",
           slot.done && "line-through opacity-70"
         )}
       >
         {timeLabel}
       </span>
       <span
-        className={cn("size-1.5 shrink-0 rounded-full", slotDotClass(slot.kind))}
+        className={cn("size-1.5 shrink-0 rounded-full", slotDotClass(slot))}
         aria-hidden
       />
       <span className="min-w-0 flex-1">
@@ -68,11 +64,11 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
           </span>
         ) : null}
       </span>
-      {slot.ev != null && slot.ev > 0.005 && !slot.done ? (
+      {slot.ev != null && slot.ev > 0.5 && !slot.done ? (
         <span className="flex shrink-0 items-center gap-1.5">
           {slot.basis ? <EvBasisBadge basis={slot.basis} /> : null}
           <span className="text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-            +£{slot.ev >= 10 ? slot.ev.toFixed(0) : slot.ev.toFixed(2)}
+            £{slot.ev >= 10 ? slot.ev.toFixed(0) : slot.ev.toFixed(1)}
           </span>
         </span>
       ) : null}
@@ -124,7 +120,8 @@ export function DailyPlan({ className }: { className?: string }) {
 
   if (slots.length === 0) return null;
 
-  const firstAnytime = slots.findIndex((s) => s.at == null);
+  const timed = slots.filter((s) => s.at != null);
+  const anytime = slots.filter((s) => s.at == null);
   const doneCount = slots.filter((s) => s.done).length;
 
   return (
@@ -133,21 +130,39 @@ export function DailyPlan({ className }: { className?: string }) {
         prominent
         icon={CalendarClock}
         title="Today's plan"
-        description="Deadlines, races and kickoffs in time order."
+        description="Deadlines, races and kick-offs in time order."
       />
       <div className={cn("app-scroll-nested max-h-[17.5rem] overflow-y-auto py-1.5", cardInsetX)}>
-        <ol className="flex flex-col">
-          {slots.map((slot, i) => (
-            <li key={slot.id}>
-              {i === firstAnytime ? (
-                <p className="mt-1.5 border-t border-border/60 px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Anytime
-                </p>
-              ) : null}
-              <SlotRow slot={slot} />
-            </li>
-          ))}
-        </ol>
+        {timed.length > 0 ? (
+          <ol className="flex flex-col">
+            {timed.map((slot) => (
+              <li key={slot.id}>
+                <SlotRow slot={slot} />
+              </li>
+            ))}
+          </ol>
+        ) : null}
+        {anytime.length > 0 ? (
+          <>
+            <p
+              role="heading"
+              aria-level={3}
+              className={cn(
+                "px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                timed.length > 0 && "mt-1.5 border-t border-border/60 pt-2"
+              )}
+            >
+              Anytime
+            </p>
+            <ol className="flex flex-col">
+              {anytime.map((slot) => (
+                <li key={slot.id}>
+                  <SlotRow slot={slot} />
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : null}
         {doneCount > 0 ? (
           <p className="px-2 pb-1 pt-1.5 text-[10px] text-muted-foreground">
             {doneCount} of {slots.length} done

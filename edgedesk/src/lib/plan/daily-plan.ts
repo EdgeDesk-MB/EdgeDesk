@@ -45,6 +45,8 @@ export interface DailyPlanSlot {
   /** Epoch ms, or null for the anytime bucket */
   at: number | null;
   kind: DailyPlanSlotKind;
+  /** For offer-derived slots: the underlying Do Next kind (drives accent colour). */
+  doKind?: DoNextItem["kind"];
   title: string;
   detail: string | null;
   ev?: number;
@@ -102,6 +104,7 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
       id: item.id,
       at: timed ? deadline : null,
       kind: timed ? "offer_action" : "anytime",
+      doKind: item.kind,
       title: item.title,
       detail: item.detail || item.offerTitle,
       ev: item.remainingEv > 0 ? item.remainingEv : undefined,
@@ -135,7 +138,7 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
       at: f.kickoff,
       kind: "kickoff",
       title: f.label,
-      detail: "Kickoff",
+      detail: "Kick-off",
       ev: f.openExpected != null && f.openExpected > 0 ? f.openExpected : undefined,
       basis: f.openExpected != null && f.openExpected > 0 ? "estimated" : undefined,
       priority: "medium",
