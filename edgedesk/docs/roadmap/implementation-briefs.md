@@ -401,7 +401,7 @@ they're in**. Pagination dots + last-position memory (sessionStorage, pattern:
 (deterministic): open `livePositions` → chart; before 12:00 with plan slots → Daily Plan; else
 hero. User pin overrides (a setting, added per §0 settings checklist).
 
-## C2. Progressive disclosure audit `[local]` (mechanical, given C1)
+## C2. Progressive disclosure audit `[local]` ✅ DONE (primary surfaces; calculator-page tables deferred)
 
 Every dashboard/desk card gets a collapsed `< sm` variant: headline stat + one line, expand in
 place. Racing Desk mobile default = race strip + suggested races + workflow steps

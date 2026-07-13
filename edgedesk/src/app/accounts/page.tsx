@@ -317,6 +317,84 @@ function AccountTable({
   }
 
   return (
+    <>
+      {/* Mobile: card list (C2 - tables become cards < sm) */}
+      <div className="sm:hidden">
+        {rows.length === 0 && (
+          <p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>
+        )}
+        {rows.map((a) => {
+          const profit = a.type === "bookie" ? profitForAccount(a.name) : null;
+          return (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => onSelect(a.id)}
+              className="w-full border-b border-border/60 px-1 py-3 text-left"
+            >
+              <span className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium">
+                  {a.type === "bookie" ? (
+                    <span
+                      className="inline-block size-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: bookieBrandColor(a.name, a.brandColor) }}
+                    />
+                  ) : a.type === "bank" ? (
+                    <Building2 className="size-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <Wallet className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="truncate">{a.name}</span>
+                  {typeBadge(a.type)}
+                  {a.type === "bookie" && a.accessStatus !== "available" ? (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] font-normal",
+                        a.accessStatus === "gubbed" &&
+                          "border-amber-500/40 text-amber-700 dark:text-amber-400",
+                        a.accessStatus === "closed" &&
+                          "border-muted-foreground/30 text-muted-foreground"
+                      )}
+                    >
+                      {a.accessStatus === "gubbed" ? "Gubbed" : "Closed"}
+                    </Badge>
+                  ) : null}
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 text-base font-semibold tabular-nums",
+                    a.balance < 0 && "text-negative"
+                  )}
+                >
+                  <MoneyFlow value={a.balance} />
+                </span>
+              </span>
+              <span className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="min-w-0 truncate">
+                  {a.fundedByAccountId && bankNameById.get(a.fundedByAccountId)
+                    ? `Funded by ${bankNameById.get(a.fundedByAccountId)}`
+                    : (a.notes?.trim() ?? "")}
+                  {(a.pendingIn ?? 0) > 0 ? ` · +£${a.pendingIn.toFixed(2)} pending` : ""}
+                  {(a.wrRemaining ?? 0) > 0 ? ` · WR £${a.wrRemaining.toFixed(2)}` : ""}
+                </span>
+                <span className="flex shrink-0 items-center gap-3 tabular-nums">
+                  {a.type === "bookie" && (a.freeBets ?? 0) > 0 ? (
+                    <span className="font-medium text-violet-600 dark:text-violet-400">
+                      FB <MoneyFlow value={a.freeBets ?? 0} className="inline" />
+                    </span>
+                  ) : null}
+                  {profit != null ? (
+                    <MoneyFlow value={profit} signColor signDisplay className="inline font-medium" />
+                  ) : null}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="hidden sm:block">
     <Table>
       <TableHeader>
         <TableRow>
@@ -454,6 +532,8 @@ function AccountTable({
         })}
       </TableBody>
     </Table>
+      </div>
+    </>
   );
 }
 
