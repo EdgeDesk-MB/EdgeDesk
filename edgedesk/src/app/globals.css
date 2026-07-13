@@ -414,6 +414,48 @@
     background-color: #94a3b8;
   }
 
+  /**
+   * Balance-adjustment markers - triangles pointing the way the money moved,
+   * same ring-and-fill construction as the dots (clip-path replaces the
+   * radius; drop-shadow follows the clipped shape where box-shadow cannot).
+   */
+  .chart-bet-marker--adjustment {
+    width: 15px;
+    height: 13px;
+    border-radius: 0;
+    box-shadow: none;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.2));
+  }
+
+  .dark .chart-bet-marker--adjustment {
+    box-shadow: none;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45));
+  }
+
+  .chart-bet-marker--adjustment .chart-bet-marker__inner {
+    width: 8px;
+    height: 7px;
+    border-radius: 0;
+  }
+
+  .chart-bet-marker--adjustment.chart-bet-marker--up {
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+
+  .chart-bet-marker--adjustment.chart-bet-marker--up .chart-bet-marker__inner {
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    margin-top: 2px;
+  }
+
+  .chart-bet-marker--adjustment.chart-bet-marker--down {
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+
+  .chart-bet-marker--adjustment.chart-bet-marker--down .chart-bet-marker__inner {
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    margin-bottom: 2px;
+  }
+
   /** Settlement rows - even tint across the full row so left/right insets read equal */
   .history-settlement-tint-win {
     background-color: rgb(16 185 129 / 0.1);

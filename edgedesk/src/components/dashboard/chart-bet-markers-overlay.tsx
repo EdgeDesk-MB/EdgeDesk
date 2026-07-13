@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { BetRow } from "@/lib/db/schema";
 import { formatGbp } from "@/lib/format-money";
+import { cn } from "@/lib/utils";
 import {
   buildAdjustmentMarkers,
   buildChartBetMarkers,
@@ -115,7 +116,12 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
               <TooltipTrigger asChild>
                 <Link
                   href={isAdjustment ? "/accounts" : `/tracker?highlight=${marker.id}`}
-                  className={chartBetMarkerClassName(marker.tone)}
+                  className={cn(
+                    chartBetMarkerClassName(marker.tone),
+                    isAdjustment && "chart-bet-marker--adjustment",
+                    isAdjustment &&
+                      (marker.betProfit > 0 ? "chart-bet-marker--up" : "chart-bet-marker--down")
+                  )}
                   style={{ left: x, top: y }}
                   aria-label={`${marker.label} - ${statusLabel}`}
                 >
