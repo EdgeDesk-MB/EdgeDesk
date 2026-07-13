@@ -2,6 +2,7 @@
  * Client-safe app state types (no SQLite / server services).
  */
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
+import type { DailyPlanFixtureInput, DailyPlanRaceInput } from "@/lib/plan/daily-plan";
 import type { BalanceSummary } from "@/lib/services/balances.types";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { AppSettings } from "@/lib/services/settings-shared";
@@ -55,6 +56,9 @@ export interface AppState {
   series: { time: number; value: number; commissionPaid: number }[];
   /** P&L-affecting balance adjustments (chart markers alongside settled bets). */
   pnlAdjustments: { id: number; time: number; amount: number; detail: string | null }[];
+  /** Daily Plan (B1) slot inputs: today's tracked races and fixtures with bets. */
+  planRaces: DailyPlanRaceInput[];
+  planFixtures: DailyPlanFixtureInput[];
   history: HistoryRow[];
   chartHistory: HistoryRow[];
   promoAwards: Record<number, { amount: number; reason: string }>;

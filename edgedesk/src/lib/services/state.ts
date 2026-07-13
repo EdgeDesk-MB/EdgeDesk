@@ -51,7 +51,7 @@ import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
 import { parseRaceResults, racingEventStatusDetail, selectionPosition } from "@/lib/racing";
 import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes";
 import { formatRacingEventTitle } from "@/lib/events";
-import { formatEventTitle } from "@/lib/events";
+import { formatEventTitle, racingVenueLabel } from "@/lib/events";
 import { livePositionValuation } from "@/lib/calc/ep/live-pnl";
 import {
   formatLiveMarkets,
@@ -662,6 +662,51 @@ export async function getAppState(): Promise<AppState> {
     .filter((h) => h.amount != null && h.amount !== 0)
     .map((h) => ({ id: h.id, time: h.createdAt, amount: h.amount!, detail: h.detail }));
 
+  // Daily Plan (B1) slot inputs: today's tracked races and fixtures with bets.
+  const planNow = new Date();
+  const planDayStart = new Date(
+    planNow.getFullYear(),
+    planNow.getMonth(),
+    planNow.getDate()
+  ).getTime();
+  const planDayEnd = planDayStart + 24 * 60 * 60 * 1000;
+  const openExpectedFor = (eventId: number) =>
+    allBets
+      .filter((b) => b.eventId === eventId && b.status === "open" && b.expectedProfit != null)
+      .reduce((s, b) => s + (b.expectedProfit ?? 0), 0);
+
+  const planRaces = allEvents
+    .filter(
+      (e) =>
+        e.sport === "horse_racing" && e.startTime >= planDayStart && e.startTime < planDayEnd
+    )
+    .map((e) => ({
+      eventId: e.id,
+      course: racingVenueLabel(e.competition),
+      offTime: e.startTime,
+      resultLogged: e.status === "finished" || parseRaceResults(e.goals) != null,
+      openExpected: Math.round(openExpectedFor(e.id) * 100) / 100 || null,
+    }));
+
+  const planFixtures = allEvents
+    .filter(
+      (e) =>
+        e.sport !== "horse_racing" && e.startTime >= planDayStart && e.startTime < planDayEnd
+    )
+    .map((e) => {
+      const linked = allBets.filter((b) => b.eventId === e.id);
+      if (linked.length === 0) return null;
+      return {
+        eventId: e.id,
+        kickoff: e.startTime,
+        label: formatEventTitle(e),
+        betCount: linked.length,
+        openBetCount: linked.filter((b) => b.status === "open").length,
+        openExpected: Math.round(openExpectedFor(e.id) * 100) / 100 || null,
+      };
+    })
+    .filter((f): f is NonNullable<typeof f> => f != null);
+
   const livePositions: LivePosition[] = [];
   let provisionalTotal = 0;
   const liveValuedBetIds = new Set<number>();
@@ -750,6 +795,8 @@ export async function getAppState(): Promise<AppState> {
     settledProfit: running,
     provisionalProfit: provisionalTotal,
     pnlAdjustments,
+    planRaces,
+    planFixtures,
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     livePositions,
     liveEventModels,

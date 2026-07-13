@@ -6,6 +6,7 @@ import { LivePnlChart } from "@/components/dashboard/live-pnl-chart";
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
 import { DashboardDoNext } from "@/components/dashboard/dashboard-do-next";
+import { DailyPlan } from "@/components/dashboard/daily-plan";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { useAppState } from "@/hooks/use-app-state";
@@ -114,6 +115,7 @@ export default function DashboardPage() {
                     : "lg:col-span-2 xl:col-span-12"
                 )}
               >
+                <DailyPlan className="border-b border-border/60" />
                 <section className={cn(dashboardSection, "min-h-0 flex-1")}>
                   <DashboardSectionHeader
                     prominent

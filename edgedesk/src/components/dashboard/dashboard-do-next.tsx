@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { VenueBadge } from "@/components/venue-badge";
@@ -8,21 +8,14 @@ import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section
 import { useAddBet } from "@/components/add-bet-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api, useAppState } from "@/hooks/use-app-state";
-import {
-  availableBookieNames,
-  offerMatchesAvailableBookies,
-} from "@/lib/accounts/available-bookies";
+import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { isOfferExpired } from "@/lib/offers/offer-inactive-ui";
 import {
-  buildDoNextItems,
   doNextBarClass,
   sortDoNextItems,
   sumActionableEv,
-  type BookieBalanceMap,
   type DoNextItem,
   type DoNextSort,
-  type FreeBetLotInput,
 } from "@/lib/offers/do-next";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
@@ -83,7 +76,6 @@ function DoNextCard({
 
   const body = (
     <>
-      <span className={cn("z-10 w-1 shrink-0 self-stretch", doNextBarClass(item.kind))} aria-hidden />
       <div
         className={cn(
           "relative z-[2] flex min-h-full min-w-0 flex-1 flex-col",
@@ -174,48 +166,12 @@ function DoNextCard({
  * Home "Do next" strip - calendar-style cards, best first, Priority / Edge sort.
  */
 export function DashboardDoNext({ className }: { className?: string }) {
-  const { state } = useAppState(5000);
+  const { items: allItems, state } = useDoNextItems(5000);
   const { openAddBet } = useAddBet();
   const { viewOffer } = useOfferDialog();
   const [sort, setSort] = useState<DoNextSort>("priority");
-  const [lots, setLots] = useState<FreeBetLotInput[]>([]);
 
   const offers = state?.offers ?? [];
-  const accounts = state?.balances?.accounts;
-  const retention = state?.retention;
-  const freeBetTotal = accounts
-    ?.filter((a) => a.type === "bookie")
-    .reduce((s, a) => s + (a.freeBets ?? 0), 0);
-
-  useEffect(() => {
-    api<{ lots: FreeBetLotInput[] }>("/api/accounts/free-bets")
-      .then((r) => setLots(r.lots ?? []))
-      .catch(() => setLots([]));
-  }, [freeBetTotal]);
-
-  const scopedOffers = useMemo(() => {
-    const available = availableBookieNames(accounts ?? []);
-    if (available.size === 0) return offers;
-    return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
-  }, [offers, accounts]);
-
-  const retentionOpts = retention
-    ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
-    : undefined;
-
-  const bookieBalances = useMemo<BookieBalanceMap>(() => {
-    const map: BookieBalanceMap = new Map();
-    for (const a of accounts ?? []) {
-      if (a.type === "bookie") map.set(a.name.trim().toLowerCase(), a.balance ?? 0);
-    }
-    return map;
-  }, [accounts]);
-
-  const allItems = useMemo(() => {
-    return buildDoNextItems(scopedOffers, lots, Date.now(), retentionOpts, bookieBalances);
-  // retentionOpts is stable per render; retention.rate change triggers this via state deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopedOffers, lots, retention?.rate]);
 
   const items = useMemo(
     () => sortDoNextItems(allItems, sort).slice(0, 8),
@@ -250,7 +206,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
 
   function onOpenCard(item: DoNextItem) {
     if (item.offerId == null) return;
-    const offer = scopedOffers.find((o) => o.id === item.offerId);
+    const offer = offers.find((o) => o.id === item.offerId);
     if (!offer) return;
     viewOffer(offer);
   }
@@ -308,7 +264,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
               onOpen={onOpenCard}
               offer={
                 item.offerId != null
-                  ? scopedOffers.find((o) => o.id === item.offerId)
+                  ? offers.find((o) => o.id === item.offerId)
                   : undefined
               }
             />

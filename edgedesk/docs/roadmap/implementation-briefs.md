@@ -20,7 +20,7 @@ Last updated: 2026-07-13 (A3 done — Phase 1 complete)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 470 tests / 67 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 486 tests / 68 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -252,7 +252,7 @@ principle). Exclude `nonRunner: true`.
 
 # PHASE 2 — DAILY DRIVER
 
-## B1. The Daily Plan `[strong]` `[design-first]`
+## B1. The Daily Plan `[strong]` `[design-first]` ✅ DONE
 
 **Objective.** One time-ordered run-sheet for today merging: offer next-actions with deadlines
 (`offer-calendar.ts` already classifies today/critical), tracked races (off times), fixture
