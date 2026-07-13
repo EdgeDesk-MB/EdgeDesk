@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BetRow, HistoryRow } from "@/lib/db/schema";
 import {
+  buildAdjustmentMarkers,
   buildChartAnnotations,
   buildChartBetMarkers,
   buildSettledPnlSeries,
@@ -82,6 +83,54 @@ describe("buildChartBetMarkers", () => {
     expect(chartBetMarkerClassName("win")).toBe("chart-bet-marker chart-bet-marker--win");
     expect(markerToneFromBet(bet({ id: 9, status: "lost", actualProfit: 12 }))).toBe("win");
     expect(markerToneForStatus("void")).toBe("neutral");
+  });
+});
+
+describe("buildAdjustmentMarkers", () => {
+  it("tones by sign and anchors at the adjustment time", () => {
+    const markers = buildAdjustmentMarkers([
+      { id: 7, time: 5_000, amount: 5.5, detail: "Tote · +£5.50" },
+      { id: 8, time: 6_000, amount: -3, detail: "Bet365 · -£3.00" },
+      { id: 9, time: 7_000, amount: 0, detail: "noop" },
+    ]);
+
+    expect(markers).toHaveLength(2); // zero-amount rows are skipped
+    expect(markers[0]).toMatchObject({
+      id: 7,
+      kind: "adjustment",
+      settledAtSec: 5,
+      betProfit: 5.5,
+      tone: "win",
+      label: "Tote · +£5.50",
+    });
+    expect(markers[1]?.tone).toBe("loss");
+  });
+
+  it("projects onto the rendered line at the top of its own step", () => {
+    const nowSec = 1_000;
+    // Line: bet +10 at t=700, adjustment +5.5 at t=750 → (700,10) (750,15.5)
+    const linePoints = [
+      { time: 700, value: 10 },
+      { time: 750, value: 15.5 },
+    ];
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs: 600,
+      showBadge: false,
+      livePoints: linePoints,
+      liveValue: 15.5,
+      nowSec,
+    });
+    expect(layout).not.toBeNull();
+
+    const markers = buildAdjustmentMarkers([
+      { id: 7, time: 750_000, amount: 5.5, detail: "Tote · +£5.50" },
+    ]);
+    const projected = projectBetMarkers(markers, layout!, linePoints);
+    expect(projected).toHaveLength(1);
+    expect(projected[0]?.y).toBeCloseTo(layout!.toY(15.5), 6);
   });
 });
 

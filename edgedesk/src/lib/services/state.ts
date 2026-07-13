@@ -658,6 +658,10 @@ export async function getAppState(): Promise<AppState> {
     return { time: p.time, value: running, commissionPaid: commissionRunning };
   });
 
+  const pnlAdjustments = balanceAdjustments
+    .filter((h) => h.amount != null && h.amount !== 0)
+    .map((h) => ({ id: h.id, time: h.createdAt, amount: h.amount!, detail: h.detail }));
+
   const livePositions: LivePosition[] = [];
   let provisionalTotal = 0;
   const liveValuedBetIds = new Set<number>();
@@ -745,6 +749,7 @@ export async function getAppState(): Promise<AppState> {
     bets: allBets.sort((a, b) => b.createdAt - a.createdAt),
     settledProfit: running,
     provisionalProfit: provisionalTotal,
+    pnlAdjustments,
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     livePositions,
     liveEventModels,

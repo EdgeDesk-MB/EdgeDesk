@@ -16,6 +16,7 @@ import { formatClockTime } from "@/lib/time-format";
 import {
   PNL_CHART_PADDING_DEFAULT,
   PNL_CHART_PADDING_PANEL,
+  type PnlAdjustment,
 } from "@/lib/pnl/chart-bet-markers";
 import { filterPillState } from "@/lib/ui/surface-styles";
 
@@ -103,6 +104,7 @@ export const LivePnlChart = memo(function LivePnlChart({
   liveTotal,
   historicSeries,
   bets = [],
+  adjustments = [],
   compact = true,
   mini = false,
   panel = false,
@@ -115,6 +117,7 @@ export const LivePnlChart = memo(function LivePnlChart({
   liveTotal: number;
   historicSeries: Array<{ time: number; value: number; commissionPaid?: number }>;
   bets?: BetRow[];
+  adjustments?: PnlAdjustment[];
   compact?: boolean;
   /** Shorter chart for dashboard - sits below the live panels */
   mini?: boolean;
@@ -320,9 +323,10 @@ export const LivePnlChart = memo(function LivePnlChart({
                 Loading chart…
               </div>
             )}
-            {mounted && bets.length > 0 ? (
+            {mounted && (bets.length > 0 || adjustments.length > 0) ? (
               <ChartBetMarkersOverlay
                 bets={bets}
+                adjustments={adjustments}
                 livePoints={livePoints}
                 liveValue={displayTotal}
                 windowSecs={effectiveWindowSecs}

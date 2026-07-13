@@ -97,6 +97,7 @@ export default function DashboardPage() {
                     liveTotal={liveTotal}
                     historicSeries={state?.series ?? []}
                     bets={state?.bets ?? []}
+                    adjustments={state?.pnlAdjustments ?? []}
                     liveInPlay={showLive}
                     hasLiveEvent={liveEvents.length > 0}
                     panel

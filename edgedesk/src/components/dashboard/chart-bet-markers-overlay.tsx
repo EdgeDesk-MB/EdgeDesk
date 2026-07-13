@@ -11,18 +11,21 @@ import {
 import type { BetRow } from "@/lib/db/schema";
 import { formatGbp } from "@/lib/format-money";
 import {
+  buildAdjustmentMarkers,
   buildChartBetMarkers,
   chartBetMarkerClassName,
   computePnlChartLayout,
   projectBetMarkers,
   settlementStatusLabel,
   type LivePnlPoint,
+  type PnlAdjustment,
   type PnlChartPadding,
   type ProjectedBetMarker,
 } from "@/lib/pnl/chart-bet-markers";
 
 export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   bets,
+  adjustments = [],
   livePoints,
   liveValue,
   windowSecs,
@@ -30,6 +33,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   padding,
 }: {
   bets: BetRow[];
+  adjustments?: PnlAdjustment[];
   livePoints: LivePnlPoint[];
   liveValue: number;
   windowSecs: number;
@@ -40,7 +44,10 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [projected, setProjected] = useState<ProjectedBetMarker[]>([]);
 
-  const markers = useMemo(() => buildChartBetMarkers(bets), [bets]);
+  const markers = useMemo(
+    () => [...buildChartBetMarkers(bets), ...buildAdjustmentMarkers(adjustments)],
+    [bets, adjustments]
+  );
 
   useEffect(() => {
     const el = hostRef.current;
@@ -75,7 +82,9 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
         liveValue,
       });
       const next = layout ? projectBetMarkers(markers, layout, livePoints) : [];
-      const key = next.map((p) => `${p.marker.id}:${p.x.toFixed(1)}:${p.y.toFixed(1)}`).join("|");
+      const key = next
+        .map((p) => `${p.marker.kind ?? "bet"}:${p.marker.id}:${p.x.toFixed(1)}:${p.y.toFixed(1)}`)
+        .join("|");
       if (key !== lastKey) {
         lastKey = key;
         setProjected(next);
@@ -96,28 +105,34 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
       aria-hidden={projected.length === 0}
     >
       <TooltipProvider delayDuration={200}>
-        {projected.map(({ marker, x, y }) => (
-          <Tooltip key={marker.id}>
-            <TooltipTrigger asChild>
-              <Link
-                href={`/tracker?highlight=${marker.id}`}
-                className={chartBetMarkerClassName(marker.tone)}
-                style={{ left: x, top: y }}
-                aria-label={`${marker.label} - ${settlementStatusLabel(marker.status)}`}
-              >
-                <span className="chart-bet-marker__inner" />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[14rem] text-xs">
-              <p className="truncate font-medium">{marker.label}</p>
-              <p className="text-background/80">
-                {settlementStatusLabel(marker.status)}
-                {" · "}
-                {formatGbp(marker.betProfit, { signed: true })}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        ))}
+        {projected.map(({ marker, x, y }) => {
+          const isAdjustment = marker.kind === "adjustment";
+          const statusLabel = isAdjustment
+            ? "Balance adjustment"
+            : settlementStatusLabel(marker.status);
+          return (
+            <Tooltip key={`${marker.kind ?? "bet"}:${marker.id}`}>
+              <TooltipTrigger asChild>
+                <Link
+                  href={isAdjustment ? "/accounts" : `/tracker?highlight=${marker.id}`}
+                  className={chartBetMarkerClassName(marker.tone)}
+                  style={{ left: x, top: y }}
+                  aria-label={`${marker.label} - ${statusLabel}`}
+                >
+                  <span className="chart-bet-marker__inner" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[14rem] text-xs">
+                <p className="truncate font-medium">{marker.label}</p>
+                <p className="text-background/80">
+                  {statusLabel}
+                  {" · "}
+                  {formatGbp(marker.betProfit, { signed: true })}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
       </TooltipProvider>
     </div>
   );

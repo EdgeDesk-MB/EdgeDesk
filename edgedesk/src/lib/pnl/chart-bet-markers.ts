@@ -40,12 +40,22 @@ export type ChartBetMarkerTone = "win" | "loss" | "neutral";
 
 export interface ChartBetMarker {
   id: number;
+  /** Settled bet (default) or a P&L-affecting balance adjustment. */
+  kind?: "bet" | "adjustment";
   label: string;
   status: BetRow["status"];
   settledAtSec: number;
   betProfit: number;
   cumulativeValue: number;
   tone: ChartBetMarkerTone;
+}
+
+export interface PnlAdjustment {
+  id: number;
+  /** Epoch ms of the adjustment (history createdAt). */
+  time: number;
+  amount: number;
+  detail: string | null;
 }
 
 export interface ProjectedBetMarker {
@@ -230,6 +240,25 @@ export function seriesValueAt(
  * gross/retained basis included) - markers are anchored to it so they sit ON
  * the line. The bets-only `cumulativeValue` is the fallback.
  */
+/** P&L-affecting balance adjustments as chart markers, toned by sign. */
+export function buildAdjustmentMarkers(adjustments: PnlAdjustment[]): ChartBetMarker[] {
+  const markers: ChartBetMarker[] = [];
+  for (const adj of adjustments) {
+    if (adj.amount === 0) continue;
+    markers.push({
+      id: adj.id,
+      kind: "adjustment",
+      label: adj.detail?.trim() || "Balance correction",
+      status: adj.amount > 0 ? "won" : "lost",
+      settledAtSec: adj.time / 1000,
+      betProfit: adj.amount,
+      cumulativeValue: 0, // resolved from the rendered line at projection
+      tone: adj.amount > 0 ? "win" : "loss",
+    });
+  }
+  return markers;
+}
+
 export function projectBetMarkers(
   markers: ChartBetMarker[],
   layout: PnlChartLayout,
