@@ -83,16 +83,20 @@ export function PwaInstallPrompt() {
   };
 
   return (
-    <div className="fixed inset-x-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30 flex items-center gap-3 rounded-lg border border-border/80 bg-popover p-3 text-sm text-popover-foreground shadow-lg">
+    // Sits above the quick-log FAB (56px + its offset) so neither is obscured.
+    <div
+      role="status"
+      className="fixed inset-x-3 bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+4.5rem)] z-30 flex items-center gap-3 rounded-lg border border-border/80 bg-popover p-3 text-sm text-popover-foreground shadow-lg"
+    >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-topbar">
-        <EdgeDeskLogoIcon className="size-5 text-emerald-400" />
+        <EdgeDeskLogoIcon className="size-5 text-topbar-foreground" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-medium">Add EdgeDesk to your Home Screen</p>
         <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
           {ios ? (
             <>
-              Tap <Share className="inline size-3.5 align-text-bottom" aria-label="Share" /> then
+              Tap <Share className="inline size-3.5 align-text-bottom" role="img" aria-label="Share" /> then
               &ldquo;Add to Home Screen&rdquo; for the full-screen app and alerts.
             </>
           ) : (
@@ -112,14 +116,16 @@ export function PwaInstallPrompt() {
           Install
         </Button>
       ) : null}
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         aria-label="Dismiss install prompt"
         onClick={dismiss}
-        className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+        className="size-9 shrink-0 text-muted-foreground"
       >
         <X className="size-4" aria-hidden />
-      </button>
+      </Button>
     </div>
   );
 }

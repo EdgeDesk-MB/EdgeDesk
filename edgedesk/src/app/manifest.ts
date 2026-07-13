@@ -8,6 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
       "Calculators, live events and real-time profit tracking for matched betting",
     start_url: "/",
     display: "standalone",
+    // Mirrors --topbar (oklch(0.14 0 0)) - manifests cannot reference CSS vars.
     background_color: "#0d0d0f",
     theme_color: "#0d0d0f",
     icons: [

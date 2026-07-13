@@ -26,7 +26,7 @@ import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Bell, Download, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
+import { Bell, BellRing, Download, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
@@ -324,14 +324,14 @@ function PreferencesPanel({
       <Card className="lg:col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Bell className="size-4" /> Alerts
+            <BellRing className="size-4" /> Alerts
           </CardTitle>
           <CardDescription>
-            Local notifications while EdgeDesk is open (browser permission needed); falls back
-            to in-app toasts.
+            Local notifications while EdgeDesk is open (browser permission needed), with
+            in-app toast fallback.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
             <div>
               <p className="text-sm font-medium">Offer expiring with EV unclaimed</p>
