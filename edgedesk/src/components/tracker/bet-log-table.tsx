@@ -93,6 +93,121 @@ export function BetLogTable({
     });
 
   return (
+    <>
+      {/* Mobile: card list (C2 progressive disclosure - tables become cards < sm) */}
+      <div className="sm:hidden">
+        {bets.map((bet) => {
+          const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
+          const raceOutcome = betRaceOutcome(bet, event, promoAwards);
+          const offer = bet.offerId != null ? offerById.get(bet.offerId) : undefined;
+          const inactiveFigure = offerInactiveFigureClass(
+            isBetCancelled(bet) || (offer != null && isOfferExpired(offer))
+          );
+          const canManualSettle =
+            bet.status === "open" &&
+            !bet.triggerRule &&
+            !isAutoSettleMarket(inferSportFromBet(bet.market, event?.sport), bet.market);
+
+          return (
+            <div
+              key={bet.id}
+              id={`bet-card-${bet.id}`}
+              className={cn(
+                "border-b border-border/60 px-[var(--layout-page-x)] py-3",
+                highlightId === bet.id && "bet-row-highlight"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-sm font-medium leading-snug">{bet.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {bet.betType.replace("_", " ")}
+                    {bet.earlyPayout ? " · 2UP" : ""}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[10px]">
+                    {bet.status === "early_payout"
+                      ? "2UP paid"
+                      : bet.status === "half_win"
+                        ? "½ win"
+                        : bet.status === "half_lose"
+                          ? "½ lose"
+                          : formatPillLabel(bet.status)}
+                  </Badge>
+                  <div className={cn("mt-1 font-medium tabular-nums", inactiveFigure)}>
+                    {bet.actualProfit != null ? (
+                      <MoneyFlow
+                        value={bet.actualProfit}
+                        signColor={!isBetCancelled(bet)}
+                        signDisplay
+                        className="text-sm"
+                      />
+                    ) : bet.expectedProfit != null ? (
+                      <span className="text-xs text-muted-foreground">
+                        exp. {formatGbp(bet.expectedProfit)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
+                {event ? formatEventTitle(event) : "No event linked"}
+                {raceOutcome?.positionLabel ? ` · ${raceOutcome.positionLabel}` : ""}
+                {" · "}
+                {MARKET_LABELS[bet.market] ?? bet.market}
+                {bet.selection
+                  ? ` · ${formatBetSelection(bet.market, bet.selection, event?.homeTeam, event?.awayTeam)}`
+                  : ""}
+              </p>
+
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className={cn("text-xs tabular-nums text-muted-foreground", inactiveFigure)}>
+                  {bet.backStake > 0
+                    ? `${formatGbp(bet.backStake)} @ ${bet.backOdds.toFixed(2)}`
+                    : "-"}
+                  {bet.layStake > 0
+                    ? ` · lay ${formatGbp(bet.layStake)} @ ${bet.layOdds.toFixed(2)}`
+                    : ""}
+                </p>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {canManualSettle && (
+                    <ManualSettleDialog
+                      bet={bet}
+                      onSettle={(status, profit) =>
+                        onPatch(bet.id, { status, actualProfit: profit }, "Bet settled")
+                      }
+                    />
+                  )}
+                  {bet.status !== "open" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0 text-muted-foreground"
+                      onClick={() => onPatch(bet.id, { status: "open" }, "Bet reopened")}
+                      aria-label="Reopen bet"
+                    >
+                      <RotateCcw className="size-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 shrink-0"
+                    onClick={() => onEdit(bet)}
+                    aria-label="Edit bet"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden sm:block">
     <Table className="min-w-[720px] table-fixed">
       <TableHeader>
         <TableRow className="hover:bg-transparent">
@@ -303,6 +418,8 @@ export function BetLogTable({
         })}
       </TableBody>
     </Table>
+      </div>
+    </>
   );
 }
 
