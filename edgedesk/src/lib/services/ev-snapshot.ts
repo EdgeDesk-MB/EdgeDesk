@@ -23,7 +23,8 @@ export function getAllSnapshots(): EvSnapshotRow[] {
 /**
  * Write an EV lock snapshot for an offer.
  * - If no snapshot exists: writes version 1.
- * - If a snapshot exists and the offer is not settled: writes a new version.
+ * - If a snapshot exists and the offer is not settled: writes a new version
+ *   (unless `onlyIfUnlocked`, which no-ops when any snapshot exists).
  * - If a snapshot exists and settled_at is already set: no-op (never mutate settled locks).
  *
  * Returns the version written, or null if no write happened.
@@ -35,12 +36,16 @@ export function writeEvLock(
     expectedProfit?: number;
     retention?: number;
     retentionSampleSize?: number;
+    /** Activation semantics: write v1 only if no snapshot exists, never re-version. */
+    onlyIfUnlocked?: boolean;
   }
 ): number | null {
   const existing = getSnapshotsForOffer(offer.id);
   const latest = existing.length > 0
     ? existing.reduce((best, s) => (s.version > best.version ? s : best))
     : null;
+
+  if (opts?.onlyIfUnlocked && latest != null) return null;
 
   // If latest snapshot is already settled, don't add more versions.
   if (latest?.settledAt != null) return null;

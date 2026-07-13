@@ -73,6 +73,23 @@ describe("writeEvLock", () => {
     expect(snaps[1].expectedProfit).toBe(18.0);
   });
 
+  it("onlyIfUnlocked writes v1 when no snapshot exists", () => {
+    const offer = makeOffer({ expectedProfit: 14.2 });
+    const v = writeEvLock(offer, { expectedProfit: 14.2, onlyIfUnlocked: true });
+    expect(v).toBe(1);
+    expect(getSnapshotsForOffer(offer.id)).toHaveLength(1);
+  });
+
+  it("onlyIfUnlocked is a no-op when a lock already exists (activation must not re-version)", () => {
+    const offer = makeOffer({ expectedProfit: 14.2 });
+    writeEvLock(offer, { expectedProfit: 14.2 });
+    const v = writeEvLock(offer, { expectedProfit: 18, onlyIfUnlocked: true });
+    expect(v).toBeNull();
+    const snaps = getSnapshotsForOffer(offer.id);
+    expect(snaps).toHaveLength(1);
+    expect(snaps[0].expectedProfit).toBe(14.2);
+  });
+
   it("does not write a new version when already settled", () => {
     const offer = makeOffer({ expectedProfit: 14.2 });
     writeEvLock(offer, { expectedProfit: 14.2 });

@@ -84,7 +84,7 @@ These are ordered; each unlocks the next.
 - **How:** Add the field at the estimator (`advantage.ts` knows which branch produced the number);
   UI badge component reused from the Racing Desk confidence chip.
 
-### A3. Expected-vs-realized: the EV Capture Rate (flagship metric)
+### A3. Expected-vs-realized: the EV Capture Rate (flagship metric) ✅ DONE
 
 - **What:** Snapshot `expectedProfit` (and its basis) at the moment an offer transitions to
   Active — call it the **EV lock**. At Settled, diff against realized net P&L and decompose:
@@ -255,7 +255,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 
 | Phase | Contents | Status | Exit criteria |
 |-------|----------|--------|---------------|
-| **1. EV truth** | ✅ A1 retention, ✅ A2 provenance, ⬜ A3 EV lock + capture, ✅ A4 hero, ✅ A5 no-vig UI | **In progress** — A3 remaining | Every £-EV on screen has a basis badge; settled offers show capture %; Home leads with edge-on-the-table |
+| **1. EV truth** | ✅ A1 retention, ✅ A2 provenance, ✅ A3 EV lock + capture, ✅ A4 hero, ✅ A5 no-vig UI | **Done** | Every £-EV on screen has a basis badge; settled offers show capture %; Home leads with edge-on-the-table |
 | **2. Daily driver** | ⬜ B1 Daily Plan, ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ⬜ B10 retained-P&L audit | **In progress** — B1, B10 remaining | A full offer day can be run start-to-finish from the plan view alone |
 | **3. Mobile** | ⬜ §4 swipe deck, quick-log (+B4 parser), collapsed variants, PWA install + local alerts | Not started | Log a bet in ≤3 taps on a phone; Home usable one-handed |
 | **4. Guardian** | ⬜ B5 naked-exposure, ⬜ B6 2UP sentinel, push alerts | Not started | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |

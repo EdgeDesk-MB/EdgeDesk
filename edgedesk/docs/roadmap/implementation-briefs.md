@@ -10,7 +10,7 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-07-12 (status updated)
+Last updated: 2026-07-13 (A3 done — Phase 1 complete)
 
 ---
 
@@ -20,7 +20,7 @@ Last updated: 2026-07-12 (status updated)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 445 tests / 65 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 455 tests / 66 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -144,7 +144,7 @@ estimator branch.
 
 ---
 
-## A3. EV lock + capture rate `[strong]` — cornerstone; B7/B8 depend on it
+## A3. EV lock + capture rate `[strong]` ✅ DONE — cornerstone; B7/B8 depend on it
 
 **Objective.** Snapshot expected profit when a campaign starts; at settlement compute
 capture % and decomposition. Never mutate a lock — version it.

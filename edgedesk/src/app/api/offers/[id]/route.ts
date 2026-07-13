@@ -65,13 +65,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .get();
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Re-lock EV snapshot when expectedProfit is edited on an active, non-settled offer
-  if (p.expectedProfit !== undefined) {
+  // Re-lock EV snapshot when expectedProfit is edited on an active, non-settled offer;
+  // planned→active transitions write v1 if the offer was never locked.
+  const activated = p.status === "active" && existing.status === "planned";
+  if (p.expectedProfit !== undefined || activated) {
     const linked = db.select().from(bets).where(eq(bets.offerId, offerId)).all();
     const summary = summariseOffer(updated, linked, getPromoAwardsByBetId());
     const stage = deriveOfferPipelineStage(summary);
     if (stage !== "settled" && stage !== "expired") {
-      writeEvLock(summary, { expectedProfit: p.expectedProfit });
+      if (p.expectedProfit !== undefined) {
+        writeEvLock(summary, { expectedProfit: p.expectedProfit });
+      } else {
+        writeEvLock(summary, { onlyIfUnlocked: true });
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import {
   writeEvLock,
   fillSettlementSnapshot,
   getAllSnapshots,
+  getSnapshotsForOffer,
 } from "@/lib/services/ev-snapshot";
 import { captureSummary, type EvSnapshotRow } from "@/lib/offers/ev-capture";
 import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
@@ -408,11 +409,24 @@ export function listOfferSummaries(): OfferSummary[] {
       const linked = allBets.filter((b) => b.offerId === o.id);
       const summary = summariseOffer(o, linked, promoAwards);
       const recurrence = getOfferRecurrenceMeta(o, seriesById.get(o.seriesId ?? -1) ?? null);
-      const snaps = snapsByOffer.get(o.id) ?? [];
+      let snaps = snapsByOffer.get(o.id) ?? [];
 
-      // Fill settlement data if the campaign just became settled
       const stage = deriveOfferPipelineStage(summary);
-      if (stage === "settled" && snaps.length > 0) {
+
+      // Catch-all: any active offer that reached this list unlocked (API create,
+      // recurrence instance, daily roll) gets its v1 lock now. Never lock a campaign
+      // whose outcome is already known - a post-hoc baseline is not a baseline.
+      if (snaps.length === 0 && o.status === "active" && stage !== "settled" && stage !== "expired") {
+        const v = writeEvLock(summary, { onlyIfUnlocked: true });
+        if (v != null) snaps = getSnapshotsForOffer(o.id) as EvSnapshotRow[];
+      }
+
+      // Fill settlement data if the campaign just became settled or expired.
+      // Expired campaigns wait for open legs to settle so the fill is truly realized
+      // (an expired unstarted campaign records realized 0 - lost EV is real signal).
+      const fillable =
+        stage === "settled" || (stage === "expired" && summary.openBets === 0);
+      if (fillable && snaps.length > 0) {
         const latest = snaps.reduce((best, s) => (s.version > best.version ? s : best));
         if (latest.settledAt == null) {
           // Commission drag: sum layStake * commission for bets where back lost (lay won)
@@ -544,7 +558,7 @@ export function syncOfferStatuses(): void {
       db.update(offers).set({ status: "active" }).where(eq(offers.id, offer.id)).run();
       // Write EV lock v1 for the newly-active offer (if not already locked).
       const activeSummary = summariseOffer({ ...offer, status: "active" }, linkedBets, promoAwards);
-      writeEvLock(activeSummary);
+      writeEvLock(activeSummary, { onlyIfUnlocked: true });
       // Fall through - may also be past scoped race/expiry.
     }
 
