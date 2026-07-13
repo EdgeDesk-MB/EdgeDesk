@@ -106,7 +106,7 @@ describe("buildAdjustmentMarkers", () => {
     expect(markers[1]?.tone).toBe("loss");
   });
 
-  it("projects onto the rendered line at the top of its own step", () => {
+  it("projects at the foot of its own step - the movement follows the marker", () => {
     const nowSec = 1_000;
     // Line: bet +10 at t=700, adjustment +5.5 at t=750 → (700,10) (750,15.5)
     const linePoints = [
@@ -130,7 +130,8 @@ describe("buildAdjustmentMarkers", () => {
     ]);
     const projected = projectBetMarkers(markers, layout!, linePoints);
     expect(projected).toHaveLength(1);
-    expect(projected[0]?.y).toBeCloseTo(layout!.toY(15.5), 6);
+    // Foot of the step: line value strictly before t=750 is 10, not 15.5.
+    expect(projected[0]?.y).toBeCloseTo(layout!.toY(10), 6);
   });
 });
 

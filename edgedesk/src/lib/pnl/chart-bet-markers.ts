@@ -269,7 +269,13 @@ export function projectBetMarkers(
 
   for (const marker of markers) {
     if (marker.settledAtSec < leftEdge || marker.settledAtSec > rightEdge) continue;
-    const lineValue = linePoints ? seriesValueAt(linePoints, marker.settledAtSec) : null;
+    // Adjustments sit at the foot of their own step (strictly before), so the
+    // marker reads as the cause of the movement that follows it.
+    const lineValue = linePoints
+      ? seriesValueAt(linePoints, marker.settledAtSec, {
+          before: marker.kind === "adjustment",
+        })
+      : null;
     const x = toX(marker.settledAtSec);
     const y = toY(lineValue ?? marker.cumulativeValue);
     if (x < pad.left - 6 || x > pad.left + chartW + 6) continue;
