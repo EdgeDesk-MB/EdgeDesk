@@ -24,6 +24,17 @@ export interface AppSettings {
   displayTimezone: string;
   /** Clock format for every displayed time of day (inputs stay HH:mm). */
   timeFormat: TimeFormatPreference;
+  /** Mobile Home deck start card: "auto" = context-aware, else a pinned card id. */
+  mobileDeckPin: MobileDeckPin;
+}
+
+export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "chart", "feed", "do-next"] as const;
+export type MobileDeckPin = (typeof MOBILE_DECK_PINS)[number];
+
+export function normalizeMobileDeckPin(value: string | null | undefined): MobileDeckPin {
+  return (MOBILE_DECK_PINS as readonly string[]).includes(value ?? "")
+    ? (value as MobileDeckPin)
+    : "auto";
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -37,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dashboardPollMs: 3000,
   displayTimezone: "Europe/London",
   timeFormat: DEFAULT_TIME_FORMAT,
+  mobileDeckPin: "auto",
 };
 
 /** Pure resolve - safe on client with settings from app state. */

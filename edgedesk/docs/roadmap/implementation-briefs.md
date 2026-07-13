@@ -390,7 +390,7 @@ per settled bet; `state.ts` accumulates it as `commissionPaid` on each series po
 
 # PHASE 3 — MOBILE (Track C) — all `[design-first]`, build after Sam's wireframes
 
-## C1. Home swipe deck `[strong]`
+## C1. Home swipe deck `[strong]` ✅ DONE
 
 CSS scroll-snap deck replacing the vertical stack on `< sm` only: container
 `overflow-x-auto snap-x snap-mandatory flex`, children `snap-center shrink-0 w-[92vw]`.

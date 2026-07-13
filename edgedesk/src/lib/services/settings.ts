@@ -7,6 +7,7 @@ import { db, appSettings } from "@/lib/db";
 import {
   DEFAULT_SETTINGS,
   bookmakerFromOfferPrefs,
+  normalizeMobileDeckPin,
   stakeFromOfferPrefs,
   type AppSettings,
   type OfferBetPref,
@@ -88,6 +89,7 @@ export function getAppSettings(): AppSettings {
         : DEFAULT_SETTINGS.dashboardPollMs,
     displayTimezone: normalizeDisplayTimezone(readRaw("displayTimezone")),
     timeFormat: normalizeTimeFormat(readRaw("timeFormat")),
+    mobileDeckPin: normalizeMobileDeckPin(readRaw("mobileDeckPin")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -171,6 +173,9 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.timeFormat != null) {
     writeRaw("timeFormat", normalizeTimeFormat(patch.timeFormat));
+  }
+  if (patch.mobileDeckPin != null) {
+    writeRaw("mobileDeckPin", normalizeMobileDeckPin(patch.mobileDeckPin));
   }
   return getAppSettings();
 }

@@ -19,7 +19,7 @@ import { BookieNamePicker, ExchangeNamePicker } from "@/components/bookie-name-p
 import { Switch } from "@/components/ui/switch";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import type { AppSettings } from "@/lib/services/settings-shared";
+import { normalizeMobileDeckPin, type AppSettings } from "@/lib/services/settings-shared";
 import type { ExchangeRow } from "@/lib/db/schema";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { PageShell } from "@/components/page-shell";
@@ -293,6 +293,29 @@ function PreferencesPanel({
             />
             <p className="text-xs text-muted-foreground">
               Lower = snappier live P&amp;L. The home dashboard picks this up automatically.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mobile-deck-pin">Mobile home starts on</Label>
+            <Select
+              value={settings.mobileDeckPin}
+              onValueChange={(v) => onPatch({ mobileDeckPin: normalizeMobileDeckPin(v) })}
+            >
+              <SelectTrigger id="mobile-deck-pin">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto (context-aware)</SelectItem>
+                <SelectItem value="hero">Overview</SelectItem>
+                <SelectItem value="plan">Today&apos;s plan</SelectItem>
+                <SelectItem value="chart">Chart</SelectItem>
+                <SelectItem value="feed">Feed</SelectItem>
+                <SelectItem value="do-next">Do next</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Auto picks the chart with open positions, the plan in the morning, otherwise the
+              overview.
             </p>
           </div>
         </CardContent>

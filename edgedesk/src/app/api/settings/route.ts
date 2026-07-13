@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAppSettings, patchAppSettings, type AppSettingsPatch } from "@/lib/services/settings";
+import { normalizeMobileDeckPin } from "@/lib/services/settings-shared";
 import { normalizeTimeFormat } from "@/lib/time-format";
 
 export async function GET() {
@@ -27,6 +28,9 @@ export async function PATCH(req: Request) {
   if (typeof body.dashboardPollMs === "number") patch.dashboardPollMs = body.dashboardPollMs;
   if (typeof body.displayTimezone === "string") patch.displayTimezone = body.displayTimezone;
   if (typeof body.timeFormat === "string") patch.timeFormat = normalizeTimeFormat(body.timeFormat);
+  if (typeof body.mobileDeckPin === "string") {
+    patch.mobileDeckPin = normalizeMobileDeckPin(body.mobileDeckPin);
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

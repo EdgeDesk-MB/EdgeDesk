@@ -1,33 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { PageShell } from "@/components/page-shell";
 import { LivePnlChart } from "@/components/dashboard/live-pnl-chart";
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
 import { DashboardDoNext } from "@/components/dashboard/dashboard-do-next";
 import { DailyPlan } from "@/components/dashboard/daily-plan";
-import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
+import { DashboardFeedPanel } from "@/components/dashboard/dashboard-feed-panel";
+import { MobileHomeDeck } from "@/components/dashboard/mobile-home-deck";
 import { EmptyState } from "@/components/help/empty-state";
 import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
-import { HistoryFeed } from "@/components/history/history-feed";
-import { buildHistoryContext } from "@/lib/history-display";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
-import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import {
   dashboardMainGrid,
   dashboardPage,
-  dashboardPanelBody,
   dashboardPanelColumn,
-  dashboardSection,
 } from "@/lib/ui/dashboard-layout";
 import { cn } from "@/lib/utils";
-import { filterPillState } from "@/lib/ui/surface-styles";
-import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { TrendingUp } from "lucide-react";
-
-type FeedFilter = "all" | "bets";
 
 export default function DashboardPage() {
   const { state } = useAppState();
@@ -45,35 +37,55 @@ export default function DashboardPage() {
   const livePositionCount = state?.livePositions.length ?? 0;
   const showLive = liveEvents.length > 0 || livePositionCount > 0;
 
-  const historyContext = useMemo(
-    () =>
-      state
-        ? buildHistoryContext(state.events, state.bets, state.promoAwards)
-        : buildHistoryContext([], [], {}),
-    [state]
-  );
-
-  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
-
   const offers = state?.offers ?? [];
   const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
   const showEmptyCta =
     openBets.length === 0 && betCount === 0 && nextActions.length === 0;
   const showActivity = betCount > 0 || liveEvents.length > 0 || Math.abs(liveTotal) > 0.01;
 
+  const planSignals =
+    (state?.planRaces?.length ?? 0) + (state?.planFixtures?.length ?? 0) + nextActions.length;
+
+  const overviewBar = (
+    <DashboardOverviewBar
+      liveTotal={liveTotal}
+      settled={settled}
+      provisional={provisional}
+      openBets={openBets.length}
+      offers={offers}
+      bets={state?.bets ?? []}
+    />
+  );
+
+  const pnlChart = (
+    <LivePnlChart
+      liveTotal={liveTotal}
+      historicSeries={state?.series ?? []}
+      bets={state?.bets ?? []}
+      adjustments={state?.pnlAdjustments ?? []}
+      liveInPlay={showLive}
+      hasLiveEvent={liveEvents.length > 0}
+      panel
+      className="min-h-0 flex-1"
+    />
+  );
+
+  const deckCards = [
+    { id: "hero", label: "Overview", node: overviewBar },
+    ...(planSignals > 0 ? [{ id: "plan", label: "Today's plan", node: <DailyPlan /> }] : []),
+    { id: "chart", label: "Chart", node: pnlChart },
+    { id: "feed", label: "Feed", node: <DashboardFeedPanel state={state} /> },
+    ...(nextActions.length > 0
+      ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
+      : []),
+  ];
+
   return (
     <PageShell fullHeight>
       <div className={dashboardPage}>
-        <DashboardOverviewBar
-          liveTotal={liveTotal}
-          settled={settled}
-          provisional={provisional}
-          openBets={openBets.length}
-          offers={offers}
-          bets={state?.bets ?? []}
-        />
+        <div className="hidden sm:contents">{overviewBar}</div>
 
-        <DashboardDoNext />
+        <DashboardDoNext className="hidden sm:block" />
 
         {showEmptyCta ? (
           <EmptyState
@@ -86,25 +98,24 @@ export default function DashboardPage() {
           />
         ) : (
           <>
+            {state ? (
+              <MobileHomeDeck
+                cards={deckCards}
+                pin={state.settings.mobileDeckPin}
+                hasOpenPositions={livePositionCount > 0}
+                hasPlanWork={planSignals > 0}
+                className="sm:hidden"
+              />
+            ) : null}
+
             <div
               className={cn(
                 dashboardMainGrid,
-                "border-t border-border/60 lg:grid-cols-2 xl:grid-cols-12"
+                "hidden border-t border-border/60 sm:grid lg:grid-cols-2 xl:grid-cols-12"
               )}
             >
               {showActivity && (
-                <div className={cn(dashboardPanelColumn, "xl:col-span-6")}>
-                  <LivePnlChart
-                    liveTotal={liveTotal}
-                    historicSeries={state?.series ?? []}
-                    bets={state?.bets ?? []}
-                    adjustments={state?.pnlAdjustments ?? []}
-                    liveInPlay={showLive}
-                    hasLiveEvent={liveEvents.length > 0}
-                    panel
-                    className="min-h-0 flex-1"
-                  />
-                </div>
+                <div className={cn(dashboardPanelColumn, "xl:col-span-6")}>{pnlChart}</div>
               )}
 
               <div
@@ -116,53 +127,12 @@ export default function DashboardPage() {
                 )}
               >
                 <DailyPlan className="border-b border-border/60" />
-                <section className={cn(dashboardSection, "min-h-0 flex-1")}>
-                  <DashboardSectionHeader
-                    prominent
-                    titleHref="/history"
-                    title="Feed"
-                    description="Goals, results and settlements in real time."
-                  />
-                  <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
-                    <div className="flex justify-end gap-1 py-2">
-                      <button
-                        type="button"
-                        className={cn(filterPillState(feedFilter === "bets"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
-                        onClick={() => setFeedFilter("bets")}
-                      >
-                        Bets only
-                      </button>
-                      <button
-                        type="button"
-                        className={cn(filterPillState(feedFilter === "all"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
-                        onClick={() => setFeedFilter("all")}
-                      >
-                        All
-                      </button>
-                    </div>
-                  </div>
-                  <ScrollFadeEdges
-                    scrollClassName={cn(
-                      dashboardPanelBody,
-                      "app-scroll-overlay px-[var(--layout-card-x)] pb-3 pt-0"
-                    )}
-                  >
-                    <HistoryFeed
-                      entries={
-                        feedFilter === "bets"
-                          ? (state?.history ?? []).filter((e) => e.kind === "settlement")
-                          : (state?.history ?? [])
-                      }
-                      ctx={historyContext}
-                      compact
-                    />
-                  </ScrollFadeEdges>
-                </section>
+                <DashboardFeedPanel state={state} />
               </div>
             </div>
 
             {showLive && (
-              <div className="border-t border-border/60">
+              <div className="hidden border-t border-border/60 sm:block">
                 <DashboardLiveTabs state={state} />
               </div>
             )}
