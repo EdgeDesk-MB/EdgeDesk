@@ -7,7 +7,8 @@ export type BetDeskQueue =
   | "needs_lay"
   | "settle"
   | "offers"
-  | "orphans";
+  | "orphans"
+  | "quick_logged";
 
 export const BET_DESK_QUEUES: { id: BetDeskQueue; label: string }[] = [
   { id: "all", label: "All" },
@@ -16,6 +17,7 @@ export const BET_DESK_QUEUES: { id: BetDeskQueue; label: string }[] = [
   { id: "settle", label: "Settle" },
   { id: "offers", label: "Offer campaigns" },
   { id: "orphans", label: "Orphans" },
+  { id: "quick_logged", label: "Quick-logged" },
 ];
 
 /** Open back bet with no exchange hedge logged yet. */
@@ -50,6 +52,8 @@ export function betMatchesDeskQueue(
       return bet.offerId != null;
     case "orphans":
       return bet.offerId == null;
+    case "quick_logged":
+      return bet.quickLogged != null;
     default:
       return true;
   }
@@ -173,6 +177,11 @@ export function deskQueueEmptyCopy(queue: BetDeskQueue): {
       return {
         title: "No orphan bets",
         description: "All logged bets are linked to an offer campaign.",
+      };
+    case "quick_logged":
+      return {
+        title: "Nothing to review",
+        description: "Bets captured with the mobile quick-log land here for tidying up.",
       };
     default:
       return {

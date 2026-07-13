@@ -183,6 +183,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_racing_odds_override_race_horse
       // column already exists
     }
   };
+  addColumn("bets", "quick_logged INTEGER");
   addColumn("events", "goals TEXT");
   addColumn("events", "ft_home_score INTEGER");
   addColumn("events", "ft_away_score INTEGER");

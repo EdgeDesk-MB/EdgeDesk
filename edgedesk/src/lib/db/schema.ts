@@ -80,6 +80,8 @@ export const bets = sqliteTable("bets", {
   createdAt: integer("created_at").notNull(),
   settledAt: integer("settled_at"),
   offerId: integer("offer_id"),
+  /** Epoch ms when the bet was captured via mobile quick-log (C3); null = full entry */
+  quickLogged: integer("quick_logged"),
 });
 
 /** Matched betting offer / promo pipeline (sign-up, reload, racing refund, etc.) */

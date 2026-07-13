@@ -43,6 +43,8 @@ const createSchema = z.object({
   homeTeam: z.string().optional(),
   awayTeam: z.string().optional(),
   offerId: z.number().optional(),
+  /** Mobile quick-log capture - flags the bet for later desktop review */
+  quickLogged: z.boolean().default(false),
 });
 
 export async function GET() {
@@ -104,6 +106,7 @@ export async function POST(req: NextRequest) {
       expectedProfit: input.expectedProfit,
       notes: input.notes,
       createdAt: Date.now(),
+      quickLogged: input.quickLogged ? Date.now() : null,
     })
     .returning()
     .get();

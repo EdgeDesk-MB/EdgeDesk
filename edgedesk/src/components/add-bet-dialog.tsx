@@ -133,6 +133,10 @@ export interface AddBetPrefill {
   notes?: string;
   offerId?: number;
   triggerText?: string;
+  /** Mobile quick-log capture - the bet is flagged for later desktop review */
+  quickLogged?: boolean;
+  /** Open the Paste slip import as soon as the dialog mounts */
+  autoOpenImport?: boolean;
 }
 
 const betTypeLabels: Record<BetMode, string> = {
@@ -867,6 +871,7 @@ export function AddBetDialog({
             bookmaker: bookmaker || prefill?.bookmaker || undefined,
             backStake: totalStake,
             legs: dutchLegs,
+            quickLogged: prefill?.quickLogged ?? undefined,
             expectedProfit: prefill?.expectedProfit,
             homeTeam: sport === "football" ? effectiveHome || undefined : undefined,
             awayTeam: sport === "football" ? effectiveAway || undefined : undefined,
@@ -972,6 +977,7 @@ export function AddBetDialog({
         expectedProfit: Number(preview.guaranteed.toFixed(2)),
         notes: prefill?.notes ?? (exchange ? `Exchange: ${exchange.name}` : undefined),
         offerId: resolvedOfferId,
+        quickLogged: prefill?.quickLogged ?? undefined,
       };
 
       if (editBet) {
@@ -1069,7 +1075,13 @@ export function AddBetDialog({
                   </button>
                   ) : null}
                 </div>
-                {!dutchLegs?.length && <BetImportDialog onApply={applyOcrFields} />}
+                {!dutchLegs?.length && (
+                  <BetImportDialog
+                    key={String(prefill?.autoOpenImport ?? false)}
+                    onApply={applyOcrFields}
+                    defaultOpen={prefill?.autoOpenImport}
+                  />
+                )}
               </div>
               {labelHasOfferTrigger && !triggerText.trim() ? (
                 <p className="text-[10px] text-violet-700 dark:text-violet-300">

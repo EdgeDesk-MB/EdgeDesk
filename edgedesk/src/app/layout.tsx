@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { QuickLogSheet } from "@/components/quick-log-sheet";
 import { AddBalanceProvider } from "@/components/add-balance-provider";
 import { AddBetProvider } from "@/components/add-bet-provider";
 import { TrackFixtureProvider } from "@/components/track-fixture-provider";
@@ -89,6 +90,7 @@ export default function RootLayout({
                             </div>
                           </div>
                           <Toaster richColors position="top-right" />
+                          <QuickLogSheet />
                           <RacingAutopilotListener />
                           <OfferReminderListener />
                         </FreeBetsProvider>

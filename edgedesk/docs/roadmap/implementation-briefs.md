@@ -408,13 +408,13 @@ place. Racing Desk mobile default = race strip + suggested races + workflow step
 (`racing-offer-guide.tsx`); full runner grid behind a tap. Tables → card lists at `< sm`
 (tracker, history — partially done; finish and make consistent).
 
-## C3. Quick-log sheet `[strong]` — needs B4
+## C3. Quick-log sheet `[strong]` ✅ DONE — needs B4
 
 Floating "+" on mobile (add to `src/components/app-nav.tsx` mobile chrome) → bottom sheet with
 three paths: Paste slip (B4), From plan (today's B1 slots → one-tap "placed"), Minimal manual
 (bookie/stake/odds only). Writes flag the bet `quick-logged` (new nullable text column
 `quick_logged` on `bets` per §0 additive-column pattern, or reuse `notes` marker — decide with
-Sam; column preferred for querying). Desktop tracker shows a "review quick-logged" filter chip.
+Sam; column preferred for querying). **Decision: INTEGER epoch-ms column `quick_logged` (2026-07-13).** Desktop tracker shows a "review quick-logged" filter chip.
 **Mobile captures, desktop curates** — the sheet never demands full data.
 
 ## C4. PWA + local alerts `[strong]`

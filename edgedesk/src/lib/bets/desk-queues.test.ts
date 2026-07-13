@@ -38,6 +38,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     createdAt: partial.createdAt ?? Date.now(),
     settledAt: null,
     offerId: partial.offerId ?? null,
+    quickLogged: partial.quickLogged ?? null,
   };
 }
 
@@ -76,6 +77,15 @@ describe("filterBetsByDeskQueue", () => {
     ]);
     expect(countDeskQueue(withEvent, "settle", events)).toBe(1);
     expect(filterBetsByDeskQueue(withEvent, "settle", events).map((b) => b.id)).toEqual([10]);
+  });
+
+  it("quick_logged queue matches only mobile-captured bets", () => {
+    const mixed = [
+      bet({ id: 20, quickLogged: 1_783_900_000_000 }),
+      bet({ id: 21, quickLogged: null }),
+    ];
+    expect(filterBetsByDeskQueue(mixed, "quick_logged").map((b) => b.id)).toEqual([20]);
+    expect(countDeskQueue(mixed, "quick_logged")).toBe(1);
   });
 });
 

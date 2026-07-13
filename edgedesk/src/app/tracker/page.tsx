@@ -287,6 +287,10 @@ function TrackerContent() {
                   q.id,
                   eventById
                 );
+                // Review chip only earns its place when quick-logged bets exist.
+                if (q.id === "quick_logged" && count === 0 && deskQueue !== "quick_logged") {
+                  return null;
+                }
                 return (
                   <button
                     key={q.id}

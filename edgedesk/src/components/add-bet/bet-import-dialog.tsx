@@ -36,10 +36,13 @@ const BetScreenshotImport = dynamic(
  */
 export function BetImportDialog({
   onApply,
+  defaultOpen = false,
 }: {
   onApply: (fields: BetOcrFields, source: ScreenshotSource) => void | Promise<void>;
+  /** Quick-log "Paste slip" path opens the import immediately (keyed remount). */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   async function handleApply(fields: BetOcrFields, source: ScreenshotSource) {
     await onApply(fields, source);
