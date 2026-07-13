@@ -9,7 +9,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock } from "lucide-react";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
@@ -128,7 +127,6 @@ export function DailyPlan({ className }: { className?: string }) {
     <section className={cn(dashboardSection, "h-auto max-h-none shrink-0", className)}>
       <DashboardSectionHeader
         prominent
-        icon={CalendarClock}
         title="Today's plan"
         description="Deadlines, races and kick-offs in time order."
       />

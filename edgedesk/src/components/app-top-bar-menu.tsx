@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { BookOpen, ChevronRight, Menu, Moon, Settings } from "lucide-react";
+import { flatNavLinks } from "@/components/app-nav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +37,7 @@ export function AppTopBarMenu() {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-72 overflow-hidden rounded-lg border-2 border-primary/35 bg-popover p-0 shadow-xl ring-0"
+        className="max-h-[min(38rem,85vh)] w-72 overflow-y-auto overflow-x-hidden rounded-lg border-2 border-primary/35 bg-popover p-0 shadow-xl ring-0"
       >
         <Link
           href="/help"
@@ -46,20 +47,20 @@ export function AppTopBarMenu() {
           <span className="flex-1">Help</span>
           <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
-        <Link
-          href="/offers/calendar"
-          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60 md:hidden"
-        >
-          <span className="flex-1">Offers · Calendar</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-        <Link
-          href="/offers"
-          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60 md:hidden"
-        >
-          <span className="flex-1">Offers · Campaigns</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
+        {/* Main navigation - the sidebar is hidden below md, so it lives here. */}
+        <nav aria-label="Main navigation" className="md:hidden">
+          {flatNavLinks.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-3 border-t border-border/80 px-4 py-3 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+            >
+              <item.icon className="size-5 shrink-0 text-muted-foreground" />
+              <span className="flex-1">{item.label}</span>
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </Link>
+          ))}
+        </nav>
         <Link
           href="/settings"
           className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"

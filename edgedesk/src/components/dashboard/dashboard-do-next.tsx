@@ -11,16 +11,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { isOfferExpired } from "@/lib/offers/offer-inactive-ui";
 import {
-  doNextBarClass,
   sortDoNextItems,
-  sumActionableEv,
   type DoNextItem,
   type DoNextSort,
 } from "@/lib/offers/do-next";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { ListChecks, ListOrdered, Sparkles, Timer } from "lucide-react";
+import { ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import type { EvBasis } from "@/lib/offers/advantage";
 
@@ -178,18 +176,6 @@ export function DashboardDoNext({ className }: { className?: string }) {
     [allItems, sort]
   );
 
-  const evChip = useMemo(() => {
-    const { total, weakestBasis } = sumActionableEv(allItems);
-    if (total < 1) return null;
-    const amount = total >= 10 ? total.toFixed(0) : total.toFixed(2);
-    return (
-      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-        +£{amount}
-        <EvBasisBadge basis={weakestBasis} />
-      </span>
-    );
-  }, [allItems]);
-
   function onConvert(item: DoNextItem) {
     const lot = item.convertLot;
     if (!lot) return;
@@ -219,13 +205,11 @@ export function DashboardDoNext({ className }: { className?: string }) {
         pageAlign
         prominent
         titleHref="/offers"
-        icon={ListChecks}
         title="Do next"
         description={
           "Best first - same cards, different sort.\n\nPriority: expiring offers and open actions first.\nEdge: highest estimated remaining EV first.\nRate: highest £/hr estimated value first."
         }
         descriptionAriaLabel="Best first. Priority sorts by urgency. Edge sorts by estimated remaining EV. Rate sorts by EV per hour of effort."
-        titleBadge={evChip}
         action={
           <Tabs value={sort} onValueChange={(v) => setSort(v as DoNextSort)}>
             <TabsList variant="segmented">

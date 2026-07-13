@@ -124,6 +124,21 @@ const entries: NavEntry[] = [
   { kind: "link", href: "/fixtures", label: "Fixtures", icon: CalendarSearch },
 ];
 
+/**
+ * Flat main-nav list for the mobile burger menu - derived from `entries` so
+ * the two navigations can never drift apart.
+ */
+export const flatNavLinks: Array<{ href: string; label: string; icon: NavIcon }> =
+  entries.flatMap((entry) =>
+    entry.kind === "link"
+      ? [{ href: entry.href, label: entry.label, icon: entry.icon }]
+      : entry.children.map((child) => ({
+          href: child.href,
+          label: `${entry.label} · ${child.label}`,
+          icon: child.icon,
+        }))
+  );
+
 /** Matches quick-action (+) / calculator icons on sibling rows */
 const navTrailingSlot =
   "absolute top-1/2 right-3 flex size-6 -translate-y-1/2 items-center justify-center";
