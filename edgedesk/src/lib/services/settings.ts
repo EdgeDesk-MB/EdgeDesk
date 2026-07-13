@@ -90,6 +90,9 @@ export function getAppSettings(): AppSettings {
     displayTimezone: normalizeDisplayTimezone(readRaw("displayTimezone")),
     timeFormat: normalizeTimeFormat(readRaw("timeFormat")),
     mobileDeckPin: normalizeMobileDeckPin(readRaw("mobileDeckPin")),
+    alertsOfferExpiring: readRaw("alertsOfferExpiring") !== "false",
+    alertsRaceOffSoon: readRaw("alertsRaceOffSoon") !== "false",
+    alertsResultSettled: readRaw("alertsResultSettled") !== "false",
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -176,6 +179,15 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.mobileDeckPin != null) {
     writeRaw("mobileDeckPin", normalizeMobileDeckPin(patch.mobileDeckPin));
+  }
+  if (patch.alertsOfferExpiring != null) {
+    writeRaw("alertsOfferExpiring", patch.alertsOfferExpiring ? "true" : "false");
+  }
+  if (patch.alertsRaceOffSoon != null) {
+    writeRaw("alertsRaceOffSoon", patch.alertsRaceOffSoon ? "true" : "false");
+  }
+  if (patch.alertsResultSettled != null) {
+    writeRaw("alertsResultSettled", patch.alertsResultSettled ? "true" : "false");
   }
   return getAppSettings();
 }

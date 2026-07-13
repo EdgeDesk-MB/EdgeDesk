@@ -26,6 +26,10 @@ export interface AppSettings {
   timeFormat: TimeFormatPreference;
   /** Mobile Home deck start card: "auto" = context-aware, else a pinned card id. */
   mobileDeckPin: MobileDeckPin;
+  /** Alert toggles (C4) - local notifications, toast fallback. */
+  alertsOfferExpiring: boolean;
+  alertsRaceOffSoon: boolean;
+  alertsResultSettled: boolean;
 }
 
 export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "chart", "feed", "do-next"] as const;
@@ -49,6 +53,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   displayTimezone: "Europe/London",
   timeFormat: DEFAULT_TIME_FORMAT,
   mobileDeckPin: "auto",
+  alertsOfferExpiring: true,
+  alertsRaceOffSoon: true,
+  alertsResultSettled: true,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

@@ -3,6 +3,8 @@ import { Noto_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { QuickLogSheet } from "@/components/quick-log-sheet";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
+import { AlertWatcher } from "@/components/alert-watcher";
 import { AddBalanceProvider } from "@/components/add-balance-provider";
 import { AddBetProvider } from "@/components/add-bet-provider";
 import { TrackFixtureProvider } from "@/components/track-fixture-provider";
@@ -34,6 +36,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EdgeDesk - Matched Betting Command Centre",
   description: "Calculators, live events and real-time profit tracking for matched betting",
+  icons: { apple: "/icon-180.png" },
 };
 
 /** viewport-fit=cover makes env(safe-area-inset-*) live for the mobile sheets. */
@@ -91,6 +94,8 @@ export default function RootLayout({
                           </div>
                           <Toaster richColors position="top-right" />
                           <QuickLogSheet />
+                          <PwaInstallPrompt />
+                          <AlertWatcher />
                           <RacingAutopilotListener />
                           <OfferReminderListener />
                         </FreeBetsProvider>

@@ -417,7 +417,7 @@ three paths: Paste slip (B4), From plan (today's B1 slots → one-tap "placed"),
 Sam; column preferred for querying). **Decision: INTEGER epoch-ms column `quick_logged` (2026-07-13).** Desktop tracker shows a "review quick-logged" filter chip.
 **Mobile captures, desktop curates** — the sheet never demands full data.
 
-## C4. PWA + local alerts `[strong]`
+## C4. PWA + local alerts `[strong]` ✅ DONE
 
 Manifest + service worker (read Next 16 PWA guidance in `node_modules/next/dist/docs/` first —
 conventions may differ from training data). iOS install prompt on first mobile visit

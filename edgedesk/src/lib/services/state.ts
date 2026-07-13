@@ -686,6 +686,7 @@ export async function getAppState(): Promise<AppState> {
       offTime: e.startTime,
       resultLogged: e.status === "finished" || parseRaceResults(e.goals) != null,
       openExpected: Math.round(openExpectedFor(e.id) * 100) / 100 || null,
+      hasOpenBet: allBets.some((b) => b.eventId === e.id && b.status === "open"),
     }));
 
   const planFixtures = allEvents

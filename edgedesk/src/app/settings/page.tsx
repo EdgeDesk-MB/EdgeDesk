@@ -26,7 +26,7 @@ import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Download, Bell, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
+import { Bell, Download, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
@@ -318,6 +318,57 @@ function PreferencesPanel({
               overview.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bell className="size-4" /> Alerts
+          </CardTitle>
+          <CardDescription>
+            Local notifications while EdgeDesk is open (browser permission needed); falls back
+            to in-app toasts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Offer expiring with EV unclaimed</p>
+              <p className="text-xs text-muted-foreground">
+                An actionable offer ends today with £1+ of edge still on the table
+              </p>
+            </div>
+            <Switch
+              checked={settings.alertsOfferExpiring}
+              onCheckedChange={(v) => onPatch({ alertsOfferExpiring: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Race off-time approaching</p>
+              <p className="text-xs text-muted-foreground">
+                A tracked race goes off within 15 minutes with no bet logged
+              </p>
+            </div>
+            <Switch
+              checked={settings.alertsRaceOffSoon}
+              onCheckedChange={(v) => onPatch({ alertsRaceOffSoon: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Result settled</p>
+              <p className="text-xs text-muted-foreground">
+                &ldquo;Haydock 13:35 settled: +£4.10&rdquo; as results land
+              </p>
+            </div>
+            <Switch
+              checked={settings.alertsResultSettled}
+              onCheckedChange={(v) => onPatch({ alertsResultSettled: v })}
+            />
+          </div>
+          <NotificationPermissionButton />
         </CardContent>
       </Card>
 
@@ -703,5 +754,49 @@ function DataApiPanel({
       </Card>
       </div>
     </div>
+  );
+}
+
+function NotificationPermissionButton() {
+  const [status, setStatus] = useState<NotificationPermission | "unsupported">("default");
+
+  useEffect(() => {
+    setStatus(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+  }, []);
+
+  if (status === "unsupported") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        This browser does not support notifications - alerts show as in-app toasts.
+      </p>
+    );
+  }
+  if (status === "granted") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Browser notifications enabled. Alerts also show as toasts when the tab is focused.
+      </p>
+    );
+  }
+  if (status === "denied") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Notifications are blocked for this site - alerts fall back to in-app toasts. Allow
+        notifications in your browser settings to change this.
+      </p>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="self-start"
+      onClick={async () => {
+        const result = await Notification.requestPermission();
+        setStatus(result);
+      }}
+    >
+      Enable browser notifications
+    </Button>
   );
 }

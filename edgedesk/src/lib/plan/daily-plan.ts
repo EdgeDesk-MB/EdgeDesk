@@ -28,6 +28,8 @@ export interface DailyPlanRaceInput {
   resultLogged: boolean;
   /** Sum of expectedProfit across open bets on this race */
   openExpected: number | null;
+  /** Whether any bet is logged on this race (alert rules use it; plan ignores it) */
+  hasOpenBet?: boolean;
 }
 
 export interface DailyPlanFixtureInput {

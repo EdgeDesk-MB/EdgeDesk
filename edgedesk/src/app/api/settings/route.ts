@@ -31,6 +31,15 @@ export async function PATCH(req: Request) {
   if (typeof body.mobileDeckPin === "string") {
     patch.mobileDeckPin = normalizeMobileDeckPin(body.mobileDeckPin);
   }
+  if (typeof body.alertsOfferExpiring === "boolean") {
+    patch.alertsOfferExpiring = body.alertsOfferExpiring;
+  }
+  if (typeof body.alertsRaceOffSoon === "boolean") {
+    patch.alertsRaceOffSoon = body.alertsRaceOffSoon;
+  }
+  if (typeof body.alertsResultSettled === "boolean") {
+    patch.alertsResultSettled = body.alertsResultSettled;
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;
