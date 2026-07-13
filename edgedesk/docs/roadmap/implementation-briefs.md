@@ -431,7 +431,7 @@ future server backend swap in without touching alert-rule logic.
 
 # PHASE 4 — GUARDIAN
 
-## B5. Naked-exposure sentinel `[strong]` — after C4's AlertChannel
+## B5. Naked-exposure sentinel `[strong]` ✅ DONE — after C4's AlertChannel
 
 **Objective.** Alert on open back bets with no lay past a threshold.
 
@@ -449,7 +449,24 @@ detector; one-tap "intentional" button on the alert writes it.
 notification. **Acceptance:** unit tests for every clause of the predicate incl. dutch exclusion
 and mute marker; manual: log an unhedged qualifying bet, alert within threshold.
 
-## B6. Live 2UP sentinel `[strong]` — after C4
+## B6. Live 2UP sentinel `[strong]` ✅ DONE — after C4
+
+> **Implementation notes (2026-07-14).** Detection rides the existing `homeLed2`/`awayLed2`
+> flags on live events (no new polling). The lock suggestion deviates deliberately from the
+> roadmap's "lay the draw" sketch: backing the selection in-play equalises the win / not-win
+> outcomes *exactly* (a draw lay leaves draw ≠ away-win), so the alert suggests the
+> commission-aware equalising back from `calc/two-up-lock.ts` using the EP live model's win
+> probability as fair odds. Alert copy: "Back at ~B for £s to lock £P either way."
+>
+> **Web push recommendation (the remaining Phase-4 line item).** Ship-state: sentinels
+> deliver via the C4 AlertChannel (Notification API + toast fallback) — full coverage while
+> EdgeDesk is open on any device, including the installed PWA. TRUE background push (app
+> closed) needs: a `web-push` dependency (must be flagged/approved per repo rules), VAPID
+> keys, a subscriptions table, an SW push handler, and the local server running and
+> reachable from the phone. iOS delivery is the roadmap's own top open question and is only
+> provable on Sam's actual iPhone. Recommendation: add push as a follow-up item once the
+> sentinels have proven their value in daily use — the AlertChannel interface means it swaps
+> in without touching any rule logic.
 
 **Objective.** Push "2-0 up — early payout triggered, lay the draw at ~X for +£Y" while a 2UP
 position is open.

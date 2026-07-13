@@ -7,7 +7,9 @@
 export type EdgeAlertKind =
   | "offer_expiring"
   | "race_off_soon"
-  | "result_settled";
+  | "result_settled"
+  | "naked_exposure"
+  | "two_up_lock";
 
 export interface EdgeAlert {
   /** Stable dedupe key - a given alert fires once per key per session. */
@@ -28,4 +30,6 @@ export interface AlertPrefs {
   offerExpiring: boolean;
   raceOffSoon: boolean;
   resultSettled: boolean;
+  nakedExposure: boolean;
+  twoUpLock: boolean;
 }

@@ -9,6 +9,7 @@ import { DashboardDoNext } from "@/components/dashboard/dashboard-do-next";
 import { DailyPlan } from "@/components/dashboard/daily-plan";
 import { DashboardFeedPanel } from "@/components/dashboard/dashboard-feed-panel";
 import { MobileHomeDeck } from "@/components/dashboard/mobile-home-deck";
+import { NakedExposureBanner } from "@/components/naked-exposure-banner";
 import { EmptyState } from "@/components/help/empty-state";
 import { useAppState } from "@/hooks/use-app-state";
 import { useIsMobile } from "@/hooks/use-is-mobile";
@@ -87,6 +88,8 @@ export default function DashboardPage() {
   return (
     <PageShell fullHeight>
       <div className={dashboardPage}>
+        <NakedExposureBanner />
+
         {isMobile !== true ? (
           <>
             <div className="hidden sm:contents">{overviewBar}</div>

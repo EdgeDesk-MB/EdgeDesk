@@ -28,10 +28,18 @@ function doNextItem(over: Partial<DoNextItem> & Pick<DoNextItem, "id">): DoNextI
 
 const base: AlertRuleInput = {
   now: NOW,
-  prefs: { offerExpiring: true, raceOffSoon: true, resultSettled: true },
+  prefs: {
+    offerExpiring: true,
+    raceOffSoon: true,
+    resultSettled: true,
+    nakedExposure: true,
+    twoUpLock: true,
+  },
   doNext: [],
   races: [],
   settledSinceLastPoll: [],
+  nakedExposed: [],
+  twoUpTriggered: [],
 };
 
 describe("offer_expiring rule", () => {
@@ -140,6 +148,61 @@ describe("result_settled rule", () => {
         ...base,
         settledSinceLastPoll: [{ betId: 42, label: "X", profit: 1 }],
         prefs: { ...base.prefs, resultSettled: false },
+      })
+    ).toHaveLength(0);
+  });
+});
+
+describe("naked_exposure rule", () => {
+  it("alerts per exposed bet and respects the toggle", () => {
+    const nakedExposed = [{ betId: 9, label: "Kempton EW", bookmaker: "Bet365" }];
+    const alerts = evaluateAlertRules({ ...base, nakedExposed });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      kind: "naked_exposure",
+      key: "naked_exposure:9",
+      href: "/tracker?highlight=9",
+    });
+    expect(alerts[0]!.body).toContain("Bet365");
+    expect(
+      evaluateAlertRules({
+        ...base,
+        nakedExposed,
+        prefs: { ...base.prefs, nakedExposure: false },
+      })
+    ).toHaveLength(0);
+  });
+});
+
+describe("two_up_lock rule", () => {
+  it("includes the lock suggestion when the live model can price it", () => {
+    const twoUpTriggered = [
+      {
+        betId: 12,
+        label: "Arsenal 2UP",
+        eventName: "Arsenal v Chelsea",
+        suggestion: { fairBackOdds: 1.25, backStake: 49.73, lockedProfit: 11.29 },
+      },
+    ];
+    const alerts = evaluateAlertRules({ ...base, twoUpTriggered });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ kind: "two_up_lock", key: "two_up_lock:12" });
+    expect(alerts[0]!.body).toContain("~1.25");
+    expect(alerts[0]!.body).toContain("£49.73");
+    expect(alerts[0]!.body).toContain("£11.29");
+  });
+
+  it("falls back to plain copy without a suggestion and respects the toggle", () => {
+    const twoUpTriggered = [
+      { betId: 13, label: "X", eventName: "A v B", suggestion: null },
+    ];
+    const alerts = evaluateAlertRules({ ...base, twoUpTriggered });
+    expect(alerts[0]!.body).toContain("hedge the open lay");
+    expect(
+      evaluateAlertRules({
+        ...base,
+        twoUpTriggered,
+        prefs: { ...base.prefs, twoUpLock: false },
       })
     ).toHaveLength(0);
   });

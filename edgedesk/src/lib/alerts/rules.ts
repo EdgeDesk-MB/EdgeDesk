@@ -19,12 +19,28 @@ export interface SettledBetNotice {
   profit: number;
 }
 
+export interface NakedExposureNotice {
+  betId: number;
+  label: string;
+  bookmaker: string | null;
+}
+
+export interface TwoUpLockNotice {
+  betId: number;
+  label: string;
+  eventName: string;
+  /** Equalising exchange back suggestion; null when the live model can't price it */
+  suggestion: { fairBackOdds: number; backStake: number; lockedProfit: number } | null;
+}
+
 export interface AlertRuleInput {
   now: number;
   prefs: AlertPrefs;
   doNext: DoNextItem[];
   races: Array<DailyPlanRaceInput & { hasOpenBet: boolean }>;
   settledSinceLastPoll: SettledBetNotice[];
+  nakedExposed: NakedExposureNotice[];
+  twoUpTriggered: TwoUpLockNotice[];
 }
 
 function dayKey(now: number): string {
@@ -40,8 +56,36 @@ function formatSignedGbp(value: number): string {
 }
 
 export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
-  const { now, prefs, doNext, races, settledSinceLastPoll } = input;
+  const { now, prefs, doNext, races, settledSinceLastPoll, nakedExposed, twoUpTriggered } =
+    input;
   const alerts: EdgeAlert[] = [];
+
+  if (prefs.nakedExposure) {
+    for (const exposed of nakedExposed) {
+      alerts.push({
+        key: `naked_exposure:${exposed.betId}`,
+        kind: "naked_exposure",
+        title: "Unhedged back bet",
+        body: `${exposed.label}${exposed.bookmaker ? ` at ${exposed.bookmaker}` : ""} has no lay logged - full stake exposed.`,
+        href: `/tracker?highlight=${exposed.betId}`,
+      });
+    }
+  }
+
+  if (prefs.twoUpLock) {
+    for (const trigger of twoUpTriggered) {
+      const s = trigger.suggestion;
+      alerts.push({
+        key: `two_up_lock:${trigger.betId}`,
+        kind: "two_up_lock",
+        title: `2UP triggered - ${trigger.eventName}`,
+        body: s
+          ? `Early payout is in. Back at ~${s.fairBackOdds.toFixed(2)} for £${s.backStake.toFixed(2)} to lock £${s.lockedProfit.toFixed(2)} either way.`
+          : "Early payout is in - hedge the open lay to lock your profit.",
+        href: `/tracker?highlight=${trigger.betId}`,
+      });
+    }
+  }
 
   if (prefs.offerExpiring) {
     for (const item of doNext) {

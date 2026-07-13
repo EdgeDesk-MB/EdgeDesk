@@ -93,6 +93,8 @@ export function getAppSettings(): AppSettings {
     alertsOfferExpiring: readRaw("alertsOfferExpiring") !== "false",
     alertsRaceOffSoon: readRaw("alertsRaceOffSoon") !== "false",
     alertsResultSettled: readRaw("alertsResultSettled") !== "false",
+    alertsNakedExposure: readRaw("alertsNakedExposure") !== "false",
+    alertsTwoUpLock: readRaw("alertsTwoUpLock") !== "false",
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -188,6 +190,12 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.alertsResultSettled != null) {
     writeRaw("alertsResultSettled", patch.alertsResultSettled ? "true" : "false");
+  }
+  if (patch.alertsNakedExposure != null) {
+    writeRaw("alertsNakedExposure", patch.alertsNakedExposure ? "true" : "false");
+  }
+  if (patch.alertsTwoUpLock != null) {
+    writeRaw("alertsTwoUpLock", patch.alertsTwoUpLock ? "true" : "false");
   }
   return getAppSettings();
 }

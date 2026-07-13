@@ -40,6 +40,12 @@ export async function PATCH(req: Request) {
   if (typeof body.alertsResultSettled === "boolean") {
     patch.alertsResultSettled = body.alertsResultSettled;
   }
+  if (typeof body.alertsNakedExposure === "boolean") {
+    patch.alertsNakedExposure = body.alertsNakedExposure;
+  }
+  if (typeof body.alertsTwoUpLock === "boolean") {
+    patch.alertsTwoUpLock = body.alertsTwoUpLock;
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

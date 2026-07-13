@@ -30,6 +30,8 @@ export interface AppSettings {
   alertsOfferExpiring: boolean;
   alertsRaceOffSoon: boolean;
   alertsResultSettled: boolean;
+  alertsNakedExposure: boolean;
+  alertsTwoUpLock: boolean;
 }
 
 export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "chart", "feed", "do-next"] as const;
@@ -56,6 +58,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alertsOfferExpiring: true,
   alertsRaceOffSoon: true,
   alertsResultSettled: true,
+  alertsNakedExposure: true,
+  alertsTwoUpLock: true,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

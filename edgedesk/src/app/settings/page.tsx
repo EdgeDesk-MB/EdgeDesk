@@ -368,6 +368,30 @@ function PreferencesPanel({
               onCheckedChange={(v) => onPatch({ alertsResultSettled: v })}
             />
           </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Unhedged back bet</p>
+              <p className="text-xs text-muted-foreground">
+                A qualifying or risk-free back has no lay after 10 minutes (3 near the off)
+              </p>
+            </div>
+            <Switch
+              checked={settings.alertsNakedExposure}
+              onCheckedChange={(v) => onPatch({ alertsNakedExposure: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">2UP triggered</p>
+              <p className="text-xs text-muted-foreground">
+                Your team goes two up - early payout is in, with a lock-in suggestion
+              </p>
+            </div>
+            <Switch
+              checked={settings.alertsTwoUpLock}
+              onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
+            />
+          </div>
           <NotificationPermissionButton />
         </CardContent>
       </Card>

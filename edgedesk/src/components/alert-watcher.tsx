@@ -8,7 +8,13 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { createLocalAlertChannel } from "@/lib/alerts/local-channel";
-import { evaluateAlertRules, type SettledBetNotice } from "@/lib/alerts/rules";
+import {
+  evaluateAlertRules,
+  type SettledBetNotice,
+  type TwoUpLockNotice,
+} from "@/lib/alerts/rules";
+import { detectNakedExposure } from "@/lib/bets/naked-exposure";
+import { suggestTwoUpLock } from "@/lib/calc/two-up-lock";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 
 const SEEN_KEY = "edgedesk-alerts-seen";
@@ -57,12 +63,60 @@ export function AlertWatcher() {
               profit: b.actualProfit ?? 0,
             }));
 
+    const now = Date.now();
+
+    // B5: unhedged backs past their threshold.
+    const eventStarts = new Map(state.events.map((e) => [e.id, e.startTime]));
+    const nakedExposed = detectNakedExposure(state.bets ?? [], eventStarts, now).map(
+      (b) => ({ betId: b.id, label: b.label, bookmaker: b.bookmaker })
+    );
+
+    // B6: open 2UP positions whose selection just went two goals up.
+    const twoUpTriggered: TwoUpLockNotice[] = [];
+    for (const bet of state.bets ?? []) {
+      if (bet.status !== "open" || !bet.earlyPayout || bet.eventId == null) continue;
+      if (bet.selection !== "home" && bet.selection !== "away") continue;
+      const event = state.events.find((e) => e.id === bet.eventId);
+      if (!event || event.status !== "live") continue;
+      const led2 = bet.selection === "home" ? !!event.homeLed2 : !!event.awayLed2;
+      if (!led2) continue;
+      const model = state.liveEventModels.find((m) => m.eventId === bet.eventId);
+      const liveWinProb =
+        bet.selection === "home" ? model?.homeWin : model?.awayWin;
+      const suggestion =
+        liveWinProb != null
+          ? suggestTwoUpLock({
+              backStake: bet.backStake,
+              backOdds: bet.backOdds,
+              layStake: bet.layStake,
+              layOdds: bet.layOdds,
+              commission: bet.commission,
+              liveWinProb,
+            })
+          : null;
+      twoUpTriggered.push({
+        betId: bet.id,
+        label: bet.label,
+        eventName: `${event.homeTeam} v ${event.awayTeam}`,
+        suggestion:
+          suggestion && suggestion.backStake > 0
+            ? {
+                fairBackOdds: suggestion.fairBackOdds,
+                backStake: suggestion.backStake,
+                lockedProfit: suggestion.lockedProfit,
+              }
+            : null,
+      });
+    }
+
     const alerts = evaluateAlertRules({
-      now: Date.now(),
+      now,
       prefs: {
         offerExpiring: state.settings.alertsOfferExpiring,
         raceOffSoon: state.settings.alertsRaceOffSoon,
         resultSettled: state.settings.alertsResultSettled,
+        nakedExposure: state.settings.alertsNakedExposure,
+        twoUpLock: state.settings.alertsTwoUpLock,
       },
       doNext,
       races: (state.planRaces ?? []).map((r) => ({
@@ -70,6 +124,8 @@ export function AlertWatcher() {
         hasOpenBet: r.hasOpenBet ?? false,
       })),
       settledSinceLastPoll,
+      nakedExposed,
+      twoUpTriggered,
     });
 
     const seen = seenRef.current;
