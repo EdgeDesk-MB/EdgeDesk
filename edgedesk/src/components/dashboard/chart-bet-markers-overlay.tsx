@@ -118,12 +118,11 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
                   href={isAdjustment ? "/accounts" : `/tracker?highlight=${marker.id}`}
                   className={cn(
                     chartBetMarkerClassName(marker.tone),
-                    isAdjustment && "chart-bet-marker--adjustment",
-                    isAdjustment &&
-                      (marker.betProfit > 0 ? "chart-bet-marker--up" : "chart-bet-marker--down")
+                    marker.tone === "win" && "chart-bet-marker--up",
+                    marker.tone === "loss" && "chart-bet-marker--down"
                   )}
                   style={{ left: x, top: y }}
-                  aria-label={`${marker.label} - ${statusLabel}`}
+                  aria-label={`${marker.label} - ${statusLabel} ${formatGbp(marker.betProfit, { signed: true })}`}
                 >
                   <span className="chart-bet-marker__inner" />
                 </Link>

@@ -5,6 +5,12 @@ import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
 import { Radio, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { MoneyFlow } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
 import { dashboardSection } from "@/lib/ui/dashboard-layout";
@@ -199,26 +205,31 @@ export const LivePnlChart = memo(function LivePnlChart({
           />
           <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
             <div className="flex items-center justify-between gap-2 py-2">
-              <div className="flex shrink-0 gap-1">
-                {PNL_BASES.map((b) => (
-                  <button
-                    key={b.key}
-                    type="button"
-                    className={cn(
-                      filterPillState(pnlBasis === b.key),
-                      "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
-                    )}
-                    title={
-                      b.key === "gross"
-                        ? "Before exchange commission - shows what commission costs you"
-                        : "Net of exchange commission - real money"
-                    }
-                    onClick={() => setPnlBasis(b.key)}
-                  >
-                    {b.label}
-                  </button>
-                ))}
-              </div>
+              <TooltipProvider delayDuration={200}>
+                <div className="flex shrink-0 gap-1">
+                  {PNL_BASES.map((b) => (
+                    <Tooltip key={b.key}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            filterPillState(pnlBasis === b.key),
+                            "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+                          )}
+                          onClick={() => setPnlBasis(b.key)}
+                        >
+                          {b.label}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                        {b.key === "gross"
+                          ? "Before exchange commission - shows what commission costs you"
+                          : "Net of exchange commission - real money"}
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </TooltipProvider>
               <div className="flex justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {CHART_WINDOWS.map((w) => (
                   <button
