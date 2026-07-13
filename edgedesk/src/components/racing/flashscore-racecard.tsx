@@ -13,7 +13,15 @@ import { PriceMovementArrow, PriceMovementBadge } from "@/components/racing/pric
 import { RacingOfferGuide } from "@/components/racing/racing-offer-guide";
 import { RunnerCloth } from "@/components/racing/runner-cloth";
 import { RegionFlag } from "@/components/region-flag";
-import { Calculator, Gift, NotebookPen, Pin, RotateCcw, TrendingDown } from "lucide-react";
+import {
+  Calculator,
+  ChevronDown,
+  Gift,
+  NotebookPen,
+  Pin,
+  RotateCcw,
+  TrendingDown,
+} from "lucide-react";
 import { formatExchangeMatchError } from "@/lib/services/exchange/format-exchange-error";
 import { cn } from "@/lib/utils";
 import { darken, lighten } from "@/lib/brands/exchanges";
@@ -457,6 +465,11 @@ export function FlashscoreRacecard({
   const activeCourse = selected?.course ?? courses[0]?.[0] ?? "";
   const courseRaces = courses.find(([c]) => c === activeCourse)?.[1] ?? [];
 
+  // Mobile progressive disclosure: the runner grid sits behind a tap, per
+  // race (switching race collapses it again). Desktop always shows it.
+  const [runnersOpenForRace, setRunnersOpenForRace] = useState<string | null>(null);
+  const runnersOpen = selected != null && runnersOpenForRace === selected.externalId;
+
   const sortedRunners = useMemo(() => {
     if (!selected) return [];
     return [...selected.runners].sort((a, b) => {
@@ -657,7 +670,23 @@ export function FlashscoreRacecard({
           )}
       </div>
 
-      <div className="overflow-x-auto">
+      <button
+        type="button"
+        onClick={() =>
+          setRunnersOpenForRace(runnersOpen ? null : selected.externalId)
+        }
+        aria-expanded={runnersOpen}
+        className="flex w-full items-center justify-center gap-1.5 border-t border-border/60 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:hidden"
+      >
+        {runnersOpen
+          ? "Hide runners"
+          : `Show ${selected.runners.filter((r) => !r.nonRunner).length} runners`}
+        <ChevronDown
+          className={cn("size-4 transition-transform", runnersOpen && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      <div className={cn("overflow-x-auto", !runnersOpen && "hidden sm:block")}>
         <table className="w-full min-w-[640px] border-collapse text-sm">
           <thead>
             <tr className="border-b bg-selection-subtle/50 text-[11px] uppercase tracking-wide text-muted-foreground">
