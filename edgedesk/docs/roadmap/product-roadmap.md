@@ -190,7 +190,7 @@ back into ranking: a gubbed account's future EV ≈ 0, so B1/Do Next should disc
 Ship manual marking first; add "it's been 40 days since Bet365 sent you an offer — mark as
 cooling?" nudges from the data later. Never auto-mark.
 
-**B10. Retained P&L integrity pass.**
+**B10. Retained P&L integrity pass. ✅ DONE**
 Audit that every P&L surface is net of commission and handles voids/Rule-4 identically (the calc
 layer does; verify the history feed and dashboards agree). Add a "gross vs retained" toggle on the
 P&L chart so the commission gap is *visible* rather than silently netted.
@@ -256,7 +256,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | Phase | Contents | Status | Exit criteria |
 |-------|----------|--------|---------------|
 | **1. EV truth** | ✅ A1 retention, ✅ A2 provenance, ✅ A3 EV lock + capture, ✅ A4 hero, ✅ A5 no-vig UI | **Done** | Every £-EV on screen has a basis badge; settled offers show capture %; Home leads with edge-on-the-table |
-| **2. Daily driver** | ⬜ B1 Daily Plan, ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ⬜ B10 retained-P&L audit | **In progress** — B1, B10 remaining | A full offer day can be run start-to-finish from the plan view alone |
+| **2. Daily driver** | ⬜ B1 Daily Plan, ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ✅ B10 retained-P&L audit | **In progress** — B1 remaining (design-first) | A full offer day can be run start-to-finish from the plan view alone |
 | **3. Mobile** | ⬜ §4 swipe deck, quick-log (+B4 parser), collapsed variants, PWA install + local alerts | Not started | Log a bet in ≤3 taps on a phone; Home usable one-handed |
 | **4. Guardian** | ⬜ B5 naked-exposure, ⬜ B6 2UP sentinel, push alerts | Not started | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |
 | **5. Coach** | ⬜ B7 mistake ledger, ⬜ B8 Edge Report, ⬜ B9 league table | Not started | Monthly report renders from ≥1 month of real captured data |

@@ -47,6 +47,7 @@ import {
   type TriggerContext,
   type TriggerRule,
 } from "@/lib/calc";
+import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
 import { parseRaceResults, racingEventStatusDetail, selectionPosition } from "@/lib/racing";
 import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes";
 import { formatRacingEventTitle } from "@/lib/events";
@@ -637,16 +638,24 @@ export async function getAppState(): Promise<AppState> {
     .where(eq(history.kind, "balance_adjustment"))
     .all();
 
-  type PnlPoint = { time: number; profit: number };
+  type PnlPoint = { time: number; profit: number; commission: number };
   const allPnlPoints: PnlPoint[] = [
-    ...settled.map((b) => ({ time: b.settledAt ?? b.createdAt, profit: b.actualProfit! })),
-    ...balanceAdjustments.filter((h) => h.amount != null).map((h) => ({ time: h.createdAt, profit: h.amount! })),
+    ...settled.map((b) => ({
+      time: b.settledAt ?? b.createdAt,
+      profit: b.actualProfit!,
+      commission: commissionPaidOnSettledBet(b),
+    })),
+    ...balanceAdjustments
+      .filter((h) => h.amount != null)
+      .map((h) => ({ time: h.createdAt, profit: h.amount!, commission: 0 })),
   ].sort((a, b) => a.time - b.time);
 
   let running = 0;
+  let commissionRunning = 0;
   const series = allPnlPoints.map((p) => {
     running += p.profit;
-    return { time: p.time, value: running };
+    commissionRunning += p.commission;
+    return { time: p.time, value: running, commissionPaid: commissionRunning };
   });
 
   const livePositions: LivePosition[] = [];

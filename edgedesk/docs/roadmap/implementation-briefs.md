@@ -20,7 +20,7 @@ Last updated: 2026-07-13 (A3 done — Phase 1 complete)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 455 tests / 66 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 470 tests / 67 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -335,7 +335,7 @@ William Hill formats) — Sam to supply samples; start with 4–5 synthetic ones
 **Acceptance.** ≥ 12 parser unit tests incl. fractional odds, each-way slips, free-bet slips,
 garbage input → null.
 
-## B10. Retained P&L integrity pass `[strong]` (audit, then small fixes)
+## B10. Retained P&L integrity pass `[strong]` ✅ DONE (audit, then small fixes)
 
 **Objective.** Verify every P&L surface is net of commission and treats
 voids/`half_*`/`early_payout`/Rule-4 identically; add a gross-vs-retained toggle on the P&L chart.
@@ -349,6 +349,42 @@ retained + commission paid (needs commission-paid accumulation exposed from sett
 `commissionPaid` to the series point build in `state.ts`).
 
 **Acceptance.** Written audit trail; any fix has a regression test; toggle renders both series.
+
+### B10 audit trail (2026-07-13)
+
+Traced every `actualProfit` write → aggregation → display surface. Verdict: **all surfaces
+agree** — every P&L figure derives from `bets.actualProfit`, which every settlement path
+writes net of commission. No disagreeing surface found; no calc fix needed.
+
+**Write paths (all commission-netted at source):**
+- Auto-settle + trigger engine (`state.ts#autoSettle`/`settleTriggers`) → `settleFromOutcome`
+  (`calc/settlement.ts`): winning lays credit `layStake × (1 − commission)`.
+- Racing (`calc/racing-settlement.ts`): win/place via `settleFromOutcome`; EW/extra-place dual
+  lays via `eachWayOutcomePnL` (`calc/each-way-outcomes.ts`) — commission netted per winning lay leg.
+- Partials (`settlePartialOutcome`): half outcomes average the full win/lose P&L, so half the
+  commission is embedded; push/void are £0.
+- Manual settle (`bet-log-table.tsx#ManualSettleDialog`): won/lost take the user's NET figure
+  (labelled so); half/push/void computed via `settlePartialOutcome`.
+
+**Aggregation surfaces (all read stored `actualProfit`):** `state.ts` series/`settledProfit`;
+`offers.ts#computeOfferProfitBreakdown`; `pnl/monthly-breakdown.ts`; history feed (via
+`history-display` context). Filter nuance: `state.ts` includes `push` rows where `offers.ts`
+excludes them — numerically identical since push profit is always £0.
+
+**Documented non-findings:**
+- Rule 4 is a calculator only (`calc/rule4.ts`); the result-centric engine cannot auto-apply
+  deductions (results carry no withdrawal data), so Rule-4-affected bets settle via the manual
+  net-P&L path. Intentional.
+- Gross decomposition for manually settled EW dual-lay wins is unknowable (no settlement
+  marker in notes) — `commissionPaidOnSettledBet` counts £0 commission for those, so the
+  gross toggle understates gross (never retained) in that corner. Auto-settled bets are
+  exact: winning-lay markers in the settlement explanation ("lay side won", "Extra place",
+  "standard place") disambiguate EW paid-but-lay-won cases, and lay-only half outcomes
+  carry half commission, mirroring `settlePartialOutcome`.
+
+**Toggle implementation:** `calc/commission-paid.ts` (pure, tested) derives commission paid
+per settled bet; `state.ts` accumulates it as `commissionPaid` on each series point;
+`live-pnl-chart.tsx` renders a Retained | Gross pill pair (gross = value + commissionPaid).
 
 ---
 

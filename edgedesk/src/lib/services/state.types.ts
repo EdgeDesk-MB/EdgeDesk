@@ -51,7 +51,8 @@ export interface AppState {
   retention: RetentionState;
   livePositions: LivePosition[];
   liveEventModels: LiveEventModel[];
-  series: { time: number; value: number }[];
+  /** Cumulative retained P&L; commissionPaid is cumulative exchange commission, so gross = value + commissionPaid. */
+  series: { time: number; value: number; commissionPaid: number }[];
   history: HistoryRow[];
   chartHistory: HistoryRow[];
   promoAwards: Record<number, { amount: number; reason: string }>;

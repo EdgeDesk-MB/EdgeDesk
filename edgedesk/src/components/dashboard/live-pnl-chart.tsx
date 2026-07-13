@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
 import { Radio, TrendingUp } from "lucide-react";
@@ -23,6 +23,14 @@ export interface LivePnlPoint {
   time: number;
   value: number;
 }
+
+/** Retained = net of exchange commission (real money); gross adds commission back. */
+type PnlBasis = "retained" | "gross";
+
+const PNL_BASES = [
+  { key: "retained", label: "Retained" },
+  { key: "gross", label: "Gross" },
+] as const;
 
 const ALL_WINDOW_SECS = 0;
 
@@ -105,7 +113,7 @@ export const LivePnlChart = memo(function LivePnlChart({
   className,
 }: {
   liveTotal: number;
-  historicSeries: Array<{ time: number; value: number }>;
+  historicSeries: Array<{ time: number; value: number; commissionPaid?: number }>;
   bets?: BetRow[];
   compact?: boolean;
   /** Shorter chart for dashboard - sits below the live panels */
@@ -120,29 +128,41 @@ export const LivePnlChart = memo(function LivePnlChart({
   const [mounted, setMounted] = useState(false);
   const [livePoints, setLivePoints] = useState<LivePnlPoint[]>([]);
   const [chartWindowSecs, setChartWindowSecs] = useState<number>(DEFAULT_CHART_WINDOW);
+  const [pnlBasis, setPnlBasis] = useState<PnlBasis>("retained");
+  const lastBasisRef = useRef<PnlBasis>("retained");
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
   }, []);
 
+  // Gross = retained + cumulative commission paid. Open positions carry the
+  // last settled cumulative figure (their commission is not yet known).
+  const grossOffset =
+    pnlBasis === "gross" ? (historicSeries.at(-1)?.commissionPaid ?? 0) : 0;
+  const displayTotal = liveTotal + grossOffset;
+
   useEffect(() => {
     const nowSec = Date.now() / 1000;
+    const gross = pnlBasis === "gross";
+    // commissionPaid arrives already cumulative from the series build - add, never re-sum.
     const historic = historicSeries.map((p) => ({
       time: p.time / 1000,
-      value: p.value,
+      value: gross ? p.value + (p.commissionPaid ?? 0) : p.value,
     }));
+    const basisChanged = lastBasisRef.current !== pnlBasis;
+    lastBasisRef.current = pnlBasis;
     setLivePoints((prev) => {
       const lastHistTime = historic.at(-1)?.time ?? 0;
-      const liveTail = prev.filter((p) => p.time > lastHistTime + 0.5);
-      const tail = [...liveTail, { time: nowSec, value: liveTotal }].slice(-3600);
+      const liveTail = basisChanged ? [] : prev.filter((p) => p.time > lastHistTime + 0.5);
+      const tail = [...liveTail, { time: nowSec, value: displayTotal }].slice(-3600);
       return anchorSeriesAtZero([...historic, ...tail], nowSec);
     });
-  }, [historicSeries, liveTotal]);
+  }, [historicSeries, liveTotal, pnlBasis, displayTotal]);
 
   const isDark = resolvedTheme === "dark";
   const chartColor = useMemo(
-    () => pnlChartColor(liveTotal, isDark),
-    [liveTotal, isDark]
+    () => pnlChartColor(displayTotal, isDark),
+    [displayTotal, isDark]
   );
 
   const effectiveWindowSecs = useMemo(() => {
@@ -175,22 +195,44 @@ export const LivePnlChart = memo(function LivePnlChart({
             description="P&L streams while tracked events are in play."
           />
           <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
-            <div className="flex justify-end gap-1 overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {CHART_WINDOWS.map((w) => (
-                <button
-                  key={w.label}
-                  type="button"
-                  className={cn(
-                    filterPillState(
-                      w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs
-                    ),
-                    "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
-                  )}
-                  onClick={() => setChartWindowSecs(w.secs)}
-                >
-                  {w.label}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2 py-2">
+              <div className="flex shrink-0 gap-1">
+                {PNL_BASES.map((b) => (
+                  <button
+                    key={b.key}
+                    type="button"
+                    className={cn(
+                      filterPillState(pnlBasis === b.key),
+                      "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+                    )}
+                    title={
+                      b.key === "gross"
+                        ? "Before exchange commission - shows what commission costs you"
+                        : "Net of exchange commission - real money"
+                    }
+                    onClick={() => setPnlBasis(b.key)}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {CHART_WINDOWS.map((w) => (
+                  <button
+                    key={w.label}
+                    type="button"
+                    className={cn(
+                      filterPillState(
+                        w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs
+                      ),
+                      "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none"
+                    )}
+                    onClick={() => setChartWindowSecs(w.secs)}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </>
@@ -246,9 +288,9 @@ export const LivePnlChart = memo(function LivePnlChart({
           <div className={cn("relative isolate min-h-0 flex-1", !panel && "h-full")}>
             {mounted ? (
               <Liveline
-                key={resolvedTheme}
+                key={`${resolvedTheme}-${pnlBasis}`}
                 data={livePoints}
-                value={liveTotal}
+                value={displayTotal}
                 theme={isDark ? "dark" : "light"}
                 color={chartColor}
                 momentum={liveInPlay}
@@ -282,7 +324,7 @@ export const LivePnlChart = memo(function LivePnlChart({
               <ChartBetMarkersOverlay
                 bets={bets}
                 livePoints={livePoints}
-                liveValue={liveTotal}
+                liveValue={displayTotal}
                 windowSecs={effectiveWindowSecs}
                 showBadge={!panel}
                 padding={markerPadding}
