@@ -4,6 +4,7 @@ import { Gift } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatPromoTooltip } from "@/lib/bet-outcomes";
@@ -29,6 +30,7 @@ export function FreeBetAwardBadge({
   const label = formatPromoTooltip(amount, reason, compact);
 
   return (
+    <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <span
@@ -45,5 +47,6 @@ export function FreeBetAwardBadge({
         {label}
       </TooltipContent>
     </Tooltip>
+    </TooltipProvider>
   );
 }

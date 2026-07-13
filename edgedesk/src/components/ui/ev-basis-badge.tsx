@@ -1,6 +1,6 @@
 "use client";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { EvBasis } from "@/lib/offers/advantage";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,7 @@ const TEXT_CLASS: Record<EvBasis, string> = {
 
 export function EvBasisBadge({ basis, className }: { basis: EvBasis; className?: string }) {
   return (
+    <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <span
@@ -46,5 +47,6 @@ export function EvBasisBadge({ basis, className }: { basis: EvBasis; className?:
         {DESCRIPTIONS[basis]}
       </TooltipContent>
     </Tooltip>
+    </TooltipProvider>
   );
 }

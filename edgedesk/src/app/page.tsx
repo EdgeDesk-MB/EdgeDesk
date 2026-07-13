@@ -124,17 +124,17 @@ export default function DashboardPage() {
                     <div className="flex justify-end gap-1 py-2">
                       <button
                         type="button"
-                        className={cn(filterPillState(feedFilter === "all"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
-                        onClick={() => setFeedFilter("all")}
-                      >
-                        All events
-                      </button>
-                      <button
-                        type="button"
                         className={cn(filterPillState(feedFilter === "bets"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
                         onClick={() => setFeedFilter("bets")}
                       >
                         Bets only
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(filterPillState(feedFilter === "all"), "shrink-0 whitespace-nowrap px-2.25 py-1 text-[9px] leading-none")}
+                        onClick={() => setFeedFilter("all")}
+                      >
+                        All
                       </button>
                     </div>
                   </div>

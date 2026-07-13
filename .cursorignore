@@ -1,0 +1,3 @@
+# AI context/indexing exclusions (Cursor also respects .gitignore)
+edgedesk/eng.traineddata
+edgedesk/package-lock.json

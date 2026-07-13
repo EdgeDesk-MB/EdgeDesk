@@ -1,0 +1,10 @@
+---
+description: EdgeDesk design-system conformance for UI work
+globs: src/app/**,src/components/**
+alwaysApply: false
+---
+
+- Read `docs/design-system.md` before UI changes: colour tokens, page headers, stat strips, pills and lists, layout.
+- Design tokens and existing shadcn patterns only; no ad-hoc colours.
+- Microcopy is British English, sentence case, commas rather than em dashes.
+- Render times of day only via `formatClockTime` / `formatClockString` from `src/lib/time-format.ts`.
