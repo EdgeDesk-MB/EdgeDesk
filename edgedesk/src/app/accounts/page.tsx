@@ -326,11 +326,18 @@ function AccountTable({
         {rows.map((a) => {
           const profit = a.type === "bookie" ? profitForAccount(a.name) : null;
           return (
-            <button
+            <div
               key={a.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(a.id)}
-              className="w-full border-b border-border/60 px-1 py-3 text-left"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(a.id);
+                }
+              }}
+              className="w-full cursor-pointer border-b border-border/60 px-1 py-3 text-left transition-colors hover:bg-selection-subtle active:bg-selection-subtle"
             >
               <span className="flex items-center justify-between gap-3">
                 <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium">
@@ -387,9 +394,23 @@ function AccountTable({
                   {profit != null ? (
                     <MoneyFlow value={profit} signColor signDisplay className="inline font-medium" />
                   ) : null}
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <ArchiveAccountButton
+                      accountName={a.name}
+                      onConfirm={async () => {
+                        try {
+                          await api(`/api/accounts/${a.id}`, { method: "DELETE" });
+                          toast.success("Account archived");
+                          onArchived();
+                        } catch (e) {
+                          toast.error("Could not remove", { description: String(e) });
+                        }
+                      }}
+                    />
+                  </span>
                 </span>
               </span>
-            </button>
+            </div>
           );
         })}
       </div>

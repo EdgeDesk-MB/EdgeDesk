@@ -153,10 +153,13 @@ function TrackerContent() {
     if (highlightId == null) return;
     if (!bets.some((b) => b.id === highlightId)) return;
     const scrollTimer = window.setTimeout(() => {
-      document.getElementById(`bet-row-${highlightId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      // Two render targets: the desktop table row and the mobile card - scroll
+      // whichever is actually visible (the other sits in a display:none wrapper).
+      const visible = [
+        document.getElementById(`bet-row-${highlightId}`),
+        document.getElementById(`bet-card-${highlightId}`),
+      ].find((el) => el && el.offsetParent !== null);
+      visible?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 100);
     return () => clearTimeout(scrollTimer);
   }, [bets, highlightId]);

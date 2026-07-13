@@ -123,7 +123,25 @@ export function BetLogTable({
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {bet.betType.replace("_", " ")}
                     {bet.earlyPayout ? " · 2UP" : ""}
+                    {offer && (
+                      <>
+                        {" · "}
+                        <Link href="/offers" className="text-primary hover:underline">
+                          {offer.title.length > 28 ? `${offer.title.slice(0, 25)}…` : offer.title}
+                        </Link>
+                      </>
+                    )}
                   </p>
+                  {bet.offerId == null && linkableOffers.length > 0 && (
+                    <div className="mt-1.5">
+                      <LinkOfferSelect
+                        offers={linkableOffers}
+                        onLink={(offerId) =>
+                          onPatch(bet.id, { offerId }, "Linked to offer campaign")
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="shrink-0 text-right">
                   <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[10px]">
@@ -184,17 +202,17 @@ export function BetLogTable({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 shrink-0 text-muted-foreground"
+                      className="size-10 shrink-0 text-muted-foreground"
                       onClick={() => onPatch(bet.id, { status: "open" }, "Bet reopened")}
                       aria-label="Reopen bet"
                     >
-                      <RotateCcw className="size-3.5" />
+                      <RotateCcw className="size-4" />
                     </Button>
                   )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8 shrink-0"
+                    className="size-10 shrink-0"
                     onClick={() => onEdit(bet)}
                     aria-label="Edit bet"
                   >
@@ -529,7 +547,11 @@ function ManualSettleDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 px-2 text-[10px]">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[10px] max-sm:h-9 max-sm:px-3 max-sm:text-xs"
+        >
           Settle
         </Button>
       </DialogTrigger>

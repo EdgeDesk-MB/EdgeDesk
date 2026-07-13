@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -33,6 +33,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EdgeDesk - Matched Betting Command Centre",
   description: "Calculators, live events and real-time profit tracking for matched betting",
+};
+
+/** viewport-fit=cover makes env(safe-area-inset-*) live for the mobile sheets. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

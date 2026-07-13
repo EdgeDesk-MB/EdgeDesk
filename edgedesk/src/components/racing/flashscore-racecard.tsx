@@ -676,6 +676,7 @@ export function FlashscoreRacecard({
           setRunnersOpenForRace(runnersOpen ? null : selected.externalId)
         }
         aria-expanded={runnersOpen}
+        aria-controls="racecard-runner-grid"
         className="flex w-full items-center justify-center gap-1.5 border-t border-border/60 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:hidden"
       >
         {runnersOpen
@@ -686,7 +687,10 @@ export function FlashscoreRacecard({
           aria-hidden
         />
       </button>
-      <div className={cn("overflow-x-auto", !runnersOpen && "hidden sm:block")}>
+      <div
+        id="racecard-runner-grid"
+        className={cn("overflow-x-auto", !runnersOpen && "hidden sm:block")}
+      >
         <table className="w-full min-w-[640px] border-collapse text-sm">
           <thead>
             <tr className="border-b bg-selection-subtle/50 text-[11px] uppercase tracking-wide text-muted-foreground">
