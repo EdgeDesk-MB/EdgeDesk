@@ -29,6 +29,7 @@ import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { buildDailyPlan, type DailyPlanSlot } from "@/lib/plan/daily-plan";
 import { formatClockTime } from "@/lib/time-format";
+import { listRowInteractive } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 type QuickLogPath = "menu" | "manual";
@@ -44,7 +45,10 @@ function PlanSlotButton({
     <button
       type="button"
       onClick={() => onPick(slot)}
-      className="flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-selection-subtle active:bg-selection-subtle"
+      className={cn(
+        listRowInteractive,
+        "flex min-h-11 w-full items-center gap-3 px-2 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-selection-subtle"
+      )}
     >
       <span className="w-12 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
         {slot.at != null ? formatClockTime(new Date(slot.at)) : ""}
@@ -204,11 +208,18 @@ export function QuickLogSheet() {
               ) : null}
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveManual();
+              }}
+            >
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="quick-log-bookie">Bookie</Label>
                 <Input
                   id="quick-log-bookie"
+                  className="h-11"
                   value={bookie}
                   onChange={(e) => setBookie(e.target.value)}
                   placeholder="Bet365"
@@ -220,6 +231,7 @@ export function QuickLogSheet() {
                   <Label htmlFor="quick-log-stake">Stake (£)</Label>
                   <Input
                     id="quick-log-stake"
+                    className="h-11"
                     type="number"
                     inputMode="decimal"
                     min={0}
@@ -232,6 +244,7 @@ export function QuickLogSheet() {
                   <Label htmlFor="quick-log-odds">Odds</Label>
                   <Input
                     id="quick-log-odds"
+                    className="h-11"
                     type="number"
                     inputMode="decimal"
                     min={1}
@@ -252,16 +265,11 @@ export function QuickLogSheet() {
                 >
                   Back
                 </Button>
-                <Button
-                  type="button"
-                  className={cn("h-11 flex-1")}
-                  onClick={saveManual}
-                  disabled={saving}
-                >
+                <Button type="submit" className="h-11 flex-1" disabled={saving}>
                   {saving ? "Saving…" : "Save"}
                 </Button>
               </div>
-            </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>
