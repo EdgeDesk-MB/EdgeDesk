@@ -76,6 +76,12 @@ export function AlertWatcher() {
     for (const bet of state.bets ?? []) {
       if (bet.status !== "open" || !bet.earlyPayout || bet.eventId == null) continue;
       if (bet.selection !== "home" && bet.selection !== "away") continue;
+      // The lock formula banks backStake×(backOdds−1); free-bet stakes bank
+      // differently, so those get the plain alert without a suggestion.
+      const formulaExact =
+        bet.betType === "qualifying" ||
+        bet.betType === "risk_free" ||
+        bet.betType === "back_only";
       const event = state.events.find((e) => e.id === bet.eventId);
       if (!event || event.status !== "live") continue;
       const led2 = bet.selection === "home" ? !!event.homeLed2 : !!event.awayLed2;
@@ -84,7 +90,7 @@ export function AlertWatcher() {
       const liveWinProb =
         bet.selection === "home" ? model?.homeWin : model?.awayWin;
       const suggestion =
-        liveWinProb != null
+        liveWinProb != null && formulaExact
           ? suggestTwoUpLock({
               backStake: bet.backStake,
               backOdds: bet.backOdds,

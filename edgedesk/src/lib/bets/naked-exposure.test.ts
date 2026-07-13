@@ -91,6 +91,10 @@ describe("isNakedExposed - clause by clause", () => {
     expect(
       isNakedExposed(bet({ id: 15, createdAt: NOW - 5 * MIN }), NOW, NOW + 3 * 60 * MIN)
     ).toBe(false);
+    // In-play (event already started) is the most urgent case - tight window
+    expect(
+      isNakedExposed(bet({ id: 17, createdAt: NOW - 5 * MIN }), NOW, NOW - 10 * MIN)
+    ).toBe(true);
   });
 
   it("honours the intentional-nohedge mute marker", () => {

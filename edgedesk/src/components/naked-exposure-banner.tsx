@@ -84,14 +84,15 @@ export function NakedExposureBanner({ className }: { className?: string }) {
           )}
         </p>
       </div>
-      <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+      <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
         <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
           <Link href={`/tracker?highlight=${primary.id}`}>Add lay</Link>
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 text-xs text-amber-800 dark:text-amber-200"
+          aria-label="Mark as intentionally unhedged"
+          className="h-8 text-xs text-amber-700 hover:text-amber-900 dark:text-amber-300"
           onClick={muteIntentional}
           disabled={muting}
         >

@@ -28,10 +28,9 @@ export function isNakedExposed(
   if (bet.legs != null) return false; // dutch bets hedge internally
   if (bet.notes?.includes(INTENTIONAL_NOHEDGE_MARKER)) return false;
 
-  const imminent =
-    eventStartMs != null &&
-    eventStartMs > now &&
-    eventStartMs - now <= IMMINENT_WINDOW_MS;
+  // Starting soon OR already in play - in-play is the most urgent case of
+  // all (a deliberate widening of the brief's "starting < 60 min away").
+  const imminent = eventStartMs != null && eventStartMs - now <= IMMINENT_WINDOW_MS;
   const threshold = imminent ? IMMINENT_THRESHOLD_MS : DEFAULT_THRESHOLD_MS;
   return now - bet.createdAt > threshold;
 }
