@@ -24,6 +24,8 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     expiresAt: rest.expiresAt ?? null,
     completedAt: null,
     createdAt: Date.now(),
+    seriesId: rest.seriesId ?? null,
+    instanceDate: rest.instanceDate ?? null,
     betCount: rest.betCount ?? 0,
     openBets: rest.openBets ?? 0,
     actualProfit: 0,
@@ -166,5 +168,64 @@ describe("deriveOfferNextAction", () => {
     expect(actions.map((a) => a.offerId)).toEqual([2, 1]);
     expect(actions[0]?.kind).toBe("convert_free_bet");
     expect(actions.every((a) => a.kind !== "await_result")).toBe(true);
+  });
+
+  it("shows only the next instance of a recurring series, not every repeat", () => {
+    const actions = listOfferNextActions(
+      [
+        offer({ id: 10, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-08", status: "active" }),
+        offer({ id: 11, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-09", status: "planned" }),
+        offer({ id: 12, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-10", status: "planned" }),
+        offer({ id: 20, title: "One-off", status: "active" }),
+      ],
+      now
+    );
+    expect(actions.filter((a) => a.offerTitle === "Daily reload").map((a) => a.offerId)).toEqual([10]);
+    expect(actions.map((a) => a.offerId)).toContain(20);
+  });
+
+  it("surfaces the following instance once the current one is completed", () => {
+    const actions = listOfferNextActions(
+      [
+        offer({ id: 10, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-08", status: "completed" }),
+        offer({ id: 11, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-09", status: "planned" }),
+        offer({ id: 12, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-10", status: "planned" }),
+      ],
+      now
+    );
+    expect(actions.map((a) => a.offerId)).toEqual([11]);
+    expect(actions[0]?.kind).toBe("start_planned");
+  });
+
+  it("suppresses future repeats while the current instance is in play", () => {
+    const actions = listOfferNextActions(
+      [
+        offer({
+          id: 10,
+          title: "Daily reload",
+          seriesId: 1,
+          instanceDate: "2026-07-08",
+          status: "active",
+          betCount: 1,
+          profit: {
+            qualifyingProfit: 0,
+            qualifyingSettledCount: 0,
+            qualifyingOpenCount: 1,
+            freeBetAwarded: false,
+            freeBetAwardAmount: null,
+            freeBetAwardReason: null,
+            freeBetStage: "awaiting_result",
+            freeBetProfit: 0,
+            freeBetOpenCount: 0,
+            freeBetSettledCount: 0,
+            openExpectedProfit: 0,
+            totalProfit: 0,
+          },
+        }),
+        offer({ id: 11, title: "Daily reload", seriesId: 1, instanceDate: "2026-07-09", status: "planned" }),
+      ],
+      now
+    );
+    expect(actions).toEqual([]);
   });
 });
