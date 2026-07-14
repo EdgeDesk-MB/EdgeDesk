@@ -464,7 +464,7 @@ and mute marker; manual: log an unhedged qualifying bet, alert within threshold.
 > closed) needs: a `web-push` dependency (must be flagged/approved per repo rules), VAPID
 > keys, a subscriptions table, an SW push handler, and the local server running and
 > reachable from the phone. iOS delivery is the roadmap's own top open question and is only
-> provable on Sam's actual iPhone. Recommendation: add push as a follow-up item once the
+> provable on Sam's actual phone (Android - simpler than iOS for push). Recommendation: add push as a follow-up item once the
 > sentinels have proven their value in daily use — the AlertChannel interface means it swaps
 > in without touching any rule logic.
 
@@ -673,6 +673,29 @@ sufficient for v1).
 **Acceptance.** Service round-trip unit-tested (dedupe upsert, read survival); live loop
 verified end-to-end on the harness (watcher-emitted alerts appeared in the inbox and badge
 unprompted); tapping navigates and clears the unread dot.
+
+## F3. Background web push `[strong]` ✅ DONE (server pipeline; real-device test = Sam's Android)
+
+**Objective.** Sentinel alerts reach the phone with every EdgeDesk tab closed. Dependencies
+`web-push` (+ types) and `cmdk` (for F4) approved by Sam 2026-07-14. **Sam's phone is Android**,
+which is the easy path (Chrome push, no iOS install-first quirks) - the roadmap's iOS open
+question applies only if an iOS device ever joins.
+
+**Implementation.** VAPID keys generated once and persisted in `app_settings` (rotating them
+orphans subscriptions - never regenerate). `push_subscriptions` table (endpoint UNIQUE,
+upserted). `src/lib/services/push.ts`: save/remove/list + `sendPush` fanning out via
+`web-push`, pruning dead subscriptions on 404/410 from the relay, never throwing (push is
+best-effort on top of the F2 inbox record). `/api/alerts` POST fans freshly recorded alerts out
+after the inbox write. `/api/push`: GET (public key + devices), POST (subscribe or
+`{test:true}` test-send), DELETE (unsubscribe). Service worker gains `push` +
+`notificationclick` handlers (focus-or-open the deep link). Settings → Alerts:
+"Push to this device" switch (permission → subscribe → register) + "Send test push".
+
+**Delivery constraint (stated honestly in the UI copy):** the local server must be running and
+online to SEND; the phone receives anywhere via the vendor relay. **Acceptance.** VAPID key
+stable across calls; test-send graceful with zero devices; invalid subscriptions fail locally
+without crashing (verified on harness); the 404/410 prune path and real delivery need Sam's
+Android - staged for his next session.
 
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8

@@ -48,6 +48,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/alerts",
         text: "Alerts inbox: every alert EdgeDesk raises is kept with an unread badge in the navigation. Notifications and toasts deliver in the moment; the inbox is the record - tap an alert to jump to the right desk.",
       },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Background push: flip \"Push to this device\" in Settings → Alerts and sentinel alerts reach your phone with the app closed. Works anywhere your phone has signal, as long as the EdgeDesk server is running at home.",
+      },
     ],
   },
   {

@@ -161,6 +161,18 @@ export const offerSeries = sqliteTable("offer_series", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/** Web-push subscriptions (F3) - one row per device/browser */
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  /** Coarse device label from the subscribing user agent */
+  label: text("label"),
+  createdAt: integer("created_at").notNull(),
+  lastOkAt: integer("last_ok_at"),
+});
+
 /** Persistent alert history (F2) - toasts/notifications deliver, this is the record */
 export const alertsInbox = sqliteTable("alerts_inbox", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -306,6 +318,7 @@ export type HistoryRow = typeof history.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
 export type NewAccountRow = typeof accounts.$inferInsert;
 export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
