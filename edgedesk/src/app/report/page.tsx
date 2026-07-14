@@ -21,6 +21,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/help/empty-state";
+import { SeasonView } from "@/components/report/season-view";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/hooks/use-app-state";
 import type { EdgeReport } from "@/lib/report/edge-report";
 import { mistakeTagLabel } from "@/lib/offers/mistakes";
@@ -44,6 +46,7 @@ function formatMonthLabel(month: string): string {
 
 export default function EdgeReportPage() {
   const { resolvedTheme } = useTheme();
+  const [view, setView] = useState<"month" | "year">("month");
   const [months, setMonths] = useState<string[]>([]);
   const [month, setMonth] = useState<string | null>(null);
   const [report, setReport] = useState<EdgeReport | null>(null);
@@ -95,25 +98,35 @@ export default function EdgeReportPage() {
         description="Cumulative expected edge vs realised P&L - tracking together means you're capturing your edge."
         icon={BarChart3}
         toolbar={
-          months.length > 1 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {months.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={cn(filterPillState(m === (month ?? report?.month)))}
-                  onClick={() => setMonth(m)}
-                >
-                  {formatMonthLabel(m)}
-                </button>
-              ))}
-            </div>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-3">
+            <Tabs value={view} onValueChange={(v) => setView(v as "month" | "year")}>
+              <TabsList variant="segmented">
+                <TabsTrigger value="month">Month</TabsTrigger>
+                <TabsTrigger value="year">Year</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {view === "month" && months.length > 1 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {months.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={cn(filterPillState(m === (month ?? report?.month)))}
+                    onClick={() => setMonth(m)}
+                  >
+                    {formatMonthLabel(m)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         }
       />
 
       <div className="flex flex-col gap-4 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
-        {loading && !report ? (
+        {view === "year" ? (
+          <SeasonView />
+        ) : loading && !report ? (
           <p className="py-10 text-center text-sm text-muted-foreground">Building report…</p>
         ) : !report ? (
           <EmptyState

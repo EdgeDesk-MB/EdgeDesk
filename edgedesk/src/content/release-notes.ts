@@ -54,6 +54,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/settings",
         text: "Demo data can be wiped in one tap - the next demo run reseeds fresh. The wipe can only ever touch the demo file.",
       },
+      {
+        kind: "feature",
+        area: "Edge Report",
+        href: "/report",
+        text: "Season summary: a Year tab on the Edge Report - profit, expected vs realised and capture month by month, commission drag, retention, and your best and worst bookmakers of the year. Months before your first EV lock show settled profit only, with the coverage window stated plainly rather than implying a capture rate that was never measured.",
+      },
     ],
   },
   {

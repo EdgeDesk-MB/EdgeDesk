@@ -750,7 +750,27 @@ restart-needed status, wipe button that only ever touches the demo file).
 
 **Onboarding wizard (pending).** First-run setup (bank → bookies + balances → defaults →
 optional E3 import → notification permission), extending the existing welcome tour rather than
-replacing it (per the standing iterate-don't-replace philosophy). Next up in Phase 8.
+replacing it (per the standing iterate-don't-replace philosophy). Deliberately sequenced LAST
+in Phase 8 (limit-pivot 2026-07-14): judgment-heavy first-run UX that wants Sam's input.
+
+## G3. Season summary `[strong]` ✅ DONE
+
+**Objective.** The year the way B8 tells the month, without ever faking pre-capture history.
+
+**Implementation.** Pure lib `src/lib/report/season-report.ts` (+3 tests, hand-worked):
+`buildSeasonReport` - per-month rows (settled profit for ALL bets; expected/realised/capture
+only for months with EV locks, null otherwise), commission drag, retention, year totals,
+`captureFrom` (first lock month), best/worst bookmaker across the year's settled bets;
+`seasonYears` newest first. `/api/report?view=year&year=YYYY`. UI: Month | Year segmented tabs
+on `/report`; the Year view (`src/components/report/season-view.tsx`) shows year pills, a
+5-tile StatStrip, the month-by-month table (desktop table + mobile card list) with the coverage
+note stated plainly ("EV capture measured from Jul 2026 - earlier months show settled profit
+only"), and a best/worst bookmaker card. Deviation: the brief's "realised £/hr" is omitted -
+there is no recorded effort-time data, and deriving it from the B2 effort guesses would present
+a made-up number as measurement.
+
+**Acceptance.** Lib unit-tested (pre-capture months null EV, year scoping excludes other years,
+best/worst); verified live (Year tab → totals, coverage note, bookmaker card).
 
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
