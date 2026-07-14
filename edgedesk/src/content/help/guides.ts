@@ -280,6 +280,20 @@ export const HELP_GUIDES: HelpGuide[] = [
           "The LAN address only matters for browsing and for the one-time subscription. After that, alerts travel from your computer through the browser's push relay to the phone - so they arrive wherever the phone has signal, as long as the EdgeDesk server is running at home.",
         ],
       },
+      {
+        heading: "The proper setup: Tailscale (real https, no flag)",
+        paragraphs: [
+          "With Tailscale on both the computer and the phone, EdgeDesk gets a genuine https address - full-screen install, push and remote browsing with none of the flag workarounds.",
+        ],
+        bullets: [
+          "In the Tailscale admin console, enable MagicDNS and HTTPS certificates (DNS page, one-time)",
+          "On the computer: tailscale serve --bg 3000 - this proxies https://<machine>.<tailnet>.ts.net to EdgeDesk with a real certificate",
+          "On the phone (Tailscale connected): open that https address - install properly from the banner, then enable push in Settings → Alerts from the new address",
+          "Afterwards, remove the Chrome flag - it is no longer needed. Push subscriptions are per-address, so re-enable push once from the https address",
+          "Tailscale only needs to be connected for browsing and subscribing; push notifications still arrive with Tailscale off, via the browser's relay",
+          "*.ts.net is already in allowedDevOrigins, so no config change is needed",
+        ],
+      },
     ],
   },
   {

@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
    * app renders dead (static null-state HTML, no hydration). If your LAN
    * IP changes, add the new one here and restart the dev server.
    */
-  allowedDevOrigins: ["192.168.50.71", "sams-mac-studio.local", "*.local"],
+  allowedDevOrigins: ["192.168.50.71", "sams-mac-studio.local", "*.local", "*.ts.net"],
 };
 
 export default nextConfig;
