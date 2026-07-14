@@ -12,6 +12,7 @@ export interface EvSnapshotRow {
   capturePct: number | null;
   commissionDrag: number | null;
   settledAt: number | null;
+  mistakeTag: string | null;
 }
 
 export interface EvCaptureSummary {
@@ -23,6 +24,8 @@ export interface EvCaptureSummary {
   /** null until settled */
   realizedProfit: number | null;
   lockedAt: number;
+  /** B7 mistake tag on the settled snapshot, null = untagged */
+  mistakeTag: string | null;
 }
 
 /** Return the latest snapshot's capture summary, or null if no snapshots exist. */
@@ -36,6 +39,7 @@ export function captureSummary(snapshots: EvSnapshotRow[]): EvCaptureSummary | n
     capturePct: latest.capturePct,
     realizedProfit: latest.realizedProfit,
     lockedAt: latest.lockedAt,
+    mistakeTag: latest.mistakeTag ?? null,
   };
 }
 

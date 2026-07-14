@@ -248,10 +248,13 @@ CREATE TABLE IF NOT EXISTS offer_ev_snapshots (
   realized_profit REAL,
   capture_pct REAL,
   commission_drag REAL,
-  settled_at INTEGER
+  settled_at INTEGER,
+  mistake_tag TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_offer_ev_snapshots_offer ON offer_ev_snapshots(offer_id, version);
 `);
+  // Additive column for DBs created before B7 (must run after the CREATE above).
+  addColumn("offer_ev_snapshots", "mistake_tag TEXT");
 
   // Data migrations - only after tables exist (fresh DBs / vitest temp files)
   sqlite.exec(`DELETE FROM history WHERE kind = 'free_bet_promo'`);

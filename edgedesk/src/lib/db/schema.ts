@@ -131,6 +131,8 @@ export const offerEvSnapshots = sqliteTable("offer_ev_snapshots", {
   capturePct: real("capture_pct"),
   commissionDrag: real("commission_drag"),
   settledAt: integer("settled_at"),
+  /** B7 mistake ledger: laid_late | wrong_market | odds_moved | bookie_voided | other */
+  mistakeTag: text("mistake_tag"),
 });
 
 /** Recurring offer template - instances are materialised as separate offer rows */

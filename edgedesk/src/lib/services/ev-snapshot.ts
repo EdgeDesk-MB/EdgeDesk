@@ -115,3 +115,35 @@ export function fillSettlementSnapshot(
     )
     .run();
 }
+
+export const MISTAKE_TAGS = [
+  "laid_late",
+  "wrong_market",
+  "odds_moved",
+  "bookie_voided",
+  "other",
+] as const;
+export type MistakeTag = (typeof MISTAKE_TAGS)[number];
+
+/**
+ * Tag (or clear, with null) the mistake on the latest SETTLED snapshot -
+ * tagging is only meaningful once expected vs realised is known.
+ * Returns false when there is no settled snapshot to tag.
+ */
+export function setMistakeTag(offerId: number, tag: MistakeTag | null): boolean {
+  const snapshots = getSnapshotsForOffer(offerId);
+  if (snapshots.length === 0) return false;
+  const latest = snapshots.reduce((best, s) => (s.version > best.version ? s : best));
+  if (latest.settledAt == null) return false;
+
+  db.update(offerEvSnapshots)
+    .set({ mistakeTag: tag })
+    .where(
+      and(
+        eq(offerEvSnapshots.offerId, offerId),
+        eq(offerEvSnapshots.version, latest.version)
+      )
+    )
+    .run();
+  return true;
+}

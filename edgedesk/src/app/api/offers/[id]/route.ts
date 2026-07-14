@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db, bets, offers } from "@/lib/db";
 import { stopRecurrenceForOffer } from "@/lib/offers/offer-recurrence";
 import { summariseOffer } from "@/lib/services/offers";
-import { writeEvLock } from "@/lib/services/ev-snapshot";
+import { MISTAKE_TAGS, setMistakeTag, writeEvLock, type MistakeTag } from "@/lib/services/ev-snapshot";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
 import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
 
@@ -25,6 +25,8 @@ const patchSchema = z.object({
   scopeRaceLabel: z.string().nullable().optional(),
   rules: z.string().nullable().optional(),
   stopRecurrence: z.boolean().optional(),
+  /** B7: tag the latest settled EV snapshot (null clears) */
+  mistakeTag: z.enum(MISTAKE_TAGS).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -40,6 +42,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   if (p.stopRecurrence) {
     stopRecurrenceForOffer(existing);
+  }
+
+  if (p.mistakeTag !== undefined) {
+    setMistakeTag(offerId, p.mistakeTag as MistakeTag | null);
   }
 
   const updated = db

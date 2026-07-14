@@ -15,6 +15,7 @@ function snap(over: Partial<EvSnapshotRow> = {}): EvSnapshotRow {
     capturePct: null,
     commissionDrag: null,
     settledAt: null,
+    mistakeTag: null,
     ...over,
   };
 }

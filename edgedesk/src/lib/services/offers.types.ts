@@ -52,6 +52,8 @@ export interface EvLockSummary {
   /** null until settled */
   realizedProfit: number | null;
   lockedAt: number;
+  /** B7 mistake tag on the settled snapshot, null = untagged */
+  mistakeTag: string | null;
 }
 
 export interface OfferSummary extends OfferRow {

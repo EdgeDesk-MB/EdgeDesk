@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { MoneyFlow } from "@/components/money-flow";
 import { api } from "@/hooks/use-app-state";
+import { filterPillState } from "@/lib/ui/surface-styles";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
 import {
   canManuallyCompleteOffer,
@@ -293,14 +294,17 @@ export function OfferCampaignCard({
           const captureLine = formatCaptureLine(offer.evLock);
           if (!captureLine) return null;
           return (
-            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5">
-              <EvBasisBadge basis={offer.evLock.basis} />
-              <span className="text-[11px] text-muted-foreground">{captureLine}</span>
-              {offer.evLock.version > 1 ? (
-                <span className="ml-auto shrink-0 rounded bg-border/60 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                  re-locked v{offer.evLock.version}
-                </span>
-              ) : null}
+            <div className="mt-2 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <EvBasisBadge basis={offer.evLock.basis} />
+                <span className="text-[11px] text-muted-foreground">{captureLine}</span>
+                {offer.evLock.version > 1 ? (
+                  <span className="ml-auto shrink-0 rounded bg-border/60 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    re-locked v{offer.evLock.version}
+                  </span>
+                ) : null}
+              </div>
+              <MistakeTagRow evLock={offer.evLock} offerId={offer.id} onRefresh={onRefresh} />
             </div>
           );
         })() : null}
@@ -561,5 +565,102 @@ function DeleteOfferDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+/** One-tap mistake tagging on under-captured settled campaigns (B7). Never forced. */
+const MISTAKE_TAG_OPTIONS = [
+  { tag: "laid_late", label: "Laid late" },
+  { tag: "wrong_market", label: "Wrong market" },
+  { tag: "odds_moved", label: "Odds moved" },
+  { tag: "bookie_voided", label: "Bookie voided" },
+  { tag: "other", label: "Other" },
+] as const;
+
+function MistakeTagRow({
+  evLock,
+  offerId,
+  onRefresh,
+}: {
+  evLock: NonNullable<OfferSummary["evLock"]>;
+  offerId: number;
+  onRefresh: () => void;
+}) {
+  const [skipped, setSkipped] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  // Only meaningful once settled, and only worth asking when capture dipped.
+  if (evLock.capturePct == null) return null;
+  const underCaptured = evLock.capturePct < 0.9;
+
+  async function setTag(tag: string | null) {
+    setSaving(true);
+    try {
+      await api(`/api/offers/${offerId}`, { method: "PATCH", json: { mistakeTag: tag } });
+      setEditing(false);
+      onRefresh();
+    } catch (e) {
+      toast.error("Could not save tag", { description: String(e) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (evLock.mistakeTag && !editing) {
+    const label =
+      MISTAKE_TAG_OPTIONS.find((o) => o.tag === evLock.mistakeTag)?.label ??
+      evLock.mistakeTag;
+    return (
+      <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+        <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-medium text-rose-700 dark:text-rose-300">
+          Leak: {label}
+        </span>
+        <button
+          type="button"
+          className="text-muted-foreground underline-offset-2 hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditing(true);
+          }}
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  if ((!underCaptured && !editing) || skipped) return null;
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        What went wrong?
+      </span>
+      {MISTAKE_TAG_OPTIONS.map((o) => (
+        <button
+          key={o.tag}
+          type="button"
+          disabled={saving}
+          className={cn(filterPillState(evLock.mistakeTag === o.tag), "px-2 py-0.5 text-[10px] leading-none")}
+          onClick={() => void setTag(o.tag)}
+        >
+          {o.label}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={saving}
+        className="ml-0.5 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+        onClick={() => {
+          if (editing && evLock.mistakeTag) void setTag(null);
+          setSkipped(true);
+          setEditing(false);
+        }}
+      >
+        {editing && evLock.mistakeTag ? "Clear" : "Skip"}
+      </button>
+    </div>
   );
 }
