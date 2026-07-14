@@ -153,6 +153,11 @@ export function AppTopBar() {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+          {state?.demoMode ? (
+            <span className="shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warning">
+              Demo data
+            </span>
+          ) : null}
           {showFreeBets ? (
             <TopBarStat
               label="Free bets"

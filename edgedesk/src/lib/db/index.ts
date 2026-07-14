@@ -5,6 +5,7 @@ import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
+import { seedDemoData } from "./demo-seed";
 
 type DB = BetterSQLite3Database<typeof schema>;
 
@@ -16,11 +17,40 @@ let rawSqlite: Database.Database | null = null;
  * Production/dev: `data/edgedesk.db` under cwd.
  * Tests: set `EDGEDESK_DB_PATH` (vitest sets a temp file) so unit tests never
  * write into the live profit-history database.
+ * Demo mode (G2): a `data/demo-mode` marker switches to `edgedesk-demo.db`.
+ * The marker is only read at connection time, so toggling requires a server
+ * restart - deliberate, because parallel dev module graphs holding
+ * connections to DIFFERENT files would split-brain writes.
  */
 export function resolveDbPath(): string {
   const override = process.env.EDGEDESK_DB_PATH?.trim();
   if (override) return path.resolve(override);
-  return path.join(process.cwd(), "data", "edgedesk.db");
+  const dataDir = path.join(process.cwd(), "data");
+  if (fs.existsSync(path.join(dataDir, "demo-mode"))) {
+    return path.join(dataDir, "edgedesk-demo.db");
+  }
+  return path.join(dataDir, "edgedesk.db");
+}
+
+/** True when this process opened the demo database (G2). */
+export function isDemoMode(): boolean {
+  return resolveDbPath().endsWith("edgedesk-demo.db");
+}
+
+/** Marker present = NEXT server start opens the demo DB (may differ from current). */
+export function demoMarkerPresent(): boolean {
+  if (process.env.EDGEDESK_DB_PATH?.trim()) return false;
+  return fs.existsSync(path.join(process.cwd(), "data", "demo-mode"));
+}
+
+export function setDemoMarker(enabled: boolean): void {
+  const marker = path.join(process.cwd(), "data", "demo-mode");
+  if (enabled) {
+    fs.mkdirSync(path.dirname(marker), { recursive: true });
+    fs.writeFileSync(marker, `enabled ${new Date().toISOString()}\n`);
+  } else {
+    fs.rmSync(marker, { force: true });
+  }
 }
 
 /** Lazy singleton - nothing touches the SQLite file until the first query at request time. */
@@ -291,6 +321,14 @@ SET category = 'free_bet'
 WHERE category = 'top_up'
   AND note LIKE '%Free bet%';
 `);
+
+  // Demo mode (G2): a fresh demo DB gets the watermarked demo dataset.
+  // Atomic - a mid-seed failure rolls back rather than stranding a
+  // half-seeded demo DB that would then skip reseeding.
+  if (dbPath.endsWith("edgedesk-demo.db")) {
+    const acc = sqlite.prepare("SELECT COUNT(*) AS n FROM accounts").get() as { n: number };
+    if (acc.n === 0) sqlite.transaction(() => seedDemoData(sqlite))();
+  }
 
   // Seed the well-known exchanges on first run so the pickers aren't empty
   const count = sqlite.prepare("SELECT COUNT(*) AS n FROM exchanges").get() as { n: number };

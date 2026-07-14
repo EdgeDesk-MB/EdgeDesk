@@ -65,6 +65,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/",
         text: "Monthly target: set one in Settings and the Monthly P&L chip shows factual pace - \"£162 of £250 · on pace\" or the £/day needed. No streaks, no confetti; a bad-variance week is not behind plan if the edge was captured.",
       },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Demo mode: a separate, seeded, clearly-watermarked database for screenshots and walkthroughs. Your real data never mixes with it - the two live in different files, and switching applies on the next server start.",
+      },
     ],
   },
   {

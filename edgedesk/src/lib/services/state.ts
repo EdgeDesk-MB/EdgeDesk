@@ -64,6 +64,7 @@ import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, s
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { getRealizedRetention } from "@/lib/services/retention";
 import { unreadCount } from "@/lib/services/alerts-inbox";
+import { isDemoMode } from "@/lib/db";
 
 export type {
   AppState,
@@ -805,6 +806,7 @@ export async function getAppState(): Promise<AppState> {
     planFixtures,
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     alertsUnread: unreadCount(),
+    demoMode: isDemoMode(),
     livePositions,
     liveEventModels,
     series,

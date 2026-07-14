@@ -734,6 +734,24 @@ exists to make.
 **Acceptance.** Lib unit-tested; verified live (target £250 → "£162 of £250 · on pace" on the
 chip; clearing the target removes the copy).
 
+## G2. Onboarding & demo mode `[strong]` — demo mode ✅ DONE, wizard ⬜ pending
+
+**Demo mode (shipped).** Demo data is a SEPARATE FILE, never a flag: `resolveDbPath` opens
+`data/edgedesk-demo.db` when a `data/demo-mode` marker exists (EDGEDESK_DB_PATH still wins, so
+tests are unaffected). Switching requires a server restart ON PURPOSE - parallel dev module
+graphs holding connections to different files would split-brain writes; the path is fixed per
+process lifetime. A fresh demo DB seeds atomically (`src/lib/db/demo-seed.ts`, wrapped in a
+transaction so a mid-seed failure can never strand a half-seeded file that would then skip
+reseeding - learned the hard way): 6 accounts, 7 offers, 11 bets, 5 settled EV-locked campaigns
+pinned INSIDE the current month so the Edge Report always renders ready, one leak tag, an open
+qualifier and a planned offer. "DEMO DATA" watermark chip in the top bar via
+`AppState.demoMode`; Settings → Data & API "Demo mode" card (arm/disarm switch with
+restart-needed status, wipe button that only ever touches the demo file).
+
+**Onboarding wizard (pending).** First-run setup (bank → bookies + balances → defaults →
+optional E3 import → notification permission), extending the existing welcome tour rather than
+replacing it (per the standing iterate-don't-replace philosophy). Next up in Phase 8.
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │
