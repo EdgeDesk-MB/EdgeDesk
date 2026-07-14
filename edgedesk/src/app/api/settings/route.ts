@@ -55,6 +55,9 @@ export async function PATCH(req: Request) {
     // patchAppSettings merges and normalises via normalizeHomeLayout
     patch.homeLayout = body.homeLayout as AppSettingsPatch["homeLayout"];
   }
+  if (typeof body.monthlyProfitTarget === "number" || body.monthlyProfitTarget === null) {
+    patch.monthlyProfitTarget = body.monthlyProfitTarget;
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

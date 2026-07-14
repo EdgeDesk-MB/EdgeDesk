@@ -39,6 +39,8 @@ export interface AppSettings {
   tuning: TuningSettings;
   /** Home widget order and visibility (E2) */
   homeLayout: HomeLayoutSettings;
+  /** Monthly profit target in £ (G1); null = no target, no pace copy */
+  monthlyProfitTarget: number | null;
 }
 
 /**
@@ -134,6 +136,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alertsTwoUpLock: true,
   tuning: DEFAULT_TUNING,
   homeLayout: DEFAULT_HOME_LAYOUT,
+  monthlyProfitTarget: null,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

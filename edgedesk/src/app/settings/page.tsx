@@ -40,7 +40,7 @@ import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
+import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, SlidersHorizontal, BookOpen, Map, RotateCcw, Target, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
@@ -155,6 +155,62 @@ export default function SettingsPage() {
       </Card>
 
     </PageShell>
+  );
+}
+
+/**
+ * G1 - monthly profit target. Home's Monthly P&L chip shows factual pace
+ * against it ("£162 of £250 · on pace"); clearing the field removes the copy.
+ */
+function TargetCard({
+  target,
+  onPatch,
+}: {
+  target: number | null;
+  onPatch: (patch: Partial<AppSettings>) => void;
+}) {
+  const inputId = useId();
+  const [draft, setDraft] = useState<string | null>(null);
+
+  function commit() {
+    if (draft == null) return;
+    const trimmed = draft.trim();
+    const v = parseFloat(trimmed);
+    if (trimmed === "" || v === 0) onPatch({ monthlyProfitTarget: null });
+    else if (Number.isFinite(v) && v > 0) onPatch({ monthlyProfitTarget: v });
+    setDraft(null);
+  }
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Target className="size-4" /> Monthly target
+        </CardTitle>
+        <CardDescription>
+          Home shows factual pace against it, nothing more. A bad-variance week is not
+          &ldquo;behind plan&rdquo; if the edge was captured. Leave empty for no target.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex max-w-sm flex-col gap-1.5">
+          <Label htmlFor={inputId}>Monthly profit target (£)</Label>
+          <Input
+            id={inputId}
+            type="number"
+            min={0}
+            step="10"
+            placeholder="No target"
+            value={draft ?? (target != null ? String(target) : "")}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -730,6 +786,8 @@ function PreferencesPanel({
           <PushDeviceControl />
         </CardContent>
       </Card>
+
+      <TargetCard target={settings.monthlyProfitTarget} onPatch={onPatch} />
 
       <HomeLayoutCard layout={settings.homeLayout} onPatch={onPatch} />
 

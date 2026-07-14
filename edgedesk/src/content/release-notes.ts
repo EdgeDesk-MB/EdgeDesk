@@ -59,6 +59,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         area: "Navigation",
         text: "Command palette: Cmd/Ctrl+K anywhere jumps to any page, open offer or bookie wallet, and runs the quick actions - add a bet, start an offer, open the calculator, adjust a balance.",
       },
+      {
+        kind: "feature",
+        area: "Home",
+        href: "/",
+        text: "Monthly target: set one in Settings and the Monthly P&L chip shows factual pace - \"£162 of £250 · on pace\" or the £/day needed. No streaks, no confetti; a bad-variance week is not behind plan if the edge was captured.",
+      },
     ],
   },
   {

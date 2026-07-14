@@ -712,6 +712,28 @@ their campaign dialog via `viewOffer`; bookies jump to Accounts.
 **Acceptance.** Cmd+K opens from any page; typing filters across all four groups (verified live:
 "bet365" → the wallet with its balance); selection runs the action and closes.
 
+---
+
+# PHASE 8 — MOMENTUM
+
+## G1. Targets & pace `[strong]` ✅ DONE
+
+**Objective.** A monthly profit target with factual pace copy - no streaks, no confetti.
+
+**Implementation.** Pure lib `src/lib/pnl/pace.ts` (+5 tests, hand-worked vectors):
+`computeMonthPace` (straight-line expectation, penny tolerance on the on-pace flag),
+`currentMonthAchieved` over monthly P&L rows, `paceLabel` ("£162 of £250 · on pace" /
+"£X/day needed" / "target met"). Setting `monthlyProfitTarget: number | null` (flat key,
+clamped parse). Settings → "Monthly target" card (clearing the field removes all pace copy -
+the description explicitly notes a bad-variance week is not "behind plan" if the edge was
+captured). Home's Monthly P&L chip appends the pace label when a target is set for the current
+month. Edge Report intentionally untouched: its realised number is campaign-EV capture, not
+total monthly P&L - mixing the two on one page would blur exactly the distinction the report
+exists to make.
+
+**Acceptance.** Lib unit-tested; verified live (target £250 → "£162 of £250 · on pace" on the
+chip; clearing the target removes the copy).
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │

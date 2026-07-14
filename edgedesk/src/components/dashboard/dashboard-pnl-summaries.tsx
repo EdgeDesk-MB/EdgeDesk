@@ -16,6 +16,8 @@ import { MonthlyPnlSection } from "@/components/tracker/monthly-pnl-section";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { BetRow } from "@/lib/db/schema";
 import { computeMonthlyBreakdown } from "@/lib/pnl/monthly-breakdown";
+import { computeMonthPace, currentMonthAchieved, paceLabel } from "@/lib/pnl/pace";
+import { useAppState } from "@/hooks/use-app-state";
 import { sectionBar } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { CalendarRange, ChevronRight, Tag } from "lucide-react";
@@ -111,6 +113,8 @@ export function DashboardPnlSummaries({
 }) {
   const [offerOpen, setOfferOpen] = useState(false);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
+  // Shared polled context (no extra fetch) - only settings are read here.
+  const { state } = useAppState();
 
   const offerStats = useMemo(() => {
     const active = offers.filter((o) => o.status === "active" || o.betCount > 0);
@@ -128,8 +132,19 @@ export function DashboardPnlSummaries({
   const monthlyStats = useMemo(() => {
     const rows = computeMonthlyBreakdown(bets);
     if (rows.length === 0) return null;
-    return { latest: rows[0], allTime: rows.reduce((s, r) => s + r.profit, 0) };
+    return { latest: rows[0], allTime: rows.reduce((s, r) => s + r.profit, 0), rows };
   }, [bets]);
+
+  // G1: pace against the user's monthly target - factual copy, no confetti.
+  // Pure libs default `now` internally, keeping this memo clean.
+  const target = state?.settings.monthlyProfitTarget;
+  const pace = useMemo(() => {
+    if (!monthlyStats || target == null) return null;
+    return computeMonthPace({
+      achieved: currentMonthAchieved(monthlyStats.rows),
+      target,
+    });
+  }, [monthlyStats, target]);
 
   if (!offerStats && !monthlyStats) return null;
 
@@ -151,7 +166,7 @@ export function DashboardPnlSummaries({
             value={
               <MoneyFlow value={monthlyStats.latest.profit} signColor className="inline text-sm" />
             }
-            sub={monthlyStats.latest.label}
+            sub={pace ? `${monthlyStats.latest.label} · ${paceLabel(pace)}` : monthlyStats.latest.label}
             icon={CalendarRange}
             onClick={() => setMonthlyOpen(true)}
           />

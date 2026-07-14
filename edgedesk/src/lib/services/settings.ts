@@ -68,6 +68,12 @@ function parseTuning(raw: string | undefined): TuningSettings {
   }
 }
 
+function parseMonthlyTarget(raw: string | undefined): number | null {
+  if (!raw || raw === "null") return null;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n > 0 && n <= 1_000_000 ? n : null;
+}
+
 function parseHomeLayout(raw: string | undefined): HomeLayoutSettings {
   if (!raw) return normalizeHomeLayout(undefined);
   try {
@@ -119,6 +125,7 @@ export function getAppSettings(): AppSettings {
     alertsTwoUpLock: readRaw("alertsTwoUpLock") !== "false",
     tuning: parseTuning(readRaw("tuning")),
     homeLayout: parseHomeLayout(readRaw("homeLayout")),
+    monthlyProfitTarget: parseMonthlyTarget(readRaw("monthlyProfitTarget")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -235,6 +242,9 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
       ...patch.homeLayout,
     });
     writeRaw("homeLayout", JSON.stringify(merged));
+  }
+  if (patch.monthlyProfitTarget !== undefined) {
+    writeRaw("monthlyProfitTarget", String(patch.monthlyProfitTarget ?? "null"));
   }
   return getAppSettings();
 }
