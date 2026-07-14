@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Share, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EdgeDeskLogoIcon } from "@/components/edge-desk-logo-icon";
@@ -99,8 +100,16 @@ export function PwaInstallPrompt() {
               Tap <Share className="inline size-3.5 align-text-bottom" role="img" aria-label="Share" /> then
               &ldquo;Add to Home Screen&rdquo; for the full-screen app and alerts.
             </>
-          ) : (
+          ) : installEvent ? (
             "Install for the full-screen app and alerts."
+          ) : (
+            <>
+              Installing needs a secure address - one-time setup in{" "}
+              <Link href="/help?guide=mobile" className="font-medium text-primary underline-offset-2 hover:underline">
+                Help → On your phone
+              </Link>
+              .
+            </>
           )}
         </p>
       </div>
