@@ -29,6 +29,10 @@ export const sectionTitle =
 
 export const sectionDescription = "text-[11px] text-muted-foreground";
 
+/** Small uppercase caption for nav sections and column headers outside tables */
+export const captionHeading =
+  "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
+
 export const tableHeaderCell =
   "h-8 px-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
 

@@ -83,6 +83,11 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         area: "Alerts",
         text: "In-app notifications on Android no longer error (\"Illegal constructor\") - they now show through the service worker, with the same tap-to-open deep links as push.",
       },
+      {
+        kind: "improvement",
+        area: "Navigation",
+        text: "Navigation, tidied: the sidebar groups into Betting, Live desks and Insight; on the phone the burger is now a full-height drawer that slides in with the whole sectioned navigation; and the old dark-mode switch is a proper Light / Dark / System appearance control with icons.",
+      },
     ],
   },
   {

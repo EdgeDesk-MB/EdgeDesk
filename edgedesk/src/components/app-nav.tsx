@@ -9,7 +9,7 @@ import {
   type ComponentType,
   type MouseEvent,
 } from "react";
-import { monoAccentActive, navLinkState } from "@/lib/ui/surface-styles";
+import { captionHeading, monoAccentActive, navLinkState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -67,75 +67,117 @@ type NavGroup = {
 
 type NavEntry = NavLeaf | NavGroup;
 
-const entries: NavEntry[] = [
-  { kind: "link", href: "/", label: "Home", icon: Home },
-  { kind: "link", href: "/history", label: "History", icon: History },
+export interface NavSection {
+  /** null = the unlabelled top section */
+  label: string | null;
+  entries: NavEntry[];
+}
+
+/**
+ * The single source of truth for main navigation - sidebar sections, the
+ * mobile drawer and the command palette all derive from this.
+ */
+export const NAV_SECTIONS: NavSection[] = [
   {
-    kind: "group",
-    label: "Offers",
-    icon: Gift,
-    /** Always open the first sub-nav item */
-    href: "/offers/calendar",
-    baseHref: "/offers",
-    children: [
-      { href: "/offers/calendar", label: "Calendar", icon: CalendarDays },
-      { href: "/offers", label: "Campaigns", icon: Gift },
+    label: null,
+    entries: [
+      { kind: "link", href: "/", label: "Home", icon: Home },
+      { kind: "link", href: "/alerts", label: "Alerts", icon: BellRing },
+      { kind: "link", href: "/history", label: "History", icon: History },
     ],
   },
   {
-    kind: "link",
-    href: "/calculators",
-    label: "Calculators",
-    icon: Calculator,
-    quickAction: "matchedCalculator",
-  },
-  { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
-  {
-    kind: "link",
-    href: "/tracker",
-    label: "Profit Tracker",
-    icon: NotebookPen,
-    quickAction: "addBet",
-  },
-  { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
-  { kind: "link", href: "/alerts", label: "Alerts", icon: BellRing },
-  {
-    kind: "link",
-    href: "/tracked-events",
-    label: "Tracked Events",
-    icon: Radio,
-    livePulse: true,
-    quickAction: "trackFixture",
-  },
-  {
-    kind: "link",
-    href: "/accounts",
-    label: "Accounts",
-    icon: Wallet,
-    quickAction: "addBalance",
-  },
-  {
-    kind: "link",
-    href: "/racing",
-    label: "Racing Desk",
-    icon: Trophy,
-    livePulse: true,
+    label: "Betting",
+    entries: [
+      {
+        kind: "group",
+        label: "Offers",
+        icon: Gift,
+        /** Always open the first sub-nav item */
+        href: "/offers/calendar",
+        baseHref: "/offers",
+        children: [
+          { href: "/offers/calendar", label: "Calendar", icon: CalendarDays },
+          { href: "/offers", label: "Campaigns", icon: Gift },
+        ],
+      },
+      {
+        kind: "link",
+        href: "/tracker",
+        label: "Profit Tracker",
+        icon: NotebookPen,
+        quickAction: "addBet",
+      },
+      { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
+      {
+        kind: "link",
+        href: "/calculators",
+        label: "Calculators",
+        icon: Calculator,
+        quickAction: "matchedCalculator",
+      },
+    ],
   },
   {
-    kind: "link",
-    href: "/calculators/ep-desk",
-    label: "2UP Desk",
-    icon: FootballIcon,
+    label: "Live desks",
+    entries: [
+      {
+        kind: "link",
+        href: "/racing",
+        label: "Racing Desk",
+        icon: Trophy,
+        livePulse: true,
+      },
+      {
+        kind: "link",
+        href: "/calculators/ep-desk",
+        label: "2UP Desk",
+        icon: FootballIcon,
+      },
+      {
+        kind: "link",
+        href: "/tracked-events",
+        label: "Tracked Events",
+        icon: Radio,
+        livePulse: true,
+        quickAction: "trackFixture",
+      },
+      { kind: "link", href: "/fixtures", label: "Fixtures", icon: CalendarSearch },
+    ],
   },
-  { kind: "link", href: "/fixtures", label: "Fixtures", icon: CalendarSearch },
+  {
+    label: "Insight",
+    entries: [
+      { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
+      {
+        kind: "link",
+        href: "/accounts",
+        label: "Accounts",
+        icon: Wallet,
+        quickAction: "addBalance",
+      },
+    ],
+  },
 ];
 
+const entries: NavEntry[] = NAV_SECTIONS.flatMap((s) => s.entries);
+
 /**
- * Flat main-nav list for the mobile burger menu - derived from `entries` so
- * the two navigations can never drift apart.
+ * Flat main-nav list for the command palette - derived from the sections so
+ * the navigations can never drift apart.
  */
 export const flatNavLinks: Array<{ href: string; label: string; icon: NavIcon }> =
-  entries.flatMap((entry) =>
+  flattenNavEntries(entries);
+
+/** Matches quick-action (+) / calculator icons on sibling rows */
+const navTrailingSlot =
+  "absolute top-1/2 right-3 flex size-6 -translate-y-1/2 items-center justify-center";
+
+/** Flatten sections/groups to plain links - shared by palette and drawer. */
+export function flattenNavEntries(
+  navEntries: NavEntry[]
+): Array<{ href: string; label: string; icon: NavIcon }> {
+  return navEntries.flatMap((entry) =>
     entry.kind === "link"
       ? [{ href: entry.href, label: entry.label, icon: entry.icon }]
       : entry.children.map((child) => ({
@@ -144,12 +186,9 @@ export const flatNavLinks: Array<{ href: string; label: string; icon: NavIcon }>
           icon: child.icon,
         }))
   );
+}
 
-/** Matches quick-action (+) / calculator icons on sibling rows */
-const navTrailingSlot =
-  "absolute top-1/2 right-3 flex size-6 -translate-y-1/2 items-center justify-center";
-
-function isLinkActive(pathname: string, href: string): boolean {
+export function isLinkActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   if (href === "/offers") {
     return pathname === "/offers" || pathname.startsWith("/offers?");
@@ -165,7 +204,7 @@ function isLinkActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href);
 }
 
-function ActionBadge({ count }: { count: number }) {
+export function ActionBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
     <span
@@ -369,11 +408,20 @@ export function AppNav() {
         appNavColumn
       )}
     >
-      <nav className="flex flex-1 flex-col gap-0.5 px-0.5">
-        {entries.map((entry) => {
-          if (entry.kind === "group") return renderGroup(entry);
-          return renderLeaf(entry);
-        })}
+      <nav className="flex flex-1 flex-col px-0.5">
+        {NAV_SECTIONS.map((section, i) => (
+          <div key={section.label ?? "top"} className="flex flex-col gap-0.5">
+            {section.label ? (
+              <p className={cn(captionHeading, "px-3 pb-1", i > 0 ? "pt-4" : "pt-1")}>
+                {section.label}
+              </p>
+            ) : null}
+            {section.entries.map((entry) => {
+              if (entry.kind === "group") return renderGroup(entry);
+              return renderLeaf(entry);
+            })}
+          </div>
+        ))}
       </nav>
     </aside>
   );
