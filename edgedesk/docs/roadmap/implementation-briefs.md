@@ -697,6 +697,21 @@ stable across calls; test-send graceful with zero devices; invalid subscriptions
 without crashing (verified on harness); the 404/410 prune path and real delivery need Sam's
 Android - staged for his next session.
 
+## F4. Command palette `[strong]` ✅ DONE
+
+**Objective.** Cmd/Ctrl+K anywhere: fuzzy jump to any page, open offer or bookie wallet, plus
+the four quick actions (Add bet, New offer, Matched calculator, Adjust balance).
+
+**Implementation.** `cmdk` (approved) behind new shadcn primitives in
+`src/components/ui/command.tsx`; `CommandDialog` wraps the app Dialog so mobile inherits the
+bottom-sheet treatment. `src/components/command-palette.tsx` mounts in the root layout inside
+the action providers; pages come from `flatNavLinks` (single source with the sidebar/burger),
+offers and bookies come from live app state only - no separate index to go stale. Offers open
+their campaign dialog via `viewOffer`; bookies jump to Accounts.
+
+**Acceptance.** Cmd+K opens from any page; typing filters across all four groups (verified live:
+"bet365" → the wallet with its balance); selection runs the action and closes.
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │

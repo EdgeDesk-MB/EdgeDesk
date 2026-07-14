@@ -32,9 +32,9 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
-    title: "The workbench begins: Match Checker and an alerts inbox",
+    title: "The workbench: Match Checker, alerts inbox, push and the palette",
     summary:
-      "Found a price? Get a verdict in seconds. Missed a notification? It's waiting for you - without EdgeDesk ever becoming an oddsmatcher.",
+      "Found a price? Get a verdict in seconds. Missed a notification? It's waiting for you, or on your phone. And everything is two keystrokes away.",
     entries: [
       {
         kind: "feature",
@@ -53,6 +53,11 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         area: "Settings",
         href: "/settings",
         text: "Background push: flip \"Push to this device\" in Settings → Alerts and sentinel alerts reach your phone with the app closed. Works anywhere your phone has signal, as long as the EdgeDesk server is running at home.",
+      },
+      {
+        kind: "feature",
+        area: "Navigation",
+        text: "Command palette: Cmd/Ctrl+K anywhere jumps to any page, open offer or bookie wallet, and runs the quick actions - add a bet, start an offer, open the calculator, adjust a balance.",
       },
     ],
   },

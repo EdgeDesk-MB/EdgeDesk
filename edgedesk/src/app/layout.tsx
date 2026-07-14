@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { QuickLogSheet } from "@/components/quick-log-sheet";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { AlertWatcher } from "@/components/alert-watcher";
+import { CommandPalette } from "@/components/command-palette";
 import { AddBalanceProvider } from "@/components/add-balance-provider";
 import { AddBetProvider } from "@/components/add-bet-provider";
 import { TrackFixtureProvider } from "@/components/track-fixture-provider";
@@ -95,6 +96,7 @@ export default function RootLayout({
                           <Toaster richColors position="top-right" />
                           <QuickLogSheet />
                           <PwaInstallPrompt />
+                          <CommandPalette />
                           <AlertWatcher />
                           <RacingAutopilotListener />
                           <OfferReminderListener />
