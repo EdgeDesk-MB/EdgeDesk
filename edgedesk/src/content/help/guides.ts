@@ -260,6 +260,14 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
+        heading: "Two gotchas after the flag",
+        bullets: [
+          "The Home Screen entry opens in Chrome with a URL bar, not full screen. That is expected: Android only mints true standalone apps for real https sites, so a flagged http address gets a shortcut instead. Push works exactly the same either way",
+          "Notifications have TWO switches: the Android app-level one (on the shortcut) and Chrome's site-level one. If EdgeDesk keeps saying notifications need enabling, the site is blocked in Chrome - tap the tune/padlock icon by the address → Permissions → Notifications → Allow (or Chrome ⋮ → Settings → Site settings → Notifications, and move the address out of Blocked)",
+          "For the real full-screen app and access away from home, serve EdgeDesk over genuine https (e.g. Tailscale serve) - then no flag is needed at all",
+        ],
+      },
+      {
         heading: "Alternative: USB (adb)",
         bullets: [
           "With USB debugging on and the phone plugged in: adb reverse tcp:3000 tcp:3000",
