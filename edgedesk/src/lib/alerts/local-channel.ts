@@ -15,27 +15,58 @@ export function createLocalAlertChannel(): AlertChannel {
       const canNotify =
         typeof Notification !== "undefined" && Notification.permission === "granted";
 
-      if (canNotify) {
-        const n = new Notification(alert.title, {
-          body: alert.body,
-          icon: "/icon-192.png",
-          tag: alert.key,
+      const showToast = () =>
+        toast.info(alert.title, {
+          description: alert.body,
+          action: {
+            label: "Open",
+            onClick: () => window.location.assign(alert.href),
+          },
         });
-        n.onclick = () => {
-          window.focus();
-          window.location.assign(alert.href);
-          n.close();
-        };
-        return;
+
+      // Android Chrome forbids page-context `new Notification` ("Illegal
+      // constructor") - notifications must go via the service worker, whose
+      // notificationclick handler (F3) opens the deep link.
+      const showPageNotification = (): boolean => {
+        try {
+          const n = new Notification(alert.title, {
+            body: alert.body,
+            icon: "/icon-192.png",
+            tag: alert.key,
+          });
+          n.onclick = () => {
+            window.focus();
+            window.location.assign(alert.href);
+            n.close();
+          };
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      if (canNotify) {
+        if ("serviceWorker" in navigator) {
+          void navigator.serviceWorker
+            .getRegistration()
+            .then((reg) => {
+              if (!reg) throw new Error("no service worker registration");
+              return reg.showNotification(alert.title, {
+                body: alert.body,
+                icon: "/icon-192.png",
+                tag: alert.key,
+                data: { href: alert.href },
+              });
+            })
+            .catch(() => {
+              if (!showPageNotification()) showToast();
+            });
+          return;
+        }
+        if (showPageNotification()) return;
       }
 
-      toast.info(alert.title, {
-        description: alert.body,
-        action: {
-          label: "Open",
-          onClick: () => window.location.assign(alert.href),
-        },
-      });
+      showToast();
     },
   };
 }
