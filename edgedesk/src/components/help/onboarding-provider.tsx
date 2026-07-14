@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { SetupWizard } from "@/components/help/setup-wizard";
 import { WelcomeDialog } from "@/components/help/welcome-dialog";
 import {
   isOnboardingComplete,
@@ -18,6 +19,8 @@ import {
 interface OnboardingContextValue {
   openWelcome: () => void;
   resetAndOpenWelcome: () => void;
+  /** G2b - the first-run setup wizard (bank → bookies → defaults → alerts) */
+  openSetup: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -30,6 +33,7 @@ export function useOnboarding() {
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
@@ -46,20 +50,29 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setWelcomeOpen(true);
   }, []);
 
+  const openSetup = useCallback(() => setSetupOpen(true), []);
+
   const value = useMemo(
-    () => ({ openWelcome, resetAndOpenWelcome }),
-    [openWelcome, resetAndOpenWelcome]
+    () => ({ openWelcome, resetAndOpenWelcome, openSetup }),
+    [openWelcome, resetAndOpenWelcome, openSetup]
   );
 
   return (
     <OnboardingContext.Provider value={value}>
       {children}
       {checked && (
-        <WelcomeDialog
-          open={welcomeOpen}
-          onOpenChange={setWelcomeOpen}
-          onComplete={markOnboardingComplete}
-        />
+        <>
+          <WelcomeDialog
+            open={welcomeOpen}
+            onOpenChange={setWelcomeOpen}
+            onComplete={markOnboardingComplete}
+            onSetup={() => {
+              setWelcomeOpen(false);
+              setSetupOpen(true);
+            }}
+          />
+          <SetupWizard open={setupOpen} onOpenChange={setSetupOpen} />
+        </>
       )}
     </OnboardingContext.Provider>
   );

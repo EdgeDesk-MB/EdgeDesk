@@ -46,7 +46,7 @@ import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
 export default function SettingsPage() {
-  const { resetAndOpenWelcome } = useOnboarding();
+  const { resetAndOpenWelcome, openSetup } = useOnboarding();
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
   const settings = state?.settings;
@@ -106,6 +106,14 @@ export default function SettingsPage() {
             onClick={resetAndOpenWelcome}
           >
             <RotateCcw className="size-4" /> Replay welcome tour
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="justify-start gap-2"
+            onClick={openSetup}
+          >
+            <SlidersHorizontal className="size-4" /> Set-up wizard
           </Button>
           <p className="w-full text-xs text-muted-foreground pt-1">
             EdgeDesk {APP_VERSION_LABEL} ({APP_VERSION})

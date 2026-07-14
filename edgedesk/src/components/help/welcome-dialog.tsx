@@ -50,9 +50,11 @@ interface WelcomeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: () => void;
+  /** G2b - the tour's last step hands off to the setup wizard */
+  onSetup?: () => void;
 }
 
-export function WelcomeDialog({ open, onOpenChange, onComplete }: WelcomeDialogProps) {
+export function WelcomeDialog({ open, onOpenChange, onComplete, onSetup }: WelcomeDialogProps) {
   const [step, setStep] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(true);
   const current = STEPS[step];
@@ -125,9 +127,26 @@ export function WelcomeDialog({ open, onOpenChange, onComplete }: WelcomeDialogP
               </Button>
             )}
             {isLast ? (
-              <Button size="sm" onClick={finish}>
-                Get started
-              </Button>
+              onSetup ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={finish}>
+                    Get started
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      finish();
+                      onSetup();
+                    }}
+                  >
+                    Set up your desk
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" onClick={finish}>
+                  Get started
+                </Button>
+              )
             ) : (
               <Button size="sm" onClick={() => setStep((s) => s + 1)}>
                 Next

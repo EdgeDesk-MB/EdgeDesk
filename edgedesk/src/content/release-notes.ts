@@ -72,6 +72,17 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/help?guide=mobile",
         text: "Opening EdgeDesk from a phone on the same network no longer loads a dead page (empty data, unresponsive menu) - the dev server now allows its own assets across LAN origins. A new \"On your phone\" guide in Help covers reaching the app from your phone and enabling push notifications on Android, step by step.",
       },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Set up your desk: the welcome tour now hands off to a four-step wizard - bank and bankroll, your bookies with balances, bet defaults, and notifications. A fresh install reaches a working desk in under a minute; re-run it any time from Settings → Help & about.",
+      },
+      {
+        kind: "fix",
+        area: "Alerts",
+        text: "In-app notifications on Android no longer error (\"Illegal constructor\") - they now show through the service worker, with the same tap-to-open deep links as push.",
+      },
     ],
   },
   {

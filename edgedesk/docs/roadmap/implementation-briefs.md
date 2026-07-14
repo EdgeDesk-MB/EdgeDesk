@@ -734,7 +734,7 @@ exists to make.
 **Acceptance.** Lib unit-tested; verified live (target £250 → "£162 of £250 · on pace" on the
 chip; clearing the target removes the copy).
 
-## G2. Onboarding & demo mode `[strong]` — demo mode ✅ DONE, wizard ⬜ pending
+## G2. Onboarding & demo mode `[strong]` ✅ DONE
 
 **Demo mode (shipped).** Demo data is a SEPARATE FILE, never a flag: `resolveDbPath` opens
 `data/edgedesk-demo.db` when a `data/demo-mode` marker exists (EDGEDESK_DB_PATH still wins, so
@@ -748,10 +748,17 @@ qualifier and a planned offer. "DEMO DATA" watermark chip in the top bar via
 `AppState.demoMode`; Settings → Data & API "Demo mode" card (arm/disarm switch with
 restart-needed status, wipe button that only ever touches the demo file).
 
-**Onboarding wizard (pending).** First-run setup (bank → bookies + balances → defaults →
-optional E3 import → notification permission), extending the existing welcome tour rather than
-replacing it (per the standing iterate-don't-replace philosophy). Deliberately sequenced LAST
-in Phase 8 (limit-pivot 2026-07-14): judgment-heavy first-run UX that wants Sam's input.
+**Onboarding wizard (shipped).** `src/components/help/setup-wizard.tsx` extends the welcome
+tour: its last step gains a "Set up your desk" CTA handing off to a four-step wizard (bank +
+bankroll → bookies + balances via the standard VenueSelect with its Add-custom affordance →
+bet defaults → notification permission, with pointers to push and the E3 CSV import rather
+than embedding them). Everything is created in ONE go at Finish (POST /api/accounts per
+account, bookies funded by the bank; PATCH /api/settings for defaults), so stepping back and
+forth never double-creates; per-item failures are reported, not silently dropped. Re-entry via
+Settings → Help & about → "Set-up wizard". Verified on a fresh DB: bank created and funded,
+defaults saved, all steps navigable. Design pass note: the wizard is a pattern-clone of the
+already-reviewed welcome dialog; it rides the next polish sweep with Sam's harvested tweaks
+(see polish-backlog.md).
 
 ## G3. Season summary `[strong]` ✅ DONE
 

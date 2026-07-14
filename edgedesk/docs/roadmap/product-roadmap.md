@@ -387,7 +387,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | **5. Coach** | ✅ B7 mistake ledger, ✅ B8 Edge Report, ✅ B9 league table | **Done** | Monthly report renders from ≥1 month of real captured data |
 | **6. Your rules** | ✅ E1 tunable thresholds, ✅ E2 widget personalisation, ✅ E3 data custody | **Done** | Every behaviour-defining number is user-tunable; Home arranged to taste; backup → restore round-trips a real DB; a spreadsheet imports cleanly |
 | **7. Workbench** | ✅ F1 match checker, ✅ F2 alerts inbox, ✅ F3 background web push (verified on Sam's Android 2026-07-14), ✅ F4 command palette | **Done** | A found match gets a verdict in <10s; no alert is ever lost; the phone buzzes with the app closed; any entity is two keystrokes away |
-| **8. Momentum** | ✅ G1 targets & pace, 🔶 G2 demo mode done / onboarding wizard pending, ✅ G3 season summary, ✅ G4 access & keyboard (contrast audit deferred) | In progress (G2b wizard remains) | Home answers "am I on pace?" at a glance; a stranger reaches a working desk in <10 min; the year renders honestly |
+| **8. Momentum** | ✅ G1 targets & pace, ✅ G2 onboarding + demo mode, ✅ G3 season summary, ✅ G4 access & keyboard (contrast audit deferred) | **Done** | Home answers "am I on pace?" at a glance; a stranger reaches a working desk in <10 min; the year renders honestly |
 | **9. Business gate** | §7 — only if gate criteria met | Not started | See §7.1 |
 
 Phases 1–2 are pure lib/UI work on existing data — ideal for local-model iteration (small,
