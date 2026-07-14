@@ -39,29 +39,16 @@ export function AppTopBarMenu() {
         sideOffset={8}
         className="max-h-[min(38rem,85vh)] w-72 overflow-y-auto overflow-x-hidden rounded-lg border-2 border-primary/35 bg-popover p-0 shadow-xl ring-0"
       >
-        <Link
-          href="/help"
-          className="flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
-        >
-          <BookOpen className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
-          <span className="flex-1">Help</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-        <Link
-          href="/release-notes"
-          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
-        >
-          <ScrollText className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
-          <span className="flex-1">Release notes</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-        {/* Main navigation - the sidebar is hidden below md, so it lives here. */}
+        {/* Main navigation first on mobile - the sidebar is hidden below md. */}
         <nav aria-label="Main navigation" className="md:hidden">
-          {flatNavLinks.map((item) => (
+          {flatNavLinks.map((item, i) => (
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 border-t border-border/80 px-4 py-3 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 text-sm font-bold text-foreground transition-colors hover:bg-muted/60",
+                i > 0 && "border-t border-border/80"
+              )}
             >
               <item.icon className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1">{item.label}</span>
@@ -69,16 +56,8 @@ export function AppTopBarMenu() {
             </Link>
           ))}
         </nav>
-        <Link
-          href="/settings"
-          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
-        >
-          <Settings className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
-          <span className="flex-1">Settings</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
         <div
-          className="flex items-center justify-between gap-3 border-t border-border/80 px-4 py-3.5"
+          className="flex items-center justify-between gap-3 border-t border-border/80 px-4 py-3.5 md:border-t-0"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-3">
@@ -92,6 +71,30 @@ export function AppTopBarMenu() {
             onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
           />
         </div>
+        <Link
+          href="/settings"
+          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+        >
+          <Settings className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="flex-1">Settings</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+        <Link
+          href="/release-notes"
+          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+        >
+          <ScrollText className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="flex-1">Release notes</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+        <Link
+          href="/help"
+          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+        >
+          <BookOpen className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="flex-1">Help</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
       </DropdownMenuContent>
     </DropdownMenu>
   );
