@@ -191,6 +191,12 @@ export const accounts = sqliteTable("accounts", {
    * risk_win - min(stake, potential winnings) e.g. Pinnacle-style
    */
   wrType: text("wr_type", { enum: ["stake", "risk_win"] }).notNull().default("stake"),
+  /**
+   * Manual bookie health flag (B9). Only "cooling" is stored here - gubbed and
+   * closed live in accessStatus (single source of truth). Null = healthy.
+   */
+  health: text("health"),
+  healthUpdatedAt: integer("health_updated_at"),
   createdAt: integer("created_at").notNull(),
 });
 

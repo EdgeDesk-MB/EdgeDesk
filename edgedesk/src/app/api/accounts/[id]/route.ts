@@ -18,6 +18,8 @@ const patchSchema = z.object({
   wrRemaining: z.number().min(0).optional(),
   wrMinOdds: z.number().nullable().optional(),
   wrType: z.enum(["stake", "risk_win"]).optional(),
+  /** B9 manual health flag - only "cooling" is stored; null = healthy */
+  health: z.enum(["cooling"]).nullable().optional(),
 });
 
 function patchFields(p: z.infer<typeof patchSchema>) {
@@ -34,6 +36,9 @@ function patchFields(p: z.infer<typeof patchSchema>) {
       ? { wrMinOdds: p.wrMinOdds != null && p.wrMinOdds > 1 ? p.wrMinOdds : null }
       : {}),
     ...(p.wrType !== undefined ? { wrType: p.wrType } : {}),
+    ...(p.health !== undefined
+      ? { health: p.health, healthUpdatedAt: Date.now() }
+      : {}),
   };
 }
 

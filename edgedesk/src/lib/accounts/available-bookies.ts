@@ -17,6 +17,23 @@ export function availableBookieNames(
   return names;
 }
 
+/**
+ * Bookie names whose offers stay VISIBLE in Do Next (B9): active and not
+ * closed. Gubbed bookies are included - their offers sink via the advantage
+ * score, they are never hidden. Empty set = no wallets → do not filter.
+ */
+export function visibleBookieNames(
+  accounts: Array<Pick<AccountRow, "name" | "type" | "isActive" | "accessStatus">>
+): Set<string> {
+  const names = new Set<string>();
+  for (const a of accounts) {
+    if (a.type !== "bookie" || !a.isActive) continue;
+    if (normalizeAccessStatus(a.accessStatus) === "closed") continue;
+    names.add(a.name.trim().toLowerCase());
+  }
+  return names;
+}
+
 /** True if offer has no bookie, or bookie is in the available set, or set is empty. */
 export function offerMatchesAvailableBookies(
   bookmaker: string | null | undefined,

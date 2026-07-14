@@ -259,7 +259,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | **2. Daily driver** | ✅ B1 Daily Plan, ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ✅ B10 retained-P&L audit | **Done** | A full offer day can be run start-to-finish from the plan view alone |
 | **3. Mobile** | ✅ §4 swipe deck, ✅ quick-log (+B4 parser), ✅ collapsed variants, ✅ PWA install + local alerts | **Done** | Log a bet in ≤3 taps on a phone; Home usable one-handed |
 | **4. Guardian** | ✅ B5 naked-exposure, ✅ B6 2UP sentinel, push alerts via local AlertChannel (web push = follow-up, see briefs §B6) | **Done (local delivery)** | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |
-| **5. Coach** | ⬜ B7 mistake ledger, ⬜ B8 Edge Report, ⬜ B9 league table | Not started | Monthly report renders from ≥1 month of real captured data |
+| **5. Coach** | ✅ B7 mistake ledger, ✅ B8 Edge Report, ✅ B9 league table | **Done** | Monthly report renders from ≥1 month of real captured data |
 | **6. Business gate** | §6 — only if gate criteria met | Not started | See §6.1 |
 
 Phases 1–2 are pure lib/UI work on existing data — ideal for local-model iteration (small,

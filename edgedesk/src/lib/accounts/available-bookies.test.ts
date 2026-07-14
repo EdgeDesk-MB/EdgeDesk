@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   availableBookieNames,
   offerMatchesAvailableBookies,
+  visibleBookieNames,
 } from "./available-bookies";
 
 describe("availableBookieNames", () => {
@@ -14,6 +15,19 @@ describe("availableBookieNames", () => {
       { name: "Betfair", type: "exchange", isActive: 1, accessStatus: "available" },
     ]);
     expect([...set]).toEqual(["bet365"]);
+  });
+});
+
+describe("visibleBookieNames", () => {
+  it("keeps gubbed bookies visible, drops only closed and inactive (B9)", () => {
+    const set = visibleBookieNames([
+      { name: "Bet365", type: "bookie", isActive: 1, accessStatus: "available" },
+      { name: "Skybet", type: "bookie", isActive: 1, accessStatus: "gubbed" },
+      { name: "Closed Co", type: "bookie", isActive: 1, accessStatus: "closed" },
+      { name: "Old", type: "bookie", isActive: 0, accessStatus: "available" },
+      { name: "Betfair", type: "exchange", isActive: 1, accessStatus: "available" },
+    ]);
+    expect([...set].sort()).toEqual(["bet365", "skybet"]);
   });
 });
 

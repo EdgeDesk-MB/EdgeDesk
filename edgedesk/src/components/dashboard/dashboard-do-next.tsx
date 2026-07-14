@@ -85,6 +85,16 @@ function DoNextCard({
         <div className="flex items-start gap-2 px-3 pt-[10px]">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {item.bookmaker ? <VenueBadge name={item.bookmaker} size="sm" /> : null}
+            {/* Warning-toned gubbed / muted cooling - matches the Accounts health chips */}
+            {item.health === "gubbed" ? (
+              <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
+                Gubbed
+              </span>
+            ) : item.health === "cooling" ? (
+              <span className="inline-flex items-center rounded-full border border-muted-foreground/30 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                Cooling
+              </span>
+            ) : null}
             {isBest ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
                 <Sparkles className="size-2.5" aria-hidden />

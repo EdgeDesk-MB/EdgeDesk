@@ -43,6 +43,13 @@ import {
   pageSecondaryButtonProps,
 } from "@/components/layout/page-header-actions";
 import type { AccountBalance } from "@/lib/services/balances.types";
+import {
+  computeBookmakerStats,
+  bookmakerHealthLabel,
+  type BookmakerLeagueRow,
+  type BookmakerStatsBet,
+  type BookmakerStatsOffer,
+} from "@/lib/accounts/bookmaker-stats";
 import { cn } from "@/lib/utils";
 import { ArrowLeftRight, Building2, Check, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
@@ -254,6 +261,13 @@ function AccountsContent() {
               />
             </CardContent>
           </Card>
+
+          <BookmakerLeagueCard
+            accounts={accounts}
+            bets={bets}
+            offers={state?.offers ?? []}
+            onChanged={refresh}
+          />
       </div>
 
       <ManageVenuesDialog open={manageVenuesOpen} onOpenChange={setManageVenuesOpen} />
@@ -282,6 +296,204 @@ function AccountsContent() {
         onSaved={refresh}
       />
     </PageShell>
+  );
+}
+
+/** Warning-toned gubbed / muted cooling chip; healthy renders nothing (B9). */
+function HealthBadge({ health }: { health: BookmakerLeagueRow["health"] }) {
+  if (health === "healthy") return null;
+  if (health === "gubbed") {
+    return (
+      <Badge variant="warning" className="shrink-0 text-[10px] font-normal">
+        {bookmakerHealthLabel(health)}
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="shrink-0 border-muted-foreground/30 text-[10px] font-normal text-muted-foreground"
+    >
+      {bookmakerHealthLabel(health)}
+    </Badge>
+  );
+}
+
+/**
+ * Bookmaker league (B9): realised ROI, per-bookie retention, offer frequency
+ * and drought per bookie account. Health is manual - cooling toggles here,
+ * gubbed/closed come from the account's access status.
+ */
+function BookmakerLeagueCard({
+  accounts,
+  bets,
+  offers,
+  onChanged,
+}: {
+  accounts: AccountBalance[];
+  bets: BookmakerStatsBet[];
+  offers: BookmakerStatsOffer[];
+  onChanged: () => void;
+}) {
+  // computeBookmakerStats defaults `now` internally - keeps this memo pure.
+  const rows = useMemo(
+    () => computeBookmakerStats({ accounts, bets, offers }),
+    [accounts, bets, offers]
+  );
+
+  async function setHealth(accountId: number, health: "cooling" | null) {
+    try {
+      await api(`/api/accounts/${accountId}`, { method: "PATCH", json: { health } });
+      toast.success(health === "cooling" ? "Marked as cooling" : "Marked as healthy");
+      onChanged();
+    } catch (e) {
+      toast.error("Could not update health", { description: String(e) });
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  function healthAction(row: BookmakerLeagueRow) {
+    if (row.health === "gubbed") return null;
+    if (row.health === "cooling") {
+      return (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[11px] text-muted-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            setHealth(row.accountId, null);
+          }}
+        >
+          Mark healthy
+        </Button>
+      );
+    }
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant={row.droughtNudge ? "outline" : "ghost"}
+        className={cn(
+          "h-6 px-2 text-[11px]",
+          row.droughtNudge ? "border-warning/40 text-warning" : "text-muted-foreground"
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          setHealth(row.accountId, "cooling");
+        }}
+      >
+        {row.droughtNudge ? "Mark as cooling?" : "Mark cooling"}
+      </Button>
+    );
+  }
+
+  function droughtNote(row: BookmakerLeagueRow) {
+    if (!row.droughtNudge) return null;
+    return (
+      <span className="text-[11px] font-medium text-warning">
+        No offers in {row.daysSinceLastOffer}d
+      </span>
+    );
+  }
+
+  const fmtRoi = (r: BookmakerLeagueRow) =>
+    r.roi != null ? `${(r.roi * 100).toFixed(1)}%` : "–";
+  const fmtRetention = (r: BookmakerLeagueRow) =>
+    r.retention ? `${Math.round(r.retention.rate * 100)}% (${r.retention.sampleSize})` : "–";
+  const fmtLastOffer = (r: BookmakerLeagueRow) =>
+    r.daysSinceLastOffer != null
+      ? r.daysSinceLastOffer === 0
+        ? "today"
+        : `${r.daysSinceLastOffer}d ago`
+      : "–";
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle section>Bookmaker league</CardTitle>
+        <CardDescription>
+          Realised profit, ROI and free-bet retention per bookie. Health is yours to set -
+          gubbed offers sink in Do next but are never hidden.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* Mobile: card list (C2 - tables become cards < sm) */}
+        <div className="sm:hidden">
+          {rows.map((r) => (
+            <div key={r.accountId} className="border-b border-border/60 px-1 py-3">
+              <span className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium">
+                  <span
+                    className="inline-block size-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: bookieBrandColor(r.name, null) }}
+                  />
+                  <span className="truncate">{r.name}</span>
+                  <HealthBadge health={r.health} />
+                </span>
+                <MoneyFlow
+                  value={r.profit}
+                  signColor
+                  signDisplay
+                  className="shrink-0 text-base font-semibold tabular-nums"
+                />
+              </span>
+              <span className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="min-w-0 truncate tabular-nums">
+                  ROI {fmtRoi(r)} · Retention {fmtRetention(r)} · {r.offerCount} offer
+                  {r.offerCount === 1 ? "" : "s"} · Last {fmtLastOffer(r)}
+                </span>
+                <span className="shrink-0">{healthAction(r)}</span>
+              </span>
+              {r.droughtNudge ? <span className="mt-1 block">{droughtNote(r)}</span> : null}
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden sm:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Bookie</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
+                <TableHead className="text-right">ROI</TableHead>
+                <TableHead className="text-right">Retention</TableHead>
+                <TableHead className="text-right">Offers</TableHead>
+                <TableHead className="text-right">Last offer</TableHead>
+                <TableHead className="w-36 text-right">Health</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.accountId}>
+                  <TableCell className="font-medium">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="inline-block size-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: bookieBrandColor(r.name, null) }}
+                      />
+                      <span className="truncate">{r.name}</span>
+                      <HealthBadge health={r.health} />
+                      {droughtNote(r)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <MoneyFlow value={r.profit} signColor signDisplay />
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtRoi(r)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtRetention(r)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.offerCount}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtLastOffer(r)}</TableCell>
+                  <TableCell className="text-right">{healthAction(r)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

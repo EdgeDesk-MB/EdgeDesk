@@ -36,8 +36,8 @@ import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
 import {
-  availableBookieNames,
   offerMatchesAvailableBookies,
+  visibleBookieNames,
 } from "@/lib/accounts/available-bookies";
 import { countDeskQueue } from "@/lib/bets/desk-queues";
 
@@ -189,11 +189,12 @@ export function AppNav() {
   );
   const offerActionCount = useMemo(() => {
     const offers = state?.offers ?? [];
-    const available = availableBookieNames(state?.balances?.accounts ?? []);
+    // Matches Do next scoping: gubbed bookies count, closed ones do not.
+    const visible = visibleBookieNames(state?.balances?.accounts ?? []);
     const scoped =
-      available.size === 0
+      visible.size === 0
         ? offers
-        : offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
+        : offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, visible));
     return listOfferNextActions(scoped).length;
   }, [state?.offers, state?.balances?.accounts]);
 

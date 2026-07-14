@@ -30,6 +30,34 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
+    title: "The Coach",
+    summary:
+      "EdgeDesk now tells you whether you actually captured your edge - and where the leaks are: a monthly Edge Report, one-tap mistake tags and a bookmaker league table with manual health.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Edge Report",
+        text: "New Edge Report page: cumulative expected edge (stepped at lock time) vs realised P&L (stepped at settle time), with capture rate, commission drag and free-bet retention for the month. Months with fewer than five settled campaigns show a not-enough-data state instead of noisy lines.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        text: "Mistake ledger: when a settled campaign captures under 90% of its locked EV, the post-mortem line offers one-tap tags (laid late, wrong market, odds moved, bookie voided, other). The Edge Report totals the £ lost per tag - \"Where the leak is\".",
+      },
+      {
+        kind: "feature",
+        area: "Accounts",
+        text: "Bookmaker league table: realised profit, ROI, free-bet retention, offer count and days since the last offer per bookie. Health is yours to set - mark a bookie as cooling, and a 40-day offer drought earns a gentle \"mark as cooling?\" nudge.",
+      },
+      {
+        kind: "improvement",
+        area: "Home",
+        text: "Gubbed bookies' offers sink to the bottom of Do next (and wear a Gubbed chip) but are never hidden - closed accounts drop out entirely.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
     title: "Guardian sentinels",
     summary:
       "EdgeDesk now watches your positions: unhedged backs and triggered 2UP payouts raise alerts the moment they matter.",

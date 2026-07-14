@@ -1,10 +1,14 @@
 import type { OfferSummary } from "@/lib/services/offers.types";
+import type { BookmakerHealth } from "@/lib/accounts/bookmaker-stats";
 import { deriveOfferNextAction, type OfferNextAction } from "@/lib/offers/next-actions";
 import { parseOfferRules } from "@/lib/offers/racing-offer-rules";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 
 /** Typical cash retention when converting an SNR free bet (fallback when no measured rate). */
 const DEFAULT_FREE_BET_RETENTION = 0.8;
+
+/** Gubbed bookies sink to the bottom of rankings but are never hidden (B9). */
+const GUBBED_SCORE_MULTIPLIER = 0.1;
 
 export type EvBasis = "live" | "estimated" | "heuristic";
 
@@ -13,6 +17,8 @@ export interface AdvantageOpts {
   retention?: number;
   /** Number of conversion bets behind the retention rate (≥5 upgrades basis to "estimated"). */
   retentionSampleSize?: number;
+  /** Normalised bookie name → effective health; gubbed multiplies score by 0.1. */
+  bookmakerHealth?: Map<string, BookmakerHealth>;
 }
 
 export interface OfferAdvantageScore {
@@ -29,6 +35,8 @@ export interface OfferAdvantageScore {
   score: number;
   reason: string;
   nextAction: OfferNextAction | null;
+  /** Effective bookie health when a health map was supplied */
+  health: BookmakerHealth;
 }
 
 function daysUntil(expiresAt: number | null, now: number): number | null {
@@ -154,7 +162,13 @@ export function scoreOfferAdvantage(
     stageBoost = 1.05;
   }
 
-  const score = remainingEv * stageBoost * (1 + urgency * 0.5);
+  const health =
+    (offer.bookmaker
+      ? opts?.bookmakerHealth?.get(offer.bookmaker.trim().toLowerCase())
+      : undefined) ?? "healthy";
+
+  const healthMultiplier = health === "gubbed" ? GUBBED_SCORE_MULTIPLIER : 1;
+  const score = remainingEv * stageBoost * (1 + urgency * 0.5) * healthMultiplier;
 
   // Skip noise with no action and no EV
   if (score < 0.01 && nextAction == null) return null;
@@ -169,6 +183,7 @@ export function scoreOfferAdvantage(
     score,
     reason,
     nextAction,
+    health,
   };
 }
 

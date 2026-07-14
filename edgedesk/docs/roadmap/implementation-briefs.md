@@ -20,7 +20,7 @@ Last updated: 2026-07-13 (A3 done — Phase 1 complete)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 515 tests / 71 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 531 tests / 74 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -491,7 +491,7 @@ exhausted path shows a visible "sentinel paused (API budget)" note rather than f
 
 # PHASE 5 — COACH
 
-## B7. Mistake ledger `[strong]` — needs A3
+## B7. Mistake ledger `[strong]` ✅ DONE — needs A3
 
 When a settled offer's capture < 90%, offer one-tap tags on the post-mortem line:
 `laid_late | wrong_market | odds_moved | bookie_voided | other`. Store on the EV snapshot row
@@ -499,7 +499,7 @@ When a settled offer's capture < 90%, offer one-tap tags on the post-mortem line
 `src/lib/offers/mistakes.ts`: £ lost per tag per month (`expected - realized` summed by tag).
 Surface inside B8's report. Never force tagging — skippable, editable later from offer detail.
 
-## B8. Monthly Edge Report `[strong]` `[design-first]` — needs A3, A1; B7 enriches
+## B8. Monthly Edge Report `[strong]` `[design-first]` ✅ DONE — needs A3, A1; B7 enriches
 
 NEW route `src/app/report/page.tsx` + pure lib `src/lib/report/edge-report.ts`:
 `buildEdgeReport(snapshots, bets, month): { cumulative: { t, expected, realized }[]; captureRate;
@@ -508,7 +508,18 @@ cumulative expected (from A3 locks, at lock time) vs cumulative realized (at set
 follow `live-pnl-chart.tsx` charting idiom (Liveline). Months with < 5 settled campaigns render
 a "not enough data" state, not noisy lines.
 
-## B9. Bookmaker league table + account health `[strong]`
+## B9. Bookmaker league table + account health `[strong]` ✅ DONE
+
+> **Implementation deviation (2026-07-14).** The `accounts` table already carried
+> `access_status` (`available|gubbed|closed`) as the manual source of truth for gubbing, so a
+> second `health` value of "gubbed" would have created two competing flags. Shipped instead:
+> the additive `health` column stores ONLY the `cooling` flag (null = healthy), and
+> `effectiveBookmakerHealth()` in `src/lib/accounts/bookmaker-stats.ts` derives the three-state
+> health: accessStatus gubbed/closed → "gubbed", manual cooling → "cooling", else "healthy".
+> Everything downstream (league table, `scoreOfferAdvantage` ×0.1 sink, Do Next chips) consumes
+> the derived state. Do Next scoping switched from `availableBookieNames` (which hid gubbed
+> bookies' offers, violating this brief's acceptance) to `visibleBookieNames` (hides only
+> closed/archived). Cooling is informational only - it never changes a score.
 
 Pure lib `src/lib/accounts/bookmaker-stats.ts` over bets+offers+lots grouped by bookmaker:
 realized ROI, retention (A1 per-bookie variant), offer frequency, days since last offer.

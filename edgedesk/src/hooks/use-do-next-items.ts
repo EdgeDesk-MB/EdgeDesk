@@ -9,9 +9,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, useAppState } from "@/hooks/use-app-state";
 import {
-  availableBookieNames,
   offerMatchesAvailableBookies,
+  visibleBookieNames,
 } from "@/lib/accounts/available-bookies";
+import { bookmakerHealthMap } from "@/lib/accounts/bookmaker-stats";
 import {
   buildDoNextItems,
   type BookieBalanceMap,
@@ -38,12 +39,19 @@ export function useDoNextItems(pollMs?: number): {
       .catch(() => setLots([]));
   }, [freeBetTotal]);
 
+  // Gubbed bookies stay in scope (their offers sink, never hide); only
+  // closed/archived wallets drop out.
   const scopedOffers = useMemo(() => {
     const all = state?.offers ?? [];
-    const available = availableBookieNames(state?.balances?.accounts ?? []);
-    if (available.size === 0) return all;
-    return all.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
+    const visible = visibleBookieNames(state?.balances?.accounts ?? []);
+    if (visible.size === 0) return all;
+    return all.filter((o) => offerMatchesAvailableBookies(o.bookmaker, visible));
   }, [state?.offers, state?.balances?.accounts]);
+
+  const healthMap = useMemo(
+    () => bookmakerHealthMap(state?.balances?.accounts ?? []),
+    [state?.balances?.accounts]
+  );
 
   const bookieBalances = useMemo<BookieBalanceMap>(() => {
     const map: BookieBalanceMap = new Map();
@@ -54,12 +62,15 @@ export function useDoNextItems(pollMs?: number): {
   }, [state?.balances?.accounts]);
 
   const items = useMemo(() => {
-    const retentionOpts = retention
-      ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
-      : undefined;
+    const opts = {
+      ...(retention
+        ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
+        : {}),
+      bookmakerHealth: healthMap,
+    };
     // buildDoNextItems defaults `now` internally - keeps this memo pure.
-    return buildDoNextItems(scopedOffers, lots, undefined, retentionOpts, bookieBalances);
-  }, [scopedOffers, lots, retention, bookieBalances]);
+    return buildDoNextItems(scopedOffers, lots, undefined, opts, bookieBalances);
+  }, [scopedOffers, lots, retention, healthMap, bookieBalances]);
 
   return { items, lots, state };
 }

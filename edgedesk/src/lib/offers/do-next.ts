@@ -12,6 +12,7 @@ import {
   type OfferNextActionKind,
 } from "@/lib/offers/next-actions";
 import { estimateOfferRemainingEv, scoreOfferAdvantage, type AdvantageOpts, type EvBasis } from "@/lib/offers/advantage";
+import type { BookmakerHealth } from "@/lib/accounts/bookmaker-stats";
 import {
   formatOfferDaysLeftLabel,
   offerExpiryDaysLeft,
@@ -77,6 +78,8 @@ export type DoNextItem = {
   };
   /** Set when the bookie account can't fund the required stake */
   funding?: DoNextFunding;
+  /** Effective bookie health (B9) - gubbed cards sink but stay visible */
+  health?: BookmakerHealth;
 };
 
 /** Parse bet stake from offer rules JSON; null when absent. */
@@ -174,6 +177,7 @@ export function buildDoNextItems(
       expiryLabel,
       convertLot,
       funding,
+      health: advantage?.health,
     });
   }
 
@@ -244,6 +248,7 @@ export function buildDoNextItems(
         rateScore: 0,
         daysLeft: null,
         expiryLabel: null,
+        health: opts?.bookmakerHealth?.get(normVenue(name)),
       });
     }
   }
@@ -330,6 +335,7 @@ export function sumActionableEv(items: DoNextItem[]): { total: number; weakestBa
 
 export function doNextActionLabel(kind: DoNextItem["kind"]): string {
   if (kind === "orphan_free_bet") return "Convert";
+  if (kind === "fund_account") return "Fund";
   return offerNextActionLabel(kind);
 }
 

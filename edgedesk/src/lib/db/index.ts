@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   wr_remaining REAL NOT NULL DEFAULT 0,
   wr_min_odds REAL,
   wr_type TEXT NOT NULL DEFAULT 'stake',
+  health TEXT,
+  health_updated_at INTEGER,
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS balance_transactions (
@@ -231,6 +233,8 @@ CREATE TABLE IF NOT EXISTS offer_series (
   addColumn("accounts", "wr_remaining REAL NOT NULL DEFAULT 0");
   addColumn("accounts", "wr_min_odds REAL");
   addColumn("accounts", "wr_type TEXT NOT NULL DEFAULT 'stake'");
+  addColumn("accounts", "health TEXT");
+  addColumn("accounts", "health_updated_at INTEGER");
   addColumn("balance_transactions", "transfer_group_id TEXT");
   addColumn("balance_transactions", "pending INTEGER NOT NULL DEFAULT 0");
   addColumn("balance_transactions", "confirmed_at INTEGER");

@@ -216,3 +216,47 @@ describe("rankOfferAdvantages", () => {
     expect(ranked[0]?.nextAction?.kind).toBe("place_qualifying");
   });
 });
+
+describe("bookmaker health (B9)", () => {
+  const gubbedMap = new Map([["bet365", "gubbed" as const]]);
+
+  it("multiplies a gubbed bookie's score by 0.1 but keeps the offer ranked", () => {
+    const plain = bestOfferAdvantage([awardedFbOffer]);
+    const sunk = bestOfferAdvantage([awardedFbOffer], Date.now(), {
+      bookmakerHealth: gubbedMap,
+    });
+    expect(plain).not.toBeNull();
+    expect(sunk).not.toBeNull();
+    expect(sunk!.score).toBeCloseTo(plain!.score * 0.1, 8);
+    expect(sunk!.remainingEv).toBeCloseTo(plain!.remainingEv, 8);
+    expect(sunk!.health).toBe("gubbed");
+  });
+
+  it("sinks gubbed offers below healthy ones without hiding them", () => {
+    const healthyLowEv = offer({
+      id: 2,
+      title: "Small healthy offer",
+      bookmaker: "Coral",
+      expectedProfit: 8,
+      status: "planned",
+    });
+    const ranked = rankOfferAdvantages(
+      [awardedFbOffer, healthyLowEv],
+      Date.now(),
+      { bookmakerHealth: gubbedMap }
+    );
+    // Gubbed £40 EV (score 58 × 0.1 = 5.8) sinks below healthy £8 EV
+    // (score 8 × 1.05 = 8.4), but stays visible.
+    expect(ranked.map((r) => r.offerId)).toEqual([2, 1]);
+    expect(ranked[1]?.health).toBe("gubbed");
+  });
+
+  it("cooling never changes the score, only the label", () => {
+    const cooling = bestOfferAdvantage([awardedFbOffer], Date.now(), {
+      bookmakerHealth: new Map([["bet365", "cooling" as const]]),
+    });
+    const plain = bestOfferAdvantage([awardedFbOffer]);
+    expect(cooling!.score).toBeCloseTo(plain!.score, 8);
+    expect(cooling!.health).toBe("cooling");
+  });
+});
