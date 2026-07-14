@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import {
   type ReleaseNoteKind,
 } from "@/content/release-notes";
 import { ROADMAP_VERSION } from "@/content/roadmap";
-import { ScrollText } from "lucide-react";
+import { ArrowUpRight, ScrollText } from "lucide-react";
 
 function kindBadgeVariant(kind: ReleaseNoteKind): "default" | "secondary" | "outline" {
   switch (kind) {
@@ -69,7 +70,18 @@ export default function ReleaseNotesPage() {
                       {RELEASE_NOTE_KIND_LABELS[entry.kind]}
                     </Badge>
                     <span className="min-w-0 leading-snug">
-                      <span className="font-medium">{entry.area}</span>
+                      {entry.href ? (
+                        <Link
+                          href={entry.href}
+                          className="inline-flex items-center gap-0.5 align-baseline font-medium text-primary underline-offset-2 hover:underline"
+                          aria-label={`Open ${entry.area}`}
+                        >
+                          {entry.area}
+                          <ArrowUpRight className="size-3 shrink-0" aria-hidden />
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{entry.area}</span>
+                      )}
                       {" · "}
                       <span className="text-muted-foreground">{entry.text}</span>
                     </span>
