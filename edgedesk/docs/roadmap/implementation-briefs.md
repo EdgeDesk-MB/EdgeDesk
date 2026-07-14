@@ -630,6 +630,31 @@ after every apply; import libs unit-tested with hand-built CSVs (quoted commas, 
 reported not silently dropped); imported bets appear in tracker/history with the import marker
 and change no balances.
 
+---
+
+# PHASE 7 — WORKBENCH
+
+## F1. Match checker `[strong]` ✅ DONE — new side-nav item
+
+**Objective.** Turn a found match into a verdict in seconds: back odds + lay odds + commission →
+good/ok/poor, qualifying cost or locked-in profit, and one tap into the full calculator. It
+checks the match you found; it NEVER lists or ranks markets (roadmap §7.3 discovery guard).
+
+**Implementation.** Pure lib `src/lib/calc/match-verdict.ts`: `checkMatch` wraps the spec-tested
+`matchedBet` (no reimplemented maths) and adds a rating (qualifying/risk-free: % of stake
+retained after the qualifying loss; free bets: % of face value retained) with documented verdict
+bands (`MATCH_VERDICT_THRESHOLDS`: qualifying good ≥97% / ok ≥93%; free bets good ≥75% /
+ok ≥65% - community rules of thumb, revisit from real use). Page `src/app/match-checker` with
+commission prefilled from the default exchange; "Open in calculator" hands the inputs to the
+matched-calculator provider (whose prefill contract is PERCENT, not fraction - calc-auditor
+caught the units mismatch). Risk-free is deliberately absent from the mode select: its verdict
+depends on refund inputs the checker doesn't collect, and a silent 70% default would mislead -
+the full calculator handles it. Nav entry after Calculators (flows into the mobile burger via
+`flatNavLinks`).
+
+**Acceptance.** Verdict lib unit-tested with hand-worked vectors; a found match gets a verdict
+in <10s; no market listing/browsing anywhere.
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │

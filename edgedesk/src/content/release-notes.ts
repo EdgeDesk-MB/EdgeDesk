@@ -32,6 +32,20 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
+    title: "The workbench begins: Match Checker",
+    summary:
+      "Found a price? Get a verdict in seconds - without EdgeDesk ever becoming an oddsmatcher.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Match Checker",
+        href: "/match-checker",
+        text: "New Match Checker page: enter the back and lay odds and get a good/ok/poor verdict with the qualifying cost or locked-in free-bet profit, commission prefilled from your default exchange, and one tap into the full calculator. It checks the match you found - it never lists markets.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
     title: "Your rules: tuning, Home layout and data custody",
     summary:
       "EdgeDesk bends to how you operate - every behaviour-defining threshold is yours to set, Home shows the widgets you choose, and your data has a proper backup, restore and import story.",

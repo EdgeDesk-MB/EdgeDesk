@@ -22,6 +22,7 @@ import {
   NotebookPen,
   Plus,
   Radio,
+  Scale,
   Trophy,
   Wallet,
 } from "lucide-react";
@@ -87,6 +88,7 @@ const entries: NavEntry[] = [
     icon: Calculator,
     quickAction: "matchedCalculator",
   },
+  { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
   {
     kind: "link",
     href: "/tracker",
