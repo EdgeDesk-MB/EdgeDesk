@@ -32,9 +32,9 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
-    title: "Your rules: tuning and Home layout",
+    title: "Your rules: tuning, Home layout and data custody",
     summary:
-      "EdgeDesk starts bending to how you operate - every behaviour-defining threshold is yours to set, and Home shows the widgets you choose, in your order.",
+      "EdgeDesk bends to how you operate - every behaviour-defining threshold is yours to set, Home shows the widgets you choose, and your data has a proper backup, restore and import story.",
     entries: [
       {
         kind: "feature",
@@ -47,6 +47,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         area: "Home",
         href: "/",
         text: "Home layout is yours: show or hide any widget per mode and reorder the mobile deck. Desktop keeps its two-column design and adapts - hide the chart and the plan takes the full width. Hidden widgets stay reachable from their own pages.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Data custody: one-tap backup (.db or JSON), validated restore that always saves a pre-restore safety copy first, and a CSV import wizard that brings spreadsheet bet history in - imported bets never change balances and never count towards EV capture.",
       },
     ],
   },

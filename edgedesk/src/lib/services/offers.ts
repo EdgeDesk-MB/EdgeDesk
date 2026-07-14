@@ -594,6 +594,9 @@ export function backfillOffersFromBets(): number {
 
   // Pass 1: create/link qualifying promo bets (never free-bet usage - those attach below).
   for (const bet of db.select().from(bets).all().filter((b) => b.offerId == null)) {
+    // Imported history was never EV-locked - linking it to campaigns would
+    // pollute capture-rate data (E3 provenance invariant).
+    if (bet.source === "import") continue;
     if (bet.betType === "free_snr" || bet.betType === "free_sr") continue;
     const offerId = resolveOfferForBet({
       label: bet.label,
@@ -609,6 +612,7 @@ export function backfillOffersFromBets(): number {
 
   // Pass 2: attach SNR/SR conversions to awarded campaigns (bookie optional).
   for (const bet of db.select().from(bets).all().filter((b) => b.offerId == null)) {
+    if (bet.source === "import") continue;
     const offerId = resolveOfferForFreeBetUsage({
       betType: bet.betType,
       bookmaker: bet.bookmaker,

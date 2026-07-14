@@ -89,7 +89,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.offerId !== undefined ? { offerId: p.offerId } : {}),
       ...(triggerFields ?? {}),
       ...(p.status && p.status !== "open" ? { settledAt: Date.now() } : {}),
-      ...(p.status === "open" ? { settledAt: null, actualProfit: null, balanceSettled: 0 } : {}),
+      // Imported history keeps balanceSettled=1 - its stake was never
+      // debited, so a re-settle must never credit a payout (E3).
+      ...(p.status === "open"
+        ? {
+            settledAt: null,
+            actualProfit: null,
+            ...(existing.source === "import" ? {} : { balanceSettled: 0 }),
+          }
+        : {}),
     })
     .where(eq(bets.id, Number(id)))
     .returning()

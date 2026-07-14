@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookieNamePicker, ExchangeNamePicker } from "@/components/bookie-name-picker";
+import { DataCustodyCard } from "@/components/settings/data-custody-card";
 import { Switch } from "@/components/ui/switch";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
@@ -137,6 +138,7 @@ export default function SettingsPage() {
 
           {prefsTab === "data" && (
             <DataApiPanel
+              onRefresh={refresh}
               apiConfigured={state?.apiConfigured}
               racingApiConfigured={state?.racingApiConfigured}
               racingResultsTier={state?.racingResultsTier}
@@ -787,6 +789,7 @@ function PreferencesPanel({
 }
 
 function DataApiPanel({
+  onRefresh,
   apiConfigured,
   racingApiConfigured,
   racingResultsTier,
@@ -796,6 +799,7 @@ function DataApiPanel({
   exchangeStatus,
   exchangeProviders,
 }: {
+  onRefresh: () => void;
   apiConfigured?: boolean;
   racingApiConfigured?: boolean;
   racingResultsTier?: "basic" | "free" | "none";
@@ -1003,6 +1007,7 @@ function DataApiPanel({
           ))}
         </CardContent>
       </Card>
+      <DataCustodyCard onRestored={onRefresh} />
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">API keys</CardTitle>

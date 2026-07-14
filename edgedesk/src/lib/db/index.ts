@@ -9,6 +9,7 @@ import * as schema from "./schema";
 type DB = BetterSQLite3Database<typeof schema>;
 
 let instance: DB | null = null;
+let rawSqlite: Database.Database | null = null;
 
 /**
  * Resolve the SQLite file path.
@@ -79,6 +80,7 @@ CREATE TABLE IF NOT EXISTS bets (
   expected_profit REAL,
   actual_profit REAL,
   notes TEXT,
+  source TEXT,
   created_at INTEGER NOT NULL,
   settled_at INTEGER
 );
@@ -196,6 +198,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_racing_odds_override_race_horse
   addColumn("bets", "balance_ledgered INTEGER NOT NULL DEFAULT 0");
   addColumn("bets", "balance_settled INTEGER NOT NULL DEFAULT 0");
   addColumn("bets", "offer_id INTEGER");
+  addColumn("bets", "source TEXT");
   addColumn("offers", "sport TEXT");
   addColumn("offers", "offer_type TEXT");
   addColumn("offers", "scope_course TEXT");
@@ -283,8 +286,88 @@ WHERE category = 'top_up'
     insert.run("Matchbook", 4, "#16344f", "#b8dff5", "#f7bac2", 0, now);
   }
 
+  rawSqlite = sqlite;
   instance = drizzle(sqlite, { schema });
   return instance;
+}
+
+/**
+ * WAL-safe online snapshot of the live database (E3 backup). Never copy the
+ * file directly - WAL pages would be missing.
+ */
+export async function backupDatabaseTo(destPath: string): Promise<void> {
+  getDb();
+  await rawSqlite!.backup(destPath);
+}
+
+/**
+ * E3 restore: copy every user table from a validated backup file INTO the
+ * live connection via ATTACH, inside one transaction. Never swap the DB file
+ * on disk - the dev server's parallel module graphs can hold a second open
+ * connection whose pager would be corrupted by a swap (SQLITE_IOERR_SHORT_READ,
+ * found the hard way). ATTACH-copy goes through SQLite's own locking, so
+ * every handle sees one consistent change.
+ *
+ * Older backups restore cleanly: the live schema is a superset (bootstrap has
+ * run), missing columns keep their defaults via the common-column insert.
+ */
+export function restoreDatabaseFrom(srcPath: string): { tablesRestored: number } {
+  getDb();
+  const sq = rawSqlite!;
+  const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
+  sq.exec(`ATTACH DATABASE '${srcPath.replace(/'/g, "''")}' AS restore_src`);
+  try {
+    const mainTables = (
+      sq
+        .prepare(
+          `SELECT name FROM main.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+        )
+        .all() as Array<{ name: string }>
+    ).map((t) => t.name);
+    const srcTables = new Set(
+      (
+        sq
+          .prepare(
+            `SELECT name FROM restore_src.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+          )
+          .all() as Array<{ name: string }>
+      ).map((t) => t.name)
+    );
+
+    let tablesRestored = 0;
+    sq.exec("BEGIN IMMEDIATE");
+    try {
+      for (const table of mainTables) {
+        // A restore is a full snapshot: clear even tables the backup predates.
+        sq.exec(`DELETE FROM main.${quote(table)}`);
+        if (!srcTables.has(table)) continue;
+
+        const mainCols = new Set(
+          (sq.pragma(`table_info(${quote(table)})`) as Array<{ name: string }>).map((c) => c.name)
+        );
+        const srcCols = (
+          sq.pragma(`restore_src.table_info(${quote(table)})`) as Array<{ name: string }>
+        )
+          .map((c) => c.name)
+          .filter((c) => mainCols.has(c));
+        if (srcCols.length === 0) continue;
+
+        const colList = srcCols.map(quote).join(", ");
+        sq.exec(
+          `INSERT INTO main.${quote(table)} (${colList}) SELECT ${colList} FROM restore_src.${quote(table)}`
+        );
+        tablesRestored++;
+      }
+      sq.exec("COMMIT");
+    } catch (e) {
+      sq.exec("ROLLBACK");
+      throw e;
+    }
+    return { tablesRestored };
+  } finally {
+    sq.exec("DETACH DATABASE restore_src");
+  }
 }
 
 export const db: DB = new Proxy({} as DB, {

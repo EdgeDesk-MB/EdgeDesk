@@ -20,7 +20,7 @@ Last updated: 2026-07-13 (A3 done — Phase 1 complete)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 541 tests / 75 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 559 tests / 78 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -592,7 +592,7 @@ in tests); hiding every widget is impossible (normaliser keeps one); hidden widg
 reachable as pages (chart → tracker chart, plan/do-next → offers, feed → history); layout lib
 unit-tested.
 
-## E3. Data custody: backup, restore, import `[strong]`
+## E3. Data custody: backup, restore, import `[strong]` ✅ DONE
 
 **Objective.** Local-first needs a lost-laptop story and a spreadsheet migration ramp: one-tap
 backup, validated restore with an automatic safety copy, and a CSV import wizard for bet history.
@@ -605,11 +605,14 @@ exportedAt, every user table dumped generically via `sqlite_master`).
 **Restore.** Two-step staged flow: `POST /api/data/restore?mode=preview` writes the upload to
 `data/restore-staged-<ts>.db`, validates (integrity_check, core tables present) and returns row
 counts + a staging token; `mode=apply&token=` then (1) safety-copies the live DB to
-`data/backups/pre-restore-<ts>.db` via the backup API, (2) closes the singleton
-(`resetDbInstance()` - the `db` export is already a lazy Proxy, so the NEXT query reopens and
-re-runs the idempotent bootstrap, which also upgrades older backups via the additive-column
-migrations), (3) replaces the DB file and removes stale `-wal`/`-shm`. Restores are therefore
-never destructive: the pre-restore copy always exists first.
+`data/backups/pre-restore-<ts>.db` via the backup API, (2) runs `restoreDatabaseFrom()` - a
+transactional ATTACH-copy of every user table into the LIVE connection (delete-all then
+common-column insert per table). **Never swap the DB file on disk**: the dev server's parallel
+module graphs can hold a second open connection whose pager a file swap corrupts
+(`SQLITE_IOERR_SHORT_READ`, found during verification). ATTACH-copy goes through SQLite's own
+locking, so every handle sees one consistent change, and older backups restore cleanly because
+the live schema is a bootstrap-guaranteed superset. Restores are never destructive: the
+pre-restore copy always exists first.
 
 **Import.** Pure libs `src/lib/import/csv.ts` (RFC-ish CSV parser - quotes, escaped quotes,
 newlines in fields; no new dependency) and `src/lib/import/bets-import.ts` (header auto-guess,

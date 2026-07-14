@@ -82,6 +82,8 @@ export const bets = sqliteTable("bets", {
   offerId: integer("offer_id"),
   /** Epoch ms when the bet was captured via mobile quick-log (C3); null = full entry */
   quickLogged: integer("quick_logged"),
+  /** Provenance (E3): "import" = spreadsheet history, excluded from EV capture */
+  source: text("source"),
 });
 
 /** Matched betting offer / promo pipeline (sign-up, reload, racing refund, etc.) */

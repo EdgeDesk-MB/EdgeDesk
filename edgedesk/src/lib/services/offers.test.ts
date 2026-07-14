@@ -321,3 +321,40 @@ describe("canManuallyCompleteOffer", () => {
     expect(offerManualCompleteBlockedReason(summary)).toBeNull();
   });
 });
+
+describe("backfillOffersFromBets (E3 import provenance)", () => {
+  it("never links or creates offers from imported history", async () => {
+    const { backfillOffersFromBets } = await import("./offers");
+    const before = db.select().from(offers).all().length;
+
+    const imported = db
+      .insert(bets)
+      .values({
+        label: "Bet £25 get £25 free bet",
+        market: "win",
+        betType: "qualifying",
+        bookmaker: "Coral",
+        backStake: 25,
+        backOdds: 4,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        status: "lost",
+        actualProfit: -1.5,
+        balanceLedgered: 1,
+        balanceSettled: 1,
+        source: "import",
+        createdAt: Date.now(),
+        settledAt: Date.now(),
+      })
+      .returning()
+      .get();
+
+    backfillOffersFromBets();
+
+    const after = db.select().from(bets).where(eq(bets.id, imported.id)).get();
+    expect(after?.offerId).toBeNull();
+    // No campaign was invented from imported history either
+    expect(db.select().from(offers).all().length).toBe(before);
+  });
+});
