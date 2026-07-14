@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
+  // Bottom-left: the quick-log FAB owns bottom-right on mobile. Set
+  // `devIndicators: false` to remove it entirely (dev-only either way).
   devIndicators: {
-    position: "bottom-right",
+    position: "bottom-left",
   },
   /**
    * Phones on the LAN hit the dev server by IP or Bonjour name; without
