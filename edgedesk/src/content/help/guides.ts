@@ -3,6 +3,7 @@ export type HelpGuideSlug =
   | "racing-desk"
   | "offers"
   | "calculators"
+  | "mobile"
   | "keyboard"
   | "faq";
 
@@ -224,6 +225,51 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Part lays - record lays already matched; app solves remaining stake",
           "Underlay - £0 net if bookie loses (all profit on bookie win)",
           "Overlay - £0 net if bookie wins",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "mobile",
+    title: "On your phone",
+    description: "Reach EdgeDesk from your phone on the same network, install it, and get push alerts.",
+    sections: [
+      {
+        heading: "Open EdgeDesk on your phone",
+        paragraphs: [
+          "With the dev server running on your computer, visit its LAN address from the phone - for example http://192.168.50.71:3000 (find your IP with ipconfig getifaddr en0 on Mac, or use the machine name such as http://sams-mac-studio.local:3000).",
+        ],
+        bullets: [
+          "Phone and computer must be on the same Wi-Fi network",
+          "The LAN address must be listed in allowedDevOrigins in next.config.ts - without it Next.js blocks its own assets cross-origin and the app loads dead (empty data, menu unresponsive). Your current IP and machine name are already configured; if your router hands out a new IP, add it and restart the server",
+        ],
+      },
+      {
+        heading: "Why push needs one extra step",
+        paragraphs: [
+          "Browsers only allow service workers, install-to-home-screen and push on secure origins. http://localhost counts as secure, but a plain http:// LAN address does not - so over the bare LAN URL the app works fully, but the push toggle reports the browser as unsupported.",
+        ],
+      },
+      {
+        heading: "Enable push on Android Chrome (one-time)",
+        bullets: [
+          "On the phone, open chrome://flags/#unsafely-treat-insecure-origin-as-secure",
+          "Enter your EdgeDesk LAN address (e.g. http://192.168.50.71:3000) in the box, set the flag to Enabled, relaunch Chrome",
+          "Open EdgeDesk, add it to your Home Screen when prompted, then Settings → Alerts → flip \"Push to this device\" and allow notifications",
+          "Tap \"Send test push\" - the notification should land even after you close the app",
+        ],
+      },
+      {
+        heading: "Alternative: USB (adb)",
+        bullets: [
+          "With USB debugging on and the phone plugged in: adb reverse tcp:3000 tcp:3000",
+          "The phone can then open http://localhost:3000, which browsers treat as secure - no flag needed",
+        ],
+      },
+      {
+        heading: "Once subscribed, push works anywhere",
+        paragraphs: [
+          "The LAN address only matters for browsing and for the one-time subscription. After that, alerts travel from your computer through the browser's push relay to the phone - so they arrive wherever the phone has signal, as long as the EdgeDesk server is running at home.",
         ],
       },
     ],

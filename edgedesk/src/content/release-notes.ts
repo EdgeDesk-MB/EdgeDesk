@@ -66,6 +66,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/help?guide=keyboard",
         text: "Every switch and icon button now carries a screen-reader name, the OS \"reduce motion\" preference stills pulsing indicators and dialog animations, and a new Keyboard & accessibility guide in Help documents the palette and everyday keys.",
       },
+      {
+        kind: "fix",
+        area: "Mobile",
+        href: "/help?guide=mobile",
+        text: "Opening EdgeDesk from a phone on the same network no longer loads a dead page (empty data, unresponsive menu) - the dev server now allows its own assets across LAN origins. A new \"On your phone\" guide in Help covers reaching the app from your phone and enabling push notifications on Android, step by step.",
+      },
     ],
   },
   {
