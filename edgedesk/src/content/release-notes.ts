@@ -32,15 +32,21 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
-    title: "Your rules: tuning",
+    title: "Your rules: tuning and Home layout",
     summary:
-      "Every behaviour-defining threshold is now yours to set - the numbers behind sentinels, nudges and rankings, in one Settings card.",
+      "EdgeDesk starts bending to how you operate - every behaviour-defining threshold is yours to set, and Home shows the widgets you choose, in your order.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
         text: "New Tuning card: unhedged-back grace windows, the offer-drought nudge, the retention prior and its weight, the mistake-tag prompt threshold, the Edge Report minimum, and per-action effort minutes behind the £/hr sort. Defaults match how EdgeDesk has always behaved, each row shows its default and resets in one tap.",
+      },
+      {
+        kind: "feature",
+        area: "Home",
+        href: "/",
+        text: "Home layout is yours: show or hide any widget per mode and reorder the mobile deck. Desktop keeps its two-column design and adapts - hide the chart and the plan takes the full width. Hidden widgets stay reachable from their own pages.",
       },
     ],
   },

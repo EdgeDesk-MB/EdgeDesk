@@ -51,6 +51,10 @@ export async function PATCH(req: Request) {
     // patchAppSettings merges and clamps via normalizeTuning
     patch.tuning = body.tuning as AppSettingsPatch["tuning"];
   }
+  if (body.homeLayout && typeof body.homeLayout === "object" && !Array.isArray(body.homeLayout)) {
+    // patchAppSettings merges and normalises via normalizeHomeLayout
+    patch.homeLayout = body.homeLayout as AppSettingsPatch["homeLayout"];
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

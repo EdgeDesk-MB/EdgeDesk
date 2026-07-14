@@ -4,6 +4,9 @@
  */
 
 import { DEFAULT_TIME_FORMAT, type TimeFormatPreference } from "@/lib/time-format";
+import { DEFAULT_HOME_LAYOUT, type HomeLayoutSettings } from "@/lib/ui/home-layout";
+
+export { normalizeHomeLayout, type HomeLayoutSettings } from "@/lib/ui/home-layout";
 
 export interface OfferBetPref {
   stake: number;
@@ -34,6 +37,8 @@ export interface AppSettings {
   alertsTwoUpLock: boolean;
   /** Tunable behaviour thresholds (E1) - see TuningSettings */
   tuning: TuningSettings;
+  /** Home widget order and visibility (E2) */
+  homeLayout: HomeLayoutSettings;
 }
 
 /**
@@ -128,6 +133,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alertsNakedExposure: true,
   alertsTwoUpLock: true,
   tuning: DEFAULT_TUNING,
+  homeLayout: DEFAULT_HOME_LAYOUT,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

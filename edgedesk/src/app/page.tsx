@@ -20,6 +20,7 @@ import {
   dashboardPage,
   dashboardPanelColumn,
 } from "@/lib/ui/dashboard-layout";
+import { DEFAULT_HOME_LAYOUT, applyDeckLayout } from "@/lib/ui/home-layout";
 import { cn } from "@/lib/utils";
 import { TrendingUp } from "lucide-react";
 
@@ -75,15 +76,27 @@ export default function DashboardPage() {
     />
   );
 
-  const deckCards = [
-    { id: "hero", label: "Overview", node: overviewBar },
-    ...(planSignals > 0 ? [{ id: "plan", label: "Today's plan", node: <DailyPlan /> }] : []),
-    { id: "chart", label: "Chart", node: pnlChart },
-    { id: "feed", label: "Feed", node: <DashboardFeedPanel state={state} /> },
-    ...(nextActions.length > 0
-      ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
-      : []),
-  ];
+  const homeLayout = state?.settings.homeLayout ?? DEFAULT_HOME_LAYOUT;
+  const desktopHidden = new Set<string>(homeLayout.desktopHidden);
+
+  // Data-driven conditionals first (no plan signals = no plan card), then the
+  // user's order and hidden set (E2).
+  const deckCards = applyDeckLayout(
+    [
+      { id: "hero", label: "Overview", node: overviewBar },
+      ...(planSignals > 0 ? [{ id: "plan", label: "Today's plan", node: <DailyPlan /> }] : []),
+      { id: "chart", label: "Chart", node: pnlChart },
+      { id: "feed", label: "Feed", node: <DashboardFeedPanel state={state} /> },
+      ...(nextActions.length > 0
+        ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
+        : []),
+    ],
+    homeLayout
+  );
+
+  const showChartPanel = showActivity && !desktopHidden.has("chart");
+  const showPlanPanel = !desktopHidden.has("plan");
+  const showFeedPanel = !desktopHidden.has("feed");
 
   return (
     <PageShell fullHeight>
@@ -92,8 +105,12 @@ export default function DashboardPage() {
 
         {isMobile !== true ? (
           <>
-            <div className="hidden sm:contents">{overviewBar}</div>
-            <DashboardDoNext className="hidden sm:block" />
+            {!desktopHidden.has("hero") ? (
+              <div className="hidden sm:contents">{overviewBar}</div>
+            ) : null}
+            {!desktopHidden.has("do-next") ? (
+              <DashboardDoNext className="hidden sm:block" />
+            ) : null}
           </>
         ) : null}
 
@@ -120,28 +137,45 @@ export default function DashboardPage() {
 
             {isMobile !== true ? (
               <>
-                <div
-                  className={cn(
-                    dashboardMainGrid,
-                    "hidden border-t border-border/60 sm:grid lg:grid-cols-2 xl:grid-cols-12"
-                  )}
-                >
-                  {showActivity && (
-                    <div className={cn(dashboardPanelColumn, "xl:col-span-6")}>{pnlChart}</div>
-                  )}
-
+                {showChartPanel || showPlanPanel || showFeedPanel ? (
                   <div
                     className={cn(
-                      dashboardPanelColumn,
-                      showActivity
-                        ? "border-t border-border/60 lg:col-span-1 lg:border-t-0 xl:col-span-6"
-                        : "lg:col-span-2 xl:col-span-12"
+                      dashboardMainGrid,
+                      "hidden border-t border-border/60 sm:grid lg:grid-cols-2 xl:grid-cols-12"
                     )}
                   >
-                    <DailyPlan className="border-b border-border/60" />
-                    <DashboardFeedPanel state={state} />
+                    {showChartPanel && (
+                      <div
+                        className={cn(
+                          dashboardPanelColumn,
+                          showPlanPanel || showFeedPanel
+                            ? "xl:col-span-6"
+                            : "lg:col-span-2 xl:col-span-12"
+                        )}
+                      >
+                        {pnlChart}
+                      </div>
+                    )}
+
+                    {showPlanPanel || showFeedPanel ? (
+                      <div
+                        className={cn(
+                          dashboardPanelColumn,
+                          showChartPanel
+                            ? "border-t border-border/60 lg:col-span-1 lg:border-t-0 xl:col-span-6"
+                            : "lg:col-span-2 xl:col-span-12"
+                        )}
+                      >
+                        {showPlanPanel ? (
+                          <DailyPlan
+                            className={showFeedPanel ? "border-b border-border/60" : undefined}
+                          />
+                        ) : null}
+                        {showFeedPanel ? <DashboardFeedPanel state={state} /> : null}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
+                ) : null}
 
                 {showLive && (
                   <div className="hidden border-t border-border/60 sm:block">

@@ -563,6 +563,70 @@ constants, asserted in tests); each threshold provably changes behaviour via uni
 parameterised libs; normaliser clamps garbage input; per-row reset restores the default and the
 default is visible on each row.
 
+## E2. Home widget personalisation `[strong]` `[design-first]` ✅ DONE
+
+**Objective.** User-controlled visibility and order for the five Home widgets (`hero`, `do-next`,
+`plan`, `chart`, `feed`), persisted in settings, without breaking the context-aware start card.
+
+**Design decisions (documented deviations).** (1) The mobile deck is homogeneous, so it gets FULL
+reorder + hide. The desktop Home is a bespoke composition (chart and plan/feed share a designed
+two-column row), so desktop gets per-widget show/hide with the grid adapting (hidden chart → the
+panel column goes full width, mirroring the existing `showActivity` behaviour) - free desktop
+reordering would destroy the pairing and is deferred until real use demands it. (2) Reordering
+uses dependency-free up/down controls rather than a drag library (no new dependencies without
+flagging); drag can be layered on later. (3) The existing `mobileDeckPin` (start card) stays a
+separate rule that operates within the user's order; a hidden pin falls back to the first
+visible card.
+
+**Implementation.** Pure lib `src/lib/ui/home-layout.ts`: `HOME_WIDGET_IDS`, labels,
+`normalizeHomeLayout` (drops unknown ids, dedupes, appends missing to order, guarantees at least
+one visible widget per mode), `applyDeckLayout(cards, layout)`. Settings: `homeLayout` object
+(single JSON key, same partial-merge pattern as E1 tuning): `{ deckOrder, deckHidden,
+desktopHidden }`. Home `page.tsx`: deck cards built in `deckOrder` minus `deckHidden` (existing
+data-driven conditionals still apply); desktop sections respect `desktopHidden`. Settings UI:
+"Home layout" card - one row per widget with desktop/mobile visibility switches and up/down
+order controls for the deck.
+
+**Acceptance.** Untouched settings render today's exact Home (default order/visibility asserted
+in tests); hiding every widget is impossible (normaliser keeps one); hidden widgets remain
+reachable as pages (chart → tracker chart, plan/do-next → offers, feed → history); layout lib
+unit-tested.
+
+## E3. Data custody: backup, restore, import `[strong]`
+
+**Objective.** Local-first needs a lost-laptop story and a spreadsheet migration ramp: one-tap
+backup, validated restore with an automatic safety copy, and a CSV import wizard for bet history.
+
+**Backup.** `GET /api/data/backup` streams a WAL-safe snapshot via better-sqlite3's online
+`backup()` API (never `fs.copyFile` on a live WAL db) as
+`edgedesk-backup-YYYY-MM-DD.db`; `?format=json` returns a versioned JSON bundle (app version,
+exportedAt, every user table dumped generically via `sqlite_master`).
+
+**Restore.** Two-step staged flow: `POST /api/data/restore?mode=preview` writes the upload to
+`data/restore-staged-<ts>.db`, validates (integrity_check, core tables present) and returns row
+counts + a staging token; `mode=apply&token=` then (1) safety-copies the live DB to
+`data/backups/pre-restore-<ts>.db` via the backup API, (2) closes the singleton
+(`resetDbInstance()` - the `db` export is already a lazy Proxy, so the NEXT query reopens and
+re-runs the idempotent bootstrap, which also upgrades older backups via the additive-column
+migrations), (3) replaces the DB file and removes stale `-wal`/`-shm`. Restores are therefore
+never destructive: the pre-restore copy always exists first.
+
+**Import.** Pure libs `src/lib/import/csv.ts` (RFC-ish CSV parser - quotes, escaped quotes,
+newlines in fields; no new dependency) and `src/lib/import/bets-import.ts` (header auto-guess,
+column mapping → validated settled-bet drafts; dd/mm/yyyy and ISO dates; profit sign derives
+won/lost, zero → void). Imported rows: additive `source TEXT` column on `bets`
+(`source = 'import'`), `balance_ledgered = 1` / `balance_settled = 1` so history import NEVER
+touches live balances, and no EV snapshots are created - imported history can never fake
+capture-rate data (the Edge Report only reads locks). UI: "Data custody" card on Settings →
+Data & API with backup/export/restore, plus an import wizard dialog (map columns → preview →
+import).
+
+**Acceptance.** backup → restore round-trips a real DB (verified live on the harness); restoring
+garbage is rejected at preview with the live DB untouched; a pre-restore safety copy exists
+after every apply; import libs unit-tested with hand-built CSVs (quoted commas, bad rows
+reported not silently dropped); imported bets appear in tracker/history with the import marker
+and change no balances.
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │

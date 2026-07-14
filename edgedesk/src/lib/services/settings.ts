@@ -7,10 +7,12 @@ import { db, appSettings } from "@/lib/db";
 import {
   DEFAULT_SETTINGS,
   bookmakerFromOfferPrefs,
+  normalizeHomeLayout,
   normalizeMobileDeckPin,
   normalizeTuning,
   stakeFromOfferPrefs,
   type AppSettings,
+  type HomeLayoutSettings,
   type OfferBetPref,
   type TuningSettings,
 } from "./settings-shared";
@@ -66,6 +68,15 @@ function parseTuning(raw: string | undefined): TuningSettings {
   }
 }
 
+function parseHomeLayout(raw: string | undefined): HomeLayoutSettings {
+  if (!raw) return normalizeHomeLayout(undefined);
+  try {
+    return normalizeHomeLayout(JSON.parse(raw));
+  } catch {
+    return normalizeHomeLayout(undefined);
+  }
+}
+
 export function getAppSettings(): AppSettings {
   const stake = parseFloat(readRaw("defaultBackStake") ?? "");
   const poll = parseInt(readRaw("dashboardPollMs") ?? "", 10);
@@ -107,6 +118,7 @@ export function getAppSettings(): AppSettings {
     alertsNakedExposure: readRaw("alertsNakedExposure") !== "false",
     alertsTwoUpLock: readRaw("alertsTwoUpLock") !== "false",
     tuning: parseTuning(readRaw("tuning")),
+    homeLayout: parseHomeLayout(readRaw("homeLayout")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -156,11 +168,13 @@ export function resolveOfferBookmaker(
   );
 }
 
-export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning">> & {
+export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning" | "homeLayout">> & {
   /** Merge a single offer pref without replacing the whole map. */
   offerBetPref?: { offerId: number; stake: number; bookmaker?: string };
   /** Partial merge into the tuning object; each field clamped on write. */
   tuning?: Partial<TuningSettings>;
+  /** Partial merge into the Home layout; normalised on write. */
+  homeLayout?: Partial<HomeLayoutSettings>;
 };
 
 export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
@@ -214,6 +228,13 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   if (patch.tuning != null) {
     const merged = normalizeTuning({ ...parseTuning(readRaw("tuning")), ...patch.tuning });
     writeRaw("tuning", JSON.stringify(merged));
+  }
+  if (patch.homeLayout != null) {
+    const merged = normalizeHomeLayout({
+      ...parseHomeLayout(readRaw("homeLayout")),
+      ...patch.homeLayout,
+    });
+    writeRaw("homeLayout", JSON.stringify(merged));
   }
   return getAppSettings();
 }

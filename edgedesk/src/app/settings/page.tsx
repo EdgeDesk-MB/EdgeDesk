@@ -26,13 +26,19 @@ import {
   type TuningSettings,
 } from "@/lib/services/settings-shared";
 import { EFFORT_MINUTES } from "@/lib/offers/do-next";
+import {
+  HOME_WIDGET_LABELS,
+  moveWidget,
+  type HomeLayoutSettings,
+  type HomeWidgetId,
+} from "@/lib/ui/home-layout";
 import type { ExchangeRow } from "@/lib/db/schema";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Bell, BellRing, Download, Gauge, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
+import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
@@ -146,6 +152,104 @@ export default function SettingsPage() {
       </Card>
 
     </PageShell>
+  );
+}
+
+/**
+ * E2 - Home widget order and visibility. Row order mirrors the mobile deck;
+ * up/down moves a widget in the deck, the switches control each mode.
+ * Desktop keeps its designed composition, so it only supports show/hide.
+ */
+function HomeLayoutCard({
+  layout,
+  onPatch,
+}: {
+  layout: HomeLayoutSettings;
+  onPatch: (patch: Partial<AppSettings>) => void;
+}) {
+  function commit(next: Partial<HomeLayoutSettings>) {
+    onPatch({ homeLayout: { ...layout, ...next } });
+  }
+
+  function toggle(list: HomeWidgetId[], id: HomeWidgetId, visible: boolean): HomeWidgetId[] {
+    return visible ? list.filter((x) => x !== id) : [...new Set([...list, id])];
+  }
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <LayoutGrid className="size-4" /> Home layout
+        </CardTitle>
+        <CardDescription>
+          Choose which widgets Home shows and the order of the mobile deck. Desktop keeps its
+          two-column layout, so it supports show and hide. At least one widget always stays.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {/* pr-4 = row px-3 + inner pr-1, so captions sit over the switch columns */}
+        <div className="flex items-center justify-end gap-4 pr-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="w-12 text-center">Desktop</span>
+          <span className="w-12 text-center">Deck</span>
+        </div>
+        {layout.deckOrder.map((id, i) => (
+          <div
+            key={id}
+            className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+          >
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="flex flex-col">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground"
+                  aria-label={`Move ${HOME_WIDGET_LABELS[id]} up in the deck`}
+                  disabled={i === 0}
+                  onClick={() => commit({ deckOrder: moveWidget(layout.deckOrder, id, -1) })}
+                >
+                  <ChevronUp className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground"
+                  aria-label={`Move ${HOME_WIDGET_LABELS[id]} down in the deck`}
+                  disabled={i === layout.deckOrder.length - 1}
+                  onClick={() => commit({ deckOrder: moveWidget(layout.deckOrder, id, 1) })}
+                >
+                  <ChevronDown className="size-3.5" />
+                </Button>
+              </div>
+              <p className="truncate text-sm font-medium">{HOME_WIDGET_LABELS[id]}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-4 pr-1">
+              <span className="flex w-12 justify-center">
+                <Switch
+                  checked={!layout.desktopHidden.includes(id)}
+                  aria-label={`Show ${HOME_WIDGET_LABELS[id]} on desktop`}
+                  onCheckedChange={(v) =>
+                    commit({ desktopHidden: toggle(layout.desktopHidden, id, v) })
+                  }
+                />
+              </span>
+              <span className="flex w-12 justify-center">
+                <Switch
+                  checked={!layout.deckHidden.includes(id)}
+                  aria-label={`Show ${HOME_WIDGET_LABELS[id]} in the mobile deck`}
+                  onCheckedChange={(v) => commit({ deckHidden: toggle(layout.deckHidden, id, v) })}
+                />
+              </span>
+            </div>
+          </div>
+        ))}
+        <p className="text-xs text-muted-foreground">
+          Hidden widgets stay reachable from their own pages - the tracker chart, the offers
+          calendar and the history feed.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -622,6 +726,8 @@ function PreferencesPanel({
           <NotificationPermissionButton />
         </CardContent>
       </Card>
+
+      <HomeLayoutCard layout={settings.homeLayout} onPatch={onPatch} />
 
       <TuningCard tuning={settings.tuning} onPatch={onPatch} />
 
