@@ -60,6 +60,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/report",
         text: "Season summary: a Year tab on the Edge Report - profit, expected vs realised and capture month by month, commission drag, retention, and your best and worst bookmakers of the year. Months before your first EV lock show settled profit only, with the coverage window stated plainly rather than implying a capture rate that was never measured.",
       },
+      {
+        kind: "improvement",
+        area: "Accessibility",
+        href: "/help?guide=keyboard",
+        text: "Every switch and icon button now carries a screen-reader name, the OS \"reduce motion\" preference stills pulsing indicators and dialog animations, and a new Keyboard & accessibility guide in Help documents the palette and everyday keys.",
+      },
     ],
   },
   {

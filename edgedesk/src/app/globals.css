@@ -709,3 +709,21 @@
 [data-sonner-toaster] {
   z-index: 40 !important;
 }
+
+/**
+ * G4 - respect the OS "reduce motion" preference: still the pulsing live
+ * indicators and dialog slide/zoom animations; keep instant state changes.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-spin {
+    animation: none !important;
+  }
+  [data-slot="dialog-content"],
+  [data-slot="dialog-overlay"] {
+    animation-duration: 0.01ms !important;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
+}

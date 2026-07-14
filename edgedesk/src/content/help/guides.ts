@@ -3,6 +3,7 @@ export type HelpGuideSlug =
   | "racing-desk"
   | "offers"
   | "calculators"
+  | "keyboard"
   | "faq";
 
 export interface HelpSection {
@@ -223,6 +224,40 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Part lays - record lays already matched; app solves remaining stake",
           "Underlay - £0 net if bookie loses (all profit on bookie win)",
           "Overlay - £0 net if bookie wins",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "keyboard",
+    title: "Keyboard & accessibility",
+    description: "Drive the desk from the keyboard, and how EdgeDesk behaves with assistive tech.",
+    sections: [
+      {
+        heading: "The command palette",
+        paragraphs: [
+          "Cmd+K (Mac) or Ctrl+K (Windows/Linux) opens the command palette from any page.",
+        ],
+        bullets: [
+          "Type to filter pages, open offers and bookie wallets",
+          "Quick actions: Add bet, New offer, Matched calculator, Adjust balance",
+          "Arrow keys move, Enter runs, Esc closes",
+        ],
+      },
+      {
+        heading: "Everyday keys",
+        bullets: [
+          "Enter commits any numeric setting (Tuning, Monthly target) - same as clicking away",
+          "Esc closes every dialog and sheet",
+          "Tab order follows the visual order on every page; all switches and icon buttons carry accessible names",
+        ],
+      },
+      {
+        heading: "Assistive tech and motion",
+        bullets: [
+          "Every alert toggle, health switch and icon-only button has a screen-reader name",
+          "Unread alerts announce their state, not just a coloured dot",
+          "With “reduce motion” set in your OS, pulsing live indicators and slide-in animations are stilled",
         ],
       },
     ],

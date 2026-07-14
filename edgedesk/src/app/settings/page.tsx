@@ -651,6 +651,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.offerRemindersEnabled}
+              aria-label="Offer expiry reminders"
               onCheckedChange={(v) => onPatch({ offerRemindersEnabled: v })}
             />
           </div>
@@ -663,6 +664,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.ocrAutoMatchEvents}
+              aria-label="OCR auto-match events"
               onCheckedChange={(v) => onPatch({ ocrAutoMatchEvents: v })}
             />
           </div>
@@ -730,6 +732,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.alertsOfferExpiring}
+              aria-label="Alert when an offer expires with EV unclaimed"
               onCheckedChange={(v) => onPatch({ alertsOfferExpiring: v })}
             />
           </div>
@@ -742,6 +745,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.alertsRaceOffSoon}
+              aria-label="Alert when a race off-time approaches"
               onCheckedChange={(v) => onPatch({ alertsRaceOffSoon: v })}
             />
           </div>
@@ -754,6 +758,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.alertsResultSettled}
+              aria-label="Alert when a result settles"
               onCheckedChange={(v) => onPatch({ alertsResultSettled: v })}
             />
           </div>
@@ -768,6 +773,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.alertsNakedExposure}
+              aria-label="Alert on an unhedged back bet"
               onCheckedChange={(v) => onPatch({ alertsNakedExposure: v })}
             />
           </div>
@@ -780,6 +786,7 @@ function PreferencesPanel({
             </div>
             <Switch
               checked={settings.alertsTwoUpLock}
+              aria-label="Alert when a 2UP triggers"
               onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
             />
           </div>

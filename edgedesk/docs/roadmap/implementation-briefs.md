@@ -772,6 +772,18 @@ a made-up number as measurement.
 **Acceptance.** Lib unit-tested (pre-capture months null EV, year scoping excludes other years,
 best/worst); verified live (Year tab → totals, coverage note, bookmaker card).
 
+## G4. Access & keyboard polish `[local]` ✅ DONE (scoped)
+
+**Shipped.** (1) Accessible names on the seven pre-existing Settings switches (offer reminders,
+OCR match, five alert toggles) - everything E1/E2/F3/G2 added already carried them; (2) global
+`prefers-reduced-motion` support: pulsing live indicators and dialog slide/zoom stilled, smooth
+scrolling disabled; (3) NEW "Keyboard & accessibility" Help guide documenting the palette,
+everyday keys and assistive-tech behaviour (unread alerts already announce via sr-only from F2).
+
+**Deferred, stated honestly:** a full contrast audit across both themes (no known failures, but
+unmeasured), and the ~40 react-compiler setState-in-effect lint sites (performance hygiene, not
+accessibility - tracked as their own backlog item).
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │
