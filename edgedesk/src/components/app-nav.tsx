@@ -12,6 +12,7 @@ import {
 import { monoAccentActive, navLinkState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import {
+  BarChart3,
   Home,
   Calculator,
   CalendarDays,
@@ -93,6 +94,7 @@ const entries: NavEntry[] = [
     icon: NotebookPen,
     quickAction: "addBet",
   },
+  { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
   {
     kind: "link",
     href: "/tracked-events",
