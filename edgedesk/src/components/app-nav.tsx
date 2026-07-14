@@ -84,6 +84,13 @@ export const NAV_SECTIONS: NavSection[] = [
       { kind: "link", href: "/", label: "Home", icon: Home },
       { kind: "link", href: "/alerts", label: "Alerts", icon: BellRing },
       { kind: "link", href: "/history", label: "History", icon: History },
+      {
+        kind: "link",
+        href: "/accounts",
+        label: "Accounts",
+        icon: Wallet,
+        quickAction: "addBalance",
+      },
     ],
   },
   {
@@ -149,13 +156,6 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Insight",
     entries: [
       { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
-      {
-        kind: "link",
-        href: "/accounts",
-        label: "Accounts",
-        icon: Wallet,
-        quickAction: "addBalance",
-      },
     ],
   },
 ];
@@ -420,6 +420,7 @@ export function AppNav() {
               if (entry.kind === "group") return renderGroup(entry);
               return renderLeaf(entry);
             })}
+            <div className="h-3" />
           </div>
         ))}
       </nav>
