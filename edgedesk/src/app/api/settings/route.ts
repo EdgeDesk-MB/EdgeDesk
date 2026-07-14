@@ -47,6 +47,11 @@ export async function PATCH(req: Request) {
     patch.alertsTwoUpLock = body.alertsTwoUpLock;
   }
 
+  if (body.tuning && typeof body.tuning === "object" && !Array.isArray(body.tuning)) {
+    // patchAppSettings merges and clamps via normalizeTuning
+    patch.tuning = body.tuning as AppSettingsPatch["tuning"];
+  }
+
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;
     const offerId = typeof pref.offerId === "number" ? pref.offerId : Number(pref.offerId);

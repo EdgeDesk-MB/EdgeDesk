@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,14 +19,20 @@ import { BookieNamePicker, ExchangeNamePicker } from "@/components/bookie-name-p
 import { Switch } from "@/components/ui/switch";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { normalizeMobileDeckPin, type AppSettings } from "@/lib/services/settings-shared";
+import {
+  DEFAULT_TUNING,
+  normalizeMobileDeckPin,
+  type AppSettings,
+  type TuningSettings,
+} from "@/lib/services/settings-shared";
+import { EFFORT_MINUTES } from "@/lib/offers/do-next";
 import type { ExchangeRow } from "@/lib/db/schema";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Bell, BellRing, Download, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
+import { Bell, BellRing, Download, Gauge, SlidersHorizontal, BookOpen, Map, RotateCcw, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
@@ -140,6 +146,225 @@ export default function SettingsPage() {
       </Card>
 
     </PageShell>
+  );
+}
+
+/** One tunable number: label + hint, right-aligned input, reset when off-default. */
+function TuningNumberRow({
+  label,
+  hint,
+  value,
+  defaultValue,
+  min,
+  max,
+  step,
+  percent,
+  onCommit,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  defaultValue: number;
+  min: number;
+  max: number;
+  step?: number;
+  /** Display and edit as 0-100 while storing 0-1 */
+  percent?: boolean;
+  onCommit: (value: number) => void;
+}) {
+  const inputId = useId();
+  // null = mirror the saved value; string only while the user is editing.
+  const [draft, setDraft] = useState<string | null>(null);
+  const display = (v: number) => (percent ? Math.round(v * 100 * 100) / 100 : v);
+  const isDefault = value === defaultValue;
+
+  function commitDraft() {
+    if (draft != null) {
+      const raw = parseFloat(draft);
+      if (Number.isFinite(raw)) onCommit(percent ? raw / 100 : raw);
+    }
+    setDraft(null);
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+      <div className="min-w-0">
+        <Label htmlFor={inputId} className="text-sm font-medium">
+          {label}
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          {hint} · default {display(defaultValue)}
+          {percent ? "%" : ""}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        {!isDefault ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label={`Reset ${label} to default`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setDraft(null);
+              onCommit(defaultValue);
+            }}
+          >
+            <RotateCcw className="size-3.5" />
+          </Button>
+        ) : null}
+        <Input
+          id={inputId}
+          type="number"
+          className="h-8 w-24 text-right"
+          min={percent ? min * 100 : min}
+          max={percent ? max * 100 : max}
+          step={step ?? 1}
+          value={draft ?? String(display(value))}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+const EFFORT_ROWS: Array<{ kind: keyof typeof EFFORT_MINUTES; label: string }> = [
+  { kind: "start_planned", label: "Start a planned offer" },
+  { kind: "place_qualifying", label: "Place qualifying bet" },
+  { kind: "convert_free_bet", label: "Convert a free bet" },
+  { kind: "orphan_free_bet", label: "Convert an orphan free bet" },
+  { kind: "review_expiry", label: "Review an expiring offer" },
+];
+
+/**
+ * E1 - every behaviour-defining threshold, user-tunable. Defaults reproduce
+ * the shipped behaviour exactly, so an untouched card changes nothing.
+ */
+function TuningCard({
+  tuning,
+  onPatch,
+}: {
+  tuning: TuningSettings;
+  onPatch: (patch: Partial<AppSettings>) => void;
+}) {
+  function patchField<K extends keyof TuningSettings>(key: K, value: TuningSettings[K]) {
+    onPatch({ tuning: { ...tuning, [key]: value } });
+  }
+
+  function patchEffort(kind: string, value: number, defaultValue: number) {
+    const next = { ...tuning.effortMinutes };
+    if (value === defaultValue) delete next[kind];
+    else next[kind] = value;
+    onPatch({ tuning: { ...tuning, effortMinutes: next } });
+  }
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Gauge className="size-4" /> Tuning
+        </CardTitle>
+        <CardDescription>
+          The thresholds behind sentinels, nudges and rankings. Defaults match how EdgeDesk has
+          always behaved - tune them to how you actually operate.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 lg:grid-cols-2">
+        <TuningNumberRow
+          label="Unhedged grace period (minutes)"
+          hint="Time between logging a back and its lay before the sentinel alerts"
+          value={tuning.nakedExposureMinutes}
+          defaultValue={DEFAULT_TUNING.nakedExposureMinutes}
+          min={1}
+          max={1440}
+          onCommit={(v) => patchField("nakedExposureMinutes", v)}
+        />
+        <TuningNumberRow
+          label="Unhedged grace near the off (minutes)"
+          hint="Tightened grace when the event starts within the hour or is in play"
+          value={tuning.nakedImminentMinutes}
+          defaultValue={DEFAULT_TUNING.nakedImminentMinutes}
+          min={0}
+          max={1440}
+          onCommit={(v) => patchField("nakedImminentMinutes", v)}
+        />
+        <TuningNumberRow
+          label="Offer drought nudge (days)"
+          hint="Days without an offer before a bookie earns “Mark as cooling?”"
+          value={tuning.droughtNudgeDays}
+          defaultValue={DEFAULT_TUNING.droughtNudgeDays}
+          min={1}
+          max={365}
+          onCommit={(v) => patchField("droughtNudgeDays", v)}
+        />
+        <TuningNumberRow
+          label="Mistake tag prompt (% captured)"
+          hint="Settled campaigns capturing less than this ask “What went wrong?”"
+          value={tuning.mistakeCapturePct}
+          defaultValue={DEFAULT_TUNING.mistakeCapturePct}
+          min={0}
+          max={1}
+          step={5}
+          percent
+          onCommit={(v) => patchField("mistakeCapturePct", v)}
+        />
+        <TuningNumberRow
+          label="Retention prior (%)"
+          hint="Assumed free-bet retention until your own conversions outweigh it"
+          value={tuning.retentionPrior}
+          defaultValue={DEFAULT_TUNING.retentionPrior}
+          min={0}
+          max={1}
+          step={5}
+          percent
+          onCommit={(v) => patchField("retentionPrior", v)}
+        />
+        <TuningNumberRow
+          label="Retention prior weight (conversions)"
+          hint="How many conversions the prior counts for in the blend"
+          value={tuning.retentionPriorWeight}
+          defaultValue={DEFAULT_TUNING.retentionPriorWeight}
+          min={0}
+          max={100}
+          onCommit={(v) => patchField("retentionPriorWeight", v)}
+        />
+        <TuningNumberRow
+          label="Edge Report minimum (campaigns)"
+          hint="Settled campaigns a month needs before the report renders"
+          value={tuning.edgeReportMinCampaigns}
+          defaultValue={DEFAULT_TUNING.edgeReportMinCampaigns}
+          min={1}
+          max={100}
+          onCommit={(v) => patchField("edgeReportMinCampaigns", v)}
+        />
+        <div className="flex flex-col gap-2 lg:col-span-2">
+          <p className="text-sm font-medium">Effort per action (minutes)</p>
+          <p className="-mt-1.5 text-xs text-muted-foreground">
+            Drives the £/hr &ldquo;Rate&rdquo; sort in Do next - lower effort ranks an action
+            higher per pound.
+          </p>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {EFFORT_ROWS.map((row) => (
+              <TuningNumberRow
+                key={row.kind}
+                label={row.label}
+                hint="Estimated minutes of hands-on effort"
+                value={tuning.effortMinutes[row.kind] ?? EFFORT_MINUTES[row.kind]}
+                defaultValue={EFFORT_MINUTES[row.kind]}
+                min={1}
+                max={480}
+                onCommit={(v) => patchEffort(row.kind, v, EFFORT_MINUTES[row.kind])}
+              />
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -372,7 +597,9 @@ function PreferencesPanel({
             <div>
               <p className="text-sm font-medium">Unhedged back bet</p>
               <p className="text-xs text-muted-foreground">
-                A qualifying or risk-free back has no lay after 10 minutes (3 near the off)
+                A qualifying or risk-free back has no lay after{" "}
+                {settings.tuning.nakedExposureMinutes} minutes (
+                {settings.tuning.nakedImminentMinutes} near the off)
               </p>
             </div>
             <Switch
@@ -395,6 +622,8 @@ function PreferencesPanel({
           <NotificationPermissionButton />
         </CardContent>
       </Card>
+
+      <TuningCard tuning={settings.tuning} onPatch={onPatch} />
 
       <Card className="lg:col-span-2">
         <CardHeader className="pb-3">

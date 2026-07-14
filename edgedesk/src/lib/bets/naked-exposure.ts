@@ -16,10 +16,17 @@ const DEFAULT_THRESHOLD_MS = 10 * 60_000;
 const IMMINENT_THRESHOLD_MS = 3 * 60_000;
 const IMMINENT_WINDOW_MS = 60 * 60_000;
 
+/** E1 tuning overrides; defaults reproduce the constants above. */
+export interface NakedExposureThresholds {
+  thresholdMs?: number;
+  imminentThresholdMs?: number;
+}
+
 export function isNakedExposed(
   bet: BetRow,
   now: number,
-  eventStartMs?: number | null
+  eventStartMs?: number | null,
+  opts?: NakedExposureThresholds
 ): boolean {
   if (bet.status !== "open") return false;
   if (bet.betType !== "qualifying" && bet.betType !== "risk_free") return false;
@@ -31,7 +38,9 @@ export function isNakedExposed(
   // Starting soon OR already in play - in-play is the most urgent case of
   // all (a deliberate widening of the brief's "starting < 60 min away").
   const imminent = eventStartMs != null && eventStartMs - now <= IMMINENT_WINDOW_MS;
-  const threshold = imminent ? IMMINENT_THRESHOLD_MS : DEFAULT_THRESHOLD_MS;
+  const threshold = imminent
+    ? (opts?.imminentThresholdMs ?? IMMINENT_THRESHOLD_MS)
+    : (opts?.thresholdMs ?? DEFAULT_THRESHOLD_MS);
   return now - bet.createdAt > threshold;
 }
 
@@ -39,10 +48,11 @@ export function isNakedExposed(
 export function detectNakedExposure(
   bets: BetRow[],
   eventStarts: Map<number, number>,
-  now: number
+  now: number,
+  opts?: NakedExposureThresholds
 ): BetRow[] {
   return bets.filter((bet) =>
-    isNakedExposed(bet, now, bet.eventId != null ? eventStarts.get(bet.eventId) : null)
+    isNakedExposed(bet, now, bet.eventId != null ? eventStarts.get(bet.eventId) : null, opts)
   );
 }
 

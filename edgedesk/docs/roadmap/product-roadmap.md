@@ -385,7 +385,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | **3. Mobile** | ✅ §4 swipe deck, ✅ quick-log (+B4 parser), ✅ collapsed variants, ✅ PWA install + local alerts | **Done** | Log a bet in ≤3 taps on a phone; Home usable one-handed |
 | **4. Guardian** | ✅ B5 naked-exposure, ✅ B6 2UP sentinel, push alerts via local AlertChannel (web push = follow-up, see briefs §B6) | **Done (local delivery)** | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |
 | **5. Coach** | ✅ B7 mistake ledger, ✅ B8 Edge Report, ✅ B9 league table | **Done** | Monthly report renders from ≥1 month of real captured data |
-| **6. Your rules** | ⬜ E1 tunable thresholds, ⬜ E2 widget personalisation, ⬜ E3 data custody | Not started | Every behaviour-defining number is user-tunable; Home arranged to taste; backup → restore round-trips a real DB; a spreadsheet imports cleanly |
+| **6. Your rules** | ✅ E1 tunable thresholds, ⬜ E2 widget personalisation, ⬜ E3 data custody | In progress | Every behaviour-defining number is user-tunable; Home arranged to taste; backup → restore round-trips a real DB; a spreadsheet imports cleanly |
 | **7. Workbench** | ⬜ F1 match checker, ⬜ F2 alerts inbox, ⬜ F3 background web push, ⬜ F4 command palette | Not started | A found match gets a verdict in <10s; no alert is ever lost; the phone buzzes with the app closed; any entity is two keystrokes away |
 | **8. Momentum** | ⬜ G1 targets & pace, ⬜ G2 onboarding + demo mode, ⬜ G3 season summary, ⬜ G4 access & keyboard | Not started | Home answers "am I on pace?" at a glance; a stranger reaches a working desk in <10 min; the year renders honestly |
 | **9. Business gate** | §7 — only if gate criteria met | Not started | See §7.1 |
@@ -482,7 +482,7 @@ cleanly onto the existing desks.
 | Betfair commercial data licence terms for a paid product | Unresolved — blocks Edge tier live lays, not personal use |
 | iOS PWA push reliability in practice (backgrounded Safari) | Test during Phase 3; fallback is timeline-visible alerts + email |
 | Racing API rate limits vs multi-race live polling on race days | Measure during Phase 4; may force snapshot cadence tiers |
-| Effort weights for £/hr (B2) — initial values are guesses | Ship with config map; user-tunable via E1 (Phase 6) |
+| Effort weights for £/hr (B2) — initial values are guesses | Resolved: user-tunable in Settings → Tuning (E1, 2026-07-14) |
 | When does expectedProfit get re-locked vs versioned (A3) | Decided: version on post-Active edits, never mutate; UI shows "re-locked" |
 | Multi-tenant route choice (hosted vs local-first sync) | Deferred to gate; leaning Route 2 (local-first + feed proxy) |
 

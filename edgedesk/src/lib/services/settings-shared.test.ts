@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_TUNING, normalizeTuning } from "./settings-shared";
+
+describe("normalizeTuning", () => {
+  it("returns exact defaults for missing or garbage input", () => {
+    expect(normalizeTuning(undefined)).toEqual(DEFAULT_TUNING);
+    expect(normalizeTuning(null)).toEqual(DEFAULT_TUNING);
+    expect(normalizeTuning("nonsense")).toEqual(DEFAULT_TUNING);
+    expect(normalizeTuning({ nakedExposureMinutes: "not a number" })).toEqual(DEFAULT_TUNING);
+  });
+
+  it("defaults reproduce the previously hardcoded behaviour", () => {
+    // Guard: if any of these change, every consumer's behaviour changes too.
+    expect(DEFAULT_TUNING).toEqual({
+      nakedExposureMinutes: 10,
+      nakedImminentMinutes: 3,
+      droughtNudgeDays: 40,
+      retentionPrior: 0.8,
+      retentionPriorWeight: 5,
+      mistakeCapturePct: 0.9,
+      edgeReportMinCampaigns: 5,
+      effortMinutes: {},
+    });
+  });
+
+  it("clamps every numeric field to its range", () => {
+    const t = normalizeTuning({
+      nakedExposureMinutes: 0,
+      nakedImminentMinutes: -5,
+      droughtNudgeDays: 9999,
+      retentionPrior: 1.4,
+      retentionPriorWeight: -1,
+      mistakeCapturePct: -0.2,
+      edgeReportMinCampaigns: 2.6,
+    });
+    expect(t.nakedExposureMinutes).toBe(1);
+    expect(t.nakedImminentMinutes).toBe(0);
+    expect(t.droughtNudgeDays).toBe(365);
+    expect(t.retentionPrior).toBe(1);
+    expect(t.retentionPriorWeight).toBe(0);
+    expect(t.mistakeCapturePct).toBe(0);
+    // Whole campaigns only
+    expect(t.edgeReportMinCampaigns).toBe(3);
+  });
+
+  it("keeps only positive finite effort-minute overrides", () => {
+    const t = normalizeTuning({
+      effortMinutes: {
+        place_qualifying: 12,
+        start_planned: 0,
+        convert_free_bet: -3,
+        review_expiry: "junk",
+        orphan_free_bet: 9999,
+      },
+    });
+    expect(t.effortMinutes).toEqual({ place_qualifying: 12 });
+  });
+});

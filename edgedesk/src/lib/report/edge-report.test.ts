@@ -77,6 +77,25 @@ describe("buildEdgeReport", () => {
     if (report.kind === "insufficient") expect(report.settledCampaigns).toBe(3);
   });
 
+  it("honours the E1 minCampaigns override in both directions", () => {
+    const relaxed = buildEdgeReport({
+      snapshots: FIVE_SNAPS.slice(0, 3),
+      bets: [],
+      month: "2026-07",
+      minCampaigns: 3,
+    });
+    expect(relaxed.kind).toBe("ready");
+
+    const strict = buildEdgeReport({
+      snapshots: FIVE_SNAPS,
+      bets: [],
+      month: "2026-07",
+      minCampaigns: 6,
+    });
+    expect(strict.kind).toBe("insufficient");
+    if (strict.kind === "insufficient") expect(strict.minCampaigns).toBe(6);
+  });
+
   it("builds month totals, capture rate and the cumulative dual series", () => {
     const report = buildEdgeReport({ snapshots: FIVE_SNAPS, bets: [], month: "2026-07" });
     expect(report.kind).toBe("ready");

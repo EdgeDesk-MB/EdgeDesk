@@ -34,7 +34,10 @@ export function NakedExposureBanner({ className }: { className?: string }) {
   const exposed = useMemo(() => {
     if (!state || now === 0) return [];
     const eventStarts = new Map(state.events.map((e) => [e.id, e.startTime]));
-    return detectNakedExposure(state.bets, eventStarts, now);
+    return detectNakedExposure(state.bets, eventStarts, now, {
+      thresholdMs: state.settings.tuning.nakedExposureMinutes * 60_000,
+      imminentThresholdMs: state.settings.tuning.nakedImminentMinutes * 60_000,
+    });
   }, [state, now]);
 
   if (exposed.length === 0) return null;

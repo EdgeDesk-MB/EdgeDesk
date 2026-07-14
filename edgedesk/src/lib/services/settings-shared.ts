@@ -32,6 +32,73 @@ export interface AppSettings {
   alertsResultSettled: boolean;
   alertsNakedExposure: boolean;
   alertsTwoUpLock: boolean;
+  /** Tunable behaviour thresholds (E1) - see TuningSettings */
+  tuning: TuningSettings;
+}
+
+/**
+ * Tunable behaviour thresholds (E1). Every default exactly reproduces the
+ * previously hardcoded behaviour, so an untouched Settings page is a
+ * zero-diff upgrade.
+ */
+export interface TuningSettings {
+  /** Grace period (minutes) before a naked back alerts */
+  nakedExposureMinutes: number;
+  /** Tightened grace (minutes) when the event starts within the hour / in play */
+  nakedImminentMinutes: number;
+  /** Offer drought (days) before the "mark as cooling?" nudge */
+  droughtNudgeDays: number;
+  /** Bayesian prior for free-bet retention (0–1) */
+  retentionPrior: number;
+  /** Pseudo-conversions behind the retention prior */
+  retentionPriorWeight: number;
+  /** Capture below this (0–1) prompts a mistake tag on settled campaigns */
+  mistakeCapturePct: number;
+  /** Settled campaigns needed before the Edge Report renders */
+  edgeReportMinCampaigns: number;
+  /** Sparse overrides for do-next EFFORT_MINUTES; empty = built-ins */
+  effortMinutes: Record<string, number>;
+}
+
+export const DEFAULT_TUNING: TuningSettings = {
+  nakedExposureMinutes: 10,
+  nakedImminentMinutes: 3,
+  droughtNudgeDays: 40,
+  retentionPrior: 0.8,
+  retentionPriorWeight: 5,
+  mistakeCapturePct: 0.9,
+  edgeReportMinCampaigns: 5,
+  effortMinutes: {},
+};
+
+function clamped(value: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof value === "number" ? value : parseFloat(String(value ?? ""));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/** The only path into storage - clamps every field, drops unknown keys. */
+export function normalizeTuning(raw: unknown): TuningSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const effort: Record<string, number> = {};
+  if (r.effortMinutes && typeof r.effortMinutes === "object" && !Array.isArray(r.effortMinutes)) {
+    for (const [kind, v] of Object.entries(r.effortMinutes as Record<string, unknown>)) {
+      const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
+      if (Number.isFinite(n) && n > 0 && n <= 480) effort[kind] = n;
+    }
+  }
+  return {
+    nakedExposureMinutes: clamped(r.nakedExposureMinutes, 1, 1440, DEFAULT_TUNING.nakedExposureMinutes),
+    nakedImminentMinutes: clamped(r.nakedImminentMinutes, 0, 1440, DEFAULT_TUNING.nakedImminentMinutes),
+    droughtNudgeDays: clamped(r.droughtNudgeDays, 1, 365, DEFAULT_TUNING.droughtNudgeDays),
+    retentionPrior: clamped(r.retentionPrior, 0, 1, DEFAULT_TUNING.retentionPrior),
+    retentionPriorWeight: clamped(r.retentionPriorWeight, 0, 100, DEFAULT_TUNING.retentionPriorWeight),
+    mistakeCapturePct: clamped(r.mistakeCapturePct, 0, 1, DEFAULT_TUNING.mistakeCapturePct),
+    edgeReportMinCampaigns: Math.round(
+      clamped(r.edgeReportMinCampaigns, 1, 100, DEFAULT_TUNING.edgeReportMinCampaigns)
+    ),
+    effortMinutes: effort,
+  };
 }
 
 export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "chart", "feed", "do-next"] as const;
@@ -60,6 +127,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alertsResultSettled: true,
   alertsNakedExposure: true,
   alertsTwoUpLock: true,
+  tuning: DEFAULT_TUNING,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

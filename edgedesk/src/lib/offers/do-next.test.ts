@@ -189,6 +189,28 @@ describe("buildDoNextItems", () => {
     const byRate = sortDoNextItems(items, "rate");
     expect(byRate[0]?.id).toBe("b"); // higher rateScore wins
   });
+
+  it("E1 effort overrides change rateScore; untouched kinds keep built-ins", () => {
+    const offers = [
+      offer({ id: 1, title: "Planned offer", expectedProfit: 8, betCount: 0, status: "planned" }),
+    ];
+
+    const builtIn = buildDoNextItems(offers, [])[0]!;
+    expect(builtIn.kind).toBe("start_planned");
+    // start_planned built-in effort is 10 min → 8/10*60 = 48 £/hr
+    expect(builtIn.rateScore).toBeCloseTo(48, 10);
+
+    const tuned = buildDoNextItems(offers, [], undefined, {
+      effortMinutes: { start_planned: 4 },
+    })[0]!;
+    // 8/4*60 = 120 £/hr
+    expect(tuned.rateScore).toBeCloseTo(120, 10);
+
+    const unrelated = buildDoNextItems(offers, [], undefined, {
+      effortMinutes: { review_expiry: 1 },
+    })[0]!;
+    expect(unrelated.rateScore).toBeCloseTo(48, 10);
+  });
 });
 
 describe("keepFirstRecurringInstance", () => {

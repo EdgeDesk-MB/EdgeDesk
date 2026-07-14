@@ -266,6 +266,7 @@ function AccountsContent() {
             accounts={accounts}
             bets={bets}
             offers={state?.offers ?? []}
+            droughtNudgeDays={state?.settings.tuning.droughtNudgeDays}
             onChanged={refresh}
           />
       </div>
@@ -328,17 +329,19 @@ function BookmakerLeagueCard({
   accounts,
   bets,
   offers,
+  droughtNudgeDays,
   onChanged,
 }: {
   accounts: AccountBalance[];
   bets: BookmakerStatsBet[];
   offers: BookmakerStatsOffer[];
+  droughtNudgeDays?: number;
   onChanged: () => void;
 }) {
   // computeBookmakerStats defaults `now` internally - keeps this memo pure.
   const rows = useMemo(
-    () => computeBookmakerStats({ accounts, bets, offers }),
-    [accounts, bets, offers]
+    () => computeBookmakerStats({ accounts, bets, offers, droughtNudgeDays }),
+    [accounts, bets, offers, droughtNudgeDays]
   );
 
   async function setHealth(accountId: number, health: "cooling" | null) {

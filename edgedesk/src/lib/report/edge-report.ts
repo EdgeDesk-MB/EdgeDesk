@@ -64,19 +64,22 @@ export function buildEdgeReport(input: {
   bets: BetRow[];
   /** YYYY-MM */
   month: string;
+  /** E1 tuning override; defaults to MIN_CAMPAIGNS */
+  minCampaigns?: number;
 }): EdgeReport {
   const { snapshots, bets, month } = input;
+  const minCampaigns = input.minCampaigns ?? MIN_CAMPAIGNS;
 
   const settled = snapshots.filter(
     (s) => s.settledAt != null && monthKey(s.settledAt) === month
   );
 
-  if (settled.length < MIN_CAMPAIGNS) {
+  if (settled.length < minCampaigns) {
     return {
       kind: "insufficient",
       month,
       settledCampaigns: settled.length,
-      minCampaigns: MIN_CAMPAIGNS,
+      minCampaigns,
     };
   }
 

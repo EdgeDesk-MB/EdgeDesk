@@ -20,7 +20,7 @@ Last updated: 2026-07-13 (A3 done — Phase 1 complete)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 531 tests / 74 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 541 tests / 75 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -533,7 +533,35 @@ visible; no automatic health writes anywhere.
 
 ---
 
-## Dependency graph (build order within/across phases)
+# PHASE 6 — YOUR RULES
+
+## E1. Tunable thresholds & effort weights `[strong]` ✅ DONE
+
+**Objective.** Every behaviour-defining hardcoded number becomes a setting whose default exactly
+reproduces today's behaviour, grouped in a "Tuning" card on Settings with per-row reset.
+
+**The numbers.** (1) naked-exposure grace 10 min + imminent grace 3 min
+(`src/lib/bets/naked-exposure.ts`); (2) drought nudge 40 days
+(`src/lib/accounts/bookmaker-stats.ts`); (3) retention prior 0.8 + prior weight 5
+(`src/lib/offers/retention-shared.ts` via `src/lib/services/retention.ts`); (4) effort minutes per
+action kind (`EFFORT_MINUTES` in `src/lib/offers/do-next.ts` — closes the roadmap §8 open
+question); (5) mistake-tag prompt threshold capture < 0.9
+(`src/components/offers/offer-campaign-card.tsx`); (6) Edge Report minimum 5 settled campaigns
+(`src/lib/report/edge-report.ts`).
+
+**Implementation.** New `tuning: TuningSettings` object on `AppSettings` (single JSON settings
+key, partial-merge patch): `nakedExposureMinutes`, `nakedImminentMinutes`, `droughtNudgeDays`,
+`retentionPrior` (0–1), `retentionPriorWeight`, `mistakeCapturePct` (0–1),
+`edgeReportMinCampaigns`, `effortMinutes` (sparse override map; empty = built-ins).
+`normalizeTuning()` clamps every field and is the only path into storage. Pure libs stay pure:
+each gains an optional opts/param defaulting to the current constant; callers thread
+`settings.tuning` through (alert-watcher + banner, accounts page, state.ts retention call,
+report route, use-do-next-items, MistakeTagRow via the shared app-state context).
+
+**Acceptance.** An untouched Settings page is a zero-diff upgrade (all defaults = today's
+constants, asserted in tests); each threshold provably changes behaviour via unit tests on the
+parameterised libs; normaliser clamps garbage input; per-row reset restores the default and the
+default is visible on each row.
 
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8

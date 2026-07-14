@@ -23,4 +23,10 @@ describe("blendedRetention", () => {
     // measured=1.0, n=10, prior=0.5, priorWeight=10 → (10 + 5)/20 = 0.75
     expect(blendedRetention(1.0, 10, 0.5, 10)).toBeCloseTo(0.75);
   });
+
+  it("returns the prior instead of NaN when n=0 and priorWeight=0 (E1 tuning)", () => {
+    expect(blendedRetention(0, 0, 0.8, 0)).toBe(0.8);
+    // With data, priorWeight=0 means pure measured rate
+    expect(blendedRetention(0.6, 4, 0.8, 0)).toBeCloseTo(0.6);
+  });
 });

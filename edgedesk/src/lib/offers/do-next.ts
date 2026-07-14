@@ -103,6 +103,12 @@ function lotMatchesOffer(lot: FreeBetLotInput, offer: OfferSummary): boolean {
   return normVenue(lot.accountName) === normVenue(offer.bookmaker);
 }
 
+/** buildDoNextItems options - advantage opts plus E1 effort-minute overrides. */
+export type DoNextOpts = AdvantageOpts & {
+  /** Sparse overrides for EFFORT_MINUTES, keyed by action kind (E1 tuning). */
+  effortMinutes?: Record<string, number>;
+};
+
 /**
  * Build a single ranked list of things to do next.
  * Offer convert actions absorb matching free-bet lots; leftover lots become orphan cards.
@@ -112,7 +118,7 @@ export function buildDoNextItems(
   offers: OfferSummary[],
   lots: FreeBetLotInput[],
   now = Date.now(),
-  opts?: AdvantageOpts,
+  opts?: DoNextOpts,
   bookieBalances?: BookieBalanceMap
 ): DoNextItem[] {
   const actions = listOfferNextActions(offers, now);
@@ -144,7 +150,7 @@ export function buildDoNextItems(
     }
 
     const itemEv = advantage?.remainingEv ?? remainingEv;
-    const effortMin = EFFORT_MINUTES[action.kind];
+    const effortMin = opts?.effortMinutes?.[action.kind] ?? EFFORT_MINUTES[action.kind];
 
     let funding: DoNextFunding | undefined;
     if (
@@ -202,7 +208,9 @@ export function buildDoNextItems(
       basis: (opts?.retentionSampleSize ?? 0) >= 5 ? "estimated" : "heuristic",
       priority: 11,
       edgeScore: ev * 1.2,
-      rateScore: (ev / EFFORT_MINUTES.orphan_free_bet) * 60,
+      rateScore:
+        (ev / Math.max(opts?.effortMinutes?.orphan_free_bet ?? EFFORT_MINUTES.orphan_free_bet, 1)) *
+        60,
       daysLeft: null,
       expiryLabel: null,
       convertLot: {

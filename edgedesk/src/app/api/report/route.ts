@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, bets } from "@/lib/db";
+import { getAppSettings } from "@/lib/services/settings";
 import { getAllSnapshots } from "@/lib/services/ev-snapshot";
 import type { EvSnapshotRow } from "@/lib/offers/ev-capture";
 import {
@@ -21,6 +22,11 @@ export async function GET(req: NextRequest) {
   }
 
   const allBets = db.select().from(bets).all();
-  const report = buildEdgeReport({ snapshots, bets: allBets, month });
+  const report = buildEdgeReport({
+    snapshots,
+    bets: allBets,
+    month,
+    minCampaigns: getAppSettings().tuning.edgeReportMinCampaigns,
+  });
   return NextResponse.json({ months, report });
 }

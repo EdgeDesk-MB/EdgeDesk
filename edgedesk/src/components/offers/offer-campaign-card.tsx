@@ -14,7 +14,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { MoneyFlow } from "@/components/money-flow";
-import { api } from "@/hooks/use-app-state";
+import { api, useAppState } from "@/hooks/use-app-state";
+import { DEFAULT_TUNING } from "@/lib/services/settings-shared";
 import { filterPillState } from "@/lib/ui/surface-styles";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
 import {
@@ -590,10 +591,14 @@ function MistakeTagRow({
   const [skipped, setSkipped] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  // Shared app-state context - no extra polling. Threshold tunable via E1.
+  const { state } = useAppState();
+  const captureThreshold =
+    state?.settings.tuning.mistakeCapturePct ?? DEFAULT_TUNING.mistakeCapturePct;
 
   // Only meaningful once settled, and only worth asking when capture dipped.
   if (evLock.capturePct == null) return null;
-  const underCaptured = evLock.capturePct < 0.9;
+  const underCaptured = evLock.capturePct < captureThreshold;
 
   async function setTag(tag: string | null) {
     setSaving(true);

@@ -107,8 +107,11 @@ export function computeBookmakerStats(input: {
   bets: BookmakerStatsBet[];
   offers: BookmakerStatsOffer[];
   now?: number;
+  /** E1 tuning override; defaults to DROUGHT_NUDGE_DAYS */
+  droughtNudgeDays?: number;
 }): BookmakerLeagueRow[] {
   const now = input.now ?? Date.now();
+  const droughtDays = input.droughtNudgeDays ?? DROUGHT_NUDGE_DAYS;
   const bookies = input.accounts.filter(
     (a) => a.type === "bookie" && (a.isActive ?? 1) !== 0
   );
@@ -175,7 +178,7 @@ export function computeBookmakerStats(input: {
       droughtNudge:
         health === "healthy" &&
         daysSinceLastOffer != null &&
-        daysSinceLastOffer > DROUGHT_NUDGE_DAYS,
+        daysSinceLastOffer > droughtDays,
     };
   });
 

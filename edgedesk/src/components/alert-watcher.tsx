@@ -65,11 +65,12 @@ export function AlertWatcher() {
 
     const now = Date.now();
 
-    // B5: unhedged backs past their threshold.
+    // B5: unhedged backs past their threshold (windows tunable via E1).
     const eventStarts = new Map(state.events.map((e) => [e.id, e.startTime]));
-    const nakedExposed = detectNakedExposure(state.bets ?? [], eventStarts, now).map(
-      (b) => ({ betId: b.id, label: b.label, bookmaker: b.bookmaker })
-    );
+    const nakedExposed = detectNakedExposure(state.bets ?? [], eventStarts, now, {
+      thresholdMs: state.settings.tuning.nakedExposureMinutes * 60_000,
+      imminentThresholdMs: state.settings.tuning.nakedImminentMinutes * 60_000,
+    }).map((b) => ({ betId: b.id, label: b.label, bookmaker: b.bookmaker }));
 
     // B6: open 2UP positions whose selection just went two goals up.
     const twoUpTriggered: TwoUpLockNotice[] = [];

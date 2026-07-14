@@ -788,7 +788,11 @@ export async function getAppState(): Promise<AppState> {
     });
   }
 
-  const retentionData = getRealizedRetention();
+  const settings = getAppSettings();
+  const retentionData = getRealizedRetention(undefined, {
+    rate: settings.tuning.retentionPrior,
+    weight: settings.tuning.retentionPriorWeight,
+  });
 
   return {
     events: allEvents.sort((a, b) => a.startTime - b.startTime),
@@ -815,7 +819,7 @@ export async function getAppState(): Promise<AppState> {
     exchangeStatus: getExchangeProviderStatus(getDefaultExchangeProvider()),
     exchangeProviders: getAllExchangeProviderStatuses(),
     racingAutopilot,
-    settings: getAppSettings(),
+    settings,
     balances: getBalanceSummary(),
     offers: listOfferSummaries(),
   };

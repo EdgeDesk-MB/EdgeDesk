@@ -61,16 +61,19 @@ export function useDoNextItems(pollMs?: number): {
     return map;
   }, [state?.balances?.accounts]);
 
+  const effortMinutes = state?.settings.tuning.effortMinutes;
+
   const items = useMemo(() => {
     const opts = {
       ...(retention
         ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
         : {}),
       bookmakerHealth: healthMap,
+      effortMinutes,
     };
     // buildDoNextItems defaults `now` internally - keeps this memo pure.
     return buildDoNextItems(scopedOffers, lots, undefined, opts, bookieBalances);
-  }, [scopedOffers, lots, retention, healthMap, bookieBalances]);
+  }, [scopedOffers, lots, retention, healthMap, effortMinutes, bookieBalances]);
 
   return { items, lots, state };
 }

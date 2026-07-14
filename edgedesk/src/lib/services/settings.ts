@@ -8,9 +8,11 @@ import {
   DEFAULT_SETTINGS,
   bookmakerFromOfferPrefs,
   normalizeMobileDeckPin,
+  normalizeTuning,
   stakeFromOfferPrefs,
   type AppSettings,
   type OfferBetPref,
+  type TuningSettings,
 } from "./settings-shared";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
 import { normalizeTimeFormat, setDisplayTimeFormat } from "@/lib/time-format";
@@ -55,6 +57,15 @@ function parseOfferBetPrefs(raw: string | undefined): Record<string, OfferBetPre
   }
 }
 
+function parseTuning(raw: string | undefined): TuningSettings {
+  if (!raw) return normalizeTuning(undefined);
+  try {
+    return normalizeTuning(JSON.parse(raw));
+  } catch {
+    return normalizeTuning(undefined);
+  }
+}
+
 export function getAppSettings(): AppSettings {
   const stake = parseFloat(readRaw("defaultBackStake") ?? "");
   const poll = parseInt(readRaw("dashboardPollMs") ?? "", 10);
@@ -95,6 +106,7 @@ export function getAppSettings(): AppSettings {
     alertsResultSettled: readRaw("alertsResultSettled") !== "false",
     alertsNakedExposure: readRaw("alertsNakedExposure") !== "false",
     alertsTwoUpLock: readRaw("alertsTwoUpLock") !== "false",
+    tuning: parseTuning(readRaw("tuning")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -144,9 +156,11 @@ export function resolveOfferBookmaker(
   );
 }
 
-export type AppSettingsPatch = Partial<AppSettings> & {
+export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning">> & {
   /** Merge a single offer pref without replacing the whole map. */
   offerBetPref?: { offerId: number; stake: number; bookmaker?: string };
+  /** Partial merge into the tuning object; each field clamped on write. */
+  tuning?: Partial<TuningSettings>;
 };
 
 export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
@@ -196,6 +210,10 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.alertsTwoUpLock != null) {
     writeRaw("alertsTwoUpLock", patch.alertsTwoUpLock ? "true" : "false");
+  }
+  if (patch.tuning != null) {
+    const merged = normalizeTuning({ ...parseTuning(readRaw("tuning")), ...patch.tuning });
+    writeRaw("tuning", JSON.stringify(merged));
   }
   return getAppSettings();
 }

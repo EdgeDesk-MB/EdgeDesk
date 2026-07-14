@@ -32,6 +32,20 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
+    title: "Your rules: tuning",
+    summary:
+      "Every behaviour-defining threshold is now yours to set - the numbers behind sentinels, nudges and rankings, in one Settings card.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "New Tuning card: unhedged-back grace windows, the offer-drought nudge, the retention prior and its weight, the mistake-tag prompt threshold, the Edge Report minimum, and per-action effort minutes behind the £/hr sort. Defaults match how EdgeDesk has always behaved, each row shows its default and resets in one tap.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
     title: "The Coach",
     summary:
       "EdgeDesk now tells you whether you actually captured your edge - and where the leaks are: a monthly Edge Report, one-tap mistake tags and a bookmaker league table with manual health.",

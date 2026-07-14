@@ -102,6 +102,19 @@ describe("isNakedExposed - clause by clause", () => {
       isNakedExposed(bet({ id: 16, notes: `some note ${INTENTIONAL_NOHEDGE_MARKER}` }), NOW)
     ).toBe(false);
   });
+
+  it("honours E1 tuning overrides for both windows", () => {
+    // 15-min-old back: exposed at the 10-min default, safe at a 20-min override
+    expect(isNakedExposed(bet({ id: 18 }), NOW, null, { thresholdMs: 20 * MIN })).toBe(false);
+    expect(isNakedExposed(bet({ id: 19 }), NOW, null, { thresholdMs: 14 * MIN })).toBe(true);
+    // Imminent event, 2-min-old back: safe at the 3-min default, exposed at 1 min
+    const soon = NOW + 45 * MIN;
+    expect(
+      isNakedExposed(bet({ id: 20, createdAt: NOW - 2 * MIN }), NOW, soon, {
+        imminentThresholdMs: 1 * MIN,
+      })
+    ).toBe(true);
+  });
 });
 
 describe("detectNakedExposure", () => {

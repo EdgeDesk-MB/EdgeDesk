@@ -106,6 +106,27 @@ describe("computeBookmakerStats", () => {
     expect(noOffers.droughtNudge).toBe(false);
   });
 
+  it("honours the E1 droughtNudgeDays override", () => {
+    const tenDaysAgo = { bookmaker: "Bet365", createdAt: NOW - 10 * DAY };
+    const strict = computeBookmakerStats({
+      accounts: [account({ id: 1, name: "Bet365" })],
+      bets: [],
+      offers: [tenDaysAgo],
+      now: NOW,
+      droughtNudgeDays: 7,
+    })[0]!;
+    expect(strict.droughtNudge).toBe(true);
+
+    const lax = computeBookmakerStats({
+      accounts: [account({ id: 1, name: "Bet365" })],
+      bets: [],
+      offers: [tenDaysAgo],
+      now: NOW,
+      droughtNudgeDays: 30,
+    })[0]!;
+    expect(lax.droughtNudge).toBe(false);
+  });
+
   it("sorts by realised profit and skips inactive accounts", () => {
     const rows = computeBookmakerStats({
       accounts: [

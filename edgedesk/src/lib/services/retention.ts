@@ -24,7 +24,11 @@ export interface RealizedRetention {
  * actualProfit already reflects the half outcome.
  * Void bets are excluded entirely.
  */
-export function getRealizedRetention(windowDays?: number): RealizedRetention {
+export function getRealizedRetention(
+  windowDays?: number,
+  /** E1 tuning: Bayesian prior + pseudo-sample weight (defaults 0.8 / 5) */
+  prior?: { rate: number; weight: number }
+): RealizedRetention {
   const FREE_BET_TYPES = ["free_snr", "free_sr"] as const;
   const EXCLUDED_STATUSES = ["open", "void"] as const;
 
@@ -43,7 +47,7 @@ export function getRealizedRetention(windowDays?: number): RealizedRetention {
     );
 
   if (conversionBets.length === 0) {
-    return { rate: blendedRetention(0, 0), sampleSize: 0, skipped: 0 };
+    return { rate: blendedRetention(0, 0, prior?.rate, prior?.weight), sampleSize: 0, skipped: 0 };
   }
 
   // Resolve lot amounts for bets that carry a [[lot:N]] marker
@@ -93,11 +97,11 @@ export function getRealizedRetention(windowDays?: number): RealizedRetention {
   }
 
   if (sampleSize === 0 || totalFaceValue < 0.01) {
-    return { rate: blendedRetention(0, 0), sampleSize: 0, skipped };
+    return { rate: blendedRetention(0, 0, prior?.rate, prior?.weight), sampleSize: 0, skipped };
   }
 
   const measuredRate = Math.max(0, totalRetained / totalFaceValue);
-  const rate = blendedRetention(measuredRate, sampleSize);
+  const rate = blendedRetention(measuredRate, sampleSize, prior?.rate, prior?.weight);
 
   return { rate, sampleSize, skipped };
 }
