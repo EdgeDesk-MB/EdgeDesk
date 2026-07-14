@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback } from "react";
 import { PageHeader } from "@/components/help/page-header";
 import { HelpGuideContent } from "@/components/help/help-guide-content";
+import { SiteMapView } from "@/components/help/site-map";
 import { PageShell } from "@/components/page-shell";
 import {
   DEFAULT_HELP_GUIDE,
@@ -102,7 +103,11 @@ function HelpPageContent() {
               <CardDescription>{activeGuide.description}</CardDescription>
             </CardHeader>
             <CardContent>
-              <HelpGuideContent guide={activeGuide} />
+              {activeSlug === "site-map" ? (
+                <SiteMapView />
+              ) : (
+                <HelpGuideContent guide={activeGuide} />
+              )}
             </CardContent>
           </Card>
 

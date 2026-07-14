@@ -5,6 +5,7 @@ export type HelpGuideSlug =
   | "calculators"
   | "mobile"
   | "keyboard"
+  | "site-map"
   | "faq";
 
 export interface HelpSection {
@@ -329,6 +330,13 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
     ],
+  },
+  {
+    slug: "site-map",
+    title: "Site map",
+    description: "Every page and where it lives - rendered live from the navigation structure.",
+    /** Content is rendered by the SiteMapView component, not these sections. */
+    sections: [],
   },
   {
     slug: "faq",

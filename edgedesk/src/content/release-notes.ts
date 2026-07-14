@@ -88,6 +88,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         area: "Navigation",
         text: "Navigation, tidied: the sidebar groups into Betting, Live desks and Insight; on the phone the burger is now a full-height drawer that slides in with the whole sectioned navigation; and the old dark-mode switch is a proper Light / Dark / System appearance control with icons.",
       },
+      {
+        kind: "feature",
+        area: "Help",
+        href: "/help?guide=site-map",
+        text: "Site map: every page and where it lives, rendered live from the navigation structure - including sub-navigation groups, quick actions and the pages that sit outside the main nav.",
+      },
     ],
   },
   {
