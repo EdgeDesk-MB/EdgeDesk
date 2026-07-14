@@ -161,6 +161,20 @@ export const offerSeries = sqliteTable("offer_series", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/** Persistent alert history (F2) - toasts/notifications deliver, this is the record */
+export const alertsInbox = sqliteTable("alerts_inbox", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** Stable rule dedupe key - a re-firing rule updates its row */
+  dedupe: text("dedupe").notNull().unique(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  href: text("href"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  readAt: integer("read_at"),
+});
+
 /** Bookie, exchange, or bank wallet for bankroll tracking */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -291,6 +305,7 @@ export type NewExchangeRow = typeof exchanges.$inferInsert;
 export type HistoryRow = typeof history.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
 export type NewAccountRow = typeof accounts.$inferInsert;
+export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
 export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;

@@ -50,6 +50,8 @@ export interface AppState {
   settledProfit: number;
   provisionalProfit: number;
   retention: RetentionState;
+  /** Unread alerts in the inbox (F2) - drives the nav badge */
+  alertsUnread: number;
   livePositions: LivePosition[];
   liveEventModels: LiveEventModel[];
   /** Cumulative retained P&L; commissionPaid is cumulative exchange commission, so gross = value + commissionPaid. */

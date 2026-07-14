@@ -63,6 +63,7 @@ import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { getRealizedRetention } from "@/lib/services/retention";
+import { unreadCount } from "@/lib/services/alerts-inbox";
 
 export type {
   AppState,
@@ -803,6 +804,7 @@ export async function getAppState(): Promise<AppState> {
     planRaces,
     planFixtures,
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
+    alertsUnread: unreadCount(),
     livePositions,
     liveEventModels,
     series,

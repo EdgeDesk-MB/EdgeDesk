@@ -386,7 +386,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | **4. Guardian** | ✅ B5 naked-exposure, ✅ B6 2UP sentinel, push alerts via local AlertChannel (web push = follow-up, see briefs §B6) | **Done (local delivery)** | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push |
 | **5. Coach** | ✅ B7 mistake ledger, ✅ B8 Edge Report, ✅ B9 league table | **Done** | Monthly report renders from ≥1 month of real captured data |
 | **6. Your rules** | ✅ E1 tunable thresholds, ✅ E2 widget personalisation, ✅ E3 data custody | **Done** | Every behaviour-defining number is user-tunable; Home arranged to taste; backup → restore round-trips a real DB; a spreadsheet imports cleanly |
-| **7. Workbench** | ✅ F1 match checker, ⬜ F2 alerts inbox, ⬜ F3 background web push, ⬜ F4 command palette | In progress | A found match gets a verdict in <10s; no alert is ever lost; the phone buzzes with the app closed; any entity is two keystrokes away |
+| **7. Workbench** | ✅ F1 match checker, ✅ F2 alerts inbox, ⬜ F3 background web push, ⬜ F4 command palette | In progress | A found match gets a verdict in <10s; no alert is ever lost; the phone buzzes with the app closed; any entity is two keystrokes away |
 | **8. Momentum** | ⬜ G1 targets & pace, ⬜ G2 onboarding + demo mode, ⬜ G3 season summary, ⬜ G4 access & keyboard | Not started | Home answers "am I on pace?" at a glance; a stranger reaches a working desk in <10 min; the year renders honestly |
 | **9. Business gate** | §7 — only if gate criteria met | Not started | See §7.1 |
 

@@ -13,6 +13,7 @@ import { monoAccentActive, navLinkState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
+  BellRing,
   Home,
   Calculator,
   CalendarDays,
@@ -97,6 +98,7 @@ const entries: NavEntry[] = [
     quickAction: "addBet",
   },
   { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
+  { kind: "link", href: "/alerts", label: "Alerts", icon: BellRing },
   {
     kind: "link",
     href: "/tracked-events",
@@ -267,6 +269,7 @@ export function AppNav() {
           />
           <span className="truncate">{item.label}</span>
           {href === "/tracker" ? <ActionBadge count={settleQueueCount} /> : null}
+          {href === "/alerts" ? <ActionBadge count={state?.alertsUnread ?? 0} /> : null}
         </Link>
         {quickAction && onQuickAction && (
           <button

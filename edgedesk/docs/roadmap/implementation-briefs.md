@@ -655,6 +655,25 @@ the full calculator handles it. Nav entry after Calculators (flows into the mobi
 **Acceptance.** Verdict lib unit-tested with hand-worked vectors; a found match gets a verdict
 in <10s; no market listing/browsing anywhere.
 
+## F2. Alerts inbox `[strong]` ✅ DONE — new side-nav item
+
+**Objective.** An alert missed is never an alert lost: every emitted EdgeAlert lands in a
+persistent inbox with read state, an unread nav badge and deep links.
+
+**Implementation.** New `alerts_inbox` table keyed on the rules' stable dedupe keys (UNIQUE) -
+a re-firing rule UPDATES its row (`onConflictDoUpdate`) and read state survives the re-fire
+(same condition, already acknowledged). Service `src/lib/services/alerts-inbox.ts`
+(record/list/unreadCount/markRead/markAllRead, unit-tested). The client alert-watcher stays the
+brain: after delivering through the AlertChannel it POSTs fresh alerts to `/api/alerts`,
+fire-and-forget so a failed write never blocks delivery. `alertsUnread` rides AppState for the
+nav badge. `/alerts` page: kind-icon rows, unread emphasis, tap = mark read + follow the deep
+link, mark-all-read toolbar. Snooze deferred until real use shows the need (read/unread proved
+sufficient for v1).
+
+**Acceptance.** Service round-trip unit-tested (dedupe upsert, read survival); live loop
+verified end-to-end on the harness (watcher-emitted alerts appeared in the inbox and badge
+unprompted); tapping navigates and clears the unread dot.
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │

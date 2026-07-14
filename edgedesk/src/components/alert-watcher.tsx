@@ -137,13 +137,32 @@ export function AlertWatcher() {
 
     const seen = seenRef.current;
     let dirty = false;
+    const fresh: typeof alerts = [];
     for (const alert of alerts) {
       if (seen.has(alert.key)) continue;
       seen.add(alert.key);
       dirty = true;
+      fresh.push(alert);
       channel.notify(alert);
     }
-    if (dirty) storeSeen(seen);
+    if (dirty) {
+      storeSeen(seen);
+      // F2: toasts/notifications deliver; the inbox is the record. Batched,
+      // fire-and-forget - a failed write never blocks delivery.
+      void fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          alerts: fresh.map((a) => ({
+            key: a.key,
+            kind: a.kind,
+            title: a.title,
+            body: a.body,
+            href: a.href,
+          })),
+        }),
+      }).catch(() => {});
+    }
   }, [state, doNext, channel]);
 
   return null;

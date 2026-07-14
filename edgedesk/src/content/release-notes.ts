@@ -32,15 +32,21 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-07-14",
-    title: "The workbench begins: Match Checker",
+    title: "The workbench begins: Match Checker and an alerts inbox",
     summary:
-      "Found a price? Get a verdict in seconds - without EdgeDesk ever becoming an oddsmatcher.",
+      "Found a price? Get a verdict in seconds. Missed a notification? It's waiting for you - without EdgeDesk ever becoming an oddsmatcher.",
     entries: [
       {
         kind: "feature",
         area: "Match Checker",
         href: "/match-checker",
         text: "New Match Checker page: enter the back and lay odds and get a good/ok/poor verdict with the qualifying cost or locked-in free-bet profit, commission prefilled from your default exchange, and one tap into the full calculator. It checks the match you found - it never lists markets.",
+      },
+      {
+        kind: "feature",
+        area: "Alerts",
+        href: "/alerts",
+        text: "Alerts inbox: every alert EdgeDesk raises is kept with an unread badge in the navigation. Notifications and toasts deliver in the moment; the inbox is the record - tap an alert to jump to the right desk.",
       },
     ],
   },
