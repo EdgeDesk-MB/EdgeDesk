@@ -18,7 +18,7 @@ export interface RunnerFairOdds {
  * (partial markets produce nonsense overrounds).
  */
 export function raceFairOdds(
-  runners: Array<{ horseId: string; bookieDecimal: number | null; nonRunner?: boolean }>
+  runners: Array<{ horseId: string; bookieDecimal?: number | null; nonRunner?: boolean }>
 ): Map<string, RunnerFairOdds> | null {
   const eligible = runners.filter((r) => !r.nonRunner);
   const priced = eligible.filter((r) => r.bookieDecimal != null && r.bookieDecimal > 1);
