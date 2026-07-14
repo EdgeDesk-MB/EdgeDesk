@@ -18,8 +18,45 @@ const OFF_NAV_PAGES: Array<{ href: string; label: string; note: string }> = [
   { href: "/release-notes", label: "Release notes", note: "burger menu" },
   { href: "/help", label: "Help", note: "burger menu" },
   { href: "/roadmap", label: "Roadmap", note: "linked from Help and Settings" },
-  { href: "/balances", label: "Balances", note: "linked from funding actions" },
-  { href: "/events", label: "Events", note: "legacy events list" },
+  { href: "/balances", label: "Balances", note: "legacy redirect → Accounts" },
+  { href: "/events", label: "Events", note: "legacy redirect → Fixtures" },
+];
+
+/**
+ * Structural observations for review - editorial, not live data. Dated so
+ * stale opinions are obvious; prune once acted on or rejected.
+ */
+const OBSERVATIONS: Array<{ title: string; detail: string }> = [
+  {
+    title: "Tracked Events + Fixtures are one workflow",
+    detail:
+      "Fixtures is browse-to-track; Tracked Events is what you tracked. The strongest candidate for an Offers-style group: Events → Tracked / Fixtures, one sidebar row instead of two.",
+  },
+  {
+    title: "2UP Desk's route contradicts its home",
+    detail:
+      "It sits under Live desks but lives at /calculators/ep-desk, which also forces a special case in the active-state logic. A /2up route (old path redirecting) would make the URL match the navigation.",
+  },
+  {
+    title: "Profit Tracker hides two views behind query params",
+    detail:
+      "The monthly P&L tab (?tab=pnl) and the settle queue (?queue=settle) are destinations in their own right. If they keep growing, Tracker → Bets / P&L is a natural sub-nav.",
+  },
+  {
+    title: "Insight is a single-item section",
+    detail:
+      "Sections earn their keep at two or more entries. Fine if the Edge Report is expected to gain siblings; otherwise it could rejoin the top section and the heading retires.",
+  },
+  {
+    title: "The mobile drawer drops the sidebar's badges",
+    detail:
+      "The sidebar shows the offers action count and the settle-queue badge; the drawer only carries Alerts. A deliberate simplification for now - worth revisiting if mobile becomes the primary way in.",
+  },
+  {
+    title: "Roadmap has no menu home",
+    detail:
+      "It is only reachable via Help and Settings. If it is consulted often, it could join the burger utilities; if not, that is fine as-is.",
+  },
 ];
 
 function Chip({ children }: { children: React.ReactNode }) {
@@ -122,6 +159,21 @@ export function SiteMapView() {
             />
           ))}
         </div>
+      </div>
+
+      <div className="rounded-md border border-dashed p-4">
+        <p className={cn(captionHeading, "pb-2")}>Tidy-up observations · 14 Jul 2026</p>
+        <ul className="flex flex-col gap-3">
+          {OBSERVATIONS.map((obs) => (
+            <li key={obs.title} className="text-sm">
+              <span className="font-medium">{obs.title}.</span>{" "}
+              <span className="text-muted-foreground">{obs.detail}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Editorial, not live data - prune each item once acted on or rejected.
+        </p>
       </div>
     </div>
   );
