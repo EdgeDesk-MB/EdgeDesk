@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { BookOpen, ChevronRight, Menu, Moon, Settings } from "lucide-react";
+import { BookOpen, ChevronRight, Menu, Moon, ScrollText, Settings } from "lucide-react";
 import { flatNavLinks } from "@/components/app-nav";
 import {
   DropdownMenu,
@@ -45,6 +45,14 @@ export function AppTopBarMenu() {
         >
           <BookOpen className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
           <span className="flex-1">Help</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+        <Link
+          href="/release-notes"
+          className="flex items-center gap-3 border-t border-border/80 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+        >
+          <ScrollText className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="flex-1">Release notes</span>
           <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
         {/* Main navigation - the sidebar is hidden below md, so it lives here. */}
