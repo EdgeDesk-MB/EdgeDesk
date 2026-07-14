@@ -9,7 +9,12 @@
 > Companion docs: `docs/api-dependencies-and-tiers.md` (API cost/tier detail),
 > `docs/offer-command-centre.md` (offer pipeline spec), `docs/design-system.md`.
 
-Last updated: 2026-07-14 (Phases 1–5 done; Tracks E–G added as Phases 6–8; business gate is now Phase 9)
+Last updated: 2026-07-14 (Phases 1–5 done; Tracks E–G added as Phases 6–8; business gate is now
+Phase 9; §9 Future ideas parking lot added)
+
+> **Roadmap hygiene.** This document is kept current as work ships: statuses flip in the §6 table
+> the day a phase lands, and *new* feature ideas are never scheduled directly — they land in
+> §9 (Future ideas) first and are only promoted into a phase after the user has reviewed them.
 
 ---
 
@@ -480,3 +485,25 @@ cleanly onto the existing desks.
 | Effort weights for £/hr (B2) — initial values are guesses | Ship with config map; user-tunable via E1 (Phase 6) |
 | When does expectedProfit get re-locked vs versioned (A3) | Decided: version on post-Active edits, never mutate; UI shows "re-locked" |
 | Multi-tenant route choice (hosted vs local-first sync) | Deferred to gate; leaning Route 2 (local-first + feed proxy) |
+
+---
+
+## 9. Future ideas (parking lot)
+
+Unscheduled, unreviewed, deliberately outside Phases 6–8. Ideas land here first — with a one-line
+case and the reason they are parked — and are only promoted into a phase after user review. If an
+idea is rejected, record that too (a decided "no" is as valuable as a "yes").
+
+| Idea | The case | Why it's parked |
+|------|----------|-----------------|
+| **Casino offer EV module** | Wagering-EV maths (slot RTP, playthrough, variance warnings) — the other half of what incumbents cover, and many matched bettors do both | Different risk model (variance, not matched); needs a deliberate scope decision — EdgeDesk's thesis is *matched* execution truth |
+| **Exchange auto-import** | Pull placed/settled lays from the Betfair account API straight into the tracker — kills manual logging for the lay side of every bet | Betfair API auth scope + ToS need a proper read; also weakens the deliberate "log it consciously" execution loop — decide with care |
+| **Each-way matcher (Racing Desk)** | EW value vs the exchange place market; natural extension of the desk's scoped matching | Racing Desk is already the deepest desk; wait for real demand from daily use |
+| **Odds drift capture** | Snapshot the market price at log time and at settlement, feeding a richer A3 capture decomposition ("odds moved" measured, not tagged) | Needs price polling beyond current windows; B7's manual tag may be enough — let the mistake ledger prove the need first |
+| **Telegram/Discord alert delivery** | A bot channel delivers alerts with zero VAPID/server-reachability pain, works on any device | Overlaps F3 (web push); pick ONE background channel after F3's iPhone verdict rather than building two |
+| **Tauri desktop packaging** | Single .app, dock icon, menubar quick-log; no terminal to start the server | Currently a deliberate "do not build" (AGENTS.md); revisit once Phases 6–8 stabilise the surface |
+| **Multi-device sync (local-first)** | CR-SQLite/Turso embedded replicas — phone and desktop share one desk without a hosted backend | This IS gate-adjacent (§7.2 Route 2); listed for visibility, blocked by the Phase 9 gate |
+| **"Ask your desk" (local AI)** | Natural-language questions over your own data via the local Ollama backbone ("commission paid at Betfair in June?") — privacy-preserving by construction | Toy risk: answers must come from the same tested calc layer as the UI, never a model's arithmetic; needs a query-plan design first |
+| **Dutching / multi-way lock calculator** | Generalise the 2UP equalising-lock maths to n-way books (dutching, arb-close-outs) | Adjacent to the spec-locked EP engine; needs its own spec + test vectors before any code |
+| **Shared offer templates** | Export/import an offer definition (T&Cs, rules, stake plan) as a link or file — friends seed each other's calendars | First taste of network value, but distribution/moderation questions belong at the gate |
+| **Weekly digest** | A Monday summary (edge captured, leaks, drought nudges) delivered via the alert channel | Needs F2/F3 delivery plumbing first; risks nagging — opt-in only |
