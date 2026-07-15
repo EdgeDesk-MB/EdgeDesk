@@ -482,12 +482,12 @@ function BookmakerLeagueCard({
                       {droughtNote(r)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right tabular-nums font-semibold">
                     <MoneyFlow value={r.profit} signColor signDisplay />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtRoi(r)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtRetention(r)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.offerCount}</TableCell>
+                  <TableCell className="text-right tabular-nums font-semibold">{fmtRoi(r)}</TableCell>
+                  <TableCell className="text-right tabular-nums font-semibold">{fmtRetention(r)}</TableCell>
+                  <TableCell className="text-right tabular-nums font-semibold">{r.offerCount}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtLastOffer(r)}</TableCell>
                   <TableCell className="text-right">{healthAction(r)}</TableCell>
                 </TableRow>

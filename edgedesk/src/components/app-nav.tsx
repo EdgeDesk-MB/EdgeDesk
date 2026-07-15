@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  useEffect,
   useMemo,
   useState,
   type ComponentType,
@@ -256,9 +255,13 @@ export function AppNav() {
   const [offersUserCollapsed, setOffersUserCollapsed] = useState(false);
   const offersInSection = pathname.startsWith("/offers");
 
-  useEffect(() => {
+  // Adjust-during-render (the sanctioned pattern): leaving the Offers
+  // section clears the manual collapse so the next visit starts expanded.
+  const [wasInSection, setWasInSection] = useState(offersInSection);
+  if (wasInSection !== offersInSection) {
+    setWasInSection(offersInSection);
     if (!offersInSection) setOffersUserCollapsed(false);
-  }, [offersInSection]);
+  }
 
   function renderLeaf(item: NavLeaf) {
     const href =

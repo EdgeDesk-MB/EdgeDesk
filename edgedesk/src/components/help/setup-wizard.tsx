@@ -7,7 +7,7 @@
  * back and forth never double-creates accounts.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Banknote, Bell, SlidersHorizontal, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,16 @@ export function SetupWizard({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Gate on open: the form renders DialogContent itself, so it must be
+          unmounted explicitly for state to reset between opens. */}
+      {open ? <SetupWizardForm onOpenChange={onOpenChange} /> : null}
+    </Dialog>
+  );
+}
+
+function SetupWizardForm({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [bankName, setBankName] = useState("Bank");
@@ -63,14 +73,9 @@ export function SetupWizard({
   const [bookies, setBookies] = useState<BookieDraft[]>([{ name: "", balance: "" }]);
   const [stake, setStake] = useState("10");
   const [defaultBookie, setDefaultBookie] = useState("");
-  const [notifState, setNotifState] = useState<string>("default");
-
-  useEffect(() => {
-    if (open) {
-      setStep(0);
-      setNotifState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
-    }
-  }, [open]);
+  const [notifState, setNotifState] = useState<string>(() =>
+    typeof Notification !== "undefined" ? Notification.permission : "unsupported"
+  );
 
   const current = STEPS[step]!;
   const Icon = current.icon;
@@ -155,8 +160,7 @@ export function SetupWizard({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+    <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -310,7 +314,6 @@ export function SetupWizard({
             )}
           </div>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }

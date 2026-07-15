@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { OfferDialog } from "@/components/offers/offer-dialog";
 import { OfferViewDialog } from "@/components/offers/offer-view-dialog";
 import type { OfferEditorPrefill } from "@/components/offers/offer-editor-form";
@@ -27,8 +27,7 @@ export function OfferProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [prefill, setPrefill] = useState<OfferEditorPrefill | undefined>();
   const [formKey, setFormKey] = useState(0);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [viewOfferState, setViewOfferState] = useState<OfferSummary | null>(null);
+  const [viewSeedId, setViewSeedId] = useState<number | null>(null);
   const { state, refresh } = useAppState(5000);
 
   const openOffer = useCallback((next?: OfferEditorPrefill) => {
@@ -38,8 +37,7 @@ export function OfferProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const viewOffer = useCallback((offer: OfferSummary) => {
-    setViewOfferState(offer);
-    setViewOpen(true);
+    setViewSeedId(offer.id);
   }, []);
 
   const handleOpenChange = useCallback((next: boolean) => {
@@ -48,28 +46,21 @@ export function OfferProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleViewOpenChange = useCallback((next: boolean) => {
-    setViewOpen(next);
-    if (!next) setViewOfferState(null);
+    if (!next) setViewSeedId(null);
   }, []);
 
   const offers = useMemo(() => state?.offers ?? [], [state?.offers]);
 
-  useEffect(() => {
-    if (!viewOpen || viewOfferState == null) return;
-    const fresh = offers.find((o) => o.id === viewOfferState.id);
-    if (fresh) {
-      setViewOfferState(fresh);
-    } else {
-      setViewOpen(false);
-      setViewOfferState(null);
-    }
-  }, [offers, viewOpen, viewOfferState?.id]);
+  // The dialog always shows the freshest polled copy; if the campaign
+  // vanishes from the list, the derived open flag closes it.
+  const viewOfferState =
+    viewSeedId != null ? (offers.find((o) => o.id === viewSeedId) ?? null) : null;
+  const viewOpen = viewOfferState != null;
 
   const viewAction = viewOfferState ? deriveOfferNextAction(viewOfferState) : null;
 
   function handleViewEdit(offer: OfferSummary) {
-    setViewOpen(false);
-    setViewOfferState(null);
+    setViewSeedId(null);
     openOffer({ editOffer: offer });
   }
 

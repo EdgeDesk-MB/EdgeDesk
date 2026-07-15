@@ -37,10 +37,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (!isOnboardingComplete()) {
-      setWelcomeOpen(true);
-    }
-    setChecked(true);
+    // localStorage is client-only; defer a microtask so the first paint
+    // settles before the tour decision lands.
+    queueMicrotask(() => {
+      if (!isOnboardingComplete()) setWelcomeOpen(true);
+      setChecked(true);
+    });
   }, []);
 
   const openWelcome = useCallback(() => setWelcomeOpen(true), []);

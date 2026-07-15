@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { MoneyFlow } from "@/components/money-flow";
 import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
@@ -242,12 +242,8 @@ function LayStakeInput({
   const [focused, setFocused] = useState(false);
   const [text, setText] = useState("");
 
-  useEffect(() => {
-    if (!focused && Number.isFinite(value)) {
-      setText(value.toFixed(2));
-    }
-  }, [value, focused]);
-
+  // While unfocused the display derives straight from `value`, and onFocus
+  // seeds `text` fresh - no sync effect needed.
   const display = focused ? text : Number.isFinite(value) ? value.toFixed(2) : "";
 
   function stepStake(delta: number) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -73,13 +73,14 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
   const legCount = requiredLegCount(betType);
   const [legs, setLegs] = useState<AccaLeg[]>(() => emptyLegs(legCount));
 
-  useEffect(() => {
-    const n = requiredLegCount(betType);
-    setLegs((prev) => {
-      if (prev.length === n) return prev;
-      return emptyLegs(n).map((leg, i) => prev[i] ?? leg);
-    });
-  }, [betType]);
+  /** Structure change resizes the legs, keeping what the user typed. */
+  function changeBetType(next: AccaStructureType) {
+    setBetType(next);
+    const n = requiredLegCount(next);
+    setLegs((prev) =>
+      prev.length === n ? prev : emptyLegs(n).map((leg, i) => prev[i] ?? leg)
+    );
+  }
 
   const result = useMemo(() => {
     if (unitStake <= 0) return null;
@@ -113,7 +114,7 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">Bet type</span>
-              <Select value={betType} onValueChange={(v) => setBetType(v as AccaStructureType)}>
+              <Select value={betType} onValueChange={(v) => changeBetType(v as AccaStructureType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
