@@ -148,6 +148,63 @@ describe("buildDailyPlan ordering", () => {
     expect(slots.map((s) => s.id)).toEqual(["offer-7-start_planned"]);
   });
 
+  it("dedupes same-action same-title offers into one slot (course siblings, backfill dupes)", () => {
+    const offers = [
+      offer({ id: 20, title: "Bet £50 get £50 FB" }),
+      offer({ id: 21, title: "Bet £50 get £50 FB" }),
+      offer({ id: 22, title: "Bet £50 get £50 FB" }),
+    ];
+    const slots = buildDailyPlan({
+      offers,
+      doNext: [
+        doNextItem({ id: "offer-20-place_qualifying", offerId: 20, offerTitle: "Bet £50 get £50 FB" }),
+        doNextItem({ id: "offer-21-place_qualifying", offerId: 21, offerTitle: "Bet £50 get £50 FB" }),
+        doNextItem({ id: "offer-22-place_qualifying", offerId: 22, offerTitle: "Bet £50 get £50 FB" }),
+      ],
+      races: [],
+      fixtures: [],
+      now: NOW,
+    });
+    // doNext arrives ranked - keep the best-ranked instance only
+    expect(slots.map((s) => s.id)).toEqual(["offer-20-place_qualifying"]);
+  });
+
+  it("keeps different actions for the same offer title as separate slots", () => {
+    const offers = [
+      offer({ id: 23, title: "Bet £50 get £50 FB" }),
+      offer({ id: 24, title: "Bet £50 get £50 FB" }),
+    ];
+    const slots = buildDailyPlan({
+      offers,
+      doNext: [
+        doNextItem({ id: "offer-23-place_qualifying", offerId: 23, offerTitle: "Bet £50 get £50 FB" }),
+        doNextItem({ id: "offer-24-convert_free_bet", kind: "convert_free_bet", offerId: 24, offerTitle: "Bet £50 get £50 FB" }),
+      ],
+      races: [],
+      fixtures: [],
+      now: NOW,
+    });
+    expect(slots).toHaveLength(2);
+  });
+
+  it("skips offers event-dated beyond today (today's sheet shows today only)", () => {
+    const offers = [
+      offer({ id: 25, eventDate: "2026-07-13" }), // today
+      offer({ id: 26, eventDate: "2026-07-19" }), // Saturday
+    ];
+    const slots = buildDailyPlan({
+      offers,
+      doNext: [
+        doNextItem({ id: "offer-25-place_qualifying", offerId: 25 }),
+        doNextItem({ id: "offer-26-place_qualifying", offerId: 26, offerTitle: "Saturday offer" }),
+      ],
+      races: [],
+      fixtures: [],
+      now: NOW,
+    });
+    expect(slots.map((s) => s.id)).toEqual(["offer-25-place_qualifying"]);
+  });
+
   it("skips await_result items", () => {
     const slots = buildDailyPlan({
       offers: [],

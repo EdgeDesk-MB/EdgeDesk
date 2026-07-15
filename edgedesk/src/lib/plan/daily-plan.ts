@@ -92,6 +92,10 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
 
   const todayKey = localYmd(new Date(now));
 
+  // One slot per action+campaign: course siblings and backfill duplicates
+  // share a title, and the plan is a run-sheet, not an inventory.
+  const seenActionKeys = new Set<string>();
+
   for (const item of doNext) {
     if (item.kind === "await_result") continue;
 
@@ -99,6 +103,13 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
     // Today's sheet only: recurring instances materialised for future days
     // would otherwise flood the anytime bucket with duplicates.
     if (offer?.instanceDate && offer.instanceDate !== todayKey) continue;
+    // Same rule for event-dated offers: Saturday's racing offer belongs to
+    // Saturday's sheet, not today's anytime bucket.
+    if (offer?.eventDate && offer.eventDate > todayKey) continue;
+
+    const dedupeKey = `${item.kind}:${(item.offerTitle ?? item.title).trim().toLowerCase()}`;
+    if (seenActionKeys.has(dedupeKey)) continue;
+    seenActionKeys.add(dedupeKey);
 
     const deadline = offer ? effectiveOfferExpiryMs(offer) : null;
     const timed = deadline != null && deadline >= start && deadline < end;
@@ -115,7 +126,9 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
       kind: timed ? "offer_action" : "anytime",
       doKind: item.kind,
       title: item.title,
-      detail: item.detail || item.offerTitle,
+      // Campaign name first: four "Place qualifying bet" rows are useless
+      // unless each says WHICH offer it belongs to.
+      detail: item.offerTitle || item.detail,
       ev: item.remainingEv > 0 ? item.remainingEv : undefined,
       basis: item.basis,
       priority,

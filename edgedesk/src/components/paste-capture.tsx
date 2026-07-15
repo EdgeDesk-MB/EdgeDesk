@@ -70,9 +70,11 @@ export function PasteCapture({
   const fileRef = useRef<HTMLInputElement>(null);
   const shotsRef = useRef<Shot[]>([]);
 
-  useEffect(() => {
-    shotsRef.current = shots;
-  }, [shots]);
+  /** Keep the ref exact in the same tick - async OCR batches read it. */
+  const applyShots = useCallback((next: Shot[]) => {
+    shotsRef.current = next;
+    setShots(next);
+  }, []);
 
   // Radix unmounts dialog content on close, so mounted = capture active;
   // revoke preview URLs on the way out.
@@ -82,17 +84,18 @@ export function PasteCapture({
     };
   }, []);
 
+  // NB: never call onTextChange (parent setState) inside a setShots updater -
+  // updaters run during render and cross-component updates there are illegal.
   const removeShot = useCallback(
     (id: string) => {
-      setShots((prev) => {
-        const hit = prev.find((s) => s.id === id);
-        if (hit) URL.revokeObjectURL(hit.url);
-        const next = prev.filter((s) => s.id !== id);
-        onTextChange(mergeOcrBlocks(next));
-        return next;
-      });
+      const prev = shotsRef.current;
+      const hit = prev.find((s) => s.id === id);
+      if (hit) URL.revokeObjectURL(hit.url);
+      const next = prev.filter((s) => s.id !== id);
+      applyShots(next);
+      onTextChange(mergeOcrBlocks(next));
     },
-    [onTextChange]
+    [onTextChange, applyShots]
   );
 
   const runOcrBatch = useCallback(
@@ -155,11 +158,9 @@ export function PasteCapture({
           return;
         }
 
-        setShots((prev) => {
-          const next = [...prev, ...added].slice(0, MAX_SCREENSHOTS);
-          onTextChange(mergeOcrBlocks(next));
-          return next;
-        });
+        const next = [...shotsRef.current, ...added].slice(0, MAX_SCREENSHOTS);
+        applyShots(next);
+        onTextChange(mergeOcrBlocks(next));
 
         const avg =
           added.reduce((s, a) => s + a.confidence, 0) / Math.max(1, added.length);
@@ -186,7 +187,7 @@ export function PasteCapture({
         setOcrProgress(null);
       }
     },
-    [onTextChange]
+    [onTextChange, applyShots]
   );
 
   useEffect(() => {
