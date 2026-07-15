@@ -6,13 +6,27 @@
  *   1. Paste slip (B4 parser prefills everything),
  *   2. From plan (today's Daily Plan slots, one tap to log as placed),
  *   3. Minimal manual (bookie, stake, odds - the rest defaults).
+ * Plus a quick-actions grid reaching every global modal (new offer, balance,
+ * matched calculator, casino log, track fixture) so common tasks never need
+ * a navigation detour on the phone.
  * Mobile captures, desktop curates: bets carry a quick-logged flag for later
  * review in the tracker.
  */
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ClipboardPaste, ListTodo, PencilLine, Plus } from "lucide-react";
+import {
+  CalendarSearch,
+  Calculator,
+  ClipboardPaste,
+  Dices,
+  Gift,
+  ListTodo,
+  PencilLine,
+  Plus,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,7 +37,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
+import { useCasinoLog } from "@/components/casino/casino-log-provider";
+import { useMatchedCalculator } from "@/components/matched-calculator-provider";
+import { useOfferDialog } from "@/components/offers/offer-provider";
+import { useTrackFixture } from "@/components/track-fixture-provider";
 import { api } from "@/hooks/use-app-state";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { useIsMobile } from "@/hooks/use-is-mobile";
@@ -63,9 +82,36 @@ function PlanSlotButton({
   );
 }
 
+function QuickActionButton({
+  icon: Icon,
+  label,
+  onPick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onPick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="h-11 justify-start gap-2.5 text-sm"
+      onClick={onPick}
+    >
+      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="truncate">{label}</span>
+    </Button>
+  );
+}
+
 export function QuickLogSheet() {
   const isMobile = useIsMobile();
   const { openAddBet } = useAddBet();
+  const { openAddBalance } = useAddBalance();
+  const { openCasinoLog } = useCasinoLog();
+  const { openMatchedCalculator } = useMatchedCalculator();
+  const { openOffer } = useOfferDialog();
+  const { openTrackFixture } = useTrackFixture();
   const { items: doNext, state } = useDoNextItems(5000);
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState<QuickLogPath>("menu");
@@ -199,13 +245,61 @@ export function QuickLogSheet() {
                     <ListTodo className="size-3.5" aria-hidden />
                     From today&apos;s plan
                   </p>
-                  <div className="app-scroll-nested max-h-56 overflow-y-auto">
+                  <div className="app-scroll-nested max-h-44 overflow-y-auto">
                     {planSlots.map((slot) => (
                       <PlanSlotButton key={slot.id} slot={slot} onPick={pickSlot} />
                     ))}
                   </div>
                 </div>
               ) : null}
+
+              <div className="mt-1.5">
+                <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Quick actions
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <QuickActionButton
+                    icon={Gift}
+                    label="New offer"
+                    onPick={() => {
+                      setOpen(false);
+                      openOffer();
+                    }}
+                  />
+                  <QuickActionButton
+                    icon={Wallet}
+                    label="Add balance"
+                    onPick={() => {
+                      setOpen(false);
+                      openAddBalance();
+                    }}
+                  />
+                  <QuickActionButton
+                    icon={Calculator}
+                    label="Matched calc"
+                    onPick={() => {
+                      setOpen(false);
+                      openMatchedCalculator();
+                    }}
+                  />
+                  <QuickActionButton
+                    icon={Dices}
+                    label="Casino offer"
+                    onPick={() => {
+                      setOpen(false);
+                      openCasinoLog();
+                    }}
+                  />
+                  <QuickActionButton
+                    icon={CalendarSearch}
+                    label="Track fixture"
+                    onPick={() => {
+                      setOpen(false);
+                      openTrackFixture();
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <form

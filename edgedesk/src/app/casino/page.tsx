@@ -138,6 +138,7 @@ export default function CasinoPage() {
       <PageHeader
         title="Casino"
         description="Wagering offers with honest EV - an expectation across many attempts, never a lock."
+        helpId="casino"
         icon={Dices}
         action={
           <>

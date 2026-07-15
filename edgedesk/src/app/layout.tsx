@@ -38,7 +38,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EdgeDesk - Matched Betting Command Centre",
   description: "Calculators, live events and real-time profit tracking for matched betting",
-  icons: { apple: "/icon-180.png" },
+  icons: {
+    icon: "/chart-line.svg",
+    apple: "/chart-line.svg"
+  },
 };
 
 /** viewport-fit=cover makes env(safe-area-inset-*) live for the mobile sheets. */

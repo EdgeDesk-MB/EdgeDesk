@@ -97,7 +97,8 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
         kind: "offer_expiring",
         title: `Offer ends today - £${item.remainingEv.toFixed(0)} unclaimed`,
         body: `${item.offerTitle ?? item.title}: £${item.remainingEv.toFixed(2)} of edge expires with it.`,
-        href: item.href ?? "/offers",
+        // P1: land on the campaign details modal, not the add-bet flow
+        href: item.offerId != null ? `/offers?view=${item.offerId}` : (item.href ?? "/offers"),
       });
     }
   }

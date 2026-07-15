@@ -52,9 +52,20 @@ describe("offer_expiring rule", () => {
     expect(alerts[0]).toMatchObject({
       kind: "offer_expiring",
       key: "offer_expiring:offer-5-place_qualifying:2026-07-13",
-      href: "/offers",
+      // P1: the push deep-links to the campaign details modal
+      href: "/offers?view=5",
     });
     expect(alerts[0]!.body).toContain("£12");
+  });
+
+  it("falls back to the item href when the do-next item has no offer id", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      doNext: [
+        doNextItem({ id: "x", remainingEv: 12, daysLeft: 0.4, offerId: null, href: "/tracker" }),
+      ],
+    });
+    expect(alerts[0]?.href).toBe("/tracker");
   });
 
   it("stays quiet for low EV, distant expiry, or when toggled off", () => {

@@ -5,6 +5,7 @@ export type PageHelpId =
   | "tracker"
   | "offers"
   | "calculators"
+  | "casino"
   | "tracked-events"
   | "settings"
   | "history"
@@ -63,6 +64,17 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
     ],
     guideSlug: "calculators",
+  },
+  casino: {
+    title: "Casino",
+    summary:
+      "Wagering offers with honest EV - bonus value minus the expected drag of cycling wagering through a game.",
+    bullets: [
+      "Log offer: bonus, wagering (×), game RTP and contribution set the verdict - or paste the promo and let it prefill.",
+      "The eligible-games picker stars the highest-RTP slot and drives the RTP field; the Game library holds published base RTPs - operators can license lower variants, so verify in the game info.",
+      "EV here is an expectation across many attempts, never a lock - the variance tier says how far one session can stray.",
+      "Casino money stays out of the matched P&L on purpose - this desk keeps its own score.",
+    ],
   },
   offers: {
     title: "Offers",

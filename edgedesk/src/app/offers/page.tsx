@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
@@ -112,6 +112,24 @@ function OffersContent() {
       expired: bookieScoped.filter((o) => isOfferEffectivelyExpired(o)).length,
     };
   }, [bookieScoped]);
+
+  // P1: push notifications deep-link to the campaign details modal via
+  // /offers?view=<id>. The param survives until the polled offers contain
+  // the id (first load can race the poll), then opens once and strips.
+  const viewParam = searchParams.get("view");
+  const handledViewRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!viewParam || handledViewRef.current === viewParam) return;
+    const id = Number(viewParam);
+    const offer = Number.isFinite(id) ? offers.find((o) => o.id === id) : undefined;
+    if (!offer) return;
+    handledViewRef.current = viewParam;
+    viewOffer(offer);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("view");
+    const qs = params.toString();
+    router.replace(qs ? `/offers?${qs}` : "/offers", { scroll: false });
+  }, [viewParam, offers, viewOffer, router, searchParams]);
 
   useEffect(() => {
     if (!highlightParam) return;
