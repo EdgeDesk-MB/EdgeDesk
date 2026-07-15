@@ -47,7 +47,6 @@ import { api } from "@/hooks/use-app-state";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { buildDailyPlan, type DailyPlanSlot } from "@/lib/plan/daily-plan";
-import { formatClockTime } from "@/lib/time-format";
 import { listRowInteractive } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
@@ -69,9 +68,6 @@ function PlanSlotButton({
         "flex min-h-11 w-full items-center gap-3 px-2 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-selection-subtle"
       )}
     >
-      <span className="w-12 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground">
-        {slot.at != null ? formatClockTime(new Date(slot.at)) : ""}
-      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{slot.title}</span>
         {slot.detail ? (
@@ -189,7 +185,7 @@ export function QuickLogSheet() {
     <>
       <button
         type="button"
-        aria-label="Quick log a bet"
+        aria-label="Open quick actions"
         onClick={() => {
           reset();
           setOpen(true);
@@ -208,7 +204,7 @@ export function QuickLogSheet() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Quick log</DialogTitle>
+            <DialogTitle>Quick actions</DialogTitle>
             <DialogDescription>
               Capture the bet now, tidy the details on desktop later.
             </DialogDescription>
