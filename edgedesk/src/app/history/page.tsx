@@ -6,6 +6,7 @@ import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { api } from "@/hooks/use-app-state";
+import { useNow } from "@/hooks/use-now";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import {
   buildHistoryContext,
@@ -93,17 +94,21 @@ export default function HistoryPage() {
     [data]
   );
 
-  const grouped = useMemo(() => {
-    if (!data?.entries.length) return [];
+  const now = useNow(60_000);
+
+  // Plain derivation - the React Compiler memoizes this better than a manual
+  // useMemo it cannot preserve.
+  const grouped = (() => {
+    if (!data?.entries.length) return [] as Array<[string, HistoryRow[]]>;
     const map = new Map<string, HistoryRow[]>();
     for (const entry of data.entries) {
-      const key = formatHistoryDateGroup(entry, ctx);
+      const key = formatHistoryDateGroup(entry, ctx, now);
       const list = map.get(key) ?? [];
       list.push(entry);
       map.set(key, list);
     }
     return [...map.entries()];
-  }, [data?.entries, ctx]);
+  })();
 
   return (
     <PageShell>

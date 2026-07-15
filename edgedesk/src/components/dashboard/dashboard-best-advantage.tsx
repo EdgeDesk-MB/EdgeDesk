@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { MoneyFlow } from "@/components/money-flow";
 import { bestOfferAdvantage } from "@/lib/offers/advantage";
+import { useNow } from "@/hooks/use-now";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { offerNextActionLabel } from "@/lib/offers/next-actions";
 import type { OfferSummary } from "@/lib/services/offers.types";
@@ -33,10 +34,11 @@ export function DashboardBestAdvantage({
     return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, available));
   }, [offers, accounts]);
 
+  const now = useNow(60_000);
   const retentionOpts = retention
     ? { retention: retention.rate, retentionSampleSize: retention.sampleSize }
     : undefined;
-  const best = bestOfferAdvantage(scoped, Date.now(), retentionOpts);
+  const best = bestOfferAdvantage(scoped, now, retentionOpts);
   if (!best || best.score < 0.5) return null;
 
   const href = best.nextAction?.href ?? `/offers?highlight=${best.offerId}`;

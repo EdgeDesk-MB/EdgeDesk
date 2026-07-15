@@ -227,15 +227,15 @@ export function FixtureBrowserContent({
     });
   }
 
+  // Plain derivations - the React Compiler memoizes these better than manual
+  // useMemo wrappers it cannot preserve.
   const myEvents = state?.events ?? [];
-  const trackedExternalIds = useMemo(
-    () => new Set(myEvents.filter((e) => e.externalId).map((e) => e.externalId!)),
-    [myEvents]
+  const trackedExternalIds = new Set(
+    myEvents.filter((e) => e.externalId).map((e) => e.externalId!)
   );
 
-  const worldCupCount = useMemo(
-    () => fixtures.filter((f) => isCurrentOrFutureFixture(f.status) && isWorldCupCompetition(f.competition)).length,
-    [fixtures]
+  const worldCupCount = (
+    fixtures.filter((f) => isCurrentOrFutureFixture(f.status) && isWorldCupCompetition(f.competition)).length
   );
 
   const filteredFixtures = useMemo(() => {

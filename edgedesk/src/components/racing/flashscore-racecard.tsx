@@ -1,5 +1,6 @@
 "use client";
 
+import { useNow } from "@/hooks/use-now";
 import { useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -462,6 +463,7 @@ export function FlashscoreRacecard({
   exchangeStatusLabel,
   bookmakerColors,
 }: FlashscoreRacecardProps) {
+  const now = useNow(30_000);
   const activeCourse = selected?.course ?? courses[0]?.[0] ?? "";
   const courseRaces = courses.find(([c]) => c === activeCourse)?.[1] ?? [];
 
@@ -542,7 +544,7 @@ export function FlashscoreRacecard({
             const active = race.externalId === selectedId;
             const isFinished =
               race.status === "finished" ||
-              (race.status === "upcoming" && race.startTime < Date.now());
+              (race.status === "upcoming" && race.startTime < now);
             const offerCount = qualifyingOfferTags(race).length;
             const nearMinTags = race.offerTags.filter(
               (t) =>

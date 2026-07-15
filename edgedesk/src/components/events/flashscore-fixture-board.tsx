@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useNow } from "@/hooks/use-now";
 import { useMemo, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -254,6 +255,7 @@ function FootballCompetitionSection({
   displayTimezone: string;
 }) {
   const [open, setOpen] = useState(true);
+  const now = useNow(30_000);
 
   return (
     <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none">
@@ -282,7 +284,7 @@ function FootballCompetitionSection({
               )}
             >
               <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
-                {formatFixtureKickoff(fixture.startTime, Date.now(), displayTimezone)}
+                {formatFixtureKickoff(fixture.startTime, now, displayTimezone)}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -339,6 +341,7 @@ function RacingCourseSection({
   displayTimezone: string;
 }) {
   const [open, setOpen] = useState(true);
+  const now = useNow(30_000);
 
   if (races.length === 0) return null;
   const hasRegionFlag = Boolean(toIsoCountryCode(region));
@@ -374,7 +377,7 @@ function RacingCourseSection({
                 )}
               >
                 <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
-                  {formatFixtureKickoff(race.startTime, Date.now(), displayTimezone)}
+                  {formatFixtureKickoff(race.startTime, now, displayTimezone)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium leading-snug">{race.raceName}</p>

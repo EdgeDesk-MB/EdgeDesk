@@ -1,5 +1,6 @@
 "use client";
 
+import { useNow } from "@/hooks/use-now";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { normalizeCourseName } from "@/lib/offers/racing-offer-rules";
@@ -45,9 +46,9 @@ export function CourseRaceTimes({
     };
   }, [scopeCourse, eventDate]);
 
-  if (!races || races.length === 0) return null;
+  const now = useNow(30_000);
 
-  const now = Date.now();
+  if (!races || races.length === 0) return null;
 
   return (
     <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">

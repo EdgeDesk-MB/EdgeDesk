@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useNow } from "@/hooks/use-now";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
@@ -89,8 +90,8 @@ function OffersContent() {
     return bookieScoped.filter((o) => isOfferInMainFeed(o));
   }, [bookieScoped, filter, needsActionIds]);
 
+  const now = useNow(60_000);
   const grouped = useMemo(() => {
-    const now = Date.now();
     const todayMs = startOfLocalDay(now);
     if (filter === "expired" || filter === "completed") {
       return groupOffersByListDay(filtered, {
@@ -104,7 +105,7 @@ function OffersContent() {
       minDayMs: todayMs,
       useFeedDay: true,
     });
-  }, [filtered, filter]);
+  }, [filtered, filter, now]);
 
   const totals = useMemo(() => {
     return {

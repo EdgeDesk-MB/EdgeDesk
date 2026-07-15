@@ -164,9 +164,13 @@ export function formatHistoryTimeBadge(entry: HistoryRow, ctx: HistoryContext): 
   return secondary ? `${primary}, ${secondary}` : primary;
 }
 
-export function formatHistoryDateGroup(entry: HistoryRow, ctx: HistoryContext): string {
+export function formatHistoryDateGroup(
+  entry: HistoryRow,
+  ctx: HistoryContext,
+  nowMs = Date.now()
+): string {
   const when = new Date(historyOccurredAt(entry, ctx));
-  const now = new Date();
+  const now = new Date(nowMs);
   if (isSameCalendarDay(when, now)) return "Today";
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);

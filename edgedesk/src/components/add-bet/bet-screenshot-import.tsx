@@ -39,7 +39,9 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
   const [activeSource, setActiveSource] = useState<ScreenshotSource>("bookie");
   const [processing, setProcessing] = useState<ScreenshotSource | null>(null);
   const activeSourceRef = useRef(activeSource);
-  activeSourceRef.current = activeSource;
+  useEffect(() => {
+    activeSourceRef.current = activeSource;
+  }, [activeSource]);
 
   const processFile = useCallback(
     async (file: File, source: ScreenshotSource) => {
