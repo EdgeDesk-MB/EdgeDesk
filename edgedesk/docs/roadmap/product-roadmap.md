@@ -389,6 +389,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | **7. Workbench** | ✅ F1 match checker, ✅ F2 alerts inbox, ✅ F3 background web push (verified on Sam's Android 2026-07-14), ✅ F4 command palette | **Done** | A found match gets a verdict in <10s; no alert is ever lost; the phone buzzes with the app closed; any entity is two keystrokes away |
 | **8. Momentum** | ✅ G1 targets & pace, ✅ G2 onboarding + demo mode, ✅ G3 season summary, ✅ G4 access & keyboard (contrast audit deferred) | **Done** | Home answers "am I on pace?" at a glance; a stranger reaches a working desk in <10 min; the year renders honestly |
 | **9. Business gate** | §7 — only if gate criteria met | Not started | See §7.1 |
+| **10. New desks** | ⬜ H1 weekly digest, ⬜ H2 casino desk (promoted from §9, 2026-07-15) | Not started | Monday digest lands as a push from real data; a casino offer gets an honest wagering-EV verdict with variance warnings — pre-gate scope, does NOT require the Phase 9 gate |
 
 Phases 1–2 are pure lib/UI work on existing data — ideal for local-model iteration (small,
 well-tested pure functions). Phase 3 is UI-heavy. Phases 4+ touch polling/notifications.
@@ -494,16 +495,19 @@ Unscheduled, unreviewed, deliberately outside Phases 6–8. Ideas land here firs
 case and the reason they are parked — and are only promoted into a phase after user review. If an
 idea is rejected, record that too (a decided "no" is as valuable as a "yes").
 
-| Idea | The case | Why it's parked |
-|------|----------|-----------------|
-| **Casino offer EV module** | Wagering-EV maths (slot RTP, playthrough, variance warnings) — the other half of what incumbents cover, and many matched bettors do both | Different risk model (variance, not matched); needs a deliberate scope decision — EdgeDesk's thesis is *matched* execution truth |
-| **Exchange auto-import** | Pull placed/settled lays from the Betfair account API straight into the tracker — kills manual logging for the lay side of every bet | Betfair API auth scope + ToS need a proper read; also weakens the deliberate "log it consciously" execution loop — decide with care |
-| **Each-way matcher (Racing Desk)** | EW value vs the exchange place market; natural extension of the desk's scoped matching | Racing Desk is already the deepest desk; wait for real demand from daily use |
-| **Odds drift capture** | Snapshot the market price at log time and at settlement, feeding a richer A3 capture decomposition ("odds moved" measured, not tagged) | Needs price polling beyond current windows; B7's manual tag may be enough — let the mistake ledger prove the need first |
-| **Telegram/Discord alert delivery** | A bot channel delivers alerts with zero VAPID/server-reachability pain, works on any device | Overlaps F3 (web push); pick ONE background channel after F3's real-phone verdict (Sam is on Android) rather than building two |
-| **Tauri desktop packaging** | Single .app, dock icon, menubar quick-log; no terminal to start the server | Currently a deliberate "do not build" (AGENTS.md); revisit once Phases 6–8 stabilise the surface |
-| **Multi-device sync (local-first)** | CR-SQLite/Turso embedded replicas — phone and desktop share one desk without a hosted backend | This IS gate-adjacent (§7.2 Route 2); listed for visibility, blocked by the Phase 9 gate |
-| **"Ask your desk" (local AI)** | Natural-language questions over your own data via the local Ollama backbone ("commission paid at Betfair in June?") — privacy-preserving by construction | Toy risk: answers must come from the same tested calc layer as the UI, never a model's arithmetic; needs a query-plan design first |
-| **Dutching / multi-way lock calculator** | Generalise the 2UP equalising-lock maths to n-way books (dutching, arb-close-outs) | Adjacent to the spec-locked EP engine; needs its own spec + test vectors before any code |
-| **Shared offer templates** | Export/import an offer definition (T&Cs, rules, stake plan) as a link or file — friends seed each other's calendars | First taste of network value, but distribution/moderation questions belong at the gate |
-| **Weekly digest** | A Monday summary (edge captured, leaks, drought nudges) delivered via the alert channel | Needs F2/F3 delivery plumbing first; risks nagging — opt-in only |
+Reviewed in full with Sam on 2026-07-15: two ideas promoted to Phase 10 (H1 digest, H2
+casino desk), one decided no, the rest stay parked with their reasons confirmed.
+
+| Idea | The case | Status |
+|------|----------|--------|
+| **Casino offer EV module** | Wagering-EV maths (slot RTP, playthrough, variance warnings) — the other half of what incumbents cover, and many matched bettors do both | **PROMOTED → H2 (2026-07-15).** Sam: dedicated "Casino" side-nav section; build in line with the app's existing layouts/stylings; straight to development, no design phase |
+| **Weekly digest** | A Monday summary (edge captured, leaks, drought nudges) delivered via the alert channel | **PROMOTED → H1 (2026-07-15).** F2/F3 plumbing shipped and push verified on Sam's Android; opt-in only |
+| **Telegram/Discord alert delivery** | A bot channel delivers alerts with zero VAPID/server-reachability pain, works on any device | **REJECTED (2026-07-15).** F3 web push verified on Sam's Android; one background channel, decided — a second is maintenance without capability |
+| **Exchange auto-import** | Pull placed/settled lays from the Betfair account API straight into the tracker — kills manual logging for the lay side of every bet | Parked (confirmed 2026-07-15). Betfair API auth scope + ToS need a proper read; also weakens the deliberate "log it consciously" execution loop — decide with care |
+| **Each-way matcher (Racing Desk)** | EW value vs the exchange place market; natural extension of the desk's scoped matching | Parked (confirmed 2026-07-15). Racing Desk is already the deepest desk; wait for real demand from daily use |
+| **Odds drift capture** | Snapshot the market price at log time and at settlement, feeding a richer A3 capture decomposition ("odds moved" measured, not tagged) | Parked (confirmed 2026-07-15). Let a month of B7 mistake tags prove drift is the leak before building price polling |
+| **Tauri desktop packaging** | Single .app, dock icon, menubar quick-log; no terminal to start the server | Parked (confirmed 2026-07-15). A launchd auto-start script is the cheap interim if the terminal grates |
+| **Multi-device sync (local-first)** | CR-SQLite/Turso embedded replicas — phone and desktop share one desk without a hosted backend | Parked (confirmed 2026-07-15). Gate-adjacent (§7.2 Route 2); Tailscale to the Mac Studio covers phone access today |
+| **"Ask your desk" (local AI)** | Natural-language questions over your own data via the local Ollama backbone ("commission paid at Betfair in June?") — privacy-preserving by construction | Parked (confirmed 2026-07-15). Toy risk: answers must come from the same tested calc layer as the UI, never a model's arithmetic; needs a query-plan design first |
+| **Dutching / multi-way lock calculator** | Generalise the 2UP equalising-lock maths to n-way books (dutching, arb-close-outs) | Parked (confirmed 2026-07-15). Needs its own spec + test vectors before any code, beside the spec-locked EP engine |
+| **Shared offer templates** | Export/import an offer definition (T&Cs, rules, stake plan) as a link or file — friends seed each other's calendars | Parked (confirmed 2026-07-15). First taste of network value, but distribution/moderation questions belong at the gate; E3 export plumbing makes it cheap later |
