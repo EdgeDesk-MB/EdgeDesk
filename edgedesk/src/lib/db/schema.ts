@@ -299,6 +299,29 @@ export const racingOddsSnapshots = sqliteTable("racing_odds_snapshots", {
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */
+/** Casino desk (H2) - wagering offers, tracked separately from matched P&L. */
+export const casinoOffers = sqliteTable("casino_offers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  casino: text("casino"),
+  title: text("title").notNull(),
+  bonusAmount: real("bonus_amount").notNull(),
+  wageringMultiplier: real("wagering_multiplier").notNull(),
+  /** User-entered game RTP (0-1); null = 96% heuristic default */
+  rtp: real("rtp"),
+  /** Game contribution to wagering (0-1); null = 100% */
+  contributionPct: real("contribution_pct"),
+  status: text("status", { enum: ["planned", "active", "completed", "expired"] })
+    .notNull()
+    .default("planned"),
+  /** EV locked at save time from the calc inputs */
+  expectedEv: real("expected_ev").notNull(),
+  /** Realised £ entered by the user at completion */
+  actualProfit: real("actual_profit"),
+  notes: text("notes"),
+  createdAt: integer("created_at").notNull(),
+  completedAt: integer("completed_at"),
+});
+
 export const racingOddsOverrides = sqliteTable("racing_odds_overrides", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   raceId: text("race_id").notNull(),
@@ -324,3 +347,5 @@ export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
 export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
+export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
+export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;

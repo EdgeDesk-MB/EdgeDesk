@@ -28,14 +28,24 @@ const TEXT_CLASS: Record<EvBasis, string> = {
   heuristic: "text-amber-700 dark:text-amber-300",
 };
 
-export function EvBasisBadge({ basis, className }: { basis: EvBasis; className?: string }) {
+export function EvBasisBadge({
+  basis,
+  className,
+  description,
+}: {
+  basis: EvBasis;
+  className?: string;
+  /** Context-specific tooltip copy; defaults to the offer-desk descriptions */
+  description?: string;
+}) {
+  const detail = description ?? DESCRIPTIONS[basis];
   return (
     <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <span
           className={cn("inline-flex cursor-default items-center gap-1", className)}
-          aria-label={`EV basis: ${DESCRIPTIONS[basis]}`}
+          aria-label={`EV basis: ${detail}`}
         >
           <span className={cn("size-1.5 shrink-0 rounded-full", DOT_CLASS[basis])} aria-hidden />
           <span className={cn("text-[9px] font-semibold uppercase tracking-wide", TEXT_CLASS[basis])}>
@@ -44,7 +54,7 @@ export function EvBasisBadge({ basis, className }: { basis: EvBasis; className?:
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[200px] text-center text-xs">
-        {DESCRIPTIONS[basis]}
+        {detail}
       </TooltipContent>
     </Tooltip>
     </TooltipProvider>

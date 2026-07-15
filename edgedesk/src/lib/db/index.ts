@@ -227,6 +227,21 @@ CREATE TABLE IF NOT EXISTS racing_odds_overrides (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_racing_odds_override_race_horse
   ON racing_odds_overrides(race_id, horse_id);
+CREATE TABLE IF NOT EXISTS casino_offers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  casino TEXT,
+  title TEXT NOT NULL,
+  bonus_amount REAL NOT NULL,
+  wagering_multiplier REAL NOT NULL,
+  rtp REAL,
+  contribution_pct REAL,
+  status TEXT NOT NULL DEFAULT 'planned',
+  expected_ev REAL NOT NULL,
+  actual_profit REAL,
+  notes TEXT,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
 `);
 
   // Additive migrations for databases created before these columns existed

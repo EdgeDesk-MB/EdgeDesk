@@ -20,7 +20,7 @@ Last updated: 2026-07-15 (Phase 10 added — H1 weekly digest, H2 casino desk br
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 589 tests / 84 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 604 tests / 85 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -855,7 +855,7 @@ commission drag hand-worked); trigger latch (not due before Mon 09:00, sends onc
 poll same week no-ops, missed week sends only latest). Live: enable toggle, force
 `digestLastSentWeek` back, next poll lands inbox row + push; disabled toggle sends nothing.
 
-## H2. Casino desk `[strong]` — dedicated side-nav section
+## H2. Casino desk `[strong]` ✅ DONE — dedicated side-nav section
 
 **Objective.** A "Casino" section for wagering-offer EV: log a casino offer (bonus, wagering
 requirement, game RTP, contribution %), get an honest EV verdict net of wagering drag with a
