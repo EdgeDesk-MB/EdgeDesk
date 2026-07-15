@@ -39,6 +39,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     settledAt: null,
     offerId: partial.offerId ?? null,
     quickLogged: partial.quickLogged ?? null,
+    source: partial.source ?? null,
   };
 }
 
@@ -111,6 +112,8 @@ describe("groupBetsByCampaign", () => {
           expiresAt: null,
           completedAt: null,
           createdAt: Date.now(),
+          seriesId: null,
+          instanceDate: null,
           betCount: 2,
           openBets: 2,
           actualProfit: 0,

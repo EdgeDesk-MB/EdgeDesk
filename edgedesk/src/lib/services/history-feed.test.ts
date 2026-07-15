@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 const mockRun = vi.fn();
 const mockWhere = vi.fn(() => ({ run: mockRun }));
-const mockFrom = vi.fn(() => ({ where: mockWhere }));
+// Loosely typed: tests swap in select-shaped returns ({ all }) per call.
+const mockFrom = vi.fn<(...args: unknown[]) => unknown>(() => ({ where: mockWhere }));
 const mockSelect = vi.fn(() => ({ from: mockFrom }));
 const mockDelete = vi.fn(() => ({ where: mockWhere }));
 

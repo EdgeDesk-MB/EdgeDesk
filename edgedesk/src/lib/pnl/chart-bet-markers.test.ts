@@ -18,9 +18,7 @@ import { buildHistoryContext } from "@/lib/history-display";
 
 function bet(partial: Partial<BetRow> & Pick<BetRow, "id" | "status">): BetRow {
   return {
-    id: partial.id,
     label: partial.label ?? `Bet ${partial.id}`,
-    status: partial.status,
     actualProfit: partial.actualProfit ?? null,
     settledAt: partial.settledAt ?? null,
     createdAt: partial.createdAt ?? partial.settledAt ?? 1_000,

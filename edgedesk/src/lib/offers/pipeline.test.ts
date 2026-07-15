@@ -5,9 +5,12 @@ import {
   offerPipelineHasStarted,
   pipelineProgressIndex,
 } from "@/lib/offers/pipeline";
-import type { OfferSummary } from "@/lib/services/offers.types";
+import type { OfferProfitBreakdown, OfferSummary } from "@/lib/services/offers.types";
 
-function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">): OfferSummary {
+function offer(
+  partial: Omit<Partial<OfferSummary>, "profit"> &
+    Pick<OfferSummary, "id" | "title"> & { profit?: Partial<OfferProfitBreakdown> }
+): OfferSummary {
   const { profit: profitPartial, ...rest } = partial;
   return {
     id: rest.id,
@@ -25,6 +28,8 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     eventDate: null,
     expiresAt: null,
     completedAt: null,
+    seriesId: null,
+    instanceDate: null,
     createdAt: Date.now(),
     betCount: rest.betCount ?? 0,
     openBets: rest.openBets ?? 0,

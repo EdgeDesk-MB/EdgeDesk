@@ -104,9 +104,9 @@ describe("missed / status labels", () => {
 
 describe("offerIssueStatusLabel", () => {
   it("returns null for active and completed offers", () => {
-    expect(offerIssueStatusLabel({ status: "active", sport: null })).toBeNull();
-    expect(offerIssueStatusLabel({ status: "completed", sport: null })).toBeNull();
-    expect(offerIssueStatusLabel({ status: "planned", sport: null })).toBeNull();
+    expect(offerIssueStatusLabel({ status: "active", sport: null, eventDate: null, scopeRaceId: null, scopeRaceLabel: null })).toBeNull();
+    expect(offerIssueStatusLabel({ status: "completed", sport: null, eventDate: null, scopeRaceId: null, scopeRaceLabel: null })).toBeNull();
+    expect(offerIssueStatusLabel({ status: "planned", sport: null, eventDate: null, scopeRaceId: null, scopeRaceLabel: null })).toBeNull();
   });
 
   it("returns issue labels for expired offers", () => {
@@ -119,6 +119,6 @@ describe("offerIssueStatusLabel", () => {
         scopeRaceLabel: "3:00 · Betway",
       })
     ).toBe("Missed race");
-    expect(offerIssueStatusLabel({ status: "expired", sport: null })).toBe("Expired");
+    expect(offerIssueStatusLabel({ status: "expired", sport: null, eventDate: null, scopeRaceId: null, scopeRaceLabel: null })).toBe("Expired");
   });
 });

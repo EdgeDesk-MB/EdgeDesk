@@ -54,6 +54,7 @@ function bet(over: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     settledAt: JUL(2),
     offerId: null,
     quickLogged: null,
+    source: null,
     ...over,
   };
 }

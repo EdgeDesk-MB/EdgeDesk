@@ -16,12 +16,10 @@ function bet(partial: Partial<BetRow> & { actualProfit: number; settledAt: numbe
     layOdds: 0,
     commission: 0,
     expectedProfit: null,
-    actualProfit: partial.actualProfit,
     triggerText: null,
     notes: null,
     balanceLedgered: 0,
     createdAt: partial.settledAt,
-    settledAt: partial.settledAt,
     ...partial,
   } as BetRow;
 }

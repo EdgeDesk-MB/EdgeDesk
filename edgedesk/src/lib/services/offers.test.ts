@@ -42,6 +42,8 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     createdAt: 1,
     settledAt: 2,
     offerId: 1,
+    quickLogged: null,
+    source: null,
     ...partial,
   };
 }
@@ -286,6 +288,8 @@ function offerRow(partial: Partial<OfferRow> & Pick<OfferRow, "id">): OfferRow {
     scopeRaceLabel: null,
     rules: null,
     completedAt: null,
+    seriesId: null,
+    instanceDate: null,
     createdAt: 1,
     ...partial,
   };

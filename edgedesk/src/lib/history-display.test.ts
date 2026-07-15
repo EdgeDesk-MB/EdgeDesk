@@ -16,15 +16,13 @@ import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 function row(partial: Partial<HistoryRow> & Pick<HistoryRow, "kind" | "title">): HistoryRow {
   return {
     id: 1,
-    dedupe: null,
-    kind: partial.kind,
-    title: partial.title,
-    detail: partial.detail ?? null,
-    amount: partial.amount ?? null,
-    minute: partial.minute ?? null,
-    eventId: partial.eventId ?? null,
-    betId: partial.betId ?? 42,
-    createdAt: partial.createdAt ?? Date.now(),
+    dedupe: `test:${partial.kind}:${partial.title}`,
+    detail: null,
+    amount: null,
+    minute: null,
+    eventId: null,
+    betId: 42,
+    createdAt: Date.now(),
     ...partial,
   };
 }
@@ -87,6 +85,8 @@ describe("isFreeBetPlacedHistoryEntry", () => {
     createdAt: Date.now(),
     settledAt: null,
     offerId: null,
+    source: null,
+    quickLogged: null,
   };
 
   const ctx = buildHistoryContext([], [freeBet], {});
@@ -298,6 +298,8 @@ describe("sortHistoryEntries", () => {
     createdAt: raceTime,
     settledAt: raceTime + 60_000,
     offerId: null,
+    source: null,
+    quickLogged: null,
   };
   const ctx = buildHistoryContext([event], [bet], {
     32: { amount: 50, reason: "Finished 2nd" },
@@ -423,6 +425,8 @@ describe("historyEntryHref", () => {
     createdAt: raceTime,
     settledAt: raceTime + 60_000,
     offerId: null,
+    source: null,
+    quickLogged: null,
   };
   const ctx = buildHistoryContext([event], [bet]);
 

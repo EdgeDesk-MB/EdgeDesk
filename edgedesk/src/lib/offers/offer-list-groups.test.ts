@@ -9,28 +9,30 @@ import {
   offerListFeedGroupDayMs,
   offerListGroupDayMs,
 } from "./offer-list-groups";
-import type { OfferSummary } from "@/lib/services/offers.types";
+import type { OfferProfitBreakdown, OfferSummary } from "@/lib/services/offers.types";
 
 function offer(
-  partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">
+  partial: Omit<Partial<OfferSummary>, "profit"> &
+    Pick<OfferSummary, "id" | "title"> & { profit?: Partial<OfferProfitBreakdown> }
 ): OfferSummary {
+  const { profit: profitPartial, ...rest } = partial;
   return {
-    id: partial.id,
     bookmaker: null,
-    title: partial.title,
     description: null,
     expectedProfit: null,
-    status: partial.status ?? "active",
-    sport: partial.sport ?? null,
+    status: rest.status ?? "active",
+    sport: rest.sport ?? null,
     offerType: null,
     rules: null,
     scopeCourse: null,
     scopeRaceId: null,
     scopeRaceLabel: null,
-    eventDate: partial.eventDate ?? null,
-    expiresAt: partial.expiresAt ?? null,
+    eventDate: rest.eventDate ?? null,
+    expiresAt: rest.expiresAt ?? null,
     completedAt: null,
-    createdAt: partial.createdAt ?? Date.now(),
+    seriesId: null,
+    instanceDate: null,
+    createdAt: rest.createdAt ?? Date.now(),
     betCount: 0,
     openBets: 0,
     actualProfit: 0,
@@ -48,8 +50,9 @@ function offer(
       freeBetSettledCount: 0,
       openExpectedProfit: 0,
       totalProfit: 0,
+      ...profitPartial,
     },
-    ...partial,
+    ...rest,
   };
 }
 

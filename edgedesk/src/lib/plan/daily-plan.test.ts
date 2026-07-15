@@ -15,7 +15,6 @@ const AT = (h: number, m = 0) => new Date(2026, 6, 13, h, m, 0).getTime();
 
 function offer(over: Partial<OfferSummary> & Pick<OfferSummary, "id">): OfferSummary {
   return {
-    id: over.id,
     bookmaker: "Bet365",
     title: `Offer ${over.id}`,
     description: null,
@@ -57,7 +56,6 @@ function offer(over: Partial<OfferSummary> & Pick<OfferSummary, "id">): OfferSum
 
 function doNextItem(over: Partial<DoNextItem> & Pick<DoNextItem, "id">): DoNextItem {
   return {
-    id: over.id,
     kind: "place_qualifying",
     title: "Place qualifying bet",
     detail: "Bet £10 get £10",

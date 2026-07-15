@@ -19,6 +19,8 @@ const baseOffer: OfferRow = {
   expiresAt: null,
   createdAt: Date.now(),
   completedAt: null,
+  seriesId: null,
+  instanceDate: null,
   sport: "horse_racing",
   offerType: "bet_get_free_place",
   scopeCourse: "all",

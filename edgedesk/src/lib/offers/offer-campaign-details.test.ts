@@ -23,6 +23,8 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     eventDate: partial.eventDate ?? null,
     expiresAt: null,
     completedAt: null,
+    seriesId: null,
+    instanceDate: null,
     createdAt: Date.now(),
     betCount: 0,
     openBets: 0,

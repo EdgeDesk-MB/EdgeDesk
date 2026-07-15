@@ -31,9 +31,7 @@ function offer(
   partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">
 ): OfferSummary {
   return {
-    id: partial.id,
     bookmaker: partial.bookmaker ?? "Betfair Sportsbook",
-    title: partial.title,
     description: null,
     expectedProfit: partial.expectedProfit ?? null,
     status: partial.status ?? "active",
@@ -47,6 +45,8 @@ function offer(
     expiresAt: partial.expiresAt ?? null,
     completedAt: null,
     createdAt: Date.now(),
+    seriesId: null,
+    instanceDate: null,
     betCount: partial.betCount ?? 0,
     openBets: 0,
     actualProfit: 0,
