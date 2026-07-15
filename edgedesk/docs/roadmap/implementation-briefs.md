@@ -10,7 +10,7 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-07-13 (A3 done — Phase 1 complete)
+Last updated: 2026-07-15 (Phase 10 added — H1 weekly digest, H2 casino desk briefs)
 
 ---
 
@@ -20,7 +20,7 @@ Last updated: 2026-07-13 (A3 done — Phase 1 complete)
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 559 tests / 78 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 589 tests / 84 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -790,6 +790,118 @@ everyday keys and assistive-tech behaviour (unread alerts already announce via s
 **Deferred, stated honestly:** a full contrast audit across both themes (no known failures, but
 unmeasured), and the ~40 react-compiler setState-in-effect lint sites (performance hygiene, not
 accessibility - tracked as their own backlog item).
+
+# PHASE 10 — NEW DESKS (promoted from §9, 2026-07-15)
+
+## H1. Weekly digest `[strong]` ✅ DONE — needs B8, F2, F3 (all shipped)
+
+**Objective.** An opt-in Monday summary of last week — edge captured, capture %, commission
+drag, biggest leak, drought nudges — recorded in the alerts inbox and pushed to subscribed
+devices via the existing F3 pipeline.
+
+**Why.** The single moment a tracker becomes a coach is when it opens the week for you.
+All the plumbing shipped: B8 computes the content shapes, F2 stores durably, F3 delivers
+to Sam's Android (verified 2026-07-14). This brief is composition, not new infrastructure.
+
+**Trigger model (local-first, no cron).** The server only runs when the desk is open, so the
+digest is compute-on-poll with a week-key latch, exactly one send per ISO week:
+- NEW `src/lib/services/weekly-digest.ts` — `maybeSendWeeklyDigest(now = Date.now())`:
+  1. Read `AppSettings.digestWeekly` (new, default **false** — opt-in) and raw setting
+     `digestLastSentWeek` (via `readRaw`/`writeRaw` in `src/lib/services/settings.ts`).
+  2. Due when `now` ≥ Monday 09:00 local of the current ISO week AND `digestLastSentWeek`
+     ≠ current ISO week key (`YYYY-Www`). Missed weeks do NOT backfill — send only the most
+     recently completed week.
+  3. Build content (pure lib below), `recordAlerts([digestAlert])`
+     (`src/lib/services/alerts-inbox.ts:19`, dedupe key `digest:<isoWeek>`), then
+     `void sendPush(digestAlert)` (`src/lib/services/push.ts:77`, fire-and-forget), then
+     write `digestLastSentWeek`.
+  4. Call from `getAppState()` in `src/lib/services/state.ts` (after `syncOfferStatuses()`);
+     the guard is one settings read per poll, send path idempotent via the latch + inbox
+     dedupe.
+
+**Content (pure, tested).** NEW `src/lib/offers/weekly-digest-content.ts` (client-safe, no db):
+`buildWeeklyDigest(input: { snapshots: EvSnapshotRow[]; bets: BetRow[]; league: BookmakerLeagueRow[]; weekStartMs: number; weekEndMs: number }): { title: string; body: string } | null`.
+- Realized: sum `realizedProfit` of snapshots settled in `[weekStartMs, weekEndMs)`;
+  expected: their `expectedProfit`; capture % (null-guard |expected| ≤ 0.01, same rule as
+  `buildEdgeReport` — `src/lib/report/edge-report.ts:137`).
+- Commission drag: `commissionPaidOnSettledBet` (`src/lib/calc/commission-paid.ts`) over
+  bets settled in the window.
+- Biggest leak: top `aggregateMistakes` row for the window's snapshots (reuse
+  `src/lib/offers/mistakes.ts`).
+- Drought nudges: `BookmakerLeagueRow.droughtNudge` names (cap at 2 in copy).
+- Returns null when the week has NO settled campaigns (nothing lands — never nag).
+- Title like `"Your week: +£47.20 captured (89%)"`; body ≤3 short lines; `href: "/report"`.
+  Money via `£x.toFixed(2)`; digest kind `"weekly_digest"`.
+
+**Settings (per §0 pattern).** `digestWeekly: boolean` DEFAULT false: interface + default in
+`settings-shared.ts`, read in `getAppSettings()`, write branch in `patchAppSettings()`, body
+handling in `src/app/api/settings/route.ts`, toggle in the Alerts card of
+`src/app/settings/page.tsx` ("Weekly digest — Monday morning summary of last week's edge").
+
+**Data sources at the call site** (verified 2026-07-15): snapshots via `getAllSnapshots()`
+(`src/lib/services/ev-snapshot.ts`), bets already loaded in `getAppState`, league rows via
+`computeBookmakerStats` (`src/lib/accounts/bookmaker-stats.ts:105`, the same builder the
+accounts league uses).
+
+**Nuance.**
+- Week window is the COMPLETED week: `[prev Monday 00:00, this Monday 00:00)` local.
+- The 09:00 gate stops a Sunday-night poll counting Monday 00:01 as "morning".
+- If push has no subscriptions, the inbox row still lands (F3 is best-effort by design).
+- Digest respects E1 tuning where it exists (droughtNudgeDays) — read from settings, do not
+  hardcode 40.
+
+**Acceptance.** Vitest: content builder (capture line, null on empty week, drought copy cap,
+commission drag hand-worked); trigger latch (not due before Mon 09:00, sends once, second
+poll same week no-ops, missed week sends only latest). Live: enable toggle, force
+`digestLastSentWeek` back, next poll lands inbox row + push; disabled toggle sends nothing.
+
+## H2. Casino desk `[strong]` — dedicated side-nav section
+
+**Objective.** A "Casino" section for wagering-offer EV: log a casino offer (bonus, wagering
+requirement, game RTP, contribution %), get an honest EV verdict net of wagering drag with a
+variance warning tier, and track realised outcomes — the variance-honest counterpart to the
+matched desks.
+
+**Sam's direction (2026-07-15).** Straight to development, no design phase — follow the
+layouts, stylings and consistencies already across the app (design tokens, shadcn patterns,
+section headers, EV basis badges).
+
+**Maths (pure calc — /calc-change applies).** NEW `src/lib/calc/casino-ev.ts`:
+- `casinoOfferEv(input: { bonusAmount: number; wageringMultiplier: number; houseEdge: number; contributionPct?: number })`
+  → `{ ev: number; wageringDrag: number; totalTurnover: number }` where
+  `totalTurnover = bonusAmount × wageringMultiplier / (contributionPct ?? 1)` and
+  `wageringDrag = totalTurnover × houseEdge`; `ev = bonusAmount − wageringDrag`.
+  House edge from RTP: `1 − rtp`. Exact arithmetic, hand-worked test vectors
+  (e.g. £20 bonus, 35× wagering, 96% RTP → turnover £700, drag £28, EV −£8).
+- Variance tier from turnover-to-bonus ratio and house edge (low/medium/high bands —
+  spec the thresholds in tests first). EV displays MUST carry a basis badge:
+  `"estimated"` when RTP supplied, `"heuristic"` when defaulted.
+- Optional stake-limited slot sessions and cash-stake-first flows are OUT of v1 scope.
+
+**Schema (per §0 migration pattern).** New `casino_offers` table: id, bookmaker, title,
+bonusAmount, wageringMultiplier, rtp, contributionPct, status (`planned|active|completed|expired`),
+expectedEv (derived at save), actualProfit (user-entered at completion), notes, createdAt,
+completedAt. Drizzle table in `schema.ts` + `CREATE TABLE IF NOT EXISTS` in `db/index.ts`.
+Casino money stays OUT of matched P&L surfaces (separate desk, separate truth) — a
+follow-up decides any combined view.
+
+**UI.** New nav entry "Casino" in the Betting section of `NAV_SECTIONS`
+(`src/components/…` nav source, single source of truth drives sidebar + drawer + palette);
+`/casino` page: offer list (calendar-card idiom from Offers), add/edit dialog, EV verdict
+with variance warning chip, completion flow capturing realised profit and an
+expected-vs-realised line (A3 idiom, but simple columns — no snapshots/locks in v1).
+
+**Nuance.**
+- Variance honesty is the product stance: copy always frames EV as an expectation across
+  many attempts, never a lock ("EV +£4.80 — high variance: most sessions lose").
+- No game data scraping; RTP is user-entered (default 96% with `"heuristic"` basis).
+- `casinoOfferEv` output NEVER feeds Do Next/edge-on-the-table sums in v1.
+
+**Acceptance.** Vitest for every calc branch with hand-worked numbers; calc-auditor pass;
+`/casino` verified in the harness (create offer → EV verdict + variance chip + basis badge;
+complete → expected-vs-realised line renders); mobile 390×844 pass; suite + build green.
+
+---
 
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8

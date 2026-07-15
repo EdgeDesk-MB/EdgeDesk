@@ -46,6 +46,9 @@ export async function PATCH(req: Request) {
   if (typeof body.alertsTwoUpLock === "boolean") {
     patch.alertsTwoUpLock = body.alertsTwoUpLock;
   }
+  if (typeof body.digestWeekly === "boolean") {
+    patch.digestWeekly = body.digestWeekly;
+  }
 
   if (body.tuning && typeof body.tuning === "object" && !Array.isArray(body.tuning)) {
     // patchAppSettings merges and clamps via normalizeTuning

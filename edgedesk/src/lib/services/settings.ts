@@ -123,6 +123,7 @@ export function getAppSettings(): AppSettings {
     alertsResultSettled: readRaw("alertsResultSettled") !== "false",
     alertsNakedExposure: readRaw("alertsNakedExposure") !== "false",
     alertsTwoUpLock: readRaw("alertsTwoUpLock") !== "false",
+    digestWeekly: readRaw("digestWeekly") === "true",
     tuning: parseTuning(readRaw("tuning")),
     homeLayout: parseHomeLayout(readRaw("homeLayout")),
     monthlyProfitTarget: parseMonthlyTarget(readRaw("monthlyProfitTarget")),
@@ -231,6 +232,9 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.alertsTwoUpLock != null) {
     writeRaw("alertsTwoUpLock", patch.alertsTwoUpLock ? "true" : "false");
+  }
+  if (patch.digestWeekly != null) {
+    writeRaw("digestWeekly", patch.digestWeekly ? "true" : "false");
   }
   if (patch.tuning != null) {
     const merged = normalizeTuning({ ...parseTuning(readRaw("tuning")), ...patch.tuning });

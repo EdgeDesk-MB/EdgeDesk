@@ -58,6 +58,7 @@ import {
   liveModelForEvent,
 } from "@/lib/calc/ep/live-model";
 import { getHistoryFeed, getChartAnnotationHistory } from "@/lib/services/history-feed";
+import { maybeSendWeeklyDigest } from "@/lib/services/weekly-digest";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
@@ -617,6 +618,7 @@ export async function getAppState(): Promise<AppState> {
   syncOfferSeriesInstances();
   syncOfferStatuses();
   backfillOffersFromBets();
+  maybeSendWeeklyDigest();
 
   const allEvents = db.select().from(events).all();
   const allBets = db.select().from(bets).all();

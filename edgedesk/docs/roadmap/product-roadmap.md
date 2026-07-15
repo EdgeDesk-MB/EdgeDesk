@@ -389,7 +389,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | **7. Workbench** | ✅ F1 match checker, ✅ F2 alerts inbox, ✅ F3 background web push (verified on Sam's Android 2026-07-14), ✅ F4 command palette | **Done** | A found match gets a verdict in <10s; no alert is ever lost; the phone buzzes with the app closed; any entity is two keystrokes away |
 | **8. Momentum** | ✅ G1 targets & pace, ✅ G2 onboarding + demo mode, ✅ G3 season summary, ✅ G4 access & keyboard (contrast audit deferred) | **Done** | Home answers "am I on pace?" at a glance; a stranger reaches a working desk in <10 min; the year renders honestly |
 | **9. Business gate** | §7 — only if gate criteria met | Not started | See §7.1 |
-| **10. New desks** | ⬜ H1 weekly digest, ⬜ H2 casino desk (promoted from §9, 2026-07-15) | Not started | Monday digest lands as a push from real data; a casino offer gets an honest wagering-EV verdict with variance warnings — pre-gate scope, does NOT require the Phase 9 gate |
+| **10. New desks** | ✅ H1 weekly digest, ⬜ H2 casino desk (promoted from §9, 2026-07-15) | **In progress** — H2 remaining | Monday digest lands as a push from real data; a casino offer gets an honest wagering-EV verdict with variance warnings — pre-gate scope, does NOT require the Phase 9 gate |
 
 Phases 1–2 are pure lib/UI work on existing data — ideal for local-model iteration (small,
 well-tested pure functions). Phase 3 is UI-heavy. Phases 4+ touch polling/notifications.

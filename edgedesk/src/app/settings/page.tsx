@@ -798,6 +798,19 @@ function PreferencesPanel({
               onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
             />
           </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Weekly digest</p>
+              <p className="text-xs text-muted-foreground">
+                Monday morning summary of last week - edge captured, leaks, offer droughts
+              </p>
+            </div>
+            <Switch
+              checked={settings.digestWeekly}
+              aria-label="Send a weekly digest on Monday mornings"
+              onCheckedChange={(v) => onPatch({ digestWeekly: v })}
+            />
+          </div>
           <NotificationPermissionButton />
           <PushDeviceControl />
         </CardContent>

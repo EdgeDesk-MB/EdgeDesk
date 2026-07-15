@@ -35,6 +35,8 @@ export interface AppSettings {
   alertsResultSettled: boolean;
   alertsNakedExposure: boolean;
   alertsTwoUpLock: boolean;
+  /** Weekly digest (H1) - Monday morning summary of last week; opt-in. */
+  digestWeekly: boolean;
   /** Tunable behaviour thresholds (E1) - see TuningSettings */
   tuning: TuningSettings;
   /** Home widget order and visibility (E2) */
@@ -134,6 +136,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alertsResultSettled: true,
   alertsNakedExposure: true,
   alertsTwoUpLock: true,
+  digestWeekly: false,
   tuning: DEFAULT_TUNING,
   homeLayout: DEFAULT_HOME_LAYOUT,
   monthlyProfitTarget: null,
