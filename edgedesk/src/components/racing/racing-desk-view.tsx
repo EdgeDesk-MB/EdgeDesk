@@ -101,14 +101,20 @@ export function RacingDeskView() {
   const [deskExchange, setDeskExchange] = useState<ExchangeProvider | "default">("default");
 
   useEffect(() => {
-    const stored = readDeskExchangeOverride();
-    if (stored) setDeskExchange(stored);
+    // localStorage is client-only; defer a microtask past hydration.
+    queueMicrotask(() => {
+      const stored = readDeskExchangeOverride();
+      if (stored) setDeskExchange(stored);
+    });
   }, []);
 
-  useEffect(() => {
-    const def = state?.settings?.defaultBackStake;
-    if (def != null && def > 0) setEpStake(def);
-  }, [state?.settings?.defaultBackStake]);
+  // Adjust-during-render: adopt the settings default stake when it changes.
+  const settingsStake = state?.settings?.defaultBackStake;
+  const [prevSettingsStake, setPrevSettingsStake] = useState(settingsStake);
+  if (prevSettingsStake !== settingsStake) {
+    setPrevSettingsStake(settingsStake);
+    if (settingsStake != null && settingsStake > 0) setEpStake(settingsStake);
+  }
 
   const activeDeskProvider: ExchangeProvider | null =
     deskExchange === "default" ? null : deskExchange;
@@ -240,13 +246,19 @@ export function RacingDeskView() {
     [payload, selectedId]
   );
 
-  useEffect(() => {
-    if (!selected) return;
+  // Adjust-during-render: place counts follow the selected race.
+  const [prevSelectedRace, setPrevSelectedRace] = useState<{ id?: string; places?: number }>({});
+  if (
+    selected &&
+    (prevSelectedRace.id !== selected.externalId ||
+      prevSelectedRace.places !== selected.standardPlaces)
+  ) {
+    setPrevSelectedRace({ id: selected.externalId, places: selected.standardPlaces });
     setExchangePlaces(selected.standardPlaces);
     setBookiePlaces((prev) =>
       prev <= selected.standardPlaces ? Math.min(selected.standardPlaces + 1, 8) : prev
     );
-  }, [selected?.externalId, selected?.standardPlaces]);
+  }
 
   const courses = useMemo(() => {
     const map = new Map<string, RacingDeskRace[]>();

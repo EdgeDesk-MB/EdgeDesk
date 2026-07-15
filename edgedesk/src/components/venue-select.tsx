@@ -249,17 +249,21 @@ export function VenueSelect({
 
   useEffect(() => {
     if (!open) {
-      setMenuStyle(null);
-      setPortalTarget(null);
+      queueMicrotask(() => {
+        setMenuStyle(null);
+        setPortalTarget(null);
+      });
       return;
     }
     const root = dialogPortalRoot(triggerRef.current);
-    setPortalTarget(root ?? document.body);
-    if (!showSearch) setSearch("");
-    updatePosition(root);
-    if (showSearch) {
-      requestAnimationFrame(() => searchRef.current?.focus());
-    }
+    queueMicrotask(() => {
+      setPortalTarget(root ?? document.body);
+      if (!showSearch) setSearch("");
+      updatePosition(root);
+      if (showSearch) {
+        requestAnimationFrame(() => searchRef.current?.focus());
+      }
+    });
 
     function onScroll(e: Event) {
       if (menuRef.current?.contains(e.target as Node)) return;

@@ -263,7 +263,7 @@ export function AddBetDialog({
   useEffect(() => {
     if (!open) {
       hydratedKeyRef.current = null;
-      resetFormState();
+      queueMicrotask(() => resetFormState());
       return;
     }
     api<{ events: EventLite[] }>("/api/events")
@@ -421,8 +421,8 @@ export function AddBetDialog({
         ? exchanges.find((e) => e.id === editBet.exchangeId)
         : undefined) ?? exchangeFromNotes(editBet.notes, exchanges);
     if (ex) {
-      setExchange(ex);
       exchangeHydratedRef.current = true;
+      queueMicrotask(() => setExchange(ex));
     }
   }, [open, editBet, exchanges, exchange]);
 
@@ -541,9 +541,8 @@ export function AddBetDialog({
     bookmaker
   );
 
-  useEffect(() => {
-    if (!needsAddBalance && addBalance) setAddBalance(false);
-  }, [needsAddBalance, addBalance]);
+  // Derived: the top-up option only holds while the shortfall exists.
+  const effectiveAddBalance = addBalance && needsAddBalance;
 
   function applySelectedOffer(offerId: number | null) {
     setSelectedOfferId(offerId);
@@ -587,13 +586,24 @@ export function AddBetDialog({
   const labelOfferTrigger = useMemo(() => offerTriggerFromLabel(label), [label]);
   const labelHasOfferTrigger = useMemo(() => offerTriggerDetectedInLabel(label), [label]);
 
-  useEffect(() => {
-    if (!labelOfferTrigger) return;
-    if (!triggerText.trim() || triggerLinkedFromLabel) {
+  // Adjust-during-render: a label that implies an offer trigger keeps the
+  // trigger text linked until the user edits it by hand.
+  const [prevTriggerSync, setPrevTriggerSync] = useState({
+    labelOfferTrigger,
+    triggerText,
+    triggerLinkedFromLabel,
+  });
+  if (
+    prevTriggerSync.labelOfferTrigger !== labelOfferTrigger ||
+    prevTriggerSync.triggerText !== triggerText ||
+    prevTriggerSync.triggerLinkedFromLabel !== triggerLinkedFromLabel
+  ) {
+    setPrevTriggerSync({ labelOfferTrigger, triggerText, triggerLinkedFromLabel });
+    if (labelOfferTrigger && (!triggerText.trim() || triggerLinkedFromLabel)) {
       setTriggerText(labelOfferTrigger);
       setTriggerLinkedFromLabel(true);
     }
-  }, [labelOfferTrigger, triggerText, triggerLinkedFromLabel]);
+  }
 
   function handleTriggerTextChange(value: string) {
     setTriggerLinkedFromLabel(false);
@@ -817,7 +827,7 @@ export function AddBetDialog({
   }
 
   async function creditBackStakeIfNeeded(bookie: string, stake: number) {
-    if (!addBalance || !(stake > 0) || !bookie.trim()) return;
+    if (!effectiveAddBalance || !(stake > 0) || !bookie.trim()) return;
     if (isFreeBetBetType(betType)) return;
     const ensured = await api<{ account: { id: number } }>("/api/accounts/ensure", {
       method: "POST",
@@ -1410,7 +1420,7 @@ export function AddBetDialog({
                 betType={betType}
                 backStake={backStake}
                 accounts={appState?.balances?.accounts}
-                addBalance={addBalance}
+                addBalance={effectiveAddBalance}
                 onAddBalanceChange={needsAddBalance ? setAddBalance : undefined}
                 onUseFreeBet={(amount) => {
                   setBetType("free_snr");

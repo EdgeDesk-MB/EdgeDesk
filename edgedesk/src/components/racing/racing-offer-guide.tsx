@@ -100,11 +100,13 @@ function OfferWorkflowBody({
   const [backDone, setBackDone] = useState(false);
   const [layDone, setLayDone] = useState(false);
 
-  // Reset step progress when switching offers
-  useEffect(() => {
+  // Adjust-during-render: switching offers resets the step progress.
+  const [prevOfferId, setPrevOfferId] = useState(offerTag.offerId);
+  if (prevOfferId !== offerTag.offerId) {
+    setPrevOfferId(offerTag.offerId);
     setBackDone(false);
     setLayDone(false);
-  }, [offerTag.offerId]);
+  }
 
   const targetRunner =
     offerTag.suggestedRunners?.[0]?.name ??
@@ -348,11 +350,13 @@ export function RacingOfferGuide({ race, onBack, onLay, onTrack }: RacingOfferGu
   const [selectedId, setSelectedId] = useState<number | null>(bestId);
   const [workflowOpen, setWorkflowOpen] = useState(true);
 
-  // When race changes, re-select best offer
-  useEffect(() => {
+  // Adjust-during-render: a new race (or new best) re-selects the best offer.
+  const [prevRaceKey, setPrevRaceKey] = useState({ race: race.externalId, bestId });
+  if (prevRaceKey.race !== race.externalId || prevRaceKey.bestId !== bestId) {
+    setPrevRaceKey({ race: race.externalId, bestId });
     setSelectedId(bestId);
     setWorkflowOpen(true);
-  }, [race.externalId, bestId]);
+  }
 
   const activeId = selectedId ?? bestId;
   const offerTag = findOfferTag(race, activeId);

@@ -97,7 +97,7 @@ export function MatchedCalculator({
 
   useEffect(() => {
     if (!open || !prefill) return;
-
+    queueMicrotask(() => {
     if (prefill.mode) setMode(prefill.mode);
     if (prefill.bookmaker) setBookmaker(prefill.bookmaker);
     if (prefill.backStake !== undefined) setBackStake(prefill.backStake);
@@ -117,15 +117,19 @@ export function MatchedCalculator({
       }
     }
     if (prefill.commission !== undefined) setCommission(prefill.commission);
+    });
   }, [open, prefill, exchanges]);
 
-  useEffect(() => {
+  // Adjust-during-render: bonus stake ceilings mirror the back stake.
+  const [prevBonusInputs, setPrevBonusInputs] = useState({ backStake, bonusKind });
+  if (prevBonusInputs.backStake !== backStake || prevBonusInputs.bonusKind !== bonusKind) {
+    setPrevBonusInputs({ backStake, bonusKind });
     setBonusMaxStake(backStake);
     if (bonusKind === "free_bet_on_win" || bonusKind === "free_bet_on_lose" ||
         bonusKind === "bonus_cash_on_win" || bonusKind === "bonus_cash_on_lose") {
       setBonusAmount((a) => (a === 10 || !Number.isFinite(a) ? backStake : a));
     }
-  }, [backStake, bonusKind]);
+  }
 
   const specialBonus: SpecialBonus | undefined = useMemo(() => {
     if (mode !== "qualifying" || bonusKind === "none") return undefined;

@@ -307,7 +307,8 @@ export function OfferEditorForm({
 
   useEffect(() => {
     if (!open) return;
-    applyBoot(initialFromPrefill(prefill));
+    // ~20 field resets - deferred a microtask to avoid the sync render cascade.
+    queueMicrotask(() => applyBoot(initialFromPrefill(prefill)));
   }, [open, prefill]);
 
   const isRacingCategory = offerCategoryById(category).isRacing;
@@ -316,11 +317,13 @@ export function OfferEditorForm({
   // Load Racing Desk racecards for the chosen day (courses + races)
   useEffect(() => {
     if (!open || !isRacingCategory || !eventDate) {
-      setRacecards([]);
+      queueMicrotask(() => setRacecards([]));
       return;
     }
     let cancelled = false;
-    setCardsLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) setCardsLoading(true);
+    });
     api<{ racecards: RacingRacecard[] }>(`/api/racing/racecards?date=${encodeURIComponent(eventDate)}`)
       .then((res) => {
         if (!cancelled) setRacecards(res.racecards ?? []);
@@ -371,9 +374,11 @@ export function OfferEditorForm({
       racesAtCourse.find((r) => normalizeOffTime(r.offTime) === want) ??
       racesAtCourse.find((r) => normalizeOffTime(r.offTime).startsWith(want.slice(0, 2)));
     if (hit) {
-      setScopeRaceId(hit.externalId);
-      setScopeRaceLabel(raceLabel(hit));
-      setPreferredOffTime(null);
+      queueMicrotask(() => {
+        setScopeRaceId(hit.externalId);
+        setScopeRaceLabel(raceLabel(hit));
+        setPreferredOffTime(null);
+      });
     }
   }, [scopeMode, preferredOffTime, scopeCourse, scopeRaceId, racesAtCourse]);
 

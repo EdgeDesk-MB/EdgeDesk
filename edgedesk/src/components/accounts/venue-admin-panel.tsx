@@ -286,10 +286,23 @@ function BookieEditRow({
   const [notes, setNotes] = useState(bookie.notes ?? "");
   const accessStatus = (bookie.accessStatus ?? "available") as BookieAccessStatus;
 
-  useEffect(() => {
+  // Adjust-during-render: external edits to the row refresh the form fields.
+  const [prevBookie, setPrevBookie] = useState({
+    id: bookie.id,
+    brandColor: bookie.brandColor,
+    name: bookie.name,
+    notes: bookie.notes,
+  });
+  if (
+    prevBookie.id !== bookie.id ||
+    prevBookie.brandColor !== bookie.brandColor ||
+    prevBookie.name !== bookie.name ||
+    prevBookie.notes !== bookie.notes
+  ) {
+    setPrevBookie({ id: bookie.id, brandColor: bookie.brandColor, name: bookie.name, notes: bookie.notes });
     setColor(bookieBrandColor(bookie.name, bookie.brandColor));
     setNotes(bookie.notes ?? "");
-  }, [bookie.id, bookie.brandColor, bookie.name, bookie.notes]);
+  }
 
   return (
     <>
@@ -376,9 +389,11 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
   const [name, setName] = useState("");
   const [brandColor, setBrandColor] = useState("#3f3f46");
 
-  useEffect(() => {
-    if (name.trim()) setBrandColor(bookieBrandColor(name.trim()));
-  }, [name]);
+  /** Typing a known bookie name adopts its brand colour immediately. */
+  function changeName(next: string) {
+    setName(next);
+    if (next.trim()) setBrandColor(bookieBrandColor(next.trim()));
+  }
 
   async function save() {
     if (!name.trim()) {
@@ -414,7 +429,7 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <BookieNamePicker value={name} onChange={setName} />
+          <BookieNamePicker value={name} onChange={changeName} />
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Brand colour</Label>
             <input
