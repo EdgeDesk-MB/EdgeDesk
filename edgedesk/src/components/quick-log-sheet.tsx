@@ -228,28 +228,21 @@ export function QuickLogSheet() {
                 </div>
               ) : null}
 
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 justify-start gap-3 text-sm"
-                onClick={() => {
-                  setOpen(false);
-                  openAddBet({ quickLogged: true, autoOpenImport: true });
-                }}
-              >
-                <ClipboardPaste className="size-4.5 shrink-0 text-muted-foreground" aria-hidden />
-                Paste slip
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 justify-start gap-3 text-sm"
-                onClick={() => setPath("manual")}
-              >
-                <PencilLine className="size-4.5 shrink-0 text-muted-foreground" aria-hidden />
-                Log manually
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <QuickActionButton
+                  icon={ClipboardPaste}
+                  label="Paste slip"
+                  onPick={() => {
+                    setOpen(false);
+                    openAddBet({ quickLogged: true, autoOpenImport: true });
+                  }}
+                />
+                <QuickActionButton
+                  icon={PencilLine}
+                  label="Log manually"
+                  onPick={() => setPath("manual")}
+                />
+              </div>
 
               <div className="mt-1.5">
                 <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
