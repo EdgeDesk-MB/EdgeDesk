@@ -5,9 +5,10 @@
  * expectation across many attempts, never a lock; every verdict carries a
  * variance tier and the copy never pretends a single session tracks the EV.
  * Casino money stays OUT of the matched P&L surfaces by design.
+ * The log dialog itself lives in CasinoLogProvider (side-nav quick action).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Dices, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,74 +19,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { useCasinoLog } from "@/components/casino/casino-log-provider";
+import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
 import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { api } from "@/hooks/use-app-state";
-import {
-  casinoOfferEv,
-  houseEdgeFromRtp,
-  varianceTier,
-  varianceTierCopy,
-  DEFAULT_RTP,
-  type CasinoVarianceTier,
-} from "@/lib/calc/casino-ev";
+import { houseEdgeFromRtp, varianceTier, DEFAULT_RTP } from "@/lib/calc/casino-ev";
 import type { CasinoOfferRow } from "@/lib/db/schema";
-import { cn } from "@/lib/utils";
 
-const TIER_DOT: Record<CasinoVarianceTier, string> = {
-  low: "bg-emerald-500",
-  medium: "bg-amber-400",
-  high: "bg-red-500",
+const STATUS_LABEL: Record<CasinoOfferRow["status"], string> = {
+  planned: "Planned",
+  active: "In progress",
+  completed: "Completed",
+  expired: "Expired",
 };
-
-const TIER_TEXT: Record<CasinoVarianceTier, string> = {
-  low: "text-emerald-700 dark:text-emerald-300",
-  medium: "text-amber-700 dark:text-amber-300",
-  high: "text-red-700 dark:text-red-300",
-};
-
-function VarianceChip({ tier, className }: { tier: CasinoVarianceTier; className?: string }) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            className={cn("inline-flex cursor-default items-center gap-1", className)}
-            aria-label={`Variance: ${varianceTierCopy(tier)}`}
-          >
-            <span className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT[tier])} aria-hidden />
-            <span className={cn("text-[9px] font-semibold uppercase tracking-wide", TIER_TEXT[tier])}>
-              {tier} variance
-            </span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[220px] text-center text-xs">
-          {varianceTierCopy(tier)}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-function gbp(value: number): string {
-  return value < 0 ? `-£${Math.abs(value).toFixed(2)}` : `+£${value.toFixed(2)}`;
-}
-
-const BASIS_COPY = {
-  entered: "Based on the game RTP you entered",
-  defaulted: "Using the 96% RTP slot default - enter the game's RTP for accuracy",
-} as const;
 
 function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
   const [armed, setArmed] = useState(false);
@@ -111,164 +61,6 @@ function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
     >
       <Trash2 className="size-3.5" />
     </Button>
-  );
-}
-
-const STATUS_LABEL: Record<CasinoOfferRow["status"], string> = {
-  planned: "Planned",
-  active: "In progress",
-  completed: "Completed",
-  expired: "Expired",
-};
-
-function AddOfferDialog({ onSaved }: { onSaved: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [casino, setCasino] = useState("");
-  const [title, setTitle] = useState("");
-  const [bonus, setBonus] = useState(20);
-  const [wagering, setWagering] = useState(35);
-  const [rtpPct, setRtpPct] = useState(NaN); // percent; empty = 96% default
-  const [contributionPct, setContributionPct] = useState(100);
-  const [saving, setSaving] = useState(false);
-
-  const rtpEntered = Number.isFinite(rtpPct);
-  const verdict = useMemo(() => {
-    const rtp = rtpEntered ? rtpPct / 100 : DEFAULT_RTP;
-    const contribution = Number.isFinite(contributionPct)
-      ? Math.min(1, Math.max(0.01, contributionPct / 100))
-      : 1;
-    return {
-      ...casinoOfferEv({
-        bonusAmount: bonus,
-        wageringMultiplier: wagering,
-        houseEdge: houseEdgeFromRtp(rtp),
-        contributionPct: contribution,
-      }),
-      tier: varianceTier({
-        wageringMultiplier: wagering,
-        houseEdge: houseEdgeFromRtp(rtp),
-        contributionPct: contribution,
-      }),
-    };
-  }, [bonus, wagering, rtpPct, rtpEntered, contributionPct]);
-
-  async function save() {
-    if (!title.trim() || !(bonus > 0)) return;
-    setSaving(true);
-    try {
-      await api("/api/casino", {
-        method: "POST",
-        json: {
-          casino: casino.trim() || undefined,
-          title: title.trim(),
-          bonusAmount: bonus,
-          wageringMultiplier: Number.isFinite(wagering) ? wagering : 0,
-          rtp: rtpEntered ? rtpPct / 100 : null,
-          contributionPct: Number.isFinite(contributionPct)
-            ? Math.min(1, Math.max(0.01, contributionPct / 100))
-            : null,
-          status: "active",
-        },
-      });
-      setOpen(false);
-      setTitle("");
-      onSaved();
-    } catch {
-      // Validation rejections leave the dialog open for correction.
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
-          <Plus className="size-3.5" /> Log offer
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Log a casino offer</DialogTitle>
-          <DialogDescription>
-            EV is an expectation across many attempts, never a lock - the variance tier says how
-            far one session can stray.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="casino-name" className="text-xs text-muted-foreground">
-              Casino
-            </Label>
-            <Input
-              id="casino-name"
-              value={casino}
-              onChange={(e) => setCasino(e.target.value)}
-              placeholder="e.g. Sky Vegas"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="casino-title" className="text-xs text-muted-foreground">
-              Offer
-            </Label>
-            <Input
-              id="casino-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Stake £10 get 50 spins"
-            />
-          </div>
-          <NumField label="Bonus value" prefix="£" value={bonus} onChange={setBonus} min={0} />
-          <NumField label="Wagering (×)" value={wagering} onChange={setWagering} min={0} step={1} />
-          <NumField
-            label="Game RTP (%)"
-            value={rtpPct}
-            onChange={(v) => setRtpPct(Number.isFinite(v) ? Math.min(100, v) : v)}
-            min={50}
-            step={0.1}
-            placeholder="96 default"
-            hint={rtpEntered ? undefined : "Using the 96% slot default"}
-          />
-          <NumField
-            label="Contribution (%)"
-            value={contributionPct}
-            onChange={setContributionPct}
-            min={1}
-            step={5}
-          />
-        </div>
-        <div className="rounded-md border bg-selection-subtle/50 px-3 py-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Verdict
-            </span>
-            <span className="flex items-center gap-2">
-              <EvBasisBadge
-                basis={rtpEntered ? "estimated" : "heuristic"}
-                description={rtpEntered ? BASIS_COPY.entered : BASIS_COPY.defaulted}
-              />
-              <VarianceChip tier={verdict.tier} />
-            </span>
-          </div>
-          <p className="mt-1 text-sm font-semibold tabular-nums">
-            EV {gbp(verdict.ev)}{" "}
-            <span className="font-normal text-muted-foreground">
-              · £{verdict.totalTurnover.toFixed(2)} turnover · £{verdict.wageringDrag.toFixed(2)}{" "}
-              expected drag
-            </span>
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{varianceTierCopy(verdict.tier)}</p>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => void save()} disabled={saving || !title.trim() || !(bonus > 0)}>
-            Start offer
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -318,6 +110,7 @@ function CompleteDialog({
 }
 
 export default function CasinoPage() {
+  const { openCasinoLog } = useCasinoLog();
   const [offers, setOffers] = useState<CasinoOfferRow[] | null>(null);
 
   const load = useCallback(() => {
@@ -328,6 +121,9 @@ export default function CasinoPage() {
 
   useEffect(() => {
     load();
+    // The global log dialog announces saves so the list stays current.
+    window.addEventListener(CASINO_CHANGED_EVENT, load);
+    return () => window.removeEventListener(CASINO_CHANGED_EVENT, load);
   }, [load]);
 
   async function remove(offer: CasinoOfferRow) {
@@ -341,7 +137,11 @@ export default function CasinoPage() {
         title="Casino"
         description="Wagering offers with honest EV - an expectation across many attempts, never a lock."
         icon={Dices}
-        action={<AddOfferDialog onSaved={load} />}
+        action={
+          <Button size="sm" className="gap-1.5" onClick={openCasinoLog}>
+            <Plus className="size-3.5" /> Log offer
+          </Button>
+        }
       />
 
       <div className="flex flex-col gap-2 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">

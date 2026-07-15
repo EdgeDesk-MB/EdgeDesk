@@ -20,7 +20,7 @@ Last updated: 2026-07-15 (Phase 10 added — H1 weekly digest, H2 casino desk br
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 604 tests / 85 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 613 tests / 86 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -900,6 +900,16 @@ expected-vs-realised line (A3 idiom, but simple columns — no snapshots/locks i
 **Acceptance.** Vitest for every calc branch with hand-worked numbers; calc-auditor pass;
 `/casino` verified in the harness (create offer → EV verdict + variance chip + basis badge;
 complete → expected-vs-realised line renders); mobile 390×844 pass; suite + build green.
+
+**Follow-ups shipped same day (Sam's requests, 2026-07-15):**
+- *Paste offer*: `parse-casino-offer-text.ts` (pure, tested — bonus/wagering/RTP/contribution
+  from promo text, fractions out) behind `CasinoPasteDialog`; the shared capture block
+  (screenshots→OCR + text merge) was extracted from the offers paste dialog into
+  `src/components/paste-capture.tsx` and both dialogs now use it (the extraction also
+  cleared the two react-compiler lint errors the old dialog carried).
+- *Side-nav quick action*: `CasinoLogProvider` (layout-mounted, `useCasinoLog()`) owns the
+  log dialog; the Casino nav entry gets `quickAction: "casinoLog"` so the + opens it from
+  any page; saves fire `CASINO_CHANGED_EVENT` so a mounted `/casino` list refreshes.
 
 ---
 

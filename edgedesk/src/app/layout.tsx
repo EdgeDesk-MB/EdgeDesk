@@ -11,6 +11,7 @@ import { AddBetProvider } from "@/components/add-bet-provider";
 import { TrackFixtureProvider } from "@/components/track-fixture-provider";
 import { MatchedCalculatorProvider } from "@/components/matched-calculator-provider";
 import { OfferProvider } from "@/components/offers/offer-provider";
+import { CasinoLogProvider } from "@/components/casino/casino-log-provider";
 import { FreeBetsProvider } from "@/components/accounts/free-bets-convert-dialog";
 import { RacingAutopilotListener } from "@/components/racing-autopilot-listener";
 import { OfferReminderListener } from "@/components/offer-reminder-listener";
@@ -67,6 +68,7 @@ export default function RootLayout({
                   <TrackFixtureProvider>
                     <MatchedCalculatorProvider>
                       <OfferProvider>
+                        <CasinoLogProvider>
                         <FreeBetsProvider>
                           <div className="flex h-dvh flex-col overflow-hidden">
                             <AppTopBar />
@@ -101,6 +103,7 @@ export default function RootLayout({
                           <RacingAutopilotListener />
                           <OfferReminderListener />
                         </FreeBetsProvider>
+                      </CasinoLogProvider>
                       </OfferProvider>
                     </MatchedCalculatorProvider>
                   </TrackFixtureProvider>

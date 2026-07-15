@@ -34,6 +34,7 @@ import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
+import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
@@ -51,7 +52,7 @@ type NavLeaf = {
   href: string;
   label: string;
   icon: NavIcon;
-  quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture";
+  quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "casinoLog";
   livePulse?: boolean;
 };
 
@@ -117,7 +118,7 @@ export const NAV_SECTIONS: NavSection[] = [
         quickAction: "addBet",
       },
       { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
-      { kind: "link", href: "/casino", label: "Casino", icon: Dices },
+      { kind: "link", href: "/casino", label: "Casino", icon: Dices, quickAction: "casinoLog" },
       {
         kind: "link",
         href: "/calculators",
@@ -226,6 +227,7 @@ export function AppNav() {
   const { openAddBet } = useAddBet();
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openTrackFixture } = useTrackFixture();
+  const { openCasinoLog } = useCasinoLog();
   const { openOffer } = useOfferDialog();
   const { state } = useAppState(5000);
   const liveTrackedCount = useMemo(
@@ -283,7 +285,9 @@ export function AppNav() {
             ? "Open matched betting calculator"
             : quickAction === "trackFixture"
               ? "Browse fixtures to track"
-              : undefined;
+              : quickAction === "casinoLog"
+                ? "Log a casino offer"
+                : undefined;
     const onQuickAction =
       quickAction === "addBalance"
         ? openAddBalance
@@ -293,7 +297,9 @@ export function AppNav() {
             ? () => openMatchedCalculator()
             : quickAction === "trackFixture"
               ? openTrackFixture
-              : undefined;
+              : quickAction === "casinoLog"
+                ? openCasinoLog
+                : undefined;
 
     return (
       <div key={href} className="relative w-full min-w-0">
