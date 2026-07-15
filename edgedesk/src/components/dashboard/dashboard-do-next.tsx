@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import type { EvBasis } from "@/lib/offers/advantage";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 
 /** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
 function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: EvBasis }) {
@@ -242,9 +243,9 @@ export function DashboardDoNext({ className }: { className?: string }) {
         }
       />
 
-      <div className="px-[var(--layout-page-x)] py-[calc(0.75rem+12px)]">
-        <div
-          className={cn(
+      <div className="pl-[var(--layout-page-x)] py-[calc(0.75rem+12px)] pr-0">
+        <ScrollFadeEdges
+          scrollClassName={cn(
             "flex gap-3 overflow-x-auto overflow-y-visible",
             "snap-x snap-mandatory",
             "px-px py-px",
@@ -265,7 +266,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
               }
             />
           ))}
-        </div>
+        </ScrollFadeEdges>
       </div>
     </section>
   );

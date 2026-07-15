@@ -201,6 +201,7 @@ export const LivePnlChart = memo(function LivePnlChart({
         <>
           <DashboardSectionHeader
             prominent
+            className="bg-card"
             icon={hasLiveEvent ? Radio : undefined}
             iconClassName={
               hasLiveEvent ? "animate-pulse text-emerald-600" : undefined
