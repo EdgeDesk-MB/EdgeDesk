@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,28 +46,74 @@ export function TransferFundsDialog({
     [accounts]
   );
 
-  const [bankId, setBankId] = useState<string>("");
-  const [venueId, setVenueId] = useState<string>("");
+  if (banks.length === 0) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Transfer funds</DialogTitle>
+            <DialogDescription>
+              Add a bank account first (Accounts → Add bank), then transfer between bank and
+              bookies.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Gate on open: the form renders DialogContent itself, so it must be
+          unmounted explicitly for state to reset between opens. */}
+      {open ? (
+        <TransferFundsForm
+          banks={banks}
+          venues={venues}
+          defaultVenueId={defaultVenueId}
+          onOpenChange={onOpenChange}
+          onSaved={onSaved}
+        />
+      ) : null}
+    </Dialog>
+  );
+}
+
+/**
+ * Form state lives here, inside DialogContent, which Radix unmounts on close -
+ * every open starts fresh from props, no reset effect needed.
+ */
+function TransferFundsForm({
+  banks,
+  venues,
+  defaultVenueId,
+  onOpenChange,
+  onSaved,
+}: {
+  banks: AccountBalance[];
+  venues: AccountBalance[];
+  defaultVenueId?: number | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [bankId, setBankId] = useState<string>(() => (banks[0] ? String(banks[0].id) : ""));
+  const [venueId, setVenueId] = useState<string>(() => {
+    const preferred =
+      (defaultVenueId != null && venues.find((v) => v.id === defaultVenueId)) ||
+      venues[0];
+    return preferred ? String(preferred.id) : "";
+  });
   const [direction, setDirection] = useState<"to_venue" | "to_bank">("to_venue");
   const [amount, setAmount] = useState(0);
   const [fee, setFee] = useState(0);
   const [note, setNote] = useState("");
   const [pendingBankCredit, setPendingBankCredit] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setBankId(banks[0] ? String(banks[0].id) : "");
-    const preferred =
-      (defaultVenueId != null && venues.find((v) => v.id === defaultVenueId)) ||
-      venues[0];
-    setVenueId(preferred ? String(preferred.id) : "");
-    setDirection("to_venue");
-    setAmount(0);
-    setFee(0);
-    setNote("");
-    setPendingBankCredit(true);
-  }, [open, banks, venues, defaultVenueId]);
 
   async function save() {
     if (!bankId || !venueId || !(amount > 0)) {
@@ -100,37 +146,15 @@ export function TransferFundsDialog({
     }
   }
 
-  if (banks.length === 0) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Transfer funds</DialogTitle>
-            <DialogDescription>
-              Add a bank account first (Accounts → Add bank), then transfer between bank and
-              bookies.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Transfer funds</DialogTitle>
-          <DialogDescription>
-            Move cash between a bank and a bookie/exchange. Withdrawals can stay pending until
-            they hit your statement.
-          </DialogDescription>
-        </DialogHeader>
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Transfer funds</DialogTitle>
+        <DialogDescription>
+          Move cash between a bank and a bookie/exchange. Withdrawals can stay pending until
+          they hit your statement.
+        </DialogDescription>
+      </DialogHeader>
 
         <div className="flex flex-col gap-3 py-1">
           <div className="flex flex-col gap-1.5">
@@ -236,7 +260,6 @@ export function TransferFundsDialog({
             Transfer
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }

@@ -68,21 +68,10 @@ function FreeBetsConvertDialog({
 }) {
   const { state } = useAppState(open ? 5_000 : 0);
   const { openAddBet } = useAddBet();
-  const [lots, setLots] = useState<Lot[]>([]);
-  const [loading, setLoading] = useState(false);
 
   const freeBetTotal = state?.balances?.accounts
     ?.filter((a) => a.type === "bookie")
     .reduce((s, a) => s + (a.freeBets ?? 0), 0);
-
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    api<{ lots: Lot[] }>("/api/accounts/free-bets")
-      .then((r) => setLots(r.lots ?? []))
-      .catch(() => setLots([]))
-      .finally(() => setLoading(false));
-  }, [open, freeBetTotal]);
 
   function convert(lot: Lot) {
     openAddBet({
@@ -110,8 +99,42 @@ function FreeBetsConvertDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {open ? <FreeBetsLots freeBetTotal={freeBetTotal} onConvert={convert} /> : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Lots live in a child mounted per open, refetching as the polled free-bet
+ * total moves; loading is the null state, so no synchronous effect setState.
+ */
+function FreeBetsLots({
+  freeBetTotal,
+  onConvert,
+}: {
+  freeBetTotal: number | undefined;
+  onConvert: (lot: Lot) => void;
+}) {
+  const [lots, setLots] = useState<Lot[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api<{ lots: Lot[] }>("/api/accounts/free-bets")
+      .then((r) => {
+        if (live) setLots(r.lots ?? []);
+      })
+      .catch(() => {
+        if (live) setLots([]);
+      });
+    return () => {
+      live = false;
+    };
+  }, [freeBetTotal]);
+
+  return (
         <div className="flex flex-col gap-2">
-          {loading && lots.length === 0 ? (
+          {lots == null ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
           ) : lots.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
@@ -141,7 +164,7 @@ function FreeBetsConvertDialog({
                   size="sm"
                   variant="outline"
                   className="h-8 shrink-0"
-                  onClick={() => convert(lot)}
+                  onClick={() => onConvert(lot)}
                 >
                   Convert
                 </Button>
@@ -149,7 +172,5 @@ function FreeBetsConvertDialog({
             ))
           )}
         </div>
-      </DialogContent>
-    </Dialog>
   );
 }

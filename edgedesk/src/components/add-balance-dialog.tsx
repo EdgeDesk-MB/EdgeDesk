@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,9 +49,46 @@ export function AddBalanceDialog({
   accounts: AccountBalance[];
   onSaved: () => void;
 }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Gate on open: the form renders DialogContent itself, so it must be
+          unmounted explicitly for state to reset between opens. */}
+      {open ? (
+        <AddBalanceForm accounts={accounts} onOpenChange={onOpenChange} onSaved={onSaved} />
+      ) : null}
+    </Dialog>
+  );
+}
+
+function seedRow(account: AccountBalance | undefined, mode: string): TopUpRow[] {
+  if (!account) return [];
+  return [
+    {
+      accountId: account.id,
+      amount: mode === "adjustment" ? roundMoney(account.balance) : 0,
+      note: "",
+      fundKind: "cash",
+    },
+  ];
+}
+
+/**
+ * Form state lives inside DialogContent, which Radix unmounts on close, so
+ * every open starts fresh with no reset effects. The first row is derived at
+ * render while `rows` is empty, covering accounts that load mid-open.
+ */
+function AddBalanceForm({
+  accounts,
+  onOpenChange,
+  onSaved,
+}: {
+  accounts: AccountBalance[];
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
   const { exchanges } = useExchanges();
   const [mode, setMode] = useState<"top_up" | "withdrawal" | "adjustment">("top_up");
-  const [rows, setRows] = useState<TopUpRow[]>([]);
+  const [rows, setRows] = useState<TopUpRow[]>(() => seedRow(accounts[0], "top_up"));
   const [affectPnl, setAffectPnl] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -61,48 +98,23 @@ export function AddBalanceDialog({
   const [newExchangeId, setNewExchangeId] = useState<string>("");
   const [exchangeCustom, setExchangeCustom] = useState(false);
   const [openingBalance, setOpeningBalance] = useState(0);
-  const prevModeRef = useRef<typeof mode>("top_up");
 
-  useEffect(() => {
-    if (!open) {
-      setRows([]);
-      setShowAddAccount(false);
-      setMode("top_up");
-      setAffectPnl(false);
-      setExchangeCustom(false);
-      prevModeRef.current = "top_up";
-    }
-  }, [open]);
+  const effectiveRows = rows.length > 0 ? rows : seedRow(accounts[0], mode);
 
-  useEffect(() => {
-    if (!open || accounts.length === 0) return;
-
-    const modeChanged = prevModeRef.current !== mode;
-    prevModeRef.current = mode;
-
-    setRows((prev) => {
-      if (prev.length === 0) {
-        const account = accounts[0];
-        return [
-          {
-            accountId: account.id,
-            amount: mode === "adjustment" ? roundMoney(account.balance) : 0,
-            note: "",
-            fundKind: "cash",
-          },
-        ];
-      }
-      if (!modeChanged) return prev;
-      return prev.map((row) => {
+  /** Mode change reshapes every row - amounts reset (or mirror balances). */
+  function changeMode(next: typeof mode) {
+    setMode(next);
+    setRows(
+      effectiveRows.map((row) => {
         const account = accounts.find((a) => a.id === row.accountId) ?? accounts[0];
         return {
           ...row,
-          amount: mode === "adjustment" ? roundMoney(account.balance) : 0,
-          fundKind: account.type === "bookie" ? row.fundKind : "cash",
+          amount: next === "adjustment" ? roundMoney(account?.balance ?? 0) : 0,
+          fundKind: account?.type === "bookie" ? row.fundKind : "cash",
         };
-      });
-    });
-  }, [mode, open, accounts]);
+      })
+    );
+  }
 
   const signedAmount = (amount: number) =>
     mode === "withdrawal" ? -Math.abs(amount) : amount;
@@ -122,7 +134,7 @@ export function AddBalanceDialog({
   }
 
   async function save() {
-    const entries = rows
+    const entries = effectiveRows
       .filter((r) => rowLedgerAmount(r) !== 0)
       .map((r) => {
         const account = accounts.find((a) => a.id === r.accountId);
@@ -154,7 +166,7 @@ export function AddBalanceDialog({
       );
       return;
     }
-    if (entries.length < rows.filter((r) => rowLedgerAmount(r) !== 0).length) {
+    if (entries.length < effectiveRows.filter((r) => rowLedgerAmount(r) !== 0).length) {
       toast.error("Free bets can only be added to bookie accounts");
       return;
     }
@@ -211,32 +223,22 @@ export function AddBalanceDialog({
     }
   }
 
-  const totalDelta = useMemo(
-    () => roundMoney(rows.reduce((s, r) => s + rowLedgerAmount(r), 0)),
-    [rows, mode, accounts]
-  );
+  // Cheap reductions - plain derivation keeps them exact every render.
+  const totalDelta = roundMoney(effectiveRows.reduce((s, r) => s + rowLedgerAmount(r), 0));
 
-  const totalFreeBets = useMemo(
-    () =>
-      mode === "top_up"
-        ? rows
-            .filter((r) => r.fundKind === "free_bet")
-            .reduce((s, r) => s + Math.abs(r.amount), 0)
-        : 0,
-    [rows, mode]
-  );
+  const totalFreeBets =
+    mode === "top_up"
+      ? effectiveRows
+          .filter((r) => r.fundKind === "free_bet")
+          .reduce((s, r) => s + Math.abs(r.amount), 0)
+      : 0;
 
-  const totalCash = useMemo(
-    () =>
-      rows
-        .filter((r) => mode !== "top_up" || r.fundKind === "cash")
-        .reduce((s, r) => s + signedAmount(r.amount), 0),
-    [rows, mode]
-  );
+  const totalCash = effectiveRows
+    .filter((r) => mode !== "top_up" || r.fundKind === "cash")
+    .reduce((s, r) => s + signedAmount(r.amount), 0);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[780px]">
+    <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[780px]">
         <DialogHeader className="border-b px-6 pb-4 pt-7">
           <DialogTitle className="text-[25px] font-extrabold tracking-tight">
             Adjust balance
@@ -248,7 +250,7 @@ export function AddBalanceDialog({
         </DialogHeader>
 
         <div className="app-scroll-nested flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-6">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+          <Tabs value={mode} onValueChange={(v) => changeMode(v as typeof mode)}>
             <TabsList>
               <TabsTrigger value="top_up">Top up</TabsTrigger>
               <TabsTrigger value="withdrawal">Withdraw</TabsTrigger>
@@ -262,7 +264,7 @@ export function AddBalanceDialog({
             </p>
           )}
 
-          {rows.map((row, i) => {
+          {effectiveRows.map((row, i) => {
             const account = accounts.find((a) => a.id === row.accountId);
             const canFreeBet = mode === "top_up" && account?.type === "bookie";
 
@@ -281,8 +283,8 @@ export function AddBalanceDialog({
                   <Select
                     value={String(row.accountId)}
                     onValueChange={(v) =>
-                      setRows((prev) =>
-                        prev.map((r, j) => {
+                      setRows(
+                        effectiveRows.map((r, j) => {
                           if (j !== i) return r;
                           const nextId = Number(v);
                           const nextAccount = accounts.find((a) => a.id === nextId);
@@ -324,8 +326,8 @@ export function AddBalanceDialog({
                     <Select
                       value={row.fundKind}
                       onValueChange={(v) =>
-                        setRows((prev) =>
-                          prev.map((r, j) =>
+                        setRows(
+                          effectiveRows.map((r, j) =>
                             j === i ? { ...r, fundKind: v as FundKind } : r
                           )
                         )
@@ -355,8 +357,8 @@ export function AddBalanceDialog({
                     prefix=""
                     value={row.amount || ""}
                     onChange={(e) =>
-                      setRows((prev) =>
-                        prev.map((r, j) =>
+                      setRows(
+                        effectiveRows.map((r, j) =>
                           j === i
                             ? { ...r, amount: roundMoney(parseFloat(e.target.value) || 0) }
                             : r
@@ -376,8 +378,8 @@ export function AddBalanceDialog({
                   <Input
                     value={row.note}
                     onChange={(e) =>
-                      setRows((prev) =>
-                        prev.map((r, j) => (j === i ? { ...r, note: e.target.value } : r))
+                      setRows(
+                        effectiveRows.map((r, j) => (j === i ? { ...r, note: e.target.value } : r))
                       )
                     }
                     placeholder="Optional"
@@ -388,8 +390,8 @@ export function AddBalanceDialog({
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground"
-                  disabled={rows.length <= 1}
-                  onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
+                  disabled={effectiveRows.length <= 1}
+                  onClick={() => setRows(effectiveRows.filter((_, j) => j !== i))}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -419,8 +421,8 @@ export function AddBalanceDialog({
               size="sm"
               disabled={accounts.length === 0}
               onClick={() =>
-                setRows((prev) => [
-                  ...prev,
+                setRows([
+                  ...effectiveRows,
                   {
                     accountId: accounts[0]?.id ?? 0,
                     amount: mode === "adjustment" ? (accounts[0]?.balance ?? 0) : 0,
@@ -570,7 +572,6 @@ export function AddBalanceDialog({
             Save balances
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }
