@@ -16,6 +16,8 @@ const createSchema = z.object({
   contributionPct: z.number().min(0.01).max(1).nullable().optional(),
   status: z.enum(["planned", "active"]).optional(),
   notes: z.string().max(1000).nullable().optional(),
+  /** Recommended (highest-RTP) eligible game */
+  game: z.string().max(120).nullable().optional(),
 });
 
 export async function GET() {
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
       status: input.status ?? "planned",
       expectedEv: ev,
       notes: input.notes ?? null,
+      game: input.game?.trim() || null,
       createdAt: Date.now(),
     })
     .returning()

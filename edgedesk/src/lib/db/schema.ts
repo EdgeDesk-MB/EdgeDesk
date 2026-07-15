@@ -318,8 +318,21 @@ export const casinoOffers = sqliteTable("casino_offers", {
   /** Realised £ entered by the user at completion */
   actualProfit: real("actual_profit"),
   notes: text("notes"),
+  /** Recommended (highest-RTP) eligible game chosen at log time */
+  game: text("game"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
+});
+
+/** Game RTP reference library (H2) - seeded with published values, user-editable. */
+export const casinoGames = sqliteTable("casino_games", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  provider: text("provider"),
+  /** Fraction 0-1 */
+  rtp: real("rtp").notNull(),
+  source: text("source").notNull().default("user"),
+  updatedAt: integer("updated_at").notNull(),
 });
 
 export const racingOddsOverrides = sqliteTable("racing_odds_overrides", {
@@ -349,3 +362,4 @@ export type NewOfferRow = typeof offers.$inferInsert;
 export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
 export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;
+export type CasinoGameRow = typeof casinoGames.$inferSelect;

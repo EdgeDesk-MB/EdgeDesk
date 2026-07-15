@@ -239,8 +239,17 @@ CREATE TABLE IF NOT EXISTS casino_offers (
   expected_ev REAL NOT NULL,
   actual_profit REAL,
   notes TEXT,
+  game TEXT,
   created_at INTEGER NOT NULL,
   completed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS casino_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  provider TEXT,
+  rtp REAL NOT NULL,
+  source TEXT NOT NULL DEFAULT 'user',
+  updated_at INTEGER NOT NULL
 );
 `);
 
@@ -262,6 +271,7 @@ CREATE TABLE IF NOT EXISTS casino_offers (
   addColumn("bets", "exchange_id INTEGER");
   addColumn("bets", "balance_ledgered INTEGER NOT NULL DEFAULT 0");
   addColumn("bets", "balance_settled INTEGER NOT NULL DEFAULT 0");
+  addColumn("casino_offers", "game TEXT");
   addColumn("bets", "offer_id INTEGER");
   addColumn("bets", "source TEXT");
   addColumn("offers", "sport TEXT");

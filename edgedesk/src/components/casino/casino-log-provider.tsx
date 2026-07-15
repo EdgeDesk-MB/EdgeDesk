@@ -6,7 +6,7 @@
  * Saving fires CASINO_CHANGED_EVENT so the Casino page refreshes if mounted.
  */
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumField } from "@/components/calc/num-field";
+import { CasinoGamePicker } from "@/components/casino/casino-game-picker";
 import { CasinoPasteDialog } from "@/components/casino/casino-paste-dialog";
 import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
@@ -29,6 +30,7 @@ import {
   varianceTierCopy,
   DEFAULT_RTP,
 } from "@/lib/calc/casino-ev";
+import { bestGame, matchGamesInText, type CasinoGame } from "@/lib/casino/game-library";
 
 type CasinoLogContextValue = {
   openCasinoLog: () => void;
@@ -51,8 +53,18 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
   const [rtpPct, setRtpPct] = useState(NaN); // percent; empty = 96% default
   const [contributionPct, setContributionPct] = useState(100);
   const [saving, setSaving] = useState(false);
+  const [games, setGames] = useState<CasinoGame[]>([]);
+  const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
 
   const openCasinoLog = useCallback(() => setOpen(true), []);
+
+  // The library is small and user-editable - refresh it each time the dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    api<{ games: CasinoGame[] }>("/api/casino/games")
+      .then((r) => setGames(r.games))
+      .catch(() => {});
+  }, [open]);
 
   function resetForm() {
     setCasino("");
@@ -61,6 +73,17 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
     setWagering(35);
     setRtpPct(NaN);
     setContributionPct(100);
+    setSelectedGameIds([]);
+  }
+
+  const selectedGames = games.filter((g) => selectedGameIds.includes(g.id));
+  const recommendedGame = bestGame(selectedGames);
+
+  /** Selection drives the RTP field (still editable afterwards). */
+  function applySelection(ids: number[]) {
+    setSelectedGameIds(ids);
+    const best = bestGame(games.filter((g) => ids.includes(g.id)));
+    if (best) setRtpPct(best.rtp * 100);
   }
 
   const rtpEntered = Number.isFinite(rtpPct);
@@ -100,6 +123,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
             ? Math.min(1, Math.max(0.01, contributionPct / 100))
             : null,
           status: "active",
+          game: recommendedGame?.name ?? null,
         },
       });
       setOpen(false);
@@ -139,6 +163,10 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                 if (draft.wageringMultiplier != null) setWagering(draft.wageringMultiplier);
                 if (draft.rtp != null) setRtpPct(draft.rtp * 100);
                 if (draft.contributionPct != null) setContributionPct(draft.contributionPct * 100);
+                // Recognise the promo's eligible-games list against the library;
+                // the best pick's library RTP then beats any generic parsed RTP.
+                const matched = matchGamesInText(draft.sourceText, games);
+                if (matched.length > 0) applySelection(matched.map((g) => g.id));
               }}
             />
           </div>
@@ -184,6 +212,18 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
               step={5}
             />
           </div>
+          <CasinoGamePicker
+            games={games}
+            selectedIds={selectedGameIds}
+            onToggle={(id) =>
+              applySelection(
+                selectedGameIds.includes(id)
+                  ? selectedGameIds.filter((x) => x !== id)
+                  : [...selectedGameIds, id]
+              )
+            }
+            onRemove={(id) => applySelection(selectedGameIds.filter((x) => x !== id))}
+          />
           <div className="rounded-md border bg-selection-subtle/50 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

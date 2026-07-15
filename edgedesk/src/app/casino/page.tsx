@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { CasinoGameLibraryDialog } from "@/components/casino/casino-game-library-dialog";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
 import { EmptyState } from "@/components/help/empty-state";
@@ -28,6 +29,7 @@ import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { api } from "@/hooks/use-app-state";
 import { houseEdgeFromRtp, varianceTier, DEFAULT_RTP } from "@/lib/calc/casino-ev";
+import { formatRtpPct } from "@/lib/casino/game-library";
 import type { CasinoOfferRow } from "@/lib/db/schema";
 
 const STATUS_LABEL: Record<CasinoOfferRow["status"], string> = {
@@ -138,9 +140,12 @@ export default function CasinoPage() {
         description="Wagering offers with honest EV - an expectation across many attempts, never a lock."
         icon={Dices}
         action={
-          <Button size="sm" className="gap-1.5" onClick={openCasinoLog}>
-            <Plus className="size-3.5" /> Log offer
-          </Button>
+          <>
+            <CasinoGameLibraryDialog />
+            <Button size="sm" className="gap-1.5" onClick={openCasinoLog}>
+              <Plus className="size-3.5" /> Log offer
+            </Button>
+          </>
         }
       />
 
@@ -172,7 +177,8 @@ export default function CasinoPage() {
                     <span className="text-xs text-muted-foreground">
                       {offer.casino ? `${offer.casino} · ` : ""}
                       {STATUS_LABEL[offer.status]} · {offer.wageringMultiplier}× wagering ·{" "}
-                      {Math.round((offer.rtp ?? DEFAULT_RTP) * 100)}% RTP
+                      {formatRtpPct(offer.rtp ?? DEFAULT_RTP)} RTP
+                      {offer.game ? ` · play ${offer.game}` : ""}
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">

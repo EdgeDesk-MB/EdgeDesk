@@ -20,7 +20,7 @@ Last updated: 2026-07-15 (Phase 10 added — H1 weekly digest, H2 casino desk br
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 613 tests / 86 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 621 tests / 87 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -910,6 +910,16 @@ complete → expected-vs-realised line renders); mobile 390×844 pass; suite + b
 - *Side-nav quick action*: `CasinoLogProvider` (layout-mounted, `useCasinoLog()`) owns the
   log dialog; the Casino nav entry gets `quickAction: "casinoLog"` so the + opens it from
   any page; saves fire `CASINO_CHANGED_EVENT` so a mounted `/casino` list refreshes.
+- *Game RTP library*: `casino_games` table lazily seeded on first `/api/casino/games` GET
+  from `src/lib/casino/game-library.ts` (published base RTPs — HONESTY: operators licence
+  lower variants, all copy says verify in the game info, every row editable; seed only runs
+  on an empty table so user edits/deletions never resurrect). Log dialog gains an
+  eligible-games picker (cmdk search, chips, starred best pick) that drives the RTP field
+  from the highest-RTP selection and stores the recommendation on `casino_offers.game`
+  (additive column); pasted promo text auto-matches library games via `matchGamesInText`
+  (longest-name-first span consumption so "Fishin' Frenzy The Big Match" never also credits
+  bare "Fishin' Frenzy"). Library manager dialog on the Casino page (upsert by name,
+  delete).
 
 ---
 

@@ -19,6 +19,8 @@ export interface ParsedCasinoOfferDraft {
   contributionPct: number | null;
   confidence: "high" | "medium" | "low";
   notes: string[];
+  /** The raw pasted text, so the log dialog can match eligible games against the library. */
+  sourceText: string;
 }
 
 const NUM = String.raw`(\d+(?:\.\d+)?)`;
@@ -128,5 +130,6 @@ export function parseCasinoOfferText(text: string): ParsedCasinoOfferDraft {
     contributionPct,
     confidence,
     notes,
+    sourceText: text,
   };
 }
