@@ -782,16 +782,25 @@ function AddBankDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Gate on open: the body renders DialogContent itself, so it must be
+          unmounted explicitly for state to reset between opens. */}
+      {open ? <AddBankBody onOpenChange={onOpenChange} onSaved={onSaved} /> : null}
+    </Dialog>
+  );
+}
+
+function AddBankBody({
+  onOpenChange,
+  onSaved,
+}: {
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
   const [name, setName] = useState("");
   const [opening, setOpening] = useState(0);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) {
-      setName("");
-      setOpening(0);
-    }
-  }, [open]);
 
   async function save() {
     if (!name.trim()) {
@@ -819,8 +828,7 @@ function AddBankDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+    <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Add bank</DialogTitle>
           <DialogDescription>
@@ -854,8 +862,7 @@ function AddBankDialog({
             Add bank
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }
 
@@ -872,25 +879,67 @@ function AccountDetailDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [accessStatus, setAccessStatus] = useState<"available" | "gubbed" | "closed">(
-    "available"
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Keyed, open-gated body: fresh form per account, state seeded from
+          props in initialisers - no sync effect, and account identity churn
+          from the 3s poll cannot reset the form (only the id matters). */}
+      {open && account ? (
+        <AccountDetailBody
+          key={account.id}
+          account={account}
+          banks={banks}
+          onOpenChange={onOpenChange}
+          onSaved={onSaved}
+        />
+      ) : null}
+    </Dialog>
   );
-  const [fundedBy, setFundedBy] = useState<string>("none");
-  const [notes, setNotes] = useState("");
-  const [wrRemaining, setWrRemaining] = useState(0);
-  const [wrMinOdds, setWrMinOdds] = useState("");
-  const [wrType, setWrType] = useState<"stake" | "risk_win">("stake");
+}
+
+function AccountDetailBody({
+  account,
+  banks,
+  onOpenChange,
+  onSaved,
+}: {
+  account: AccountBalance;
+  banks: AccountBalance[];
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(account.name);
+  const [accessStatus, setAccessStatus] = useState<"available" | "gubbed" | "closed">(
+    account.accessStatus === "gubbed" || account.accessStatus === "closed"
+      ? account.accessStatus
+      : "available"
+  );
+  const [fundedBy, setFundedBy] = useState<string>(
+    account.fundedByAccountId != null ? String(account.fundedByAccountId) : "none"
+  );
+  const [notes, setNotes] = useState(account.notes ?? "");
+  const [wrRemaining, setWrRemaining] = useState(account.wrRemaining ?? 0);
+  const [wrMinOdds, setWrMinOdds] = useState(
+    account.wrMinOdds != null && account.wrMinOdds > 1 ? String(account.wrMinOdds) : ""
+  );
+  const [wrType, setWrType] = useState<"stake" | "risk_win">(
+    account.wrType === "risk_win" ? "risk_win" : "stake"
+  );
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [freeBetLots, setFreeBetLots] = useState<
     Array<{ id: number; remaining: number; originalAmount: number; note: string | null }>
   >([]);
   const [saving, setSaving] = useState(false);
-  const [loadingTx, setLoadingTx] = useState(false);
+  const [loadingTx, setLoadingTx] = useState(true);
   const [removingLotId, setRemovingLotId] = useState<number | null>(null);
 
+  useEffect(() => {
+    void loadLedger(account.id, { silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only (body is keyed by account id)
+  }, []);
+
+  /** silent = keep the current rows on failure (refreshes after actions). */
   async function loadLedger(accountId: number, opts?: { silent?: boolean }) {
-    if (!opts?.silent) setLoadingTx(true);
     try {
       const r = await api<{
         transactions: TxRow[];
@@ -909,32 +958,9 @@ function AccountDetailDialog({
         setFreeBetLots([]);
       }
     } finally {
-      if (!opts?.silent) setLoadingTx(false);
+      setLoadingTx(false);
     }
   }
-
-  // Depend on account.id only - full `account` identity changes every app-state poll (~3s)
-  // and was resetting the form + flashing "Loading…" in the ledger.
-  useEffect(() => {
-    if (!account || !open) return;
-    setName(account.name);
-    setAccessStatus(
-      account.accessStatus === "gubbed" || account.accessStatus === "closed"
-        ? account.accessStatus
-        : "available"
-    );
-    setFundedBy(
-      account.fundedByAccountId != null ? String(account.fundedByAccountId) : "none"
-    );
-    setNotes(account.notes ?? "");
-    setWrRemaining(account.wrRemaining ?? 0);
-    setWrMinOdds(
-      account.wrMinOdds != null && account.wrMinOdds > 1 ? String(account.wrMinOdds) : ""
-    );
-    setWrType(account.wrType === "risk_win" ? "risk_win" : "stake");
-    void loadLedger(account.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: open + id only
-  }, [account?.id, open]);
 
   async function removeFreeBet(lotId: number) {
     if (!account) return;
@@ -1000,8 +1026,6 @@ function AccountDetailDialog({
     }
   }
 
-  if (!account) return null;
-
   const freeBetsShown =
     account.type === "bookie"
       ? loadingTx
@@ -1010,8 +1034,7 @@ function AccountDetailDialog({
       : 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0">
+    <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-5 pb-3 pt-5">
           <DialogTitle className="flex items-center gap-2">
             {account.type === "bookie" ? (
@@ -1258,8 +1281,7 @@ function AccountDetailDialog({
             Save
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   );
 }
 

@@ -113,12 +113,17 @@ function TrackerContent() {
     if (!highlightParam) return;
     const id = Number(highlightParam);
     if (!Number.isFinite(id)) return;
-    setHighlightId(id);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("highlight");
-    const qs = params.toString();
-    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
-    const fadeTimer = window.setTimeout(() => setHighlightId(null), 2000);
+    // Deferred a microtask: URL-driven highlight is external state, and the
+    // sync-setState-in-effect render cascade is what we are avoiding.
+    let fadeTimer: number | undefined;
+    queueMicrotask(() => {
+      setHighlightId(id);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("highlight");
+      const qs = params.toString();
+      router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+      fadeTimer = window.setTimeout(() => setHighlightId(null), 2000);
+    });
     return () => clearTimeout(fadeTimer);
     // Only react to highlight changes - avoid replace loops from searchParams identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps

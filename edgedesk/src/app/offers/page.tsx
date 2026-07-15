@@ -135,12 +135,16 @@ function OffersContent() {
     if (!highlightParam) return;
     const id = Number(highlightParam);
     if (!Number.isFinite(id)) return;
-    setHighlightId(id);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("highlight");
-    const qs = params.toString();
-    router.replace(qs ? `/offers?${qs}` : "/offers", { scroll: false });
-    const fadeTimer = window.setTimeout(() => setHighlightId(null), 2500);
+    // Deferred a microtask - see tracker/page.tsx highlight handling.
+    let fadeTimer: number | undefined;
+    queueMicrotask(() => {
+      setHighlightId(id);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("highlight");
+      const qs = params.toString();
+      router.replace(qs ? `/offers?${qs}` : "/offers", { scroll: false });
+      fadeTimer = window.setTimeout(() => setHighlightId(null), 2500);
+    });
     return () => clearTimeout(fadeTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightParam, router]);

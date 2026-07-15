@@ -555,10 +555,20 @@ function PreferencesPanel({
   const [pollMs, setPollMs] = useState(String(settings.dashboardPollMs));
   const defaultExchange = exchanges.find((e) => e.isDefault) ?? exchanges[0] ?? null;
 
-  useEffect(() => {
+  // Adjust-during-render: saved settings coming back from the server refresh
+  // the text fields without an effect round-trip.
+  const [prevDefaults, setPrevDefaults] = useState({
+    stake: settings.defaultBackStake,
+    poll: settings.dashboardPollMs,
+  });
+  if (
+    prevDefaults.stake !== settings.defaultBackStake ||
+    prevDefaults.poll !== settings.dashboardPollMs
+  ) {
+    setPrevDefaults({ stake: settings.defaultBackStake, poll: settings.dashboardPollMs });
     setStake(String(settings.defaultBackStake));
     setPollMs(String(settings.dashboardPollMs));
-  }, [settings]);
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -1215,7 +1225,10 @@ function NotificationPermissionButton() {
   const [status, setStatus] = useState<NotificationPermission | "unsupported">("default");
 
   useEffect(() => {
-    setStatus(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+    // Client-only API - defer a microtask so hydration settles first.
+    queueMicrotask(() => {
+      setStatus(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+    });
   }, []);
 
   if (status === "unsupported") {

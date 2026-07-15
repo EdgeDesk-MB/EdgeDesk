@@ -220,6 +220,7 @@ function EpDeskContent() {
     const away = searchParams.get("away")?.trim();
     if (!home && !away) return;
     fixtureApplied.current = true;
+    queueMicrotask(() => {
     setS((prev) => ({
       ...DEFAULTS,
       // Keep wallet prefs / stake sizing from previous session
@@ -243,6 +244,7 @@ function EpDeskContent() {
     toast.message("Match loaded from fixtures", {
       description: "Odds reset - paste exchange + EP prices for this match.",
     });
+    });
   }, [hydrated, searchParams]);
 
   // Prefer available wallets for empty EP book fields once accounts load
@@ -250,6 +252,7 @@ function EpDeskContent() {
     if (!hydrated || bookieWallets.length === 0) return;
     const available = bookieWallets.filter((b) => b.accessStatus === "available");
     if (available.length === 0) return;
+    queueMicrotask(() =>
     setS((prev) => {
       const next = { ...prev };
       let changed = false;
@@ -283,7 +286,8 @@ function EpDeskContent() {
         changed = true;
       }
       return changed ? next : prev;
-    });
+    })
+    );
   }, [hydrated, bookieWallets]);
 
   useEffect(() => {

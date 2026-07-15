@@ -63,19 +63,27 @@ export default function HistoryPage() {
     storeViewDensity(next);
   }
 
-  const load = useCallback(async (nextFilter: HistoryFilter) => {
+  /** Loading flips in the event handler; the effect only does async work. */
+  function changeFilter(next: HistoryFilter) {
+    setFilter(next);
     setLoading(true);
-    try {
-      const res = await api<HistoryPayload>(`/api/history?filter=${nextFilter}&limit=200`);
-      setData(res);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }
 
   useEffect(() => {
-    void load(filter);
-  }, [filter, load]);
+    let live = true;
+    api<HistoryPayload>(`/api/history?filter=${filter}&limit=200`)
+      .then((res) => {
+        if (!live) return;
+        setData(res);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [filter]);
 
   const ctx = useMemo(
     () =>
@@ -127,7 +135,7 @@ export default function HistoryPage() {
               <button
                 key={f.id}
                 type="button"
-                onClick={() => setFilter(f.id)}
+                onClick={() => changeFilter(f.id)}
                 className={filterPillState(filter === f.id)}
               >
                 {historyFilterIcon(f.id)}
