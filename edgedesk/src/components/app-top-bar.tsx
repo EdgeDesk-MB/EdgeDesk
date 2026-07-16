@@ -6,7 +6,10 @@ import { EdgeDeskLogoIcon } from "@/components/edge-desk-logo-icon";
 import { AppTopBarMenu, TopBarButton } from "@/components/app-top-bar-menu";
 import { MoneyFlow } from "@/components/money-flow";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
+import { useMemo } from "react";
 import { useAppState } from "@/hooks/use-app-state";
+import { accountOwner } from "@/lib/accounts/owners";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   appNavColumn,
   appNavInset,
@@ -87,10 +90,13 @@ function TopBarBankroll({
   exchange,
   inBets,
   total,
+  ownerLines,
 }: {
   exchange: number;
   inBets: number;
   total: number;
+  /** J8: per-owner bookie balances; tooltip renders when >1 owner */
+  ownerLines: Array<{ owner: string; balance: number }>;
 }) {
   const showInBets = inBets > 0.005;
   const parts = [
@@ -99,7 +105,7 @@ function TopBarBankroll({
     { label: "Total", value: total },
   ] as const;
 
-  return (
+  const chip = (
     <Link
       href="/accounts"
       className="hidden h-8 items-center rounded-lg bg-topbar-accent px-2.5 text-sm transition-colors hover:bg-topbar-accent/80 sm:flex"
@@ -128,6 +134,23 @@ function TopBarBankroll({
       ))}
     </Link>
   );
+
+  if (ownerLines.length <= 1) return chip;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{chip}</TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">
+          <p className="mb-1 font-semibold">Bookie balances by owner</p>
+          {ownerLines.map((l) => (
+            <p key={l.owner} className="tabular-nums">
+              {l.owner === "me" ? "Me" : l.owner}: £{l.balance.toFixed(2)}
+            </p>
+          ))}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export function AppTopBar() {
@@ -137,6 +160,17 @@ export function AppTopBar() {
   const exchange = balances?.exchanges ?? 0;
   const inBets = balances?.inBets ?? 0;
   const bankroll = balances?.bankroll ?? balances?.total ?? 0;
+  const ownerBalances = useMemo(() => {
+    const rows = new Map<string, number>();
+    for (const a of balances?.accounts ?? []) {
+      if (a.type !== "bookie") continue;
+      const owner = accountOwner(a);
+      rows.set(owner, (rows.get(owner) ?? 0) + (a.balance ?? 0));
+    }
+    return [...rows.entries()]
+      .map(([owner, balance]) => ({ owner, balance }))
+      .sort((a, b) => (a.owner === "me" ? -1 : b.owner === "me" ? 1 : a.owner.localeCompare(b.owner)));
+  }, [balances?.accounts]);
   const profit = (state?.settledProfit ?? 0) + (state?.provisionalProfit ?? 0);
   const freeBetsTotal =
     balances?.accounts
@@ -167,7 +201,12 @@ export function AppTopBar() {
             />
           ) : null}
           <TopBarStat href="/tracker?tab=pnl" label="Profit" value={profit} profitTone />
-          <TopBarBankroll exchange={exchange} inBets={inBets} total={bankroll} />
+          <TopBarBankroll
+            exchange={exchange}
+            inBets={inBets}
+            total={bankroll}
+            ownerLines={ownerBalances}
+          />
 
           {showFreeBets ? (
             <button

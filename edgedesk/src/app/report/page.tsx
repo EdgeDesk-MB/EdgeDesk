@@ -23,7 +23,8 @@ import {
 import { EmptyState } from "@/components/help/empty-state";
 import { SeasonView } from "@/components/report/season-view";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/hooks/use-app-state";
+import { api, useAppState } from "@/hooks/use-app-state";
+import { ALL_OWNERS, OwnerFilter } from "@/components/accounts/owner-filter";
 import type { EdgeReport } from "@/lib/report/edge-report";
 import { mistakeTagLabel } from "@/lib/offers/mistakes";
 import { formatGbp } from "@/lib/format-money";
@@ -46,6 +47,8 @@ function formatMonthLabel(month: string): string {
 
 export default function EdgeReportPage() {
   const { resolvedTheme } = useTheme();
+  const { state } = useAppState(30_000);
+  const [owner, setOwner] = useState(ALL_OWNERS);
   const [view, setView] = useState<"month" | "year">("month");
   const [months, setMonths] = useState<string[]>([]);
   const [month, setMonth] = useState<string | null>(null);
@@ -56,7 +59,8 @@ export default function EdgeReportPage() {
   // report on screen until the new one arrives (no synchronous setState).
   useEffect(() => {
     let cancelled = false;
-    const query = month ? `?month=${month}` : "";
+    const ownerQ = owner !== ALL_OWNERS ? `&owner=${encodeURIComponent(owner)}` : "";
+    const query = `?${month ? `month=${month}` : ""}${ownerQ}`;
     api<{ months: string[]; report: EdgeReport | null }>(`/api/report${query}`)
       .then((r) => {
         if (cancelled) return;
@@ -73,7 +77,7 @@ export default function EdgeReportPage() {
     return () => {
       cancelled = true;
     };
-  }, [month]);
+  }, [month, owner]);
 
   const dark = resolvedTheme === "dark";
   const colors = dark ? SERIES_COLORS.dark : SERIES_COLORS.light;
@@ -99,6 +103,11 @@ export default function EdgeReportPage() {
         icon={BarChart3}
         toolbar={
           <div className="flex flex-wrap items-center gap-3">
+            <OwnerFilter
+              accounts={state?.balances?.accounts ?? []}
+              value={owner}
+              onChange={setOwner}
+            />
             <Tabs value={view} onValueChange={(v) => setView(v as "month" | "year")}>
               <TabsList variant="segmented">
                 <TabsTrigger value="month">Month</TabsTrigger>
@@ -125,7 +134,7 @@ export default function EdgeReportPage() {
 
       <div className="flex flex-col gap-4 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
         {view === "year" ? (
-          <SeasonView />
+          <SeasonView owner={owner !== ALL_OWNERS ? owner : null} />
         ) : loading && !report ? (
           <p className="py-10 text-center text-sm text-muted-foreground">Building report…</p>
         ) : !report ? (

@@ -339,6 +339,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("bets", "quick_logged INTEGER");
   addColumn("bets", "purpose TEXT");
   addColumn("offers", "source TEXT");
+  addColumn("accounts", "owner TEXT NOT NULL DEFAULT 'me'");
   addColumn("events", "goals TEXT");
   addColumn("events", "ft_home_score INTEGER");
   addColumn("events", "ft_away_score INTEGER");

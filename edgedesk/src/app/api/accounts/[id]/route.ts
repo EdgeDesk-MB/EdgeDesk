@@ -13,6 +13,7 @@ const patchSchema = z.object({
   isActive: z.boolean().optional(),
   brandColor: z.string().optional(),
   accessStatus: z.enum(["available", "gubbed", "closed"]).optional(),
+  owner: z.string().min(1).max(60).optional(),
   notes: z.string().nullable().optional(),
   fundedByAccountId: z.number().nullable().optional(),
   wrRemaining: z.number().min(0).optional(),
@@ -27,6 +28,7 @@ function patchFields(p: z.infer<typeof patchSchema>) {
     ...(p.isActive !== undefined ? { isActive: p.isActive ? 1 : 0 } : {}),
     ...(p.brandColor !== undefined ? { brandColor: p.brandColor } : {}),
     ...(p.accessStatus !== undefined ? { accessStatus: p.accessStatus } : {}),
+    ...(p.owner !== undefined ? { owner: p.owner.trim() || "me" } : {}),
     ...(p.notes !== undefined ? { notes: p.notes } : {}),
     ...(p.fundedByAccountId !== undefined
       ? { fundedByAccountId: p.fundedByAccountId }

@@ -37,6 +37,8 @@ import { MoneyFlow } from "@/components/money-flow";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { NumField } from "@/components/calc/num-field";
 import { mugDue } from "@/lib/accounts/mug-plan";
+import { ALL_OWNERS, OwnerFilter } from "@/components/accounts/owner-filter";
+import { accountOwner, ownerByBookmakerName, splitPnlByOwner } from "@/lib/accounts/owners";
 import { useNow } from "@/hooks/use-now";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { PageHeader } from "@/components/help/page-header";
@@ -89,10 +91,23 @@ function AccountsContent() {
   const [manageVenuesOpen, setManageVenuesOpen] = useState(false);
   const [pending, setPending] = useState<PendingTx[]>([]);
 
+  const [ownerFilter, setOwnerFilter] = useState(ALL_OWNERS);
+  const ownerScoped = useMemo(
+    () =>
+      ownerFilter === ALL_OWNERS
+        ? accounts
+        : accounts.filter((a) => a.type !== "bookie" || accountOwner(a) === ownerFilter),
+    [accounts, ownerFilter]
+  );
+  const ownerClashes = useMemo(() => ownerByBookmakerName(accounts).clashes, [accounts]);
+  const ownerPnl = useMemo(
+    () => splitPnlByOwner(state?.bets ?? [], accounts),
+    [state?.bets, accounts]
+  );
   const banks = useMemo(() => accounts.filter((a) => a.type === "bank"), [accounts]);
   const venues = useMemo(
-    () => accounts.filter((a) => a.type === "bookie" || a.type === "exchange"),
-    [accounts]
+    () => ownerScoped.filter((a) => a.type === "bookie" || a.type === "exchange"),
+    [ownerScoped]
   );
 
   const profitByBookie = useMemo(() => {
@@ -240,6 +255,27 @@ function AccountsContent() {
             </Card>
           ) : null}
 
+          {ownerClashes.length > 0 ? (
+            <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+              Two owners hold identically-named wallets ({ownerClashes.join(", ")}) - give each
+              its own name (Manage venues → rename) so P&amp;L attributes to the right owner.
+              Shared names count as yours until renamed.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <OwnerFilter accounts={accounts} value={ownerFilter} onChange={setOwnerFilter} />
+            {ownerPnl.length > 1 ? (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {ownerPnl.map((r, i) => (
+                  <span key={r.owner}>
+                    {i > 0 ? " · " : ""}
+                    {r.owner === "me" ? "Me" : r.owner}{" "}
+                    <MoneyFlow value={r.settledProfit} signColor signDisplay className="inline font-medium" />
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </div>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle section>Bookies &amp; exchanges</CardTitle>
@@ -267,7 +303,7 @@ function AccountsContent() {
           </Card>
 
           <BookmakerLeagueCard
-            accounts={accounts}
+            accounts={ownerScoped}
             bets={bets}
             offers={state?.offers ?? []}
             droughtNudgeDays={state?.settings.tuning.droughtNudgeDays}

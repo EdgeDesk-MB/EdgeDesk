@@ -41,7 +41,7 @@ function pct(v: number | null): string {
   return v != null ? `${Math.round(v * 100)}%` : "–";
 }
 
-export function SeasonView() {
+export function SeasonView({ owner }: { owner?: string | null } = {}) {
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState<number | null>(null);
   const [season, setSeason] = useState<SeasonReport | null>(null);
@@ -50,7 +50,7 @@ export function SeasonView() {
   useEffect(() => {
     let cancelled = false;
     const query = year != null ? `&year=${year}` : "";
-    api<{ years: number[]; season: SeasonReport | null }>(`/api/report?view=year${query}`)
+    api<{ years: number[]; season: SeasonReport | null }>(`/api/report?view=year${query}${owner ? `&owner=${encodeURIComponent(owner)}` : ""}`)
       .then((r) => {
         if (cancelled) return;
         setYears(r.years);
@@ -66,7 +66,7 @@ export function SeasonView() {
     return () => {
       cancelled = true;
     };
-  }, [year]);
+  }, [year, owner]);
 
   if (loading && !season) {
     return <p className="py-10 text-center text-sm text-muted-foreground">Building season…</p>;

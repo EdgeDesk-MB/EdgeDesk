@@ -179,6 +179,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "First bet at a new bookie creates the account automatically.",
       "Rename a bookie to cascade the name across bets, offers and prefs.",
       "Mark bookies Available, Gubbed or Closed to filter offer next-actions.",
+      "Household sets (J8): tag each account with its operator in Manage venues → Owner. Owner chips then filter Accounts, the league and the Edge Report; the top-bar total shows the household combined. EdgeDesk tracks accounts operated by their owner - it never encourages operating someone else's accounts. Shared wallet names attribute to you until renamed.",
       "Mug plans (league table → Plan): set a camouflage cadence and monthly budget per bookie. Due plans surface as low-priority Do next items and the league shows the month's mug cost on its own line.",
     ],
     guideSlug: "getting-started",

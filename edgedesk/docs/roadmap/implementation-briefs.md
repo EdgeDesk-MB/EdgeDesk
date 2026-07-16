@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 714 tests / 97 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 719 tests / 98 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1193,7 +1193,15 @@ lay-due legs (extends `buildDailyPlan`).
 create 3-fold sequential run → leg 1 result → leg 2 lay stake matches hand-worked; alert
 fires; mobile pass.
 
-## J8. Household account sets `[strong]` (W3)
+## J8. Household account sets `[strong]` (W3) — ✅ DONE 2026-07-16
+
+Shipped with Sam's design answers: owners are an OPEN LIST (any name assigned to an
+account; no separate registry), shared bookie names resolve by DISTINCT WALLET NAMES
+(identical names across owners are ambiguous → attributed to 'me' + a warning banner),
+one shared Do Next plan, all five surfaces (Accounts filter + per-owner P&L strip,
+league follows the filter, Edge Report + Season via ?owner= on /api/report, top-bar
+per-owner balance tooltip). Owner set per account in Manage venues. Compliance framing
+throughout: "operated by their owner" - tracks, never encourages.
 
 **Objective.** Track a partner's separately-operated accounts as a tagged second set:
 `accounts.owner` (additive column, default 'me'), owner filter on Accounts/Tracker/League/

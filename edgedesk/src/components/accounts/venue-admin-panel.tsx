@@ -172,6 +172,7 @@ export function ManageVenuesDialog({
               <TableHeader>
                 <TableRow>
                   <TableHead>Bookie</TableHead>
+                  <TableHead className="w-28">Owner</TableHead>
                   <TableHead className="w-28">Status</TableHead>
                   <TableHead className="w-28">Colour</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -322,6 +323,20 @@ function BookieEditRow({
           </span>
         </TableCell>
         <TableCell>
+          <Input
+            defaultValue={bookie.owner ?? "me"}
+            key={`owner-${bookie.id}-${bookie.owner ?? "me"}`}
+            className="h-8 text-xs"
+            aria-label={`Owner of ${bookie.name}`}
+            onBlur={(e) => {
+              const next = e.target.value.trim() || "me";
+              if (next !== (bookie.owner ?? "me")) {
+                onPatch(bookie.id, { owner: next }, `${bookie.name} → operated by ${next}`);
+              }
+            }}
+          />
+        </TableCell>
+        <TableCell>
           <Select
             value={accessStatus}
             onValueChange={(v) => {
@@ -364,7 +379,7 @@ function BookieEditRow({
         </TableCell>
       </TableRow>
       <TableRow className={bookie.isActive ? "border-b" : "border-b opacity-60"}>
-        <TableCell colSpan={5} className="pt-0 pb-3">
+        <TableCell colSpan={6} className="pt-0 pb-3">
           <Input
             value={notes}
             placeholder="Notes - limits, gub details, login tips…"

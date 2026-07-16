@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, bets } from "@/lib/db";
+import { db, accounts, bets, offers } from "@/lib/db";
+import { bookieNamesForOwner } from "@/lib/accounts/owners";
 import { getAppSettings } from "@/lib/services/settings";
 import { getAllSnapshots } from "@/lib/services/ev-snapshot";
 import type { EvSnapshotRow } from "@/lib/offers/ev-capture";
@@ -12,11 +13,30 @@ import { buildSeasonReport, seasonYears } from "@/lib/report/season-report";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const snapshots = getAllSnapshots() as EvSnapshotRow[];
+  let snapshots = getAllSnapshots() as EvSnapshotRow[];
+
+  // J8: ?owner= scopes both inputs through the bookmaker→account mapping.
+  const owner = req.nextUrl.searchParams.get("owner");
+  const ownerScope = owner
+    ? bookieNamesForOwner(db.select().from(accounts).all(), owner)
+    : null;
+  const scopeBets = (rows: (typeof bets.$inferSelect)[]) =>
+    ownerScope
+      ? rows.filter((b) => b.bookmaker && ownerScope.has(b.bookmaker.trim().toLowerCase()))
+      : rows;
+  if (ownerScope) {
+    const offerRows = db.select().from(offers).all();
+    const offerOk = new Set(
+      offerRows
+        .filter((o) => o.bookmaker && ownerScope.has(o.bookmaker.trim().toLowerCase()))
+        .map((o) => o.id)
+    );
+    snapshots = snapshots.filter((s) => offerOk.has(s.offerId));
+  }
 
   // G3: season (year) view
   if (req.nextUrl.searchParams.get("view") === "year") {
-    const allBets = db.select().from(bets).all();
+    const allBets = scopeBets(db.select().from(bets).all());
     const years = seasonYears(snapshots, allBets);
     const requestedYear = Number(req.nextUrl.searchParams.get("year"));
     const year = years.includes(requestedYear) ? requestedYear : (years[0] ?? null);
@@ -36,7 +56,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ months: [], report: null });
   }
 
-  const allBets = db.select().from(bets).all();
+  const allBets = scopeBets(db.select().from(bets).all());
   const report = buildEdgeReport({
     snapshots,
     bets: allBets,

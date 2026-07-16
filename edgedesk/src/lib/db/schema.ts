@@ -258,6 +258,8 @@ export const accounts = sqliteTable("accounts", {
   /** Bookie/exchange: which bank usually funds this wallet */
   fundedByAccountId: integer("funded_by_account_id"),
   brandColor: text("brand_color"),
+  /** J8: household owner operating this account; everything existing = 'me' */
+  owner: text("owner").notNull().default("me"),
   isActive: integer("is_active").notNull().default(1),
   /**
    * Bookie access status:
