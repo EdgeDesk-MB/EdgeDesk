@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 719 tests / 98 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 721 tests / 99 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1220,7 +1220,17 @@ Do Next unaffected v1 (single plan). Migration: everything existing = 'me'.
 **Acceptance.** Analytics split tests (owner A vs B vs combined reconcile to totals);
 harness: tag an account, filters split correctly; copy review for framing.
 
-## J9. Betslip prefill extension `[strong]` (W3, last — new surface)
+## J9. Betslip prefill extension `[strong]` (W3, last — new surface) — ✅ DONE 2026-07-16
+
+Shipped BETDAQ-FIRST (Sam's call — his default exchange and every real lay is there;
+the brief's Betfair map follows once the pattern proves out). `extension/` at the repo
+root: plain MV3, no build step — EdgeDesk pages dispatch an `edgedesk:fill-slip`
+CustomEvent, the bridge content script relays to the service worker, which focuses the
+Betdaq tab and fills the stake via a VERSIONED selector map that fails loud (on-page
+banner). FILL ONLY — the extension never places; and EdgeDesk copies the stake to the
+clipboard BEFORE emitting, so no extension = graceful degrade. Surfaces: the lay-stake
+banner (matched calculator + Add bet), the Lock in dialog, and Acca Desk lay-due rows.
+Install + manual fixture test protocol in extension/README.md.
 
 **Objective.** A Chrome (MV3) extension: one click in EdgeDesk copies a structured intent →
 the extension fills the betslip (selection search + stake) on the exchange tab. Betfair

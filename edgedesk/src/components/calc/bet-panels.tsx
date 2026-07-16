@@ -299,6 +299,7 @@ export function LayStakeBanner({
   value,
   liability,
   onChange,
+  fillSelection,
 }: {
   label?: string;
   value: number;
@@ -306,7 +307,20 @@ export function LayStakeBanner({
   liability?: number;
   /** When set, renders an editable input; typing updates the slider above */
   onChange?: (v: number) => void;
+  /** J9: when set, a Fill slip action emits the extension intent */
+  fillSelection?: string;
 }) {
+  const fillSlip = fillSelection?.trim()
+    ? () =>
+        void import("@/lib/betslip-intent").then(({ emitFillSlip }) =>
+          emitFillSlip({ side: "lay", selection: fillSelection, stake: value }).then((ok) => {
+            if (ok)
+              toast.success(`Stake £${value.toFixed(2)} copied`, {
+                description: "The extension fills the exchange slip if installed.",
+              });
+          })
+        )
+    : null;
   if (onChange) {
     return (
       <div className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-white dark:bg-slate-700">
@@ -319,6 +333,16 @@ export function LayStakeBanner({
             <LayStakeInput label={label} value={value} onChange={onChange} />
           </span>
         </label>
+        {fillSlip ? (
+          <button
+            type="button"
+            aria-label="Fill exchange slip"
+            className="shrink-0 rounded bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/80 transition-colors hover:text-white"
+            onClick={fillSlip}
+          >
+            Fill slip
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label="Copy lay stake"
@@ -351,6 +375,16 @@ export function LayStakeBanner({
         >
           <Copy className="size-3.5" />
         </button>
+        {fillSlip ? (
+          <button
+            type="button"
+            aria-label="Fill exchange slip"
+            className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80 transition-colors hover:text-white"
+            onClick={fillSlip}
+          >
+            Fill slip
+          </button>
+        ) : null}
       </span>
       {liability != null && (
         <span className="shrink-0 text-xs text-white/65">

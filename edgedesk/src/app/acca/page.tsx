@@ -50,6 +50,7 @@ import {
 } from "@/lib/calc/acca-workflow";
 import type { AccaLegRow, AccaRunRow } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { FillSlipButton } from "@/components/fill-slip-button";
 
 type RunView = { run: AccaRunRow; legs: AccaLegRow[] };
 
@@ -317,6 +318,12 @@ function LegRow({
             step={0.01}
             className="w-24"
           />
+          {suggestion != null ? (
+            <FillSlipButton
+              className="mt-5 h-8"
+              intent={{ side: "lay", selection: leg.label, stake: suggestion, odds: layOdds }}
+            />
+          ) : null}
           <Button size="sm" className="mt-5 h-8" onClick={() => void logLay()} disabled={suggestion == null}>
             Lay £{suggestion?.toFixed(2) ?? "–"}
           </Button>

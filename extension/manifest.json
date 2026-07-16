@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "EdgeDesk Betslip Fill",
+  "version": "1.0.0",
+  "description": "Fills the exchange betslip from EdgeDesk with one click. Fill only - you always place the bet yourself.",
+  "permissions": ["tabs"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://192.168.50.71:3000/*",
+        "https://*.ts.net/*"
+      ],
+      "js": ["edgedesk-bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.betdaq.com/*"],
+      "js": ["betdaq-fill.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

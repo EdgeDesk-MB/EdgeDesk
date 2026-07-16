@@ -9,6 +9,10 @@ Before doing any work:
 2. For repo conventions (git paths, tests, DB bootstrap, data shapes), read
    section 0 of `edgedesk/docs/roadmap/implementation-briefs.md`.
 
+The browser extension (J9 betslip fill) lives in `extension/` — plain Chrome
+MV3, no build step; see `extension/README.md` for the install and the manual
+test protocol.
+
 Other pointers:
 - Model routing strategy (local Ollama backbone vs cloud frontier):
   `docs/Local-vs-Cloud-Model-Strategy.md`.

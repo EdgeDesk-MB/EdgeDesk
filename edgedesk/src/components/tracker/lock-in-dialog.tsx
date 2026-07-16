@@ -33,6 +33,7 @@ import { roundPence } from "@/lib/calc/money";
 import type { BetMode } from "@/lib/calc";
 import type { BetRow } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { FillSlipButton } from "@/components/fill-slip-button";
 
 const LOCKABLE_TYPES = new Set<string>(["qualifying", "free_snr", "free_sr", "risk_free"]);
 
@@ -301,9 +302,20 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
             loses.
           </p>
 
-          <Button onClick={() => void logTrade()} disabled={saving || !(chosenStake > 0)}>
-            Log this trade
-          </Button>
+          <div className="flex items-center gap-2">
+            <FillSlipButton
+              className="shrink-0"
+              intent={{
+                side: advice.direction === "back" ? "back" : "lay",
+                selection: bet.selection || bet.label,
+                stake: chosenStake,
+                odds: tradeOdds,
+              }}
+            />
+            <Button className="flex-1" onClick={() => void logTrade()} disabled={saving || !(chosenStake > 0)}>
+              Log this trade
+            </Button>
+          </div>
         </>
       )}
     </>

@@ -414,7 +414,7 @@ export function MatchedCalculator({
             accent={exchange?.brandColor ?? "#1e293b"}
           />
         )}
-        <LayStakeBanner value={layStake} liability={result?.totalLiability} />
+        <LayStakeBanner value={layStake} liability={result?.totalLiability} fillSelection={bookmaker ? `Lay vs ${bookmaker}` : "Matched lay"} />
       </LayPanel>
 
       <ProfitTable

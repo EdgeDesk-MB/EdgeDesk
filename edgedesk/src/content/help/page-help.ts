@@ -127,6 +127,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Matched Betting - qualifiers, free bets (SNR/SR) and risk-free offers.",
       "Dutching - equal-profit splits; 2UP dutch mode for early-payout windfalls.",
       "Each Way & Extra Place - lay win and place separately for extra-place offers.",
+      "Fill slip: the lay-stake banner (and Lock in / Acca Desk) can fill your exchange betslip via the EdgeDesk browser extension - fill only, you always place the bet yourself. Without the extension the stake still lands on your clipboard.",
     ],
     guideSlug: "calculators",
   },

@@ -1574,6 +1574,7 @@ export function AddBetDialog({
                 ))}
               <LayStakeBanner
                 value={layStake}
+                fillSelection={selection || label}
                 onChange={(v) =>
                   setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
                 }
