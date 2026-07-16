@@ -60,6 +60,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary: "Every position linked to real events. Results settle bets automatically.",
     bullets: [
       "Add bets manually, from calculators, or via OCR screenshot import.",
+      "Placing a deliberate back-only bet (e.g. a mug bet)? Pick the No lay bet type - the lay panel disappears and the outcomes show the bookie side only.",
       "Link an event once - score changes settle match odds, BTTS, O/U 2.5 and 2UP together.",
       "Use “The bet wins IF …” for goalscorer and combo triggers - settles at the decisive moment.",
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
