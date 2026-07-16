@@ -6,6 +6,7 @@ export type PageHelpId =
   | "offers"
   | "calculators"
   | "casino"
+  | "boosts"
   | "tracked-events"
   | "settings"
   | "history"
@@ -64,6 +65,17 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
     ],
     guideSlug: "calculators",
+  },
+  boosts: {
+    title: "Boosts",
+    summary:
+      "Fair-price verdicts for price boosts and bet builders - and a diary of the EV you banked.",
+    bullets: [
+      "Price boost: enter the boosted odds plus the exchange back/lay - the verdict compares against the no-vig midpoint.",
+      "Bet builder: enter fair odds per leg; same-match legs are correlated, so set a haircut to shorten the naive product.",
+      "Log a check to the diary, then settle it Won/Lost/Void - the header keeps the running EV banked vs realised.",
+      "Nothing is fetched: you type the prices you see, so verdicts carry an estimated basis (heuristic until you set a builder haircut).",
+    ],
   },
   casino: {
     title: "Casino",

@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 642 tests / 89 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 652 tests / 90 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -965,7 +965,13 @@ wins). Rate captions show the basis: "£24/hr · measured (12)".
 flow on :3799 → sample lands, card shows duration, £/hr caption flips to measured at n≥5;
 suite green.
 
-## J2. Boosts page — boost & bet-builder checkers + boost diary `[strong]` (W1)
+## J2. Boosts page — boost & bet-builder checkers + boost diary `[strong]` (W1) — ✅ DONE 2026-07-16
+
+Shipped as briefed: `boost-check.ts` (verdict thresholds ±1% edge → take/marginal/skip),
+`boost_diary` table + `/api/boosts` CRUD/settle, `/boosts` page with mode tabs, live verdict
+card (basis: boost = estimated, builder = heuristic until the haircut is touched), diary with
+EV-banked vs realised headline. The optional "Lay it" calculator handoff was deferred — add
+it when a real boost play wants a lay leg.
 
 **Objective.** A separate nav page (**Sam: not Match Checker tabs**) answering "is this
 boosted/builder price above fair?" in <10s, and a diary accumulating boost EV captured.

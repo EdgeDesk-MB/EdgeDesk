@@ -299,6 +299,24 @@ export const racingOddsSnapshots = sqliteTable("racing_odds_snapshots", {
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */
+/** Boost diary (J2) - price boosts / bet builders taken, with their EV at check time. */
+export const boostDiary = sqliteTable("boost_diary", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  label: text("label").notNull(),
+  bookmaker: text("bookmaker"),
+  kind: text("kind", { enum: ["boost", "builder"] }).notNull(),
+  boostedOdds: real("boosted_odds").notNull(),
+  fairOdds: real("fair_odds").notNull(),
+  stake: real("stake").notNull(),
+  evGbp: real("ev_gbp").notNull(),
+  /** EV basis at check time (A2 rule) */
+  basis: text("basis", { enum: ["estimated", "heuristic"] }).notNull().default("estimated"),
+  outcome: text("outcome", { enum: ["won", "lost", "void"] }),
+  actualProfit: real("actual_profit"),
+  createdAt: integer("created_at").notNull(),
+  settledAt: integer("settled_at"),
+});
+
 /** Measured execution effort per offer action (J1) - powers real £/hr. */
 export const offerEffortSamples = sqliteTable("offer_effort_samples", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -376,3 +394,4 @@ export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;
 export type CasinoGameRow = typeof casinoGames.$inferSelect;
 export type OfferEffortSampleRow = typeof offerEffortSamples.$inferSelect;
+export type BoostDiaryRow = typeof boostDiary.$inferSelect;

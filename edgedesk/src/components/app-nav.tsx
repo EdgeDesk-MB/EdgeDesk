@@ -25,6 +25,7 @@ import {
   Radio,
   Scale,
   Trophy,
+  Zap,
   Wallet,
 } from "lucide-react";
 import { FootballIcon } from "@/components/sport-icon";
@@ -117,6 +118,7 @@ export const NAV_SECTIONS: NavSection[] = [
         quickAction: "addBet",
       },
       { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
+      { kind: "link", href: "/boosts", label: "Boosts", icon: Zap },
       { kind: "link", href: "/casino", label: "Casino", icon: Dices, quickAction: "casinoLog" },
       {
         kind: "link",

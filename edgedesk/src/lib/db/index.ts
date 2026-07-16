@@ -243,6 +243,21 @@ CREATE TABLE IF NOT EXISTS casino_offers (
   created_at INTEGER NOT NULL,
   completed_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS boost_diary (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  bookmaker TEXT,
+  kind TEXT NOT NULL,
+  boosted_odds REAL NOT NULL,
+  fair_odds REAL NOT NULL,
+  stake REAL NOT NULL,
+  ev_gbp REAL NOT NULL,
+  basis TEXT NOT NULL DEFAULT 'estimated',
+  outcome TEXT,
+  actual_profit REAL,
+  created_at INTEGER NOT NULL,
+  settled_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS offer_effort_samples (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   offer_id INTEGER NOT NULL,
