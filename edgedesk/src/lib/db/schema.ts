@@ -131,6 +131,8 @@ export const offers = sqliteTable("offers", {
   seriesId: integer("series_id"),
   /** YYYY-MM-DD occurrence date for recurring instances */
   instanceDate: text("instance_date"),
+  /** J6: 'email' = created by email intake (drafts land planned for review) */
+  source: text("source"),
 });
 
 /** Immutable EV baseline written when a campaign goes active; versioned on re-lock. */

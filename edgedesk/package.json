@@ -19,6 +19,7 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "filepond": "^4.32.12",
+    "imapflow": "^1.4.7",
     "liveline": "^0.0.7",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",

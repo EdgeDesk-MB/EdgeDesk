@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookieNamePicker, ExchangeNamePicker } from "@/components/bookie-name-picker";
 import { DataCustodyCard } from "@/components/settings/data-custody-card";
+import { EmailIntakeCard } from "@/components/settings/email-intake-card";
 import { DemoModeCard } from "@/components/settings/demo-mode-card";
 import { PushDeviceControl } from "@/components/settings/push-device-control";
 import { Switch } from "@/components/ui/switch";
@@ -1106,6 +1107,7 @@ function DataApiPanel({
           ))}
         </CardContent>
       </Card>
+      <EmailIntakeCard />
       <DataCustodyCard onRestored={onRefresh} />
       <DemoModeCard />
       <Card>

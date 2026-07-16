@@ -21,6 +21,7 @@ const baseOffer: OfferRow = {
   completedAt: null,
   seriesId: null,
   instanceDate: null,
+  source: null,
   sport: "horse_racing",
   offerType: "bet_get_free_place",
   scopeCourse: "all",

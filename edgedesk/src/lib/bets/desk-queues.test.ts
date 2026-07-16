@@ -115,6 +115,7 @@ describe("groupBetsByCampaign", () => {
           createdAt: Date.now(),
           seriesId: null,
           instanceDate: null,
+          source: null,
           betCount: 2,
           openBets: 2,
           actualProfit: 0,

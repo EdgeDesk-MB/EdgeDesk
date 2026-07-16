@@ -27,6 +27,7 @@ function offer(
     completedAt: null,
     seriesId: null,
     instanceDate: null,
+    source: null,
     createdAt: Date.now(),
     betCount: rest.betCount ?? 0,
     openBets: 0,

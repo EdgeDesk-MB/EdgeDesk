@@ -32,6 +32,7 @@ function offer(
     createdAt: rest.createdAt ?? Date.now(),
     seriesId: rest.seriesId ?? null,
     instanceDate: rest.instanceDate ?? null,
+    source: null,
     betCount: rest.betCount ?? 0,
     openBets: 0,
     actualProfit: 0,
@@ -148,6 +149,7 @@ describe("buildOfferCalendarDays", () => {
           status: "planned",
           betCount: 0,
           instanceDate: "2026-07-09",
+          source: null,
           expiresAt: new Date(2026, 6, 9, 23, 0, 0).getTime(),
           recurrence: {
             seriesId: 1,
@@ -163,6 +165,7 @@ describe("buildOfferCalendarDays", () => {
           status: "planned",
           betCount: 0,
           instanceDate: "2026-07-12",
+          source: null,
           expiresAt: new Date(2026, 6, 12, 23, 0, 0).getTime(),
           recurrence: {
             seriesId: 1,
@@ -193,6 +196,7 @@ describe("buildOfferCalendarDays", () => {
           status: "active",
           betCount: 0,
           instanceDate: "2026-07-07",
+          source: null,
           expiresAt: new Date(2026, 6, 7, 23, 0, 0).getTime(),
           recurrence: {
             seriesId: 2,
@@ -281,6 +285,7 @@ describe("buildOfferCalendarBoard", () => {
           status: "planned",
           betCount: 0,
           instanceDate: "2026-07-12",
+          source: null,
           expiresAt: new Date(2026, 6, 12, 23, 0, 0).getTime(),
           recurrence: {
             seriesId: 3,

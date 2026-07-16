@@ -138,6 +138,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Free stack: Racing API + Betfair delayed key + optional API-Football = £0/month.",
       "Refresh rates: racing cards cached ~15 min; Betfair delayed ~1–3 min; football live ~60s.",
       "Restart the dev server after changing .env.local keys.",
+      "Email intake: forward promo emails to a dedicated mailbox folder and the desk drafts them as Planned campaigns for review - the app password is stored locally unencrypted, so never use a main account.",
       "Export bets, settlements and accounts as CSV anytime.",
     ],
     guideSlug: "faq",

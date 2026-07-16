@@ -25,6 +25,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     completedAt: null,
     seriesId: null,
     instanceDate: null,
+    source: null,
     createdAt: Date.now(),
     betCount: rest.betCount ?? 0,
     openBets: rest.openBets ?? 0,

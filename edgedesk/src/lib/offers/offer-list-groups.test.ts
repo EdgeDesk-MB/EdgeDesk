@@ -32,6 +32,7 @@ function offer(
     completedAt: null,
     seriesId: null,
     instanceDate: null,
+    source: null,
     createdAt: rest.createdAt ?? Date.now(),
     betCount: 0,
     openBets: 0,
@@ -76,6 +77,7 @@ describe("offer list date groups", () => {
       id: 4,
       title: "Daily",
       instanceDate: "2026-07-11",
+      source: null,
       eventDate: "2026-07-10",
     });
     expect(offerListGroupDayMs(o)).toBe(tomorrow);

@@ -104,7 +104,7 @@ is read directly off `product-roadmap.md` §6 (phase status) and §9 (parking lo
 | Live 2UP trigger alert | — | — | ✅ Have (B6) | Push notification when early payout triggers. |
 | Offer expiry / unfinished workflow alerts | Email digest | Email digest | ✅ Have (F2/F3, H1) | Persistent alerts inbox + background push + weekly digest. |
 | Betslip auto-fill browser extension | — | — | 🔜 Planned (J9) | Betwatch does this; execution automation, not discovery, so it's in scope. |
-| Offer email ingestion (forward a promo email, get a prefilled offer) | — | — | 🔜 Planned (J6) | Staged: paste/drop first, IMAP pull later. |
+| Offer email ingestion (forward a promo email, get a prefilled offer) | — | — | ✅ Have (J6, 2026-07-16) | .eml drop/paste parse + IMAP folder pull into planned drafts. |
 | Exchange auto-import (pull settled lays from Betfair account API) | — | — | ⛔ Not planned | Parked: ToS/auth scope needs a proper read, and it weakens the deliberate "log it consciously" execution loop. |
 
 ### Content & community

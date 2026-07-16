@@ -59,6 +59,7 @@ import {
 } from "@/lib/calc/ep/live-model";
 import { getHistoryFeed, getChartAnnotationHistory } from "@/lib/services/history-feed";
 import { maybeSendWeeklyDigest } from "@/lib/services/weekly-digest";
+import { maybePollEmailIntake } from "@/lib/services/email-intake";
 import { recordAlerts } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
 import {
@@ -662,6 +663,7 @@ export async function getAppState(): Promise<AppState> {
   syncOfferStatuses();
   backfillOffersFromBets();
   maybeSendWeeklyDigest();
+  maybePollEmailIntake();
 
   const allEvents = db.select().from(events).all();
   const allBets = db.select().from(bets).all();
