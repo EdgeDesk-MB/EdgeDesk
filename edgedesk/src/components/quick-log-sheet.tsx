@@ -20,6 +20,7 @@ import {
   Calculator,
   ClipboardPaste,
   Dices,
+  Zap,
   Gift,
   ListTodo,
   PencilLine,
@@ -40,6 +41,7 @@ import { Label } from "@/components/ui/label";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
+import { useBoostCheck } from "@/components/boosts/boost-check-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
@@ -106,6 +108,7 @@ export function QuickLogSheet() {
   const { openAddBet } = useAddBet();
   const { openAddBalance } = useAddBalance();
   const { openCasinoLog } = useCasinoLog();
+  const { openBoostCheck } = useBoostCheck();
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openOffer } = useOfferDialog();
   const { openTrackFixture } = useTrackFixture();
@@ -281,6 +284,14 @@ export function QuickLogSheet() {
                     onPick={() => {
                       setOpen(false);
                       openCasinoLog();
+                    }}
+                  />
+                  <QuickActionButton
+                    icon={Zap}
+                    label="Boost check"
+                    onPick={() => {
+                      setOpen(false);
+                      openBoostCheck();
                     }}
                   />
                   <QuickActionButton

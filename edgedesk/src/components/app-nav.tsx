@@ -35,6 +35,7 @@ import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
+import { useBoostCheck } from "@/components/boosts/boost-check-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { useAppState } from "@/hooks/use-app-state";
 import { effectiveEventStatus } from "@/lib/events";
@@ -52,7 +53,7 @@ type NavLeaf = {
   href: string;
   label: string;
   icon: NavIcon;
-  quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "casinoLog";
+  quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "casinoLog" | "boostCheck";
   livePulse?: boolean;
 };
 
@@ -118,7 +119,7 @@ export const NAV_SECTIONS: NavSection[] = [
         quickAction: "addBet",
       },
       { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
-      { kind: "link", href: "/boosts", label: "Boosts", icon: Zap },
+      { kind: "link", href: "/boosts", label: "Boosts", icon: Zap, quickAction: "boostCheck" },
       { kind: "link", href: "/casino", label: "Casino", icon: Dices, quickAction: "casinoLog" },
       {
         kind: "link",
@@ -229,6 +230,7 @@ export function AppNav() {
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openTrackFixture } = useTrackFixture();
   const { openCasinoLog } = useCasinoLog();
+  const { openBoostCheck } = useBoostCheck();
   const { openOffer } = useOfferDialog();
   const { state } = useAppState(5000);
   const liveTrackedCount = useMemo(
@@ -292,7 +294,9 @@ export function AppNav() {
               ? "Browse fixtures to track"
               : quickAction === "casinoLog"
                 ? "Log a casino offer"
-                : undefined;
+                : quickAction === "boostCheck"
+                  ? "Check a boost"
+                  : undefined;
     const onQuickAction =
       quickAction === "addBalance"
         ? openAddBalance
@@ -304,7 +308,9 @@ export function AppNav() {
               ? openTrackFixture
               : quickAction === "casinoLog"
                 ? openCasinoLog
-                : undefined;
+                : quickAction === "boostCheck"
+                  ? openBoostCheck
+                  : undefined;
 
     return (
       <div key={href} className="relative w-full min-w-0">
