@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ocrOfferScreenshots } from "@/lib/ocr/extract-text";
+import { parseEmlToOfferText } from "@/lib/offers/parse-email";
 import { cn } from "@/lib/utils";
 import { ImageIcon, Loader2, ScanLine, X } from "lucide-react";
 
@@ -50,6 +51,13 @@ function collectImageFiles(
     if (file.type.startsWith("image/")) files.push(file);
   }
   return files;
+}
+
+function collectEmlFiles(list: FileList | File[] | null | undefined): File[] {
+  if (!list) return [];
+  return Array.from(list as FileList | File[]).filter(
+    (f) => f.name.toLowerCase().endsWith(".eml") || f.type === "message/rfc822"
+  );
 }
 
 export function PasteCapture({
@@ -214,6 +222,30 @@ export function PasteCapture({
     return () => window.removeEventListener("paste", onPaste);
   }, [runOcrBatch, onTextChange, text]);
 
+  /** J6 stage 1: dropped promo emails parse locally into the text box. */
+  const ingestEmlFiles = useCallback(
+    async (files: File[]) => {
+      let combined = text;
+      let added = 0;
+      for (const file of files) {
+        const parsed = parseEmlToOfferText(await file.text());
+        if (!parsed) {
+          toast.error("Could not read that email", { description: file.name });
+          continue;
+        }
+        added += 1;
+        combined = combined ? `${combined.trim()}\n\n${parsed.offerText}` : parsed.offerText;
+      }
+      if (added > 0) {
+        onTextChange(combined);
+        toast.success(added === 1 ? "Email added" : `${added} emails added`, {
+          description: "Parsed locally - check the preview below.",
+        });
+      }
+    },
+    [onTextChange, text]
+  );
+
   const canAddMore = shots.length < MAX_SCREENSHOTS;
 
   return (
@@ -234,6 +266,8 @@ export function PasteCapture({
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
+          const emls = collectEmlFiles(e.dataTransfer.files);
+          if (emls.length) void ingestEmlFiles(emls);
           void runOcrBatch(collectImageFiles(e.dataTransfer.files));
         }}
       >
@@ -245,7 +279,7 @@ export function PasteCapture({
         <p className="text-xs text-muted-foreground">
           {ocrProgress ??
             (canAddMore
-              ? "Drop or paste screenshots (⌘V / Ctrl+V), or choose files"
+              ? "Drop screenshots or a promo email (.eml), paste (⌘V / Ctrl+V), or choose files"
               : `Maximum ${MAX_SCREENSHOTS} screenshots - remove one to add more`)}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -263,13 +297,15 @@ export function PasteCapture({
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/png,image/jpeg,image/webp,image/gif,.eml,message/rfc822"
             multiple
             className="hidden"
             onChange={(e) => {
-              const files = collectImageFiles(e.target.files);
+              const images = collectImageFiles(e.target.files);
+              const emls = collectEmlFiles(e.target.files);
               e.target.value = "";
-              if (files.length) void runOcrBatch(files);
+              if (emls.length) void ingestEmlFiles(emls);
+              if (images.length) void runOcrBatch(images);
             }}
           />
         </div>

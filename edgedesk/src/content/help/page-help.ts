@@ -100,6 +100,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Campaigns and calendar - track promos, next actions, and what to do today. Settled profit lives in the top bar.",
     bullets: [
       "Campaigns: pipeline stages, filters, and edit/complete. Calendar: Today / This week / Later.",
+      "Got a promo email? Drop the .eml straight into Paste offer (or paste its text) - it parses locally into the same preview, subject line included.",
       "Racing offers drive Intelligence on the Racing Desk - add a place-refund offer first.",
       "Expiry is the earlier of the Expires field or a scoped race/match time - missed windows show as Missed race / Missed match.",
       "Expiry reminders fire at 7, 3 and 1 days before - toggle in Settings → Preferences.",

@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 690 tests / 93 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 697 tests / 94 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1108,7 +1108,12 @@ League table shows "camouflage cost this month" per bookie and total vs monthly 
 **Acceptance.** Exclusion tests per surface; due-logic lib tests; harness: plan → due item
 → log mug → stamps + costs appear, edge metrics unchanged (assert equality before/after).
 
-## J6. Offer email ingestion `[strong]` (W2) — staged
+## J6. Offer email ingestion `[strong]` (W2) — staged — 🔶 STAGE 1 DONE 2026-07-16
+
+Stage 1 shipped: hand-rolled MIME-lite (`parse-email.ts` — multipart walk, plain-preferred,
+QP/base64, RFC2047 subjects, HTML→text; no new dependency needed) feeding the existing
+PasteCapture drop zone (.eml drops and Choose files; casino dialog inherits). Sam approved
+`imapflow` for stage 2 on 2026-07-16 — build next.
 
 **Objective.** Bookie promo emails become prefilled offers. **Stage 1:** drop an .eml (or
 paste the email body) into the existing paste pipeline. **Stage 2 (the destination, Sam is
