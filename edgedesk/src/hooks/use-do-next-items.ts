@@ -13,6 +13,7 @@ import {
   visibleBookieNames,
 } from "@/lib/accounts/available-bookies";
 import { bookmakerHealthMap } from "@/lib/accounts/bookmaker-stats";
+import { effectiveEffortMinutes } from "@/lib/offers/effort";
 import {
   buildDoNextItems,
   type BookieBalanceMap,
@@ -61,7 +62,13 @@ export function useDoNextItems(pollMs?: number): {
     return map;
   }, [state?.balances?.accounts]);
 
-  const effortMinutes = state?.settings.tuning.effortMinutes;
+  // J1: explicit E1 overrides win; measured kinds blend toward the defaults.
+  const tuningEffort = state?.settings.tuning.effortMinutes;
+  const effortMeasured = state?.effortMeasured;
+  const effortMinutes = useMemo(
+    () => effectiveEffortMinutes(tuningEffort ?? {}, effortMeasured ?? {}),
+    [tuningEffort, effortMeasured]
+  );
 
   const items = useMemo(() => {
     const opts = {

@@ -23,6 +23,7 @@ import { ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import type { EvBasis } from "@/lib/offers/advantage";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { beginEffort } from "@/lib/effort-timer";
 
 /** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
 function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: EvBasis }) {
@@ -207,6 +208,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
     if (item.offerId == null) return;
     const offer = offers.find((o) => o.id === item.offerId);
     if (!offer) return;
+    beginEffort(item.offerId, item.kind);
     viewOffer(offer);
   }
 
@@ -242,6 +244,18 @@ export function DashboardDoNext({ className }: { className?: string }) {
           </Tabs>
         }
       />
+
+      {sort === "rate" ? (
+        <p className="px-[var(--layout-page-x)] pt-2 text-[11px] text-muted-foreground">
+          {(() => {
+            const measured = Object.values(state?.effortMeasured ?? {});
+            const n = measured.reduce((a, m) => a + m.sampleSize, 0);
+            return n > 0
+              ? `£/hr uses your measured times where available (${n} timed offer${n === 1 ? "" : "s"}).`
+              : "£/hr uses estimated effort - times are measured automatically as you work offers.";
+          })()}
+        </p>
+      ) : null}
 
       <div className="pl-[var(--layout-page-x)] py-[calc(0.75rem+12px)] pr-0">
         <ScrollFadeEdges

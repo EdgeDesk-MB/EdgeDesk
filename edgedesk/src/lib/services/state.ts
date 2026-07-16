@@ -66,6 +66,8 @@ import {
   needsResultBackfill,
   shouldFetchGoalTimeline,
 } from "@/lib/live-poll-rules";
+import { medianEffortByKind } from "@/lib/offers/effort";
+import { offerEffortSamples } from "@/lib/db";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
@@ -839,6 +841,8 @@ export async function getAppState(): Promise<AppState> {
     weight: settings.tuning.retentionPriorWeight,
   });
 
+  const effortMeasured = medianEffortByKind(db.select().from(offerEffortSamples).all());
+
   return {
     events: allEvents.sort((a, b) => a.startTime - b.startTime),
     bets: allBets.sort((a, b) => b.createdAt - a.createdAt),
@@ -848,6 +852,7 @@ export async function getAppState(): Promise<AppState> {
     planRaces,
     planFixtures,
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
+    effortMeasured,
     alertsUnread: unreadCount(),
     demoMode: isDemoMode(),
     livePositions,

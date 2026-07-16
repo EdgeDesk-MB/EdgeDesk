@@ -44,6 +44,7 @@ import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
 import { api } from "@/hooks/use-app-state";
+import { beginEffort } from "@/lib/effort-timer";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { buildDailyPlan, type DailyPlanSlot } from "@/lib/plan/daily-plan";
@@ -137,6 +138,7 @@ export function QuickLogSheet() {
 
   function pickSlot(slot: DailyPlanSlot) {
     const item = doNext.find((i) => i.id === slot.id);
+    if (item?.offerId != null) beginEffort(item.offerId, item.kind);
     setOpen(false);
     openAddBet({
       quickLogged: true,

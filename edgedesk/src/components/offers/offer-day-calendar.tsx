@@ -16,6 +16,12 @@ import { isOfferExpired } from "@/lib/offers/offer-inactive-ui";
 import { formatOfferDaysLeftLabel } from "@/lib/offers/offer-expiry";
 import { VenueBadge } from "@/components/venue-badge";
 import { OfferPipelineStrip } from "@/components/offers/offer-pipeline-strip";
+import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
+import { Badge } from "@/components/ui/badge";
+import {
+  offerCategoryFromSport,
+  offerCategoryLabel,
+} from "@/lib/offers/offer-categories";
 import { filterPillGroup, filterPillState, offerCalendarCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { CalendarDays, Columns3, List } from "lucide-react";
@@ -245,6 +251,8 @@ function CalendarItemCard({
   const p = priorityStyles(item.priority);
   const expiry = formatOfferDaysLeftLabel(item.daysLeft);
   const headerTint = calendarHeaderTint(item.offer);
+  const categoryId = offerCategoryFromSport(item.offer.sport);
+  const categoryLabel = offerCategoryLabel(item.offer.sport);
 
   return (
     <button
@@ -266,14 +274,22 @@ function CalendarItemCard({
         <div className="flex flex-col gap-2">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              {item.offer.bookmaker ? (
-                <VenueBadge name={item.offer.bookmaker} size="sm" />
-              ) : null}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {item.offer.bookmaker ? (
+                  <VenueBadge name={item.offer.bookmaker} size="sm" />
+                ) : null}
+                <Badge
+                  variant="outline"
+                  className="h-auto gap-1 px-2 py-0.5 text-[10px] font-medium leading-tight"
+                >
+                  <OfferCategoryIcon category={categoryId} size={10} className="opacity-80" />
+                  {categoryLabel}
+                </Badge>
+              </div>
               <p
                 className={cn(
-                  "break-words font-bold leading-snug",
-                  variant === "board" ? "text-sm" : "text-base",
-                  item.offer.bookmaker && "mt-1"
+                  "mt-1 break-words font-bold leading-snug",
+                  variant === "board" ? "text-sm" : "text-base"
                 )}
               >
                 {item.offer.title}

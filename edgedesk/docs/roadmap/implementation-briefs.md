@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 621 tests / 87 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 642 tests / 89 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -931,7 +931,7 @@ complete → expected-vs-realised line renders); mobile 390×844 pass; suite + b
 > W3 = J7–J9. Standing process per item: brief → tests-first lib → UI → harness verify (dev on
 > :3799, NEVER build in the live tree) → calc-auditor/design-reviewer → docs → commit.
 
-## J1. Measured effort — real £/hr `[strong]` (W1)
+## J1. Measured effort — real £/hr `[strong]` ✅ DONE (W1)
 
 **Objective.** Replace estimated effort minutes with measured ones. Time the span from first
 meaningful engagement with an offer to its final bet logged; blend measured medians into the

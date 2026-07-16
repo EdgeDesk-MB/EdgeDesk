@@ -299,6 +299,18 @@ export const racingOddsSnapshots = sqliteTable("racing_odds_snapshots", {
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */
+/** Measured execution effort per offer action (J1) - powers real £/hr. */
+export const offerEffortSamples = sqliteTable("offer_effort_samples", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  offerId: integer("offer_id").notNull(),
+  actionKind: text("action_kind").notNull(),
+  startedAt: integer("started_at").notNull(),
+  endedAt: integer("ended_at").notNull(),
+  durationMin: real("duration_min").notNull(),
+  edited: integer("edited").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+});
+
 /** Casino desk (H2) - wagering offers, tracked separately from matched P&L. */
 export const casinoOffers = sqliteTable("casino_offers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -363,3 +375,4 @@ export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
 export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;
 export type CasinoGameRow = typeof casinoGames.$inferSelect;
+export type OfferEffortSampleRow = typeof offerEffortSamples.$inferSelect;

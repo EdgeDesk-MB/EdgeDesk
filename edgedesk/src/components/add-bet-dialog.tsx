@@ -36,6 +36,7 @@ import {
 } from "@/components/calc/bet-panels";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { api } from "@/hooks/use-app-state";
+import { completeEffort } from "@/lib/effort-timer";
 import { useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
@@ -1007,6 +1008,7 @@ export function AddBetDialog({
           json: { ...payload, eventId: resolvedEventId },
         });
         await rememberOfferBetPref(resolvedOfferId, backStake, resolvedBookmaker);
+        if (resolvedOfferId != null) completeEffort(resolvedOfferId);
         setOpen(false);
         onSaved?.(bet.id);
         if (toastOnSave) {

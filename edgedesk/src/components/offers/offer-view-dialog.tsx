@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { OfferEffortLine } from "@/components/offers/offer-effort-line";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +80,9 @@ export function OfferViewDialog({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-4 border-t px-6 py-5">
+          <span className="mr-auto">
+            <OfferEffortLine offerId={offer.id} />
+          </span>
           <Button variant="outline" size="lg" asChild>
             <Link
               href={`/offers?highlight=${offer.id}`}

@@ -243,6 +243,16 @@ CREATE TABLE IF NOT EXISTS casino_offers (
   created_at INTEGER NOT NULL,
   completed_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS offer_effort_samples (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  offer_id INTEGER NOT NULL,
+  action_kind TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER NOT NULL,
+  duration_min REAL NOT NULL,
+  edited INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS casino_games (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,

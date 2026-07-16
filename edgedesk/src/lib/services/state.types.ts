@@ -50,6 +50,8 @@ export interface AppState {
   settledProfit: number;
   provisionalProfit: number;
   retention: RetentionState;
+  /** J1: per-action-kind median execution minutes from logged samples */
+  effortMeasured: Record<string, { minutes: number; sampleSize: number }>;
   /** Unread alerts in the inbox (F2) - drives the nav badge */
   alertsUnread: number;
   /** True when this process opened the demo database (G2 watermark) */
