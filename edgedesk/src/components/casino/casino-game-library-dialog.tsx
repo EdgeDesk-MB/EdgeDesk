@@ -23,7 +23,12 @@ import { NumField } from "@/components/calc/num-field";
 import { api } from "@/hooks/use-app-state";
 import { formatRtpPct, type CasinoGame } from "@/lib/casino/game-library";
 
-export function CasinoGameLibraryDialog() {
+export function CasinoGameLibraryDialog({
+  triggerProps,
+}: {
+  /** Overrides for the trigger button (page headers pass secondary sizing) */
+  triggerProps?: React.ComponentProps<typeof Button>;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [games, setGames] = useState<CasinoGame[] | null>(null);
   const [name, setName] = useState("");
@@ -65,7 +70,7 @@ export function CasinoGameLibraryDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
+        <Button variant="outline" size="sm" {...triggerProps} className="gap-1.5">
           <Library className="size-3.5" /> Game library
         </Button>
       </DialogTrigger>

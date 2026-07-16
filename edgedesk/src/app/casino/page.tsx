@@ -25,6 +25,7 @@ import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
 import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
+import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { PageShell } from "@/components/page-shell";
 import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
@@ -143,9 +144,11 @@ export default function CasinoPage() {
         icon={Dices}
         action={
           <>
-            <CasinoGameLibraryDialog />
-            <Button size="sm" className="gap-1.5" onClick={openCasinoLog}>
-              <Plus className="size-3.5" /> Log offer
+            <CasinoGameLibraryDialog
+              triggerProps={{ variant: "outline", ...pageSecondaryButtonProps }}
+            />
+            <Button {...pagePrimaryButtonProps} onClick={openCasinoLog}>
+              <Plus className="size-4" /> Log offer
             </Button>
           </>
         }
