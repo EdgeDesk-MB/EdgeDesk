@@ -41,6 +41,9 @@ const patchSchema = z.object({
       ftHomeScore: z.number().int().min(0),
       ftAwayScore: z.number().int().min(0),
       matchEnding: z.enum(["ft", "aet", "pen"]),
+      /** Final score incl. extra time - what the lists display. Defaults to the 90-min score. */
+      finalHomeScore: z.number().int().min(0).optional(),
+      finalAwayScore: z.number().int().min(0).optional(),
       homeLed2: z.boolean().optional(),
       awayLed2: z.boolean().optional(),
     })
@@ -63,6 +66,25 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const { ftHomeScore, ftAwayScore, matchEnding } = p.correctResult;
     const newHomeLed2 = p.correctResult.homeLed2;
     const newAwayLed2 = p.correctResult.awayLed2;
+    // The headline score every list displays - a correction that only fixed
+    // the settlement columns used to leave the visible score stale.
+    const finalHome = p.correctResult.finalHomeScore ?? ftHomeScore;
+    const finalAway = p.correctResult.finalAwayScore ?? ftAwayScore;
+
+    // Keep the goal timeline consistent with the corrected final score so
+    // 2UP/trigger evaluation and the history feed agree with it.
+    let timeline: GoalEvent[] = existing.goals ? JSON.parse(existing.goals) : [];
+    const syncCorrectedTimeline = (side: "home" | "away", target: number) => {
+      while (timeline.filter((g) => g.side === side).length > target) {
+        const idx = timeline.map((g) => g.side).lastIndexOf(side);
+        timeline = timeline.filter((_, i) => i !== idx);
+      }
+      while (timeline.filter((g) => g.side === side).length < target) {
+        timeline = [...timeline, { minute: matchEnding === "ft" ? 90 : 120, side }];
+      }
+    };
+    syncCorrectedTimeline("home", finalHome);
+    syncCorrectedTimeline("away", finalAway);
 
     const updated = db
       .update(events)
@@ -70,6 +92,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         matchEnding,
         ftHomeScore,
         ftAwayScore,
+        homeScore: finalHome,
+        awayScore: finalAway,
+        minute: matchEnding === "ft" ? 90 : 120,
+        status: "finished",
+        goals: JSON.stringify(timeline),
         ...(newHomeLed2 !== undefined ? { homeLed2: newHomeLed2 ? 1 : 0 } : {}),
         ...(newAwayLed2 !== undefined ? { awayLed2: newAwayLed2 ? 1 : 0 } : {}),
       })

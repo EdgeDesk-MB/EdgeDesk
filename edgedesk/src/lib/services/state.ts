@@ -59,6 +59,13 @@ import {
 } from "@/lib/calc/ep/live-model";
 import { getHistoryFeed, getChartAnnotationHistory } from "@/lib/services/history-feed";
 import { maybeSendWeeklyDigest } from "@/lib/services/weekly-digest";
+import { recordAlerts } from "@/lib/services/alerts-inbox";
+import { sendPush } from "@/lib/services/push";
+import {
+  LIVE_POLL_WINDOW_MS,
+  needsResultBackfill,
+  shouldFetchGoalTimeline,
+} from "@/lib/live-poll-rules";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
@@ -180,24 +187,39 @@ function tickSimulations(): void {
 }
 
 /** Refresh imported API events that are tracked (scores poll every ~60s via fixtures cache). */
+/** One result-backfill attempt per event per server session. */
+const backfillAttempted = new Set<number>();
+/** One budget-exhausted alert latch per day per server session. */
+let budgetAlertDay = "";
+
 async function refreshApiEvents(): Promise<void> {
   if (!hasApiKey()) return;
   const now = Date.now();
 
-  const apiEvents = db
+  const allApiRows = db
     .select()
     .from(events)
     .where(eq(events.source, "api"))
-    .all()
-    .filter(
-      (e) =>
-        (e.sport ?? "football") === "football" &&
-        e.externalId &&
-        e.status !== "finished" &&
-        e.startTime < now + 5 * 60 * 1000 && // kickoff imminent or passed
-        e.startTime > now - 4 * 60 * 60 * 1000 // and not ancient
-    );
-  if (apiEvents.length === 0) return;
+    .all();
+
+  const apiEvents = allApiRows.filter(
+    (e) =>
+      (e.sport ?? "football") === "football" &&
+      e.externalId &&
+      e.status !== "finished" &&
+      e.startTime < now + 5 * 60 * 1000 && // kickoff imminent or passed
+      e.startTime > now - LIVE_POLL_WINDOW_MS // and not ancient
+  );
+
+  // Matches that missed their live window (budget ran dry, desk was closed)
+  // get one cheap result fetch instead of freezing at the last polled minute.
+  const backfillEvents = allApiRows.filter(
+    (e) => needsResultBackfill(e, now) && !backfillAttempted.has(e.id)
+  );
+  for (const e of backfillEvents) backfillAttempted.add(e.id);
+
+  if (apiEvents.length === 0 && backfillEvents.length === 0) return;
+  apiEvents.push(...backfillEvents);
 
   // Goal timeline is expensive - only fetch for open trigger bets that need scorers.
   const openTriggerBets = db
@@ -225,7 +247,9 @@ async function refreshApiEvents(): Promise<void> {
       const awayLed2 = event.awayLed2 || (fixture.awayScore - fixture.homeScore >= 2 ? 1 : 0);
 
       let goals = event.goals;
-      if (needTimeline.has(event.id) && fixture.status !== "upcoming") {
+      // Timeline is a SECOND request per poll - only spend it when the score
+      // moved (or a live match has no timeline yet), never every minute.
+      if (needTimeline.has(event.id) && shouldFetchGoalTimeline(event, fixture)) {
         try {
           goals = JSON.stringify(await fixtureGoalEvents(event.externalId!, fixture.homeTeam));
         } catch {
@@ -255,6 +279,23 @@ async function refreshApiEvents(): Promise<void> {
     }
   } catch {
     // API hiccups must never break the dashboard; scores just refresh next poll
+  }
+
+  // Budget exhaustion mid-match previously died silently (England v Argentina
+  // froze at 45' 0-0) - raise a once-a-day alert so it is never a mystery.
+  const usage = apiUsageToday();
+  const today = new Date().toISOString().slice(0, 10);
+  if (usage.used >= usage.budget && budgetAlertDay !== today && apiEvents.length > 0) {
+    budgetAlertDay = today;
+    const alert = {
+      key: `api_budget:${today}`,
+      kind: "api_budget",
+      title: "Live score updates paused - API budget used up",
+      body: `The football API's ${usage.budget} requests for today are spent. Tracked matches will not update until tomorrow - log goals manually or correct the result after full time.`,
+      href: "/tracked-events",
+    };
+    recordAlerts([alert]);
+    void sendPush(alert).catch(() => {});
   }
 }
 

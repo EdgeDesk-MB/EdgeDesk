@@ -130,14 +130,14 @@ export function DashboardOverviewBar({
 
   return (
     // min-h-full + flex column lets the mobile deck card stretch this to the viewport.
-    <div className="flex min-h-full shrink-0 flex-col overflow-hidden border-b border-border/60 sm:block sm:min-h-0">
+    <div className="flex min-h-0 shrink-0 flex-col overflow-hidden border-b border-border/60 sm:block sm:min-h-0">
       <div
         className={cn(
-          "flex flex-1 flex-col justify-evenly gap-[var(--layout-section-y)] sm:flex-none sm:justify-start lg:flex-row lg:items-stretch lg:justify-between",
+          "flex flex-none flex-col justify-start gap-[var(--layout-section-y)] sm:flex-none sm:justify-start lg:flex-row lg:items-stretch lg:justify-between",
           overviewInset
         )}
       >
-        <div className="flex min-w-0 flex-1 flex-col gap-6 sm:flex-row sm:items-stretch sm:gap-1.5 lg:gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-10 sm:flex-row sm:items-stretch sm:gap-1.5 lg:gap-2">
           <OverviewMetric
             label="Profit"
             value={<MoneyFlow value={liveTotal} signColor className="inline" />}
@@ -167,7 +167,7 @@ export function DashboardOverviewBar({
           ) : null}
         </div>
 
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <div className="flex flex-col items-stretch gap-2 border-t border-border/60 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end pb-10">
           <DashboardPnlSummaries offers={offers} bets={bets} />
         </div>
       </div>

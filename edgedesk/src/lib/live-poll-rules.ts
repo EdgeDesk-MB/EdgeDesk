@@ -1,0 +1,50 @@
+/**
+ * Pure decision rules for football live polling. The free API tier allows
+ * ~100 requests/day, and a live match already costs one per minute - these
+ * rules keep the second (timeline) request rare and give missed matches a
+ * cheap way to their final result.
+ */
+
+/** Live polling covers kickoff-imminent through 4h after kickoff. */
+export const LIVE_POLL_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+/** Backfill gives up after 3 days - beyond that, correct manually. */
+export const RESULT_BACKFILL_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+
+/**
+ * The goal timeline is a SECOND request per poll (it once drained the whole
+ * daily budget by half-time). Fetch it only when the score moved, or once
+ * when a live match has no stored timeline yet.
+ */
+export function shouldFetchGoalTimeline(
+  event: { goals: string | null; homeScore: number; awayScore: number },
+  fixture: { status: string; homeScore: number; awayScore: number }
+): boolean {
+  if (fixture.status === "upcoming") return false;
+  const scoreChanged =
+    fixture.homeScore !== event.homeScore || fixture.awayScore !== event.awayScore;
+  const noTimelineYet = !event.goals || event.goals === "[]";
+  return scoreChanged || noTimelineYet;
+}
+
+/**
+ * An api football match that never reached "finished" inside the live window
+ * (budget ran dry, server was closed, …) deserves one result fetch so the
+ * final score lands instead of freezing at the last polled minute.
+ */
+export function needsResultBackfill(
+  event: {
+    sport: string | null;
+    source: string | null;
+    externalId: string | null;
+    status: string;
+    startTime: number;
+  },
+  now: number
+): boolean {
+  if ((event.sport ?? "football") !== "football") return false;
+  if (event.source !== "api" || !event.externalId) return false;
+  if (event.status === "finished") return false;
+  const age = now - event.startTime;
+  return age > LIVE_POLL_WINDOW_MS && age <= RESULT_BACKFILL_MAX_AGE_MS;
+}

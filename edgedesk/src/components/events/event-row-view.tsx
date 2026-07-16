@@ -338,6 +338,8 @@ function CorrectResultDialog({
     ftHomeScore: number;
     ftAwayScore: number;
     matchEnding: "ft" | "aet" | "pen";
+    finalHomeScore: number;
+    finalAwayScore: number;
     homeLed2?: boolean;
     awayLed2?: boolean;
   }) => void;
@@ -346,6 +348,8 @@ function CorrectResultDialog({
   const [matchEnding, setMatchEnding] = useState<"ft" | "aet" | "pen">(
     (event.matchEnding as "ft" | "aet" | "pen" | null) ?? "aet"
   );
+  const [finalHome, setFinalHome] = useState(event.homeScore);
+  const [finalAway, setFinalAway] = useState(event.awayScore);
   const [ftHome, setFtHome] = useState(
     event.ftHomeScore ?? event.homeScore
   );
@@ -385,6 +389,31 @@ function CorrectResultDialog({
                 <SelectItem value="pen">Penalty shootout</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Final score{needsFtScore ? " (after extra time)" : ""}
+            </Label>
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 text-right text-sm font-medium">{event.homeTeam}</span>
+              <Input
+                type="number"
+                min={0}
+                className="w-14 text-center"
+                value={finalHome}
+                onChange={(e) => setFinalHome(Math.max(0, parseInt(e.target.value) || 0))}
+              />
+              <span className="text-muted-foreground">–</span>
+              <Input
+                type="number"
+                min={0}
+                className="w-14 text-center"
+                value={finalAway}
+                onChange={(e) => setFinalAway(Math.max(0, parseInt(e.target.value) || 0))}
+              />
+              <span className="min-w-0 flex-1 text-sm font-medium">{event.awayTeam}</span>
+            </div>
           </div>
 
           {needsFtScore && (
@@ -429,9 +458,12 @@ function CorrectResultDialog({
           <Button
             onClick={() => {
               onCorrect({
-                ftHomeScore: needsFtScore ? ftHome : event.homeScore,
-                ftAwayScore: needsFtScore ? ftAway : event.awayScore,
+                // Full time: the final IS the 90-minute score
+                ftHomeScore: needsFtScore ? ftHome : finalHome,
+                ftAwayScore: needsFtScore ? ftAway : finalAway,
                 matchEnding,
+                finalHomeScore: finalHome,
+                finalAwayScore: finalAway,
                 homeLed2,
                 awayLed2,
               });
