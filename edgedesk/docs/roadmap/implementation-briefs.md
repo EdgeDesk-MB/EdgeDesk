@@ -10,7 +10,7 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-07-15 (Phase 10 added — H1 weekly digest, H2 casino desk briefs)
+Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, three waves)
 
 ---
 
@@ -920,6 +920,262 @@ complete → expected-vs-realised line renders); mobile 390×844 pass; suite + b
   (longest-name-first span consumption so "Fishin' Frenzy The Big Match" never also credits
   bare "Fishin' Frenzy"). Library manager dialog on the Casino page (upsert by name,
   delete).
+
+---
+
+# PHASE 11 — EXECUTION EDGE (promoted from §9, 2026-07-16)
+
+> Landscape research (`docs/roadmap/competitive-landscape.md`) showed the incumbents optimise
+> *finding* offers; nobody measures *executing* them. These nine briefs are that gap. Sam's
+> design decisions (2026-07-16) are baked in below. Build in waves: W1 = J1–J3, W2 = J4–J6,
+> W3 = J7–J9. Standing process per item: brief → tests-first lib → UI → harness verify (dev on
+> :3799, NEVER build in the live tree) → calc-auditor/design-reviewer → docs → commit.
+
+## J1. Measured effort — real £/hr `[strong]` (W1)
+
+**Objective.** Replace estimated effort minutes with measured ones. Time the span from first
+meaningful engagement with an offer to its final bet logged; blend measured medians into the
+£/hr sort once samples exist. **Hybrid capture (Sam):** automatic, with edit-after.
+
+**Why.** B2's £/hr sort divides EV by `EFFORT_MINUTES[action.kind]` guesses
+(`src/lib/offers/do-next.ts:27`, E1-tunable overrides at :108). Measured minutes make the
+number personal and honest — no competitor measures execution at all.
+
+**Schema (§0 pattern).** New `offer_effort_samples` table: id, offerId, actionKind,
+startedAt, endedAt, durationMin REAL, edited INTEGER DEFAULT 0, createdAt. Additive only.
+
+**Capture points (client, via a small provider):**
+- START: first of — Do Next action click-through, offer campaign "Place qualifying bet",
+  matched calculator opened from an offer context, Add bet opened with an offerId prefill.
+  Keyed `offerId:actionKind`; re-engagement while open does not restart.
+- STOP: a bet POST succeeds carrying that offerId → sample written via
+  `POST /api/effort` (new thin route). Abandoned starts expire after 60 min unrecorded.
+- EDIT-AFTER: the sample renders on the offer campaign card ("Logged in 4m") with a small
+  edit affordance → PATCH duration, sets `edited=1`.
+
+**Blend (pure lib, tests first).** NEW `src/lib/offers/effort.ts`:
+`measuredEffortMinutes(samples, actionKind): { minutes: number; sampleSize: number } | null`
+(median of last 20 per kind) and `blendedEffort(measured, n, prior)` following the A1
+`blendedRetention` idiom (`src/lib/offers/retention-shared.ts`): n=0 → prior (current
+EFFORT_MINUTES), large n → measured. Thread through `buildDoNextItems` opts alongside the
+E1 overrides (measured beats default; explicit E1 user override beats measured — user intent
+wins). Rate captions show the basis: "£24/hr · measured (12)".
+
+**Acceptance.** Lib unit-tested (median, blend, override precedence); harness: run an offer
+flow on :3799 → sample lands, card shows duration, £/hr caption flips to measured at n≥5;
+suite green.
+
+## J2. Boosts page — boost & bet-builder checkers + boost diary `[strong]` (W1)
+
+**Objective.** A separate nav page (**Sam: not Match Checker tabs**) answering "is this
+boosted/builder price above fair?" in <10s, and a diary accumulating boost EV captured.
+
+**Why.** The incumbents' Price Boost Matcher / Bet Builder Finder are discovery (D2). The
+*checker* halves are one manual-entry step from F1's maths and extend the same fair-price
+idiom. The diary turns one-off checks into an edge ledger.
+
+**Maths (pure calc — /calc-change).** NEW `src/lib/calc/boost-check.ts`:
+- `boostVerdict({ boostedOdds, fairOdds, stake })` → `{ evPct, evGbp, verdict }` where
+  fairOdds comes from user-entered exchange back/lay (mid or no-vig via `ev.ts#noVig`).
+- `betBuilderFairOdds(legs: Array<{ fairOdds: number }>, correlationHaircutPct = 0)` →
+  product of leg odds × (1 − haircut) — the haircut is user-set with copy explaining
+  same-match legs are correlated so true fair is LOWER than the naive product; default 0
+  with a "heuristic" basis, any haircut set by the user = "estimated". EV badges per A2.
+
+**Schema.** `boost_diary` table: id, label, bookmaker, boostedOdds, fairOdds, stake, evGbp,
+kind ('boost' | 'builder'), outcome nullable ('won'|'lost'|'void'), actualProfit nullable,
+createdAt. Log-at-check, settle later from the row.
+
+**UI.** Nav "Boosts" (Betting section, after Match Checker; Zap icon); page = checker form
+(mode toggle boost/builder) with live verdict card (EV %, £EV, basis badge) + "Log to diary"
++ diary table (sum EV captured headline; settle/void inline). Optional "Lay it" handoff to
+the matched calculator prefill (COMMISSION IS PERCENT in that prefill — F1 audit lesson).
+
+**Acceptance.** Calc vectors hand-worked (incl. haircut and no-vig paths); diary CRUD;
+harness drive: check a boost → verdict <10s → diary row → settle it; mobile 390×844 pass.
+
+## J3. Lock-in advisor — close any open position `[strong]` (W1)
+
+**Objective.** Any open back+lay single shows "close now for £X guaranteed": enter the
+CURRENT back/lay odds and get the equalising trade (further lay at today's price, or back
+on the exchange) with the locked P&L either way.
+
+**Why.** The 2UP desk already computes equalising trades (`equalizedStakes`,
+`src/lib/calc/ep/engine.ts:325` — spec-locked, consume don't modify). Generalising to any
+open position is a small step no personal tool takes.
+
+**Maths (pure calc — /calc-change).** NEW `src/lib/calc/lock-in.ts` (do NOT touch the EP
+engine): `lockInTrade({ backStake, backOdds, layStake, layOdds, commission, currentLayOdds })`
+→ `{ additionalLayStake, lockedProfitIfWin, lockedProfitIfLose, guaranteed }` — standard
+equalisation across the remaining exposure; supports positions with zero original lay
+(back-only → full lay-to-lock). Exact arithmetic via roundPence; hand-worked vectors
+including the classic "back 50 @ 4.0, laid 48 @ 4.2, now 2.5 → lock +£X".
+
+**UI.** Tracker row action "Lock in…" on open back/lay singles (not dutch/EW v1) → dialog:
+current lay odds input (prefill = original), trade card, "Log the lay" handoff into Add bet
+prefilled as lay-only linked to the same event/offer.
+
+**Acceptance.** Calc vectors; harness: open position → dialog → sensible trade → handoff
+prefills Add bet; EV basis "estimated" (user-entered price).
+
+## J4. Casino variance simulator `[strong]` (W2) — needs H2
+
+**Objective.** Monte Carlo a wagering offer with **volatility presets (Sam)**: bust
+probability, median outcome, percentile band, distribution chart — extending H2's variance
+tiers into honest distributions.
+
+**Why.** Incumbents publish static EV lists. "62% bust, median −£4, top decile +£40 across
+10,000 runs" is the most honest casino tool on the market and pure local compute.
+
+**Spec FIRST (calc-change, test vectors before code).** NEW `src/lib/calc/casino-sim.ts`:
+- Slot model per spin: win probability p and multiplier distribution parameterised by
+  volatility preset (low/medium/high) calibrated so E[return] = RTP exactly. Presets are
+  SPEC'D CONSTANTS with test vectors (e.g. low = frequent small wins: hit rate ~30%,
+  capped multipliers; high = hit rate ~15%, long tail). Document that presets are stylised
+  models, not real game maths.
+- `simulateWagering({ bonusAmount, wageringMultiplier, houseEdge, contributionPct, volatility, spinStake, runs = 10_000, seed })`
+  → `{ bustPct, median, p10, p90, meanEv, histogram }`. Seeded PRNG (mulberry32) so tests
+  are deterministic; meanEv must converge on `casinoOfferEv().ev` within tolerance — that
+  cross-check IS a test.
+- Runs in a web worker (or chunked) — never block the main thread.
+
+**UI.** "Simulate" on the casino verdict card + offer rows → sheet with the distribution
+(dataviz skill for the chart), bust %, median, honest copy ("stylised model — real games
+vary"). Volatility preset picker; spin stake input (default bonus/50).
+
+**Acceptance.** Deterministic seeded vectors; EV convergence test; harness drive on
+/casino; chart renders both themes.
+
+## J5. Mug-bet scheduler `[strong]` (W2) — feeds B9
+
+**Objective.** Plan, log and budget camouflage bets per bookie. **Own category excluded
+from edge (Sam):** mug spend counts in real bankroll and net P&L but never in EV capture,
+£/hr, retention or leak analytics; it shows as its own per-bookie cost line.
+
+**Why.** Account longevity is half the game; B9 scores health but nothing maintains it.
+Nobody does this systematically.
+
+**Schema.** Additive column `bets.purpose TEXT` (NULL/'edge' = normal, 'mug') — betType
+and ALL settlement maths untouched (a mug bet is a normal bet, usually back-only or
+loosely layed). Plus `mug_plan` table: id, accountId, cadenceDays, monthlyBudget,
+lastMugAt nullable, notes, createdAt.
+
+**Exclusion sweep (the careful part).** Audit every analytics surface and exclude
+`purpose='mug'`: EV capture/edge-report inputs, retention (`retention.ts` conversions are
+free-bet types so unaffected — verify), £/hr, mistake ledger, Do Next expectedFromBets;
+KEEP in: bankroll ledgering, net P&L series/settledProfit (real money), bookmaker league
+staked/profit with a separate "mug cost" column. Each exclusion gets a test.
+
+**Workflow.** Accounts page per-bookie: mug plan editor + "due" indicator
+(now − lastMugAt > cadenceDays); Do Next gains low-priority `place_mug` items when due
+(respects visibleBookieNames); Add bet gains a "Mug bet" toggle setting purpose+quickLog
+label; logging one stamps lastMugAt. Alert rule optional OFF-by-default ("Bet365 mug due").
+League table shows "camouflage cost this month" per bookie and total vs monthly budget.
+
+**Acceptance.** Exclusion tests per surface; due-logic lib tests; harness: plan → due item
+→ log mug → stamps + costs appear, edge metrics unchanged (assert equality before/after).
+
+## J6. Offer email ingestion `[strong]` (W2) — staged
+
+**Objective.** Bookie promo emails become prefilled offers. **Stage 1:** drop an .eml (or
+paste the email body) into the existing paste pipeline. **Stage 2 (the destination, Sam is
+keen):** the desk polls an IMAP folder you forward offers to and queues drafts for review.
+
+**Stage 1 (ship first).** Extend `PasteCapture` (`src/components/paste-capture.tsx`) to
+accept `.eml` drops: parse locally — text/plain part preferred, else HTML → text (strip
+tags, keep hrefs' text); subject line prepended (often the offer title). Feed the existing
+`parseOfferFromText` preview. NEW pure lib `src/lib/offers/parse-email.ts` (tests: real-ish
+multipart fixtures, base64 + quoted-printable bodies). No new dependency if hand-rolled
+MIME-lite proves tractable; otherwise flag `postal-mime` (tiny, no native deps) BEFORE
+adding, per AGENTS.md.
+
+**Stage 2 (separate follow-up commit, same brief).** Settings → "Email intake": IMAP host,
+user, app-password (stored in app_settings; document plainly that it is stored locally
+unencrypted like API keys in .env — prefer a dedicated forwarding mailbox, never a main
+account), folder name (default "EdgeDesk"). A poll (60s×N backoff, only while desk open —
+same compute-on-poll idiom as H1) fetches UNSEEN messages, runs stage-1 parsing, creates
+PLANNED offers tagged `source='email'` with an inbox alert "3 offers arrived by email —
+review". Never auto-activates: drafts require human review (planned status IS the review
+queue). Dependency to flag at build time: `imapflow`.
+
+**Acceptance.** Stage 1: fixture-tested parser; harness: drop .eml → preview → offer
+created. Stage 2: mock-IMAP test for the fetch→draft path; drafts land planned + alert.
+
+## J7. Acca desk — leg-by-leg lay workflow `[strong]` (W3, biggest)
+
+**Objective.** Run acca offers as guided multi-day workflows. **Both types in v1 (Sam):**
+(a) **sequential lay** — lay each leg just before it starts, restaking after each result so
+the position stays locked; (b) **acca insurance** — free bet refund if exactly one leg
+loses, lay the whole acca once (or legs) per the standard insurance method.
+
+**Why.** Outplayed's Acca Catcher proves demand; its tracker half is pure execution
+workflow. Ours works from any acca the user logs — no finder, no D2 conflict.
+
+**Maths (pure calc — /calc-change; consume `accaMatched`,
+`src/lib/calc/accumulator.ts:330`, extend beside it).** NEW `src/lib/calc/acca-workflow.ts`:
+- `nextLegLay({ remainingLegs, accaStake, accaOddsRemaining, legLayOdds, commission, bankedSoFar, method })`
+  → per-leg lay stake for the sequential ("lock") method — the standard recursion where each
+  leg's lay covers the acca's current exposure; test vectors from a worked 4-fold.
+- Insurance method: qualifying maths for "refund if exactly 1 leg loses" (trigger
+  probability irrelevant to stakes; lay legs individually so any single loss is covered —
+  vectors for 3- and 4-fold).
+
+**Schema.** `acca_runs`: id, offerId nullable, method ('sequential'|'insurance'), stake,
+status, createdAt. `acca_legs`: id, runId, seq, label, eventId nullable, backOdds,
+layOdds nullable, layStake nullable, layBetId nullable, result ('pending'|'won'|'lost'|'void'),
+scheduledAt nullable. Each placed lay is a REAL bets row (lay_only) linked via layBetId, so
+settlement/P&L ride existing rails — the desk orchestrates, the tracker owns money.
+
+**Workflow.** New nav "Acca Desk" (Live desks). Create run (from an offer or standalone) →
+legs list → per-leg state machine: upcoming → LAY DUE (alert via rules.ts + push: "Lay leg
+3 of your Bet365 acca — £12.40 @ ~2.1") → laid → result. Result entry manual v1 (or linked
+event auto). Run summary: locked P&L so far, worst case, projection. Daily Plan slots for
+lay-due legs (extends `buildDailyPlan`).
+
+**Acceptance.** Calc vectors both methods; run lifecycle service tests (temp DB); harness:
+create 3-fold sequential run → leg 1 result → leg 2 lay stake matches hand-worked; alert
+fires; mobile pass.
+
+## J8. Household account sets `[strong]` (W3)
+
+**Objective.** Track a partner's separately-operated accounts as a tagged second set:
+`accounts.owner` (additive column, default 'me'), owner filter on Accounts/Tracker/League/
+Reports, per-owner P&L split, combined by default.
+
+**Why.** Long-standing community practice the incumbents support. **Compliance framing
+(standing):** copy always says "accounts operated by their owner" — EdgeDesk tracks, never
+encourages operating someone else's accounts.
+
+**How.** Additive `accounts.owner TEXT DEFAULT 'me'` + owners list in settings (names);
+bets/offers inherit owner via bookmaker→account mapping at analytics time (no bet-level
+column — an account belongs to one owner). Surfaces: owner chip filter (Accounts, league,
+Edge Report, season summary); balances top-bar shows combined with per-owner popover.
+Do Next unaffected v1 (single plan). Migration: everything existing = 'me'.
+
+**Acceptance.** Analytics split tests (owner A vs B vs combined reconcile to totals);
+harness: tag an account, filters split correctly; copy review for framing.
+
+## J9. Betslip prefill extension `[strong]` (W3, last — new surface)
+
+**Objective.** A Chrome (MV3) extension: one click in EdgeDesk copies a structured intent →
+the extension fills the betslip (selection search + stake) on the exchange tab. Betfair
+exchange first; bookies later. Execution automation, zero odds scraping (D2 intact).
+
+**Why.** Betwatch proves the pattern. Cuts the most error-prone manual step (fat-fingered
+lay stakes) — directly serves "am I executing correctly?".
+
+**How (size carefully — new package).** `extension/` workspace (plain MV3, no build deps if
+possible): content script for betfair.com that finds the market view and fills
+selection/stake from a payload received via `chrome.runtime` messaging; EdgeDesk page emits
+via a custom DOM event the extension listens for (localhost + tailscale origins). Fill only
+— NEVER auto-place; the user always clicks the exchange's own confirm. Fragile-selector
+risk: version the selector map, fail loud with a toast fallback ("couldn't find the slip —
+stake copied to clipboard" as the graceful degrade). EdgeDesk side: "Fill slip" buttons on
+matched calculator + lock-in dialog + acca lay-due rows.
+
+**Acceptance.** Manual harness protocol (extension loaded unpacked, drive a Betfair market
+page in the harness Chrome with a stubbed page fixture for CI-less testing); clipboard
+fallback tested; docs page "Install the extension".
 
 ---
 
