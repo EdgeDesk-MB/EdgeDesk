@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,9 @@ import { TransferFundsDialog } from "@/components/accounts/transfer-funds-dialog
 import { ManageVenuesDialog } from "@/components/accounts/venue-admin-panel";
 import { MoneyFlow } from "@/components/money-flow";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { NumField } from "@/components/calc/num-field";
+import { mugDue } from "@/lib/accounts/mug-plan";
+import { useNow } from "@/hooks/use-now";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
@@ -267,6 +271,7 @@ function AccountsContent() {
             bets={bets}
             offers={state?.offers ?? []}
             droughtNudgeDays={state?.settings.tuning.droughtNudgeDays}
+            mugPlans={state?.mugPlans ?? []}
             onChanged={refresh}
           />
       </div>
@@ -325,19 +330,35 @@ function HealthBadge({ health }: { health: BookmakerLeagueRow["health"] }) {
  * and drought per bookie account. Health is manual - cooling toggles here,
  * gubbed/closed come from the account's access status.
  */
+type MugPlanSummary = {
+  id: number;
+  accountId: number;
+  accountName: string;
+  cadenceDays: number;
+  monthlyBudget: number | null;
+  lastMugAt: number | null;
+};
+
 function BookmakerLeagueCard({
   accounts,
   bets,
   offers,
   droughtNudgeDays,
+  mugPlans,
   onChanged,
 }: {
   accounts: AccountBalance[];
   bets: BookmakerStatsBet[];
   offers: BookmakerStatsOffer[];
   droughtNudgeDays?: number;
+  mugPlans: MugPlanSummary[];
   onChanged: () => void;
 }) {
+  const now = useNow(60_000);
+  const planByAccountId = useMemo(
+    () => new Map(mugPlans.map((p) => [p.accountId, p])),
+    [mugPlans]
+  );
   // computeBookmakerStats defaults `now` internally - keeps this memo pure.
   const rows = useMemo(
     () => computeBookmakerStats({ accounts, bets, offers, droughtNudgeDays }),
@@ -406,6 +427,31 @@ function BookmakerLeagueCard({
     r.roi != null ? `${(r.roi * 100).toFixed(1)}%` : "–";
   const fmtRetention = (r: BookmakerLeagueRow) =>
     r.retention ? `${Math.round(r.retention.rate * 100)}% (${r.retention.sampleSize})` : "–";
+  function mugCell(r: BookmakerLeagueRow) {
+    const plan = planByAccountId.get(r.accountId);
+    const due = plan ? mugDue(plan, now) : null;
+    return (
+      <span className="inline-flex items-center justify-end gap-1.5">
+        {r.mugNetMonth !== 0 || plan?.monthlyBudget != null ? (
+          <span className="tabular-nums">
+            <MoneyFlow value={r.mugNetMonth} signColor signDisplay className="inline" />
+            {plan?.monthlyBudget != null ? (
+              <span className="text-muted-foreground"> / £{plan.monthlyBudget.toFixed(0)}</span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">–</span>
+        )}
+        {due?.due ? (
+          <Badge variant="warning" className="text-[10px]">
+            Due
+          </Badge>
+        ) : null}
+        <MugPlanDialog account={{ id: r.accountId, name: r.name }} plan={plan} onSaved={onChanged} />
+      </span>
+    );
+  }
+
   const fmtLastOffer = (r: BookmakerLeagueRow) =>
     r.daysSinceLastOffer != null
       ? r.daysSinceLastOffer === 0
@@ -450,6 +496,10 @@ function BookmakerLeagueCard({
                 </span>
                 <span className="shrink-0">{healthAction(r)}</span>
               </span>
+              <span className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span>Mug this month</span>
+                {mugCell(r)}
+              </span>
               {r.droughtNudge ? <span className="mt-1 block">{droughtNote(r)}</span> : null}
             </div>
           ))}
@@ -465,6 +515,7 @@ function BookmakerLeagueCard({
                 <TableHead className="text-right">Retention</TableHead>
                 <TableHead className="text-right">Offers</TableHead>
                 <TableHead className="text-right">Last offer</TableHead>
+                <TableHead className="text-right">Mug (month)</TableHead>
                 <TableHead className="w-36 text-right">Health</TableHead>
               </TableRow>
             </TableHeader>
@@ -489,6 +540,7 @@ function BookmakerLeagueCard({
                   <TableCell className="text-right tabular-nums font-semibold">{fmtRetention(r)}</TableCell>
                   <TableCell className="text-right tabular-nums font-semibold">{r.offerCount}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtLastOffer(r)}</TableCell>
+                  <TableCell className="text-right">{mugCell(r)}</TableCell>
                   <TableCell className="text-right">{healthAction(r)}</TableCell>
                 </TableRow>
               ))}
@@ -497,6 +549,139 @@ function BookmakerLeagueCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** J5: per-bookie camouflage cadence editor - one plan per account. */
+function MugPlanDialog({
+  account,
+  plan,
+  onSaved,
+}: {
+  account: { id: number; name: string };
+  plan?: MugPlanSummary;
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[11px] text-muted-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {plan ? "Plan" : "Plan…"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm" onClick={(e) => e.stopPropagation()}>
+        {open ? (
+          <MugPlanForm
+            account={account}
+            plan={plan}
+            onDone={() => {
+              setOpen(false);
+              onSaved();
+            }}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MugPlanForm({
+  account,
+  plan,
+  onDone,
+}: {
+  account: { id: number; name: string };
+  plan?: MugPlanSummary;
+  onDone: () => void;
+}) {
+  const [cadenceDays, setCadenceDays] = useState(plan?.cadenceDays ?? 14);
+  const [monthlyBudget, setMonthlyBudget] = useState(plan?.monthlyBudget ?? NaN);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api("/api/mug-plans", {
+        method: "POST",
+        json: {
+          accountId: account.id,
+          cadenceDays: Math.round(cadenceDays),
+          monthlyBudget: Number.isFinite(monthlyBudget) ? monthlyBudget : null,
+        },
+      });
+      toast.success("Mug plan saved", { description: account.name });
+      onDone();
+    } catch (e) {
+      toast.error("Could not save plan", { description: String(e) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (!plan) return;
+    setSaving(true);
+    try {
+      await api(`/api/mug-plans/${plan.id}`, { method: "DELETE" });
+      toast.success("Mug plan removed");
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Mug plan · {account.name}</DialogTitle>
+        <DialogDescription>
+          Camouflage cadence: a deliberate, budgeted cost that keeps the account looking
+          human. Mug money stays in real P&L but never touches edge metrics.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid grid-cols-2 gap-3">
+        <NumField
+          label="Every N days"
+          value={cadenceDays}
+          onChange={setCadenceDays}
+          min={1}
+          step={1}
+        />
+        <NumField
+          label="Monthly budget"
+          prefix="£"
+          value={monthlyBudget}
+          onChange={setMonthlyBudget}
+          min={0}
+          placeholder="Optional"
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {plan?.lastMugAt
+          ? `Last mug bet ${new Date(plan.lastMugAt).toLocaleDateString()}`
+          : "No mug bet logged yet - one is due as soon as the plan exists."}
+      </p>
+      <div className="flex justify-end gap-2">
+        {plan ? (
+          <Button variant="ghost" className="mr-auto text-destructive" onClick={() => void remove()} disabled={saving}>
+            Remove
+          </Button>
+        ) : null}
+        <Button variant="outline" onClick={onDone} disabled={saving}>
+          Cancel
+        </Button>
+        <Button onClick={() => void save()} disabled={saving || !(cadenceDays >= 1)}>
+          Save plan
+        </Button>
+      </div>
+    </>
   );
 }
 

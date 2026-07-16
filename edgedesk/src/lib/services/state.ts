@@ -67,7 +67,7 @@ import {
   shouldFetchGoalTimeline,
 } from "@/lib/live-poll-rules";
 import { medianEffortByKind } from "@/lib/offers/effort";
-import { offerEffortSamples } from "@/lib/db";
+import { accounts as accountsTable, mugPlans, offerEffortSamples } from "@/lib/db";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
@@ -842,6 +842,28 @@ export async function getAppState(): Promise<AppState> {
   });
 
   const effortMeasured = medianEffortByKind(db.select().from(offerEffortSamples).all());
+  const accountNameById = new Map(
+    db.select().from(accountsTable).all().map((a) => [a.id, a.name])
+  );
+  const mugPlanRows = db
+    .select()
+    .from(mugPlans)
+    .all()
+    .flatMap((p) => {
+      const accountName = accountNameById.get(p.accountId);
+      return accountName
+        ? [
+            {
+              id: p.id,
+              accountId: p.accountId,
+              accountName,
+              cadenceDays: p.cadenceDays,
+              monthlyBudget: p.monthlyBudget,
+              lastMugAt: p.lastMugAt,
+            },
+          ]
+        : [];
+    });
 
   return {
     events: allEvents.sort((a, b) => a.startTime - b.startTime),
@@ -853,6 +875,7 @@ export async function getAppState(): Promise<AppState> {
     planFixtures,
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     effortMeasured,
+    mugPlans: mugPlanRows,
     alertsUnread: unreadCount(),
     demoMode: isDemoMode(),
     livePositions,

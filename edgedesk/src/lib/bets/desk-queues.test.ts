@@ -40,6 +40,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     offerId: partial.offerId ?? null,
     quickLogged: partial.quickLogged ?? null,
     source: partial.source ?? null,
+    purpose: partial.purpose ?? null,
   };
 }
 

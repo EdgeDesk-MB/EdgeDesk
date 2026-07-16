@@ -50,7 +50,7 @@ export interface DoNextFunding {
 
 export type DoNextItem = {
   id: string;
-  kind: OfferNextActionKind | "orphan_free_bet" | "fund_account";
+  kind: OfferNextActionKind | "orphan_free_bet" | "fund_account" | "place_mug";
   title: string;
   detail: string;
   bookmaker: string | null;
@@ -107,6 +107,8 @@ function lotMatchesOffer(lot: FreeBetLotInput, offer: OfferSummary): boolean {
 export type DoNextOpts = AdvantageOpts & {
   /** Sparse overrides for EFFORT_MINUTES, keyed by action kind (E1 tuning). */
   effortMinutes?: Record<string, number>;
+  /** J5: bookies whose mug cadence is due - lowest-priority reminder items */
+  mugDue?: Array<{ accountName: string; daysSince: number | null }>;
 };
 
 /**
@@ -261,6 +263,32 @@ export function buildDoNextItems(
     }
   }
 
+  // J5: camouflage reminders - lowest priority, no EV claim (the point is
+  // account longevity, not edge). Clicking opens Add bet pre-set to Mug.
+  for (const due of opts?.mugDue ?? []) {
+    items.push({
+      id: `mug-${normVenue(due.accountName)}`,
+      kind: "place_mug",
+      title: `Mug bet at ${due.accountName}`,
+      detail:
+        due.daysSince == null
+          ? "No camouflage logged yet - keep the account looking human"
+          : `Last mug ${Math.floor(due.daysSince)}d ago - cadence due`,
+      bookmaker: due.accountName,
+      offerTitle: null,
+      offerId: null,
+      href: `/tracker?mug=${encodeURIComponent(due.accountName)}`,
+      remainingEv: 0,
+      basis: "heuristic",
+      priority: 30,
+      edgeScore: 0,
+      rateScore: 0,
+      daysLeft: null,
+      expiryLabel: null,
+      health: opts?.bookmakerHealth?.get(normVenue(due.accountName)),
+    });
+  }
+
   return items;
 }
 
@@ -344,6 +372,7 @@ export function sumActionableEv(items: DoNextItem[]): { total: number; weakestBa
 export function doNextActionLabel(kind: DoNextItem["kind"]): string {
   if (kind === "orphan_free_bet") return "Convert";
   if (kind === "fund_account") return "Fund";
+  if (kind === "place_mug") return "Mug bet";
   return offerNextActionLabel(kind);
 }
 
@@ -360,6 +389,8 @@ export function doNextBarClass(kind: DoNextItem["kind"]): string {
       return "bg-sky-500";
     case "fund_account":
       return "bg-orange-400";
+    case "place_mug":
+      return "bg-slate-400";
     default:
       return "bg-muted-foreground/50";
   }
@@ -377,6 +408,8 @@ export function doNextKindBadgeClass(kind: DoNextItem["kind"]): string {
       return "border-sky-500/35 bg-sky-500/10 text-sky-800 dark:text-sky-300";
     case "fund_account":
       return "border-orange-400/35 bg-orange-400/10 text-orange-800 dark:text-orange-300";
+    case "place_mug":
+      return "border-slate-400/35 bg-slate-400/10 text-slate-700 dark:text-slate-300";
     default:
       return "border-border/60 bg-muted/40 text-muted-foreground";
   }

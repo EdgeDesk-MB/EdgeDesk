@@ -61,6 +61,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     bullets: [
       "Add bets manually, from calculators, or via OCR screenshot import.",
       "Placing a deliberate back-only bet (e.g. a mug bet)? Pick the No lay bet type - the lay panel disappears and the outcomes show the bookie side only.",
+      "Flag a bet as a Mug bet (camouflage): it stays in real P&L but is excluded from every edge metric, never links an offer, and stamps the bookie's cadence plan.",
       "Link an event once - score changes settle match odds, BTTS, O/U 2.5 and 2UP together.",
       "Use “The bet wins IF …” for goalscorer and combo triggers - settles at the decisive moment.",
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
@@ -163,6 +164,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "First bet at a new bookie creates the account automatically.",
       "Rename a bookie to cascade the name across bets, offers and prefs.",
       "Mark bookies Available, Gubbed or Closed to filter offer next-actions.",
+      "Mug plans (league table → Plan): set a camouflage cadence and monthly budget per bookie. Due plans surface as low-priority Do next items and the league shows the month's mug cost on its own line.",
     ],
     guideSlug: "getting-started",
   },

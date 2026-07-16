@@ -52,6 +52,15 @@ export interface AppState {
   retention: RetentionState;
   /** J1: per-action-kind median execution minutes from logged samples */
   effortMeasured: Record<string, { minutes: number; sampleSize: number }>;
+  /** J5: mug-bet cadence plans joined to account names */
+  mugPlans: Array<{
+    id: number;
+    accountId: number;
+    accountName: string;
+    cadenceDays: number;
+    monthlyBudget: number | null;
+    lastMugAt: number | null;
+  }>;
   /** Unread alerts in the inbox (F2) - drives the nav badge */
   alertsUnread: number;
   /** True when this process opened the demo database (G2 watermark) */

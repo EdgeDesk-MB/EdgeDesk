@@ -48,6 +48,24 @@ describe("bookmakerHealthMap", () => {
 });
 
 describe("computeBookmakerStats", () => {
+  it("mug bets stay in profit/staked (real money) and get their own month line (J5)", () => {
+    const rows = computeBookmakerStats({
+      accounts: [account({ id: 1, name: "Bet365" })],
+      bets: [
+        bet({}), // edge: −2 on 50
+        bet({ purpose: "mug", actualProfit: -5, backStake: 10, settledAt: NOW - 2 * DAY }),
+        bet({ purpose: "mug", actualProfit: -4, backStake: 10, settledAt: NOW - 40 * DAY }), // last month
+      ],
+      offers: [],
+      now: NOW,
+    });
+    const row = rows[0]!;
+    expect(row.profit).toBeCloseTo(-11, 10); // ALL real money kept
+    expect(row.staked).toBeCloseTo(70, 10);
+    expect(row.mugNetMonth).toBeCloseTo(-5, 10); // only this month's camouflage
+  });
+
+
   it("computes ROI and retention per bookie from settled non-void bets", () => {
     const rows = computeBookmakerStats({
       accounts: [account({ id: 1, name: "Bet365" })],

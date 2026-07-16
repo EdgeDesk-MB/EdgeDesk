@@ -103,8 +103,14 @@ export function buildEdgeReport(input: {
   const totalExpected = round2(settled.reduce((a, s) => a + s.expectedProfit, 0));
   const totalRealized = round2(settled.reduce((a, s) => a + (s.realizedProfit ?? 0), 0));
 
+  // J5: monthBets feeds commission drag and retention - edge metrics, so
+  // camouflage bets are excluded (their money still counts in net P&L).
   const monthBets = bets.filter(
-    (b) => b.settledAt != null && b.status !== "open" && monthKey(b.settledAt) === month
+    (b) =>
+      b.purpose !== "mug" &&
+      b.settledAt != null &&
+      b.status !== "open" &&
+      monthKey(b.settledAt) === month
   );
   const commissionDrag = round2(
     monthBets.reduce((a, b) => a + commissionPaidOnSettledBet(b), 0)

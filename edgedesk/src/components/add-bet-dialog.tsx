@@ -138,6 +138,8 @@ export interface AddBetPrefill {
   triggerText?: string;
   /** Mobile quick-log capture - the bet is flagged for later desktop review */
   quickLogged?: boolean;
+  /** J5: pre-set the Mug bet toggle (camouflage, excluded from edge analytics) */
+  mug?: boolean;
   /** Open the Paste slip import as soon as the dialog mounts */
   autoOpenImport?: boolean;
 }
@@ -222,6 +224,7 @@ export function AddBetDialog({
   /** The calc/settlement mode behind the UI type */
   const calcBetType: BetMode = betType === "no_lay" ? "qualifying" : betType;
   const noLay = betType === "no_lay";
+  const [mugBet, setMugBet] = useState(false);
   const [backStake, setBackStake] = useState(NaN);
   const [backOdds, setBackOdds] = useState(NaN);
   const [layOdds, setLayOdds] = useState(NaN);
@@ -314,6 +317,7 @@ export function AddBetDialog({
           ? "no_lay"
           : (editBet.betType as BetMode)
       );
+      setMugBet(editBet.purpose === "mug");
       setBackStake(editBet.backStake);
       setBackOdds(editBet.backOdds);
       setLayOdds(editBet.layOdds);
@@ -364,6 +368,10 @@ export function AddBetDialog({
       if (prefill.labelSuggestion && !prefill.label) setLabel(prefill.labelSuggestion);
       if (prefill.label !== undefined) setLabel(prefill.label);
       if (prefill.betType) setBetType(prefill.betType);
+      if (prefill.mug) {
+        setMugBet(true);
+        setBetType("no_lay");
+      }
       if (prefill.backStake !== undefined) setBackStake(prefill.backStake);
       if (prefill.backOdds !== undefined) setBackOdds(prefill.backOdds);
       if (prefill.layOdds !== undefined) setLayOdds(prefill.layOdds);
@@ -1014,6 +1022,7 @@ export function AddBetDialog({
         commission: commission / 100,
         earlyPayout,
         triggerText: triggerText.trim() || prefill?.triggerText || undefined,
+        purpose: mugBet ? "mug" : editBet?.purpose === "mug" ? null : undefined,
         expectedProfit: noLay ? undefined : Number(preview!.guaranteed.toFixed(2)),
         notes: prefill?.notes ?? (!noLay && exchange ? `Exchange: ${exchange.name}` : undefined),
         offerId: resolvedOfferId,
@@ -1570,6 +1579,19 @@ export function AddBetDialog({
                 }
               />
             </LayPanel>
+            )}
+
+            {(betType === "qualifying" || betType === "no_lay") && (
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div>
+                  <div className="text-sm font-medium">Mug bet (camouflage)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Real money, but excluded from every edge metric - keeps the account
+                    looking human
+                  </div>
+                </div>
+                <Switch checked={mugBet} onCheckedChange={setMugBet} />
+              </div>
             )}
 
             {market === "match_odds" && (

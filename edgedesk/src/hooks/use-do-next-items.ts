@@ -14,6 +14,8 @@ import {
 } from "@/lib/accounts/available-bookies";
 import { bookmakerHealthMap } from "@/lib/accounts/bookmaker-stats";
 import { effectiveEffortMinutes } from "@/lib/offers/effort";
+import { mugDue } from "@/lib/accounts/mug-plan";
+import { useNow } from "@/hooks/use-now";
 import {
   buildDoNextItems,
   type BookieBalanceMap,
@@ -28,6 +30,8 @@ export function useDoNextItems(pollMs?: number): {
 } {
   const { state } = useAppState(pollMs);
   const [lots, setLots] = useState<FreeBetLotInput[]>([]);
+  // Minute-bucketed clock keeps the memo pure while mug due-ness can flip.
+  const now = useNow(60_000);
 
   const retention = state?.retention;
   const freeBetTotal = state?.balances?.accounts
@@ -70,6 +74,16 @@ export function useDoNextItems(pollMs?: number): {
     [tuningEffort, effortMeasured]
   );
 
+  // J5: due camouflage reminders, scoped like offers (closed bookies drop out).
+  const mugDueList = useMemo(() => {
+    const visible = visibleBookieNames(state?.balances?.accounts ?? []);
+    return (state?.mugPlans ?? [])
+      .filter((p) => visible.size === 0 || visible.has(p.accountName.trim().toLowerCase()))
+      .map((p) => ({ plan: p, due: mugDue(p, now) }))
+      .filter(({ due }) => due.due)
+      .map(({ plan, due }) => ({ accountName: plan.accountName, daysSince: due.daysSince }));
+  }, [state?.mugPlans, state?.balances?.accounts, now]);
+
   const items = useMemo(() => {
     const opts = {
       ...(retention
@@ -77,10 +91,11 @@ export function useDoNextItems(pollMs?: number): {
         : {}),
       bookmakerHealth: healthMap,
       effortMinutes,
+      mugDue: mugDueList,
     };
     // buildDoNextItems defaults `now` internally - keeps this memo pure.
     return buildDoNextItems(scopedOffers, lots, undefined, opts, bookieBalances);
-  }, [scopedOffers, lots, retention, healthMap, effortMinutes, bookieBalances]);
+  }, [scopedOffers, lots, retention, healthMap, effortMinutes, mugDueList, bookieBalances]);
 
   return { items, lots, state };
 }

@@ -55,6 +55,7 @@ function bet(over: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     offerId: null,
     quickLogged: null,
     source: null,
+    purpose: null,
     ...over,
   };
 }
@@ -148,6 +149,25 @@ describe("buildEdgeReport", () => {
     if (report.kind !== "ready") throw new Error("expected ready");
     expect(report.commissionDrag).toBeCloseTo(0.96, 10);
     expect(report.retention).toEqual({ rate: 0.76, sampleSize: 1 });
+  });
+
+  it("mug bets never touch commission drag or retention (J5 exclusion)", () => {
+    const bets = [
+      bet({ id: 1 }),
+      bet({ id: 2, betType: "free_snr", backStake: 50, layStake: 0, status: "won", actualProfit: 38 }),
+    ];
+    const withMug = [
+      ...bets,
+      // A LAID mug (commission would leak into drag without the filter)
+      bet({ id: 4, purpose: "mug", layStake: 30, commission: 0.05, status: "lost", actualProfit: -3 }),
+      // A mug SNR would otherwise pollute retention
+      bet({ id: 5, purpose: "mug", betType: "free_snr", backStake: 20, layStake: 0, status: "won", actualProfit: 5 }),
+    ];
+    const a = buildEdgeReport({ snapshots: FIVE_SNAPS, bets, month: "2026-07" });
+    const b = buildEdgeReport({ snapshots: FIVE_SNAPS, bets: withMug, month: "2026-07" });
+    if (a.kind !== "ready" || b.kind !== "ready") throw new Error("expected ready");
+    expect(b.commissionDrag).toBe(a.commissionDrag);
+    expect(b.retention).toEqual(a.retention);
   });
 });
 

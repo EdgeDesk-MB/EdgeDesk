@@ -87,6 +87,7 @@ describe("isFreeBetPlacedHistoryEntry", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    purpose: null,
   };
 
   const ctx = buildHistoryContext([], [freeBet], {});
@@ -300,6 +301,7 @@ describe("sortHistoryEntries", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    purpose: null,
   };
   const ctx = buildHistoryContext([event], [bet], {
     32: { amount: 50, reason: "Finished 2nd" },
@@ -427,6 +429,7 @@ describe("historyEntryHref", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    purpose: null,
   };
   const ctx = buildHistoryContext([event], [bet]);
 

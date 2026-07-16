@@ -129,6 +129,20 @@ function TrackerContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightParam, router]);
 
+  // J5: /tracker?mug=<bookie> → Add bet pre-set to a camouflage bet
+  const mugParam = searchParams.get("mug");
+  const mugApplied = useRef(false);
+  useEffect(() => {
+    if (!mugParam || mugApplied.current) return;
+    mugApplied.current = true;
+    openAddBet({
+      mug: true,
+      bookmaker: mugParam,
+      labelSuggestion: `Mug bet · ${mugParam}`,
+    });
+    router.replace("/tracker", { scroll: false });
+  }, [mugParam, openAddBet, router]);
+
   // Best next / Offers: /tracker?offer=&action=convert|qualify → open Add bet
   useEffect(() => {
     if (actionApplied.current) return;

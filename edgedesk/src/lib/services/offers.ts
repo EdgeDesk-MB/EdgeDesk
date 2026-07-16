@@ -73,9 +73,12 @@ function betHasUnconditionalFreeBet(bet: BetRow): boolean {
 }
 
 export function computeOfferProfitBreakdown(
-  linked: BetRow[],
+  linkedInput: BetRow[],
   promoAwards: Record<number, { amount: number; reason: string }> = getPromoAwardsByBetId()
 ): OfferProfitBreakdown {
+  // J5: camouflage bets are real money but never offer edge - excluded here
+  // so EV capture, capture %, and the mistake ledger can't see them.
+  const linked = linkedInput.filter((b) => b.purpose !== "mug");
   const qualifying = linked.filter(isQualifyingBet);
   const freeBetBets = linked.filter(isFreeBetUsage);
 
@@ -371,9 +374,11 @@ export function resolveOfferForFreeBetUsage(input: {
 
 export function summariseOffer(
   offer: OfferRow,
-  linked: BetRow[],
+  linkedInput: BetRow[],
   promoAwards: Record<number, { amount: number; reason: string }> = getPromoAwardsByBetId()
 ): OfferSummary {
+  // J5: same exclusion as computeOfferProfitBreakdown (single-purpose rule).
+  const linked = linkedInput.filter((b) => b.purpose !== "mug");
   const openBets = linked.filter((b) => b.status === "open").length;
   const profit = computeOfferProfitBreakdown(linked, promoAwards);
   const expectedFromBets = linked.reduce((a, b) => a + (b.expectedProfit ?? 0), 0);
@@ -429,9 +434,11 @@ export function listOfferSummaries(): OfferSummary[] {
       if (fillable && snaps.length > 0) {
         const latest = snaps.reduce((best, s) => (s.version > best.version ? s : best));
         if (latest.settledAt == null) {
-          // Commission drag: sum layStake * commission for bets where back lost (lay won)
+          // Commission drag: sum layStake * commission for bets where back lost
+          // (lay won). Mug bets are excluded - drag must match the realised
+          // side, which computeOfferProfitBreakdown already filters.
           const drag = linked
-            .filter((b) => b.status === "lost" && b.layStake > 0)
+            .filter((b) => b.purpose !== "mug" && b.status === "lost" && b.layStake > 0)
             .reduce((sum, b) => sum + b.layStake * b.commission, 0);
           fillSettlementSnapshot(o.id, summary.profit.totalProfit, drag);
           // Refresh the snapshot list so evLock reflects the fill

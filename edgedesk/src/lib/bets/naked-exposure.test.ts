@@ -41,6 +41,7 @@ function bet(over: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     offerId: null,
     quickLogged: null,
     source: null,
+    purpose: null,
     ...over,
   };
 }
@@ -101,6 +102,12 @@ describe("isNakedExposed - clause by clause", () => {
   it("honours the intentional-nohedge mute marker", () => {
     expect(
       isNakedExposed(bet({ id: 16, notes: `some note ${INTENTIONAL_NOHEDGE_MARKER}` }), NOW)
+    ).toBe(false);
+  });
+
+  it("mug bets are deliberately unlaid - never exposed (J5)", () => {
+    expect(
+      isNakedExposed(bet({ id: 17, purpose: "mug" }), NOW)
     ).toBe(false);
   });
 

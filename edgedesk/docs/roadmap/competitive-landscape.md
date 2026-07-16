@@ -92,7 +92,7 @@ is read directly off `product-roadmap.md` §6 (phase status) and §9 (parking lo
 | Profit tracker | All tiers | All tiers | ✅ Have | Deeper: EV capture rate (A3), retention (A1), mistake ledger (B7), commission drag — measured, not estimated. |
 | Bookmaker league table / account health | Basic | Basic | ✅ Have (B9) | Manual health marking (Healthy/Cooling/Gubbed), never auto. |
 | Household / partner account sets | Some community workarounds | Some community workarounds | 🔜 Planned (J8) | Owner-tag model, per-owner P&L. |
-| Mug-bet (camouflage) budgeting | — | — | 🔜 Planned (J5) | Nobody plans/tracks this systematically as a deliberate cost. |
+| Mug-bet (camouflage) budgeting | — | — | ✅ Have (J5, 2026-07-16) | Nobody plans/tracks this systematically as a deliberate cost. |
 | Monthly / season summary report | Basic | Basic | ✅ Have (B8, G3) | Expected-vs-realized capture chart is the flagship metric — neither incumbent has an equivalent. |
 | Spreadsheet import / data export / backup | — | — | ✅ Have (E3) | Migration ramp for spreadsheet users; local-first backup/restore. |
 

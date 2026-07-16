@@ -8,7 +8,7 @@ import { commissionPaidOnSettledBet, type CommissionPaidInput } from "@/lib/calc
 import type { EvSnapshotRow } from "@/lib/offers/ev-capture";
 import { mistakeTagLabel } from "@/lib/offers/mistakes";
 
-export type DigestBet = CommissionPaidInput & { settledAt: number | null };
+export type DigestBet = CommissionPaidInput & { settledAt: number | null; purpose?: string | null };
 
 export type DigestLeagueRow = { name: string; droughtNudge: boolean };
 
@@ -43,9 +43,10 @@ export function buildWeeklyDigest(input: {
   const realized = round2(settled.reduce((a, s) => a + (s.realizedProfit ?? 0), 0));
   const capture = Math.abs(expected) > 0.01 ? realized / expected : null;
 
+  // J5: mug bets are excluded from drag - camouflage cost is not an edge leak.
   const drag = round2(
     bets
-      .filter((b) => b.status !== "open" && inWindow(b.settledAt))
+      .filter((b) => b.purpose !== "mug" && b.status !== "open" && inWindow(b.settledAt))
       .reduce((a, b) => a + commissionPaidOnSettledBet(b), 0)
   );
 

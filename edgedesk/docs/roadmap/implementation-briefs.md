@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 678 tests / 92 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 690 tests / 93 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1067,7 +1067,19 @@ vary"). Volatility preset picker; spin stake input (default bonus/50).
 **Acceptance.** Deterministic seeded vectors; EV convergence test; harness drive on
 /casino; chart renders both themes.
 
-## J5. Mug-bet scheduler `[strong]` (W2) — feeds B9
+## J5. Mug-bet scheduler `[strong]` (W2) — feeds B9 — ✅ DONE 2026-07-16
+
+Shipped as briefed. Exclusion sweep landed at the chokepoints with a test per surface:
+offer money (computeOfferProfitBreakdown + summariseOffer → EV capture, expectedFromBets,
+mistake ledger all inherit), edge-report monthBets (commission drag + retention),
+retention.ts conversions, naked-exposure (a flagged mug is deliberately unlaid — muted);
+KEPT in net P&L, bankroll and league profit/staked, with a separate per-bookie
+"Mug (month)" line vs budget. Do Next gains lowest-priority (30) place_mug reminders
+that deep-link to /tracker?mug=<bookie> → Add bet pre-set (Mug toggle + No lay type).
+Mug bets never link offers (server-enforced) and stamp every matching account's plan
+(duplicate wallet names exist in real data). The optional OFF-by-default "mug due"
+push alert is DEFERRED — the Do Next reminder covers the workflow; add the alert rule
+only if daily use wants a push.
 
 **Objective.** Plan, log and budget camouflage bets per bookie. **Own category excluded
 from edge (Sam):** mug spend counts in real bankroll and net P&L but never in EV capture,

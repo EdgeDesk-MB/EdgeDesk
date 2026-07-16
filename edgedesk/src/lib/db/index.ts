@@ -152,7 +152,19 @@ CREATE TABLE IF NOT EXISTS offers (
 );
 `);
 
-  sqlite.exec(`
+    sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS mug_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id INTEGER NOT NULL,
+      cadence_days INTEGER NOT NULL,
+      monthly_budget REAL,
+      last_mug_at INTEGER,
+      notes TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+sqlite.exec(`
 CREATE TABLE IF NOT EXISTS accounts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -287,6 +299,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
     }
   };
   addColumn("bets", "quick_logged INTEGER");
+  addColumn("bets", "purpose TEXT");
   addColumn("events", "goals TEXT");
   addColumn("events", "ft_home_score INTEGER");
   addColumn("events", "ft_away_score INTEGER");

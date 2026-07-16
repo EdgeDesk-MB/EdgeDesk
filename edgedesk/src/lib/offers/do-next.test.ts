@@ -396,3 +396,23 @@ describe("buildDoNextItems — bankroll-aware funding (B3)", () => {
     expect(fundItems[0]?.remainingEv).toBeGreaterThan(0); // sum of both blocked EVs
   });
 });
+
+describe("place_mug items (J5)", () => {
+  it("a due plan becomes a lowest-priority reminder with no EV claim", () => {
+    const items = buildDoNextItems([], [], Date.now(), {
+      mugDue: [{ accountName: "Bet365", daysSince: 9 }],
+    });
+    const mug = items.find((i) => i.kind === "place_mug");
+    expect(mug).toBeDefined();
+    expect(mug!.title).toBe("Mug bet at Bet365");
+    expect(mug!.detail).toContain("Last mug 9d ago");
+    expect(mug!.remainingEv).toBe(0);
+    expect(mug!.priority).toBe(30);
+    expect(mug!.href).toBe("/tracker?mug=Bet365");
+  });
+
+  it("no due plans → no mug items", () => {
+    const items = buildDoNextItems([], [], Date.now(), { mugDue: [] });
+    expect(items.some((i) => i.kind === "place_mug")).toBe(false);
+  });
+});

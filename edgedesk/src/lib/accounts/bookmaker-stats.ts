@@ -62,6 +62,8 @@ export interface BookmakerStatsBet {
   backStake: number;
   actualProfit: number | null;
   settledAt: number | null;
+  /** J5: 'mug' = camouflage bet */
+  purpose?: string | null;
 }
 
 export interface BookmakerStatsOffer {
@@ -87,6 +89,8 @@ export interface BookmakerLeagueRow {
   staked: number;
   /** profit ÷ staked; null when nothing staked */
   roi: number | null;
+  /** Net £ from settled mug bets this calendar month (usually negative) */
+  mugNetMonth: number;
   settledBets: number;
   /** Free-bet conversion retention (retained ÷ face); null when no conversions */
   retention: { rate: number; sampleSize: number } | null;
@@ -146,6 +150,16 @@ export function computeBookmakerStats(input: {
 
     const profit = roundPence(settled.reduce((s, b) => s + (b.actualProfit ?? 0), 0));
     const staked = roundPence(settled.reduce((s, b) => s + b.backStake, 0));
+    // Camouflage cost line (J5): profit/staked above KEEP mug money (real
+    // £), this line makes the deliberate spend visible on its own.
+    const monthStart = new Date(now);
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const mugNetMonth = roundPence(
+      settled
+        .filter((b) => b.purpose === "mug" && (b.settledAt ?? 0) >= monthStart.getTime())
+        .reduce((s, b) => s + (b.actualProfit ?? 0), 0)
+    );
 
     const conversions = settled.filter(
       (b) => (b.betType === "free_snr" || b.betType === "free_sr") && b.backStake > 0
@@ -169,6 +183,7 @@ export function computeBookmakerStats(input: {
       health,
       profit,
       staked,
+      mugNetMonth,
       roi: staked > 0 ? profit / staked : null,
       settledBets: settled.length,
       retention,

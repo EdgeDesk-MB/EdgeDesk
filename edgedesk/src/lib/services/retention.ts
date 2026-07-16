@@ -41,6 +41,7 @@ export function getRealizedRetention(
     .filter(
       (b) =>
         (FREE_BET_TYPES as readonly string[]).includes(b.betType) &&
+        b.purpose !== "mug" && // J5: camouflage never informs retention
         !(EXCLUDED_STATUSES as readonly string[]).includes(b.status) &&
         b.actualProfit != null &&
         (cutoff === 0 || (b.settledAt ?? b.createdAt) >= cutoff)

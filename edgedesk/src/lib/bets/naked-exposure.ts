@@ -34,6 +34,7 @@ export function isNakedExposed(
   if (bet.layStake > 0) return false;
   if (bet.legs != null) return false; // dutch bets hedge internally
   if (bet.notes?.includes(INTENTIONAL_NOHEDGE_MARKER)) return false;
+  if (bet.purpose === "mug") return false; // camouflage is deliberately unlaid (J5)
 
   // Starting soon OR already in play - in-play is the most urgent case of
   // all (a deliberate widening of the brief's "starting < 60 min away").

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, isNotNull } from "drizzle-orm";
+import { eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
-import { db, bets, events, history } from "@/lib/db";
+import { db, accounts, bets, events, history, mugPlans } from "@/lib/db";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import { ledgerBetPlacement, ledgerFromSettledBet } from "@/lib/services/balances";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
@@ -45,6 +45,8 @@ const createSchema = z.object({
   offerId: z.number().optional(),
   /** Mobile quick-log capture - flags the bet for later desktop review */
   quickLogged: z.boolean().default(false),
+  /** J5: 'mug' = camouflage bet, excluded from edge analytics */
+  purpose: z.enum(["edge", "mug"]).nullable().optional(),
 });
 
 export async function GET() {
@@ -66,14 +68,16 @@ export async function POST(req: NextRequest) {
     awayTeam: input.awayTeam,
   });
 
-  const resolvedOfferId = resolveOfferForBet({
+  // Camouflage bets never attach to offers - they must not touch EV capture.
+  const isMug = input.purpose === "mug";
+  const resolvedOfferId = isMug ? undefined : resolveOfferForBet({
     offerId: input.offerId,
     label: input.label,
     triggerText,
     bookmaker: input.bookmaker,
     expectedProfit: input.expectedProfit,
   });
-  const offerId =
+  const offerId = isMug ? undefined :
     resolveOfferForFreeBetUsage({
       offerId: resolvedOfferId ?? input.offerId,
       betType: input.betType,
@@ -107,11 +111,30 @@ export async function POST(req: NextRequest) {
       notes: input.notes,
       createdAt: Date.now(),
       quickLogged: input.quickLogged ? Date.now() : null,
+      purpose: input.purpose ?? null,
     })
     .returning()
     .get();
 
   ledgerBetPlacement(inserted);
+
+  // Logging a mug bet stamps the bookie's cadence plan (J5). Duplicate
+  // wallet names can exist, so stamp every matching account's plan.
+  if (inserted.purpose === "mug" && inserted.bookmaker) {
+    const target = inserted.bookmaker.trim().toLowerCase();
+    const matchingIds = db
+      .select()
+      .from(accounts)
+      .all()
+      .filter((a) => a.name.trim().toLowerCase() === target)
+      .map((a) => a.id);
+    if (matchingIds.length > 0) {
+      db.update(mugPlans)
+        .set({ lastMugAt: inserted.createdAt })
+        .where(inArray(mugPlans.accountId, matchingIds))
+        .run();
+    }
+  }
 
   if (inserted.eventId) {
     await syncRacingResultsForEvents([inserted.eventId]);

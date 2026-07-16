@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { db, bets, events } from "@/lib/db";
+import { db, accounts, bets, events, mugPlans } from "@/lib/db";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import { ledgerFromSettledBet } from "@/lib/services/balances";
 import { purgeHistoryForBet } from "@/lib/services/history-feed";
@@ -10,6 +10,7 @@ import { resolveOfferForBet, syncOfferStatuses } from "@/lib/services/offers";
 export const dynamic = "force-dynamic";
 
 const patchSchema = z.object({
+  purpose: z.enum(["edge", "mug"]).nullable().optional(),
   status: z
     .enum(["open", "won", "lost", "void", "early_payout", "half_win", "half_lose", "push"])
     .optional(),
@@ -75,6 +76,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.betType !== undefined ? { betType: p.betType } : {}),
       ...(p.bookmaker !== undefined ? { bookmaker: p.bookmaker } : {}),
       ...(p.exchangeId !== undefined ? { exchangeId: p.exchangeId } : {}),
+      ...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
       ...(p.backStake !== undefined ? { backStake: p.backStake } : {}),
       ...(p.backOdds !== undefined ? { backOdds: p.backOdds } : {}),
       ...(p.layStake !== undefined ? { layStake: p.layStake } : {}),
@@ -87,6 +89,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.market !== undefined ? { market: p.market } : {}),
       ...(p.selection !== undefined ? { selection: p.selection } : {}),
       ...(p.offerId !== undefined ? { offerId: p.offerId } : {}),
+      // A mug bet must never stay offer-linked (mirrors the POST guard);
+      // placed after the offerId spread so it always wins.
+      ...(p.purpose === "mug" ? { offerId: null } : {}),
       ...(triggerFields ?? {}),
       ...(p.status && p.status !== "open" ? { settledAt: Date.now() } : {}),
       // Imported history keeps balanceSettled=1 - its stake was never
@@ -103,6 +108,32 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .returning()
     .get();
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Editing a bet into a mug stamps the cadence plan with the bet's
+  // placement date - only ever moving the stamp FORWARD (J5).
+  if (p.purpose === "mug" && updated.bookmaker) {
+    const target = updated.bookmaker.trim().toLowerCase();
+    const matchingIds = db
+      .select()
+      .from(accounts)
+      .all()
+      .filter((a) => a.name.trim().toLowerCase() === target)
+      .map((a) => a.id);
+    if (matchingIds.length > 0) {
+      for (const plan of db
+        .select()
+        .from(mugPlans)
+        .where(inArray(mugPlans.accountId, matchingIds))
+        .all()) {
+        if ((plan.lastMugAt ?? 0) < updated.createdAt) {
+          db.update(mugPlans)
+            .set({ lastMugAt: updated.createdAt })
+            .where(eq(mugPlans.id, plan.id))
+            .run();
+        }
+      }
+    }
+  }
   if (updated.status !== "open") ledgerFromSettledBet(updated);
   syncOfferStatuses();
   return NextResponse.json({ bet: updated });

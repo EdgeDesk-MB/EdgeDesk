@@ -98,6 +98,17 @@ describe("buildWeeklyDigest", () => {
     expect(digest?.body).toContain("commission £0.96");
   });
 
+  it("mug bets never inflate digest commission drag (J5 exclusion)", () => {
+    const digest = buildWeeklyDigest({
+      snapshots: [snap({})],
+      bets: [bet({}), bet({ purpose: "mug", layStake: 100, commission: 0.05 })],
+      league: [],
+      weekStartMs: WEEK_START,
+      weekEndMs: WEEK_END,
+    });
+    expect(digest?.body).toContain("commission £0.96");
+  });
+
   it("no commission line when drag is zero", () => {
     const digest = buildWeeklyDigest({
       snapshots: [snap({})],

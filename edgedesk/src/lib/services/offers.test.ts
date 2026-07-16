@@ -44,6 +44,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     offerId: 1,
     quickLogged: null,
     source: null,
+    purpose: null,
     ...partial,
   };
 }
@@ -64,6 +65,22 @@ describe("normalizeOfferTitleKey", () => {
 });
 
 describe("computeOfferProfitBreakdown", () => {
+  it("mug bets never touch offer money (J5 exclusion)", () => {
+    const linked = [
+      bet({ id: 1, betType: "qualifying", actualProfit: -1.51, status: "lost" }),
+      bet({ id: 2, betType: "free_snr", actualProfit: 42, status: "won", triggerText: null }),
+    ];
+    const withMug = [
+      ...linked,
+      bet({ id: 3, purpose: "mug", betType: "qualifying", actualProfit: -8, status: "lost", triggerText: null }),
+    ];
+    const promo = { 1: { amount: 50, reason: "Finished 3rd" } };
+    expect(computeOfferProfitBreakdown(withMug, promo)).toEqual(
+      computeOfferProfitBreakdown(linked, promo)
+    );
+  });
+
+
   it("splits qualifying loss from free bet conversion profit", () => {
     const linked = [
       bet({ id: 1, betType: "qualifying", actualProfit: -1.51, status: "lost" }),

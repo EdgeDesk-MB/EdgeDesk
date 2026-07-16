@@ -84,6 +84,20 @@ export const bets = sqliteTable("bets", {
   quickLogged: integer("quick_logged"),
   /** Provenance (E3): "import" = spreadsheet history, excluded from EV capture */
   source: text("source"),
+  /** J5: null/'edge' = normal; 'mug' = camouflage bet, excluded from edge analytics */
+  purpose: text("purpose"),
+});
+
+/** Mug-bet cadence plan per bookie account (J5) - camouflage budgeting. */
+export const mugPlans = sqliteTable("mug_plans", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  accountId: integer("account_id").notNull(),
+  /** Place a mug bet at least every N days */
+  cadenceDays: integer("cadence_days").notNull(),
+  monthlyBudget: real("monthly_budget"),
+  lastMugAt: integer("last_mug_at"),
+  notes: text("notes"),
+  createdAt: integer("created_at").notNull(),
 });
 
 /** Matched betting offer / promo pipeline (sign-up, reload, racing refund, etc.) */
@@ -395,3 +409,4 @@ export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;
 export type CasinoGameRow = typeof casinoGames.$inferSelect;
 export type OfferEffortSampleRow = typeof offerEffortSamples.$inferSelect;
 export type BoostDiaryRow = typeof boostDiary.$inferSelect;
+export type MugPlanRow = typeof mugPlans.$inferSelect;
