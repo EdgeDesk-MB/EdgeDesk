@@ -20,6 +20,7 @@ import { PageShell } from "@/components/page-shell";
 import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { MoneyFlow } from "@/components/money-flow";
+import { VenueSelect } from "@/components/venue-select";
 import { api } from "@/hooks/use-app-state";
 import {
   boostVerdict,
@@ -171,17 +172,13 @@ export default function BoostsPage() {
                 placeholder="e.g. Salah anytime scorer"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="boost-bookie" className="text-xs text-muted-foreground">
-                Bookmaker
-              </Label>
-              <Input
-                id="boost-bookie"
-                value={bookmaker}
-                onChange={(e) => setBookmaker(e.target.value)}
-                placeholder="e.g. Sky Bet"
-              />
-            </div>
+            <VenueSelect
+              value={bookmaker}
+              onChange={setBookmaker}
+              label="Bookmaker"
+              placeholder="Select bookie"
+              kinds={["bookie"]}
+            />
             <NumField
               label={mode === "boost" ? "Boosted odds" : "Offered builder odds"}
               value={boostedOdds}
