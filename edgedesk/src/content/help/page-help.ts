@@ -7,6 +7,7 @@ export type PageHelpId =
   | "calculators"
   | "casino"
   | "boosts"
+  | "acca"
   | "tracked-events"
   | "settings"
   | "history"
@@ -68,6 +69,18 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Lock in on any open single: enter today's exchange prices and close the position for a guaranteed P&L - slide to lock part and let the rest ride. 2UP bets lock on the 2UP Desk instead.",
     ],
     guideSlug: "calculators",
+  },
+  acca: {
+    title: "Acca Desk",
+    summary:
+      "Run acca offers as guided multi-day workflows - the desk says when and how much to lay, leg by leg.",
+    bullets: [
+      "Sequential lock: each leg is laid to cover the stake plus every liability paid so far - £0 if any leg loses; the final leg is equalised so the run ends the same either way.",
+      "Insurance runs (refund if exactly one leg loses): lay leg-by-leg with the same cover rhythm, or lay the whole acca once at the combined price - pick per run.",
+      "A leg turns LAY DUE once the previous result is in and kick-off is within 30 minutes - alert + push (mutable per run), plus a Daily Plan slot.",
+      "Legs linked to a tracked event auto-result from the score; anything else settles with the Won/Lost/Void buttons.",
+      "The acca back and every lay are real Profit Tracker bets - the desk orchestrates, the tracker owns the money.",
+    ],
   },
   boosts: {
     title: "Boosts",

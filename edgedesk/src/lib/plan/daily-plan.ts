@@ -59,11 +59,22 @@ export interface DailyPlanSlot {
   done: boolean;
 }
 
+export interface DailyPlanAccaLegInput {
+  legId: number;
+  runLabel: string;
+  legLabel: string;
+  seq: number;
+  scheduledAt: number | null;
+  suggestedStake: number | null;
+}
+
 export interface DailyPlanInput {
   offers: OfferSummary[];
   doNext: DoNextItem[];
   races: DailyPlanRaceInput[];
   fixtures: DailyPlanFixtureInput[];
+  /** J7: lay-due acca legs - timed by kick-off, else anytime */
+  accaLegs?: DailyPlanAccaLegInput[];
   now?: number;
 }
 
@@ -87,8 +98,26 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
   const { offers, doNext, races, fixtures } = input;
   const now = input.now ?? Date.now();
   const { start, end } = todayWindow(now);
+
   const offersById = new Map(offers.map((o) => [o.id, o]));
   const slots: DailyPlanSlot[] = [];
+
+  for (const leg of input.accaLegs ?? []) {
+    const timed = leg.scheduledAt != null && leg.scheduledAt >= start && leg.scheduledAt < end;
+    slots.push({
+      id: `acca-lay-${leg.legId}`,
+      at: timed ? leg.scheduledAt : null,
+      kind: timed ? "kickoff" : "anytime",
+      title: `Lay leg ${leg.seq} · ${leg.runLabel}`,
+      detail:
+        leg.suggestedStake != null
+          ? `${leg.legLabel} - ~£${leg.suggestedStake.toFixed(2)} at the live price`
+          : leg.legLabel,
+      priority: "high",
+      href: "/acca",
+      done: false,
+    });
+  }
 
   const todayKey = localYmd(new Date(now));
 

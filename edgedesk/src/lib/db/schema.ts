@@ -100,6 +100,52 @@ export const mugPlans = sqliteTable("mug_plans", {
   createdAt: integer("created_at").notNull(),
 });
 
+/** Acca desk run (J7) - a guided multi-day acca workflow. */
+export const accaRuns = sqliteTable("acca_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  offerId: integer("offer_id"),
+  label: text("label").notNull(),
+  /** sequential lock, or insurance laid leg-by-leg / once at combined odds */
+  method: text("method", { enum: ["sequential", "insurance_legs", "insurance_whole"] }).notNull(),
+  stake: real("stake").notNull(),
+  bookmaker: text("bookmaker"),
+  commission: real("commission").notNull().default(0),
+  /** Insurance: free bet face refunded when exactly one leg loses */
+  refundAmount: real("refund_amount"),
+  /** The acca back itself as a REAL bets row - tracker owns the money */
+  backBetId: integer("back_bet_id"),
+  /** insurance_whole: the single combined lay, also a real lay_only bet */
+  wholeLayBetId: integer("whole_lay_bet_id"),
+  wholeLayStake: real("whole_lay_stake"),
+  wholeLayOdds: real("whole_lay_odds"),
+  muteAlerts: integer("mute_alerts").notNull().default(0),
+  status: text("status", { enum: ["active", "completed", "abandoned"] })
+    .notNull()
+    .default("active"),
+  createdAt: integer("created_at").notNull(),
+  settledAt: integer("settled_at"),
+});
+
+/** One leg of an acca run; placed lays are REAL bets rows via layBetId. */
+export const accaLegs = sqliteTable("acca_legs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  runId: integer("run_id").notNull(),
+  seq: integer("seq").notNull(),
+  label: text("label").notNull(),
+  eventId: integer("event_id"),
+  /** For auto-results from a linked event (match_odds selections v1) */
+  market: text("market"),
+  selection: text("selection"),
+  backOdds: real("back_odds").notNull(),
+  layOdds: real("lay_odds"),
+  layStake: real("lay_stake"),
+  layBetId: integer("lay_bet_id"),
+  result: text("result", { enum: ["pending", "won", "lost", "void"] })
+    .notNull()
+    .default("pending"),
+  scheduledAt: integer("scheduled_at"),
+});
+
 /** Matched betting offer / promo pipeline (sign-up, reload, racing refund, etc.) */
 export const offers = sqliteTable("offers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -412,3 +458,5 @@ export type CasinoGameRow = typeof casinoGames.$inferSelect;
 export type OfferEffortSampleRow = typeof offerEffortSamples.$inferSelect;
 export type BoostDiaryRow = typeof boostDiary.$inferSelect;
 export type MugPlanRow = typeof mugPlans.$inferSelect;
+export type AccaRunRow = typeof accaRuns.$inferSelect;
+export type AccaLegRow = typeof accaLegs.$inferSelect;

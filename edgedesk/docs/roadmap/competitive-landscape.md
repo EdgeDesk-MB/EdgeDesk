@@ -81,7 +81,7 @@ is read directly off `product-roadmap.md` §6 (phase status) and §9 (parking lo
 | Extra Place EV / EP master | Ultra | Pro/Elite | ✅ Have | EP desk. |
 | Price boost / bet builder *checker* (verdict on a price you found) | — | — | ✅ Have (J2, 2026-07-16) | Boosts page: fair-price verdict + boost diary. Neither incumbent separates checker from finder — this is a gap they don't fill. |
 | Lock-in advisor (close any open position for £X guaranteed) | — | — | ✅ Have (J3, 2026-07-16) | Generalises the 2UP equalising-lock maths to any back+lay. No competitor has this. |
-| Acca leg-by-leg lay tracker + "lay leg 3 now" alerts | — | Elite (Acca Catcher, bundled with their finder) | 🔜 Planned (J7) | Works from any acca logged, not just ones their finder surfaced. |
+| Acca leg-by-leg lay tracker + "lay leg 3 now" alerts | — | Elite (Acca Catcher, bundled with their finder) | ✅ Have (J7, 2026-07-16) | Works from any acca logged, not just ones their finder surfaced. |
 | Casino wagering EV + variance | Casino tools (£39.99 tier+) | Casino tools (£24.99 tier+) | ✅ Have (H2) | Variance tiers shipped; Monte Carlo distribution is J4 (planned). |
 | Casino variance simulator (bust %, distribution) | — | — | ✅ Have (J4, 2026-07-16) | Neither incumbent publishes distributions, only static EV lists. |
 

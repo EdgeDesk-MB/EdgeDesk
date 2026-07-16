@@ -52,6 +52,15 @@ export interface AppState {
   retention: RetentionState;
   /** J1: per-action-kind median execution minutes from logged samples */
   effortMeasured: Record<string, { minutes: number; sampleSize: number }>;
+  /** J7: lay-due acca legs for the Daily Plan and desk badges */
+  accaLayDue: Array<{
+    legId: number;
+    runLabel: string;
+    legLabel: string;
+    seq: number;
+    scheduledAt: number | null;
+    suggestedStake: number | null;
+  }>;
   /** J5: mug-bet cadence plans joined to account names */
   mugPlans: Array<{
     id: number;

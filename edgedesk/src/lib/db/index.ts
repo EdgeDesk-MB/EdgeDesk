@@ -152,7 +152,45 @@ CREATE TABLE IF NOT EXISTS offers (
 );
 `);
 
-    sqlite.exec(`
+      sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS acca_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      offer_id INTEGER,
+      label TEXT NOT NULL,
+      method TEXT NOT NULL,
+      stake REAL NOT NULL,
+      bookmaker TEXT,
+      commission REAL NOT NULL DEFAULT 0,
+      refund_amount REAL,
+      back_bet_id INTEGER,
+      whole_lay_bet_id INTEGER,
+      whole_lay_stake REAL,
+      whole_lay_odds REAL,
+      mute_alerts INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at INTEGER NOT NULL,
+      settled_at INTEGER
+    )
+  `);
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS acca_legs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      event_id INTEGER,
+      market TEXT,
+      selection TEXT,
+      back_odds REAL NOT NULL,
+      lay_odds REAL,
+      lay_stake REAL,
+      lay_bet_id INTEGER,
+      result TEXT NOT NULL DEFAULT 'pending',
+      scheduled_at INTEGER
+    )
+  `);
+
+sqlite.exec(`
     CREATE TABLE IF NOT EXISTS mug_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER NOT NULL,

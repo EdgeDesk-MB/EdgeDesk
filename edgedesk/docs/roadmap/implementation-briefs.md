@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 701 tests / 95 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 714 tests / 97 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1146,7 +1146,19 @@ queue). Dependency to flag at build time: `imapflow`.
 **Acceptance.** Stage 1: fixture-tested parser; harness: drop .eml → preview → offer
 created. Stage 2: mock-IMAP test for the fetch→draft path; drafts land planned + alert.
 
-## J7. Acca desk — leg-by-leg lay workflow `[strong]` (W3, biggest)
+## J7. Acca desk — leg-by-leg lay workflow `[strong]` (W3, biggest) — ✅ DONE 2026-07-16
+
+Shipped with Sam's design answers: lay-due = previous result in + kick-off within 30 min
+(no schedule → due on previous result); lay-due alerts ON by default with per-run mute;
+legs linked to tracked events auto-result (match-odds v1); insurance = BOTH methods,
+picked per run. Method maths as built: sequential = zero-loss cover recursion
+L=(stake+priorLiabilities)/(1−c) with the FINAL leg equalised (lock algebra) so the run
+ends the same either way; insurance leg-by-leg reuses the cover recursion (run stops at
+the first loss, refund alert fires when exactly one leg lost); insurance whole = one
+standard equalising lay at the combined price. The acca back and every lay are REAL
+tracker bets settled by the desk the moment results land. Daily Plan gains lay-due slots.
+Deviation: leg "result entry" for laid sequential legs uses inline Won/Lost/Void buttons
+on the desk (no separate dialog); deriveOutcomes drives linked legs.
 
 **Objective.** Run acca offers as guided multi-day workflows. **Both types in v1 (Sam):**
 (a) **sequential lay** — lay each leg just before it starts, restaking after each result so

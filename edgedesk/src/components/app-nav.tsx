@@ -20,6 +20,7 @@ import {
   Dices,
   Gift,
   History,
+  Layers,
   NotebookPen,
   Plus,
   Radio,
@@ -146,6 +147,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "2UP Desk",
         icon: FootballIcon,
       },
+      { kind: "link", href: "/acca", label: "Acca Desk", icon: Layers },
       {
         kind: "link",
         href: "/tracked-events",

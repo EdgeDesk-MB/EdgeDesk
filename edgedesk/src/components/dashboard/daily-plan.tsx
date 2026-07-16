@@ -108,6 +108,7 @@ export function DailyPlan({ className }: { className?: string }) {
       doNext,
       races: races ?? [],
       fixtures: fixtures ?? [],
+      accaLegs: state.accaLayDue ?? [],
       now,
     });
     setSlots((prev) => {

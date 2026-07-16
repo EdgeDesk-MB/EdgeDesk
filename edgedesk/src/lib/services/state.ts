@@ -60,6 +60,7 @@ import {
 import { getHistoryFeed, getChartAnnotationHistory } from "@/lib/services/history-feed";
 import { maybeSendWeeklyDigest } from "@/lib/services/weekly-digest";
 import { maybePollEmailIntake } from "@/lib/services/email-intake";
+import { autoResultLinkedLegs, legDueState, listAccaRuns, maybeAccaLayDueAlerts } from "@/lib/services/acca-desk";
 import { recordAlerts } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
 import {
@@ -664,6 +665,8 @@ export async function getAppState(): Promise<AppState> {
   backfillOffersFromBets();
   maybeSendWeeklyDigest();
   maybePollEmailIntake();
+  autoResultLinkedLegs();
+  maybeAccaLayDueAlerts();
 
   const allEvents = db.select().from(events).all();
   const allBets = db.select().from(bets).all();
@@ -844,6 +847,19 @@ export async function getAppState(): Promise<AppState> {
   });
 
   const effortMeasured = medianEffortByKind(db.select().from(offerEffortSamples).all());
+  const accaLayDue = listAccaRuns().flatMap(({ run, legs }) =>
+    legs
+      .map((leg) => ({ leg, due: legDueState(run, legs, leg, Date.now()) }))
+      .filter(({ due }) => due.due)
+      .map(({ leg, due }) => ({
+        legId: leg.id,
+        runLabel: run.label,
+        legLabel: leg.label,
+        seq: leg.seq,
+        scheduledAt: leg.scheduledAt,
+        suggestedStake: due.suggestedStake,
+      }))
+  );
   const accountNameById = new Map(
     db.select().from(accountsTable).all().map((a) => [a.id, a.name])
   );
@@ -878,6 +894,7 @@ export async function getAppState(): Promise<AppState> {
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     effortMeasured,
     mugPlans: mugPlanRows,
+    accaLayDue,
     alertsUnread: unreadCount(),
     demoMode: isDemoMode(),
     livePositions,

@@ -127,7 +127,8 @@ export function QuickLogSheet() {
       doNext,
       races: [],
       fixtures: [],
-    }).filter((s) => !s.done && s.doKind != null);
+      accaLegs: state.accaLayDue ?? [],
+    }).filter((s) => !s.done && (s.doKind != null || s.id.startsWith("acca-lay-")));
   }, [state, doNext]);
 
   if (isMobile !== true) return null;
