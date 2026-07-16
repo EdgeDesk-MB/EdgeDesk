@@ -89,6 +89,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Log offer: bonus, wagering (×), game RTP and contribution set the verdict - or paste the promo and let it prefill.",
       "The eligible-games picker stars the highest-RTP slot and drives the RTP field; the Game library holds published base RTPs - operators can license lower variants, so verify in the game info.",
       "EV here is an expectation across many attempts, never a lock - the variance tier says how far one session can stray.",
+      "Simulate runs 10,000 sessions of an offer (pick a volatility preset): bust probability, median, the 10-90% band and the distribution - a stylised model calibrated to the RTP, not real game maths.",
       "Casino money stays out of the matched P&L on purpose - this desk keeps its own score.",
     ],
   },

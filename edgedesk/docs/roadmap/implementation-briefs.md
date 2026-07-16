@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 664 tests / 91 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 678 tests / 92 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1032,7 +1032,14 @@ prefilled as lay-only linked to the same event/offer.
 **Acceptance.** Calc vectors; harness: open position → dialog → sensible trade → handoff
 prefills Add bet; EV basis "estimated" (user-entered price).
 
-## J4. Casino variance simulator `[strong]` (W2) — needs H2
+## J4. Casino variance simulator `[strong]` (W2) — needs H2 — ✅ DONE 2026-07-16
+
+Shipped as briefed: spec'd preset ladders (hand-worked expectations 3.46/5.805/13.6 per
+hit) scaled so E[return] = RTP exactly; mulberry32-seeded, deterministic; chunked runner
+(500 runs/tick) instead of a worker — same non-blocking guarantee, no bundler surface.
+One honest deviation surfaced by the model itself: where drag exceeds the bonus the
+simulated mean sits ABOVE the static H2 EV (a session can only lose the bonus; busting
+truncates the drag) — the dialog shows both figures side by side and says why.
 
 **Objective.** Monte Carlo a wagering offer with **volatility presets (Sam)**: bust
 probability, median outcome, percentile band, distribution chart — extending H2's variance

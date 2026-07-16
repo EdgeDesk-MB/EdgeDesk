@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CasinoGameLibraryDialog } from "@/components/casino/casino-game-library-dialog";
+import { CasinoSimDialog } from "@/components/casino/casino-sim-dialog";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
 import { EmptyState } from "@/components/help/empty-state";
@@ -199,6 +200,16 @@ export default function CasinoPage() {
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
+                  <CasinoSimDialog
+                    offer={{
+                      title: offer.title,
+                      bonusAmount: offer.bonusAmount,
+                      wageringMultiplier: offer.wageringMultiplier,
+                      rtp: offer.rtp,
+                      contributionPct: offer.contributionPct,
+                      defaultVolatility: tier,
+                    }}
+                  />
                   {offer.status === "planned" ? (
                     <Button
                       variant="outline"

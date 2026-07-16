@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { NumField } from "@/components/calc/num-field";
 import { CasinoGamePicker } from "@/components/casino/casino-game-picker";
 import { CasinoPasteDialog } from "@/components/casino/casino-paste-dialog";
+import { CasinoSimDialog } from "@/components/casino/casino-sim-dialog";
 import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { api } from "@/hooks/use-app-state";
@@ -247,6 +248,21 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
             <p className="mt-0.5 text-xs text-muted-foreground">{varianceTierCopy(verdict.tier)}</p>
           </div>
           <div className="flex justify-end gap-2">
+            {bonus > 0 ? (
+              <CasinoSimDialog
+                triggerClassName="mr-auto"
+                offer={{
+                  title: title.trim() || "this offer",
+                  bonusAmount: bonus,
+                  wageringMultiplier: Number.isFinite(wagering) ? wagering : 0,
+                  rtp: rtpEntered ? rtpPct / 100 : null,
+                  contributionPct: Number.isFinite(contributionPct)
+                    ? Math.min(1, Math.max(0.01, contributionPct / 100))
+                    : null,
+                  defaultVolatility: verdict.tier,
+                }}
+              />
+            ) : null}
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
