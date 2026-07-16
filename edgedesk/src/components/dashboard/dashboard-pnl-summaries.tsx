@@ -166,7 +166,7 @@ export function DashboardPnlSummaries({
             value={
               <MoneyFlow value={monthlyStats.latest.profit} signColor className="inline text-sm" />
             }
-            sub={pace ? `${monthlyStats.latest.label} · ${paceLabel(pace)}` : monthlyStats.latest.label}
+            sub={monthlyStats.latest.label}
             icon={CalendarRange}
             onClick={() => setMonthlyOpen(true)}
           />
@@ -193,6 +193,19 @@ export function DashboardPnlSummaries({
         footerLabel="Full breakdown in tracker"
         wide
       >
+        {pace ? (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border bg-selection-subtle/50 px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Monthly target
+            </span>
+            <span className="text-sm font-semibold tabular-nums">
+              <MoneyFlow value={pace.achieved} signColor className="inline" />{" "}
+              <span className="font-normal text-muted-foreground">
+                of £{pace.target.toFixed(0)} · {paceLabel(pace).split("· ").pop()}
+              </span>
+            </span>
+          </div>
+        ) : null}
         <MonthlyPnlSection variant="plain" />
       </PnlDialogShell>
     </>

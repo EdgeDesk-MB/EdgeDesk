@@ -1,5 +1,7 @@
 export type HelpGuideSlug =
   | "getting-started"
+  | "how-it-works"
+  | "desk-how-tos"
   | "racing-desk"
   | "offers"
   | "calculators"
@@ -76,6 +78,163 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Result-centric settlement",
         paragraphs: [
           "EdgeDesk is result-centric, not bet-centric. Record what happened (a 2-1 score) and the app derives every market outcome - BTTS, Over 2.5, Home Win, 2UP triggered - and settles all linked bets automatically.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "how-it-works",
+    title: "How EdgeDesk thinks",
+    description:
+      "The logic behind the numbers - the result-centric model, EV honesty, the live layer, and how the desks learn from your own history.",
+    sections: [
+      {
+        heading: "The three questions",
+        paragraphs: [
+          "Everything in EdgeDesk exists to answer one of three daily questions: what should I do next (Do next, the Daily Plan, the offer calendar), am I executing correctly (trackers, checkers, alerts), and did it actually pay (P&L, EV capture, the Edge Report). If a number does not serve one of those, it is not on the desk.",
+        ],
+      },
+      {
+        heading: "The result-centric model (why settlement is automatic)",
+        paragraphs: [
+          "You record what happened in the real world - a score, a race winner - and EdgeDesk derives every market from it. One England 2-1 result settles match odds, BTTS, over/under and a 2UP trigger together, because they are all views of the same fact.",
+        ],
+        bullets: [
+          "Bets linked to a tracked event settle themselves when the result lands; unlinked bets get manual Won/Lost/Void buttons.",
+          "Corrections re-derive: fix a score and every dependent market re-settles the same way.",
+          "The same engine powers the Acca Desk (linked legs auto-result) and goalscorer/combo triggers (settle at the decisive moment, not full time).",
+        ],
+      },
+      {
+        heading: "EV honesty: the basis badge",
+        paragraphs: [
+          "Every £-EV figure carries a basis badge because not all estimates deserve equal trust. This is the single most important convention on the platform.",
+        ],
+        bullets: [
+          "LIVE (green) - derived from real exchange odds fetched moments ago (Racing Desk with a Betfair key).",
+          "EST. (blue) - built from numbers you entered or from your own measured history (a boost check, a locked EV, measured retention).",
+          "~EST. (amber) - a heuristic stands in for something unknown (default 96% slot RTP, builder legs assumed independent, casino volatility presets). The tooltip always says which assumption.",
+          "Aggregates inherit the WEAKEST basis of their parts - one heuristic row makes the total heuristic.",
+        ],
+      },
+      {
+        heading: "The live layer: what refreshes when",
+        paragraphs: [
+          "The Home dashboard polls the app state every few seconds (tunable in Settings). That poll is also the platform's heartbeat: several background jobs run compute-on-poll, meaning they fire while the desk is open and stay silent when it is not. Nothing runs on a server somewhere - your machine is the desk.",
+        ],
+        bullets: [
+          "Live football scores refresh at most once per 60s per tracked match; goal timelines only re-fetch when the score changes (the API allows ~95 requests/day, and the budget guard alerts once daily if it runs dry).",
+          "Racing cards cache ~15 minutes; Betfair delayed prices run 1-3 minutes behind live.",
+          "Compute-on-poll jobs: the Monday weekly digest (week-key latch so it sends once), email intake (checks your IMAP folder every ~5 minutes when enabled), acca auto-results and lay-due alerts.",
+          "Alerts write to the inbox with a dedupe key, so a re-firing condition updates the existing alert instead of stacking copies; web push mirrors them to your phone.",
+        ],
+      },
+      {
+        heading: "The learning loop: your history sharpens the numbers",
+        paragraphs: [
+          "Several estimates start as defaults and are replaced by YOUR measured reality as evidence accumulates. Small samples blend toward the default (so one lucky conversion does not swing everything); large samples take over.",
+        ],
+        bullets: [
+          "Free-bet retention: starts at 80%, becomes your measured rate from settled conversions - this feeds every 'remaining edge' figure in Do next.",
+          "EV capture: when a campaign goes active its expected profit is LOCKED (snapshot). Settlement compares reality against the lock - capture %, commission drag, and the mistake ledger all come from that diff. Edits after activation create a visible re-lock, never a silent change.",
+          "Effort (£/hr): the desk times offer open → bet logged. After enough samples the rate sort uses your real minutes, not estimates.",
+          "The Edge Report and weekly digest aggregate all of it monthly/weekly: expected vs realized is the flagship chart.",
+        ],
+      },
+      {
+        heading: "Money truth: what counts where",
+        paragraphs: [
+          "Different pots deliberately do not mix. Knowing these rules explains almost every 'why is this number different there?' moment.",
+        ],
+        bullets: [
+          "Net P&L (top bar, monthly breakdown, season view) counts EVERY settled pound - it is real money.",
+          "Edge metrics (EV capture, retention, £/hr, commission drag, mistake ledger) EXCLUDE mug bets - camouflage is a deliberate cost, not lost edge. The league shows it as its own 'Mug (month)' line instead.",
+          "Casino money never touches matched P&L - the Casino desk keeps its own score because its EV is an expectation across many attempts, never a lock.",
+          "Household owners: an account belongs to one operator; bets inherit the owner through the bookmaker name. Identical wallet names across owners attribute to you until renamed - the split must always reconcile to the total.",
+          "Commission is tracked per bet and shown as drag; your gross and retained figures are equal only while you lay at 0%.",
+        ],
+      },
+      {
+        heading: "Dependencies at a glance",
+        bullets: [
+          "Do next ranks offers using: measured retention + EV basis + bookie health (gubbed sinks, never hides) + funding checks + measured £/hr.",
+          "The Daily Plan is Do next re-cut for today, plus timed slots: tracked races, kickoffs, and acca lay-due legs.",
+          "The 2UP Desk consumes tracked-event live scores; the Acca Desk consumes event results; the Racing Desk consumes racecards plus your racing offers.",
+          "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, acca lay-due, email-intake drafts, API budget, and the weekly digest.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "desk-how-tos",
+    title: "How to run each feature",
+    description:
+      "Step-by-step working instructions for every desk and tool, in the order a real offer flows through them.",
+    sections: [
+      {
+        heading: "Offers: the campaign lifecycle",
+        bullets: [
+          "Capture: New offer → type it, paste the promo text, drop screenshots, or drop a promo EMAIL (.eml) - all parse on-device into the same preview. Or forward emails to your intake folder (Settings → Data & API) and drafts arrive as Planned campaigns.",
+          "Planned → Active: activating LOCKS the expected EV (the baseline your execution is judged against).",
+          "Work it: Do next tells you the next action; opening a card starts the effort timer; logging the bet stops it.",
+          "Settle: results land, capture % is computed, and anything below 100% can be tagged in the mistake ledger (laid late, odds moved, wrong market…).",
+        ],
+      },
+      {
+        heading: "Tracker: logging and protecting positions",
+        bullets: [
+          "Add bet: back+lay in one form; Advanced unlocks part lays and the underlay/overlay slider; 'No lay (back only)' hides the lay panel for deliberate back-only bets.",
+          "Mug bet toggle: marks camouflage - real P&L, excluded from edge, never linked to offers, stamps the bookie's cadence plan.",
+          "Lock in (on any open single): enter today's exchange prices → the equalising trade in whichever direction closes the gap, with a partial slider. One click logs the closing trade as a real bet.",
+          "Naked exposure: an open cash back with no lay alerts after a grace window (3 minutes when kick-off is close).",
+        ],
+      },
+      {
+        heading: "Boosts: price boosts and bet builders",
+        bullets: [
+          "Price boost: Back Bet panel (boosted price) + Lay Bet panel (exchange back/lay set the fair midpoint) → verdict at ±1% edge: Take / Marginal / Skip.",
+          "Advanced underlay: £0 back if it loses, the full edge if it wins - the common risk-free boost play.",
+          "Builders: fair odds per leg with a correlation haircut (same-match legs are NOT independent); verdict-only, since a builder cannot be laid as one bet.",
+          "Log to diary → settle later → the header keeps EV banked vs realised. The + on the nav row opens the checker anywhere.",
+        ],
+      },
+      {
+        heading: "Casino: wagering offers with honest variance",
+        bullets: [
+          "Log offer (paste prefills it): bonus, wagering ×, game RTP, contribution → EV = bonus minus expected drag.",
+          "The eligible-games picker stars the highest published RTP; the Game library holds base RTPs (operators can license lower variants - verify in game info).",
+          "Simulate: 10,000 runs at a volatility preset → bust %, median, the 10-90% band, and the distribution. Heavy-wagering offers often simulate ABOVE the static EV because busting truncates losses - both figures are shown.",
+        ],
+      },
+      {
+        heading: "Racing Desk and the 2UP Desk",
+        bullets: [
+          "Racing: add a place-refund offer first - Intelligence then scores today's races by offer fit, field size and EV. Lay opens the calculator with real odds; Basic-tier results auto-settle.",
+          "2UP: track the match, the desk watches for 2-goals-ahead, alerts the early-payout trigger, and computes the equalising lock trades live.",
+        ],
+      },
+      {
+        heading: "Acca Desk: multi-day accas, leg by leg",
+        bullets: [
+          "Create a run: legs in play order, method = Sequential lock, Insurance leg-by-leg, or Insurance whole-acca (refund offers). The acca back is logged as a real tracker bet immediately.",
+          "A leg turns LAY DUE when the previous result is in and kick-off is within 30 minutes - alert + push + a Daily Plan slot. The suggested stake covers your whole exposure (£0 if the leg loses); the FINAL leg equalises instead so the run ends the same either way.",
+          "Insurance runs stay open after a loss until every other leg resolves - the refund only counts when exactly one leg lost.",
+          "Legs linked to tracked events settle from the score; everything else has Won/Lost/Void buttons.",
+        ],
+      },
+      {
+        heading: "Checkers and the betslip extension",
+        bullets: [
+          "Match Checker: paste a bookie price and the exchange back/lay - fair-price verdict in seconds, no feeds.",
+          "Fill slip: buttons on the lay banner, Lock in and acca legs copy the stake AND fill your Betdaq slip via the browser extension (extension/README.md to install). Fill only - you always place the bet yourself; without the extension the stake is still on your clipboard.",
+        ],
+      },
+      {
+        heading: "Staying informed",
+        bullets: [
+          "Alerts inbox (+ badge) holds everything; push mirrors to your phone once enabled from a secure origin (see On your phone).",
+          "The weekly digest (Settings → opt-in) lands Monday morning: the week's edge, leaks, drought nudges.",
+          "The command palette (⌘K) reaches every page and quick action; the mobile Quick actions sheet mirrors it.",
         ],
       },
     ],
