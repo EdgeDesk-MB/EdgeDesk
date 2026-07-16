@@ -20,7 +20,7 @@ Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, thre
   `edgedesk/`. Run all npm commands from `edgedesk/`.
 - **This is Next.js 16** — APIs may differ from training data. Read the relevant guide in
   `node_modules/next/dist/docs/` before writing App Router / server code (per `AGENTS.md`).
-- **Tests:** `npx vitest run` from `edgedesk/`. 652 tests / 90 files must stay green.
+- **Tests:** `npx vitest run` from `edgedesk/`. 664 tests / 91 files must stay green.
   `vitest.setup.ts` gives each test process an isolated temp SQLite DB via `EDGEDESK_DB_PATH`.
   `server-only` is stubbed via alias in `vitest.config.ts` — server modules are importable in tests.
 - **DB migrations:** there is NO drizzle-kit migration tooling. `src/lib/db/index.ts` runs an
@@ -1000,7 +1000,15 @@ the matched calculator prefill (COMMISSION IS PERCENT in that prefill — F1 aud
 **Acceptance.** Calc vectors hand-worked (incl. haircut and no-vig paths); diary CRUD;
 harness drive: check a boost → verdict <10s → diary row → settle it; mobile 390×844 pass.
 
-## J3. Lock-in advisor — close any open position `[strong]` (W1)
+## J3. Lock-in advisor — close any open position `[strong]` (W1) — ✅ DONE 2026-07-16
+
+Shipped with Sam's design answers folded in: all four single bet types (incl. back-only
+rows), 2UP early-payout bets excluded (the EP desk owns that maths), a partial slider
+(lock some, let the rest ride), and one-click logging from the dialog instead of an Add
+bet handoff — the lay direction writes a real `lay_only` bet; the back direction stores
+commission-adjusted odds (1+(Ob−1)(1−c), commission 0) so plain-back settlement is exact.
+Deviation from the brief: no Add bet round-trip (Sam's call — fewer steps). The companion
+"No lay" Add bet type Sam requested rides the same session as a follow-up.
 
 **Objective.** Any open back+lay single shows "close now for £X guaranteed": enter the
 CURRENT back/lay odds and get the equalising trade (further lay at today's price, or back

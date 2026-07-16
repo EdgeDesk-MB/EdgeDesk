@@ -332,6 +332,7 @@ function TrackerContent() {
               highlightId={highlightId}
               onEdit={setEditingBet}
               onPatch={patchBet}
+              onLogged={() => refresh()}
             />
           ) : (
             <BetLogTable
@@ -343,6 +344,7 @@ function TrackerContent() {
               highlightId={highlightId}
               onEdit={setEditingBet}
               onPatch={patchBet}
+              onLogged={() => refresh()}
             />
           )}
         </CardContent>

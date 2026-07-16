@@ -63,6 +63,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Link an event once - score changes settle match odds, BTTS, O/U 2.5 and 2UP together.",
       "Use “The bet wins IF …” for goalscorer and combo triggers - settles at the decisive moment.",
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
+      "Lock in on any open single: enter today's exchange prices and close the position for a guaranteed P&L - slide to lock part and let the rest ride. 2UP bets lock on the 2UP Desk instead.",
     ],
     guideSlug: "calculators",
   },
@@ -71,9 +72,11 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary:
       "Fair-price verdicts for price boosts and bet builders - and a diary of the EV you banked.",
     bullets: [
-      "Price boost: enter the boosted odds plus the exchange back/lay - the verdict compares against the no-vig midpoint.",
-      "Bet builder: enter fair odds per leg; same-match legs are correlated, so set a haircut to shorten the naive product.",
+      "Price boost: fill the Back Bet and Lay Bet panels - fair price is the exchange back/lay no-vig midpoint, and the verdict shows the edge at the boosted odds.",
+      "Advanced (on the Lay Bet panel) unlocks part lays and the underlay/standard/overlay slider - Underlay is the boost play: £0 back if it loses, the full edge if it wins.",
+      "Bet builder: enter fair odds per leg; same-match legs are correlated, so set a haircut to shorten the naive product. Builders are verdict-only - they can't be laid as one bet.",
       "Log a check to the diary, then settle it Won/Lost/Void - the header keeps the running EV banked vs realised.",
+      "Check from anywhere: the + on the Boosts nav row (or Quick actions on mobile) opens this checker as a dialog.",
       "Nothing is fetched: you type the prices you see, so verdicts carry an estimated basis (heuristic until you set a builder haircut).",
     ],
   },

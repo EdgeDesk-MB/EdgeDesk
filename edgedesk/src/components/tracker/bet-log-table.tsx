@@ -35,6 +35,7 @@ import { formatEventStatus, formatEventTitle } from "@/lib/events";
 import { SportEventBlock, SportIcon } from "@/components/sport-icon";
 import { previewAiTriggers, settlePartialOutcome, type SettledBetStatus } from "@/lib/calc";
 import { betRaceOutcome, type PromoAwardsByBetId } from "@/lib/bet-outcomes";
+import { LockInDialog, canLockIn } from "@/components/tracker/lock-in-dialog";
 import { parseRaceResults } from "@/lib/racing";
 import {
   formatBetSelection,
@@ -68,6 +69,7 @@ export function BetLogTable({
   highlightId,
   onEdit,
   onPatch,
+  onLogged,
 }: {
   bets: BetRow[];
   events: EventRow[];
@@ -77,6 +79,8 @@ export function BetLogTable({
   highlightId: number | null;
   onEdit: (bet: BetRow) => void;
   onPatch: (id: number, json: Record<string, unknown>, message: string) => void;
+  /** Called after a lock-in trade is logged so the parent refreshes */
+  onLogged: () => void;
 }) {
   const linkableOffers = [...offerById.values()]
     .filter(
@@ -190,6 +194,7 @@ export function BetLogTable({
                     : ""}
                 </p>
                 <div className="flex shrink-0 items-center gap-1.5">
+                  {canLockIn(bet) && <LockInDialog bet={bet} onLogged={onLogged} />}
                   {canManualSettle && (
                     <ManualSettleDialog
                       bet={bet}
@@ -405,6 +410,7 @@ export function BetLogTable({
                   >
                     <Pencil className="size-4" />
                   </Button>
+                  {canLockIn(bet) && <LockInDialog bet={bet} onLogged={onLogged} />}
                   {bet.status === "open" &&
                     !bet.triggerRule &&
                     !isAutoSettleMarket(

@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Gift, Plus, Wallet } from "lucide-react";
+import { Dices, Gift, Plus, Wallet, Zap } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -21,6 +21,8 @@ import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
+import { useCasinoLog } from "@/components/casino/casino-log-provider";
+import { useBoostCheck } from "@/components/boosts/boost-check-provider";
 import { useAppState } from "@/hooks/use-app-state";
 
 export function CommandPalette() {
@@ -31,6 +33,8 @@ export function CommandPalette() {
   const { openAddBalance } = useAddBalance();
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openOffer, viewOffer } = useOfferDialog();
+  const { openCasinoLog } = useCasinoLog();
+  const { openBoostCheck } = useBoostCheck();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -79,6 +83,12 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => run(openAddBalance)}>
             <Wallet /> Adjust balance
+          </CommandItem>
+          <CommandItem onSelect={() => run(openCasinoLog)}>
+            <Dices /> Log casino offer
+          </CommandItem>
+          <CommandItem onSelect={() => run(openBoostCheck)}>
+            <Zap /> Check a boost
           </CommandItem>
         </CommandGroup>
         <CommandGroup heading="Pages">

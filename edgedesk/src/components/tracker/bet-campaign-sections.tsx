@@ -23,6 +23,7 @@ export function BetCampaignSections({
   highlightId,
   onEdit,
   onPatch,
+  onLogged,
 }: {
   groups: BetCampaignGroup[];
   events: EventRow[];
@@ -32,6 +33,7 @@ export function BetCampaignSections({
   highlightId: number | null;
   onEdit: (bet: BetRow) => void;
   onPatch: (id: number, json: Record<string, unknown>, message: string) => void;
+  onLogged: () => void;
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -102,6 +104,7 @@ export function BetCampaignSections({
               highlightId={highlightId}
               onEdit={onEdit}
               onPatch={onPatch}
+              onLogged={onLogged}
             />
           </div>
         </section>

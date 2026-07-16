@@ -309,7 +309,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
         bullets: [
           "Type to filter pages, open offers and bookie wallets",
-          "Quick actions: Add bet, New offer, Matched calculator, Adjust balance",
+          "Quick actions: Add bet, New offer, Matched calculator, Adjust balance, Log casino offer, Check a boost",
           "Arrow keys move, Enter runs, Esc closes",
         ],
       },
