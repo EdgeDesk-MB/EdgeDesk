@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BackPanel, PanelInput, PanelTextInput } from "@/components/calc/bet-panels";
 import { MoneyFlow, PercentFlow } from "@/components/money-flow";
+import { useExchanges } from "@/hooks/use-exchanges";
 import { dutch, dutchStakeForLegStake, dutchStakeForProfit, type DutchLeg, type DutchResult } from "@/lib/calc";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -65,6 +66,8 @@ export function DutchOutcomesBuilder({
   const [fixedLegIndex, setFixedLegIndex] = useState(0);
   const [fixedLegStakeInput, setFixedLegStakeInput] = useState(40);
 
+  const { defaultExchange } = useExchanges();
+
   const legsValid = legs.length >= minLegs && legs.every((l) => l.odds > 1);
   const safeFixedIndex = Math.min(fixedLegIndex, legs.length - 1);
 
@@ -94,7 +97,7 @@ export function DutchOutcomesBuilder({
   }
 
   return (
-    <BackPanel title={title} className={className}>
+    <BackPanel title={title} exchange={defaultExchange} className={className}>
       <Tabs value={mode} onValueChange={(v) => setMode(v as DutchStakeMode)}>
         <TabsList variant="segmented">
           <TabsTrigger value="total">Total stake</TabsTrigger>

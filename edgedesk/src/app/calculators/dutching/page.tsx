@@ -8,6 +8,7 @@ import { BackPanel, PanelInput, PanelTextInput } from "@/components/calc/bet-pan
 import { DutchOutcomesBuilder, inferMatchOddsSelection } from "@/components/calc/dutch-outcomes-builder";
 import { MoneyFlow } from "@/components/money-flow";
 import { CalculatorShell } from "@/components/page-shell";
+import { useExchanges } from "@/hooks/use-exchanges";
 import { twoUpDutchScenarios, type DutchLeg, type DutchResult } from "@/lib/calc";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +73,7 @@ function StandardDutch() {
 }
 
 function TwoUpDutch() {
+  const { defaultExchange } = useExchanges();
   const [homeLabel, setHomeLabel] = useState("Home team");
   const [awayLabel, setAwayLabel] = useState("Away team");
   const [homeStake, setHomeStake] = useState(50);
@@ -87,7 +89,7 @@ function TwoUpDutch() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-6 lg:grid-cols-2">
-        <BackPanel title="Back both teams at 2UP bookies">
+        <BackPanel title="Back both teams at 2UP bookies" exchange={defaultExchange}>
           <p className="text-xs text-black/60 dark:text-white/70">
             Both bookies pay out the moment their team goes two goals ahead.
           </p>
