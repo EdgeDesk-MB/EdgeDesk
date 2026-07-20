@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { BackPanel, PanelInput } from "@/components/calc/bet-panels";
 import { MoneyFlow } from "@/components/money-flow";
 import { CalculatorShell } from "@/components/page-shell";
 import { RULE4_PRESETS, rule4Adjust, rule4EffectiveOdds } from "@/lib/calc/rule4";
+import { cn } from "@/lib/utils";
 
 export default function Rule4CalculatorPage() {
   const [stake, setStake] = useState(10);
@@ -28,64 +28,36 @@ export default function Rule4CalculatorPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Your bet</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Stake (£)</Label>
-            <Input
-              type="number"
-              min={0}
-              step={0.01}
-              className="tabular-nums"
-              value={stake}
-              onChange={(e) => setStake(parseFloat(e.target.value))}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Original odds (decimal)</Label>
-            <Input
-              type="number"
-              min={1.01}
-              step={0.01}
-              className="tabular-nums"
-              value={odds}
-              onChange={(e) => setOdds(parseFloat(e.target.value))}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Rule 4 deduction (p in £)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={90}
-              step={5}
-              className="tabular-nums"
-              value={deductionPence}
-              onChange={(e) => setDeductionPence(parseFloat(e.target.value))}
-            />
-          </div>
-          <div className="col-span-full flex flex-wrap gap-1.5">
-            {RULE4_PRESETS.map((p) => (
-              <button
-                key={p.pence}
-                type="button"
-                onClick={() => setDeductionPence(p.pence)}
-                className={
-                  "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors " +
-                  (deductionPence === p.pence
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80")
-                }
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <BackPanel title="Your bet">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <PanelInput label="Stake" prefix="£" value={stake} onChange={setStake} min={0} />
+          <PanelInput label="Original odds (decimal)" value={odds} onChange={setOdds} min={1.01} />
+          <PanelInput
+            label="Rule 4 deduction (p in £)"
+            value={deductionPence}
+            onChange={setDeductionPence}
+            min={0}
+            step={5}
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {RULE4_PRESETS.map((p) => (
+            <button
+              key={p.pence}
+              type="button"
+              onClick={() => setDeductionPence(p.pence)}
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                deductionPence === p.pence
+                  ? "bg-black/80 text-white dark:bg-white/90 dark:text-black"
+                  : "bg-black/10 text-black/70 hover:bg-black/15 dark:bg-white/15 dark:text-white/80 dark:hover:bg-white/20"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </BackPanel>
 
       {result && (
         <Card>

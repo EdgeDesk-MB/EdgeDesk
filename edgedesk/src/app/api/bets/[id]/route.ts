@@ -9,8 +9,19 @@ import { resolveOfferForBet, syncOfferStatuses } from "@/lib/services/offers";
 
 export const dynamic = "force-dynamic";
 
+const dutchLegSchema = z.object({
+  label: z.string(),
+  market: z.string(),
+  selection: z.string(),
+  odds: z.number().positive(),
+  stake: z.number().min(0),
+  earlyPayout: z.boolean().optional(),
+});
+
 const patchSchema = z.object({
   purpose: z.enum(["edge", "mug"]).nullable().optional(),
+  /** Dutch bets: replace the leg set (Add bet's legs editor, edit mode) */
+  legs: z.array(dutchLegSchema).nullable().optional(),
   status: z
     .enum(["open", "won", "lost", "void", "early_payout", "half_win", "half_lose", "push"])
     .optional(),
@@ -77,6 +88,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.bookmaker !== undefined ? { bookmaker: p.bookmaker } : {}),
       ...(p.exchangeId !== undefined ? { exchangeId: p.exchangeId } : {}),
       ...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
+      ...(p.legs !== undefined ? { legs: p.legs ? JSON.stringify(p.legs) : null } : {}),
       ...(p.backStake !== undefined ? { backStake: p.backStake } : {}),
       ...(p.backOdds !== undefined ? { backOdds: p.backOdds } : {}),
       ...(p.layStake !== undefined ? { layStake: p.layStake } : {}),

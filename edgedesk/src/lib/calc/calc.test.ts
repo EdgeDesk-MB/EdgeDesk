@@ -5,6 +5,7 @@ import {
   decimalToFractional,
   dutch,
   dutchStakeForProfit,
+  dutchStakeForLegStake,
   eachWay,
   extraPlace,
   accaMatched,
@@ -173,6 +174,34 @@ describe("dutching", () => {
     const stakeNeeded = dutchStakeForProfit(legs, 10);
     expect(stakeNeeded).not.toBeNull();
     expect(dutch(legs, stakeNeeded!).profit).toBeCloseTo(10, 6);
+  });
+
+  // Hand-worked: odds 2.0 / 3.0, inverses 0.5 / 0.33333..., S = 0.833333...
+  // Fixing leg 0 (odds 2.0) at £40: totalStake = 40 × 2 × S = 66.666667.
+  // Leg 0 must recover to exactly £40; leg 1 = totalStake × (1/3)/S = 26.666667.
+  // profit = totalStake/S − totalStake = 80 − 66.666667 = 13.333333.
+  it("dutchStakeForLegStake: fixing one leg's stake recovers it exactly", () => {
+    const legs = [
+      { label: "A", odds: 2.0 },
+      { label: "B", odds: 3.0 },
+    ];
+    const totalStake = dutchStakeForLegStake(legs, 0, 40);
+    expect(totalStake).not.toBeNull();
+    expect(totalStake!).toBeCloseTo(66.666667, 5);
+    const r = dutch(legs, totalStake!);
+    expect(r.legs[0].stake).toBeCloseTo(40, 6);
+    expect(r.legs[1].stake).toBeCloseTo(26.666667, 5);
+    expect(r.profit).toBeCloseTo(13.333333, 5);
+  });
+
+  it("dutchStakeForLegStake guards a bad leg index or non-positive stake", () => {
+    const legs = [
+      { label: "A", odds: 2.0 },
+      { label: "B", odds: 3.0 },
+    ];
+    expect(dutchStakeForLegStake(legs, 5, 40)).toBeNull();
+    expect(dutchStakeForLegStake(legs, 0, 0)).toBeNull();
+    expect(dutchStakeForLegStake(legs, 0, -10)).toBeNull();
   });
 
   it("2up dutch windfall doubles the payout", () => {

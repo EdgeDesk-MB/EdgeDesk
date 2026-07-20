@@ -2,14 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -20,9 +12,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
-import { NumField } from "@/components/calc/num-field";
+import { BackPanel, PanelInput, PanelSelect, PanelTextInput } from "@/components/calc/bet-panels";
 import { MoneyFlow } from "@/components/money-flow";
-import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
 import { CalculatorShell } from "@/components/page-shell";
 import {
   accaMatched,
@@ -101,138 +92,87 @@ function AccaCalculator({ mode }: { mode: "standard" | "full_cover" }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Structure</CardTitle>
-          <CardDescription>
-            {mode === "standard"
-              ? "Single accumulator - layered lay stakes on each leg."
-              : "Full-cover bets - unit stake is per constituent bet."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Bet type</span>
-              <Select value={betType} onValueChange={(v) => changeBetType(v as AccaStructureType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {types.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {TYPE_LABELS[t]} ({requiredLegCount(t)} legs)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <NumField
-              label={mode === "standard" ? "Back stake" : "Unit stake (per bet)"}
-              prefix="£"
-              value={unitStake}
-              onChange={setUnitStake}
+      <BackPanel title="Structure">
+        <p className="text-xs text-black/60 dark:text-white/70">
+          {mode === "standard"
+            ? "Single accumulator - layered lay stakes on each leg."
+            : "Full-cover bets - unit stake is per constituent bet."}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <PanelSelect
+            label="Bet type"
+            value={betType}
+            onChange={(v) => changeBetType(v as AccaStructureType)}
+          >
+            {types.map((t) => (
+              <option key={t} value={t}>
+                {TYPE_LABELS[t]} ({requiredLegCount(t)} legs)
+              </option>
+            ))}
+          </PanelSelect>
+          <PanelInput
+            label={mode === "standard" ? "Back stake" : "Unit stake (per bet)"}
+            prefix="£"
+            value={unitStake}
+            onChange={setUnitStake}
+            min={0}
+          />
+          {(isSingleMulti || (mode === "full_cover" && isLuckyLayMatrixType(betType))) && (
+            <PanelInput
+              label="Lay commission (%)"
+              value={commission}
+              onChange={setCommission}
               min={0}
+              step={0.5}
             />
-            {isSingleMulti && (
-              <NumField
-                label="Lay commission (%)"
-                value={commission}
-                onChange={setCommission}
-                min={0}
-                step={0.5}
-              />
-            )}
-            {mode === "full_cover" && isLuckyLayMatrixType(betType) && (
-              <NumField
-                label="Lay commission (%)"
-                value={commission}
-                onChange={setCommission}
-                min={0}
-                step={0.5}
-              />
-            )}
-          </div>
+          )}
+        </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Selection</TableHead>
-                <TableHead className="w-28">Back odds</TableHead>
-                {showLayOdds && <TableHead className="w-28">Lay odds</TableHead>}
-                {isSingleMulti && result && (
-                  <TableHead className="w-28 text-right">Lay stake</TableHead>
-                )}
-                {layMatrix && (
-                  <TableHead className="w-28 text-right">Lay stake</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {legs.map((leg, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Input
-                      value={leg.label}
-                      onChange={(e) => updateLeg(i, { label: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min={1}
-                      value={leg.backOdds}
-                      onChange={(e) => updateLeg(i, { backOdds: parseFloat(e.target.value) })}
-                    />
-                  </TableCell>
-                  {showLayOdds && (
-                    <>
-                      <TableCell>
-                        {(() => {
-                          const layOddsStep = exchangeOddsStepHandlers(
-                            leg.layOdds ?? NaN,
-                            (layOdds) => updateLeg(i, { layOdds })
-                          );
-                          return (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={1}
-                          value={leg.layOdds ?? ""}
-                          onChange={(e) => updateLeg(i, { layOdds: parseFloat(e.target.value) })}
-                          onKeyDown={layOddsStep.onKeyDown}
-                          onWheel={layOddsStep.onWheel}
-                        />
-                          );
-                        })()}
-                      </TableCell>
-                      {isSingleMulti && (
-                        <TableCell className="text-right tabular-nums">
-                          {result?.layerLays[i] ? (
-                            <MoneyFlow value={result.layerLays[i].layStake} />
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                      )}
-                      {layMatrix && (
-                        <TableCell className="text-right tabular-nums">
-                          {layMatrix.lays[i] ? (
-                            <MoneyFlow value={layMatrix.lays[i].layStake} />
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                      )}
-                    </>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <div className="flex flex-col gap-2">
+          {legs.map((leg, i) => (
+            <div key={i} className="flex items-end gap-2">
+              <PanelTextInput
+                label={i === 0 ? "Selection" : ""}
+                value={leg.label}
+                onChange={(v) => updateLeg(i, { label: v })}
+                inputClassName="h-10 text-sm"
+              />
+              <PanelInput
+                label={i === 0 ? "Back odds" : ""}
+                value={leg.backOdds}
+                onChange={(v) => updateLeg(i, { backOdds: v })}
+                min={1}
+                step={0.01}
+                inputClassName="h-10 w-24 text-sm"
+              />
+              {showLayOdds && (
+                <PanelInput
+                  label={i === 0 ? "Lay odds" : ""}
+                  value={leg.layOdds ?? NaN}
+                  onChange={(v) => updateLeg(i, { layOdds: v })}
+                  min={1}
+                  step={0.01}
+                  inputClassName="h-10 w-24 text-sm"
+                  exchangeOddsStepping
+                />
+              )}
+              {showLayOdds && (isSingleMulti || layMatrix) && (
+                <div className="flex h-10 w-28 shrink-0 flex-col items-end justify-center">
+                  <span className="text-sm font-bold tabular-nums text-black/85 dark:text-white/95">
+                    {isSingleMulti && result?.layerLays[i] ? (
+                      <MoneyFlow value={result.layerLays[i].layStake} />
+                    ) : layMatrix?.lays[i] ? (
+                      <MoneyFlow value={layMatrix.lays[i].layStake} />
+                    ) : (
+                      "–"
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </BackPanel>
 
       {result && (
         <Card>

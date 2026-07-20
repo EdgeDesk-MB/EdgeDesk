@@ -49,8 +49,10 @@ import {
   offerTriggerFromLabel,
   previewAiTriggersFromInput,
   type BetMode,
+  type DutchLeg,
   type PartLay,
 } from "@/lib/calc";
+import { DutchOutcomesBuilder, inferMatchOddsSelection } from "@/components/calc/dutch-outcomes-builder";
 import { contrastText } from "@/lib/brands/exchanges";
 import { defaultSelection, formatCorrectScore, inferSportFromBet, marketDef, MARKETS, parseCorrectScore, SPORTS, teamSelectionLabel } from "@/lib/markets";
 import type { BetRow, ExchangeRow } from "@/lib/db/schema";
@@ -145,8 +147,9 @@ export interface AddBetPrefill {
 }
 
 /** UI bet types: the four calc modes plus "no lay" (saved as qualifying
- * with zeroed lay - a deliberate back-only bet, e.g. mug bets). */
-type UiBetType = BetMode | "no_lay";
+ * with zeroed lay - a deliberate back-only bet, e.g. mug bets) and "dutch"
+ * (saved as betType dutch with a legs array - no single back/lay shape). */
+type UiBetType = BetMode | "no_lay" | "dutch";
 
 const betTypeLabels: Record<UiBetType, string> = {
   qualifying: "Qualifying",
@@ -154,6 +157,7 @@ const betTypeLabels: Record<UiBetType, string> = {
   free_sr: "Free bet (SR)",
   risk_free: "Risk-free",
   no_lay: "No lay (back only)",
+  dutch: "Dutch (multiple outcomes)",
 };
 
 function exchangeFromNotes(notes: string | null | undefined, exchanges: ExchangeRow[]) {
@@ -222,8 +226,10 @@ export function AddBetDialog({
   const [selection, setSelection] = useState("home");
   const [betType, setBetType] = useState<UiBetType>("qualifying");
   /** The calc/settlement mode behind the UI type */
-  const calcBetType: BetMode = betType === "no_lay" ? "qualifying" : betType;
+  const calcBetType: BetMode =
+    betType === "no_lay" || betType === "dutch" ? "qualifying" : betType;
   const noLay = betType === "no_lay";
+  const isDutch = betType === "dutch";
   const [mugBet, setMugBet] = useState(false);
   const [backStake, setBackStake] = useState(NaN);
   const [backOdds, setBackOdds] = useState(NaN);
@@ -313,9 +319,18 @@ export function AddBetDialog({
       setLabel(editBet.label);
       setBookmaker(editBet.bookmaker ?? "");
       setBetType(
-        editBet.betType === "qualifying" && editBet.layStake === 0 && editBet.layOdds === 0
-          ? "no_lay"
-          : (editBet.betType as BetMode)
+        editBet.betType === "dutch"
+          ? "dutch"
+          : editBet.betType === "qualifying" && editBet.layStake === 0 && editBet.layOdds === 0
+            ? "no_lay"
+            : (editBet.betType as BetMode)
+      );
+      // Bug fix: a dutch bet's legs were never restored on edit, so saving
+      // silently overwrote it as a plain single bet and lost the legs.
+      setDutchLegs(
+        editBet.betType === "dutch" && editBet.legs
+          ? (JSON.parse(editBet.legs) as AddBetPrefill["dutchLegs"])
+          : undefined
       );
       setMugBet(editBet.purpose === "mug");
       setBackStake(editBet.backStake);
@@ -467,7 +482,7 @@ export function AddBetDialog({
   const currentMarket = marketDef(sport, market);
 
   const planInput = useMemo(() => {
-    if (noLay) return null;
+    if (noLay || isDutch) return null;
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
     return {
       mode: calcBetType,
@@ -477,7 +492,7 @@ export function AddBetDialog({
       commission: commission / 100,
       partLays: advanced ? partLays.filter((p) => p.odds > 1 && p.stake > 0) : [],
     };
-  }, [betType, noLay, calcBetType, backStake, backOdds, layOdds, commission, advanced, partLays]);
+  }, [betType, noLay, isDutch, calcBetType, backStake, backOdds, layOdds, commission, advanced, partLays]);
 
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
   const layStake = useMemo(
@@ -733,6 +748,27 @@ export function AddBetDialog({
     if (m !== "match_odds") setEarlyPayout(false);
   }
 
+  /** Dutch type: the builder computes stakes, this maps them into stored legs
+   * (market/selection) - same convention as the Dutching calculator. */
+  function handleDutchResult(
+    result: { legs: Array<{ label: string; odds: number; stake: number }> } | null,
+    legs: DutchLeg[]
+  ) {
+    if (!result) {
+      setDutchLegs(undefined);
+      return;
+    }
+    setDutchLegs(
+      legs.map((l, i) => ({
+        label: l.label,
+        market: "match_odds",
+        selection: inferMatchOddsSelection(l.label),
+        odds: l.odds,
+        stake: result.legs[i]?.stake ?? 0,
+      }))
+    );
+  }
+
   function setCorrectScore(home: number, away: number) {
     setSelection(formatCorrectScore(home, away));
   }
@@ -886,7 +922,8 @@ export function AddBetDialog({
       setSaving(true);
       try {
         const totalStake = dutchLegs.reduce((a, l) => a + l.stake, 0);
-        let resolvedEventId = eventId !== "none" ? Number(eventId) : undefined;
+        let resolvedEventId =
+          eventId !== "none" ? Number(eventId) : editBet?.eventId ?? undefined;
         if (!resolvedEventId && homeTeam.trim() && awayTeam.trim()) {
           const tracked = await api<{ event: { id: number } }>("/api/events/track", {
             method: "POST",
@@ -899,30 +936,40 @@ export function AddBetDialog({
           });
           resolvedEventId = tracked.event.id;
         }
-        const { bet } = await api<{ bet: { id: number } }>("/api/bets", {
-          method: "POST",
-          json: {
-            label:
-              label ||
-              prefill?.labelSuggestion ||
-              `Dutch · ${dutchLegs.map((l) => l.label).join(" / ")}`,
-            eventId: resolvedEventId,
-            market: dutchLegs[0]?.market ?? "match_odds",
-            selection: "",
-            betType: "dutch",
-            bookmaker: bookmaker || prefill?.bookmaker || undefined,
-            backStake: totalStake,
-            legs: dutchLegs,
-            quickLogged: prefill?.quickLogged ?? undefined,
-            expectedProfit: prefill?.expectedProfit,
-            homeTeam: sport === "football" ? effectiveHome || undefined : undefined,
-            awayTeam: sport === "football" ? effectiveAway || undefined : undefined,
-          },
-        });
+        const payload = {
+          label:
+            label ||
+            prefill?.labelSuggestion ||
+            `Dutch · ${dutchLegs.map((l) => l.label).join(" / ")}`,
+          market: dutchLegs[0]?.market ?? "match_odds",
+          selection: "",
+          betType: "dutch",
+          bookmaker: bookmaker || prefill?.bookmaker || undefined,
+          backStake: totalStake,
+          legs: dutchLegs,
+          homeTeam: sport === "football" ? effectiveHome || undefined : undefined,
+          awayTeam: sport === "football" ? effectiveAway || undefined : undefined,
+        };
+        const { bet } = editBet
+          ? await api<{ bet: { id: number } }>(`/api/bets/${editBet.id}`, {
+              method: "PATCH",
+              json: { ...payload, eventId: resolvedEventId ?? null },
+            })
+          : await api<{ bet: { id: number } }>("/api/bets", {
+              method: "POST",
+              json: {
+                ...payload,
+                eventId: resolvedEventId,
+                quickLogged: prefill?.quickLogged ?? undefined,
+                expectedProfit: prefill?.expectedProfit,
+              },
+            });
         setOpen(false);
         onSaved?.(bet.id);
         if (toastOnSave) {
-          toast.success("Bet added", { description: "It's in the Profit Tracker." });
+          toast.success(editBet ? "Bet updated" : "Bet added", {
+            description: editBet ? undefined : "It's in the Profit Tracker.",
+          });
         }
       } catch (e) {
         toast.error("Could not save bet", { description: String(e) });
@@ -1168,7 +1215,16 @@ export function AddBetDialog({
                     </span>
                   ) : null}
                 </Label>
-                <Select value={betType} onValueChange={(v) => setBetType(v as UiBetType)}>
+                <Select
+                  value={betType}
+                  onValueChange={(v) => {
+                    const next = v as UiBetType;
+                    setBetType(next);
+                    // Leaving Dutch clears the legs so the plain back/lay
+                    // panels become the save-path source of truth again.
+                    if (next !== "dutch") setDutchLegs(undefined);
+                  }}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue>
                       <span className="flex items-center gap-1.5">
@@ -1343,6 +1399,12 @@ export function AddBetDialog({
                 </div>
               </div>
             )}
+            {isDutch ? (
+              <p className="text-[10px] leading-tight text-muted-foreground">
+                Each outcome settles automatically from the score (home/draw/away, by label) -
+                link the event above for that to work.
+              </p>
+            ) : (
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Market</Label>
               <Select value={market} onValueChange={changeMarket}>
@@ -1363,10 +1425,20 @@ export function AddBetDialog({
                   : "Manual settle, or use a win trigger below"}
               </span>
             </div>
+            )}
           </div>
 
           {/* Right - back/lay & triggers */}
           <div className="flex flex-col gap-3 p-6">
+            {isDutch ? (
+              <DutchOutcomesBuilder
+                key={editBet?.id ?? "new"}
+                title="Outcomes"
+                initialLegs={dutchLegs?.map((l) => ({ label: l.label, odds: l.odds }))}
+                onResult={handleDutchResult}
+              />
+            ) : (
+              <>
             <BackPanel
               title="Back Bet"
               exchange={exchange}
@@ -1623,10 +1695,13 @@ export function AddBetDialog({
                 !effectiveHome
               }
             />
+              </>
+            )}
           </div>
         </div>
 
         <div className="shrink-0 border-t">
+          {!isDutch && (
           <div className="px-6 pt-4 pb-2">
             {noLay ? (
               <div className="overflow-hidden rounded-lg border text-sm">
@@ -1666,6 +1741,7 @@ export function AddBetDialog({
             />
             )}
           </div>
+          )}
           <div className="flex justify-end gap-2 px-6 pb-4 pt-2">
           {editBet && (
             <Button

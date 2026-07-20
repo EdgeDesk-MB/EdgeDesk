@@ -54,6 +54,23 @@ export function dutchStakeForProfit(legs: DutchLeg[], targetProfit: number): num
 }
 
 /**
+ * Total stake needed so `legs[legIndex]` gets exactly `legStake`, while every
+ * leg still returns equal profit (the "fix one outcome's stake" entry mode).
+ * Null if the leg index is out of range or the inputs are non-positive.
+ */
+export function dutchStakeForLegStake(
+  legs: DutchLeg[],
+  legIndex: number,
+  legStake: number
+): number | null {
+  const leg = legs[legIndex];
+  if (!leg || !(legStake > 0) || !(leg.odds > 1)) return null;
+  const effective = legs.map((l) => 1 + (l.odds - 1) * (1 - (l.commission ?? 0)));
+  const S = effective.map((o) => 1 / o).reduce((a, b) => a + b, 0);
+  return legStake * effective[legIndex] * S;
+}
+
+/**
  * 2UP dutch: back Home at bookie A and Away at bookie B, both paying out early at 2 goals up.
  * Scenario matrix including double-payout windfalls.
  */
