@@ -159,7 +159,7 @@ const betTypeLabels: Record<UiBetType, string> = {
   free_sr: "Free bet (SR)",
   risk_free: "Risk-free",
   no_lay: "No lay (back only)",
-  dutch: "Dutch (multiple outcomes)",
+  dutch: "Dutch",
 };
 
 function exchangeFromNotes(notes: string | null | undefined, exchanges: ExchangeRow[]) {

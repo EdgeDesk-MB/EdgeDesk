@@ -271,54 +271,65 @@ export function DutchOutcomesBuilder({
           const legResult = result?.legs[i];
           const isFreeLeg = freeLegActive && i === safeFixedIndex;
           return (
-            <div key={i} className="flex items-end gap-2">
-              <PanelTextInput
-                label={i === 0 ? "Outcome" : ""}
-                value={leg.label}
-                onChange={(v) => updateLeg(i, { label: v })}
-                placeholder={`Outcome ${i + 1}`}
-                inputClassName="h-10 text-sm"
-              />
-              <div className="flex flex-col gap-1">
-                {i === 0 ? (
+            <div
+              key={i}
+              className="flex flex-col gap-2 rounded-lg bg-black/5 p-2.5 dark:bg-white/5"
+            >
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <PanelTextInput
+                    label="Outcome"
+                    value={leg.label}
+                    onChange={(v) => updateLeg(i, { label: v })}
+                    placeholder={`Outcome ${i + 1}`}
+                    inputClassName="h-10 text-sm"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 shrink-0 text-black/50 hover:text-black/80 dark:text-white/50 dark:hover:text-white/80"
+                  disabled={legs.length <= minLegs}
+                  onClick={() => setLegs((prev) => prev.filter((_, j) => j !== i))}
+                  aria-label={`Remove outcome ${i + 1}`}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">
                     Venue
                   </span>
-                ) : null}
-                <VenueSelect
-                  compact
-                  value={leg.bookmaker ?? ""}
-                  onChange={(v) => updateLeg(i, { bookmaker: v })}
-                  className="shrink-0"
+                  <VenueSelect
+                    compact
+                    value={leg.bookmaker ?? ""}
+                    onChange={(v) => updateLeg(i, { bookmaker: v })}
+                  />
+                </div>
+                <PanelInput
+                  label="Odds"
+                  value={leg.odds}
+                  onChange={(v) => updateLeg(i, { odds: v })}
+                  min={1.01}
+                  step={0.01}
+                  inputClassName="h-10 text-sm"
                 />
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">
+                    Stake
+                  </span>
+                  <div className="flex h-10 items-center gap-1 rounded-md bg-[var(--pi)] px-2.5 dark:bg-[var(--pi-dark)]">
+                    {isFreeLeg ? (
+                      <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
+                    ) : null}
+                    <span className="truncate text-sm font-bold tabular-nums text-black/85 dark:text-white/95">
+                      <MoneyFlow value={legResult?.stake ?? 0} />
+                    </span>
+                  </div>
+                </div>
               </div>
-              <PanelInput
-                label={i === 0 ? "Odds" : ""}
-                value={leg.odds}
-                onChange={(v) => updateLeg(i, { odds: v })}
-                min={1.01}
-                step={0.01}
-                inputClassName="h-10 w-24 text-sm"
-              />
-              <div className="flex h-10 w-28 shrink-0 flex-col items-end justify-center">
-                <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-black/85 dark:text-white/95">
-                  {isFreeLeg ? (
-                    <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
-                  ) : null}
-                  <MoneyFlow value={legResult?.stake ?? 0} />
-                </span>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9 shrink-0 text-black/50 hover:text-black/80 dark:text-white/50 dark:hover:text-white/80"
-                disabled={legs.length <= minLegs}
-                onClick={() => setLegs((prev) => prev.filter((_, j) => j !== i))}
-                aria-label={`Remove outcome ${i + 1}`}
-              >
-                <Trash2 className="size-4" />
-              </Button>
             </div>
           );
         })}
