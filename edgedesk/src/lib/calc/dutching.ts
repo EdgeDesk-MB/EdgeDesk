@@ -71,6 +71,56 @@ export function dutchStakeForLegStake(
 }
 
 /**
+ * Free-bet dutching: `freeLegIndex` carries a fixed free-bet stake (never
+ * real cash - so it costs nothing if it loses). The other (cash) legs are
+ * solved so every outcome pays the same guaranteed profit, given the free
+ * leg's own payout if it wins.
+ *
+ * SNR: winning profit is stake × (odds − 1) (bookie doesn't return the stake).
+ * SR: winning profit is stake × odds (the "stake" is paid out as winnings too).
+ * Null if the free leg or any other leg's odds/stake are invalid.
+ */
+export function dutchStakesForFreeLeg(
+  legs: DutchLeg[],
+  freeLegIndex: number,
+  freeLegStake: number,
+  freeLegType: "snr" | "sr"
+): DutchResult | null {
+  const freeLeg = legs[freeLegIndex];
+  if (!freeLeg || !(freeLegStake > 0)) return null;
+  if (legs.length < 2 || legs.some((l) => !(l.odds > 1))) return null;
+
+  const effective = legs.map((l) => 1 + (l.odds - 1) * (1 - (l.commission ?? 0)));
+  const freeEffective = effective[freeLegIndex];
+  const freeProfit =
+    freeLegType === "sr" ? freeLegStake * freeEffective : freeLegStake * (freeEffective - 1);
+
+  const cashStakes = legs.map((_, i) => (i === freeLegIndex ? freeLegStake : freeProfit / effective[i]));
+  const cashOutlay = cashStakes.reduce((sum, stake, i) => (i === freeLegIndex ? sum : sum + stake), 0);
+  const profit = freeProfit - cashOutlay;
+
+  const legResults: DutchLegResult[] = legs.map((leg, i) => ({
+    ...leg,
+    stake: cashStakes[i],
+    // SNR doesn't return the stake, so the actual payout if it wins is the
+    // winnings only - everywhere else the stake comes back as part of the return.
+    returnIfWins: i === freeLegIndex && freeLegType === "snr" ? freeProfit : cashStakes[i] * effective[i],
+    profitIfWins: profit,
+  }));
+
+  const inverses = effective.map((o) => 1 / o);
+  const S = inverses.reduce((a, b) => a + b, 0);
+
+  return {
+    legs: legResults,
+    totalStake: freeLegStake + cashOutlay,
+    profit,
+    totalImplied: S,
+    overroundPct: (S - 1) * 100,
+  };
+}
+
+/**
  * 2UP dutch: back Home at bookie A and Away at bookie B, both paying out early at 2 goals up.
  * Scenario matrix including double-payout windfalls.
  */

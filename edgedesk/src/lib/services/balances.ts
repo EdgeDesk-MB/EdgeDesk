@@ -16,6 +16,7 @@ import {
 import { ensureVenueAccount } from "@/lib/accounts/ensure-venue";
 import { sumFreeBetLotBalance } from "@/lib/accounts/free-bet-lot-balance";
 import { applyWageringRequirement } from "@/lib/accounts/wagering";
+import type { DutchLegRecord } from "@/lib/calc/settlement";
 
 export type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
 import type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
@@ -250,6 +251,17 @@ export function findBookieAccount(name: string | null | undefined): AccountRow |
     .find((a) => a.type === "bookie" && a.name.toLowerCase() === q);
 }
 
+/** Any active bookie or exchange wallet by name (dutch legs may be either). */
+function findVenueAccountByName(name: string): AccountRow | undefined {
+  const q = name.trim().toLowerCase();
+  return db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.isActive, 1))
+    .all()
+    .find((a) => (a.type === "bookie" || a.type === "exchange") && a.name.toLowerCase() === q);
+}
+
 export function findExchangeAccount(exchangeId: number | null | undefined): AccountRow | undefined {
   if (!exchangeId) return undefined;
   return db
@@ -439,9 +451,44 @@ export function listPendingTransactions(limit = 50) {
     .slice(0, limit);
 }
 
+/**
+ * Dutch bets hedge internally and aren't otherwise ledgered - but a leg
+ * flagged as a free bet still needs to draw down that venue's tracked
+ * free-bet balance, same as a normal free_snr/free_sr bet does.
+ */
+function ledgerDutchFreeLegs(bet: BetRow): boolean {
+  if (!bet.legs) return false;
+  const legs = JSON.parse(bet.legs) as DutchLegRecord[];
+  let ledgered = false;
+  for (const leg of legs) {
+    if (!leg.freeBet || !leg.bookmaker?.trim() || !(leg.stake > 0)) continue;
+    const account =
+      findVenueAccountByName(leg.bookmaker) ?? ensureVenueAccount(leg.bookmaker, "bookie").account;
+    insertTx(account.id, -leg.stake, "free_bet", `Free bet used - ${bet.label} (${leg.label})`, bet.id);
+    ledgered = true;
+  }
+  db.update(bets).set({ balanceLedgered: 1 }).where(eq(bets.id, bet.id)).run();
+  return ledgered;
+}
+
+/**
+ * Re-sync a dutch bet's free-bet ledger entries after its legs are edited.
+ * PATCH doesn't run `ledgerBetPlacement` (that's create-only), so without
+ * this an edit that adds, removes or re-stakes a free-bet leg would leave
+ * the venue's tracked free-bet balance silently out of sync.
+ */
+export function reledgerDutchFreeLegs(bet: BetRow): void {
+  if (bet.betType !== "dutch") return;
+  db.delete(balanceTransactions)
+    .where(and(eq(balanceTransactions.betId, bet.id), eq(balanceTransactions.category, "free_bet")))
+    .run();
+  ledgerDutchFreeLegs(bet);
+}
+
 /** Debit back stake and lay liability when a bet is saved. */
 export function ledgerBetPlacement(bet: BetRow): boolean {
   if (bet.balanceLedgered) return false;
+  if (bet.betType === "dutch") return ledgerDutchFreeLegs(bet);
 
   // First-use: create wallets so tracked bets always move money (Ultimatcher-style).
   const bookie = bet.bookmaker?.trim()

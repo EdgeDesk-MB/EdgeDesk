@@ -79,6 +79,12 @@ export interface DutchLegRecord {
   stake: number;
   /** Bookie offers 2UP early payout on this leg */
   earlyPayout?: boolean;
+  /** Bookie or exchange this leg is placed at */
+  bookmaker?: string;
+  /** Set when this leg's stake is a free bet, not real cash - it costs
+   * nothing if it loses. SNR: profit is stake × (odds − 1). SR: the stake
+   * itself is paid out too, so profit is stake × odds. */
+  freeBet?: "snr" | "sr";
 }
 
 export interface SettleableBet {
@@ -316,7 +322,13 @@ export function settleBet(bet: SettleableBet, result: MatchResult): SettlementOu
           early = true;
         }
       }
-      profit += paid ? leg.stake * (leg.odds - 1) : -leg.stake;
+      if (leg.freeBet === "sr") {
+        profit += paid ? leg.stake * leg.odds : 0;
+      } else if (leg.freeBet === "snr") {
+        profit += paid ? leg.stake * (leg.odds - 1) : 0;
+      } else {
+        profit += paid ? leg.stake * (leg.odds - 1) : -leg.stake;
+      }
       notes.push(`${leg.label}: ${paid ? (early ? "paid early (2UP)" : "won") : "lost"}`);
     }
     if (!anyKnown) return null;

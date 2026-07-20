@@ -133,6 +133,8 @@ export interface AddBetPrefill {
     odds: number;
     stake: number;
     earlyPayout?: boolean;
+    bookmaker?: string;
+    freeBet?: "snr" | "sr";
   }>;
   expectedProfit?: number;
   notes?: string;
@@ -752,7 +754,7 @@ export function AddBetDialog({
    * (market/selection) - same convention as the Dutching calculator. */
   function handleDutchResult(
     result: { legs: Array<{ label: string; odds: number; stake: number }> } | null,
-    legs: DutchLeg[]
+    legs: Array<DutchLeg & { bookmaker?: string; freeBet?: "snr" | "sr" }>
   ) {
     if (!result) {
       setDutchLegs(undefined);
@@ -765,6 +767,8 @@ export function AddBetDialog({
         selection: inferMatchOddsSelection(l.label),
         odds: l.odds,
         stake: result.legs[i]?.stake ?? 0,
+        bookmaker: l.bookmaker,
+        freeBet: l.freeBet,
       }))
     );
   }
@@ -1434,7 +1438,13 @@ export function AddBetDialog({
               <DutchOutcomesBuilder
                 key={editBet?.id ?? "new"}
                 title="Outcomes"
-                initialLegs={dutchLegs?.map((l) => ({ label: l.label, odds: l.odds }))}
+                initialLegs={dutchLegs?.map((l) => ({
+                  label: l.label,
+                  odds: l.odds,
+                  stake: l.stake,
+                  bookmaker: l.bookmaker,
+                  freeBet: l.freeBet,
+                }))}
                 onResult={handleDutchResult}
               />
             ) : (

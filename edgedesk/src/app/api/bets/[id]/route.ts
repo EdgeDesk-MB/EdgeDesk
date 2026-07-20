@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, accounts, bets, events, mugPlans } from "@/lib/db";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
-import { ledgerFromSettledBet } from "@/lib/services/balances";
+import { ledgerFromSettledBet, reledgerDutchFreeLegs } from "@/lib/services/balances";
 import { purgeHistoryForBet } from "@/lib/services/history-feed";
 import { resolveOfferForBet, syncOfferStatuses } from "@/lib/services/offers";
 
@@ -16,6 +16,8 @@ const dutchLegSchema = z.object({
   odds: z.number().positive(),
   stake: z.number().min(0),
   earlyPayout: z.boolean().optional(),
+  bookmaker: z.string().optional(),
+  freeBet: z.enum(["snr", "sr"]).optional(),
 });
 
 const patchSchema = z.object({
@@ -146,6 +148,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       }
     }
   }
+  if (p.legs !== undefined) reledgerDutchFreeLegs(updated);
   if (updated.status !== "open") ledgerFromSettledBet(updated);
   syncOfferStatuses();
   return NextResponse.json({ bet: updated });

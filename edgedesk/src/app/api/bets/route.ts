@@ -16,6 +16,8 @@ const legSchema = z.object({
   odds: z.number().positive(),
   stake: z.number().min(0),
   earlyPayout: z.boolean().optional(),
+  bookmaker: z.string().optional(),
+  freeBet: z.enum(["snr", "sr"]).optional(),
 });
 
 const createSchema = z.object({

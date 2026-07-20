@@ -40,7 +40,7 @@ export default function DutchingCalculatorPage() {
 
 function StandardDutch() {
   const [result, setResult] = useState<DutchResult | null>(null);
-  const [legs, setLegs] = useState<DutchLeg[]>([]);
+  const [legs, setLegs] = useState<Array<DutchLeg & { bookmaker?: string; freeBet?: "snr" | "sr" }>>([]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,6 +63,8 @@ function StandardDutch() {
               selection: inferMatchOddsSelection(l.label),
               odds: l.odds,
               stake: result.legs[i]?.stake ?? 0,
+              bookmaker: l.bookmaker,
+              freeBet: l.freeBet,
             })),
             expectedProfit: Number(result.profit.toFixed(2)),
           }}

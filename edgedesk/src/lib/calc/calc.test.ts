@@ -6,6 +6,7 @@ import {
   dutch,
   dutchStakeForProfit,
   dutchStakeForLegStake,
+  dutchStakesForFreeLeg,
   eachWay,
   extraPlace,
   accaMatched,
@@ -202,6 +203,64 @@ describe("dutching", () => {
     expect(dutchStakeForLegStake(legs, 5, 40)).toBeNull();
     expect(dutchStakeForLegStake(legs, 0, 0)).toBeNull();
     expect(dutchStakeForLegStake(legs, 0, -10)).toBeNull();
+  });
+
+  // Hand-worked: free bet (SNR) £20 @ 2.0 on leg 0 → freeProfit = 20×(2.0−1) = 20.
+  // Cash leg 1 @ 1.5 must return exactly £20 whichever leg wins:
+  // x1 = freeProfit / 1.5 = 13.333333. Guaranteed profit = 20 − 13.333333 = 6.666667.
+  it("dutchStakesForFreeLeg (SNR): cash leg solved so both outcomes pay the free leg's win profit", () => {
+    const legs = [
+      { label: "Free bet", odds: 2.0 },
+      { label: "Cash", odds: 1.5 },
+    ];
+    const r = dutchStakesForFreeLeg(legs, 0, 20, "snr");
+    expect(r).not.toBeNull();
+    expect(r!.legs[0].stake).toBeCloseTo(20, 6);
+    expect(r!.legs[1].stake).toBeCloseTo(13.333333, 5);
+    expect(r!.profit).toBeCloseTo(6.666667, 5);
+    // Equal profit whichever leg actually wins (free leg costs nothing if it
+    // loses; the cash leg's stake is the only real money at risk either way)
+    const freeWins = r!.legs[0].stake * (legs[0].odds - 1) - r!.legs[1].stake;
+    const cashWins = r!.legs[1].stake * legs[1].odds - r!.legs[1].stake;
+    expect(freeWins).toBeCloseTo(r!.profit, 5);
+    expect(cashWins).toBeCloseTo(r!.profit, 5);
+  });
+
+  // Hand-worked SR variant: stake IS paid out on top of winnings, so
+  // freeProfit = 20×2.0 = 40. x1 = 40/1.5 = 26.666667, profit = 40−26.666667 = 13.333333.
+  it("dutchStakesForFreeLeg (SR): the free leg's stake counts fully as profit on win", () => {
+    const legs = [
+      { label: "Free bet", odds: 2.0 },
+      { label: "Cash", odds: 1.5 },
+    ];
+    const r = dutchStakesForFreeLeg(legs, 0, 20, "sr");
+    expect(r!.legs[1].stake).toBeCloseTo(26.666667, 5);
+    expect(r!.profit).toBeCloseTo(13.333333, 5);
+  });
+
+  it("dutchStakesForFreeLeg: three-way book with two cash legs still equalises", () => {
+    const legs = [
+      { label: "Free bet", odds: 2.5 },
+      { label: "Draw", odds: 3.4 },
+      { label: "Away", odds: 3.2 },
+    ];
+    const r = dutchStakesForFreeLeg(legs, 0, 10, "snr");
+    expect(r).not.toBeNull();
+    expect(r!.legs[1].stake).toBeCloseTo(4.411765, 5);
+    expect(r!.legs[2].stake).toBeCloseTo(4.6875, 5);
+    expect(r!.profit).toBeCloseTo(5.900735, 4);
+    for (const leg of r!.legs) expect(leg.profitIfWins).toBeCloseTo(r!.profit, 6);
+  });
+
+  it("dutchStakesForFreeLeg guards a bad leg index or non-positive stake", () => {
+    const legs = [
+      { label: "A", odds: 2.0 },
+      { label: "B", odds: 3.0 },
+    ];
+    expect(dutchStakesForFreeLeg(legs, 5, 20, "snr")).toBeNull();
+    expect(dutchStakesForFreeLeg(legs, 0, 0, "snr")).toBeNull();
+    expect(dutchStakesForFreeLeg(legs, 0, -10, "snr")).toBeNull();
+    expect(dutchStakesForFreeLeg([legs[0]], 0, 20, "snr")).toBeNull();
   });
 
   it("2up dutch windfall doubles the payout", () => {
@@ -423,6 +482,74 @@ describe("settlement engine (result-centric)", () => {
     );
     expect(outcome!.status).toBe("early_payout");
     expect(outcome!.profit).toBeCloseTo(55 * 1.2 + 45 * 1.75, 6);
+  });
+
+  // Hand-worked: Home leg is a free bet (SNR) £55 @ 2.2, Away leg is cash £45 @ 2.75.
+  // Home wins: free profit = 55×(2.2−1) = 66; Away (cash) loses its stake = −45.
+  // Total = 66 − 45 = 21. A losing free leg costs nothing (already sunk).
+  it("settles a dutch free-bet (SNR) leg: it costs nothing if it loses", () => {
+    const outcome = settleBet(
+      {
+        market: "match_odds",
+        selection: "",
+        betType: "dutch",
+        backStake: 0,
+        backOdds: 0,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        legs: [
+          { label: "Home", market: "match_odds", selection: "home", odds: 2.2, stake: 55, freeBet: "snr" },
+          { label: "Away", market: "match_odds", selection: "away", odds: 2.75, stake: 45 },
+        ],
+      },
+      { homeScore: 2, awayScore: 0, homeLed2: false, awayLed2: false }
+    );
+    expect(outcome!.status).toBe("won");
+    expect(outcome!.profit).toBeCloseTo(66 - 45, 6);
+  });
+
+  // SR variant: the free leg's stake is paid out on top of winnings when it
+  // wins (profit = 55×2.2 = 121), and still costs nothing when it loses.
+  it("settles a dutch free-bet (SR) leg: full stake counts as profit on win, zero cost on loss", () => {
+    const wins = settleBet(
+      {
+        market: "match_odds",
+        selection: "",
+        betType: "dutch",
+        backStake: 0,
+        backOdds: 0,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        legs: [
+          { label: "Home", market: "match_odds", selection: "home", odds: 2.2, stake: 55, freeBet: "sr" },
+          { label: "Away", market: "match_odds", selection: "away", odds: 2.75, stake: 45 },
+        ],
+      },
+      { homeScore: 2, awayScore: 0, homeLed2: false, awayLed2: false }
+    );
+    expect(wins!.profit).toBeCloseTo(55 * 2.2 - 45, 6);
+
+    const loses = settleBet(
+      {
+        market: "match_odds",
+        selection: "",
+        betType: "dutch",
+        backStake: 0,
+        backOdds: 0,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        legs: [
+          { label: "Home", market: "match_odds", selection: "home", odds: 2.2, stake: 55, freeBet: "sr" },
+          { label: "Away", market: "match_odds", selection: "away", odds: 2.75, stake: 45 },
+        ],
+      },
+      { homeScore: 0, awayScore: 1, homeLed2: false, awayLed2: false }
+    );
+    // Free (SR) leg loses: costs nothing. Cash leg (Away) wins: 45×(2.75−1).
+    expect(loses!.profit).toBeCloseTo(45 * 1.75, 6);
   });
 
   it("returns null for markets it cannot derive (manual fallback)", () => {
