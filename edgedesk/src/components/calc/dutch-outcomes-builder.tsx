@@ -275,6 +275,16 @@ export function DutchOutcomesBuilder({
               key={i}
               className="flex flex-col gap-2 rounded-lg bg-black/5 p-2.5 dark:bg-white/5"
             >
+              <div className="flex justify-end">
+                {/* Ghost chip - background matches the leg card, same idiom
+                    as the Back Bet panel's "Bookie" header chip. */}
+                <VenueSelect
+                  compact
+                  value={leg.bookmaker ?? ""}
+                  onChange={(v) => updateLeg(i, { bookmaker: v })}
+                  className="[--pi:transparent] [--pi-dark:transparent]"
+                />
+              </div>
               <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1">
                   <PanelTextInput
@@ -297,17 +307,7 @@ export function DutchOutcomesBuilder({
                   <Trash2 className="size-4" />
                 </Button>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">
-                    Venue
-                  </span>
-                  <VenueSelect
-                    compact
-                    value={leg.bookmaker ?? ""}
-                    onChange={(v) => updateLeg(i, { bookmaker: v })}
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-2">
                 <PanelInput
                   label="Odds"
                   value={leg.odds}
