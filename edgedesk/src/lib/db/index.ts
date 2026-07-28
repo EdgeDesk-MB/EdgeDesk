@@ -6,6 +6,12 @@ import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
 import { seedDemoData } from "./demo-seed";
+import {
+  CLASSIC_SEED_GAMES,
+  BETFAIR_OFFER_ELIGIBLE_GAMES_2026_07_21,
+  COMMON_UK_SLOTS_2026_07_21,
+  type SeedGame,
+} from "@/lib/casino/game-library";
 
 type DB = BetterSQLite3Database<typeof schema>;
 
@@ -166,6 +172,7 @@ CREATE TABLE IF NOT EXISTS offers (
       whole_lay_bet_id INTEGER,
       whole_lay_stake REAL,
       whole_lay_odds REAL,
+      boost_pct REAL,
       mute_alerts INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
       created_at INTEGER NOT NULL,
@@ -293,6 +300,27 @@ CREATE TABLE IF NOT EXISTS casino_offers (
   created_at INTEGER NOT NULL,
   completed_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS casino_offer_components (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  casino_offer_id INTEGER NOT NULL,
+  component_type TEXT NOT NULL,
+  amount REAL,
+  wagering_multiplier REAL,
+  rtp REAL,
+  contribution_pct REAL,
+  spins REAL,
+  spin_value REAL,
+  chip_count REAL,
+  chip_value REAL,
+  house_edge_preset TEXT,
+  cashback_pct REAL,
+  cashback_cap REAL,
+  game TEXT,
+  expected_ev REAL NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_casino_offer_components_offer ON casino_offer_components(casino_offer_id, sort_order);
 CREATE TABLE IF NOT EXISTS boost_diary (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   label TEXT NOT NULL,
@@ -350,6 +378,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("bets", "balance_ledgered INTEGER NOT NULL DEFAULT 0");
   addColumn("bets", "balance_settled INTEGER NOT NULL DEFAULT 0");
   addColumn("casino_offers", "game TEXT");
+  addColumn("casino_offers", "expires_at INTEGER");
   addColumn("bets", "offer_id INTEGER");
   addColumn("bets", "source TEXT");
   addColumn("offers", "sport TEXT");
@@ -361,6 +390,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("offers", "rules TEXT");
   addColumn("offers", "series_id INTEGER");
   addColumn("offers", "instance_date TEXT");
+  addColumn("offers", "starts_on TEXT");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -396,6 +426,7 @@ CREATE TABLE IF NOT EXISTS offer_series (
   addColumn("balance_transactions", "confirmed_at INTEGER");
   addColumn("balance_transactions", "affect_pnl INTEGER NOT NULL DEFAULT 0");
   addColumn("racing_odds_snapshots", "kind TEXT NOT NULL DEFAULT 'bookie'");
+  addColumn("acca_runs", "boost_pct REAL");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS offer_ev_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -425,6 +456,30 @@ WHERE category = 'top_up'
   AND note LIKE '%Free bet%';
 `);
 
+  // K1: every casino_offers row that predates the multi-component model has no
+  // linked casino_offer_components row yet - backfill one now (see function doc).
+  backfillLegacyCasinoOffers(sqlite);
+
+  // Casino game library: dated batches, each backfilled into every existing
+  // library under its own marker (see function doc for why this is a
+  // one-time, marker-gated migration rather than the K1 pattern above). The
+  // original "classic" set goes through this same mechanism too, not just
+  // the lazy seed-if-empty route in api/casino/games - otherwise the two
+  // dated batches below would un-empty a fresh install's table before that
+  // route ever got a chance to run, and the classic 28 games would never
+  // seed at all.
+  backfillCasinoGameLibrary(sqlite, "casino_games_backfill_classic", CLASSIC_SEED_GAMES);
+  backfillCasinoGameLibrary(
+    sqlite,
+    "casino_games_backfill_2026_07_21",
+    BETFAIR_OFFER_ELIGIBLE_GAMES_2026_07_21
+  );
+  backfillCasinoGameLibrary(
+    sqlite,
+    "casino_games_backfill_2026_07_21_common_uk_slots",
+    COMMON_UK_SLOTS_2026_07_21
+  );
+
   // Demo mode (G2): a fresh demo DB gets the watermarked demo dataset.
   // Atomic - a mid-seed failure rolls back rather than stranding a
   // half-seeded demo DB that would then skip reseeding.
@@ -450,6 +505,132 @@ WHERE category = 'top_up'
   rawSqlite = sqlite;
   instance = drizzle(sqlite, { schema });
   return instance;
+}
+
+/**
+ * K1 migration: backfill every `casino_offers` row with no linked
+ * `casino_offer_components` row into one 'bonus'-type component copying its
+ * legacy `bonus_amount`/`wagering_multiplier`/`rtp`/`contribution_pct`/`game`/
+ * `expected_ev` columns, so a pre-K1 offer keeps exactly its current EV and
+ * reward framing under the multi-component model. Idempotent (the LEFT JOIN
+ * excludes rows already migrated) - safe to call repeatedly. Returns the
+ * number of rows backfilled.
+ *
+ * `bonus_amount > 0` is a DELIBERATE second filter, not redundant with the
+ * LEFT JOIN: pre-K1 POSTs validated `bonusAmount` as `.positive()`, so every
+ * genuine legacy row satisfies it. A brand-new K1 campaign created with zero
+ * components (a valid "nothing logged yet" state, same as a sports offer
+ * with zero bets) inserts 0 into the vestigial `bonus_amount` column - without
+ * this filter, the NEXT server restart would misread that empty campaign as
+ * an unmigrated legacy row and backfill a bogus zero-value bonus component
+ * into it.
+ */
+function backfillLegacyCasinoOffers(sqlite: Database.Database): number {
+  const preK1 = sqlite
+    .prepare(
+      `SELECT co.id, co.bonus_amount, co.wagering_multiplier, co.rtp, co.contribution_pct,
+              co.game, co.expected_ev, co.created_at
+       FROM casino_offers co
+       LEFT JOIN casino_offer_components coc ON coc.casino_offer_id = co.id
+       WHERE coc.id IS NULL AND co.bonus_amount > 0`
+    )
+    .all() as Array<{
+    id: number;
+    bonus_amount: number;
+    wagering_multiplier: number;
+    rtp: number | null;
+    contribution_pct: number | null;
+    game: string | null;
+    expected_ev: number;
+    created_at: number;
+  }>;
+  if (preK1.length === 0) return 0;
+
+  const insertBonusComponent = sqlite.prepare(
+    `INSERT INTO casino_offer_components
+       (casino_offer_id, component_type, amount, wagering_multiplier, rtp, contribution_pct, game, expected_ev, sort_order, created_at)
+     VALUES (?, 'bonus', ?, ?, ?, ?, ?, ?, 0, ?)`
+  );
+  for (const row of preK1) {
+    insertBonusComponent.run(
+      row.id,
+      row.bonus_amount,
+      row.wagering_multiplier,
+      row.rtp,
+      row.contribution_pct,
+      row.game,
+      row.expected_ev,
+      row.created_at
+    );
+  }
+  return preK1.length;
+}
+
+/**
+ * Public, re-callable hook onto {@link backfillLegacyCasinoOffers} for tests
+ * and for anywhere else that wants to force a re-check (e.g. after an E3
+ * restore brings in older-shape rows). Production bootstrap already calls
+ * the migration once via `getDb()`; this exists so tests can insert a
+ * legacy-shape row through the normal `db` API and then trigger the same
+ * idempotent backfill against the live connection, without reaching for the
+ * module-private raw `Database` handle.
+ */
+export function runCasinoOfferComponentsBackfill(): number {
+  getDb();
+  return backfillLegacyCasinoOffers(rawSqlite!);
+}
+
+/**
+ * One-time backfill of a dated `SEED_GAMES` batch into `casino_games`,
+ * gated by its OWN `app_settings` marker. The lazy seed-on-empty-table path
+ * (`api/casino/games`) only ever fires for a brand-new install, so an
+ * already-populated library (every existing user, once any game exists)
+ * would never pick up a batch added to `game-library.ts` after that first
+ * install on its own.
+ *
+ * Unlike {@link backfillLegacyCasinoOffers} (which safely re-checks
+ * structural state - "does this offer have a component yet" - on every
+ * boot), each of these must run EXACTLY ONCE per batch: `casino_games` is a
+ * curated reference list a user can deliberately delete rows from ("every
+ * row editable"), and an unconditional re-run would resurrect a deletion
+ * the next time the entry's name matched a seed row. `INSERT OR IGNORE`
+ * also means it never touches a name that already exists (including a
+ * user's own edited RTP for a pre-existing title), only adds ones that are
+ * missing entirely. A SEPARATE marker per batch (rather than one marker for
+ * the whole growing `SEED_GAMES`) is what lets a LATER batch still reach an
+ * existing library after an EARLIER batch's migration has already run and
+ * will never fire again. Returns the number of rows actually inserted (0 if
+ * this batch's marker was already set).
+ */
+function backfillCasinoGameLibrary(
+  sqlite: Database.Database,
+  marker: string,
+  games: SeedGame[]
+): number {
+  const alreadyRun = sqlite.prepare(`SELECT 1 FROM app_settings WHERE key = ?`).get(marker);
+  if (alreadyRun) return 0;
+
+  const insertGame = sqlite.prepare(
+    `INSERT OR IGNORE INTO casino_games (name, provider, rtp, source, updated_at) VALUES (?, ?, ?, 'seed', ?)`
+  );
+  const now = Date.now();
+  let inserted = 0;
+  for (const g of games) {
+    const result = insertGame.run(g.name, g.provider, g.rtp, now);
+    if (result.changes > 0) inserted++;
+  }
+  sqlite.prepare(`INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`).run(marker, "done");
+  return inserted;
+}
+
+/**
+ * Public, re-callable hook onto {@link backfillCasinoGameLibrary} for tests -
+ * re-runs a named batch's migration against the live connection, mirroring
+ * {@link runCasinoOfferComponentsBackfill}.
+ */
+export function runCasinoGameLibraryBackfill(marker: string, games: SeedGame[]): number {
+  getDb();
+  return backfillCasinoGameLibrary(rawSqlite!, marker, games);
 }
 
 /**

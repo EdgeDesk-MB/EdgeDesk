@@ -118,6 +118,8 @@ export const accaRuns = sqliteTable("acca_runs", {
   wholeLayBetId: integer("whole_lay_bet_id"),
   wholeLayStake: real("whole_lay_stake"),
   wholeLayOdds: real("whole_lay_odds"),
+  /** Bookmaker acca boost, e.g. 50 for a 50% boost on the combined price (winnings-only convention) */
+  boostPct: real("boost_pct"),
   muteAlerts: integer("mute_alerts").notNull().default(0),
   status: text("status", { enum: ["active", "completed", "abandoned"] })
     .notNull()
@@ -159,6 +161,8 @@ export const offers = sqliteTable("offers", {
   expiresAt: integer("expires_at"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
+  /** YYYY-MM-DD; a "planned" offer auto-activates once this date arrives. Null = live now. */
+  startsOn: text("starts_on"),
   /** horse_racing | football | sports | casino; null = general */
   sport: text("sport"),
   /** e.g. bet_get_free_place | promo_terms */
@@ -393,29 +397,87 @@ export const offerEffortSamples = sqliteTable("offer_effort_samples", {
   createdAt: integer("created_at").notNull(),
 });
 
-/** Casino desk (H2) - wagering offers, tracked separately from matched P&L. */
+/**
+ * Casino desk (H2/K1) - wagering offers, tracked separately from matched P&L.
+ * A row is a CAMPAIGN; its reward/cost maths lives in linked `casinoOfferComponents`
+ * rows (K1), mirroring how `offers` campaigns hold their maths in linked `bets`.
+ *
+ * `bonusAmount`, `wageringMultiplier`, `rtp`, `contributionPct`, `expectedEv` and `game`
+ * are LEGACY (pre-K1): read exactly once by the K1 backfill migration in `db/index.ts`
+ * to create each pre-existing offer's single `bonus`-type component, then never again.
+ * Kept rather than dropped per the additive-only migration convention - do not read or
+ * write them from any code path added after K1.
+ */
 export const casinoOffers = sqliteTable("casino_offers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   casino: text("casino"),
   title: text("title").notNull(),
+  /** @deprecated legacy pre-K1 field, migration-only */
   bonusAmount: real("bonus_amount").notNull(),
+  /** @deprecated legacy pre-K1 field, migration-only */
   wageringMultiplier: real("wagering_multiplier").notNull(),
-  /** User-entered game RTP (0-1); null = 96% heuristic default */
+  /** @deprecated legacy pre-K1 field, migration-only */
   rtp: real("rtp"),
-  /** Game contribution to wagering (0-1); null = 100% */
+  /** @deprecated legacy pre-K1 field, migration-only */
   contributionPct: real("contribution_pct"),
   status: text("status", { enum: ["planned", "active", "completed", "expired"] })
     .notNull()
     .default("planned"),
-  /** EV locked at save time from the calc inputs */
+  /** @deprecated legacy pre-K1 field, migration-only - use CasinoOfferSummary.expectedEv */
   expectedEv: real("expected_ev").notNull(),
-  /** Realised £ entered by the user at completion */
+  /** Realised £ entered by the user at completion (campaign-level total) */
   actualProfit: real("actual_profit"),
   notes: text("notes"),
-  /** Recommended (highest-RTP) eligible game chosen at log time */
+  /** @deprecated legacy pre-K1 field, migration-only */
   game: text("game"),
+  /** When the offer/wagering window closes (epoch ms); null = no known expiry. Drives the Casino calendar. */
+  expiresAt: integer("expires_at"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
+});
+
+/**
+ * Casino offer components (K1) - one row per reward or cost stage on a campaign.
+ * `amount`, `wageringMultiplier`, `rtp`, `contributionPct` etc are reused across
+ * component types (meaning depends on `componentType`) rather than duplicated into
+ * per-type columns - see the K1 brief (implementation-briefs.md, Phase 12) for the
+ * exact field meaning per type and the calc functions in `casino-reward-ev.ts` /
+ * `casino-ev.ts` that consume them.
+ */
+export const casinoOfferComponents = sqliteTable("casino_offer_components", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  casinoOfferId: integer("casino_offer_id").notNull(),
+  componentType: text("component_type", {
+    enum: ["qualifying_wager", "cash", "bonus", "free_spins", "golden_chips", "cashback"],
+  }).notNull(),
+  /** Wager amount / cash amount / bonus amount / cashback's expected-turnover basis */
+  amount: real("amount"),
+  /** Bonus playthrough x, or free-spins winnings-wager x */
+  wageringMultiplier: real("wagering_multiplier"),
+  /** Game RTP or edge-derived RTP (0-1); null = 96% heuristic default */
+  rtp: real("rtp"),
+  /** Game contribution to wagering (0-1); null = 100% */
+  contributionPct: real("contribution_pct"),
+  /** Free spins only */
+  spins: real("spins"),
+  /** Free spins only, £ per spin */
+  spinValue: real("spin_value"),
+  /** Golden chips only */
+  chipCount: real("chip_count"),
+  /** Golden chips only, £ per chip */
+  chipValue: real("chip_value"),
+  /** Golden chips only - cosmetic, drives which preset populated `rtp` */
+  houseEdgePreset: text("house_edge_preset", { enum: ["european", "american", "custom"] }),
+  /** Cashback only, fraction 0-1 */
+  cashbackPct: real("cashback_pct"),
+  /** Cashback only, £ cap on the payout */
+  cashbackCap: real("cashback_cap"),
+  /** Recommended eligible game for this component (bonus / free_spins) */
+  game: text("game"),
+  /** This component's own EV, locked at save time - negative for qualifying_wager */
+  expectedEv: real("expected_ev").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
 });
 
 /** Game RTP reference library (H2) - seeded with published values, user-editable. */
@@ -456,6 +518,8 @@ export type NewOfferRow = typeof offers.$inferInsert;
 export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
 export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;
+export type CasinoOfferComponentRow = typeof casinoOfferComponents.$inferSelect;
+export type NewCasinoOfferComponentRow = typeof casinoOfferComponents.$inferInsert;
 export type CasinoGameRow = typeof casinoGames.$inferSelect;
 export type OfferEffortSampleRow = typeof offerEffortSamples.$inferSelect;
 export type BoostDiaryRow = typeof boostDiary.$inferSelect;
