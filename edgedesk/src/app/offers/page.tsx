@@ -25,7 +25,20 @@ import {
   offerMatchesAvailableBookies,
 } from "@/lib/accounts/available-bookies";
 import { OfferCampaignCard } from "@/components/offers/offer-campaign-card";
+import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import { useOfferDialog } from "@/components/offers/offer-provider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  OFFER_CATEGORIES,
+  offerCategoryFromSport,
+  type OfferCategoryId,
+} from "@/lib/offers/offer-categories";
 import { Gift, Plus, Tag } from "lucide-react";
 
 export default function OffersPage() {
@@ -53,6 +66,7 @@ function OffersContent() {
     "all" | "active" | "completed" | "expired" | "needs_action"
   >("all");
   const [availableOnly, setAvailableOnly] = useState(false);
+  const [category, setCategory] = useState<OfferCategoryId | "all">("all");
   const [highlightId, setHighlightId] = useState<number | null>(null);
 
   const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
@@ -71,24 +85,42 @@ function OffersContent() {
     return offers.filter((o) => offerMatchesAvailableBookies(o.bookmaker, availableNames));
   }, [offers, availableOnly, availableNames]);
 
+  // Only offer categories actually present - keeps the picker short instead
+  // of listing all ~20 sports regardless of what's been logged.
+  const availableCategories = useMemo(() => {
+    const ids = new Set<OfferCategoryId>();
+    for (const o of bookieScoped) ids.add(offerCategoryFromSport(o.sport));
+    return OFFER_CATEGORIES.filter((c) => ids.has(c.id));
+  }, [bookieScoped]);
+  const showCategoryFilter = availableCategories.length > 1;
+  // Falls back to "all" during render (not an effect) once the picked
+  // category disappears from the data - e.g. its last offer was deleted.
+  const effectiveCategory =
+    showCategoryFilter && availableCategories.some((c) => c.id === category) ? category : "all";
+
+  const categoryScoped = useMemo(() => {
+    if (effectiveCategory === "all") return bookieScoped;
+    return bookieScoped.filter((o) => offerCategoryFromSport(o.sport) === effectiveCategory);
+  }, [bookieScoped, effectiveCategory]);
+
   const filtered = useMemo(() => {
     if (filter === "expired") {
-      return bookieScoped.filter((o) => isOfferInExpiredFeed(o));
+      return categoryScoped.filter((o) => isOfferInExpiredFeed(o));
     }
     if (filter === "completed") {
-      return bookieScoped.filter((o) => o.status === "completed");
+      return categoryScoped.filter((o) => o.status === "completed");
     }
     if (filter === "needs_action") {
-      return bookieScoped.filter(
+      return categoryScoped.filter(
         (o) => needsActionIds.has(o.id) && isOfferInMainFeed(o)
       );
     }
     if (filter === "active") {
-      return bookieScoped.filter((o) => o.status === "active" && isOfferInMainFeed(o));
+      return categoryScoped.filter((o) => o.status === "active" && isOfferInMainFeed(o));
     }
     // All — open campaigns from today onward (no expired, completed, or past windows).
-    return bookieScoped.filter((o) => isOfferInMainFeed(o));
-  }, [bookieScoped, filter, needsActionIds]);
+    return categoryScoped.filter((o) => isOfferInMainFeed(o));
+  }, [categoryScoped, filter, needsActionIds]);
 
   const now = useNow(60_000);
   const grouped = useMemo(() => {
@@ -109,10 +141,10 @@ function OffersContent() {
 
   const totals = useMemo(() => {
     return {
-      active: bookieScoped.filter((o) => o.status === "active" && isOfferInMainFeed(o)).length,
-      expired: bookieScoped.filter((o) => isOfferEffectivelyExpired(o)).length,
+      active: categoryScoped.filter((o) => o.status === "active" && isOfferInMainFeed(o)).length,
+      expired: categoryScoped.filter((o) => isOfferEffectivelyExpired(o)).length,
     };
-  }, [bookieScoped]);
+  }, [categoryScoped]);
 
   // P1: push notifications deep-link to the campaign details modal via
   // /offers?view=<id>. The param survives until the polled offers contain
@@ -194,6 +226,34 @@ function OffersContent() {
                     : formatPillLabel(f)}
               </button>
             ))}
+            {showCategoryFilter ? (
+              <Select
+                value={effectiveCategory}
+                onValueChange={(v) => setCategory(v as OfferCategoryId | "all")}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-auto rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground hover:text-foreground data-[state=open]:bg-muted/60 data-[state=open]:text-foreground"
+                >
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {availableCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        <OfferCategoryIcon
+                          category={c.id}
+                          size={14}
+                          className="text-muted-foreground"
+                        />
+                        {c.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
             <button
               type="button"
               onClick={() => setAvailableOnly((v) => !v)}
