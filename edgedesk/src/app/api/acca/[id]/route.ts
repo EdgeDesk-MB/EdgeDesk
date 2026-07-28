@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, accaLegs, accaRuns, bets } from "@/lib/db";
-import { logWholeLay } from "@/lib/services/acca-desk";
+import { logWholeLay, setRunBoost } from "@/lib/services/acca-desk";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,7 @@ const patchSchema = z.object({
   muteAlerts: z.boolean().optional(),
   status: z.literal("abandoned").optional(),
   wholeLay: z.object({ layOdds: z.number().gt(1), layStake: z.number().gt(0) }).optional(),
+  boostPct: z.number().min(0).max(500).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (p.wholeLay) {
     const run = logWholeLay(Number(id), p.wholeLay.layOdds, p.wholeLay.layStake);
     if (!run) return NextResponse.json({ error: "Cannot log whole lay" }, { status: 400 });
+    return NextResponse.json({ run });
+  }
+  if (p.boostPct !== undefined) {
+    const run = setRunBoost(Number(id), p.boostPct);
+    if (!run) return NextResponse.json({ error: "Cannot set boost - run is no longer active" }, { status: 400 });
     return NextResponse.json({ run });
   }
   const run = db

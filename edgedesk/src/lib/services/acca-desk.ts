@@ -25,6 +25,7 @@ import {
 import {
   DEFAULT_LAY_LEAD_MINUTES,
   LAY_DUE_EXPIRY_MS,
+  applyAccaBoost,
   finalLegLockLay,
   nextSequentialLay,
   priorLayLiabilities,
@@ -52,6 +53,8 @@ export interface CreateAccaRunInput {
   commission?: number;
   offerId?: number | null;
   refundAmount?: number | null;
+  /** Bookmaker acca boost %, winnings-only convention - see applyAccaBoost */
+  boostPct?: number | null;
   legs: CreateAccaLegInput[];
 }
 
@@ -64,8 +67,12 @@ export function combinedBackOdds(legs: Array<Pick<AccaLegRow, "backOdds" | "resu
 export function createAccaRun(input: CreateAccaRunInput): { run: AccaRunRow; legs: AccaLegRow[] } {
   const now = Date.now();
   const combined = input.legs.reduce((a, l) => a * l.backOdds, 1);
+  const boostedCombined = applyAccaBoost(combined, input.boostPct);
 
   // The acca back is a real bet - back-only (the desk manages the hedging).
+  // backOdds stores the BOOSTED price (what the bookmaker actually pays) so
+  // it stays consistent with completeRun()'s settlement and every other
+  // surface that reads this bet's odds (Profit Tracker, reports, ...).
   const backBet = db
     .insert(bets)
     .values({
@@ -75,7 +82,7 @@ export function createAccaRun(input: CreateAccaRunInput): { run: AccaRunRow; leg
       betType: "qualifying",
       bookmaker: input.bookmaker ?? null,
       backStake: input.stake,
-      backOdds: Number(combined.toFixed(4)),
+      backOdds: Number(boostedCombined.toFixed(4)),
       commission: 0,
       offerId: input.offerId ?? null,
       notes: "Acca desk run - hedged leg-by-leg on the exchange",
@@ -94,6 +101,7 @@ export function createAccaRun(input: CreateAccaRunInput): { run: AccaRunRow; leg
       bookmaker: input.bookmaker ?? null,
       commission: input.commission ?? 0,
       refundAmount: input.refundAmount ?? null,
+      boostPct: input.boostPct ?? null,
       backBetId: backBet.id,
       createdAt: now,
     })
@@ -127,6 +135,35 @@ export function listAccaRuns(): Array<{ run: AccaRunRow; legs: AccaLegRow[] }> {
     run,
     legs: allLegs.filter((l) => l.runId === run.id).sort((a, b) => a.seq - b.seq),
   }));
+}
+
+/**
+ * Set (or clear) a run's boost % after creation. Keeps the linked back
+ * bet's stored backOdds in sync with the boosted price. Refuses once the
+ * run isn't active any more - a completed run's back bet has already
+ * settled at whatever price applied at the time, and letting boostPct
+ * drift after that would desync the stored run field from the real,
+ * already-settled ledger it's supposed to describe.
+ */
+export function setRunBoost(runId: number, boostPct: number | null): AccaRunRow | null {
+  const run = db.select().from(accaRuns).where(eq(accaRuns.id, runId)).get();
+  if (!run || run.status !== "active") return null;
+  const legs = db.select().from(accaLegs).where(eq(accaLegs.runId, runId)).all();
+  const boosted = applyAccaBoost(combinedBackOdds(legs), boostPct);
+
+  if (run.backBetId != null) {
+    db.update(bets)
+      .set({ backOdds: Number(boosted.toFixed(4)) })
+      .where(and(eq(bets.id, run.backBetId), eq(bets.status, "open")))
+      .run();
+  }
+
+  return db
+    .update(accaRuns)
+    .set({ boostPct })
+    .where(eq(accaRuns.id, runId))
+    .returning()
+    .get();
 }
 
 export interface LegDueState {
@@ -166,7 +203,7 @@ export function legDueState(
   if (run.method === "sequential" && isFinal) {
     const lock = finalLegLockLay({
       accaStake: run.stake,
-      combinedBackOdds: combinedBackOdds(legs),
+      combinedBackOdds: applyAccaBoost(combinedBackOdds(legs), run.boostPct),
       priorLiabilities: prior,
       legLayOdds: q,
       commission: run.commission,
@@ -301,7 +338,7 @@ export function setLegResult(
 }
 
 function completeRun(run: AccaRunRow, legs: AccaLegRow[], anyLost: boolean) {
-  const combined = combinedBackOdds(legs);
+  const combined = applyAccaBoost(combinedBackOdds(legs), run.boostPct);
   const allVoid = legs.every((l) => l.result === "void");
   if (anyLost) {
     settleLinkedBet(run.backBetId, "lost", -run.stake);

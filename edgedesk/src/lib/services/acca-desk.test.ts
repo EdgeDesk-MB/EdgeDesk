@@ -8,6 +8,7 @@ import {
   logLegLay,
   logWholeLay,
   setLegResult,
+  setRunBoost,
 } from "./acca-desk";
 
 function bet(id: number | null) {
@@ -124,5 +125,73 @@ describe("acca-desk settlement (auditor F3)", () => {
     expect(bet(updated.backBetId).actualProfit).toBe(62);
     expect(bet(updated.wholeLayBetId).status).toBe("lost");
     expect(bet(updated.wholeLayBetId).actualProfit).toBe(-62.4); // 9.6 × 6.5
+  });
+
+  it("a 50% boost (winnings-only) reaches the real settlement, not just display", () => {
+    // Raw combined 2.0 × 2.0 = 4.0, boosted 1 + (4-1)×1.5 = 5.5.
+    const { run, legs } = createAccaRun({
+      label: "Boosted 2-fold",
+      method: "sequential",
+      stake: 10,
+      commission: 0,
+      boostPct: 50,
+      legs: [
+        { label: "A", backOdds: 2.0 },
+        { label: "B", backOdds: 2.0 },
+      ],
+    });
+    // The stored back bet's odds are the BOOSTED price, not the raw product.
+    expect(bet(run.backBetId).backOdds).toBeCloseTo(5.5, 10);
+
+    // Leg A isn't final (B is still pending) - cover-lay maths is odds-
+    // independent, so the boost doesn't touch this suggestion.
+    const legA = legDueState(run, legs, legs[0], Date.now());
+    expect(legA.suggestedStake).toBeCloseTo(10, 10);
+    logLegLay(legs[0].id, 2.0, 10.0); // liability 10×(2.0−1) = £10, matches priorLiabilities below
+    setLegResult(legs[0].id, "won");
+
+    // Leg B IS final - its lock stake must be computed against the
+    // BOOSTED combined odds (5.5), not the raw 4.0.
+    const afterA = listAccaRuns().find((r) => r.run.id === run.id)!;
+    const legB = legDueState(afterA.run, afterA.legs, afterA.legs[1], Date.now());
+    expect(legB.isFinal).toBe(true);
+    // win0 = 10×(5.5−1) − 10 = 35, lose0 = −(10+10) = −20, L = 55/2 = 27.5
+    expect(legB.suggestedStake).toBeCloseTo(27.5, 10);
+
+    logLegLay(legs[1].id, 2.0, 27.5);
+    const done = setLegResult(legs[1].id, "won");
+    expect(done?.runCompleted).toBe(true);
+
+    // Real settlement: back wins at the BOOSTED price, £45 not £30.
+    expect(bet(run.backBetId).actualProfit).toBeCloseTo(45, 10);
+    // Locked either way at £7.50 - the whole point of the final-leg lock.
+    const legALay = bet(db.select().from(accaLegs).where(eq(accaLegs.id, legs[0].id)).get()!.layBetId);
+    const legBLay = bet(db.select().from(accaLegs).where(eq(accaLegs.id, legs[1].id)).get()!.layBetId);
+    const net = bet(run.backBetId).actualProfit! + legALay.actualProfit! + legBLay.actualProfit!;
+    expect(net).toBeCloseTo(7.5, 6);
+  });
+
+  it("setRunBoost updates the run and re-syncs the linked back bet's stored odds", () => {
+    const { run } = createAccaRun(THREE_FOLD); // unboosted, combined 2×2×1.8=7.2
+    expect(bet(run.backBetId).backOdds).toBeCloseTo(7.2, 10);
+
+    const updated = setRunBoost(run.id, 25); // 1 + (7.2−1)×1.25 = 8.75
+    expect(updated?.boostPct).toBe(25);
+    expect(bet(run.backBetId).backOdds).toBeCloseTo(8.75, 10);
+
+    setRunBoost(run.id, null); // clearing the boost restores the raw price
+    expect(bet(run.backBetId).backOdds).toBeCloseTo(7.2, 10);
+  });
+
+  it("setRunBoost refuses once the run is no longer active, so it can never desync a settled bet", () => {
+    const { run, legs } = createAccaRun(THREE_FOLD);
+    setLegResult(legs[0].id, "lost"); // sequential dies on first loss -> completed
+    expect(listAccaRuns().find((r) => r.run.id === run.id)?.run.status).toBe("completed");
+    const oddsBeforeAttempt = bet(run.backBetId).backOdds;
+
+    const result = setRunBoost(run.id, 50);
+    expect(result).toBeNull();
+    expect(bet(run.backBetId).backOdds).toBe(oddsBeforeAttempt); // untouched
+    expect(listAccaRuns().find((r) => r.run.id === run.id)?.run.boostPct).toBeNull(); // untouched
   });
 });

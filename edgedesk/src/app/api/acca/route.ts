@@ -25,6 +25,7 @@ const createSchema = z.object({
   commission: z.number().min(0).max(0.2).optional(),
   offerId: z.number().nullable().optional(),
   refundAmount: z.number().min(0).nullable().optional(),
+  boostPct: z.number().min(0).max(500).nullable().optional(),
   legs: z.array(legSchema).min(2).max(12),
 });
 
