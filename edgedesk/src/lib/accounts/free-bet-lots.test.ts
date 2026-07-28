@@ -118,7 +118,9 @@ describe("listFreeBetLots", () => {
       .returning()
       .get();
 
-    const now = Date.now();
+    // Backdated well before "now" - removeFreeBetLot stamps its debit with a
+    // real Date.now(), which must land safely after both synthetic credits.
+    const now = Date.now() - 1000;
     const older = db
       .insert(balanceTransactions)
       .values({
@@ -229,5 +231,67 @@ describe("listFreeBetLots", () => {
 
     expect(sumFreeBetLotBalance(bookie.id)).toBeCloseTo(50);
     expect(listFreeBetLots(bookie.id)).toHaveLength(1);
+  });
+
+  it("an over-drawn historical debit does not eat a later top-up", () => {
+    const bookie = db
+      .insert(accounts)
+      .values({
+        name: "FbLot Overdraw",
+        type: "bookie",
+        isActive: 1,
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+
+    const now = Date.now();
+    // A credit fully used up, then a *second* undirected debit for which no
+    // lot was open at the time (e.g. a duplicated "convert to cash" debit).
+    db.insert(balanceTransactions)
+      .values([
+        {
+          accountId: bookie.id,
+          amount: 50,
+          category: "free_bet",
+          note: "Free bet promo - award",
+          createdAt: now,
+          pending: 0,
+        },
+        {
+          accountId: bookie.id,
+          amount: -50,
+          category: "free_bet",
+          note: "Free bet used - convert",
+          createdAt: now + 1,
+          pending: 0,
+        },
+        {
+          accountId: bookie.id,
+          amount: -50,
+          category: "free_bet",
+          note: "Free bet used - convert (duplicate)",
+          createdAt: now + 2,
+          pending: 0,
+        },
+      ])
+      .run();
+
+    // Days later, a fresh manual top-up is added - it must stay open, not be
+    // retroactively consumed by the earlier over-drawn debit.
+    db.insert(balanceTransactions)
+      .values({
+        accountId: bookie.id,
+        amount: 20,
+        category: "free_bet",
+        note: "Manual free bet top-up",
+        createdAt: now + 1000 * 60 * 60 * 24 * 5,
+        pending: 0,
+      })
+      .run();
+
+    expect(sumFreeBetLotBalance(bookie.id)).toBeCloseTo(20);
+    expect(listFreeBetLots(bookie.id)).toHaveLength(1);
+    expect(listFreeBetLots(bookie.id)[0].remaining).toBeCloseTo(20);
   });
 });

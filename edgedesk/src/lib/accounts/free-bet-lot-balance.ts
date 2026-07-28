@@ -24,6 +24,10 @@ export function targetedLotId(note: string | null | undefined): number | null {
 /**
  * Positive free_bet credits with remaining after later free_bet debits (FIFO).
  * Debits tagged `[[lot:N]]` write off that credit only (used for manual remove).
+ *
+ * Processed as a single chronological pass, so a debit can only draw down
+ * lots that already existed at its own timestamp - an old, over-drawn debit
+ * must not reach forward and silently eat a credit added afterwards.
  */
 export function listFreeBetLots(accountId: number): FreeBetLot[] {
   const txs = db
@@ -35,7 +39,6 @@ export function listFreeBetLots(accountId: number): FreeBetLot[] {
     .sort((a, b) => a.createdAt - b.createdAt || a.id - b.id);
 
   const lots: Array<FreeBetLot & { _left: number }> = [];
-  const debits: typeof txs = [];
 
   for (const t of txs) {
     if (t.amount > 0) {
@@ -49,12 +52,10 @@ export function listFreeBetLots(accountId: number): FreeBetLot[] {
         betId: t.betId,
         _left: t.amount,
       });
-    } else if (t.amount < 0) {
-      debits.push(t);
+      continue;
     }
-  }
+    if (t.amount >= 0) continue;
 
-  for (const t of debits) {
     let need = -t.amount;
     const targetId = targetedLotId(t.note);
     if (targetId != null) {
