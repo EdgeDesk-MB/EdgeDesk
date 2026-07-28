@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
 
 function Tabs({
   className,
@@ -47,20 +48,48 @@ const tabsListVariants = cva(
 function TabsList({
   className,
   variant = "default",
+  /** Scroll-fade gradient source for variant="line" - match the surface the tab strip sits on. */
+  fadeClassName = "from-card",
   children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
-  VariantProps<typeof tabsListVariants>) {
-  return (
+  VariantProps<typeof tabsListVariants> & { fadeClassName?: string }) {
+  const list = (
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn(
+        tabsListVariants({ variant }),
+        variant === "line" && "w-max",
+        className
+      )}
       {...props}
     >
       {children}
     </TabsPrimitive.List>
   )
+
+  // Underline tab strips can outgrow their container (Settings, fixture
+  // filters, ...) - scroll horizontally with a fade cue instead of wrapping
+  // or clipping, and never show a scrollbar (line tabs read as app chrome).
+  // The leading/trailing space is padding on the scrollable content itself
+  // (matching gap-6, the same as the inter-tab gap) rather than an outer
+  // margin, so it scrolls away and fades like any other tab.
+  if (variant === "line") {
+    return (
+      <ScrollFadeEdges
+        orientation="horizontal"
+        dragToScroll
+        className="w-full flex-none"
+        scrollClassName="app-scroll-overlay overflow-x-auto pl-6 pr-6"
+        fadeClassName={fadeClassName}
+      >
+        {list}
+      </ScrollFadeEdges>
+    )
+  }
+
+  return list
 }
 
 const segmentedTrigger =
@@ -100,7 +129,13 @@ function TabsContent({
 
 export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
 
-/** Full-width bottom rule for underline tab rows - active indicator sits on this line. */
+/**
+ * Full-width bottom rule for underline tab rows - active indicator sits on
+ * this line. Bleeds to the true edge with no re-added inset: the line-variant
+ * TabsList owns its own leading/trailing space (see TabsList) so that space
+ * lives inside the scrollable region and fades correctly, instead of sitting
+ * outside it as a fixed gap.
+ */
 export function TabsLineBar({
   className,
   bleed,
@@ -111,8 +146,8 @@ export function TabsLineBar({
       data-slot="tabs-line-bar"
       className={cn(
         "w-full border-b border-border/60",
-        bleed === "card" && "-mx-(--card-spacing) px-(--card-spacing)",
-        bleed === "dialog" && "-mx-6 px-6",
+        bleed === "card" && "-mx-(--card-spacing)",
+        bleed === "dialog" && "-mx-6",
         className
       )}
       {...props}

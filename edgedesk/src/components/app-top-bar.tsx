@@ -14,6 +14,7 @@ import {
   appNavColumn,
   appNavInset,
   appShellGap,
+  appShellMaxWidth,
   appShellPadding,
 } from "@/lib/ui/app-shell-layout";
 import { cn } from "@/lib/utils";
@@ -180,7 +181,14 @@ export function AppTopBar() {
 
   return (
     <header className="relative z-[45] shrink-0 border-b border-topbar-border bg-topbar text-topbar-foreground">
-      <div className={cn("flex h-12 w-full items-center", appShellGap, appShellPadding)}>
+      <div
+        className={cn(
+          "flex h-12 w-full items-center",
+          appShellGap,
+          appShellPadding,
+          appShellMaxWidth
+        )}
+      >
         <BrandLink className="md:hidden" />
         <div className={cn("hidden md:block", appNavColumn)}>
           <BrandLink />

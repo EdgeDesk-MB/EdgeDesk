@@ -210,11 +210,25 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* App-like chrome, not a page of prose - selection is opt-in via the
+     overrides below (inputs, contenteditable, copyable code/values). */
   body {
-    @apply h-full overflow-hidden bg-background text-foreground;
+    @apply h-full overflow-hidden bg-background text-foreground select-none;
+  }
+  input, textarea, [contenteditable], [contenteditable="true"], code, pre {
+    @apply select-text;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+  /* Mobile browsers flash their own tap-highlight overlay on any clickable
+     element; it can get "stuck" showing as a pressed/active state when a
+     tap opens a modal (e.g. from a push notification) rather than the
+     element it landed on. Non-input chrome relies on our own hover/active
+     utility classes instead, so switch the native overlay off. Inputs keep
+     it - it's useful feedback there. */
+  button, [role="button"], a, summary {
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply h-full overflow-hidden font-sans;

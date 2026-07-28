@@ -214,7 +214,7 @@ function DesktopUtilitiesMenu() {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="max-h-[min(38rem,85vh)] w-72 overflow-y-auto overflow-x-hidden rounded-lg border-2 border-primary/35 bg-popover p-0 shadow-xl ring-0"
+        className="max-h-[min(38rem,85vh)] w-72 overflow-y-auto overflow-x-hidden rounded-lg border-2 border-border bg-popover p-0 shadow-xl ring-0"
       >
         <AppearanceRow />
         <UtilityLinks asMenuItems />

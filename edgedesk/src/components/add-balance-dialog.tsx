@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { AccountTypeBadge } from "@/components/accounts/account-type-badge";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { BookieNamePicker, EXCHANGE_CUSTOM } from "@/components/bookie-name-picker";
@@ -308,12 +309,15 @@ function AddBalanceForm({
                     <SelectContent>
                       {accounts.map((a) => (
                         <SelectItem key={a.id} value={String(a.id)}>
-                          {a.name}{" "}
-                          <span className="text-muted-foreground">
-                            ({a.type}) · {formatGbp(a.balance)}
-                            {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
-                              <> · FB {formatGbp(a.freeBets ?? 0)}</>
-                            )}
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate">{a.name}</span>
+                            <AccountTypeBadge type={a.type} />
+                            <span className="text-muted-foreground">
+                              · {formatGbp(a.balance)}
+                              {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
+                                <> · FB {formatGbp(a.freeBets ?? 0)}</>
+                              )}
+                            </span>
                           </span>
                         </SelectItem>
                       ))}

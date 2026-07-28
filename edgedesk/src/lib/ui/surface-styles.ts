@@ -19,6 +19,11 @@ export const pageSurface = cn(
 /** Lighter grey - hover states, secondary bars, section headers on white */
 export const selectionSubtle = "bg-selection-subtle";
 
+/** Muted grey band - matches the "Campaign P&L" header strip on Acca run cards
+ * and the Tracker's campaign grouping. Neutral alternative to a coloured panel
+ * when there's no exchange/bookie to tint from. */
+export const campaignHeaderBand = "bg-muted/50 dark:bg-input/30";
+
 /** Stronger grey - selected / active items */
 export const selectionSubdued = "bg-selection-subdued";
 

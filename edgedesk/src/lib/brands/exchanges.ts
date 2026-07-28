@@ -60,28 +60,21 @@ export function contrastText(hex: string): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#1a1a1a" : "#ffffff";
 }
 
-/** Darken a hex colour by a factor (0..1) - used to derive dark-mode panel tints. */
-export function darken(hex: string, factor: number): string {
-  const m = hex.replace("#", "");
-  const full = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
-  const channel = (i: number) =>
-    Math.round(parseInt(full.slice(i, i + 2), 16) * (1 - factor))
-      .toString(16)
-      .padStart(2, "0");
-  return `#${channel(0)}${channel(2)}${channel(4)}`;
+/**
+ * Darken a colour toward black by a factor (0..1) - used to derive dark-mode
+ * panel tints. `color-mix` accepts any valid CSS colour (hex, `hsl(...)`,
+ * named, etc.), not just hex - needed because unmapped bookies fall back to
+ * a deterministic `hsl(...)` string (see `hashStyle` in `brands/bookies.ts`).
+ */
+export function darken(color: string, factor: number): string {
+  const pct = Math.round((1 - factor) * 100);
+  return `color-mix(in srgb, ${color} ${pct}%, black)`;
 }
 
-/** Lighten a hex colour toward white by a factor (0..1) - derives input tints from panel colours. */
-export function lighten(hex: string, factor: number): string {
-  const m = hex.replace("#", "");
-  const full = m.length === 3 ? m.split("").map((c) => c + c).join("") : m;
-  const channel = (i: number) => {
-    const v = parseInt(full.slice(i, i + 2), 16);
-    return Math.round(v + (255 - v) * factor)
-      .toString(16)
-      .padStart(2, "0");
-  };
-  return `#${channel(0)}${channel(2)}${channel(4)}`;
+/** Lighten a colour toward white by a factor (0..1) - derives input tints from panel colours. */
+export function lighten(color: string, factor: number): string {
+  const pct = Math.round((1 - factor) * 100);
+  return `color-mix(in srgb, ${color} ${pct}%, white)`;
 }
 
 /** Pill border ~20% darker than background — works with hex, hsl, and Settings overrides. */

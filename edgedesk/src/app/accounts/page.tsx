@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { AccountTypeBadge } from "@/components/accounts/account-type-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -741,17 +742,6 @@ function AccountTable({
 }) {
   const colCount = inlineTypeBadge ? 6 : 7;
 
-  function typeBadge(type: AccountBalance["type"]) {
-    return (
-      <Badge
-        variant={type === "bookie" ? "secondary" : type === "bank" ? "default" : "outline"}
-        className="shrink-0 text-[10px] font-normal capitalize"
-      >
-        {type}
-      </Badge>
-    );
-  }
-
   return (
     <>
       {/* Mobile: card list (C2 - tables become cards < sm) */}
@@ -788,7 +778,7 @@ function AccountTable({
                     <Wallet className="size-4 shrink-0 text-muted-foreground" />
                   )}
                   <span className="truncate">{a.name}</span>
-                  {typeBadge(a.type)}
+                  <AccountTypeBadge type={a.type} />
                   {a.type === "bookie" && a.accessStatus !== "available" ? (
                     <Badge
                       variant="outline"
@@ -891,7 +881,7 @@ function AccountTable({
                   <Wallet className="size-4 shrink-0 text-muted-foreground" />
                 )}
                 <span>{a.name}</span>
-                {inlineTypeBadge ? typeBadge(a.type) : null}
+                {inlineTypeBadge ? <AccountTypeBadge type={a.type} /> : null}
               </span>
               {a.fundedByAccountId && bankNameById.get(a.fundedByAccountId) ? (
                 <p className="mt-0.5 text-[11px] font-normal text-muted-foreground">
@@ -914,7 +904,7 @@ function AccountTable({
               ) : null}
             </TableCell>
             {!inlineTypeBadge ? (
-              <TableCell>{typeBadge(a.type)}</TableCell>
+              <TableCell><AccountTypeBadge type={a.type} /></TableCell>
             ) : null}
             <TableCell>
               {a.type === "bookie" ? (

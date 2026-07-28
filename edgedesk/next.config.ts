@@ -2,11 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
-  // Bottom-left: the quick-log FAB owns bottom-right on mobile. Set
-  // `devIndicators: false` to remove it entirely (dev-only either way).
-  devIndicators: {
-    position: "bottom-left",
-  },
+  // Fully hidden - the on-screen Rendering/Compiling badge is dev-only
+  // chrome, not a performance signal. Errors still surface regardless.
+  devIndicators: false,
   /**
    * Phones on the LAN hit the dev server by IP or Bonjour name; without
    * these, Next blocks its own /_next dev resources cross-origin and the

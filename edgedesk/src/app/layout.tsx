@@ -22,7 +22,7 @@ import { OnboardingProvider } from "@/components/help/onboarding-provider";
 import { AppStateProvider } from "@/components/app-state-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { pagePanel } from "@/lib/ui/surface-styles";
-import { appShellGap, appShellPadding } from "@/lib/ui/app-shell-layout";
+import { appShellGap, appShellMaxWidth, appShellPadding } from "@/lib/ui/app-shell-layout";
 import { cn } from "@/lib/utils";
 
 const notoSans = Noto_Sans({
@@ -82,7 +82,8 @@ export default function RootLayout({
                                 className={cn(
                                   "flex w-full items-stretch",
                                   appShellPadding,
-                                  appShellGap
+                                  appShellGap,
+                                  appShellMaxWidth
                                 )}
                               >
                               <AppNav />

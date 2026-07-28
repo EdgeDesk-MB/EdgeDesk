@@ -4,7 +4,7 @@
  * fuzzy startsWith → deterministic hash-hue fallback.
  */
 
-import { pillBorderColor } from "@/lib/brands/exchanges";
+import { lighten, pillBorderColor } from "@/lib/brands/exchanges";
 
 export interface BookieChipStyle {
   bg: string;
@@ -113,6 +113,15 @@ export function bookieStyle(name: string): BookieChipStyle {
 export function bookieBrandColor(name: string, override?: string | null): string {
   if (override?.trim()) return override.trim();
   return bookieStyle(name).bg;
+}
+
+/**
+ * Pastel tint of a bookie's brand colour for Back Bet panel backgrounds -
+ * lightened to sit alongside the hand-tuned exchange `backColor` pastels
+ * (see `EXCHANGE_PRESETS` in `exchanges.ts`) that panels use by default.
+ */
+export function bookiePanelTint(name: string, override?: string | null): string {
+  return lighten(bookieBrandColor(name, override), 0.7);
 }
 
 /**
