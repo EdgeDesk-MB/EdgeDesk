@@ -142,7 +142,7 @@ export interface CasinoSimResult {
 const BUST_EPSILON = 0.01;
 const HISTOGRAM_BUCKETS = 20;
 
-interface SessionParams {
+export interface SessionParams {
   bonus: number;
   requirement: number;
   contribution: number;
@@ -153,8 +153,41 @@ interface SessionParams {
   multipliers: number[];
 }
 
+/** Hit-rate + cumulative-probability ladder for a volatility/RTP pair - shared by every session shape (K2 reuses this for spins and chained stages, never rebuilding it). */
+export function ladderCumulative(
+  volatility: SlotVolatility,
+  rtp: number
+): { hitRate: number; cumP: number[]; multipliers: number[] } {
+  const { hitRate, steps } = scaledLadder(volatility, rtp);
+  const cumP: number[] = [];
+  let acc = 0;
+  for (const s of steps) {
+    acc += s.p;
+    cumP.push(acc);
+  }
+  return { hitRate, cumP, multipliers: steps.map((s) => s.multiplier) };
+}
+
+/** One stake's outcome against a scaled ladder: hit → stake × multiplier, miss → 0. Exported so K2's spins/chip draws use the SAME per-stake logic runSession does, never a reimplementation. */
+export function drawLadderReturn(
+  hitRate: number,
+  cumP: number[],
+  multipliers: number[],
+  stake: number,
+  rng: () => number
+): number {
+  if (rng() >= hitRate) return 0;
+  const roll = rng();
+  let i = 0;
+  while (i < cumP.length - 1 && roll >= cumP[i]) i++;
+  return stake * multipliers[i];
+}
+
 /** One full wagering session; returns the retained balance and £ staked. */
-function runSession(params: SessionParams, rng: () => number): { final: number; staked: number } {
+export function runSession(
+  params: SessionParams,
+  rng: () => number
+): { final: number; staked: number } {
   let balance = params.bonus;
   let remaining = params.requirement;
   let staked = 0;
@@ -163,30 +196,19 @@ function runSession(params: SessionParams, rng: () => number): { final: number; 
     staked += stake;
     remaining -= stake * params.contribution;
     balance -= stake;
-    if (rng() < params.hitRate) {
-      const roll = rng();
-      let i = 0;
-      while (i < params.cumP.length - 1 && roll >= params.cumP[i]) i++;
-      balance += stake * params.multipliers[i];
-    }
+    balance += drawLadderReturn(params.hitRate, params.cumP, params.multipliers, stake, rng);
   }
   return { final: balance < BUST_EPSILON ? 0 : balance, staked };
 }
 
-function sessionParams(input: CasinoSimInput): SessionParams | null {
+export function sessionParams(input: CasinoSimInput): SessionParams | null {
   const bonus = input.bonusAmount;
   if (!Number.isFinite(bonus) || bonus <= 0) return null;
   const contribution = Math.min(1, Math.max(0.01, input.contributionPct ?? 1));
   const spinStake = input.spinStake ?? Math.max(0.1, bonus / 50);
   if (!(spinStake > 0)) return null;
   const rtp = 1 - Math.min(1, Math.max(0, input.houseEdge));
-  const { hitRate, steps } = scaledLadder(input.volatility, rtp);
-  const cumP: number[] = [];
-  let acc = 0;
-  for (const s of steps) {
-    acc += s.p;
-    cumP.push(acc);
-  }
+  const { hitRate, cumP, multipliers } = ladderCumulative(input.volatility, rtp);
   return {
     bonus,
     requirement: Math.max(0, input.wageringMultiplier) * bonus,
@@ -194,7 +216,7 @@ function sessionParams(input: CasinoSimInput): SessionParams | null {
     spinStake,
     hitRate,
     cumP,
-    multipliers: steps.map((s) => s.multiplier),
+    multipliers,
   };
 }
 

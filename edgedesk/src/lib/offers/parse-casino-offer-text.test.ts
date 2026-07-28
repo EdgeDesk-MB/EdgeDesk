@@ -76,3 +76,64 @@ describe("parseCasinoOfferText", () => {
     expect(d.bonusAmount).toBe(30);
   });
 });
+
+describe("parseCasinoOfferText - K1 reward-type detection", () => {
+  it("the Grosvenor shape: '20 Free Spins when you play £100', spins worth 40p each", () => {
+    const d = parseCasinoOfferText(
+      "Grosvenor\nGrab Your Exclusive Big Bass Football Bonanza Offer!\n" +
+        "Opt in to be on your way to 20 Free Spins on Big Bass Football Bonanza!\n" +
+        "20 Free Spins on Big Bass Football Bonanza worth 40p each will be rewarded when " +
+        "£100 has been wagered on eligible casino games."
+    );
+    expect(d.spins).toBe(20);
+    expect(d.spinValue).toBeCloseTo(0.4, 10);
+    expect(d.likelyComponentType).toBe("free_spins");
+  });
+
+  it("spin value stated in pounds each: 'spins worth £0.50 each'", () => {
+    const d = parseCasinoOfferText("50 free spins worth £0.50 each on Starburst.");
+    expect(d.spins).toBe(50);
+    expect(d.spinValue).toBeCloseTo(0.5, 10);
+    expect(d.likelyComponentType).toBe("free_spins");
+  });
+
+  it("does not populate spins/spinValue for a plain bonus offer", () => {
+    const d = parseCasinoOfferText("Sky Vegas\nStake £10 get a £20 casino bonus\n35x wagering.");
+    expect(d.spins).toBeNull();
+    expect(d.spinValue).toBeNull();
+    expect(d.likelyComponentType).toBe("bonus");
+  });
+
+  it("golden chips: '10 golden chips worth £5 each' on roulette", () => {
+    const d = parseCasinoOfferText("Get 10 golden chips worth £5 each to play on Roulette.");
+    expect(d.chipCount).toBe(10);
+    expect(d.chipValue).toBeCloseTo(5, 10);
+    expect(d.likelyComponentType).toBe("golden_chips");
+  });
+
+  it("cashback: '10% cashback up to £50' on losses", () => {
+    const d = parseCasinoOfferText("Get 10% cashback on your losses, up to £50 this week.");
+    expect(d.cashbackPct).toBeCloseTo(0.1, 10);
+    expect(d.likelyComponentType).toBe("cashback");
+  });
+
+  it("garbage in → all K1 fields null, likelyComponentType defaults to bonus", () => {
+    const d = parseCasinoOfferText("hello world nothing to see");
+    expect(d.spins).toBeNull();
+    expect(d.spinValue).toBeNull();
+    expect(d.chipCount).toBeNull();
+    expect(d.chipValue).toBeNull();
+    expect(d.cashbackPct).toBeNull();
+    expect(d.likelyComponentType).toBe("bonus");
+  });
+
+  it("spins detection does not disturb the legacy bonusAmount-from-worth parsing", () => {
+    // Pre-K1 behaviour test above ("free spins with a stated worth") must still pass
+    // unchanged - this pins that the new spins/spinValue fields are ADDITIVE.
+    const d = parseCasinoOfferText(
+      "Get 50 free spins worth £5 when you stake £10. Winnings paid in cash."
+    );
+    expect(d.bonusAmount).toBe(5);
+    expect(d.spins).toBe(50);
+  });
+});

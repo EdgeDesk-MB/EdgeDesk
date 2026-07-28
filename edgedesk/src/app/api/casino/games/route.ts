@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { asc } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, casinoGames } from "@/lib/db";
 import { SEED_GAMES } from "@/lib/casino/game-library";
@@ -22,7 +22,10 @@ function seedIfEmpty(): void {
 
 export async function GET() {
   seedIfEmpty();
-  const games = db.select().from(casinoGames).orderBy(asc(casinoGames.name)).all();
+  // RTP order, highest first - the whole point of the library is "which
+  // eligible game should I play", so lead with the answer everywhere it's
+  // consumed, not alphabetically.
+  const games = db.select().from(casinoGames).orderBy(desc(casinoGames.rtp)).all();
   return NextResponse.json({ games });
 }
 

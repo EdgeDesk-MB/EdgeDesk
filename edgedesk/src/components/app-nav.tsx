@@ -54,7 +54,7 @@ type NavLeaf = {
   href: string;
   label: string;
   icon: NavIcon;
-  quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "casinoLog" | "boostCheck";
+  quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "boostCheck";
   livePulse?: boolean;
 };
 
@@ -67,6 +67,7 @@ type NavGroup = {
   /** Section prefix - leaving it auto-collapses */
   baseHref: string;
   children: Array<{ href: string; label: string; icon: NavIcon }>;
+  quickAction?: "newOffer" | "casinoLog";
 };
 
 type NavEntry = NavLeaf | NavGroup;
@@ -107,6 +108,7 @@ export const NAV_SECTIONS: NavSection[] = [
         /** Always open the first sub-nav item */
         href: "/offers/calendar",
         baseHref: "/offers",
+        quickAction: "newOffer",
         children: [
           { href: "/offers/calendar", label: "Calendar", icon: CalendarDays },
           { href: "/offers", label: "Campaigns", icon: Gift },
@@ -121,7 +123,18 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
       { kind: "link", href: "/boosts", label: "Boosts", icon: Zap, quickAction: "boostCheck" },
-      { kind: "link", href: "/casino", label: "Casino", icon: Dices, quickAction: "casinoLog" },
+      {
+        kind: "group",
+        label: "Casino",
+        icon: Dices,
+        href: "/casino/calendar",
+        baseHref: "/casino",
+        quickAction: "casinoLog",
+        children: [
+          { href: "/casino/calendar", label: "Calendar", icon: CalendarDays },
+          { href: "/casino", label: "Campaigns", icon: Dices },
+        ],
+      },
       {
         kind: "link",
         href: "/calculators",
@@ -136,6 +149,14 @@ export const NAV_SECTIONS: NavSection[] = [
     entries: [
       {
         kind: "link",
+        href: "/tracked-events",
+        label: "Tracked Events",
+        icon: Radio,
+        livePulse: true,
+        quickAction: "trackFixture",
+      },
+      {
+        kind: "link",
         href: "/racing",
         label: "Racing Desk",
         icon: Trophy,
@@ -148,14 +169,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: FootballIcon,
       },
       { kind: "link", href: "/acca", label: "Acca Desk", icon: Layers },
-      {
-        kind: "link",
-        href: "/tracked-events",
-        label: "Tracked Events",
-        icon: Radio,
-        livePulse: true,
-        quickAction: "trackFixture",
-      },
       { kind: "link", href: "/fixtures", label: "Fixtures", icon: CalendarSearch },
     ],
   },
@@ -168,6 +181,9 @@ export const NAV_SECTIONS: NavSection[] = [
 ];
 
 const entries: NavEntry[] = NAV_SECTIONS.flatMap((s) => s.entries);
+
+/** Every collapsible group nav renders - drives the generic collapse-state tracking below. */
+const navGroups: NavGroup[] = entries.filter((e): e is NavGroup => e.kind === "group");
 
 /**
  * Flat main-nav list for the command palette - derived from the sections so
@@ -202,6 +218,12 @@ export function isLinkActive(pathname: string, href: string): boolean {
   }
   if (href === "/offers/calendar") {
     return pathname.startsWith("/offers/calendar");
+  }
+  if (href === "/casino") {
+    return pathname === "/casino" || pathname.startsWith("/casino?");
+  }
+  if (href === "/casino/calendar") {
+    return pathname.startsWith("/casino/calendar");
   }
   if (href === "/calculators") {
     return (
@@ -257,16 +279,18 @@ export function AppNav() {
     return countDeskQueue(bets, "settle", eventById);
   }, [state?.bets, state?.events]);
 
-  /** Manual collapse while still on an Offers route */
-  const [offersUserCollapsed, setOffersUserCollapsed] = useState(false);
-  const offersInSection = pathname.startsWith("/offers");
+  /** Manual collapse per group (keyed by baseHref) while still on that group's route */
+  const [userCollapsed, setUserCollapsed] = useState<Record<string, boolean>>({});
 
-  // Adjust-during-render (the sanctioned pattern): leaving the Offers
-  // section clears the manual collapse so the next visit starts expanded.
-  const [wasInSection, setWasInSection] = useState(offersInSection);
-  if (wasInSection !== offersInSection) {
-    setWasInSection(offersInSection);
-    if (!offersInSection) setOffersUserCollapsed(false);
+  // Adjust-during-render (the sanctioned pattern): leaving a group's section
+  // clears its manual collapse so the next visit starts expanded.
+  const [wasInSection, setWasInSection] = useState<Record<string, boolean>>({});
+  for (const group of navGroups) {
+    const inSection = pathname.startsWith(group.baseHref);
+    if (wasInSection[group.baseHref] !== inSection) {
+      setWasInSection((prev) => ({ ...prev, [group.baseHref]: inSection }));
+      if (!inSection) setUserCollapsed((prev) => ({ ...prev, [group.baseHref]: false }));
+    }
   }
 
   function renderLeaf(item: NavLeaf) {
@@ -294,11 +318,9 @@ export function AppNav() {
             ? "Open matched betting calculator"
             : quickAction === "trackFixture"
               ? "Browse fixtures to track"
-              : quickAction === "casinoLog"
-                ? "Log a casino offer"
-                : quickAction === "boostCheck"
-                  ? "Check a boost"
-                  : undefined;
+              : quickAction === "boostCheck"
+                ? "Check a boost"
+                : undefined;
     const onQuickAction =
       quickAction === "addBalance"
         ? openAddBalance
@@ -308,11 +330,9 @@ export function AppNav() {
             ? () => openMatchedCalculator()
             : quickAction === "trackFixture"
               ? openTrackFixture
-              : quickAction === "casinoLog"
-                ? openCasinoLog
-                : quickAction === "boostCheck"
-                  ? openBoostCheck
-                  : undefined;
+              : quickAction === "boostCheck"
+                ? openBoostCheck
+                : undefined;
 
     return (
       <div key={href} className="relative w-full min-w-0">
@@ -350,19 +370,33 @@ export function AppNav() {
 
   function renderGroup(entry: NavGroup) {
     const inSection = pathname.startsWith(entry.baseHref);
-    const expanded = inSection && !offersUserCollapsed;
+    const collapsed = userCollapsed[entry.baseHref] ?? false;
+    const expanded = inSection && !collapsed;
     const GroupIcon = entry.icon;
     const parentActive = inSection;
     const firstChildHref = entry.children[0]?.href ?? entry.href;
+    const badgeCount = entry.baseHref === "/offers" ? offerActionCount : 0;
+    const quickLabel =
+      entry.quickAction === "newOffer"
+        ? "New offer"
+        : entry.quickAction === "casinoLog"
+          ? "Log offer"
+          : undefined;
+    const onQuickAction =
+      entry.quickAction === "newOffer"
+        ? () => openOffer()
+        : entry.quickAction === "casinoLog"
+          ? openCasinoLog
+          : undefined;
 
     function onParentClick(e: MouseEvent<HTMLAnchorElement>) {
       if (expanded) {
         e.preventDefault();
-        setOffersUserCollapsed(true);
+        setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: true }));
         return;
       }
       // Expanding: always land on the first sub-nav item
-      setOffersUserCollapsed(false);
+      setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: false }));
       if (pathname === firstChildHref || pathname.startsWith(`${firstChildHref}?`)) {
         e.preventDefault();
       }
@@ -381,20 +415,22 @@ export function AppNav() {
             <GroupIcon className="size-4 shrink-0" />
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate">{entry.label}</span>
-              <ActionBadge count={offerActionCount} />
+              {badgeCount > 0 ? <ActionBadge count={badgeCount} /> : null}
             </span>
           </Link>
-          <button
-            type="button"
-            className={cn(
-              navTrailingSlot,
-              "rounded-md text-muted-foreground transition-colors hover:text-foreground"
-            )}
-            aria-label="New offer"
-            onClick={() => openOffer()}
-          >
-            <Plus className="size-3.5" />
-          </button>
+          {onQuickAction ? (
+            <button
+              type="button"
+              className={cn(
+                navTrailingSlot,
+                "rounded-md text-muted-foreground transition-colors hover:text-foreground"
+              )}
+              aria-label={quickLabel}
+              onClick={onQuickAction}
+            >
+              <Plus className="size-3.5" />
+            </button>
+          ) : null}
         </div>
 
         <div className="nav-sub-panel" data-open={expanded ? "true" : "false"}>

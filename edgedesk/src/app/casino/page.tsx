@@ -1,16 +1,23 @@
 "use client";
 
 /**
- * Casino desk (H2) - wagering-offer EV with variance honesty. EV here is an
- * expectation across many attempts, never a lock; every verdict carries a
+ * Casino desk (H2/K1) - wagering-offer EV with variance honesty. EV here is
+ * an expectation across many attempts, never a lock; every verdict carries a
  * variance tier and the copy never pretends a single session tracks the EV.
  * Casino money stays OUT of the matched P&L surfaces by design.
- * The log dialog itself lives in CasinoLogProvider (side-nav quick action).
+ *
+ * K1: an offer is a CAMPAIGN that can carry multiple components (a
+ * qualifying wager, plus one or more rewards). The log dialog itself lives
+ * in CasinoLogProvider (side-nav quick action) and creates the campaign +
+ * its first component; this page adds/edits/removes further components and
+ * runs the campaign-level Start/Complete/Delete actions.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { Dices, Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -19,20 +26,37 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { CasinoCampaignSimDialog } from "@/components/casino/casino-campaign-sim-dialog";
+import { CasinoComponentDialog } from "@/components/casino/casino-component-dialog";
 import { CasinoGameLibraryDialog } from "@/components/casino/casino-game-library-dialog";
-import { CasinoSimDialog } from "@/components/casino/casino-sim-dialog";
+import { CasinoOfferEditDialog } from "@/components/casino/casino-offer-edit-dialog";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
-import { BASIS_COPY, CASINO_CHANGED_EVENT, VarianceChip, gbp } from "@/components/casino/casino-ui";
+import {
+  BASIS_COPY,
+  CASINO_CHANGED_EVENT,
+  COMPONENT_LABELS,
+  VarianceChip,
+  campaignVarianceTier,
+  componentSummaryLine,
+} from "@/components/casino/casino-ui";
 import { EmptyState } from "@/components/help/empty-state";
+import { MoneyFlow } from "@/components/money-flow";
 import { PageHeader } from "@/components/help/page-header";
-import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
+import { outlineButtonGroup, pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { PageShell } from "@/components/page-shell";
+import { VenueBadge } from "@/components/venue-badge";
 import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { api } from "@/hooks/use-app-state";
-import { houseEdgeFromRtp, varianceTier, DEFAULT_RTP } from "@/lib/calc/casino-ev";
-import { formatRtpPct } from "@/lib/casino/game-library";
-import type { CasinoOfferRow } from "@/lib/db/schema";
+import {
+  daysUntilOfferExpiry,
+  formatOfferDaysLeftLabel,
+  offerExpiryUrgency,
+} from "@/lib/offers/offer-expiry";
+import { offerStatusBadgeVariant } from "@/lib/ui/status-badges";
+import { cn } from "@/lib/utils";
+import type { CasinoOfferComponentRow, CasinoOfferRow } from "@/lib/db/schema";
+import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 
 const STATUS_LABEL: Record<CasinoOfferRow["status"], string> = {
   planned: "Planned",
@@ -41,16 +65,11 @@ const STATUS_LABEL: Record<CasinoOfferRow["status"], string> = {
   expired: "Expired",
 };
 
-function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
+function DeleteButton({ onConfirm, label }: { onConfirm: () => void; label: string }) {
   const [armed, setArmed] = useState(false);
   if (armed) {
     return (
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={onConfirm}
-        onBlur={() => setArmed(false)}
-      >
+      <Button variant="destructive" size="sm" onClick={onConfirm} onBlur={() => setArmed(false)}>
         Delete?
       </Button>
     );
@@ -59,8 +78,8 @@ function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
     <Button
       variant="ghost"
       size="icon"
-      className="size-8 text-muted-foreground"
-      aria-label="Delete offer"
+      className="size-7 text-muted-foreground"
+      aria-label={label}
       onClick={() => setArmed(true)}
     >
       <Trash2 className="size-3.5" />
@@ -68,13 +87,7 @@ function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-function CompleteDialog({
-  offer,
-  onDone,
-}: {
-  offer: CasinoOfferRow;
-  onDone: () => void;
-}) {
+function CompleteDialog({ offer, onDone }: { offer: CasinoOfferSummary; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [profit, setProfit] = useState(0);
 
@@ -98,7 +111,7 @@ function CompleteDialog({
         <DialogHeader>
           <DialogTitle>Complete offer</DialogTitle>
           <DialogDescription>
-            Net result of the whole offer - stake, bonus and cashout together.
+            Net result of the whole campaign - stake, bonus and cashout together.
           </DialogDescription>
         </DialogHeader>
         <NumField label="Net profit" prefix="£" value={profit} onChange={setProfit} />
@@ -113,12 +126,200 @@ function CompleteDialog({
   );
 }
 
+function ComponentRow({
+  offer,
+  component,
+  onChanged,
+}: {
+  offer: CasinoOfferSummary;
+  component: CasinoOfferComponentRow;
+  onChanged: (offer: CasinoOfferSummary) => void;
+}) {
+  async function remove() {
+    const res = await api<{ offer: CasinoOfferSummary }>(
+      `/api/casino/${offer.id}/components/${component.id}`,
+      { method: "DELETE" }
+    );
+    onChanged(res.offer);
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded border border-border/60 bg-background px-2.5 py-1.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium">
+          {COMPONENT_LABELS[component.componentType]}{" "}
+          <MoneyFlow
+            value={component.expectedEv}
+            signColor
+            signDisplay
+            className="font-semibold tabular-nums"
+          />
+        </p>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {componentSummaryLine(component)}
+        </p>
+      </div>
+      <CasinoComponentDialog casinoOfferId={offer.id} existing={component} onSaved={onChanged} />
+      <DeleteButton onConfirm={() => void remove()} label="Remove step" />
+    </div>
+  );
+}
+
+function CampaignCard({
+  offer,
+  onChanged,
+  onRemoved,
+}: {
+  offer: CasinoOfferSummary;
+  onChanged: (offer: CasinoOfferSummary) => void;
+  onRemoved: () => void;
+}) {
+  const tier = campaignVarianceTier(offer.components);
+  const settled = offer.status === "completed" && offer.actualProfit != null;
+  const headerEv = settled ? offer.actualProfit! : offer.expectedEv;
+  const isExpired = offer.status === "expired";
+  const daysLeft = daysUntilOfferExpiry(offer.expiresAt);
+  const expiryLabel =
+    !settled && !isExpired ? formatOfferDaysLeftLabel(daysLeft) : null;
+  const expiryUrgency = offerExpiryUrgency(daysLeft);
+  const headerTintClass = isExpired
+    ? "offer-header-tint-expired"
+    : headerEv > 0.005
+      ? "offer-header-tint-win"
+      : headerEv < -0.005
+        ? "offer-header-tint-loss"
+        : null;
+
+  async function remove() {
+    await api(`/api/casino/${offer.id}`, { method: "DELETE" }).catch(() => {});
+    onRemoved();
+  }
+
+  return (
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className={cn("space-y-0 pt-(--card-spacing) pb-3", headerTintClass ?? "bg-card")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {offer.casino ? <VenueBadge name={offer.casino} kind="bookie" size="md" /> : null}
+              <Badge variant={offerStatusBadgeVariant(offer.status)}>
+                {STATUS_LABEL[offer.status]}
+              </Badge>
+            </div>
+            <CardTitle className="mt-2 text-xl font-bold leading-snug text-foreground">
+              {offer.title}
+            </CardTitle>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {settled ? "Realised" : "Total EV"}
+            </p>
+            <MoneyFlow value={headerEv} signColor className="text-xl font-bold tabular-nums" />
+            <div className="mt-0.5 flex items-center justify-end gap-1.5">
+              <EvBasisBadge
+                basis={offer.evBasis}
+                description={offer.evBasis === "estimated" ? BASIS_COPY.entered : BASIS_COPY.defaulted}
+              />
+              {tier ? <VarianceChip tier={tier} /> : null}
+            </div>
+          </div>
+        </div>
+        {settled ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Expected{" "}
+            <MoneyFlow
+              value={offer.expectedEv}
+              signColor
+              signDisplay
+              className="inline font-medium"
+            />{" "}
+            → Realised{" "}
+            <MoneyFlow
+              value={offer.actualProfit!}
+              signColor
+              signDisplay
+              className="inline font-medium"
+            />
+          </p>
+        ) : null}
+      </CardHeader>
+
+      <CardContent className="border-t border-border/50 py-2.5">
+        {offer.components.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            {offer.components.map((c) => (
+              <ComponentRow key={c.id} offer={offer} component={c} onChanged={onChanged} />
+            ))}
+          </div>
+        ) : (
+          <p className="rounded border border-dashed border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
+            Nothing logged yet - add a step to get an EV verdict.
+          </p>
+        )}
+        <div className="mt-2">
+          <CasinoComponentDialog casinoOfferId={offer.id} onSaved={onChanged} />
+        </div>
+      </CardContent>
+
+      <CardContent className="offer-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
+        <span className="text-xs text-muted-foreground">
+          {offer.components.length} step{offer.components.length === 1 ? "" : "s"}
+          {expiryLabel && expiryUrgency === "today" ? (
+            <>
+              {" · "}
+              <span className="font-medium text-rose-600 dark:text-rose-400">{expiryLabel}</span>
+            </>
+          ) : expiryLabel && expiryUrgency === "tomorrow" ? (
+            <>
+              {" · "}
+              <span className="font-medium text-orange-600 dark:text-orange-400">{expiryLabel}</span>
+            </>
+          ) : expiryLabel ? (
+            ` · ${expiryLabel}`
+          ) : null}
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          <DeleteButton onConfirm={() => void remove()} label="Delete campaign" />
+          <div className={outlineButtonGroup}>
+            <CasinoOfferEditDialog offer={offer} onSaved={onChanged} />
+            {offer.components.length > 0 ? (
+              <CasinoCampaignSimDialog
+                title={offer.title}
+                components={offer.components}
+                analyticEv={offer.expectedEv}
+                defaultVolatility={tier ?? undefined}
+              />
+            ) : null}
+            {offer.status === "planned" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  void api(`/api/casino/${offer.id}`, {
+                    method: "PATCH",
+                    json: { status: "active" },
+                  }).then(() => onChanged({ ...offer, status: "active" }))
+                }
+              >
+                Start
+              </Button>
+            ) : null}
+            {offer.status === "planned" || offer.status === "active" ? (
+              <CompleteDialog offer={offer} onDone={onRemoved} />
+            ) : null}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function CasinoPage() {
   const { openCasinoLog } = useCasinoLog();
-  const [offers, setOffers] = useState<CasinoOfferRow[] | null>(null);
+  const [offers, setOffers] = useState<CasinoOfferSummary[] | null>(null);
 
   const load = useCallback(() => {
-    api<{ offers: CasinoOfferRow[] }>("/api/casino")
+    api<{ offers: CasinoOfferSummary[] }>("/api/casino")
       .then((r) => setOffers(r.offers))
       .catch(() => setOffers([]));
   }, []);
@@ -130,15 +331,14 @@ export default function CasinoPage() {
     return () => window.removeEventListener(CASINO_CHANGED_EVENT, load);
   }, [load]);
 
-  async function remove(offer: CasinoOfferRow) {
-    await api(`/api/casino/${offer.id}`, { method: "DELETE" }).catch(() => {});
-    load();
+  function patchOfferInPlace(updated: CasinoOfferSummary) {
+    setOffers((prev) => (prev ? prev.map((o) => (o.id === updated.id ? updated : o)) : prev));
   }
 
   return (
     <PageShell className="gap-5">
       <PageHeader
-        title="Casino"
+        title="Casino Campaigns"
         description="Wagering offers with honest EV - an expectation across many attempts, never a lock."
         helpId="casino"
         icon={Dices}
@@ -161,80 +361,12 @@ export default function CasinoPage() {
           <EmptyState
             icon={Dices}
             title="No casino offers yet"
-            description="Log a wagering offer to get its EV verdict - bonus value minus the expected drag of cycling the wagering through the game."
+            description="Log a wagering offer to get its EV verdict - each step (qualifying wager, bonus, free spins, golden chips or cashback) is priced honestly and summed to a campaign total."
           />
         ) : (
-          offers.map((offer) => {
-            const tier = varianceTier({
-              wageringMultiplier: offer.wageringMultiplier,
-              houseEdge: houseEdgeFromRtp(offer.rtp ?? DEFAULT_RTP),
-              contributionPct: offer.contributionPct ?? undefined,
-            });
-            const settled = offer.status === "completed" && offer.actualProfit != null;
-            return (
-              <div
-                key={offer.id}
-                className="flex items-start gap-3 rounded-md border bg-card px-3 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-sm font-semibold">{offer.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {offer.casino ? `${offer.casino} · ` : ""}
-                      {STATUS_LABEL[offer.status]} · {offer.wageringMultiplier}× wagering ·{" "}
-                      {formatRtpPct(offer.rtp ?? DEFAULT_RTP)} RTP
-                      {offer.game ? ` · play ${offer.game}` : ""}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-sm font-medium tabular-nums">
-                      EV {gbp(offer.expectedEv)}
-                    </span>
-                    <EvBasisBadge
-                      basis={offer.rtp != null ? "estimated" : "heuristic"}
-                      description={offer.rtp != null ? BASIS_COPY.entered : BASIS_COPY.defaulted}
-                    />
-                    <VarianceChip tier={tier} />
-                  </div>
-                  {settled ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Expected {gbp(offer.expectedEv)} → Realised {gbp(offer.actualProfit!)}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <CasinoSimDialog
-                    offer={{
-                      title: offer.title,
-                      bonusAmount: offer.bonusAmount,
-                      wageringMultiplier: offer.wageringMultiplier,
-                      rtp: offer.rtp,
-                      contributionPct: offer.contributionPct,
-                      defaultVolatility: tier,
-                    }}
-                  />
-                  {offer.status === "planned" ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        void api(`/api/casino/${offer.id}`, {
-                          method: "PATCH",
-                          json: { status: "active" },
-                        }).then(load)
-                      }
-                    >
-                      Start
-                    </Button>
-                  ) : null}
-                  {offer.status === "planned" || offer.status === "active" ? (
-                    <CompleteDialog offer={offer} onDone={load} />
-                  ) : null}
-                  <DeleteButton onConfirm={() => void remove(offer)} />
-                </div>
-              </div>
-            );
-          })
+          offers.map((offer) => (
+            <CampaignCard key={offer.id} offer={offer} onChanged={patchOfferInPlace} onRemoved={load} />
+          ))
         )}
       </div>
     </PageShell>
