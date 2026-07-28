@@ -185,6 +185,7 @@ export function BoostCheckerForm({
       <BackPanel
         title="Back Bet"
         exchange={exchange}
+        venue={bookmaker}
         chip={
           <BookmakerSelect
             value={bookmaker}
@@ -392,6 +393,7 @@ export function BoostCheckerForm({
           ]}
           guaranteed={preview.guaranteed}
           exchange={exchange}
+          venue={bookmaker}
           totalLabel="Guaranteed (worst case)"
         />
       ) : null}

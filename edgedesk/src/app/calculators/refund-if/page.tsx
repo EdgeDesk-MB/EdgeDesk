@@ -94,7 +94,7 @@ export default function RefundIfCalculatorPage() {
         </p>
       </div>
 
-      <BackPanel title="Back bet (refund offer)" exchange={exchange}>
+      <BackPanel title="Back bet (refund offer)" exchange={exchange} venue={bookmaker}>
         <div className="grid grid-cols-2 gap-3">
           <PanelBookieInput
             value={bookmaker}
@@ -189,6 +189,7 @@ export default function RefundIfCalculatorPage() {
         rows={displayRows}
         guaranteed={result?.guaranteed ?? 0}
         exchange={exchange}
+        venue={bookmaker}
         totalLabel="Locked-in profit"
       />
 

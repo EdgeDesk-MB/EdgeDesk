@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Label } from "@/components/ui/label";
-import { useVenueAccounts } from "@/hooks/use-venue-accounts";
+import { useVenueAccounts, type VenueOption } from "@/hooks/use-venue-accounts";
 import {
   accessStatusLabel,
   normalizeAccessStatus,
@@ -22,6 +22,20 @@ type PickerRow = {
   brandColor: string | null;
   section: "bookies" | "exchanges";
 };
+
+/** Exchange-ish names → exchange, else bookie. Shared with callers that defer persistence (e.g. the offer form's own auto-add checkbox). */
+export function inferVenueKind(
+  name: string,
+  exchangeDirectory: VenueOption[],
+  exchangeWallets: VenueOption[]
+): "bookie" | "exchange" {
+  const key = name.trim().toLowerCase();
+  const asExchange =
+    /\b(exchange|betfair|betdaq|smarkets|matchbook)\b/i.test(name) ||
+    exchangeDirectory.some((e) => e.name.toLowerCase() === key) ||
+    exchangeWallets.some((e) => e.name.toLowerCase() === key);
+  return asExchange ? "exchange" : "bookie";
+}
 
 function dialogPortalRoot(from: HTMLElement | null): HTMLElement | null {
   const dialog = from?.closest("[data-slot='dialog-content']") as HTMLElement | null;
@@ -48,6 +62,8 @@ export function VenueSelect({
   kinds = ["bookie", "exchange"],
   /** Allow typing a new name that is not in the list */
   allowCustom = true,
+  /** Persist a free-typed name as a wallet immediately on pick. Set false to defer creation to the caller (e.g. save-time, gated by its own checkbox). */
+  persistCustom = true,
 }: {
   value: string;
   onChange: (name: string) => void;
@@ -58,6 +74,7 @@ export function VenueSelect({
   placeholder?: string;
   kinds?: Array<"bookie" | "exchange">;
   allowCustom?: boolean;
+  persistCustom?: boolean;
 }) {
   const {
     bookieWallets,
@@ -313,19 +330,14 @@ export function VenueSelect({
     const name = search.trim();
     if (!name) return;
     if (showExchanges && !showBookies) {
-      await pick(name, "exchange", true);
+      await pick(name, "exchange", persistCustom);
       return;
     }
     if (showBookies && !showExchanges) {
-      await pick(name, "bookie", true);
+      await pick(name, "bookie", persistCustom);
       return;
     }
-    // Both sections: exchange-ish names → exchange, else bookie
-    const asExchange =
-      /\b(exchange|betfair|betdaq|smarkets|matchbook)\b/i.test(name) ||
-      exchangeDirectory.some((e) => e.name.toLowerCase() === name.toLowerCase()) ||
-      exchangeWallets.some((e) => e.name.toLowerCase() === name.toLowerCase());
-    await pick(name, asExchange ? "exchange" : "bookie", true);
+    await pick(name, inferVenueKind(name, exchangeDirectory, exchangeWallets), persistCustom);
   }
 
   const inDialog = portalTarget?.hasAttribute("data-dialog-overlay-portal");

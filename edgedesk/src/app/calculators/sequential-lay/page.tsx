@@ -120,7 +120,7 @@ export default function SequentialLayCalculatorPage() {
         </div>
       </div>
 
-      <BackPanel title="Back bet" exchange={exchange}>
+      <BackPanel title="Back bet" exchange={exchange} venue={bookmaker}>
         <div className="grid grid-cols-2 gap-3">
           <PanelBookieInput
             value={bookmaker}
@@ -218,6 +218,7 @@ export default function SequentialLayCalculatorPage() {
         rows={rows}
         guaranteed={result?.guaranteed ?? 0}
         exchange={exchange}
+        venue={bookmaker}
         totalLabel={mode === "qualifying" ? "Qualifying loss" : "Total profit"}
       />
 

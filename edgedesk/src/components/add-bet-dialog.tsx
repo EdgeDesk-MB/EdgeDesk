@@ -1405,8 +1405,9 @@ export function AddBetDialog({
             )}
             {isDutch ? (
               <p className="text-[10px] leading-tight text-muted-foreground">
-                Each outcome settles automatically from the score (home/draw/away, by label) -
-                link the event above for that to work.
+                {sport === "football"
+                  ? "Home/away teams link this match so it can be tracked and auto-settled - they don't relabel the outcomes on the right, which settle by whichever label says home, draw or away."
+                  : "Each outcome settles automatically from the score (home/draw/away, by label) - link the event above for that to work."}
               </p>
             ) : (
             <div className="flex flex-col gap-1.5">
@@ -1452,6 +1453,7 @@ export function AddBetDialog({
             <BackPanel
               title="Back Bet"
               exchange={exchange}
+              venue={bookmaker}
               chip={
                 <BookmakerSelect
                   value={bookmaker}
@@ -1739,6 +1741,7 @@ export function AddBetDialog({
               rows={outcomeRows}
               guaranteed={preview?.guaranteed ?? 0}
               exchange={exchange}
+              venue={bookmaker}
               totalLabel={
                 betType === "qualifying"
                   ? advanced

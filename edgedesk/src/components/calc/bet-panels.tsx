@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { MoneyFlow } from "@/components/money-flow";
+import { bookiePanelTint } from "@/lib/brands/bookies";
 import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
 import type { ExchangeRow } from "@/lib/db/schema";
 import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
@@ -10,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { Copy, ChevronDown } from "lucide-react";
 
 /* Default panel palette (Matched Betting Blog green back / blue lay) */
-const BACK_LIGHT = "#5fc478";
+export const BACK_LIGHT = "#5fc478";
 const LAY_LIGHT = "#6ea8e8";
 
 interface PanelProps {
@@ -56,9 +57,18 @@ function Panel({ title, children, className, color, chip }: PanelProps) {
 
 export function BackPanel({
   exchange,
+  venue,
   ...props
-}: Omit<PanelProps, "color"> & { exchange?: ExchangeRow | null; color?: string }) {
-  return <Panel {...props} color={props.color ?? exchange?.backColor ?? BACK_LIGHT} />;
+}: Omit<PanelProps, "color"> & {
+  exchange?: ExchangeRow | null;
+  /** Selected bookmaker/venue name for the back leg - when set, the panel
+   * tints from that venue's own brand colour instead of the paired
+   * exchange's back-cell colour (see `bookiePanelTint`). */
+  venue?: string;
+  color?: string;
+}) {
+  const venueTint = venue?.trim() ? bookiePanelTint(venue) : null;
+  return <Panel {...props} color={props.color ?? venueTint ?? exchange?.backColor ?? BACK_LIGHT} />;
 }
 
 export function LayPanel({
@@ -412,13 +422,17 @@ export function ProfitTable({
   totalLabel = "Total profit",
   guaranteed,
   exchange,
+  venue,
 }: {
   rows: OutcomeRow[];
   totalLabel?: string;
   guaranteed: number;
   exchange?: ExchangeRow | null;
+  /** Selected bookmaker/venue name for the back leg - see `BackPanel`. */
+  venue?: string;
 }) {
-  const backBase = exchange?.backColor ?? BACK_LIGHT;
+  const hasVenueTint = !!venue?.trim();
+  const backBase = hasVenueTint ? bookiePanelTint(venue!) : (exchange?.backColor ?? BACK_LIGHT);
   const layBase = exchange?.layColor ?? LAY_LIGHT;
   return (
     <div className="flex flex-col gap-3">
@@ -434,7 +448,12 @@ export function ProfitTable({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const accent = row.accent === "lay" ? layBase : backBase;
+              const isBack = row.accent !== "lay";
+              const accent = isBack ? backBase : layBase;
+              // Bookie tints are always a pastel (lightened toward white), same
+              // assumption the rest of the panel family makes - contrastText
+              // can't parse that `color-mix(...)` string, so skip it here.
+              const chevText = isBack && hasVenueTint ? "#1a1a1a" : contrastText(accent);
               return (
                 <tr key={row.label} className="border-t">
                   <td className="py-2 pr-3">
@@ -444,7 +463,7 @@ export function ProfitTable({
                         {
                           "--chev": accent,
                           "--chev-dark": darken(accent, 0.45),
-                          "--chev-text": contrastText(accent),
+                          "--chev-text": chevText,
                           clipPath:
                             "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)",
                         } as React.CSSProperties

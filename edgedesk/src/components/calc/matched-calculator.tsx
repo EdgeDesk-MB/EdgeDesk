@@ -318,7 +318,7 @@ export function MatchedCalculator({
         ) : null}
       </div>
 
-      <BackPanel title="Back Bet" exchange={exchange}>
+      <BackPanel title="Back Bet" exchange={exchange} venue={bookmaker}>
         <div className="grid grid-cols-2 gap-3">
           <PanelBookieInput
             value={bookmaker}
@@ -421,6 +421,7 @@ export function MatchedCalculator({
         rows={rows}
         guaranteed={result?.guaranteed ?? 0}
         exchange={exchange}
+        venue={bookmaker}
         totalLabel={mode === "qualifying" && bonusKind === "none" ? "Qualifying loss" : "Total profit"}
       />
 

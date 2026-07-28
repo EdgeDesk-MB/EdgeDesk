@@ -112,7 +112,7 @@ export default function TwoUpCalculatorPage() {
         </div>
       </div>
 
-      <BackPanel title="Back Bet" exchange={exchange}>
+      <BackPanel title="Back Bet" exchange={exchange} venue={bookmaker}>
         <div className="grid grid-cols-2 gap-3">
           <PanelBookieInput
             value={bookmaker}

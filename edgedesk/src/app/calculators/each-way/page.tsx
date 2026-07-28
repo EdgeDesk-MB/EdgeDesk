@@ -172,7 +172,7 @@ export default function EachWayCalculatorPage() {
         </TabsList>
       </Tabs>
 
-      <BackPanel title="Back Bet (Bookie)" exchange={exchange}>
+      <BackPanel title="Back Bet (Bookie)" exchange={exchange} venue={bookmaker}>
         <div className="grid grid-cols-2 gap-3">
           <PanelBookieInput
             value={bookmaker}
@@ -293,6 +293,7 @@ export default function EachWayCalculatorPage() {
         rows={rows}
         guaranteed={guaranteed}
         exchange={exchange}
+        venue={bookmaker}
         totalLabel={mode === "extra_place" ? "Worst case" : "Worst case"}
       />
 

@@ -14,10 +14,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BackPanel, PanelInput, PanelTextInput } from "@/components/calc/bet-panels";
+import { BACK_LIGHT, PanelInput, PanelTextInput } from "@/components/calc/bet-panels";
 import { MoneyFlow, PercentFlow } from "@/components/money-flow";
 import { VenueSelect } from "@/components/venue-select";
 import { bookieFreeBetBalance } from "@/components/add-bet/back-bookie-balance-strip";
+import { bookiePanelTint } from "@/lib/brands/bookies";
+import { darken, lighten } from "@/lib/brands/exchanges";
 import { useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
@@ -28,8 +30,9 @@ import {
   type DutchLeg,
   type DutchResult,
 } from "@/lib/calc";
+import { campaignHeaderBand } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Gift, Plus, Trash2 } from "lucide-react";
+import { Gift, Plus, X } from "lucide-react";
 
 export type DutchStakeMode = "total" | "profit" | "leg";
 
@@ -156,7 +159,20 @@ export function DutchOutcomesBuilder({
   const fixedLegFreeBets = bookieFreeBetBalance(appState?.balances?.accounts, fixedLegVenue);
 
   return (
-    <BackPanel title={title} exchange={defaultExchange} className={className}>
+    // Plain neutral shell (matches the "Campaign P&L" header band, see
+    // `campaignHeaderBand`) - the account-default tint now applies per
+    // outcome box below, not to this shared shell, so a leg's own bookie
+    // tint can stand apart from its siblings.
+    <div className={cn("overflow-hidden rounded-xl border bg-card", className)}>
+      <div
+        className={cn(
+          "flex items-center justify-between border-b border-border/50 px-4 py-2.5",
+          campaignHeaderBand
+        )}
+      >
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      </div>
+      <div className="flex flex-col gap-3 p-4">
       <Tabs value={mode} onValueChange={(v) => setMode(v as DutchStakeMode)}>
         <TabsList variant="segmented">
           <TabsTrigger value="total">Total stake</TabsTrigger>
@@ -166,7 +182,14 @@ export function DutchOutcomesBuilder({
       </Tabs>
 
       {mode === "total" ? (
-        <PanelInput label="Total stake" prefix="£" value={totalStakeInput} onChange={setTotalStakeInput} min={0} />
+        <PanelInput
+          label="Total stake"
+          prefix="£"
+          value={totalStakeInput}
+          onChange={setTotalStakeInput}
+          min={0}
+          inputClassName="bg-muted dark:bg-muted"
+        />
       ) : mode === "profit" ? (
         <>
           <PanelInput
@@ -174,9 +197,10 @@ export function DutchOutcomesBuilder({
             prefix="£"
             value={targetProfitInput}
             onChange={setTargetProfitInput}
+            inputClassName="bg-muted dark:bg-muted"
           />
           {legsValid && totalStake == null ? (
-            <p className="text-xs font-medium text-black/70 dark:text-white/70">
+            <p className="text-xs font-medium text-muted-foreground">
               Not achievable at these odds - the market doesn&apos;t allow a guaranteed profit.
             </p>
           ) : null}
@@ -185,13 +209,13 @@ export function DutchOutcomesBuilder({
         <>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">
+              <span className="text-[11px] font-semibold text-muted-foreground">
                 Fix stake on
               </span>
               <select
                 value={safeFixedIndex}
                 onChange={(e) => changeFixedLeg(Number(e.target.value))}
-                className="h-11 w-full rounded-md border-0 bg-[var(--pi)] px-3 text-sm font-semibold text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-[var(--pi-dark)] dark:text-white/95"
+                className="h-11 w-full rounded-md border-0 bg-muted px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/40"
               >
                 {legs.map((l, i) => (
                   <option key={i} value={i}>
@@ -206,6 +230,7 @@ export function DutchOutcomesBuilder({
               value={fixedLegStakeInput}
               onChange={setFixedLegStakeInput}
               min={0}
+              inputClassName="bg-muted dark:bg-muted"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +241,7 @@ export function DutchOutcomesBuilder({
                 "flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold",
                 freeBetType
                   ? "bg-violet-600/20 text-violet-950 dark:bg-violet-500/25 dark:text-violet-100"
-                  : "bg-[var(--pi)] text-black/70 dark:bg-[var(--pi-dark)] dark:text-white/80"
+                  : "bg-muted text-muted-foreground"
               )}
             >
               <Gift className="size-3.5" aria-hidden />
@@ -234,7 +259,7 @@ export function DutchOutcomesBuilder({
                         "h-full px-2.5",
                         freeBetType === t
                           ? "bg-violet-600/25 text-violet-950 dark:bg-violet-500/30 dark:text-violet-100"
-                          : "bg-[var(--pi)] text-black/60 dark:bg-[var(--pi-dark)] dark:text-white/70"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {t.toUpperCase()}
@@ -251,12 +276,12 @@ export function DutchOutcomesBuilder({
                       Use £{fixedLegFreeBets.toFixed(2)} available
                     </button>
                   ) : (
-                    <span className="text-[11px] text-black/50 dark:text-white/50">
+                    <span className="text-[11px] text-muted-foreground">
                       No free bet balance tracked for {fixedLegVenue}
                     </span>
                   )
                 ) : (
-                  <span className="text-[11px] text-black/50 dark:text-white/50">
+                  <span className="text-[11px] text-muted-foreground">
                     Pick a venue below to see its free bet balance
                   </span>
                 )}
@@ -270,22 +295,37 @@ export function DutchOutcomesBuilder({
         {legs.map((leg, i) => {
           const legResult = result?.legs[i];
           const isFreeLeg = freeLegActive && i === safeFixedIndex;
+          // Each outcome box tints from ITS OWN bookmaker when one is set,
+          // else falls back to the account's default exchange - so a leg
+          // stands apart from its siblings the moment it gets its own venue.
+          const legBase = leg.bookmaker?.trim()
+            ? bookiePanelTint(leg.bookmaker)
+            : (defaultExchange?.backColor ?? BACK_LIGHT);
           return (
             <div
               key={i}
-              className="flex flex-col gap-2 rounded-lg bg-black/5 p-2.5 dark:bg-white/5"
+              className="relative flex flex-col gap-2 rounded-lg bg-[var(--panel)] p-2.5 dark:bg-[var(--panel-dark)]"
+              style={
+                {
+                  "--panel": legBase,
+                  "--panel-dark": darken(legBase, 0.72),
+                  "--pi": lighten(legBase, 0.62),
+                  "--pi-dark": darken(legBase, 0.5),
+                } as React.CSSProperties
+              }
             >
-              <div className="flex justify-end">
-                {/* Ghost chip - background matches the leg card, same idiom
-                    as the Back Bet panel's "Bookie" header chip. */}
-                <VenueSelect
-                  compact
-                  value={leg.bookmaker ?? ""}
-                  onChange={(v) => updateLeg(i, { bookmaker: v })}
-                  className="[--pi:transparent] [--pi-dark:transparent]"
-                />
-              </div>
-              <div className="flex items-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="absolute right-1.5 top-1.5 text-black/45 hover:bg-black/10 hover:text-black/75 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white/80"
+                disabled={legs.length <= minLegs}
+                onClick={() => setLegs((prev) => prev.filter((_, j) => j !== i))}
+                aria-label={`Remove outcome ${i + 1}`}
+              >
+                <X />
+              </Button>
+              <div className="flex items-end gap-2 pr-6">
                 <div className="min-w-0 flex-1">
                   <PanelTextInput
                     label="Outcome"
@@ -295,17 +335,14 @@ export function DutchOutcomesBuilder({
                     inputClassName="h-10 text-sm"
                   />
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 shrink-0 text-black/50 hover:text-black/80 dark:text-white/50 dark:hover:text-white/80"
-                  disabled={legs.length <= minLegs}
-                  onClick={() => setLegs((prev) => prev.filter((_, j) => j !== i))}
-                  aria-label={`Remove outcome ${i + 1}`}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                {/* Ghost chip - background matches the leg card, same idiom
+                    as the Back Bet panel's "Bookie" header chip. */}
+                <VenueSelect
+                  compact
+                  value={leg.bookmaker ?? ""}
+                  onChange={(v) => updateLeg(i, { bookmaker: v })}
+                  className="shrink-0 [--pi:transparent] [--pi-dark:transparent]"
+                />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <PanelInput
@@ -373,6 +410,7 @@ export function DutchOutcomesBuilder({
           </div>
         </div>
       </div>
-    </BackPanel>
+      </div>
+    </div>
   );
 }
