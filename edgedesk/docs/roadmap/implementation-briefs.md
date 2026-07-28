@@ -10,7 +10,11 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-07-16 (Phase 11 added — J1–J9 execution-edge briefs, three waves)
+Last updated: 2026-07-22 (Phase 12 — K1/K2 ✅ DONE, K3 recurring casino offers still not started;
+Phase 13 — styling pass, L1 outcome-probability calc, L2 history/richer-columns view and L3
+boosted odds ALL ✅ DONE same day - the Acca Desk gained a live Campaign P&L header, an
+ALL WIN/1 LOSE/1+ LOSE probability meter, an Active/History split with collapsible history cards,
+and native bookmaker-boost support end to end from create form to real settlement)
 
 ---
 
@@ -1251,6 +1255,577 @@ matched calculator + lock-in dialog + acca lay-due rows.
 **Acceptance.** Manual harness protocol (extension loaded unpacked, drive a Betfair market
 page in the harness Chrome with a stubbed page fixture for CI-less testing); clipboard
 fallback tested; docs page "Install the extension".
+
+---
+
+# PHASE 12 — CASINO REWARD PARITY (promoted from §9, 2026-07-21)
+
+## K1. Casino reward-type parity — multi-component campaign model `[strong]` — needs H2 — ✅ DONE 2026-07-21
+
+**Shipped as spec'd**, including the parser extension (spin/chip/cashback single-component
+detection) originally flagged as an optional lighter follow-up - there was time to do it
+properly rather than defer it. Multi-component paste SPLITTING (one promo → several
+components) remains out of scope, as spec'd, for a K2 follow-up.
+
+**Objective.** H2's Casino desk models exactly one reward shape per offer — a £ bonus amount
+with its own wagering multiplier, RTP and contribution % (`casinoOfferEv` in
+`src/lib/calc/casino-ev.ts`). That covers **Bonus** (site credit + playthrough) and, by setting
+wagering to 0, **Cash**, but has no way to represent **Free Spins** (spin count × spin value,
+sometimes with a second wagering requirement on the winnings), **Golden Chips** (roulette-only
+credit at a near-fixed game edge), **Cashback/loss-back** (a % of expected losses refunded, up
+to a cap), or a **qualifying wager** stage (a deposit that must be staked before the reward is
+even granted — e.g. "wager £100 to unlock 20 free spins"). Sam confirmed the gap against
+Outplayed's EV calculator (2026-07-21) and, further, that real casino offers routinely bundle
+more than one of these in a single promotion — so a single `rewardType` column per offer is the
+wrong shape entirely. This brief instead makes a casino offer a **campaign that can carry
+multiple components**, mirroring the pattern EdgeDesk already uses for sports offers.
+
+**The existing pattern this mirrors.** A sports `offers` row is a campaign; `bets` rows link to
+it via `offerId` and carry a `betType` (`qualifying | free_snr | free_sr | risk_free`); each leg
+is added incrementally via the normal "Add bet" flow prefilled with the offer (see
+`offer-view-dialog.tsx`'s `openAddBet(trackBet.prefill)`, which passes `offerId` + `betType`); a
+service (`src/lib/services/offers.ts`) aggregates the linked bets into `OfferProfitBreakdown`
+(`qualifyingProfit + freeBetProfit → totalProfit`), computed on read, never stored on the
+campaign row. K1 reproduces this exactly for casino: `casino_offers` becomes the campaign,
+a new `casino_offer_components` table holds N components (one row per reward or cost stage),
+each contributing its own locked `expectedEv`, summed into the campaign total by a new service.
+
+**Why this shape, concretely.** The Grosvenor "20 Free Spins" screenshot Sam supplied is a
+qualifying wager (£100 staked) PLUS a Free Spins reward (20 spins @ 40p) in one promotion — two
+components, one campaign. The flat single-`rewardType` model literally cannot represent this;
+the campaign model does, the same way a free-bet sign-up offer needs both a qualifying bet leg
+and a free-bet leg to be represented honestly.
+
+**Component types (`componentType` enum).** `qualifying_wager | cash | bonus | free_spins |
+golden_chips | cashback`. `qualifying_wager` is a COST component (its EV is always ≤ 0 — the
+price of unlocking whatever reward components follow); the other five are reward components.
+A campaign can hold any combination, including just one (the common case — a plain Bonus offer
+is still a one-component campaign, and the UI should make that feel like a single step, not a
+two-step chore — see UI section).
+
+**Maths (pure calc — `/calc-change` applies, tests-first, hand-worked vectors before code).**
+`src/lib/calc/casino-ev.ts`'s `casinoOfferEv` is UNCHANGED — it remains exactly the Bonus
+component's calc (Cash is `wageringMultiplier: 0` through it, both already correct today; zero
+risk to the 445 existing green tests). NEW sibling file `src/lib/calc/casino-reward-ev.ts`:
+
+- `freeSpinsEv(input: { spins: number; spinValue: number; houseEdge: number; winningsWagerX?: number; contributionPct?: number }): { spinWinnings: number; totalTurnover: number; wageringDrag: number; ev: number }`.
+  Stage 1 (the spins themselves): `spinWinnings = roundPence(spins × spinValue × (1 − houseEdge))`.
+  Stage 2 (winnings wagering, only when `winningsWagerX` is truthy and > 0):
+  `totalTurnover = roundPence(spinWinnings × winningsWagerX / (contributionPct ?? 1))`,
+  `wageringDrag = roundPence(totalTurnover × houseEdge)` — reuses the SAME house edge as stage 1
+  (Outplayed's Free Spins panel shows one RTP field servicing both). `ev = roundPence(spinWinnings
+  − wageringDrag)`. When `winningsWagerX` is 0/undefined, `totalTurnover`/`wageringDrag` are 0
+  and `ev = spinWinnings`. Hand-worked vectors:
+  - 20 spins, £0.40 spin value, 95% RTP, no winnings wagering → `spinWinnings = £7.60`, `ev = £7.60`.
+  - 50 spins, £0.10 spin value, 95% RTP, winnings wagered 20×, 100% contribution →
+    `spinWinnings = £4.75`, `totalTurnover = £95.00`, `wageringDrag = £4.75`, `ev = £0.00` —
+    exact break-even, shows winnings-wagering can fully erode a spins payout.
+  - 10 spins, £1.00 spin value, 96% RTP, winnings wagered 10×, 50% contribution →
+    `spinWinnings = £9.60`, `totalTurnover = £192.00`, `wageringDrag = £7.68`, `ev = £1.92`.
+- `goldenChipsEv(input: { chipCount: number; chipValue: number; houseEdge: number }): { totalTurnover: number; wageringDrag: number; ev: number }`.
+  Single-shot, no compounding turnover (chips are staked once, not cycled like slot wagering):
+  `totalTurnover = roundPence(chipCount × chipValue)`, `wageringDrag = roundPence(totalTurnover
+  × houseEdge)`, `ev = roundPence(totalTurnover − wageringDrag)`. House-edge presets (exported
+  const, UI-facing): `EUROPEAN_ROULETTE_EDGE = 0.027`, `AMERICAN_ROULETTE_EDGE = 0.0526`.
+  Hand-worked vectors: 10 chips at £5, European (2.70%) → `totalTurnover = £50.00`,
+  `wageringDrag = £1.35`, `ev = £48.65`. 5 chips at £10, American (5.26%) →
+  `totalTurnover = £50.00`, `wageringDrag = £2.63`, `ev = £47.37`.
+- `qualifyingWagerDrag(input: { amount: number; houseEdge: number }): { totalTurnover: number; wageringDrag: number; ev: number }`.
+  Now a full component type (built now, applies to any campaign — Sam's call, 2026-07-21), not
+  optional. `totalTurnover = amount` (staked once, cf. Outplayed's left-hand Wagering panel),
+  `wageringDrag = roundPence(totalTurnover × houseEdge)`, `ev = roundPence(-wageringDrag)` —
+  ALWAYS ≤ 0; a qualifying wager never nets positive, its "value" is entirely the cost of
+  unlocking the reward components that follow it. Hand-worked vector: £100 at 96% RTP →
+  `wageringDrag = £4.00`, `ev = −£4.00`.
+- `cashbackEv(input: { expectedTurnover: number; houseEdge: number; cashbackPct: number; cashbackCap?: number }): { expectedLoss: number; cashbackAmount: number; ev: number }`.
+  A cashback offer refunds a % of losses the player would incur from their OWN play regardless
+  of the offer — so the offer's marginal value is the refund itself, not the underlying play's
+  own house-edge drag (that drag isn't caused by the offer; it's the baseline cost of gambling,
+  same with or without it). `expectedLoss = roundPence(expectedTurnover × houseEdge)`,
+  `cashbackAmount = roundPence(Math.min(expectedLoss × cashbackPct, cashbackCap ?? Infinity))`,
+  `ev = cashbackAmount`. Hand-worked vectors: £500 turnover, 4% edge, 10% cashback, no cap →
+  `expectedLoss = £20.00`, `cashbackAmount = £2.00`, `ev = £2.00`. £2,000 turnover, 4% edge, 10%
+  cashback, £5 cap → `expectedLoss = £80.00`, cashback would be £8 but caps at `£5.00`,
+  `ev = £5.00`.
+- `sumCampaignEv(components: { expectedEv: number }[]): number` → `roundPence(sum)`. Trivial, but
+  exists so the service layer and UI never hand-roll the addition — money maths stays exact per
+  the hard rule, and it's the one function every consumer (service, UI verdict card, tests) calls
+  rather than each re-summing independently.
+- **Combined example (proves the campaign model, not just the components).** Qualifying wager
+  £100 @ 96% RTP → `ev = −£4.00`. Free Spins 20 @ £0.40 @ 95% RTP, no winnings wagering →
+  `ev = £7.60`. `sumCampaignEv([...]) = £3.60` — this is the Grosvenor screenshot's actual shape,
+  and the flat single-component model from the previous draft of this brief could not express it.
+- `casino-sim.ts` (J4 Monte Carlo) stays scoped to individual Bonus-type COMPONENTS in v1 — its
+  balance-cycling session model doesn't fit Free Spins' discrete two-stage payout, Golden Chips'
+  single-shot mechanic, Cashback's refund-on-own-play framing, or a qualifying wager's pure-cost
+  shape. The "Simulate" trigger (`CasinoSimDialog`) appears per-component, only on `bonus`-type
+  rows, not once per campaign. Leave a `// TODO K2` marker on the others rather than silently
+  misrepresenting their distribution — a deliberate v1 scope line, flag it as such in the PR.
+
+**Schema.** `casino_offers` (the campaign row) SLIMS DOWN — reward fields move to components:
+- KEEP: `id`, `casino`, `title`, `status` (`planned|active|completed|expired`), `notes`,
+  `actualProfit` (nullable, user-entered TOTAL realised profit across the whole campaign at
+  completion — unchanged from today), `createdAt`, `completedAt`.
+- `bonusAmount`, `wageringMultiplier`, `rtp`, `contributionPct`, `expectedEv`, `game` become
+  LEGACY — kept in `schema.ts` (commented "superseded by casino_offer_components, read only by
+  the one-time migration below, never written after K1 ships") rather than dropped. §0's
+  migration pattern is additive-only; dropping four unused columns isn't worth the risk for a
+  single-user local SQLite file, and keeping them costs nothing.
+- NEW `casino_offer_components` table: `id` PK, `casinoOfferId` integer NOT NULL (references
+  `casino_offers.id`), `componentType` text enum (`qualifying_wager | cash | bonus | free_spins |
+  golden_chips | cashback`), `amount` real nullable (meaning depends on `componentType`: wager
+  amount / cash amount / bonus amount / cashback's expected-turnover basis), `wageringMultiplier`
+  real nullable (bonus playthrough ×, or free-spins winnings-wager ×), `rtp` real nullable (game
+  RTP or edge-derived RTP, null = 96% heuristic default, same convention as today), `contributionPct`
+  real nullable, `spins` real nullable, `spinValue` real nullable, `chipCount` real nullable,
+  `chipValue` real nullable, `houseEdgePreset` text nullable (`european|american|custom`,
+  cosmetic — the calc only ever reads `rtp`, this can't drift out of sync with the number that
+  matters), `cashbackPct` real nullable, `cashbackCap` real nullable, `game` text nullable
+  (recommended eligible game for this component), `expectedEv` real NOT NULL (locked at save
+  time from this component's own inputs — negative for `qualifying_wager`), `sortOrder` integer
+  NOT NULL default 0, `createdAt` integer NOT NULL. Drizzle table in `schema.ts` + `CREATE TABLE
+  IF NOT EXISTS` in `db/index.ts`, per §0.
+
+**Backward-compat migration (one-time, idempotent, in the `db/index.ts` bootstrap alongside the
+existing additive-column helper).** For every `casino_offers` row with no linked
+`casino_offer_components` row yet (every row that predates K1), insert one `bonus`-type
+component copying `bonusAmount → amount`, `wageringMultiplier`, `rtp`, `contributionPct`, `game`
+and `expectedEv` from the legacy columns, `sortOrder: 0`. Idempotent — check for an existing
+linked component before inserting, so it only ever runs once per row. This is the one part of
+this brief that mutates existing data rather than purely adding schema; dry-run it against a
+copy of `data/edgedesk.db` before it ships, and write a migration test (below).
+
+**Services.** NEW `src/lib/services/casino-offers.ts` (server): `getCasinoOfferSummaries():
+CasinoOfferSummary[]` joins `casino_offers` with `casino_offer_components` (grouped by
+`casinoOfferId`, ordered by `sortOrder`). NEW client-safe `src/lib/services/casino-offers.types.ts`:
+`CasinoOfferSummary extends CasinoOfferRow { components: CasinoOfferComponentRow[]; expectedEv:
+number }` where `expectedEv = sumCampaignEv(components)`, computed on read, NEVER stored on the
+campaign row — mirrors `OfferSummary.profit` being derived, not stored. The legacy
+`casino_offers.expectedEv` column is read exactly once, by the migration, then never again.
+
+**API.**
+- `GET /api/casino` → returns `CasinoOfferSummary[]` (was flat `CasinoOfferRow[]`).
+- `POST /api/casino` → creates the CAMPAIGN only (`casino`, `title`, `status`, `notes`) — no
+  reward fields. A campaign with zero components is valid, same as a sports offer with zero bets.
+- NEW `POST /api/casino/[id]/components` → adds one component to an existing campaign. Zod
+  discriminated union keyed on `componentType`, validating only the fields that type uses
+  (reject stray ones — e.g. a `cash` component must not also carry `spins`). Derives and stores
+  `expectedEv` from the matching calc function. Mirrors the `offerId`-prefill pattern
+  `add-bet-dialog.tsx` already uses.
+- NEW `PATCH /api/casino/[id]/components/[componentId]` → edits one component, re-derives its
+  `expectedEv`.
+- NEW `DELETE /api/casino/[id]/components/[componentId]` → removes one component.
+- `PATCH /api/casino/[id]` → campaign-level fields only (`casino`, `title`, `status`,
+  `actualProfit`, `notes`) — reward fields move entirely to the components endpoints.
+- Validation bounds carried over from today: `spins`/`chipCount` positive; `spinValue`/`chipValue`
+  positive; `wageringMultiplier`/`winningsWagerX` non-negative, max 200 (matches the existing
+  `wageringMultiplier` bound); `cashbackPct` in (0, 1]; `rtp` in [0.5, 1].
+
+**UI — mirrors the sports "Add bet against this offer" idiom, not one giant form.**
+- "Log a casino offer" (`casino-log-provider.tsx`) becomes a small first step — Casino, Title
+  only — creating the empty campaign, then immediately opening "Add a component" for the first
+  one, so the common single-component case (a plain Bonus offer) still reads as one continuous
+  flow even though it's technically two calls.
+- NEW component dialog (opened from the log flow's first component, or from an existing
+  campaign's card via "+ Add component", mirroring `openAddBet` prefilled with `offerId`/
+  `betType` in `offer-view-dialog.tsx`): a `componentType` dropdown (Qualifying wager / Cash /
+  Bonus / Free Spins / Golden Chips / Cashback) swaps the field set below it —
+  - *Qualifying wager*: Wager amount (£), Game RTP (%).
+  - *Cash*: Cash amount (£) only.
+  - *Bonus*: Bonus value (£), Wagering (×), Game RTP (%), Contribution (%) — unchanged from today.
+  - *Free Spins*: No. of spins, Spin value (£), Game RTP (%) (fed by `CasinoGamePicker`),
+    Winnings wager (×) (optional, default 0), Contribution (%) (stage 2 only, disabled while
+    `winningsWagerX` is 0).
+  - *Golden Chips*: No. of chips, Chip value (£), House edge preset (European 2.70% / American
+    5.26% / Custom, the last revealing a % field).
+  - *Cashback*: Expected turnover (£), Game RTP (%), Cashback (%), Cap (£, optional).
+- `/casino/page.tsx` campaign cards replace today's flat rows: casino/title/status header, a
+  per-component breakdown line (e.g. "Qualifying wager −£4.00 · Free Spins +£7.60"), the campaign
+  total EV + basis badge (worst basis across components — any heuristic component makes the whole
+  campaign read "heuristic", same honesty principle as everywhere else) + variance chip (sourced
+  from whichever components carry genuine wagering-bust risk — Bonus, Free Spins with
+  `winningsWagerX` > 0, Cashback; NOT Cash, Golden Chips, or a qualifying wager alone), "+ Add
+  component", and per-component edit/remove actions.
+- `parse-casino-offer-text.ts` stays single-component detection in v1 (today's regexes, extended
+  with spin/chip/cashback patterns: `"(\d+)\s+free\s+spins"`, `"spins?\s+worth\s+£X(?:\s+each)?"`,
+  `"(\d+)\s+(?:golden\s+)?chips"`, `"(\d+)%\s+cashback"`) — the parsed draft prefills the FIRST
+  component of a new campaign. Detecting and correctly splitting multiple components from one
+  block of promo text (e.g. "deposit £10 get £10 bonus AND 20 free spins" — which phrase belongs
+  to which component) is real ambiguity and is EXPLICITLY OUT OF SCOPE for K1; flag as a K2
+  follow-up once the multi-component model is live and real paste examples exist to test against.
+
+**Nuance.**
+- This is materially bigger than a column-add — schema, services and API all change shape. If it
+  doesn't fit one PR, it splits cleanly at: (1) schema + migration + calc + services + API,
+  (2) component dialog + campaign card UI, (3) parser extension — ship in that order, each
+  independently testable, mirroring how H2 itself shipped its follow-ups same-day but separately.
+- Casino money still stays OUT of matched P&L surfaces — no change to that boundary.
+- `qualifyingWagerDrag`'s `ev` is always ≤ 0 by construction — a campaign consisting of ONLY a
+  qualifying-wager component (no reward added yet) should read as a net-negative "not worth it
+  yet" state in the UI, not an error; it's a legitimate intermediate campaign state, same as a
+  sports offer that's qualifying but hasn't been awarded its free bet.
+
+**Acceptance.**
+- Vitest: every calc branch (`freeSpinsEv`, `goldenChipsEv`, `qualifyingWagerDrag`, `cashbackEv`,
+  `sumCampaignEv`) with the hand-worked vectors above; the combined qualifying-wager + free-spins
+  vector proves campaign summing is exact.
+- Migration test: seed a legacy-shape `casino_offers` row (no components), run the bootstrap,
+  assert exactly one `bonus`-type component exists with the original values and the campaign's
+  derived `expectedEv` matches the original stored value exactly.
+- calc-auditor pass.
+- `/casino` verified in the harness: create a campaign, add a Qualifying wager component, add a
+  Free Spins component, verify the card shows both lines and the correct summed EV; edit and
+  remove a component; a pre-migration offer still loads, displays and edits correctly.
+- Mobile 390×844 pass; suite + build green.
+
+## K2. Combined-campaign Monte Carlo simulation `[strong]` — needs K1 — ✅ DONE 2026-07-21
+
+**Shipped as spec'd**, including both lowest-confidence parts confirmed by building rather than
+asking again: the Golden Chips even-money payout multiplier default, and the cashback
+underlying-play model (which turned out to need a `Math.max(0, …)` clamp on the per-run loss the
+brief's text didn't spell out explicitly — real cashback never claws back a winning session, so
+the clamp is correct; it does mean the simulated mean sits at/above a naive unclamped expectation,
+same honesty category as the module's existing bust-truncation divergence for Bonus, and the test
+suite asserts structural properties for cashback rather than a tight numeric convergence for
+exactly that reason). Also folded in as part of this ship: an "Expires" date on casino campaigns
+and a day-split Casino calendar (`/casino/calendar`), plus the sidebar's Casino entry becoming a
+Calendar/Campaigns group mirroring Offers — bundled in by Sam alongside the K2 build request,
+not separately briefed.
+
+**Objective.** J4's Monte Carlo (`src/lib/calc/casino-sim.ts`) simulates ONE Bonus component's
+wagering session in isolation; K1's campaign card only offers "Simulate" on a Bonus row for
+exactly that reason. Sam asked (2026-07-21) whether a campaign with several components (e.g. a
+qualifying wager + free spins, or a bonus + cashback) could get ONE combined distribution instead
+of simulating each component separately in your head. Confirmed worth building, as its own
+scoped brief given the modelling lift, not a quick extension.
+
+**Why.** A campaign's real bust risk is the SUM of its components' risk, and summing two
+independent distributions isn't the same as adding their means (K1's `sumCampaignEv` is correct
+for the EV number, but the variance of a sum is not the sum of the variances' square roots in any
+way a user should have to compute by hand). A combined simulation is the only honest way to show
+"what does a whole Grosvenor-shaped campaign (wager £100, get 20 spins) actually look like across
+many attempts" as one distribution, the same honesty standard J4 already set for a single Bonus.
+
+**Architecture - compose, do not fork, the existing session primitives.** `runSession` (the
+wagering-cycle loop: stake `spinStake` per iteration, hit the scaled volatility ladder, until the
+requirement clears or the balance busts) is the ONE reusable engine and must not be
+reimplemented per component type (same "never reimplement, only extend" rule K1 already
+followed for `casino-sim.ts` itself). Each component type maps onto it or a small sibling as
+follows:
+
+- **Bonus** - already `runSession` exactly as J4 built it. No change.
+- **Qualifying wager** - `runSession` with `bonus = amount`, `wageringMultiplier = 1` (the wager
+  clears its own value once, by definition). The session's `final` balance is what the player
+  keeps after clearing the qualifying stake through the game - this is the simulated analogue of
+  `qualifyingWagerDrag`'s analytic `ev = -wageringDrag`, i.e. `simulatedEv = final - amount`
+  (framed as a cost relative to the stake put in, matching the analytic function's sign
+  convention). Hand-worked sanity check before coding: with `wageringMultiplier = 1` and a
+  realistic RTP, `mean(final) ≈ amount × rtp` across many runs, so `mean(simulatedEv) ≈
+  amount × rtp - amount = -amount × houseEdge`, converging on `qualifyingWagerDrag`'s analytic
+  figure - pin this convergence with a test exactly like J4's own analytic-convergence test for
+  Bonus.
+- **Free Spins stage 1 (the spins)** - NOT a wagering cycle, so NOT `runSession`. NEW
+  `simulateSpinsSession(spins, spinValue, volatility, rtp, rng)`: draw exactly `spins`
+  independent hits from the SAME scaled ladder (`scaledLadder`) used elsewhere, each staking
+  `spinValue`, sum the returns. No requirement, no cycling, no bust condition - a fixed number of
+  independent draws. `mean(sum) ≈ spins × spinValue × rtp` must converge on `freeSpinsEv`'s
+  `spinWinnings` - test this convergence.
+- **Free Spins stage 2 (winnings wagering, only when `winningsWagerX > 0`)** - CHAINED, not
+  independent: for a given run, feed THAT run's stage-1 simulated winnings into `runSession` as
+  `bonus`, with `wageringMultiplier = winningsWagerX`. This is the one place a combined
+  simulation must carry state between two sub-steps of the SAME run (every other component's
+  contribution is independent per run and can be summed directly).
+- **Golden Chips** - NEEDS A NEW, SIMPLER DISTRIBUTION, not the slot ladder. A golden chip is one
+  discrete bet, not a slot spin - model as a single Bernoulli draw per chip: win with probability
+  `p = (1 - houseEdge) / payoutMultiplier` and return `chipValue × payoutMultiplier` on a win, 0
+  otherwise. **Confirm payoutMultiplier before building** (lowest-confidence part of this brief,
+  same "confirm before /calc-change starts" flag K1 used for its own uncertain parts): the
+  natural default is an even-money outside bet (red/black, odd/even), `payoutMultiplier = 2`, but
+  this should be confirmed against what Sam has actually seen in a golden-chips promo rather than
+  assumed. Hand-worked check: `p × payoutMultiplier = 1 - houseEdge` must hold exactly so
+  `mean(chip return) = chipValue × (1 - houseEdge)`, converging on `goldenChipsEv`.
+- **Cashback** - simulates the UNDERLYING play the cashback is a rebate on, using `runSession`
+  with `bonus = expectedTurnover`, `wageringMultiplier = 1` (the same "clears its own value once"
+  shape as the qualifying wager - the player is simply playing through their stated turnover).
+  `actualLoss = expectedTurnover - final` for that run; `cashbackAmount = min(actualLoss ×
+  cashbackPct, cashbackCap ?? Infinity)` is that run's simulated payout. This is the component
+  whose modelling choice is LEAST certain of the five (a cashback offer's true variance depends
+  on how the player actually staked during the period, which K1's analytic model already
+  simplifies away) - flag it for Sam's sign-off alongside the Golden Chips payout multiplier
+  before starting `/calc-change`.
+
+**Composition.** NEW `simulateCampaign(components, volatility, rng): number` runs ONE simulated
+outcome per call, summing each component's contribution as spec'd above (chaining Free Spins'
+two stages, everything else independent), returning a single £ figure. The existing chunked
+10,000-run loop, seeding, histogram bucketing and percentile maths in `casino-sim-dialog.tsx`
+and `summariseFinals` are REUSED as-is, just fed `simulateCampaign` results instead of
+`runSession` results directly - no UI rework needed beyond swapping what feeds the distribution
+and moving the "Simulate" trigger from a per-component row to the campaign card's header
+(replacing the per-component placement K1 shipped, now redundant once whole-campaign simulation
+exists - keep the per-component `CasinoSimDialog` for a Bonus-only campaign as a degenerate case
+of the same combined function, do not maintain two separate simulate code paths).
+
+**Acceptance.** Vitest for `simulateSpinsSession` and the Golden Chips Bernoulli draw (hand-worked
+convergence tests, same rigor as J4's `expectedSpinReturn` calibration test); `simulateCampaign`
+convergence test against `sumCampaignEv` for a multi-component campaign (mirrors K1's own
+Grosvenor combined-vector test, run through simulation instead of the analytic path); calc-auditor
+pass; harness check that a multi-component campaign's "Simulate" produces one histogram, not one
+per component; suite + build green.
+
+## K3. Recurring casino offers `[strong]` — needs K1
+
+**Objective.** Sports offers already support recurrence (Sam asked 2026-07-21 whether casino
+offers should too, "we do this for Bet offers"): a template row (`offer_series`) plus a
+horizon-based materialiser (`src/lib/offers/offer-recurrence.ts`) that stamps out one `offers`
+instance per calendar date the rule fires, rolls each instance's status by date, and can "stop
+from this date forward" without touching already-materialised history. Casino has no equivalent -
+a genuinely daily/weekly casino offer (a real, common shape: many operators run the same reload
+bonus or free-spins drop every day) has to be logged by hand each time today.
+
+**Why this is comparable in size to K1 itself, not a small add-on.** The sports model recurs a
+SINGLE `offers` row per instance (bets get logged fresh against each instance as they happen).
+A casino campaign's whole value is in its COMPONENTS - "the same offer daily" means the same
+components repeat, not just an empty campaign shell. The template therefore has to carry a
+component template too, and materialising an instance means creating both the `casino_offers`
+row AND its component rows in one transaction, every time the rule fires.
+
+**Architecture - mirror `offer_series`/`offer-recurrence.ts` exactly, do not invent a new
+recurrence shape.** NEW `casino_offer_series` table (Drizzle + `CREATE TABLE IF NOT EXISTS` per
+§0): `id`, `recurrenceEnabled`, `recurrenceStoppedFrom`, `ruleJson` (reuse
+`OfferRecurrenceRule`/`parseRecurrenceRule` from `offer-recurrence-shared.ts` UNCHANGED - do not
+fork the rule grammar), `casino`, `title`, `notes`, `horizonDays` (default 14, matches the sports
+default), `createdAt`, `updatedAt`. NEW `casino_offer_series_components` table: `seriesId`, plus
+the SAME component-shape columns as `casino_offer_components` (componentType and its
+type-specific fields) MINUS `expectedEv` (a template has no locked EV - each materialised
+instance derives its own via `deriveComponentEv` at creation time, same as a manually-logged
+component) and MINUS `casinoOfferId` (replaced by `seriesId`).
+
+`casino_offers` gains `seriesId` (nullable, additive) + `instanceDate` (nullable, additive) -
+mirrors `offers.seriesId`/`offers.instanceDate` exactly.
+
+NEW `src/lib/offers/casino-offer-recurrence.ts` (sibling to, not a merge with,
+`offer-recurrence.ts` - the sports module's `insertInstance` writes sport/racing-specific columns
+that don't apply here, and forcing one shared function to branch on "is this a casino series" is
+worse than two small parallel modules): `insertCasinoInstance(series, componentsTemplate,
+instanceDate, todayKey, now)` creates the `casino_offers` row (status derived from
+`instanceStatusForDate`, REUSE that helper unchanged, it's date-arithmetic with no sports
+coupling) then loops the component template rows, inserting one `casino_offer_components` row
+per template row with `expectedEv` derived fresh via `deriveComponentEv` (so a component that
+references game RTP or a preset picks up the CURRENT calc, not a stale locked number).
+`syncCasinoOfferSeriesInstances(now)` mirrors `syncOfferSeriesInstances` - expand the rule over
+the horizon window, materialise missing dates, no double-creation (check existing
+`instanceDate`s first, same idempotency the sports version relies on).
+`stopCasinoOfferRecurrence(seriesId, fromDateKey)` mirrors `stopOfferRecurrence` - disable the
+series, delete only untouched future planned instances (an instance with logged components more
+than the template default, or already started/completed, is never silently deleted - reuse the
+sports version's exact "don't delete if there's user work on it" guard, adapted to check
+`casino_offer_components` rows that diverge from the template rather than linked `bets`).
+
+**UI.** `CasinoLogProvider`'s campaign-creation step gains a "Repeat" toggle (mirrors wherever the
+sports offer editor exposes `OfferRecurrenceRule` - reuse that same rule-editing control, do not
+build a second one) that, when enabled, saves the just-built campaign + its components as a
+`casino_offer_series` template instead of (or in addition to - confirm which) a one-off
+`casino_offers` row. `/casino` page cards for a recurring instance show the same recurrence
+affordance sports offers show (stop-from-here action) - reuse the existing component if it isn't
+sports-coupled, otherwise a small casino-specific sibling.
+
+**Confirm before `/calc-change` starts (lowest-confidence parts, Sam's call).**
+1. Does starting a recurring campaign create the FIRST instance immediately (so "daily from
+   today" behaves the same as the sports flow) or only from tomorrow? Match whatever the sports
+   flow already does - check `createOfferSeriesWithInstance`'s exact behaviour and mirror it,
+   don't re-decide this independently.
+2. When a template's components change (Sam edits the series, not a single instance), do
+   already-materialised FUTURE (not-yet-started) instances update, or only instances
+   materialised after the edit? The sports model's answer to the equivalent question should be
+   the default here too - confirm by reading how editing an `offer_series` template behaves
+   today rather than assuming.
+
+**Acceptance.** Reuse `offer-recurrence.test.ts`'s test shapes as the template for
+`casino-offer-recurrence.test.ts` (horizon expansion, no double-materialisation, stop-from-date
+leaves history intact, status rolls correctly by date) - CasinoOfferSeries gets the same rigor
+sports series already has, adapted to also assert each materialised instance's components match
+the template with freshly-derived (not stale) EVs; calc-auditor pass on the EV-derivation path;
+harness check: create a daily series, roll the clock (or force a resync), confirm a second day's
+instance appears with its own components and its own locked EV; suite + build green.
+
+---
+
+# PHASE 13 — ACCA DESK GROWS UP (Track J follow-on)
+
+J7's leg-by-leg lay workflow shipped 2026-07-16; a styling pass on 2026-07-22 fixed the run
+header (grey "Campaign P&L" bar matching the Profit Tracker's `bet-campaign-sections.tsx`
+convention, backed by a new tested `accaCampaignProfit()` in `acca-workflow.ts`), replaced the
+misleading "Pending" badge on legs a busted sequential run will never lay with "not needed", and
+added a one-line bust reason. That work is DONE and out of scope here — these three briefs are
+what Sam asked to scope next (2026-07-22), inspired by (not cloned from) Oddsmonkey's acca
+tooling: an outcome-probability readout, a proper history/richer-columns view, and native
+boosted-odds support (Sam's own trigger: a 50% final-price boost on a 2-leg acca that he had to
+reverse-engineer into per-leg odds by hand to use the desk at all).
+
+## L1. Acca outcome-probability calc `[local]` — needs J7 — ✅ DONE 2026-07-22
+
+**Objective.** A small, pure, independently-shippable calc: given each leg's back odds, return
+`{ allWinPct, oneLosePct, atLeastOneLosePct }` - the "ALL WIN / 1 LOSE / 1+ LOSE" breakdown
+Oddsmonkey shows per acca campaign - so the run card can carry one honest probability readout
+without waiting on L2's bigger layout work.
+
+**Why.** It's the single most useful "informative piece" from Oddsmonkey's tool and it's cheap:
+no schema change, no new UI surface, pure maths on data already in `AccaLegRow[]`. Shipping it
+alone first also de-risks L2 - the probability bar can be built and tested against real runs
+before the bigger view around it is designed.
+
+**Maths (pure calc — /calc-change; extend `src/lib/calc/acca-workflow.ts`, beside
+`accaCampaignProfit`).** New `accaOutcomePercentages(legs: { backOdds: number; result: "pending" |
+"won" | "lost" | "void" }[])`:
+- Naive implied win probability per leg `p_i = 1 / backOdds_i` (no market-wide prices exist for an
+  ad-hoc acca leg, so a true no-vig `p_i` per A2's provenance model isn't available - this MUST
+  render with a `basis: "heuristic"` badge, same component A2 already built, never presented as
+  a live/measured probability).
+- Legs already settled (`result !== "pending"`) are certain, not probabilistic: a `won`/`lost` leg
+  contributes probability 1 or 0, not `1/backOdds`, so the bar sharpens as a run plays out rather
+  than staying static from creation.
+- `allWinPct = Π p_i` (product over every non-void leg; void legs excluded, same convention as
+  `combinedBackOdds`).
+- `oneLosePct = Σ_i [(1 - p_i) · Π_{j≠i} p_j]` (exactly one leg loses, every other wins).
+- `atLeastOneLosePct = 1 - allWinPct`.
+- Test vectors: a clean 3-leg example with round odds (e.g. 2.0/2.0/2.0 → allWin 12.5%, exactly-one
+  37.5%, 1+ 87.5% - hand-verifiable with p=0.5 each); a leg already `won` (p forced to 1) changes
+  the remaining product; a `void` leg is excluded entirely, matching `combinedBackOdds`'s existing
+  void-exclusion convention (reuse the same filter, don't reinvent it).
+
+**UI.** A slim three-segment bar (or three stat chips) in `RunCard` (`src/app/acca/page.tsx`),
+under the existing grey Campaign P&L header, labelled exactly as Oddsmonkey does (ALL WIN / 1
+LOSE / 1+ LOSE) since that's a well-understood convention in this community, styled with existing
+shadcn/Tailwind tokens (no new colour). Carries the heuristic basis badge (A2 component) inline.
+
+**Acceptance.** New `describe("accaOutcomePercentages...")` block in `acca-workflow.test.ts`
+covering the vectors above; `npx vitest run` green; calc-auditor pass (it's additive/pure, same
+shape as `accaCampaignProfit` - should be a fast review); wired into `RunCard` behind no feature
+flag (additive UI, nothing to gate).
+
+## L2. Acca Desk history & richer per-leg view `[strong]` `[design-first]` — needs J7, L1 — ✅ DONE 2026-07-22
+
+Shipped built-then-screenshotted rather than mock-first (Sam's standing preference for design-first
+items - iterate from a working build, not a wireframe): segmented `Tabs` split Active/History by
+`run.status` (zero API change, filtered client-side as scoped); History `RunCard`s default
+collapsed to the headline (header + Campaign P&L + L1's probability bar) via a `collapsedByDefault`
+prop and a `ChevronDown` toggle, expanding to the full leg list and footer on demand - the same
+progressive-disclosure split §4.2 already uses for mobile, reused here for a growing desktop list;
+each `LegRow` gained a per-leg £ contribution figure (liability paid or lay profit kept, once that
+leg's lay has actually settled) next to its badge. Screenshotted and reviewed (design-reviewer pass
+clean bar two pre-existing, unrelated colour/time-format nits in the same file, fixed same day).
+
+**Objective.** Grow the Acca Desk from "one flat list of run cards" into the fuller feature Sam
+asked for: a clear split between live runs and finished ones, and more informative per-leg
+columns/detail - Oddsmonkey's ideas (dedicated campaign table, clear concluded-vs-live treatment),
+reshaped into EdgeDesk's own calculator/BackPanel design language rather than copied wholesale.
+
+**Why.** Today `/acca` (`src/app/acca/page.tsx`) renders every run - active or long-settled - in
+one `runs.map(...)` list (verified 2026-07-22, `AccaDeskPage` component). As history accumulates
+this becomes a scroll of dead campaigns ahead of the ones that actually need attention today,
+which is the same "informative pieces displayed clearly" gap Sam flagged when reporting the
+misleading Pending-state bug that prompted the Phase 13 styling pass.
+
+**Design-first - wait for Sam's wireframe/mock before building.** This is a real information-
+architecture decision, not a wiring job: how much of Oddsmonkey's per-leg column density
+(Date/Event/Bet/Back/Lay/Exchange/Com/Stake/Lbty/Outcome) is worth carrying into EdgeDesk's
+denser calculator-card idiom vs collapsing into the existing `LegRow` line, where the L1
+probability bar sits relative to the P&L header, and what a "History" tab/section looks like
+(separate route, a collapsed accordion under Active, or a filter toggle) all need a decision Sam
+should sketch or describe before code starts, per the sizing tag's own definition.
+
+**Known constraints for whoever designs this (from the current code, verified 2026-07-22).**
+- `GET /api/acca` (`src/app/api/acca/route.ts` → `listAccaRuns()` in
+  `src/lib/services/acca-desk.ts`) returns every run regardless of status, sorted newest-created-
+  first - an Active/History split can filter client-side on `run.status` with zero API change, or
+  gain a `?status=` param if the history list needs pagination once it's large.
+- `run.status` is exactly `"active" | "completed" | "abandoned"` (schema.ts) - History = the
+  latter two, Active = the former. No new status values needed.
+- L1's probability bar and the existing Campaign P&L header both need to reflow into whatever the
+  new card/row shape is - don't design L2 assuming today's `RunCard` header exists unchanged.
+
+**Acceptance.** Once a mock exists: harness check with several runs spanning both buckets confirms
+correct placement; a completed run's history view still renders the busted-leg reason (already
+shipped) and the L1 probability bar frozen at its final state; suite + build green; design-reviewer
+pass against `docs/design-system.md`.
+
+## L3. Boosted acca odds `[strong]` — needs J7 — ✅ DONE 2026-07-22
+
+Shipped with Sam's confirmed answers to all three open questions: winnings-only convention
+(`boosted = 1 + (rawCombined − 1) × (1 + boostPct/100)`); entered as a run-level percentage,
+recomputed live from current leg odds (not a direct final-price override); and a voided leg
+recomputes the boost against the remaining legs rather than freezing the original price.
+`boostPct` (nullable, additive) on `acca_runs`; `applyAccaBoost()` threaded through every
+money-relevant call site that read the raw combined odds - `completeRun`'s real settlement,
+`legDueState`'s final-leg lock suggestion (used by both the UI and lay-due alerts),
+`createAccaRun`'s stored back-bet odds, and `accaCampaignProfit`'s all-win branch - plus a new
+`setRunBoost()` service function (PATCH-only for now, no dedicated edit-after-creation UI yet)
+that refuses once a run is no longer active, so a completed run's boost can never desync from its
+already-settled bet. calc-auditor passed twice (once on the core threading, once after closing a
+`setRunBoost` guard gap and finishing the API/UI wiring it flagged as incomplete).
+
+**Objective.** Let a run carry a bookmaker "acca boost" percentage and have the desk apply it
+correctly from then on, instead of the user reverse-engineering equivalent per-leg odds by hand
+(Sam's real example: a 50% boost on the FINAL combined price of a 2-leg acca).
+
+**Why this is `[strong]`, not a UI label.** The boost changes the combined odds the acca actually
+pays at, and combined odds feed two money-maths paths, not one cosmetic display:
+1. `finalLegLockLay()`'s `combinedBackOdds` input (the last leg's equalising lock stake - gets this
+   wrong and the "locks the same either way" guarantee breaks).
+2. `accaCampaignProfit()`'s all-win branch (`run.stake * (combined - 1)`, shipped 2026-07-22) and
+   the existing "if all win (est.)" footer figure in `RunCard` - both need the BOOSTED figure, not
+   the raw leg-odds product, once a boost is set.
+- Good news verified 2026-07-22: `nextSequentialLay()` (the non-final-leg cover recursion) takes
+  only `accaStake` + `priorLiabilities` + `commission` - no odds input at all - so intermediate
+  legs' cover-lay maths is UNAFFECTED by a boost. The blast radius is smaller than it first looks:
+  only the final-leg lock and the two profit/projection figures need the boosted combined odds
+  substituted in for the raw product.
+
+**Confirm before `/calc-change` starts (Sam's call - do not guess, do not write code yet).**
+1. **Which convention does the boost use?** Two real formulas exist in the market and they give
+   different numbers: (a) *whole-price* boost - `boostedOdds = rawCombined × (1 + boostPct)`; (b)
+   *winnings-only* boost (more common industry phrasing, "your winnings boosted by X%") -
+   `boostedOdds = 1 + (rawCombined − 1) × (1 + boostPct)`. Sam's own 2-leg example (50% boost) is
+   the acceptance test: hand-compute both conventions against his actual bet slip and confirm
+   which one matches before writing `applyAccaBoost()` or its test.
+2. **Does the user enter the boost as a run-level percentage (recomputed live from current leg
+   odds) or as a direct boosted-combined-odds override?** A percentage is more useful if legs get
+   edited before kick-off; an override is simpler and matches "I already know the boosted price
+   from the slip." Recommend the percentage (matches how bookies market it, "50% boost") unless
+   Sam has a reason to prefer entering the final price directly.
+3. **What happens if a leg voids after the boost is set?** Real bookmakers are inconsistent here
+   (some keep the original fixed boosted price, some recompute against the remaining legs). Default
+   recommendation: recompute from the remaining (non-void) legs' product using the same boost %,
+   clearly documented as EdgeDesk's choice, not a scraped bookmaker rule - confirm Sam is fine with
+   that default before building it in, since it's the kind of silent-assumption the calc-change
+   guardrail exists to catch.
+
+**Schema (once Q1-Q2 are answered).** `acca_runs` gains `boostPct` (real, nullable, additive
+column per §0's `ALTER TABLE` convention - needs both the Drizzle field in `schema.ts` AND the
+matching `CREATE TABLE`/`ALTER TABLE` block in `src/lib/db/index.ts`).
+
+**Maths (pure calc — /calc-change; extend `src/lib/calc/acca-workflow.ts`).** New
+`applyAccaBoost(rawCombinedOdds, boostPct)` using whichever convention Q1 confirms, exported and
+tested with Sam's own 2-leg worked example as the primary vector (hand-computed, not invented) plus
+a `boostPct` of 0/undefined round-tripping to `rawCombinedOdds` unchanged (existing unboosted runs
+must show byte-for-byte the same numbers they do today - this is the regression guard). Thread the
+boosted figure into `finalLegLockLay`'s `combinedBackOdds` argument and into `RunCard`'s all-win
+projection and `accaCampaignProfit`'s all-win branch (both currently call the plain leg-odds
+product `combined(legs)` in `src/app/acca/page.tsx` - each call site needs the boosted figure
+substituted when `run.boostPct` is set).
+
+**UI.** `CreateRunForm` (`src/app/acca/page.tsx`) gains an optional "Boosted?" toggle + a boost %
+`PanelInput`, shown collapsed by default (most accas aren't boosted) inside the existing green→
+exchange-tinted `BackPanel`. `RunCard`'s header shows the boosted combined odds (with the raw
+odds available on hover/tooltip - never silently hide the real bookmaker price) once a run has
+`boostPct` set.
+
+**Acceptance.** `applyAccaBoost` test vectors (Sam's real example + the zero-boost identity check)
+green under `npx vitest run`; calc-auditor pass BEFORE this lands (money maths, touches the
+final-leg lock and campaign P&L) verifying every call site that reads `combined(legs)` for money
+purposes was updated consistently, not just the ones on the happy path; harness check: create a
+boosted 2-leg run matching Sam's real slip, confirm the final-leg lock stake and the Campaign P&L
+figure match hand-computed numbers at both conventions' worth of scrutiny; suite + build green.
 
 ---
 
