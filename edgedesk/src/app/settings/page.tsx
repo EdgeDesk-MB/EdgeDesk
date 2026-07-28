@@ -46,12 +46,22 @@ import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, Sl
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
+type SettingsTab =
+  | "bet-defaults"
+  | "automation"
+  | "alerts"
+  | "targets"
+  | "home-layout"
+  | "time"
+  | "integrations"
+  | "data";
+
 export default function SettingsPage() {
   const { resetAndOpenWelcome, openSetup } = useOnboarding();
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
   const settings = state?.settings;
-  const [prefsTab, setPrefsTab] = useState<"preferences" | "data">("preferences");
+  const [tab, setTab] = useState<SettingsTab>("bet-defaults");
 
   async function setDefaultExchange(id: number) {
     const name = exchanges.find((e) => e.id === id)?.name ?? "Exchange";
@@ -124,22 +134,24 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader className="pb-0">
-          <Tabs
-            value={prefsTab}
-            onValueChange={(v) => setPrefsTab(v as typeof prefsTab)}
-            className="gap-0"
-          >
+          <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)} className="gap-0">
             <TabsLineBar bleed="card">
-              <TabsList variant="line" className="w-full justify-start">
-                <TabsTrigger value="preferences">Preferences</TabsTrigger>
-                <TabsTrigger value="data">Data &amp; API</TabsTrigger>
+              <TabsList variant="line" className="justify-start">
+                <TabsTrigger value="bet-defaults">Bet defaults</TabsTrigger>
+                <TabsTrigger value="automation">Automation</TabsTrigger>
+                <TabsTrigger value="alerts">Alerts</TabsTrigger>
+                <TabsTrigger value="targets">Targets &amp; tuning</TabsTrigger>
+                <TabsTrigger value="home-layout">Home layout</TabsTrigger>
+                <TabsTrigger value="time">Time &amp; region</TabsTrigger>
+                <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                <TabsTrigger value="data">Data &amp; backup</TabsTrigger>
               </TabsList>
             </TabsLineBar>
           </Tabs>
         </CardHeader>
         <CardContent className="pt-4">
-          {prefsTab === "preferences" && settings && (
-            <PreferencesPanel
+          {tab === "bet-defaults" && settings && (
+            <BetDefaultsCard
               settings={settings}
               exchanges={exchanges}
               onPatch={patchSettings}
@@ -147,9 +159,31 @@ export default function SettingsPage() {
             />
           )}
 
-          {prefsTab === "data" && (
-            <DataApiPanel
-              onRefresh={refresh}
+          {tab === "automation" && settings && (
+            <AutomationCard settings={settings} onPatch={patchSettings} />
+          )}
+
+          {tab === "alerts" && settings && (
+            <AlertsCard settings={settings} onPatch={patchSettings} />
+          )}
+
+          {tab === "targets" && settings && (
+            <div className="flex flex-col gap-4">
+              <TargetCard target={settings.monthlyProfitTarget} onPatch={patchSettings} />
+              <TuningCard tuning={settings.tuning} onPatch={patchSettings} />
+            </div>
+          )}
+
+          {tab === "home-layout" && settings && (
+            <HomeLayoutCard layout={settings.homeLayout} onPatch={patchSettings} />
+          )}
+
+          {tab === "time" && settings && (
+            <TimeRegionCard settings={settings} onPatch={patchSettings} />
+          )}
+
+          {tab === "integrations" && (
+            <IntegrationsPanel
               apiConfigured={state?.apiConfigured}
               racingApiConfigured={state?.racingApiConfigured}
               racingResultsTier={state?.racingResultsTier}
@@ -161,9 +195,9 @@ export default function SettingsPage() {
             />
           )}
 
+          {tab === "data" && <DataBackupPanel onRefresh={refresh} />}
         </CardContent>
       </Card>
-
     </PageShell>
   );
 }
@@ -192,7 +226,7 @@ function TargetCard({
   }
 
   return (
-    <Card className="lg:col-span-2">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Target className="size-4" /> Monthly target
@@ -245,7 +279,7 @@ function HomeLayoutCard({
   }
 
   return (
-    <Card className="lg:col-span-2">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <LayoutGrid className="size-4" /> Home layout
@@ -437,7 +471,7 @@ function TuningCard({
   }
 
   return (
-    <Card className="lg:col-span-2">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Gauge className="size-4" /> Tuning
@@ -515,7 +549,7 @@ function TuningCard({
           max={100}
           onCommit={(v) => patchField("edgeReportMinCampaigns", v)}
         />
-        <div className="flex flex-col gap-2 lg:col-span-2">
+        <div className="mt-6 flex flex-col gap-2 lg:col-span-2">
           <p className="text-sm font-medium">Effort per action (minutes)</p>
           <p className="-mt-1.5 text-xs text-muted-foreground">
             Drives the £/hr &ldquo;Rate&rdquo; sort in Do next - lower effort ranks an action
@@ -541,7 +575,7 @@ function TuningCard({
   );
 }
 
-function PreferencesPanel({
+function BetDefaultsCard({
   settings,
   exchanges,
   onPatch,
@@ -553,343 +587,368 @@ function PreferencesPanel({
   onSetDefaultExchange: (id: number) => void;
 }) {
   const [stake, setStake] = useState(String(settings.defaultBackStake));
-  const [pollMs, setPollMs] = useState(String(settings.dashboardPollMs));
   const defaultExchange = exchanges.find((e) => e.isDefault) ?? exchanges[0] ?? null;
 
   // Adjust-during-render: saved settings coming back from the server refresh
-  // the text fields without an effect round-trip.
-  const [prevDefaults, setPrevDefaults] = useState({
-    stake: settings.defaultBackStake,
-    poll: settings.dashboardPollMs,
-  });
-  if (
-    prevDefaults.stake !== settings.defaultBackStake ||
-    prevDefaults.poll !== settings.dashboardPollMs
-  ) {
-    setPrevDefaults({ stake: settings.defaultBackStake, poll: settings.dashboardPollMs });
+  // the text field without an effect round-trip.
+  const [prevStake, setPrevStake] = useState(settings.defaultBackStake);
+  if (prevStake !== settings.defaultBackStake) {
+    setPrevStake(settings.defaultBackStake);
     setStake(String(settings.defaultBackStake));
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <SlidersHorizontal className="size-4" /> Bet defaults
+        </CardTitle>
+        <CardDescription>
+          Pre-fill Add bet when you open it from the nav. Changes save as you pick them.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 lg:max-w-xl">
+        <div className="flex flex-col gap-1.5">
+          <Label>Default back stake (£)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            min={0}
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
+            onBlur={() => {
+              const v = parseFloat(stake);
+              if (Number.isFinite(v) && v > 0) onPatch({ defaultBackStake: v });
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Default bet type</Label>
+          <Select
+            value={settings.defaultBetType}
+            onValueChange={(v) =>
+              onPatch({ defaultBetType: v as AppSettings["defaultBetType"] })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="qualifying">Qualifying</SelectItem>
+              <SelectItem value="free_snr">Free bet (SNR)</SelectItem>
+              <SelectItem value="free_sr">Free bet (SR)</SelectItem>
+              <SelectItem value="risk_free">Risk-free</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Default bookie</Label>
+          <BookieNamePicker
+            label=""
+            value={settings.defaultBookmaker}
+            onChange={(v) => {
+              const trimmed = v.trim();
+              if (trimmed && trimmed !== settings.defaultBookmaker) {
+                onPatch({ defaultBookmaker: trimmed });
+              }
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Default exchange</Label>
+          <ExchangeNamePicker
+            label=""
+            allowCustom={false}
+            value={defaultExchange?.name ?? ""}
+            onChange={(name) => {
+              const ex = exchanges.find(
+                (e) => e.name.toLowerCase() === name.trim().toLowerCase()
+              );
+              if (ex && ex.id !== defaultExchange?.id) {
+                onSetDefaultExchange(ex.id);
+              }
+            }}
+          />
+          {exchanges.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Add exchanges on the Accounts page first.
+            </p>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AutomationCard({
+  settings,
+  onPatch,
+}: {
+  settings: AppSettings;
+  onPatch: (patch: Partial<AppSettings>) => void;
+}) {
+  const [pollMs, setPollMs] = useState(String(settings.dashboardPollMs));
+
+  // Adjust-during-render: saved settings coming back from the server refresh
+  // the text field without an effect round-trip.
+  const [prevPoll, setPrevPoll] = useState(settings.dashboardPollMs);
+  if (prevPoll !== settings.dashboardPollMs) {
+    setPrevPoll(settings.dashboardPollMs);
     setPollMs(String(settings.dashboardPollMs));
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <SlidersHorizontal className="size-4" /> Bet defaults
-          </CardTitle>
-          <CardDescription>
-            Pre-fill Add bet when you open it from the nav. Changes save as you pick them.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Default back stake (£)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
-              value={stake}
-              onChange={(e) => setStake(e.target.value)}
-              onBlur={() => {
-                const v = parseFloat(stake);
-                if (Number.isFinite(v) && v > 0) onPatch({ defaultBackStake: v });
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Default bet type</Label>
-            <Select
-              value={settings.defaultBetType}
-              onValueChange={(v) =>
-                onPatch({ defaultBetType: v as AppSettings["defaultBetType"] })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="qualifying">Qualifying</SelectItem>
-                <SelectItem value="free_snr">Free bet (SNR)</SelectItem>
-                <SelectItem value="free_sr">Free bet (SR)</SelectItem>
-                <SelectItem value="risk_free">Risk-free</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Default bookie</Label>
-            <BookieNamePicker
-              label=""
-              value={settings.defaultBookmaker}
-              onChange={(v) => {
-                const trimmed = v.trim();
-                if (trimmed && trimmed !== settings.defaultBookmaker) {
-                  onPatch({ defaultBookmaker: trimmed });
-                }
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Default exchange</Label>
-            <ExchangeNamePicker
-              label=""
-              allowCustom={false}
-              value={defaultExchange?.name ?? ""}
-              onChange={(name) => {
-                const ex = exchanges.find(
-                  (e) => e.name.toLowerCase() === name.trim().toLowerCase()
-                );
-                if (ex && ex.id !== defaultExchange?.id) {
-                  onSetDefaultExchange(ex.id);
-                }
-              }}
-            />
-            {exchanges.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Add exchanges on the Accounts page first.
-              </p>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Bell className="size-4" /> Automation
-          </CardTitle>
-          <CardDescription>Live dashboard polling, offer reminders and OCR matching.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Offer expiry reminders</p>
-              <p className="text-xs text-muted-foreground">
-                Toast at {settings.offerReminderDays.join(", ")} days before expiry
-              </p>
-            </div>
-            <Switch
-              checked={settings.offerRemindersEnabled}
-              aria-label="Offer expiry reminders"
-              onCheckedChange={(v) => onPatch({ offerRemindersEnabled: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">OCR auto-match events</p>
-              <p className="text-xs text-muted-foreground">
-                Link screenshot imports to tracked fixtures when possible
-              </p>
-            </div>
-            <Switch
-              checked={settings.ocrAutoMatchEvents}
-              aria-label="OCR auto-match events"
-              onCheckedChange={(v) => onPatch({ ocrAutoMatchEvents: v })}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Dashboard refresh (ms)</Label>
-            <Input
-              type="number"
-              step={500}
-              min={1000}
-              max={60000}
-              value={pollMs}
-              onChange={(e) => setPollMs(e.target.value)}
-              onBlur={() => {
-                const v = parseInt(pollMs, 10);
-                if (Number.isFinite(v)) onPatch({ dashboardPollMs: v });
-              }}
-            />
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bell className="size-4" /> Automation
+        </CardTitle>
+        <CardDescription>Live dashboard polling, offer reminders and OCR matching.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 lg:max-w-xl">
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Offer expiry reminders</p>
             <p className="text-xs text-muted-foreground">
-              Lower = snappier live P&amp;L. The home dashboard picks this up automatically.
+              Toast at {settings.offerReminderDays.join(", ")} days before expiry
             </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="mobile-deck-pin">Mobile home starts on</Label>
-            <Select
-              value={settings.mobileDeckPin}
-              onValueChange={(v) => onPatch({ mobileDeckPin: normalizeMobileDeckPin(v) })}
-            >
-              <SelectTrigger id="mobile-deck-pin">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Auto (context-aware)</SelectItem>
-                <SelectItem value="hero">Overview</SelectItem>
-                <SelectItem value="plan">Today&apos;s plan</SelectItem>
-                <SelectItem value="chart">Chart</SelectItem>
-                <SelectItem value="feed">Feed</SelectItem>
-                <SelectItem value="do-next">Do next</SelectItem>
-              </SelectContent>
-            </Select>
+          <Switch
+            checked={settings.offerRemindersEnabled}
+            aria-label="Offer expiry reminders"
+            onCheckedChange={(v) => onPatch({ offerRemindersEnabled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">OCR auto-match events</p>
             <p className="text-xs text-muted-foreground">
-              Auto picks the chart with open positions, the plan in the morning, otherwise the
-              overview.
+              Link screenshot imports to tracked fixtures when possible
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BellRing className="size-4" /> Alerts
-          </CardTitle>
-          <CardDescription>
-            Local notifications while EdgeDesk is open (browser permission needed), with
-            in-app toast fallback.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Offer expiring with EV unclaimed</p>
-              <p className="text-xs text-muted-foreground">
-                An actionable offer ends today with £1+ of edge still on the table
-              </p>
-            </div>
-            <Switch
-              checked={settings.alertsOfferExpiring}
-              aria-label="Alert when an offer expires with EV unclaimed"
-              onCheckedChange={(v) => onPatch({ alertsOfferExpiring: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Race off-time approaching</p>
-              <p className="text-xs text-muted-foreground">
-                A tracked race goes off within 15 minutes with no bet logged
-              </p>
-            </div>
-            <Switch
-              checked={settings.alertsRaceOffSoon}
-              aria-label="Alert when a race off-time approaches"
-              onCheckedChange={(v) => onPatch({ alertsRaceOffSoon: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Result settled</p>
-              <p className="text-xs text-muted-foreground">
-                &ldquo;Haydock 13:35 settled: +£4.10&rdquo; as results land
-              </p>
-            </div>
-            <Switch
-              checked={settings.alertsResultSettled}
-              aria-label="Alert when a result settles"
-              onCheckedChange={(v) => onPatch({ alertsResultSettled: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Unhedged back bet</p>
-              <p className="text-xs text-muted-foreground">
-                A qualifying or risk-free back has no lay after{" "}
-                {settings.tuning.nakedExposureMinutes} minutes (
-                {settings.tuning.nakedImminentMinutes} near the off)
-              </p>
-            </div>
-            <Switch
-              checked={settings.alertsNakedExposure}
-              aria-label="Alert on an unhedged back bet"
-              onCheckedChange={(v) => onPatch({ alertsNakedExposure: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">2UP triggered</p>
-              <p className="text-xs text-muted-foreground">
-                Your team goes two up - early payout is in, with a lock-in suggestion
-              </p>
-            </div>
-            <Switch
-              checked={settings.alertsTwoUpLock}
-              aria-label="Alert when a 2UP triggers"
-              onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Weekly digest</p>
-              <p className="text-xs text-muted-foreground">
-                Monday morning summary of last week - edge captured, leaks, offer droughts
-              </p>
-            </div>
-            <Switch
-              checked={settings.digestWeekly}
-              aria-label="Send a weekly digest on Monday mornings"
-              onCheckedChange={(v) => onPatch({ digestWeekly: v })}
-            />
-          </div>
-          <NotificationPermissionButton />
-          <PushDeviceControl />
-        </CardContent>
-      </Card>
-
-      <TargetCard target={settings.monthlyProfitTarget} onPatch={onPatch} />
-
-      <HomeLayoutCard layout={settings.homeLayout} onPatch={onPatch} />
-
-      <TuningCard tuning={settings.tuning} onPatch={onPatch} />
-
-      <Card className="lg:col-span-2">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="size-4" /> Time &amp; timezone
-          </CardTitle>
-          <CardDescription>
-            Fixture kickoffs and race off-times are shown in this timezone. Defaults to London.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 sm:flex-row">
-          <div className="flex flex-col gap-1.5 w-full max-w-sm">
-            <Label htmlFor="display-timezone">Display timezone</Label>
-            <Select
-              value={settings.displayTimezone}
-              onValueChange={(v) => onPatch({ displayTimezone: v })}
-            >
-              <SelectTrigger id="display-timezone">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DISPLAY_TIMEZONE_OPTIONS.map((tz) => (
-                  <SelectItem key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5 w-full max-w-sm">
-            <Label htmlFor="time-format">Time format</Label>
-            <Select
-              value={settings.timeFormat}
-              onValueChange={(v) => onPatch({ timeFormat: normalizeTimeFormat(v) })}
-            >
-              <SelectTrigger id="time-format">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_FORMAT_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Applies to every time shown in the app. Manual time entry stays HH:MM.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          <Switch
+            checked={settings.ocrAutoMatchEvents}
+            aria-label="OCR auto-match events"
+            onCheckedChange={(v) => onPatch({ ocrAutoMatchEvents: v })}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Dashboard refresh (ms)</Label>
+          <Input
+            type="number"
+            step={500}
+            min={1000}
+            max={60000}
+            value={pollMs}
+            onChange={(e) => setPollMs(e.target.value)}
+            onBlur={() => {
+              const v = parseInt(pollMs, 10);
+              if (Number.isFinite(v)) onPatch({ dashboardPollMs: v });
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Lower = snappier live P&amp;L. The home dashboard picks this up automatically.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="mobile-deck-pin">Mobile home starts on</Label>
+          <Select
+            value={settings.mobileDeckPin}
+            onValueChange={(v) => onPatch({ mobileDeckPin: normalizeMobileDeckPin(v) })}
+          >
+            <SelectTrigger id="mobile-deck-pin">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Auto (context-aware)</SelectItem>
+              <SelectItem value="hero">Overview</SelectItem>
+              <SelectItem value="plan">Today&apos;s plan</SelectItem>
+              <SelectItem value="chart">Chart</SelectItem>
+              <SelectItem value="feed">Feed</SelectItem>
+              <SelectItem value="do-next">Do next</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Auto picks the chart with open positions, the plan in the morning, otherwise the
+            overview.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-function DataApiPanel({
-  onRefresh,
+function AlertsCard({
+  settings,
+  onPatch,
+}: {
+  settings: AppSettings;
+  onPatch: (patch: Partial<AppSettings>) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BellRing className="size-4" /> Alerts
+        </CardTitle>
+        <CardDescription>
+          Local notifications while EdgeDesk is open (browser permission needed), with
+          in-app toast fallback.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 lg:grid-cols-2">
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Offer expiring with EV unclaimed</p>
+            <p className="text-xs text-muted-foreground">
+              An actionable offer ends today with £1+ of edge still on the table
+            </p>
+          </div>
+          <Switch
+            checked={settings.alertsOfferExpiring}
+            aria-label="Alert when an offer expires with EV unclaimed"
+            onCheckedChange={(v) => onPatch({ alertsOfferExpiring: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Race off-time approaching</p>
+            <p className="text-xs text-muted-foreground">
+              A tracked race goes off within 15 minutes with no bet logged
+            </p>
+          </div>
+          <Switch
+            checked={settings.alertsRaceOffSoon}
+            aria-label="Alert when a race off-time approaches"
+            onCheckedChange={(v) => onPatch({ alertsRaceOffSoon: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Result settled</p>
+            <p className="text-xs text-muted-foreground">
+              &ldquo;Haydock 13:35 settled: +£4.10&rdquo; as results land
+            </p>
+          </div>
+          <Switch
+            checked={settings.alertsResultSettled}
+            aria-label="Alert when a result settles"
+            onCheckedChange={(v) => onPatch({ alertsResultSettled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Unhedged back bet</p>
+            <p className="text-xs text-muted-foreground">
+              A qualifying or risk-free back has no lay after{" "}
+              {settings.tuning.nakedExposureMinutes} minutes (
+              {settings.tuning.nakedImminentMinutes} near the off)
+            </p>
+          </div>
+          <Switch
+            checked={settings.alertsNakedExposure}
+            aria-label="Alert on an unhedged back bet"
+            onCheckedChange={(v) => onPatch({ alertsNakedExposure: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">2UP triggered</p>
+            <p className="text-xs text-muted-foreground">
+              Your team goes two up - early payout is in, with a lock-in suggestion
+            </p>
+          </div>
+          <Switch
+            checked={settings.alertsTwoUpLock}
+            aria-label="Alert when a 2UP triggers"
+            onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Weekly digest</p>
+            <p className="text-xs text-muted-foreground">
+              Monday morning summary of last week - edge captured, leaks, offer droughts
+            </p>
+          </div>
+          <Switch
+            checked={settings.digestWeekly}
+            aria-label="Send a weekly digest on Monday mornings"
+            onCheckedChange={(v) => onPatch({ digestWeekly: v })}
+          />
+        </div>
+        <div className="flex flex-col gap-3 lg:col-span-2">
+          <NotificationPermissionButton />
+          <PushDeviceControl />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimeRegionCard({
+  settings,
+  onPatch,
+}: {
+  settings: AppSettings;
+  onPatch: (patch: Partial<AppSettings>) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Globe className="size-4" /> Time &amp; timezone
+        </CardTitle>
+        <CardDescription>
+          Fixture kickoffs and race off-times are shown in this timezone. Defaults to London.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 sm:flex-row">
+        <div className="flex flex-col gap-1.5 w-full max-w-sm">
+          <Label htmlFor="display-timezone">Display timezone</Label>
+          <Select
+            value={settings.displayTimezone}
+            onValueChange={(v) => onPatch({ displayTimezone: v })}
+          >
+            <SelectTrigger id="display-timezone">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DISPLAY_TIMEZONE_OPTIONS.map((tz) => (
+                <SelectItem key={tz.value} value={tz.value}>
+                  {tz.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5 w-full max-w-sm">
+          <Label htmlFor="time-format">Time format</Label>
+          <Select
+            value={settings.timeFormat}
+            onValueChange={(v) => onPatch({ timeFormat: normalizeTimeFormat(v) })}
+          >
+            <SelectTrigger id="time-format">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TIME_FORMAT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Applies to every time shown in the app. Manual time entry stays HH:MM.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function IntegrationsPanel({
   apiConfigured,
   racingApiConfigured,
   racingResultsTier,
@@ -899,12 +958,11 @@ function DataApiPanel({
   exchangeStatus,
   exchangeProviders,
 }: {
-  onRefresh: () => void;
   apiConfigured?: boolean;
   racingApiConfigured?: boolean;
   racingResultsTier?: "basic" | "free" | "none";
   apiUsage?: { used: number; budget: number };
-  racingApiUsage?: { used: number; budget: number };
+  racingApiUsage?: { used: number };
   exchangeName?: string;
   exchangeStatus?: ExchangeProviderStatus;
   exchangeProviders?: ExchangeProviderStatus[];
@@ -982,7 +1040,7 @@ function DataApiPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Your free stack (£0/mo)</CardTitle>
@@ -1084,32 +1142,6 @@ function DataApiPanel({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Export</CardTitle>
-          <CardDescription>Download your data for spreadsheets or backups.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          {(
-            [
-              ["bets", "Bets"],
-              ["monthly", "Monthly P&L"],
-              ["offers", "Offers"],
-              ["accounts", "Accounts"],
-            ] as const
-          ).map(([type, label]) => (
-            <Button key={type} variant="outline" className="justify-start gap-2" asChild>
-              <a href={`/api/export/csv?type=${type}`} download>
-                <Download className="size-4" /> Export {label}
-              </a>
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-      <EmailIntakeCard />
-      <DataCustodyCard onRestored={onRefresh} />
-      <DemoModeCard />
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">API keys</CardTitle>
@@ -1151,7 +1183,7 @@ function DataApiPanel({
             </div>
             {racingApiUsage && racingApiConfigured && (
               <p className="text-xs text-muted-foreground">
-                Today: {racingApiUsage.used}/{racingApiUsage.budget} requests (local budget guard)
+                Today: {racingApiUsage.used} requests logged
               </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -1213,12 +1245,43 @@ function DataApiPanel({
             required, also set{" "}
             <code className="rounded bg-muted px-1">BETFAIR_TOTP_SECRET</code> (Authenticator
             base32 secret). Restart after changes, then Test. Set your default exchange in
-            Preferences - Racing Desk can still override for that page only.{" "}
+            Bet defaults - Racing Desk can still override for that page only.{" "}
             <strong>Betdaq:</strong> partner API only - placeholder until credentials available.
           </p>
         </CardContent>
       </Card>
-      </div>
+    </div>
+  );
+}
+
+function DataBackupPanel({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Export</CardTitle>
+          <CardDescription>Download your data for spreadsheets or backups.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {(
+            [
+              ["bets", "Bets"],
+              ["monthly", "Monthly P&L"],
+              ["offers", "Offers"],
+              ["accounts", "Accounts"],
+            ] as const
+          ).map(([type, label]) => (
+            <Button key={type} variant="outline" className="justify-start gap-2" asChild>
+              <a href={`/api/export/csv?type=${type}`} download>
+                <Download className="size-4" /> Export {label}
+              </a>
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+      <EmailIntakeCard />
+      <DataCustodyCard onRestored={onRefresh} />
+      <DemoModeCard />
     </div>
   );
 }
