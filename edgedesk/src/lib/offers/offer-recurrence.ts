@@ -58,9 +58,14 @@ function insertInstance(
   series: OfferSeriesRow,
   instanceDate: string,
   todayKey: string,
-  now: number
+  now: number,
+  rule: OfferRecurrenceRule
 ): void {
-  const expiresAt = instanceExpiresAt(series.templateExpiresAt, instanceDate);
+  const expiresAt = instanceExpiresAt(
+    series.templateExpiresAt,
+    instanceDate,
+    rule.expiryOffsetDays ?? 0
+  );
   const status = instanceStatusForDate(instanceDate, todayKey);
   const racing = isRacingSport(series.sport);
 
@@ -166,7 +171,7 @@ export function syncOfferSeriesInstances(now = Date.now()): number {
 
     for (const dateKey of dates) {
       if (existingDates.has(dateKey)) continue;
-      insertInstance(series, dateKey, todayKey, now);
+      insertInstance(series, dateKey, todayKey, now, rule);
       created += 1;
     }
   }
@@ -177,10 +182,21 @@ export function syncOfferSeriesInstances(now = Date.now()): number {
 export function createOfferSeriesWithInstance(
   template: OfferInstanceTemplate,
   rule: OfferRecurrenceRule,
-  options?: { instanceDate?: string; now?: number }
+  options?: { instanceDate?: string; startsOn?: string; now?: number }
 ): { seriesId: number; offerId: number } {
   const now = options?.now ?? Date.now();
-  const instanceDate = options?.instanceDate ?? localYmd(new Date(now));
+  const todayKeyForAnchor = localYmd(new Date(now));
+  // Anchor the search for the first occurrence at "starts on" when it's a future
+  // date, otherwise today - so e.g. "every Wednesday" created on a Tuesday doesn't
+  // materialise a same-day instance that isn't actually due yet.
+  const anchor =
+    options?.startsOn && options.startsOn > todayKeyForAnchor
+      ? options.startsOn
+      : todayKeyForAnchor;
+  const instanceDate =
+    options?.instanceDate ??
+    expandRecurrenceDates(rule, anchor, addDaysYmd(anchor, 400))[0] ??
+    anchor;
 
   const series = db
     .insert(offerSeries)
@@ -216,7 +232,11 @@ export function createOfferSeriesWithInstance(
       description: template.description,
       expectedProfit: template.expectedProfit,
       status: instanceStatusForDate(instanceDate, todayKey),
-      expiresAt: instanceExpiresAt(template.expiresAt ?? null, instanceDate),
+      expiresAt: instanceExpiresAt(
+        template.expiresAt ?? null,
+        instanceDate,
+        rule.expiryOffsetDays ?? 0
+      ),
       sport: template.sport,
       offerType: template.offerType,
       scopeCourse: template.scopeCourse,

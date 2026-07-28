@@ -15,9 +15,10 @@ import {
 import { OfferPasteDialog } from "@/components/offers/offer-paste-dialog";
 import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import { RegionFlag } from "@/components/region-flag";
-import { VenueSelect } from "@/components/venue-select";
+import { VenueSelect, inferVenueKind } from "@/components/venue-select";
 import { api } from "@/hooks/use-app-state";
-import type { OfferSummary } from "@/lib/services/offers.types";
+import { useVenueAccounts } from "@/hooks/use-venue-accounts";
+import type { OfferRecurrenceRule, OfferSummary } from "@/lib/services/offers.types";
 import type { RacingRacecard } from "@/lib/services/theracingapi";
 import {
   formatBetGetFreePlaceSummary,
@@ -44,7 +45,7 @@ import {
 } from "@/lib/offers/offer-terms";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
 import { missedOfferLabelForCategory } from "@/lib/offers/offer-expiry";
-import { formatRecurrenceLabel } from "@/lib/offers/offer-recurrence-shared";
+import { formatRecurrenceLabel, localYmd, parseYmd } from "@/lib/offers/offer-recurrence-shared";
 import type { ParsedOfferDraft } from "@/lib/offers/parse-offer-text";
 import { formatApiError } from "@/lib/api-errors";
 import { filterPillState } from "@/lib/ui/surface-styles";
@@ -59,6 +60,9 @@ export type OfferEditorPrefill = {
 
 type OfferStatus = "planned" | "active" | "completed" | "expired";
 type ScopeMode = "uk_ire" | "course" | "race";
+type RepeatFreq = "daily" | "weekly" | "monthly";
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function formImportantFromState(input: {
   minOdds: string;
@@ -192,7 +196,12 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
       minStake: important.minStake != null ? String(important.minStake) : "",
       maxStake: important.maxStake != null ? String(important.maxStake) : "",
       importantNotes: important.importantNotes,
+      startsOn: offer.startsOn ?? "",
       repeatsEnabled: false,
+      repeatFreq: "daily" as RepeatFreq,
+      repeatInterval: "1",
+      repeatWeekdays: [new Date().getDay()] as number[],
+      repeatMonthday: String(new Date().getDate()),
       stopRecurrence: false,
       seriesRecurrence: offer.recurrence ?? null,
     };
@@ -222,7 +231,12 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     minStake: empty.minStake != null ? String(empty.minStake) : "",
     maxStake: empty.maxStake != null ? String(empty.maxStake) : "",
     importantNotes: empty.importantNotes,
+    startsOn: "",
     repeatsEnabled: false,
+    repeatFreq: "daily" as RepeatFreq,
+    repeatInterval: "1",
+    repeatWeekdays: [new Date().getDay()] as number[],
+    repeatMonthday: String(new Date().getDate()),
     stopRecurrence: false,
     seriesRecurrence: null as import("@/lib/services/offers.types").OfferRecurrenceMeta | null,
   };
@@ -261,7 +275,12 @@ export function OfferEditorForm({
   const [minStake, setMinStake] = useState(boot.minStake);
   const [maxStake, setMaxStake] = useState(boot.maxStake);
   const [importantNotes, setImportantNotes] = useState(boot.importantNotes);
+  const [startsOn, setStartsOn] = useState(boot.startsOn);
   const [repeatsEnabled, setRepeatsEnabled] = useState(boot.repeatsEnabled);
+  const [repeatFreq, setRepeatFreq] = useState<RepeatFreq>(boot.repeatFreq);
+  const [repeatInterval, setRepeatInterval] = useState(boot.repeatInterval);
+  const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>(boot.repeatWeekdays);
+  const [repeatMonthday, setRepeatMonthday] = useState(boot.repeatMonthday);
   const [stopRecurrence, setStopRecurrence] = useState(boot.stopRecurrence);
   const [seriesRecurrence, setSeriesRecurrence] = useState(boot.seriesRecurrence);
   const [saving, setSaving] = useState(false);
@@ -272,6 +291,32 @@ export function OfferEditorForm({
   const [sectionScope, setSectionScope] = useState(false);
   const [sectionDetails, setSectionDetails] = useState(true);
   const [sectionImportant, setSectionImportant] = useState(true);
+  const [autoAddAccount, setAutoAddAccount] = useState(true);
+  // Tracks which venue name autoAddAccount's value belongs to, so it can be
+  // reset to opted-in during render (not an effect) whenever a genuinely
+  // different new venue is picked, while still respecting an explicit
+  // uncheck for the venue currently shown.
+  const [autoAddAccountFor, setAutoAddAccountFor] = useState(bookmaker.trim());
+
+  const { bookieWallets, exchangeWallets, exchangeDirectory, ensureVenue } = useVenueAccounts();
+  const bookmakerTrimmed = bookmaker.trim();
+  const bookmakerIsKnownAccount = useMemo(() => {
+    const key = bookmakerTrimmed.toLowerCase();
+    return (
+      bookieWallets.some((w) => w.name.toLowerCase() === key) ||
+      exchangeWallets.some((w) => w.name.toLowerCase() === key)
+    );
+  }, [bookmakerTrimmed, bookieWallets, exchangeWallets]);
+  const showAutoAddAccount = bookmakerTrimmed !== "" && !bookmakerIsKnownAccount;
+  const autoAddKind = useMemo(
+    () => inferVenueKind(bookmakerTrimmed, exchangeDirectory, exchangeWallets),
+    [bookmakerTrimmed, exchangeDirectory, exchangeWallets]
+  );
+
+  if (bookmakerTrimmed !== autoAddAccountFor) {
+    setAutoAddAccountFor(bookmakerTrimmed);
+    setAutoAddAccount(true);
+  }
 
   function applyBoot(next: Boot) {
     setTitle(next.title);
@@ -295,7 +340,12 @@ export function OfferEditorForm({
     setMinStake(next.minStake);
     setMaxStake(next.maxStake);
     setImportantNotes(next.importantNotes);
+    setStartsOn(next.startsOn);
     setRepeatsEnabled(next.repeatsEnabled);
+    setRepeatFreq(next.repeatFreq);
+    setRepeatInterval(next.repeatInterval);
+    setRepeatWeekdays(next.repeatWeekdays);
+    setRepeatMonthday(next.repeatMonthday);
     setStopRecurrence(next.stopRecurrence);
     setSeriesRecurrence(next.seriesRecurrence);
     setEditingId(next.editingId);
@@ -457,17 +507,46 @@ export function OfferEditorForm({
     const courseValue =
       scopeMode === "uk_ire" ? "uk_ire" : scopeCourse.trim() || "uk_ire";
 
+    const startsOnTrimmed = startsOn.trim();
+    // The offset an occurrence expires after its own date, derived from the gap
+    // between "Starts on" (or today, if blank) and the "Expires" date picked for
+    // the FIRST occurrence - e.g. starts Wed, expires next Tue → every future
+    // occurrence also runs for that same span from its own start date.
+    const expiryOffsetDays = (() => {
+      const expiresMs = fromDatetimeLocalValue(expires);
+      if (expiresMs == null) return undefined;
+      const anchor = startsOnTrimmed || localYmd(new Date());
+      const expiresYmd = localYmd(new Date(expiresMs));
+      const diffDays = Math.round(
+        (parseYmd(expiresYmd).getTime() - parseYmd(anchor).getTime()) / 86_400_000
+      );
+      return diffDays > 0 ? diffDays : undefined;
+    })();
+    const repeatRule: OfferRecurrenceRule | null =
+      editingId == null && repeatsEnabled
+        ? {
+            freq: repeatFreq,
+            interval: Math.max(1, parseInt(repeatInterval, 10) || 1),
+            ...(repeatFreq === "weekly"
+              ? { byWeekday: repeatWeekdays.length > 0 ? repeatWeekdays : [new Date().getDay()] }
+              : {}),
+            ...(repeatFreq === "monthly"
+              ? { byMonthday: Math.min(31, Math.max(1, parseInt(repeatMonthday, 10) || 1)) }
+              : {}),
+            ...(expiryOffsetDays != null ? { expiryOffsetDays } : {}),
+          }
+        : null;
+
     return {
       title: isRacing ? racingTitle : title.trim(),
       bookmaker: bookmaker.trim() || undefined,
       expectedProfit: expected.trim() ? parseFloat(expected) : undefined,
       status: offerStatus,
       expiresAt: fromDatetimeLocalValue(expires),
+      startsOn: startsOnTrimmed || null,
       sport: cat.sport,
       description: description ?? "",
-      ...(editingId == null && repeatsEnabled
-        ? { recurrence: { freq: "daily" as const, interval: 1 } }
-        : {}),
+      ...(repeatRule ? { recurrence: repeatRule } : {}),
       ...(editingId != null && stopRecurrence && seriesRecurrence?.enabled
         ? { stopRecurrence: true }
         : {}),
@@ -499,7 +578,6 @@ export function OfferEditorForm({
     if (isRacingCategory) {
       const stake = parseFloat(betStake);
       const free = parseFloat(freeBetAmount);
-      const runners = parseInt(minRunners, 10);
       if (!Number.isFinite(stake) || stake <= 0) {
         setSectionRacing(true);
         return "Enter a bet stake greater than 0.";
@@ -507,10 +585,6 @@ export function OfferEditorForm({
       if (!Number.isFinite(free) || free <= 0) {
         setSectionRacing(true);
         return "Enter a free bet amount greater than 0.";
-      }
-      if (!Number.isFinite(runners) || runners < 5) {
-        setSectionRacing(true);
-        return "Min runners must be at least 5.";
       }
       if (!eventDate.trim()) {
         setSectionScope(true);
@@ -616,6 +690,22 @@ export function OfferEditorForm({
       } else {
         await api("/api/offers", { method: "POST", json: payload });
         toast.success("Offer added");
+      }
+      if (showAutoAddAccount && autoAddAccount) {
+        try {
+          const res = await ensureVenue(bookmakerTrimmed, autoAddKind);
+          if (res?.created) {
+            toast.success(
+              autoAddKind === "exchange"
+                ? `Added exchange “${bookmakerTrimmed}”`
+                : `Added bookie “${bookmakerTrimmed}”`
+            );
+          }
+        } catch (err) {
+          toast.error("Offer saved, but could not add the account", {
+            description: formatApiError(err),
+          });
+        }
       }
       onSaved();
     } catch (err) {
@@ -725,7 +815,7 @@ export function OfferEditorForm({
               <Input
                 id="offer-min-runners"
                 type="number"
-                min={5}
+                min={1}
                 value={minRunners}
                 onChange={(e) => setMinRunners(e.target.value)}
               />
@@ -929,7 +1019,26 @@ export function OfferEditorForm({
           onChange={setBookmaker}
           label="Bookie / Exchange"
           placeholder="Select bookie or exchange"
+          persistCustom={false}
         />
+        {showAutoAddAccount ? (
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={autoAddAccount}
+              onChange={(e) => setAutoAddAccount(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-foreground">
+                Add &ldquo;{bookmakerTrimmed}&rdquo; to Accounts
+              </span>
+              <span className="mt-0.5 block text-muted-foreground">
+                Creates a {autoAddKind} wallet for this venue when you save the offer.
+              </span>
+            </span>
+          </label>
+        ) : null}
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="offer-exp" className="text-[11px] text-muted-foreground">
@@ -945,16 +1054,33 @@ export function OfferEditorForm({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-expires" className="text-[11px] text-muted-foreground">
-              Expires
+            <Label htmlFor="offer-starts-on" className="text-[11px] text-muted-foreground">
+              Starts on
             </Label>
             <Input
-              id="offer-expires"
-              type="datetime-local"
-              value={expires}
-              onChange={(e) => setExpires(e.target.value)}
+              id="offer-starts-on"
+              type="date"
+              placeholder="Today"
+              value={startsOn}
+              onChange={(e) => setStartsOn(e.target.value)}
             />
           </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="offer-expires" className="text-[11px] text-muted-foreground">
+            Expires
+          </Label>
+          <Input
+            id="offer-expires"
+            type="datetime-local"
+            value={expires}
+            onChange={(e) => setExpires(e.target.value)}
+          />
+          {startsOn.trim() && startsOn.trim() > localYmd(new Date()) ? (
+            <p className="text-[11px] text-muted-foreground">
+              Stays &ldquo;Planned&rdquo; until {startsOn}, then goes live automatically.
+            </p>
+          ) : null}
         </div>
         {editingId == null ? (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
@@ -965,13 +1091,104 @@ export function OfferEditorForm({
               onChange={(e) => setRepeatsEnabled(e.target.checked)}
             />
             <span>
-              <span className="font-medium text-foreground">Repeats daily</span>
+              <span className="font-medium text-foreground">Repeats</span>
               <span className="mt-0.5 block text-muted-foreground">
-                Creates a new offer each day for the next 2 weeks. Each day gets its own ID so
-                bets and completion stay separate.
+                Creates a new offer each occurrence. Each gets its own ID so bets and completion
+                stay separate.
               </span>
             </span>
           </label>
+        ) : null}
+        {editingId == null && repeatsEnabled ? (
+          <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-2.5">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-[11px] text-muted-foreground">Frequency</Label>
+                <Select
+                  value={repeatFreq}
+                  onValueChange={(v) => setRepeatFreq(v as RepeatFreq)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="offer-repeat-interval" className="text-[11px] text-muted-foreground">
+                  Every
+                </Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="offer-repeat-interval"
+                    type="number"
+                    min={1}
+                    className="w-16"
+                    value={repeatInterval}
+                    onChange={(e) => setRepeatInterval(e.target.value)}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {repeatFreq === "daily" ? "day(s)" : repeatFreq === "weekly" ? "week(s)" : "month(s)"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {repeatFreq === "weekly" ? (
+              <div className="flex flex-col gap-1">
+                <Label className="text-[11px] text-muted-foreground">On</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAY_LABELS.map((label, day) => {
+                    const active = repeatWeekdays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() =>
+                          setRepeatWeekdays((prev) => {
+                            if (active) {
+                              const next = prev.filter((d) => d !== day);
+                              return next.length > 0 ? next : prev;
+                            }
+                            return [...prev, day].sort();
+                          })
+                        }
+                        className={filterPillState(active)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {repeatFreq === "monthly" ? (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="offer-repeat-monthday" className="text-[11px] text-muted-foreground">
+                  Day of month
+                </Label>
+                <Input
+                  id="offer-repeat-monthday"
+                  type="number"
+                  min={1}
+                  max={31}
+                  className="w-20"
+                  value={repeatMonthday}
+                  onChange={(e) => setRepeatMonthday(e.target.value)}
+                />
+              </div>
+            ) : null}
+
+            <p className="text-[11px] text-muted-foreground">
+              Each occurrence stays live for the same span as &ldquo;Starts on&rdquo; → &ldquo;Expires&rdquo;
+              above (leave &ldquo;Starts on&rdquo; blank to anchor from today).
+            </p>
+          </div>
         ) : seriesRecurrence?.enabled ? (
           <div className="rounded-md border border-dashed bg-muted/20 px-3 py-2.5 text-xs">
             <p className="font-medium text-foreground">

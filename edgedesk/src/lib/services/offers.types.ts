@@ -27,12 +27,16 @@ export interface OfferProfitBreakdown {
   totalProfit: number;
 }
 
-export type OfferRecurrenceFreq = "daily" | "weekly";
+export type OfferRecurrenceFreq = "daily" | "weekly" | "monthly";
 
 export interface OfferRecurrenceRule {
   freq: OfferRecurrenceFreq;
   interval: number;
   byWeekday?: number[];
+  /** Monthly only: day of month 1-31 (clamped to the month's last day when shorter). */
+  byMonthday?: number;
+  /** Days after each occurrence's date that it expires; 0/undefined = same calendar day. */
+  expiryOffsetDays?: number;
 }
 
 export interface OfferRecurrenceMeta {

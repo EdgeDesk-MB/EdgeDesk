@@ -32,6 +32,7 @@ function offer(
     completedAt: null,
     seriesId: null,
     instanceDate: null,
+    startsOn: null,
     source: null,
     createdAt: rest.createdAt ?? Date.now(),
     betCount: 0,

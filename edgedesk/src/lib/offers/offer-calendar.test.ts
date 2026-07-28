@@ -32,6 +32,7 @@ function offer(
     createdAt: rest.createdAt ?? Date.now(),
     seriesId: rest.seriesId ?? null,
     instanceDate: rest.instanceDate ?? null,
+    startsOn: rest.startsOn ?? null,
     source: null,
     betCount: rest.betCount ?? 0,
     openBets: 0,

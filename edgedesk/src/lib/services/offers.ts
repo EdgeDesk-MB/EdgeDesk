@@ -536,6 +536,7 @@ export {
 export function syncOfferStatuses(): void {
   normalizeAllOfferOddsText();
   const now = Date.now();
+  const todayKey = localYmd(new Date(now));
   const allOffers = db.select().from(offers).all();
   const allBets = db.select().from(bets).all();
   const promoAwards = getPromoAwardsByBetId();
@@ -561,7 +562,10 @@ export function syncOfferStatuses(): void {
       continue;
     }
 
-    if (offer.status === "planned" && linkedBets.length > 0) {
+    // A scheduled "Starts on" date arriving is as good a trigger as a first bet.
+    const readyToGoLive = offer.startsOn != null && offer.startsOn <= todayKey;
+
+    if (offer.status === "planned" && (linkedBets.length > 0 || readyToGoLive)) {
       db.update(offers).set({ status: "active" }).where(eq(offers.id, offer.id)).run();
       // Write EV lock v1 for the newly-active offer (if not already locked).
       const activeSummary = summariseOffer({ ...offer, status: "active" }, linkedBets, promoAwards);

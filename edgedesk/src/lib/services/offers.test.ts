@@ -307,6 +307,7 @@ function offerRow(partial: Partial<OfferRow> & Pick<OfferRow, "id">): OfferRow {
     completedAt: null,
     seriesId: null,
     instanceDate: null,
+    startsOn: null,
     source: null,
     createdAt: 1,
     ...partial,

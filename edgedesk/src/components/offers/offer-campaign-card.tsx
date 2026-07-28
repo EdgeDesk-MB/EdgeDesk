@@ -376,6 +376,12 @@ export function OfferCampaignCard({
         onKeyDown={stopCardActivate}
       >
         <span className="text-xs text-muted-foreground">
+          {offer.status === "planned" && offer.startsOn ? (
+            <>
+              <span className="font-medium text-foreground">Starts {offer.startsOn}</span>
+              {" · "}
+            </>
+          ) : null}
           {offer.betCount} bet{offer.betCount === 1 ? "" : "s"}
           {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
           {expiryMs != null && expiryUrgency === "today" ? (
