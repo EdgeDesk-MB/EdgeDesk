@@ -16,6 +16,8 @@ import {
   buildChartBetMarkers,
   chartBetMarkerClassName,
   computePnlChartLayout,
+  PNL_CHART_MARKER_FADE_IN_MS,
+  PNL_CHART_WINDOW_TRANSITION_MS,
   projectBetMarkers,
   settlementStatusLabel,
   type LivePnlPoint,
@@ -30,6 +32,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   livePoints,
   liveValue,
   windowSecs,
+  activeWindowSecs,
   showBadge,
   padding,
 }: {
@@ -38,12 +41,29 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   livePoints: LivePnlPoint[];
   liveValue: number;
   windowSecs: number;
+  /** The user-selected timeframe (not the continuously-drifting "All" bound) - drives the hide/fade below. */
+  activeWindowSecs: number;
   showBadge: boolean;
   padding: PnlChartPadding;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [projected, setProjected] = useState<ProjectedBetMarker[]>([]);
+
+  // Hide markers for the duration of Liveline's window-change animation, then
+  // fade them back in over half that time so they don't pop in mid-reflow.
+  const prevActiveWindowRef = useRef(activeWindowSecs);
+  const [markerFade, setMarkerFade] = useState({ opacity: 1, transition: false });
+
+  useEffect(() => {
+    if (prevActiveWindowRef.current === activeWindowSecs) return;
+    prevActiveWindowRef.current = activeWindowSecs;
+    setMarkerFade({ opacity: 0, transition: false });
+    const timer = window.setTimeout(() => {
+      setMarkerFade({ opacity: 1, transition: true });
+    }, PNL_CHART_WINDOW_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeWindowSecs]);
 
   const markers = useMemo(
     () => [...buildChartBetMarkers(bets), ...buildAdjustmentMarkers(adjustments)],
@@ -63,6 +83,11 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
     return () => ro.disconnect();
   }, []);
 
+  // Frozen {min, max} from the last frame that had 2+ in-window points -
+  // reused when the window goes sparse so markers don't jump to a
+  // mismatched scale relative to Liveline's own (also-frozen) line range.
+  const lastGoodRangeRef = useRef<{ min: number; max: number } | null>(null);
+
   useEffect(() => {
     if (!size.width || !size.height || markers.length === 0) {
       setProjected([]);
@@ -81,7 +106,11 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
         showBadge,
         livePoints,
         liveValue,
+        fallbackRange: lastGoodRangeRef.current ?? undefined,
       });
+      if (layout?.hasSufficientData) {
+        lastGoodRangeRef.current = { min: layout.minVal, max: layout.maxVal };
+      }
       const next = layout ? projectBetMarkers(markers, layout, livePoints) : [];
       const key = next
         .map((p) => `${p.marker.kind ?? "bet"}:${p.marker.id}:${p.x.toFixed(1)}:${p.y.toFixed(1)}`)
@@ -104,6 +133,12 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
       ref={hostRef}
       className="chart-bet-marker-layer pointer-events-none absolute inset-0"
       aria-hidden={projected.length === 0}
+      style={{
+        opacity: markerFade.opacity,
+        transition: markerFade.transition
+          ? `opacity ${PNL_CHART_MARKER_FADE_IN_MS}ms ease`
+          : undefined,
+      }}
     >
       <TooltipProvider delayDuration={200}>
         {projected.map(({ marker, x, y }) => {

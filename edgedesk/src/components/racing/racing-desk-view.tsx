@@ -27,6 +27,7 @@ import {
 } from "@/components/racing/racing-intelligence-dialog";
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
 import { useAddBet } from "@/components/add-bet-provider";
+import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { VenueBadge } from "@/components/venue-badge";
@@ -92,6 +93,11 @@ export function RacingDeskView() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const hasPayloadRef = useRef(false);
+  // Courses is a horizontal pill row below `xl`, a vertical list above it -
+  // drag-to-pan only matters in the pill layout (no-op once it's vertical,
+  // since there's nothing to scroll horizontally there).
+  const coursesScrollRef = useRef<HTMLDivElement>(null);
+  const coursesDrag = useDragToScroll(coursesScrollRef);
   const [bookiePlaces, setBookiePlaces] = useState(4);
   const [exchangePlaces, setExchangePlaces] = useState(3);
   const [epStake, setEpStake] = useState(10);
@@ -303,6 +309,17 @@ export function RacingDeskView() {
     } catch (e) {
       toast.error("Could not track race", { description: String(e) });
       return null;
+    }
+  }
+
+  async function untrackRace(race: RacingDeskRace) {
+    if (race.trackedEventId == null) return;
+    try {
+      await api(`/api/events/${race.trackedEventId}`, { method: "DELETE" });
+      toast.success("Race untracked");
+      await load({ soft: true });
+    } catch (e) {
+      toast.error("Could not untrack race", { description: String(e) });
     }
   }
 
@@ -596,9 +613,9 @@ export function RacingDeskView() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <aside className="flex flex-col gap-3 lg:col-span-3">
-          <Card>
+      <div className="grid gap-4 xl:grid-cols-12">
+        <aside className="flex min-w-0 flex-col gap-3 xl:col-span-3">
+          <Card className="min-w-0">
             <CardHeader className="pb-2">
               <CardTitle section>Courses</CardTitle>
               <CardDescription compact>
@@ -606,7 +623,18 @@ export function RacingDeskView() {
                 {qualifyingOnly ? " · qualifying" : ""}
               </CardDescription>
             </CardHeader>
-            <CardContent className="app-scroll-nested max-h-[22rem] space-y-0.5 overflow-y-auto">
+            <CardContent
+              ref={coursesScrollRef}
+              className={cn(
+                "app-scroll-nested min-w-0 flex cursor-grab gap-1.5 overflow-x-auto pb-1 active:cursor-grabbing",
+                "xl:max-h-[22rem] xl:cursor-default xl:flex-col xl:gap-0 xl:space-y-0.5 xl:overflow-x-hidden xl:overflow-y-auto xl:pb-0 xl:active:cursor-default"
+              )}
+              onPointerDown={coursesDrag.onPointerDown}
+              onPointerMove={coursesDrag.onPointerMove}
+              onPointerUp={coursesDrag.onPointerUp}
+              onPointerCancel={coursesDrag.onPointerCancel}
+              onClickCapture={coursesDrag.onClickCapture}
+            >
               {visibleCourses.length === 0 && (
                 <p className="px-2 py-4 text-center text-xs text-muted-foreground">
                   No qualifying races for your offers today.
@@ -632,8 +660,9 @@ export function RacingDeskView() {
                       setSelectedId(nextRace?.externalId ?? null);
                     }}
                     className={cn(
-                      "flex w-full items-center justify-between px-2.5 py-2 text-left text-sm",
-                      listRowSelected(active)
+                      listRowSelected(active),
+                      "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-left text-sm",
+                      "xl:w-full xl:shrink xl:justify-between xl:whitespace-normal xl:rounded-md xl:px-2.5 xl:py-2"
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium">
@@ -762,7 +791,7 @@ export function RacingDeskView() {
           )}
         </aside>
 
-        <div className="min-w-0 lg:col-span-9">
+        <div className="min-w-0 xl:col-span-9">
           <FlashscoreRacecard
             courses={visibleCourses}
             selected={selected}
@@ -771,6 +800,7 @@ export function RacingDeskView() {
             bookiePlaces={bookiePlaces}
             exchangePlaces={exchangePlaces}
             onTrack={trackRace}
+            onUntrack={untrackRace}
             onBet={openBetForRunner}
             onOddsOverride={saveOddsOverride}
             backColor={summary?.backColor ?? deskExchangeRow?.backColor}

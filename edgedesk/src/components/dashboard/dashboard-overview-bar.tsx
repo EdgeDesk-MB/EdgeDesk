@@ -167,7 +167,7 @@ export function DashboardOverviewBar({
           ) : null}
         </div>
 
-        <div className="flex flex-col items-stretch gap-2 border-t border-border/60 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end pb-10">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <DashboardPnlSummaries offers={offers} bets={bets} />
         </div>
       </div>

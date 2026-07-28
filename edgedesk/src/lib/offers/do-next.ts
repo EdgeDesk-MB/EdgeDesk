@@ -160,10 +160,15 @@ export function buildDoNextItems(
       action.bookmaker &&
       (action.kind === "place_qualifying" || action.kind === "start_planned")
     ) {
-      const needed = rulesStake(offer) ?? 10;
-      const available = bookieBalances.get(normVenue(action.bookmaker)) ?? -1;
-      if (available >= 0 && available < needed) {
-        funding = { needed, available, short: needed - available };
+      // Non-racing offers often have no parsed stake in `rules` - without a
+      // known required stake we can't judge a shortfall, so skip the check
+      // rather than guess (a guessed £10 was showing bogus shortfalls).
+      const needed = rulesStake(offer);
+      if (needed != null) {
+        const available = bookieBalances.get(normVenue(action.bookmaker)) ?? -1;
+        if (available >= 0 && available < needed) {
+          funding = { needed, available, short: needed - available };
+        }
       }
     }
 

@@ -47,8 +47,6 @@ const CHART_WINDOWS: ReadonlyArray<{
   /** Hidden below the `sm` breakpoint to keep the mobile chip row tight. */
   desktopOnly?: true;
 }> = [
-  { label: "5m", secs: 300, desktopOnly: true },
-  { label: "1hr", secs: 3600 },
   { label: "24h", secs: 86_400 },
   { label: "This week", secs: 604_800 },
   { label: "This month", secs: 2_592_000, desktopOnly: true },
@@ -201,7 +199,7 @@ export const LivePnlChart = memo(function LivePnlChart({
         <>
           <DashboardSectionHeader
             prominent
-            className="bg-card"
+            className="bg-page"
             icon={hasLiveEvent ? Radio : undefined}
             iconClassName={
               hasLiveEvent ? "animate-pulse text-emerald-600" : undefined
@@ -348,6 +346,7 @@ export const LivePnlChart = memo(function LivePnlChart({
                 livePoints={livePoints}
                 liveValue={displayTotal}
                 windowSecs={effectiveWindowSecs}
+                activeWindowSecs={chartWindowSecs}
                 showBadge={!panel}
                 padding={markerPadding}
               />

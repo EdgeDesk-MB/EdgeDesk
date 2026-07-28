@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import {
   AlarmClock,
   BellRing,
+  Check,
   CheckCheck,
   CircleCheck,
   Flag,
@@ -78,6 +79,15 @@ export default function AlertsPage() {
     load();
   }
 
+  /** Mark a single alert read in place - no navigation, unlike open(). */
+  async function markOneRead(alert: AlertsInboxRow) {
+    await api("/api/alerts", { method: "PATCH", json: { id: alert.id, read: true } }).catch(
+      () => {}
+    );
+    void refresh();
+    load();
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -107,10 +117,17 @@ export default function AlertsPage() {
             const Icon = KIND_ICONS[alert.kind] ?? BellRing;
             const isUnread = alert.readAt == null;
             return (
-              <button
+              <div
                 key={alert.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => void open(alert)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    void open(alert);
+                  }
+                }}
                 className={cn(
                   "flex items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-colors hover:bg-selection-subtle",
                   isUnread ? "bg-card" : "opacity-70"
@@ -137,13 +154,22 @@ export default function AlertsPage() {
                     {dayLabel(alert.updatedAt)}
                   </span>
                   {isUnread ? (
-                    <>
-                      <span className="sr-only">Unread</span>
-                      <span aria-hidden className="size-2 rounded-full bg-primary" />
-                    </>
+                    <button
+                      type="button"
+                      aria-label="Mark as read"
+                      title="Mark as read"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void markOneRead(alert);
+                      }}
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    >
+                      <Check className="size-3.5" />
+                      <span className="sr-only">Mark as read</span>
+                    </button>
                   ) : null}
                 </span>
-              </button>
+              </div>
             );
           })
         )}

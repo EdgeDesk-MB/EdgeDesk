@@ -90,7 +90,7 @@ export interface AppState {
   racingApiConfigured: boolean;
   racingResultsTier: RacingResultsTier;
   apiUsage: { used: number; budget: number };
-  racingApiUsage: { used: number; budget: number };
+  racingApiUsage: { used: number };
   exchangeProvider: string;
   exchangeName: string;
   exchangeStatus: ExchangeProviderStatus;

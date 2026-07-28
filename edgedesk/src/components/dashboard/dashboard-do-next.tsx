@@ -39,19 +39,22 @@ function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: Ev
   );
 }
 
-function doNextHeaderTint(offer?: OfferSummary, remainingEv = 0): string | null {
-  if (offer) {
-    const isExpired = isOfferExpired(offer);
+function doNextHeaderTint(item: DoNextItem, offer?: OfferSummary): string | null {
+  if (offer && isOfferExpired(offer)) return "offer-header-tint-expired";
+
+  // Convert-free-bet cards are about the free bet still on the table, not the
+  // (already realised) qualifying-leg cost baked into offer.profit.totalProfit -
+  // tint those on the remaining EV like orphan free-bet cards.
+  if (offer && item.kind !== "convert_free_bet") {
     const tintValue =
       Math.abs(offer.profit.totalProfit) > 0.005
         ? offer.profit.totalProfit
         : (offer.expectedProfit ?? offer.expectedFromBets);
-    if (isExpired) return "offer-header-tint-expired";
     if (tintValue > 0.005) return "offer-header-tint-win";
     if (tintValue < -0.005) return "offer-header-tint-loss";
     return null;
   }
-  if (remainingEv > 0.5) return "offer-header-tint-win";
+  if (item.remainingEv > 0.5) return "offer-header-tint-win";
   return null;
 }
 
@@ -68,11 +71,11 @@ function DoNextCard({
   onOpen?: (item: DoNextItem) => void;
   offer?: OfferSummary;
 }) {
-  const headerTint = doNextHeaderTint(offer, item.remainingEv);
+  const headerTint = doNextHeaderTint(item, offer);
 
   const cardClass = cn(
     offerCalendarCardShell,
-    "w-[min(100%,300px)] shrink-0 snap-start min-h-[148px]"
+    "w-[min(100%,300px)] shrink-0 snap-start min-h-[148px] rounded-[20px]"
   );
 
   const body = (
@@ -84,7 +87,7 @@ function DoNextCard({
           isBest && "bg-primary/[0.03]"
         )}
       >
-        <div className="flex items-start gap-2 px-3 pt-[10px]">
+        <div className="flex items-start gap-2 px-4 pt-4">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {item.bookmaker ? <VenueBadge name={item.bookmaker} size="sm" /> : null}
             {/* Warning-toned gubbed / muted cooling - matches the Accounts health chips */}
@@ -107,7 +110,7 @@ function DoNextCard({
           <DoNextEvCorner remainingEv={item.remainingEv} basis={item.basis} />
         </div>
 
-        <div className="flex flex-1 flex-col px-3 pb-3">
+        <div className="flex flex-1 flex-col px-4 pb-4">
           <p className="truncate text-base font-semibold leading-snug text-foreground">{item.title}</p>
           {item.offerTitle && item.offerTitle !== item.title ? (
             <p className="mt-0.5 truncate text-sm font-medium text-foreground">{item.offerTitle}</p>
@@ -257,29 +260,35 @@ export function DashboardDoNext({ className }: { className?: string }) {
         </p>
       ) : null}
 
-      <div className="pl-[var(--layout-page-x)] py-[calc(0.75rem+12px)] pr-0">
+      <div className="py-[calc(0.75rem+12px)]">
         <ScrollFadeEdges
+          orientation="horizontal"
+          dragToScroll
           scrollClassName={cn(
-            "flex gap-3 overflow-x-auto overflow-y-visible",
+            "app-scroll-overlay overflow-x-auto overflow-y-visible",
             "snap-x snap-mandatory",
-            "px-px py-px",
-            "[scrollbar-width:thin]"
+            "py-px"
           )}
         >
-          {items.map((item, i) => (
-            <DoNextCard
-              key={item.id}
-              item={item}
-              isBest={i === 0}
-              onConvert={onConvert}
-              onOpen={onOpenCard}
-              offer={
-                item.offerId != null
-                  ? offers.find((o) => o.id === item.offerId)
-                  : undefined
-              }
-            />
-          ))}
+          {/* Card content is inset px-4 (1rem) from the card edge, so the
+              container's leading margin is short by that much - the card's
+              text (not its edge) is what needs to land under "Do next". */}
+          <div className="flex gap-3 ml-[calc(var(--layout-page-x)_-_1rem)] pr-3">
+            {items.map((item, i) => (
+              <DoNextCard
+                key={item.id}
+                item={item}
+                isBest={i === 0}
+                onConvert={onConvert}
+                onOpen={onOpenCard}
+                offer={
+                  item.offerId != null
+                    ? offers.find((o) => o.id === item.offerId)
+                    : undefined
+                }
+              />
+            ))}
+          </div>
         </ScrollFadeEdges>
       </div>
     </section>

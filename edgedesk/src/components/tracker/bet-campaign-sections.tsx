@@ -11,6 +11,7 @@ import { MoneyFlow } from "@/components/money-flow";
 import { VenueBadge } from "@/components/venue-badge";
 import { formatOfferStatusDisplay } from "@/lib/offers/offer-expiry";
 import { isOfferExpired, offerInactiveFigureClass } from "@/lib/offers/offer-inactive-ui";
+import { campaignHeaderBand } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Gift, Tag } from "lucide-react";
 
@@ -42,7 +43,12 @@ export function BetCampaignSections({
           key={group.offerId ?? "orphans"}
           className="min-w-0 overflow-hidden rounded-lg ring-1 ring-border/50"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-muted/50 px-3 py-2 dark:bg-input/30">
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2",
+              campaignHeaderBand
+            )}
+          >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 {group.offerId != null ? (

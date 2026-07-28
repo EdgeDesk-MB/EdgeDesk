@@ -66,41 +66,48 @@ export async function findOrCreateRacingEvent(opts: {
   }
 
   if (hasRacingApiKey()) {
-    let card = matchRacecard(await racecardsFree("today"), course, opts.startTime);
-    if (!card) card = matchRacecard(await racecardsFree("tomorrow"), course, opts.startTime);
+    // Racing API failures (budget exhausted, network, auth) must never block
+    // tracking the race - fall through to the manual event below, same as
+    // when the API is reachable but simply has no matching card.
+    try {
+      let card = matchRacecard(await racecardsFree("today"), course, opts.startTime);
+      if (!card) card = matchRacecard(await racecardsFree("tomorrow"), course, opts.startTime);
 
-    if (card) {
-      const byExternal = db
-        .select()
-        .from(events)
-        .all()
-        .find((e) => e.externalId === card!.externalId);
-      if (byExternal) {
-        await syncRacingResultsForEvents([byExternal.id]);
-        const refreshed =
-          db.select().from(events).where(eq(events.id, byExternal.id)).get() ?? byExternal;
-        return { event: refreshed, mode: "existing" };
+      if (card) {
+        const byExternal = db
+          .select()
+          .from(events)
+          .all()
+          .find((e) => e.externalId === card!.externalId);
+        if (byExternal) {
+          await syncRacingResultsForEvents([byExternal.id]);
+          const refreshed =
+            db.select().from(events).where(eq(events.id, byExternal.id)).get() ?? byExternal;
+          return { event: refreshed, mode: "existing" };
+        }
+
+        const inserted = db
+          .insert(events)
+          .values({
+            sport: "horse_racing",
+            competition: card.course,
+            homeTeam: opts.raceName?.trim() || card.raceName,
+            awayTeam: card.offTime,
+            startTime: card.startTime,
+            source: "api",
+            externalId: card.externalId,
+            status: card.status,
+            goals: card.runners.length ? serializeRacecardRunners(card.runners) : null,
+            createdAt: Date.now(),
+          })
+          .returning()
+          .get();
+        await syncRacingResultsForEvents([inserted.id]);
+        const refreshed = db.select().from(events).where(eq(events.id, inserted.id)).get() ?? inserted;
+        return { event: refreshed, mode: "api" };
       }
-
-      const inserted = db
-        .insert(events)
-        .values({
-          sport: "horse_racing",
-          competition: card.course,
-          homeTeam: opts.raceName?.trim() || card.raceName,
-          awayTeam: card.offTime,
-          startTime: card.startTime,
-          source: "api",
-          externalId: card.externalId,
-          status: card.status,
-          goals: card.runners.length ? serializeRacecardRunners(card.runners) : null,
-          createdAt: Date.now(),
-        })
-        .returning()
-        .get();
-      await syncRacingResultsForEvents([inserted.id]);
-      const refreshed = db.select().from(events).where(eq(events.id, inserted.id)).get() ?? inserted;
-      return { event: refreshed, mode: "api" };
+    } catch {
+      // fall through to manual tracking below
     }
   }
 

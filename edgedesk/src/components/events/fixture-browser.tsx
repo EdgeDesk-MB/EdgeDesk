@@ -344,7 +344,7 @@ export function FixtureBrowserContent({
         onValueChange={(v) => setFixtureSport(v as "football" | "horse_racing")}
         className="gap-0"
       >
-        <TabsList variant="line">
+        <TabsList variant="line" fadeClassName={tabBleed === "dialog" ? "from-popover" : "from-card"}>
           {FIXTURE_SPORTS.map((sport) => (
             <TabsTrigger key={sport.id} value={sport.id} className="gap-1.5">
               <SportIcon sport={sport.id} size={14} />

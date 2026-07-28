@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -248,8 +247,7 @@ export default function TrackedEventsPage() {
               <TableRow>
                 <TableHead>Event</TableHead>
                 <TableHead className="w-28">Status</TableHead>
-                <TableHead className="w-36 text-center">Score</TableHead>
-                <TableHead className="w-32">2UP flags</TableHead>
+                <TableHead className="w-36">Result</TableHead>
                 <TableHead className="w-52 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>

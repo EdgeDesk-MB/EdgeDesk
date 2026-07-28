@@ -145,6 +145,11 @@ function OfferWorkflowBody({
   const tracked = race.trackedEventId != null;
   const hasOpenBet = race.openBetCount > 0 || linkedBackBet != null;
   const logged = tracked || hasOpenBet;
+  // A lay stake entered on the same bet row (e.g. via the racecard's
+  // place-refund Add-bet flow) counts as the lay leg being done too - it
+  // isn't only reachable through this guide's own "Lay" CTA.
+  const hasLayStake = (linkedBackBet?.layStake ?? 0) > 0;
+  const layStepDone = layDone || hasLayStake;
 
   const steps: Array<{ id: StepId; done: boolean; active: boolean }> = [
     { id: "pick", done: true, active: false },
@@ -153,7 +158,7 @@ function OfferWorkflowBody({
       done: backDone || hasOpenBet,
       active: !backDone && !hasOpenBet,
     },
-    { id: "lay", done: layDone, active: (backDone || hasOpenBet) && !layDone },
+    { id: "lay", done: layStepDone, active: (backDone || hasOpenBet) && !layStepDone },
     {
       id: "log",
       done: logged,

@@ -114,7 +114,7 @@ export function SeasonView({ owner }: { owner?: string | null } = {}) {
         <StatTile
           label="Commission drag"
           value={formatGbp(season.totals.commissionDrag)}
-          sub="exchange commission paid"
+          sub="ex. comm. paid"
         />
       </StatStrip>
 
@@ -170,12 +170,12 @@ export function SeasonView({ owner }: { owner?: string | null } = {}) {
               <TableBody>
                 {season.months.map((m) => (
                   <TableRow key={m.month}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium font-semibold">
                       {monthLabel(m.month)} {m.month.slice(0, 4)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <MoneyFlow value={m.profit} signColor signDisplay />
-                    </TableCell>
+                     <TableCell className="text-right tabular-nums font-semibold">
+                       <MoneyFlow value={m.profit} signColor signDisplay />
+                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {m.expected != null ? formatGbp(m.expected) : "–"}
                     </TableCell>

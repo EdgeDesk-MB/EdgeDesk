@@ -102,7 +102,7 @@ export function SiteMapView() {
       <p className="text-sm text-muted-foreground">
         Rendered live from the navigation structure, so this page is always current. Groups show
         their sub-navigation indented - the pattern to copy when a page grows sub-pages of its
-        own (as Offers already has).
+        own (as Offers and Casino already have).
       </p>
 
       {NAV_SECTIONS.map((section) => (

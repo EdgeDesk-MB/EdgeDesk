@@ -40,7 +40,7 @@ export function DashboardFeedPanel({
     <section className={cn(dashboardSection, "min-h-0 flex-1", className)}>
       <DashboardSectionHeader
         prominent
-        className="bg-card"
+        className="bg-page"
         titleHref="/history"
         title="Feed"
         description="Goals, results and settlements in real time."

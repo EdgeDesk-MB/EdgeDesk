@@ -36,7 +36,7 @@ export function EmptyState({
           </div>
         )}
         <div className="max-w-md space-y-1">
-          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-base font-semibold">{title}</p>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
         {(action || secondaryAction) && (

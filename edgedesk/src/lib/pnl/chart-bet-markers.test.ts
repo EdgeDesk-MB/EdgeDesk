@@ -256,6 +256,74 @@ describe("projectBetMarkers", () => {
   });
 });
 
+describe("computePnlChartLayout", () => {
+  it("builds a layout on narrow windows even with fewer than 2 points in view", () => {
+    const nowSec = 1_000;
+    // Both line points are outside a 300s (5m) window - only liveValue anchors it.
+    const livePoints = [
+      { time: nowSec - 5_000, value: 0 },
+      { time: nowSec - 4_000, value: 10 },
+    ];
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs: 300,
+      showBadge: false,
+      livePoints,
+      liveValue: 10,
+      nowSec,
+    });
+    expect(layout).not.toBeNull();
+
+    // A bet that settled inside the narrow window still projects.
+    const bets = [
+      bet({ id: 1, status: "won", actualProfit: 5, settledAt: (nowSec - 200) * 1000 }),
+      bet({ id: 2, status: "won", actualProfit: 5, settledAt: (nowSec - 100) * 1000 }),
+    ];
+    const projected = projectBetMarkers(buildChartBetMarkers(bets), layout!);
+    expect(projected).toHaveLength(1);
+    expect(projected[0]?.marker.id).toBe(2);
+  });
+
+  it("reuses fallbackRange (not the currentValue/referenceValue guess) when the window is sparse", () => {
+    const nowSec = 1_000;
+    const livePoints = [
+      { time: nowSec - 5_000, value: 0 },
+      { time: nowSec - 4_000, value: 165 },
+    ];
+    const wideRange = { min: 0, max: 180 };
+
+    const withFallback = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs: 300,
+      showBadge: false,
+      livePoints,
+      liveValue: 165,
+      nowSec,
+      fallbackRange: wideRange,
+    });
+    expect(withFallback?.hasSufficientData).toBe(false);
+    expect(withFallback?.minVal).toBe(0);
+    expect(withFallback?.maxVal).toBe(180);
+
+    const withoutFallback = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs: 300,
+      showBadge: false,
+      livePoints,
+      liveValue: 165,
+      nowSec,
+    });
+    // No fallback supplied - falls back to the narrower currentValue/referenceValue guess.
+    expect(withoutFallback?.maxVal).not.toBe(180);
+  });
+});
+
 describe("seriesValueAt", () => {
   const points = [
     { time: 700, value: 10 },

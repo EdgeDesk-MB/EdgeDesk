@@ -46,26 +46,37 @@ interface CacheEntry<T> {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 const RACECARDS_TTL = 15 * 60 * 1000;
-const RESULTS_TTL = 90 * 1000;
+// The app-wide state poll (every few seconds, on every page - not just
+// Racing Desk) transitively calls resultsToday() via getAppState() ->
+// refreshRacingApiEvents()/resolveRacingResultsTier(), every tick. A short
+// TTL here means that drip alone burns the whole daily request budget
+// within a few hours of the app just being open. Race results don't need
+// sub-minute freshness for auto-settlement, so 5 minutes cuts the "always
+// on" drain ~3x with no meaningful UX cost.
+const RESULTS_TTL = 5 * 60 * 1000;
 
 /** Drop cached `/v1/results/today` so a manual Fetch results hits the API. */
 export function clearRacingResultsCache(): void {
   cache.delete("results:today");
 }
 
-const DAILY_BUDGET = 200;
+// The Racing API's real constraint is a per-second rate limit (5 req/s on
+// paid plans, 1 req/s free), not a daily cap - and the multi-minute cache
+// TTLs above already keep this app's real request rate far below that.
+// requestsToday is kept purely as an informational counter for Settings;
+// it no longer blocks requests (a hardcoded "200/day" guard was throttling
+// the app well before any real limit was at risk, silently degrading
+// Racing Desk to demo data).
 let budgetDay = "";
 let requestsToday = 0;
 
-function spendBudget(): boolean {
+function trackRequest(): void {
   const today = new Date().toISOString().slice(0, 10);
   if (today !== budgetDay) {
     budgetDay = today;
     requestsToday = 0;
   }
-  if (requestsToday >= DAILY_BUDGET) return false;
   requestsToday += 1;
-  return true;
 }
 
 function credentials(): { user: string; pass: string } | null {
@@ -79,9 +90,9 @@ export function hasRacingApiKey(): boolean {
   return !!credentials();
 }
 
-export function racingApiUsageToday(): { used: number; budget: number } {
+export function racingApiUsageToday(): { used: number } {
   const today = new Date().toISOString().slice(0, 10);
-  return { used: today === budgetDay ? requestsToday : 0, budget: DAILY_BUDGET };
+  return { used: today === budgetDay ? requestsToday : 0 };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -219,7 +230,7 @@ export function isRacingTierAccessError(error: unknown): boolean {
 async function apiGet(path: string): Promise<any> {
   const creds = credentials();
   if (!creds) throw new Error("RACING_API_USERNAME / RACING_API_PASSWORD not configured");
-  if (!spendBudget()) throw new Error("Racing API daily request budget exhausted");
+  trackRequest();
 
   const token = Buffer.from(`${creds.user}:${creds.pass}`).toString("base64");
   const res = await fetch(`${BASE}${path}`, {

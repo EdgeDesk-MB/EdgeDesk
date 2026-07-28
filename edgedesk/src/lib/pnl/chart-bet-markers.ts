@@ -33,6 +33,11 @@ export const PNL_CHART_PADDING_DEFAULT: PnlChartPadding = {
   right: 80,
 };
 
+/** Mirrors Liveline's internal window-change animation (`WINDOW_TRANSITION_MS`, not exported by the lib). */
+export const PNL_CHART_WINDOW_TRANSITION_MS = 750;
+/** Bet markers stay hidden for the full transition, then fade in over half that time. */
+export const PNL_CHART_MARKER_FADE_IN_MS = PNL_CHART_WINDOW_TRANSITION_MS / 2;
+
 const WINDOW_BUFFER_BADGE = 0.05;
 const WINDOW_BUFFER_NO_BADGE = 0.015;
 
@@ -94,6 +99,8 @@ export interface PnlChartLayout {
   minVal: number;
   maxVal: number;
   valRange: number;
+  /** False when the window has fewer than 2 in-range points and `minVal`/`maxVal` came from `fallbackRange` (or a low-confidence single-value guess). */
+  hasSufficientData: boolean;
   toX: (timeSec: number) => number;
   toY: (value: number) => number;
 }
@@ -386,6 +393,14 @@ export function computePnlChartLayout(opts: {
   liveValue: number;
   nowSec?: number;
   referenceValue?: number;
+  /**
+   * Last well-computed {min, max} (from a frame with 2+ in-window points).
+   * Liveline itself freezes its displayed range rather than recomputing it
+   * when a window goes sparse (see `updateRange` early-return in the lib) -
+   * mirror that here so markers stay on the same vertical scale as the line
+   * instead of jumping to a narrower/mismatched fallback range.
+   */
+  fallbackRange?: { min: number; max: number };
 }): PnlChartLayout | null {
   const {
     width,
@@ -396,6 +411,7 @@ export function computePnlChartLayout(opts: {
     livePoints,
     liveValue,
     referenceValue = 0,
+    fallbackRange,
   } = opts;
   const nowSec = opts.nowSec ?? Date.now() / 1000;
 
@@ -409,18 +425,18 @@ export function computePnlChartLayout(opts: {
   const rightEdge = nowSec + windowSecs * buffer;
   const leftEdge = rightEdge - windowSecs;
 
+  // Markers must still project even when few (or zero) line points fall in a
+  // narrow window (5m/1hr).
   const visible: LivePnlPoint[] = [];
   for (const p of livePoints) {
     if (p.time >= leftEdge - 2 && p.time <= rightEdge) visible.push(p);
   }
-  if (visible.length < 2) return null;
 
-  const { min: minVal, max: maxVal } = computePnlValueRange(
-    visible,
-    liveValue,
-    referenceValue,
-    false
-  );
+  const hasSufficientData = visible.length >= 2;
+  const { min: minVal, max: maxVal } =
+    !hasSufficientData && fallbackRange
+      ? fallbackRange
+      : computePnlValueRange(visible, liveValue, referenceValue, false);
   const valRange = maxVal - minVal || 1;
 
   return {
@@ -432,6 +448,7 @@ export function computePnlChartLayout(opts: {
     minVal,
     maxVal,
     valRange,
+    hasSufficientData,
     toX: (timeSec) => pad.left + ((timeSec - leftEdge) / (rightEdge - leftEdge)) * chartW,
     toY: (value) => pad.top + (1 - (value - minVal) / valRange) * chartH,
   };

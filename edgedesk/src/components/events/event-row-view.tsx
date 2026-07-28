@@ -171,34 +171,30 @@ export function EventRowView({
             )}
           </span>
         ) : (
-          <div className="flex items-center justify-center gap-2">
-            {isManual && event.status !== "finished" && (
-              <ScoreStepper
-                value={event.homeScore}
-                onChange={(homeScore) => onPatch(event.id, { homeScore, status: "live" })}
-              />
-            )}
-            <span className="min-w-12 text-center text-lg font-semibold tabular-nums">
-              {event.homeScore}–{event.awayScore}
-            </span>
-            {isManual && event.status !== "finished" && (
-              <ScoreStepper
-                value={event.awayScore}
-                onChange={(awayScore) => onPatch(event.id, { awayScore, status: "live" })}
-              />
+          <div>
+            <div className="flex items-center gap-2">
+              {isManual && event.status !== "finished" && (
+                <ScoreStepper
+                  value={event.homeScore}
+                  onChange={(homeScore) => onPatch(event.id, { homeScore, status: "live" })}
+                />
+              )}
+              <span className="text-lg font-semibold tabular-nums">
+                {event.homeScore}–{event.awayScore}
+              </span>
+              {isManual && event.status !== "finished" && (
+                <ScoreStepper
+                  value={event.awayScore}
+                  onChange={(awayScore) => onPatch(event.id, { awayScore, status: "live" })}
+                />
+              )}
+            </div>
+            {!!(event.homeLed2 || event.awayLed2) && (
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {event.homeLed2 ? "Home led by 2" : "Away led by 2"}
+              </div>
             )}
           </div>
-        )}
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {isRacing ? (
-          "-"
-        ) : (
-          <>
-            {event.homeLed2 ? "Home led by 2 " : ""}
-            {event.awayLed2 ? "Away led by 2" : ""}
-            {!event.homeLed2 && !event.awayLed2 && "-"}
-          </>
         )}
       </TableCell>
       <TableCell>

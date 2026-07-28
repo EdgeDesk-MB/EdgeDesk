@@ -16,6 +16,7 @@ import { RunnerCloth } from "@/components/racing/runner-cloth";
 import { RegionFlag } from "@/components/region-flag";
 import {
   Calculator,
+  Check,
   ChevronDown,
   Gift,
   NotebookPen,
@@ -44,6 +45,7 @@ export interface FlashscoreRacecardProps {
   bookiePlaces: number;
   exchangePlaces: number;
   onTrack: (race: RacingDeskRace) => void;
+  onUntrack: (race: RacingDeskRace) => void;
   onBet: (
     race: RacingDeskRace,
     runner: string,
@@ -452,6 +454,7 @@ export function FlashscoreRacecard({
   bookiePlaces,
   exchangePlaces,
   onTrack,
+  onUntrack,
   onBet,
   onOddsOverride,
   backColor,
@@ -529,14 +532,28 @@ export function FlashscoreRacecard({
                 ) : null}
               </p>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 border-border bg-card text-foreground hover:bg-selection-subtle"
-              onClick={() => onTrack(selected)}
-            >
-              Track race
-            </Button>
+            {selected.trackedEventId != null ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="group h-7 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:text-emerald-300 dark:hover:text-destructive"
+                onClick={() => onUntrack(selected)}
+                title="Stop tracking this race"
+              >
+                <Check className="size-3.5 group-hover:hidden" />
+                <span className="group-hover:hidden">Tracked</span>
+                <span className="hidden group-hover:inline">Untrack race</span>
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-border bg-card text-foreground hover:bg-selection-subtle"
+                onClick={() => onTrack(selected)}
+              >
+                Track race
+              </Button>
+            )}
           </div>
         </div>
         <div className="mt-2 flex gap-1 overflow-x-auto pb-1">

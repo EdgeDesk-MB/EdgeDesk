@@ -172,7 +172,7 @@ export default function EdgeReportPage() {
               <StatTile
                 label="Commission drag"
                 value={formatGbp(report.commissionDrag)}
-                sub="exchange commission paid"
+                sub="ex. comm. paid"
               />
               <StatTile
                 label="Retention"
