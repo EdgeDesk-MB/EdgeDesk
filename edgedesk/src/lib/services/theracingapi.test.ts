@@ -111,6 +111,9 @@ describe("theracingapi tier access", () => {
               ],
             },
           ],
+          total: 1,
+          limit: 100,
+          skip: 0,
         }),
       })
     );
@@ -124,5 +127,39 @@ describe("theracingapi tier access", () => {
     const filtered = await resultsForRaceIds(["race-win", "missing"]);
     expect(filtered.tier).toBe("basic");
     expect(filtered.results.size).toBe(1);
+  });
+
+  it("pages results/today when total exceeds the API limit of 100", async () => {
+    const page = (start: number, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        race_id: `race-${start + i}`,
+        course: "Ascot",
+        date: new Date().toISOString().slice(0, 10),
+        field_size: 1,
+        runners: [{ horse_id: `h${start + i}`, horse: `Horse ${start + i}`, position: 1 }],
+      }));
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ results: page(0, 100), total: 120, limit: 100, skip: 0 }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ results: page(100, 20), total: 120, limit: 100, skip: 100 }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { resultsToday } = await import("./theracingapi");
+    const payload = await resultsToday();
+    expect(payload.tier).toBe("basic");
+    expect(payload.results.size).toBe(120);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("limit=100");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("skip=0");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("skip=100");
   });
 });

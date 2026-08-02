@@ -17,7 +17,9 @@ import {
   type DoNextSort,
 } from "@/lib/offers/do-next";
 import type { OfferSummary } from "@/lib/services/offers.types";
-import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
+import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
+import { formatDecimalOdds } from "@/lib/racing/odds";
+import { formatClockTime } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
 import { ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
@@ -74,7 +76,7 @@ function DoNextCard({
   const headerTint = doNextHeaderTint(item, offer);
 
   const cardClass = cn(
-    offerCalendarCardShell,
+    offerCampaignCardShell,
     "w-[min(100%,300px)] shrink-0 snap-start min-h-[148px] rounded-[20px]"
   );
 
@@ -82,7 +84,7 @@ function DoNextCard({
     <>
       <div
         className={cn(
-          "relative z-[2] flex min-h-full min-w-0 flex-1 flex-col",
+          "flex min-h-full min-w-0 flex-1 flex-col",
           headerTint ?? "bg-card",
           isBest && "bg-primary/[0.03]"
         )}
@@ -125,7 +127,23 @@ function DoNextCard({
               £{item.funding.short.toFixed(2)} short at {item.bookmaker}
             </p>
           ) : null}
-          {item.kind !== "place_qualifying" ? (
+          {item.edge ? (
+            <p className="mt-1 line-clamp-2 text-xs text-edge">
+              <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide">
+                <Sparkles className="size-3 shrink-0" aria-hidden />
+                Edge
+              </span>
+              <span className="mx-1.5 text-muted-foreground">·</span>
+              <span className="font-mono tabular-nums text-foreground">
+                {formatClockTime(item.edge.startTime)}
+              </span>{" "}
+              <span className="text-foreground">
+                {item.edge.course}, back{" "}
+                <span className="font-semibold">{item.edge.runnerName}</span> at{" "}
+                <span className="tabular-nums">{formatDecimalOdds(item.edge.backDecimal)}</span>
+              </span>
+            </p>
+          ) : item.kind !== "place_qualifying" ? (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.detail}</p>
           ) : null}
 
@@ -264,16 +282,19 @@ export function DashboardDoNext({ className }: { className?: string }) {
         <ScrollFadeEdges
           orientation="horizontal"
           dragToScroll
+          springSnap
           scrollClassName={cn(
             "app-scroll-overlay overflow-x-auto overflow-y-visible",
             "snap-x snap-mandatory",
+            // Match "Do next" title at page-x. Padding + matching
+            // scroll-padding so snap-start does not pull the first card
+            // flush to the panel edge.
+            "pl-[var(--layout-page-x)] scroll-pl-[var(--layout-page-x)]",
+            "pr-[var(--layout-page-x)] scroll-pr-[var(--layout-page-x)]",
             "py-px"
           )}
         >
-          {/* Card content is inset px-4 (1rem) from the card edge, so the
-              container's leading margin is short by that much - the card's
-              text (not its edge) is what needs to land under "Do next". */}
-          <div className="flex gap-3 ml-[calc(var(--layout-page-x)_-_1rem)] pr-3">
+          <div className="flex gap-3">
             {items.map((item, i) => (
               <DoNextCard
                 key={item.id}

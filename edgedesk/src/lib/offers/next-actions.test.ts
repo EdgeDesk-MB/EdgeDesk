@@ -4,6 +4,42 @@ import {
   listOfferNextActions,
 } from "@/lib/offers/next-actions";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
+import { formatClockTime } from "@/lib/time-format";
+
+function edgePlay(over: Partial<OfferEdgePlay> = {}): OfferEdgePlay {
+  return {
+    offerId: 2,
+    offerTitle: "Reload",
+    bookmaker: "Bet365",
+    raceExternalId: "race-1",
+    course: "Chepstow",
+    raceName: "Handicap Chase",
+    offTime: "15:20",
+    startTime: Date.parse("2026-07-31T14:20:00Z"),
+    region: "GB",
+    fieldSize: 9,
+    runner: {
+      horseId: "storm-rider",
+      name: "Storm Rider",
+      backDecimal: 6.5,
+      layDecimal: 6.8,
+      marketRank: 3,
+    },
+    triggerProb: 0.42,
+    triggerBasis: "model",
+    qualLoss: -1.2,
+    layStake: 47.9,
+    freeBetEv: 13.6,
+    totalEv: 12.4,
+    retention: 0.8,
+    retentionSampleSize: 8,
+    confidence: "live",
+    reasons: ["Only 9 runners, the minimum this offer allows"],
+    warnings: [],
+    ...over,
+  };
+}
 
 function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">): OfferSummary {
   const { profit: profitPartial, ...rest } = partial;
@@ -114,6 +150,54 @@ describe("deriveOfferNextAction", () => {
       now
     );
     expect(action?.kind).toBe("place_qualifying");
+  });
+
+  it("names the race and horse when Offer Edge has a play", () => {
+    const play = edgePlay();
+    const action = deriveOfferNextAction(
+      offer({ id: 2, title: "Reload", betCount: 0, status: "active" }),
+      now,
+      { edgePlays: new Map([[2, play]]) }
+    );
+
+    expect(action?.kind).toBe("place_qualifying");
+    expect(action?.detail).toBe(
+      `Chepstow ${formatClockTime(play.startTime)}, back Storm Rider at 6.50, EV +£12.40.`
+    );
+    expect(action?.edge?.raceExternalId).toBe("race-1");
+    expect(action?.edge?.runnerName).toBe("Storm Rider");
+  });
+
+  it("names the race on a planned offer too", () => {
+    const action = deriveOfferNextAction(
+      offer({ id: 7, title: "Reload", betCount: 0, status: "planned" }),
+      now,
+      { edgePlays: new Map([[7, edgePlay()]]) }
+    );
+
+    expect(action?.kind).toBe("start_planned");
+    expect(action?.detail).toContain("back Storm Rider at 6.50");
+  });
+
+  it("keeps the generic copy when no play matches the offer", () => {
+    const action = deriveOfferNextAction(
+      offer({ id: 2, title: "Reload", betCount: 0, status: "active" }),
+      now,
+      { edgePlays: new Map([[99, edgePlay()]]) }
+    );
+
+    expect(action?.edge).toBeUndefined();
+    expect(action?.detail).toBe("No bets linked yet - start the qualifying leg at Bet365.");
+  });
+
+  it("shows a negative EV play honestly rather than hiding the sign", () => {
+    const action = deriveOfferNextAction(
+      offer({ id: 2, title: "Reload", betCount: 0, status: "active" }),
+      now,
+      { edgePlays: new Map([[2, edgePlay({ totalEv: -1.5 })]]) }
+    );
+
+    expect(action?.detail).toContain("EV -£1.50");
   });
 
   it("ignores completed offers", () => {

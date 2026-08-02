@@ -1,13 +1,23 @@
 import { matchedBet } from "@/lib/calc/matched";
+import { sumPositions } from "@/lib/calc/racing/finish-positions";
+import type { TargetOutcome } from "@/lib/offers/target-outcome";
 import type { OddsSource } from "@/lib/racing/odds";
 import type { ExchangeOddsSource } from "@/lib/services/exchange/types";
 
 export type OfferConfidence = "live" | "mixed" | "estimate";
 
+/** Where a trigger probability came from - the model, or the rank heuristic. */
+export type TriggerBasis = "model" | "heuristic";
+
 const FREE_BET_RETENTION = 0.8;
 const DEFAULT_COMMISSION = 0.02;
 
-/** Rough P(2nd–4th finish, not winning) from market rank and price. */
+/**
+ * Rough P(2nd–4th finish, not winning) from market rank and price.
+ *
+ * The degraded fallback for when the exchange book is too sparse to model, which
+ * is the normal case on the free Racing API tier. Prefer `triggerProbFromModel`.
+ */
 export function estimatePlaceRefundTriggerProb(
   marketRank: number,
   fieldSize: number,
@@ -39,6 +49,20 @@ export function resolveOfferConfidence(
   return "estimate";
 }
 
+/**
+ * P(the offer triggers) from the finishing-position model.
+ *
+ * `positionProbs` is one runner's row from `finishPositionProbs`, so the sum picks
+ * out exactly the positions the offer pays on. A win counts only when the offer
+ * says it does, which for a place-refund consolation it does not.
+ */
+export function triggerProbFromModel(
+  positionProbs: number[],
+  target: TargetOutcome
+): number {
+  return sumPositions(positionProbs, target.positions);
+}
+
 export interface PlaceRefundEvInput {
   betStake: number;
   freeBetAmount: number;
@@ -47,12 +71,19 @@ export interface PlaceRefundEvInput {
   marketRank: number;
   fieldSize: number;
   commission?: number;
+  /** Modelled trigger probability. Falls back to the rank heuristic when absent. */
+  triggerProb?: number;
+  /** Measured free-bet retention (A1). Defaults to the 0.8 prior. */
+  retention?: number;
 }
 
 export interface PlaceRefundEvResult {
   qualLoss: number;
   layStake: number;
   triggerProb: number;
+  triggerBasis: TriggerBasis;
+  /** The retention rate actually applied, so callers need not re-derive the default. */
+  retention: number;
   freeBetEv: number;
   totalEv: number;
 }
@@ -69,18 +100,20 @@ export function placeRefundRunnerEv(input: PlaceRefundEvInput): PlaceRefundEvRes
   });
 
   const qualLoss = matched.guaranteed;
-  const triggerProb = estimatePlaceRefundTriggerProb(
-    input.marketRank,
-    input.fieldSize,
-    input.backOdds
-  );
-  const freeBetEv = triggerProb * input.freeBetAmount * FREE_BET_RETENTION;
+  const modelled = input.triggerProb != null && Number.isFinite(input.triggerProb);
+  const triggerProb = modelled
+    ? Math.max(0, Math.min(1, input.triggerProb!))
+    : estimatePlaceRefundTriggerProb(input.marketRank, input.fieldSize, input.backOdds);
+  const retention = input.retention ?? FREE_BET_RETENTION;
+  const freeBetEv = triggerProb * input.freeBetAmount * retention;
   const totalEv = qualLoss + freeBetEv;
 
   return {
     qualLoss,
     layStake: matched.layStake,
     triggerProb,
+    triggerBasis: modelled ? "model" : "heuristic",
+    retention,
     freeBetEv,
     totalEv,
   };

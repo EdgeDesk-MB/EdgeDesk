@@ -15,6 +15,14 @@ import {
 } from "@/components/ui/dialog";
 import { MoneyFlow } from "@/components/money-flow";
 import { api, useAppState } from "@/hooks/use-app-state";
+import {
+  offerExpiringAlertDedupePrefix,
+  offerExpiringAlertKeys,
+} from "@/lib/alerts/rules";
+import {
+  dismissBrowserNotifications,
+  suppressAlertKeys,
+} from "@/lib/alerts/seen";
 import { DEFAULT_TUNING } from "@/lib/services/settings-shared";
 import { filterPillState } from "@/lib/ui/surface-styles";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
@@ -43,11 +51,17 @@ import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import {
   isOfferExpired,
   offerInactiveFigureClass,
+  OfferInactiveCurrencyText,
 } from "@/lib/offers/offer-inactive-ui";
 import { formatCaptureLine } from "@/lib/offers/ev-capture";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
-import { isRegionalScope, parseOfferRules } from "@/lib/offers/racing-offer-rules";
+import {
+  isRegionalScope,
+  offerHasResultTrigger,
+  parseOfferRules,
+} from "@/lib/offers/racing-offer-rules";
 import { CourseRaceTimes } from "@/components/offers/course-race-times";
+import { OfferEdgePanel } from "@/components/offers/offer-edge-panel";
 import { VenueBadge } from "@/components/venue-badge";
 import {
   offerFreeBetAmount,
@@ -55,6 +69,10 @@ import {
 } from "@/lib/offers/offer-ui";
 import { outlineButtonGroup } from "@/components/layout/page-header-actions";
 import { Check, ChevronDown, Eye, Pencil, Sparkles, Trash2 } from "lucide-react";
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export function OfferCampaignCard({
   offer,
@@ -84,6 +102,15 @@ export function OfferCampaignCard({
   } = buildCampaignDetailsContext(offer);
   const racingRules = offer.sport === "horse_racing" ? parseOfferRules(offer) : null;
   const minRunners = racingRules?.minRunners ?? null;
+
+  // Offer Edge only makes sense while the offer is still live and there are races
+  // to run it on, so an undated or finished campaign shows nothing.
+  const edgeDate = offer.eventDate ?? todayIso();
+  const showEdgePanel =
+    racingRules != null &&
+    offerHasResultTrigger(racingRules) &&
+    (offer.status === "active" || offer.status === "planned") &&
+    edgeDate >= todayIso();
   const categoryId = offerCategoryFromSport(offer.sport);
   const categoryLabel = offerCategoryLabel(offer.sport);
   const hasFreeBet = offerHasFreeBetReward(offer);
@@ -227,7 +254,8 @@ export function OfferCampaignCard({
               const expected = offer.expectedProfit ?? offer.expectedFromBets;
               const actual = offer.profit.totalProfit;
               const hasActual = Math.abs(actual) > 0.005;
-              if (expected > 0.005 && hasActual) {
+              const hasExpected = Math.abs(expected) > 0.005;
+              if (hasExpected && hasActual) {
                 return (
                   <>
                     <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -254,7 +282,7 @@ export function OfferCampaignCard({
                   </>
                 );
               }
-              if (expected > 0.005) {
+              if (hasExpected) {
                 return (
                   <>
                     <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -281,7 +309,7 @@ export function OfferCampaignCard({
                   <MoneyFlow
                     value={actual}
                     signColor={!isExpired}
-                    className={cn("text-lg font-bold", inactiveFigure)}
+                    className={cn("text-xl font-bold tabular-nums", inactiveFigure)}
                   />
                 </>
               );
@@ -298,7 +326,9 @@ export function OfferCampaignCard({
             <div className="mt-2 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5">
               <div className="flex items-center gap-1.5">
                 <EvBasisBadge basis={offer.evLock.basis} />
-                <span className="text-[11px] text-muted-foreground">{captureLine}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  <OfferInactiveCurrencyText text={captureLine} inactive={isExpired} />
+                </span>
                 {offer.evLock.version > 1 ? (
                   <span className="ml-auto shrink-0 rounded bg-border/60 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                     re-locked v{offer.evLock.version}
@@ -309,6 +339,12 @@ export function OfferCampaignCard({
             </div>
           );
         })() : null}
+
+        {showEdgePanel ? (
+          <div className="mt-2" onClick={stopCardActivate} onKeyDown={stopCardActivate}>
+            <OfferEdgePanel offerId={offer.id} eventDate={edgeDate} />
+          </div>
+        ) : null}
       </CardHeader>
 
       {hasDetails ? (
@@ -355,9 +391,12 @@ export function OfferCampaignCard({
               {scopeLine ? (
                 <p className="text-[11px] text-muted-foreground">{scopeLine}</p>
               ) : null}
+              {/* Meeting times only for course-wide scope. Race-scoped offers
+                  already show the single race in scopeLine above. */}
               {offer.sport === "horse_racing" &&
                 !isRegionalScope(offer.scopeCourse) &&
-                offer.eventDate ? (
+                offer.eventDate &&
+                !offer.scopeRaceId?.trim() ? (
                   <CourseRaceTimes
                     scopeCourse={offer.scopeCourse!}
                     eventDate={offer.eventDate}
@@ -529,12 +568,26 @@ function DeleteOfferDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const recurring = Boolean(offer.seriesId && offer.recurrence?.enabled);
+  const [scope, setScope] = useState<"instance" | "future">("instance");
 
   async function confirmDelete() {
     setBusy(true);
+    const alertKeys = offerExpiringAlertKeys(offer.id);
+    // Suppress before DELETE returns so a stale Do Next poll cannot toast/push
+    // for a campaign the user has just removed.
+    suppressAlertKeys(alertKeys);
+    void dismissBrowserNotifications(alertKeys);
     try {
-      await api(`/api/offers/${offer.id}`, { method: "DELETE" });
-      toast.success("Offer deleted");
+      const qs = recurring && scope === "future" ? "?scope=future" : "";
+      await api(`/api/offers/${offer.id}${qs}`, { method: "DELETE" });
+      void api("/api/alerts", {
+        method: "PATCH",
+        json: { dedupePrefix: offerExpiringAlertDedupePrefix(offer.id), read: true },
+      }).catch(() => {});
+      toast.success(
+        recurring && scope === "future" ? "Offer deleted and series stopped" : "Offer deleted"
+      );
       setOpen(false);
       onDeleted();
     } catch (e) {
@@ -545,7 +598,13 @@ function DeleteOfferDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setScope("instance");
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
           <Trash2 className="size-3.5" /> Delete
@@ -562,6 +621,41 @@ function DeleteOfferDialog({
             This cannot be undone.
           </DialogDescription>
         </DialogHeader>
+        {recurring ? (
+          <fieldset className="space-y-2 text-sm">
+            <legend className="sr-only">Delete scope</legend>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="radio"
+                name={`delete-scope-${offer.id}`}
+                className="mt-1"
+                checked={scope === "instance"}
+                onChange={() => setScope("instance")}
+              />
+              <span>
+                <span className="font-medium text-foreground">This occurrence only</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  The series keeps repeating. This date will not come back.
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="radio"
+                name={`delete-scope-${offer.id}`}
+                className="mt-1"
+                checked={scope === "future"}
+                onChange={() => setScope("future")}
+              />
+              <span>
+                <span className="font-medium text-foreground">This and future occurrences</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Stops the series from this date. Past history stays.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+        ) : null}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>
             Cancel

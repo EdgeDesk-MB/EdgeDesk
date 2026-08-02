@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { OfferRow } from "@/lib/db/schema";
 import {
+  courseMatchesScope,
+  encodeScopeCourses,
   formatBetGetFreePlaceSummary,
   formatOfferScopeLabel,
+  offerHasResultTrigger,
   parseOfferRules,
+  parseScopeCourses,
+  placeRefundTriggerText,
   raceQualifiesForOffer,
   scorePlaceRefundRunners,
   scorePlaceRefundStrategy,
@@ -46,6 +51,22 @@ describe("parseOfferRules", () => {
     expect(rules?.qualifyingPlaces).toEqual([2, 3, 4]);
   });
 
+  it("formats SP-favourite place-refund trigger text", () => {
+    const rules = {
+      type: "bet_get_free_place" as const,
+      minRunners: 6,
+      regions: ["GB", "IRE"] as ("GB" | "IRE")[],
+      qualifyingPlaces: [2],
+      betStake: 10,
+      freeBetAmount: 10,
+      winnerMustBeSpFavourite: true,
+    };
+    expect(placeRefundTriggerText(rules)).toBe(
+      "Bet £10 get £10 FB if 2nd to SP favourite"
+    );
+    expect(formatBetGetFreePlaceSummary(rules)).toContain("2nd to SP favourite");
+  });
+
   it("returns null for generic offers", () => {
     expect(parseOfferRules({ ...baseOffer, offerType: null, rules: null })).toBeNull();
   });
@@ -56,6 +77,49 @@ describe("formatBetGetFreePlaceSummary", () => {
     const rules = parseOfferRules(baseOffer)!;
     expect(formatBetGetFreePlaceSummary(rules)).toContain("£50");
     expect(formatBetGetFreePlaceSummary(rules)).toContain("2, 3, 4");
+  });
+
+  it("omits place clause for unconditional bet&get", () => {
+    const rules = {
+      type: "bet_get_free_place" as const,
+      minRunners: 8,
+      regions: ["GB", "IRE"] as ("GB" | "IRE")[],
+      qualifyingPlaces: [],
+      betStake: 5,
+      freeBetAmount: 5,
+    };
+    expect(offerHasResultTrigger(rules)).toBe(false);
+    expect(formatBetGetFreePlaceSummary(rules)).toBe(
+      "Bet £5 get £5 free · min 8 runners · GB & IRE"
+    );
+    expect(placeRefundTriggerText(rules)).toBe("Bet £5 get £5 FB");
+  });
+});
+
+describe("offerHasResultTrigger", () => {
+  it("is true for place-refund and SP-favourite clauses", () => {
+    expect(
+      offerHasResultTrigger({
+        qualifyingPlaces: [2, 3, 4],
+        winnerMustBeSpFavourite: false,
+      })
+    ).toBe(true);
+    expect(
+      offerHasResultTrigger({
+        qualifyingPlaces: [],
+        winnerMustBeSpFavourite: true,
+      })
+    ).toBe(true);
+  });
+
+  it("is false for empty places with no SP-favourite clause", () => {
+    expect(
+      offerHasResultTrigger({
+        qualifyingPlaces: [],
+        winnerMustBeSpFavourite: false,
+      })
+    ).toBe(false);
+    expect(offerHasResultTrigger(null)).toBe(false);
   });
 });
 
@@ -105,6 +169,19 @@ describe("raceQualifiesForOffer", () => {
     expect(result.reasons[0]).toContain("Catterick");
   });
 
+  it("qualifies when the race course is one of several scoped courses", () => {
+    const multi = { ...baseOffer, scopeCourse: "Galway, Goodwood" };
+    expect(raceQualifiesForOffer(multi, { ...race, course: "Goodwood" }, "2026-07-08").qualifies).toBe(
+      true
+    );
+    expect(raceQualifiesForOffer(multi, { ...race, course: "Galway" }, "2026-07-08").qualifies).toBe(
+      true
+    );
+    expect(raceQualifiesForOffer(multi, { ...race, course: "Ascot" }, "2026-07-08").qualifies).toBe(
+      false
+    );
+  });
+
   it("rejects when locked to a different race", () => {
     const locked = {
       ...baseOffer,
@@ -132,6 +209,18 @@ describe("raceQualifiesForOffer", () => {
     const result = raceQualifiesForOffer(baseOffer, { ...race, fieldSize: 6 }, "2026-07-08");
     expect(result.qualifies).toBe(false);
     expect(result.reasons[0]).toContain("6 runners");
+  });
+});
+
+describe("parseScopeCourses", () => {
+  it("splits comma and ampersand lists, deduping by normalised name", () => {
+    expect(parseScopeCourses("Galway, Goodwood")).toEqual(["Galway", "Goodwood"]);
+    expect(parseScopeCourses("Galway & Goodwood")).toEqual(["Galway", "Goodwood"]);
+    expect(parseScopeCourses("Galway or Goodwood")).toEqual(["Galway", "Goodwood"]);
+    expect(parseScopeCourses("Goodwood, goodwood")).toEqual(["Goodwood"]);
+    expect(encodeScopeCourses(["Goodwood", "Galway"])).toBe("Goodwood, Galway");
+    expect(courseMatchesScope("Goodwood", "Galway, Goodwood")).toBe(true);
+    expect(formatOfferScopeLabel("Galway, Goodwood")).toBe("Galway, Goodwood");
   });
 });
 

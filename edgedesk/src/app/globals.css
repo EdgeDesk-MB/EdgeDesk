@@ -30,6 +30,7 @@
   --color-negative: var(--negative);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-edge: var(--edge);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -88,6 +89,8 @@
   --negative: oklch(0.577 0.245 27.325);
   --success: oklch(0.45 0.12 150);
   --warning: oklch(0.55 0.14 75);
+  /* Offer Edge / Race picks / pro-tier signature (violet family, not caution amber) */
+  --edge: oklch(0.5 0.2 295);
   --border: oklch(0.885 0.003 250);
   --input: oklch(0.885 0.003 250);
   --ring: oklch(0.42 0.06 250);
@@ -175,6 +178,7 @@
   --negative: oklch(0.78 0.15 22.216);
   --success: oklch(0.62 0.14 150);
   --warning: oklch(0.72 0.13 75);
+  --edge: oklch(0.72 0.16 295);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.58 0.08 250);
@@ -565,12 +569,19 @@
     text-decoration-color: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
   }
 
-  /** Offer campaign cards - outer ring + 1px white inset line */
+  /**
+   * Lifted surfaces with a 1px light inset line (offer campaign cards, modals).
+   * Pair with an outer ring-1 ring-border/50 (dark: darkened border mix).
+   * Do NOT set position on .modal-surface — DialogContent uses `fixed`; a
+   * relative override here knocked modals below the viewport.
+   * ::after still anchors: `fixed` / other positioned ancestors create the CB.
+   */
   .offer-campaign-card {
     position: relative;
   }
 
-  .offer-campaign-card::after {
+  .offer-campaign-card::after,
+  .modal-surface::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -580,7 +591,8 @@
     z-index: 1;
   }
 
-  .dark .offer-campaign-card::after {
+  .dark .offer-campaign-card::after,
+  .dark .modal-surface::after {
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
   }
 

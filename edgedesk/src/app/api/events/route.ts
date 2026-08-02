@@ -3,10 +3,25 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, events } from "@/lib/db";
 import { generateScript, type SimPreset } from "@/lib/services/sim";
-import { serializeRacecardRunners } from "@/lib/racing";
+import {
+  parseRaceResults,
+  serializeRacecardRunners,
+  serializeRaceResults,
+  withPreservedRaceDisplayMeta,
+  type RaceDisplayMeta,
+} from "@/lib/racing";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 
 export const dynamic = "force-dynamic";
+
+const raceMetaSchema = z.object({
+  type: z.string().optional(),
+  distance: z.string().optional(),
+  raceClass: z.string().optional(),
+  prize: z.string().optional(),
+  going: z.string().optional(),
+  fieldSize: z.number().int().positive().optional(),
+});
 
 const createSchema = z.object({
   sport: z.string().default("football"),
@@ -19,6 +34,8 @@ const createSchema = z.object({
   status: z.enum(["upcoming", "live", "finished"]).optional(),
   /** Horse racing racecard runners (stored until results replace goals) */
   runners: z.array(z.string()).optional(),
+  /** Optional racecard details for result-dialog headers */
+  raceMeta: raceMetaSchema.optional(),
   homeScore: z.number().optional(),
   awayScore: z.number().optional(),
   minute: z.number().optional(),
@@ -27,6 +44,18 @@ const createSchema = z.object({
   /** Named strikers for sim goalscorer triggers - each scores their side's first goal */
   simStars: z.object({ homeStar: z.string().optional(), awayStar: z.string().optional() }).optional(),
 });
+
+function raceMetaFromInput(input: {
+  raceMeta?: z.infer<typeof raceMetaSchema>;
+  runners?: string[];
+}): RaceDisplayMeta | undefined {
+  const meta = input.raceMeta;
+  if (!meta && !input.runners?.length) return undefined;
+  return {
+    ...meta,
+    fieldSize: meta?.fieldSize ?? input.runners?.length,
+  };
+}
 
 export async function GET() {
   return NextResponse.json({ events: db.select().from(events).all() });
@@ -47,6 +76,38 @@ export async function POST(req: NextRequest) {
       .all()
       .find((e) => e.externalId === input.externalId);
     if (existing) {
+      // Refresh pending-card meta (prize/going/type) when re-tracking before a result lands.
+      if (
+        existing.sport === "horse_racing" &&
+        !parseRaceResults(existing.goals) &&
+        input.runners?.length
+      ) {
+        db.update(events)
+          .set({
+            homeTeam: input.homeTeam,
+            competition: input.competition ?? existing.competition,
+            goals: serializeRacecardRunners(input.runners, raceMetaFromInput(input)),
+          })
+          .where(eq(events.id, existing.id))
+          .run();
+      } else if (
+        existing.sport === "horse_racing" &&
+        parseRaceResults(existing.goals) &&
+        input.raceMeta
+      ) {
+        const result = parseRaceResults(existing.goals)!;
+        db.update(events)
+          .set({
+            goals: serializeRaceResults(
+              withPreservedRaceDisplayMeta(
+                { ...result, ...raceMetaFromInput(input) },
+                existing.goals
+              )
+            ),
+          })
+          .where(eq(events.id, existing.id))
+          .run();
+      }
       await syncRacingResultsForEvents([existing.id]);
       const refreshed = db.select().from(events).where(eq(events.id, existing.id)).get() ?? existing;
       return NextResponse.json({ event: refreshed, existing: true });
@@ -74,7 +135,7 @@ export async function POST(req: NextRequest) {
       minute: input.minute ?? 0,
       goals:
         input.sport === "horse_racing" && input.runners?.length
-          ? serializeRacecardRunners(input.runners)
+          ? serializeRacecardRunners(input.runners, raceMetaFromInput(input))
           : null,
       simScript: script ? JSON.stringify(script) : null,
       simStartedAt: isSim ? now : null,

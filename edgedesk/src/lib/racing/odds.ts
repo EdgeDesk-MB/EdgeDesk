@@ -161,3 +161,53 @@ export function resolveRunnerOdds(input: {
     exchangeSource,
   };
 }
+
+/** Minimal runner shape for favourite-first (odds-order) sorting. */
+export type OddsSortableRunner = {
+  name: string;
+  nonRunner?: boolean;
+  exchangeDecimal?: number | null;
+  bookieDecimal?: number | null;
+  spDecimal?: number | null;
+  spFraction?: string | null;
+  oddsList?: unknown[];
+};
+
+/**
+ * Price used for Racing Desk ordering: live exchange lay, then bookie, then SP.
+ * Unpriced / non-runners sort last (Infinity).
+ */
+export function runnerOddsSortPrice(runner: OddsSortableRunner): number {
+  if (runner.nonRunner) return Infinity;
+  const resolved = resolveRunnerOdds({
+    spDecimal: runner.spDecimal ?? undefined,
+    spFraction: runner.spFraction ?? undefined,
+    oddsList: runner.oddsList,
+  });
+  const price =
+    runner.exchangeDecimal ??
+    runner.bookieDecimal ??
+    resolved.exchangeDecimal ??
+    resolved.bookieDecimal ??
+    runner.spDecimal;
+  return price != null && Number.isFinite(price) && price > 1 ? price : Infinity;
+}
+
+/**
+ * Sort runners favourite-first (ascending decimal), non-runners last.
+ * Matches the Racing Desk racecard grid order.
+ */
+export function sortRunnersByOddsPrice<T extends OddsSortableRunner>(runners: T[]): T[] {
+  return [...runners].sort((a, b) => {
+    if (!!a.nonRunner !== !!b.nonRunner) return a.nonRunner ? 1 : -1;
+    // Equal / missing prices keep input order (stable sort), matching Racing Desk.
+    return runnerOddsSortPrice(a) - runnerOddsSortPrice(b);
+  });
+}
+
+/** Odds-ordered runner names (active runners only when `nonRunner` is set). */
+export function sortRunnerNamesByOdds(runners: OddsSortableRunner[]): string[] {
+  return sortRunnersByOddsPrice(runners)
+    .filter((r) => !r.nonRunner && r.name.trim())
+    .map((r) => r.name.trim());
+}

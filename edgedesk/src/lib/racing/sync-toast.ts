@@ -27,7 +27,7 @@ export function racingSyncToast(result: RacingSyncToastInput): RacingSyncToast {
       kind: "info",
       title: "API results unavailable on Free",
       description:
-        "Stay on Free - use Set placings (1st–4th) on Tracked Events for place-refund free bets. Basic (~£28/mo) only if you want auto results.",
+        "Stay on Free - use Set result (1st–4th) on Tracked Events or Profit Tracker for place-refund free bets. Basic (~£28/mo) only if you want auto results.",
     };
   }
   if (result.pending > 0) {

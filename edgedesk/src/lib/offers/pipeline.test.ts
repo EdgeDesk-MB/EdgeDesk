@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveOfferPipelineStage,
+  formatAwaitingResultLabel,
+  formatOfferPipelineStageLabel,
   OFFER_PIPELINE_PROGRESS_STAGES,
   offerPipelineHasStarted,
   pipelineProgressIndex,
 } from "@/lib/offers/pipeline";
+import { setDisplayTimeFormat } from "@/lib/time-format";
 import type { OfferProfitBreakdown, OfferSummary } from "@/lib/services/offers.types";
 
 function offer(
@@ -22,10 +25,10 @@ function offer(
     sport: null,
     offerType: null,
     rules: null,
-    scopeCourse: null,
-    scopeRaceId: null,
-    scopeRaceLabel: null,
-    eventDate: null,
+    scopeCourse: rest.scopeCourse ?? null,
+    scopeRaceId: rest.scopeRaceId ?? null,
+    scopeRaceLabel: rest.scopeRaceLabel ?? null,
+    eventDate: rest.eventDate ?? null,
     expiresAt: null,
     completedAt: null,
     seriesId: null,
@@ -153,5 +156,45 @@ describe("offer pipeline progress", () => {
         })
       )
     ).toBe(true);
+  });
+});
+
+describe("formatAwaitingResultLabel", () => {
+  it("includes race time and today when race-scoped for today", () => {
+    setDisplayTimeFormat("24h");
+    const now = Date.parse("2026-08-01T12:00:00+01:00");
+    expect(
+      formatAwaitingResultLabel(
+        {
+          scopeRaceLabel: "1:50 · Highclere Castle Gin Summer Handicap Stakes",
+          eventDate: "2026-08-01",
+        },
+        now
+      )
+    ).toBe("Awaiting result at 13:50 today");
+  });
+
+  it("falls back to Awaiting result when no off-time is known", () => {
+    expect(
+      formatAwaitingResultLabel({ scopeRaceLabel: null, eventDate: "2026-08-01" })
+    ).toBe("Awaiting result");
+  });
+
+  it("uses the enriched label on the awaiting pipeline stage", () => {
+    setDisplayTimeFormat("24h");
+    const now = Date.parse("2026-08-01T12:00:00+01:00");
+    expect(
+      formatOfferPipelineStageLabel(
+        offer({
+          id: 7,
+          title: "Tote",
+          scopeRaceLabel: "1:50 · Race",
+          eventDate: "2026-08-01",
+          profit: { freeBetStage: "awaiting_result", qualifyingOpenCount: 1 },
+        }),
+        "awaiting",
+        now
+      )
+    ).toBe("Awaiting result at 13:50 today");
   });
 });

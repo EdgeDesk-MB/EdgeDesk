@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, events, bets, balanceTransactions, history } from "@/lib/db";
 import type { GoalEvent } from "@/lib/calc";
-import { serializeRaceResults } from "@/lib/racing";
+import { serializeRaceResults, withPreservedRaceDisplayMeta } from "@/lib/racing";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,9 @@ const patchSchema = z.object({
       z.object({
         horse: z.string(),
         position: z.number().int().min(0),
+        spDecimal: z.number().positive().optional(),
+        spLabel: z.string().optional(),
+        isSpFavourite: z.boolean().optional(),
       })
     )
     .optional(),
@@ -141,11 +144,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       p.raceRunners?.length
         ? p.raceRunners
         : [{ horse: winner, position: 1 }];
-    goals = serializeRaceResults({
-      winner,
-      runners,
-      fieldSize: runners.length,
-    });
+    goals = serializeRaceResults(
+      withPreservedRaceDisplayMeta(
+        {
+          winner,
+          runners,
+          fieldSize: runners.length,
+        },
+        existing.goals
+      )
+    );
     const updated = db
       .update(events)
       .set({

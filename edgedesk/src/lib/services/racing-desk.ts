@@ -4,6 +4,7 @@
 import { db, bets, events, offers, type BetRow, type EventRow, type OfferRow } from "@/lib/db";
 import {
   resolveRunnerOdds,
+  sortRunnerNamesByOdds,
   type OddsSource,
 } from "@/lib/racing/odds";
 import type { RacingRunnerDetail } from "@/lib/racing-desk/types";
@@ -19,6 +20,7 @@ import type {
 import {
   formatBetGetFreePlaceSummary,
   isRegionalScope,
+  offerHasResultTrigger,
   parseOfferRules,
   placeRefundTriggerText,
   raceQualifiesForOffer,
@@ -26,6 +28,10 @@ import {
   scorePlaceRefundStrategy,
 } from "@/lib/offers/racing-offer-rules";
 import { resolveOfferConfidence } from "@/lib/offers/place-refund-ev";
+import { buildOfferEdgePlays } from "@/lib/offers/offer-edge";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
+import { getRealizedRetention } from "@/lib/services/retention";
+import { getAppSettings } from "@/lib/services/settings";
 import {
   demoMovement,
   priceMovementFor,
@@ -51,26 +57,7 @@ import {
   type ExchangeProvider,
 } from "@/lib/services/exchange";
 import { syncCourseOfferExpiryFromRaces } from "@/lib/offers/course-offer-sync";
-
-function startOfTodayMs(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function racingPnlToday(allBets: BetRow[]): number {
-  const start = startOfTodayMs();
-  return allBets
-    .filter(
-      (b) =>
-        b.settledAt != null &&
-        b.settledAt >= start &&
-        b.actualProfit != null &&
-        b.status !== "open" &&
-        b.status !== "void"
-    )
-    .reduce((a, b) => a + (b.actualProfit ?? 0), 0);
-}
+import { racingPnlToday } from "@/lib/racing/pnl-today";
 
 async function loadRacecards(
   date: string,
@@ -109,13 +96,21 @@ async function loadRacecards(
   };
 }
 
+/** Both sides of the exchange book for one runner, when the feed returns them. */
+interface ExchangeBookQuote {
+  layDecimal: number;
+  laySize?: number;
+  backDecimal?: number;
+  backSize?: number;
+}
+
 function enrichRunners(
   card: RacingRacecard,
   isDemo: boolean,
   idxSeed: number,
   preferredBookmaker?: string | null,
   forceProxy?: boolean,
-  exchangeLayByHorse?: Map<string, { layDecimal: number; laySize?: number }>,
+  exchangeLayByHorse?: Map<string, ExchangeBookQuote>,
   overrides?: Map<string, { bookieDecimal: number | null; exchangeDecimal: number | null }>
 ): RacingRunnerDetail[] {
   const active = card.runnerDetails.filter((r) => !r.nonRunner);
@@ -179,6 +174,8 @@ function enrichRunners(
       bookieDecimal,
       exchangeDecimal,
       exchangeLaySize: exchangeOverride ? undefined : layQuote?.laySize,
+      exchangeBackDecimal: exchangeOverride ? undefined : layQuote?.backDecimal,
+      exchangeBackSize: exchangeOverride ? undefined : layQuote?.backSize,
       exchangeSource: exchangeOverride
         ? ("api" as const)
         : layQuote?.layDecimal
@@ -240,27 +237,33 @@ function evaluateOfferTags(
     if (!qualifies) {
       return { offerId: offer.id, offerTitle: offer.title, qualifies: false, reasons };
     }
-    const { score, summary } = scorePlaceRefundStrategy(race);
-    const suggestedRunners = scorePlaceRefundRunners(race, {
-      betStake: rules?.betStake ?? 0,
-      freeBetAmount: rules?.freeBetAmount ?? 0,
-      offerId: offer.id,
-    });
-    return {
+    const base = {
       offerId: offer.id,
       offerTitle: offer.title,
-      qualifies: true,
-      score,
-      summary,
+      qualifies: true as const,
       betStake: rules?.betStake,
       freeBetAmount: rules?.freeBetAmount,
       bookmaker: offer.bookmaker,
       triggerText: rules ? placeRefundTriggerText(rules) : undefined,
-      suggestedRunners,
       minRunners:
         offer.scopeCourse?.trim() && !isRegionalScope(offer.scopeCourse)
           ? (rules?.minRunners ?? null)
           : null,
+    };
+    // Unconditional bet&get: race can still "qualify" on scope/min runners, but
+    // place-target heuristics and Best plays must not invent a pick.
+    if (!offerHasResultTrigger(rules)) return base;
+
+    const { score, summary } = scorePlaceRefundStrategy(race);
+    return {
+      ...base,
+      score,
+      summary,
+      suggestedRunners: scorePlaceRefundRunners(race, {
+        betStake: rules?.betStake ?? 0,
+        freeBetAmount: rules?.freeBetAmount ?? 0,
+        offerId: offer.id,
+      }),
     };
   });
 }
@@ -289,11 +292,52 @@ function applyRunnerOfferTargets(race: RacingDeskRace): RacingDeskRace {
   };
 }
 
-function buildSuggestedRaces(races: RacingDeskRace[]): SuggestedRace[] {
+/**
+ * Offer Edge plays for every active place-refund offer.
+ *
+ * The modelled path is the primary one. Races the model cannot price (too little
+ * of the field quoted, which is the norm on the free Racing API tier) simply do
+ * not produce a play, and the legacy rank-scored suggestion still covers them.
+ */
+function buildEdgePlays(
+  races: RacingDeskRace[],
+  activeOffers: OfferRow[],
+  date: string,
+  retention: number,
+  retentionSampleSize: number
+): OfferEdgePlay[] {
+  const plays: OfferEdgePlay[] = [];
+
+  for (const offer of activeOffers) {
+    const rules = parseOfferRules(offer);
+    if (!rules || !offerHasResultTrigger(rules)) continue;
+    plays.push(
+      ...buildOfferEdgePlays(
+        { id: offer.id, title: offer.title, bookmaker: offer.bookmaker, rules, row: offer },
+        races,
+        { date, retention, retentionSampleSize }
+      )
+    );
+  }
+
+  return plays.sort((a, b) => b.totalEv - a.totalEv || a.startTime - b.startTime);
+}
+
+function buildSuggestedRaces(
+  races: RacingDeskRace[],
+  edgePlays: OfferEdgePlay[]
+): SuggestedRace[] {
+  const edgeByRaceOffer = new Map(
+    edgePlays.map((play) => [`${play.raceExternalId}:${play.offerId}`, play])
+  );
+
   const suggestions: SuggestedRace[] = [];
   for (const race of races) {
     for (const tag of race.offerTags) {
-      if (!tag.qualifies || tag.score == null || tag.score <= 0) continue;
+      if (!tag.qualifies) continue;
+      const edge = edgeByRaceOffer.get(`${race.externalId}:${tag.offerId}`);
+      if (!edge && (tag.score == null || tag.score <= 0)) continue;
+
       const topTarget = tag.suggestedRunners?.[0];
       suggestions.push({
         externalId: race.externalId,
@@ -304,17 +348,29 @@ function buildSuggestedRaces(races: RacingDeskRace[]): SuggestedRace[] {
         region: race.region,
         offerId: tag.offerId,
         offerTitle: tag.offerTitle,
-        score: tag.score,
-        summary: tag.summary ?? "",
+        bookmaker: tag.bookmaker ?? edge?.bookmaker ?? null,
+        score: tag.score ?? 0,
+        summary: edge?.reasons.join(" · ") || tag.summary || "",
         oddsSource: race.oddsSource,
         suggestedRunners: tag.suggestedRunners,
         topTarget,
-        confidence: topTarget?.confidence ?? resolveOfferConfidence(race.oddsSource),
-        topEv: topTarget?.totalEv,
+        confidence: edge?.confidence ?? topTarget?.confidence ?? resolveOfferConfidence(race.oddsSource),
+        topEv: edge?.totalEv ?? topTarget?.totalEv,
+        edge,
       });
     }
   }
-  return suggestions.sort((a, b) => b.score - a.score).slice(0, 8);
+
+  // Modelled plays first, then by expected value, so the honest numbers lead.
+  return suggestions
+    .sort((a, b) => {
+      if (!!a.edge !== !!b.edge) return a.edge ? -1 : 1;
+      const evA = a.topEv ?? Number.NEGATIVE_INFINITY;
+      const evB = b.topEv ?? Number.NEGATIVE_INFINITY;
+      if (evA !== evB) return evB - evA;
+      return b.score - a.score;
+    })
+    .slice(0, 8);
 }
 
 export async function getRacingDesk(
@@ -376,10 +432,7 @@ export async function getRacingDesk(
   const settingsStatus = getExchangeProviderStatus(settingsProvider);
 
   const upcomingCards = cards.filter((c) => c.status !== "finished");
-  const exchangeLayByRace = new Map<
-    string,
-    Map<string, { layDecimal: number; laySize?: number }>
-  >();
+  const exchangeLayByRace = new Map<string, Map<string, ExchangeBookQuote>>();
   const exchangeMetaByRace = new Map<
     string,
     { source: "live" | "estimated" | "api"; error?: string; quoteCount: number }
@@ -403,9 +456,14 @@ export async function getRacingDesk(
     );
 
     for (const raceOdds of exchangeResult.races) {
-      const byHorse = new Map<string, { layDecimal: number; laySize?: number }>();
+      const byHorse = new Map<string, ExchangeBookQuote>();
       for (const q of raceOdds.quotes) {
-        byHorse.set(q.horseId, { layDecimal: q.layDecimal, laySize: q.laySize });
+        byHorse.set(q.horseId, {
+          layDecimal: q.layDecimal,
+          laySize: q.laySize,
+          backDecimal: q.backDecimal,
+          backSize: q.backSize,
+        });
       }
       if (byHorse.size > 0) exchangeLayByRace.set(raceOdds.externalId, byHorse);
       exchangeMetaByRace.set(raceOdds.externalId, {
@@ -519,7 +577,21 @@ export async function getRacingDesk(
   }
 
   const activeOfferSummaries = buildActiveOfferSummaries(activeOffers);
-  const suggestedRaces = buildSuggestedRaces(races);
+  // Same prior the rest of the app measures against, so an EV shown on the Racing
+  // Desk cannot disagree with the same offer's EV on the dashboard.
+  const { tuning } = getAppSettings();
+  const realizedRetention = getRealizedRetention(undefined, {
+    rate: tuning.retentionPrior,
+    weight: tuning.retentionPriorWeight,
+  });
+  const edgePlays = buildEdgePlays(
+    races,
+    activeOffers,
+    date,
+    realizedRetention.rate,
+    realizedRetention.sampleSize
+  );
+  const suggestedRaces = buildSuggestedRaces(races, edgePlays);
 
   const trackedCount = races.filter((r) => r.trackedEventId).length;
   const effectiveOddsTier: RacingDeskSummary["oddsTier"] =
@@ -556,7 +628,7 @@ export async function getRacingDesk(
       const ev = allEvents.find((e) => e.id === b.eventId);
       return ev?.sport === "horse_racing";
     }).length,
-    racingPnlToday: racingPnlToday(allBets),
+    racingPnlToday: racingPnlToday(allBets, allEvents),
     source: error ? "error" : source === "demo" ? "demo" : "racing-api",
     oddsSnapshotsEnabled: true,
     premiumOddsApi: hasRacingApiKey(),
@@ -584,7 +656,15 @@ export async function getRacingDesk(
     layColor: exchangeColors.layColor,
   };
 
-  return { date, summary, races, activeOffers: activeOfferSummaries, suggestedRaces, error };
+  return {
+    date,
+    summary,
+    races,
+    activeOffers: activeOfferSummaries,
+    suggestedRaces,
+    edgePlays,
+    error,
+  };
 }
 
 export function findTrackedEventForRace(
@@ -592,4 +672,26 @@ export function findTrackedEventForRace(
   allEvents: EventRow[]
 ): EventRow | undefined {
   return allEvents.find((e) => e.externalId === externalId);
+}
+
+/**
+ * Runner names in Racing Desk grid order (favourite-first by exchange / bookie / SP).
+ * Uses the same enrichment as the desk so Add bet Selection matches what the user sees.
+ */
+export async function getDeskOrderedRunnerNames(input: {
+  date: string;
+  externalId?: string | null;
+  trackedEventId?: number | null;
+}): Promise<string[] | null> {
+  if (!input.externalId && input.trackedEventId == null) return null;
+  const desk = await getRacingDesk(input.date);
+  const race = desk.races.find(
+    (r) =>
+      (input.externalId != null &&
+        input.externalId !== "" &&
+        r.externalId === input.externalId) ||
+      (input.trackedEventId != null && r.trackedEventId === input.trackedEventId)
+  );
+  if (!race?.runners.length) return null;
+  return sortRunnerNamesByOdds(race.runners);
 }

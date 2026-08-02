@@ -56,7 +56,7 @@ describe("racingSyncToast", () => {
   it("explains Free tier when blocked", () => {
     const toast = racingSyncToast({ updated: 0, pending: 2, tierBlocked: true, tier: "free" });
     expect(toast.kind).toBe("info");
-    expect(toast.description).toMatch(/Set placings/i);
+    expect(toast.description).toMatch(/Set result/i);
   });
 
   it("explains lag when Basic but results not published", () => {

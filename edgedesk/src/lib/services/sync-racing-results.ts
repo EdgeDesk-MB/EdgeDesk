@@ -4,12 +4,16 @@
 import { eq } from "drizzle-orm";
 import { db, bets, events, type EventRow } from "@/lib/db";
 import { formatRacingEventTitle } from "@/lib/events";
-import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
+import {
+  isRaceResultIncomplete,
+  parseRaceResults,
+  serializeRaceResults,
+  withPreservedRaceDisplayMeta,
+} from "@/lib/racing";
 import {
   clearRacingResultsCache,
   getCachedRacingResultsTier,
   hasRacingApiKey,
-  raceResultToGoals,
   resultsForRaceIds,
   type RacingResultsTier,
 } from "@/lib/services/theracingapi";
@@ -134,7 +138,9 @@ export async function syncRacingResultsForEvents(
       db.update(events)
         .set({
           status: "finished",
-          goals: raceResultToGoals(result),
+          goals: serializeRaceResults(
+            withPreservedRaceDisplayMeta(result, event.goals)
+          ),
           homeScore: 1,
           awayScore: 0,
         })

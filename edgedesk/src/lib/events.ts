@@ -215,12 +215,24 @@ export function formatRacingEventTitle(ev: {
 
 /** Status line for racing events - never football scores. */
 export function formatRacingEventStatus(
-  ev: { status: string },
-  raceResult?: { winner: string } | null
+  ev: {
+    status: string;
+    sport?: string;
+    source?: string | null;
+    startTime?: number;
+  },
+  raceResult?: { winner: string } | null,
+  now = Date.now()
 ): string {
-  if (ev.status === "live") return "Off";
-  if (ev.status === "finished" && raceResult?.winner) return `Won by ${raceResult.winner}`;
-  if (ev.status === "finished") return "Result";
+  // Same live window as Home: off-time passed (and not finished) counts as live
+  // even if the DB row is still "upcoming" awaiting a results sync.
+  const status = effectiveEventStatus(
+    { ...ev, sport: ev.sport ?? "horse_racing" },
+    now
+  );
+  if (status === "live") return "Live";
+  if (status === "finished" && raceResult?.winner) return `Won by ${raceResult.winner}`;
+  if (status === "finished") return "Result";
   return "Upcoming";
 }
 
@@ -245,11 +257,14 @@ export function formatEventStatus(
     awayScore: number;
     minute: number;
     goals?: string | null;
+    source?: string | null;
+    startTime?: number;
   },
-  raceResult?: { winner: string } | null
+  raceResult?: { winner: string } | null,
+  now = Date.now()
 ): string {
-  if (ev.sport === "horse_racing") return formatRacingEventStatus(ev, raceResult);
-  const status = effectiveEventStatus(ev);
+  if (ev.sport === "horse_racing") return formatRacingEventStatus(ev, raceResult, now);
+  const status = effectiveEventStatus(ev, now);
   if (status === "live") {
     const min = ev.minute > 0 ? ` (${ev.minute}')` : "";
     return `LIVE ${ev.homeScore}-${ev.awayScore}${min}`;

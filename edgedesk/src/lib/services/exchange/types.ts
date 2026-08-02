@@ -25,6 +25,9 @@ export interface ExchangeLayQuote {
   horseName: string;
   layDecimal: number;
   laySize?: number;
+  /** Best available back price, when the provider returns both sides of the book */
+  backDecimal?: number;
+  backSize?: number;
   /** Best available lay price on the exchange */
   source: ExchangeOddsSource;
 }

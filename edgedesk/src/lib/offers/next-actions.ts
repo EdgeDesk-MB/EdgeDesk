@@ -1,5 +1,9 @@
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
+import { formatAwaitingResultLabel } from "@/lib/offers/pipeline";
+import { formatDecimalOdds } from "@/lib/racing/odds";
+import { formatClockTime } from "@/lib/time-format";
 
 export type OfferNextActionKind =
   | "place_qualifying"
@@ -7,6 +11,17 @@ export type OfferNextActionKind =
   | "convert_free_bet"
   | "review_expiry"
   | "start_planned";
+
+/** The specific race and runner Offer Edge recommends for this action. */
+export interface OfferNextActionEdge {
+  raceExternalId: string;
+  course: string;
+  /** Epoch ms. The off time is rendered from this, never from the raw card string. */
+  startTime: number;
+  runnerName: string;
+  backDecimal: number;
+  totalEv: number;
+}
 
 export interface OfferNextAction {
   offerId: number;
@@ -18,9 +33,36 @@ export interface OfferNextAction {
   bookmaker: string | null;
   offerTitle: string;
   expiresAt: number | null;
+  /** Present when Offer Edge could name a race and horse for this offer. */
+  edge?: OfferNextActionEdge;
+}
+
+export interface OfferNextActionOptions {
+  /** Best Offer Edge play per offer id. */
+  edgePlays?: Map<number, OfferEdgePlay>;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+function toActionEdge(play: OfferEdgePlay): OfferNextActionEdge {
+  return {
+    raceExternalId: play.raceExternalId,
+    course: play.course,
+    startTime: play.startTime,
+    runnerName: play.runner.name,
+    backDecimal: play.runner.backDecimal,
+    totalEv: play.totalEv,
+  };
+}
+
+/** "Chepstow 15:20, back Storm Rider at 6.50, EV +£12.40." */
+function formatEdgeDetail(edge: OfferNextActionEdge): string {
+  const ev =
+    edge.totalEv >= 0
+      ? `+£${edge.totalEv.toFixed(2)}`
+      : `-£${Math.abs(edge.totalEv).toFixed(2)}`;
+  return `${edge.course} ${formatClockTime(edge.startTime)}, back ${edge.runnerName} at ${formatDecimalOdds(edge.backDecimal)}, EV ${ev}.`;
+}
 
 function daysUntil(expiresAt: number | null, now: number): number | null {
   if (expiresAt == null) return null;
@@ -38,9 +80,13 @@ export function isActionableOfferNext(kind: OfferNextActionKind): boolean {
  */
 export function deriveOfferNextAction(
   offer: OfferSummary,
-  now = Date.now()
+  now = Date.now(),
+  opts?: OfferNextActionOptions
 ): OfferNextAction | null {
   if (offer.status === "completed" || offer.status === "expired") return null;
+
+  const edgePlay = opts?.edgePlays?.get(offer.id);
+  const edge = edgePlay ? toActionEdge(edgePlay) : undefined;
 
   const profit = offer.profit;
   const bookmaker = offer.bookmaker;
@@ -63,9 +109,12 @@ export function deriveOfferNextAction(
       kind: "start_planned",
       priority: expiringSoon ? 15 : 40,
       title: "Start this offer",
-      detail: expiringSoon
-        ? `Expires soon - place the qualifying bet${bookmaker ? ` at ${bookmaker}` : ""}.`
-        : `Log the qualifying bet to move this from planned to active.`,
+      detail: edge
+        ? formatEdgeDetail(edge)
+        : expiringSoon
+          ? `Expires soon - place the qualifying bet${bookmaker ? ` at ${bookmaker}` : ""}.`
+          : `Log the qualifying bet to move this from planned to active.`,
+      edge,
     };
   }
 
@@ -74,8 +123,9 @@ export function deriveOfferNextAction(
       ...base,
       kind: "await_result",
       priority: 50,
-      title: "Awaiting result",
-      detail: "Qualifying bet is open - free bet awards when the result lands.",
+      title: formatAwaitingResultLabel(offer),
+      detail:
+        "Qualifying bet is open - free bet awards on settlement, or mark Free bet awarded in the feed if the bookie released it early.",
     };
   }
 
@@ -129,10 +179,13 @@ export function deriveOfferNextAction(
       kind: "place_qualifying",
       priority: expiringSoon ? 8 : 30,
       title: "Place qualifying bet",
-      detail: bookmaker
-        ? `No bets linked yet - start the qualifying leg at ${bookmaker}.`
-        : "No bets linked yet - start the qualifying leg.",
+      detail: edge
+        ? formatEdgeDetail(edge)
+        : bookmaker
+          ? `No bets linked yet - start the qualifying leg at ${bookmaker}.`
+          : "No bets linked yet - start the qualifying leg.",
       href: `/tracker?offer=${offer.id}&queue=offers&action=qualify`,
+      edge,
     };
   }
 
@@ -158,10 +211,11 @@ export function deriveOfferNextAction(
  */
 export function listOfferNextActions(
   offers: OfferSummary[],
-  now = Date.now()
+  now = Date.now(),
+  opts?: OfferNextActionOptions
 ): OfferNextAction[] {
   return offers
-    .map((o) => deriveOfferNextAction(o, now))
+    .map((o) => deriveOfferNextAction(o, now, opts))
     .filter((a): a is OfferNextAction => a != null && isActionableOfferNext(a.kind))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;

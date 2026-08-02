@@ -1,6 +1,7 @@
 "use client";
 
 import NumberFlow from "@number-flow/react";
+import { OFFER_INACTIVE_FIGURE_CLASS } from "@/lib/offers/offer-inactive-ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,6 +20,9 @@ const timings = {
  *
  * trend={0} on the animated fraction: each digit takes its own shortest path
  * (wrapping 9→0 is a single step), so 10p → 32p never cycles the long way round.
+ *
+ * Inactive/expired figures skip NumberFlow so text-decoration can strike the
+ * whole amount (NumberFlow's shadow-DOM digits do not inherit line-through).
  */
 function SplitFlow({
   value,
@@ -28,6 +32,7 @@ function SplitFlow({
   className,
   signColor,
   signDisplay,
+  animateFraction = true,
 }: {
   value: number;
   digits: number;
@@ -36,6 +41,7 @@ function SplitFlow({
   className?: string;
   signColor?: boolean;
   signDisplay?: boolean;
+  animateFraction?: boolean;
 }) {
   const safe = Number.isFinite(value) ? value : 0;
   const scale = 10 ** digits;
@@ -45,33 +51,40 @@ function SplitFlow({
   const positive = safe > 0 && totalUnits > 0;
   const intPart = Math.floor(totalUnits / scale);
   const fracPart = totalUnits % scale;
+  const fracText = String(fracPart).padStart(digits, "0");
 
   return (
     <span
       className={cn(
         "whitespace-nowrap tabular-nums",
-        signColor && (positive ? "text-emerald-600 dark:text-emerald-400" : negative ? "text-negative" : ""),
+        signColor && (positive ? moneyPositiveClass : negative ? "text-negative" : ""),
         className
       )}
     >
       {negative ? "-" : signDisplay && positive ? "+" : ""}
       {prefix}
       {intPart.toLocaleString("en-GB")}
-      {digits > 0 && (
-        <>
-          .
-          <NumberFlow
-            value={fracPart}
-            trend={0}
-            {...timings}
-            format={{ minimumIntegerDigits: digits, useGrouping: false }}
-          />
-        </>
-      )}
+      {digits > 0 &&
+        (animateFraction ? (
+          <>
+            .
+            <NumberFlow
+              value={fracPart}
+              trend={0}
+              {...timings}
+              format={{ minimumIntegerDigits: digits, useGrouping: false }}
+            />
+          </>
+        ) : (
+          `.${fracText}`
+        ))}
       {suffix}
     </span>
   );
 }
+
+/** Positive money green, shared by MoneyFlow signColor and static P&L labels. */
+export const moneyPositiveClass = "text-emerald-600 dark:text-emerald-400";
 
 interface MoneyFlowProps {
   value: number;
@@ -95,7 +108,7 @@ export function MoneyFlow({ value, className, signColor, signDisplay, compact }:
       <span
         className={cn(
           "tabular-nums",
-          signColor && (safe > 0.004 ? "text-emerald-600 dark:text-emerald-400" : safe < -0.004 ? "text-negative" : ""),
+          signColor && (safe > 0.004 ? moneyPositiveClass : safe < -0.004 ? "text-negative" : ""),
           className
         )}
       >
@@ -108,6 +121,7 @@ export function MoneyFlow({ value, className, signColor, signDisplay, compact }:
       </span>
     );
   }
+  const animateFraction = !className?.includes(OFFER_INACTIVE_FIGURE_CLASS);
   return (
     <SplitFlow
       value={safe}
@@ -116,6 +130,7 @@ export function MoneyFlow({ value, className, signColor, signDisplay, compact }:
       className={className}
       signColor={signColor}
       signDisplay={signDisplay}
+      animateFraction={animateFraction}
     />
   );
 }
@@ -128,6 +143,7 @@ interface PercentFlowProps {
 }
 
 export function PercentFlow({ value, className, signColor, digits = 2 }: PercentFlowProps) {
+  const animateFraction = !className?.includes(OFFER_INACTIVE_FIGURE_CLASS);
   return (
     <SplitFlow
       value={value}
@@ -136,6 +152,7 @@ export function PercentFlow({ value, className, signColor, digits = 2 }: Percent
       className={className}
       signColor={signColor}
       signDisplay
+      animateFraction={animateFraction}
     />
   );
 }
@@ -149,5 +166,13 @@ export function NumFlow({
   className?: string;
   digits?: number;
 }) {
-  return <SplitFlow value={value} digits={digits} className={className} />;
+  const animateFraction = !className?.includes(OFFER_INACTIVE_FIGURE_CLASS);
+  return (
+    <SplitFlow
+      value={value}
+      digits={digits}
+      className={className}
+      animateFraction={animateFraction}
+    />
+  );
 }

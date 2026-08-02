@@ -5,6 +5,7 @@ import {
   fractionalToDecimal,
   formatWeightStones,
   resolveRunnerOdds,
+  sortRunnerNamesByOdds,
 } from "./odds";
 
 describe("fractionalToDecimal", () => {
@@ -32,6 +33,29 @@ describe("resolveRunnerOdds", () => {
     expect(r.bookieDecimal).toBe(4.5);
     expect(r.source).toBe("proxy");
     expect(r.exchangeDecimal).toBeGreaterThan(4.5);
+  });
+});
+
+describe("sortRunnerNamesByOdds", () => {
+  it("orders favourite-first like Racing Desk (exchange, then bookie, then SP)", () => {
+    expect(
+      sortRunnerNamesByOdds([
+        { name: "Outsider", spDecimal: 21 },
+        { name: "Favourite", exchangeDecimal: 2.5 },
+        { name: "Second", bookieDecimal: 4 },
+        { name: "NR", spDecimal: 3, nonRunner: true },
+      ])
+    ).toEqual(["Favourite", "Second", "Outsider"]);
+  });
+
+  it("keeps unpriced runners in input order", () => {
+    expect(
+      sortRunnerNamesByOdds([
+        { name: "Alpha" },
+        { name: "Beta" },
+        { name: "Gamma" },
+      ])
+    ).toEqual(["Alpha", "Beta", "Gamma"]);
   });
 });
 

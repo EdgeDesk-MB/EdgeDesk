@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +11,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { Switch } from "@/components/ui/switch";
+import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
+import { OfferConfidenceBadge } from "@/components/offers/offer-confidence-badge";
+import { VenueBadge } from "@/components/venue-badge";
 import {
   formatConfidenceLabel,
-  formatOddsSourceLabel,
   type OfferConfidence,
 } from "@/lib/offers/place-refund-ev";
 import { formatDecimalOdds } from "@/lib/racing/odds";
@@ -24,7 +33,7 @@ import type { SuggestedRace, SuggestedRunner } from "@/lib/racing-desk/types";
 import { RegionFlag } from "@/components/region-flag";
 import { filterPillState, listRowInteractive } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Gift, Sparkles } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Gift, Sparkles } from "lucide-react";
 
 export interface RacingIntelligenceDialogProps {
   open: boolean;
@@ -32,58 +41,47 @@ export interface RacingIntelligenceDialogProps {
   suggestions: SuggestedRace[];
   onSelectRace: (externalId: string) => void;
   onBackRunner: (raceId: string, runnerName: string, offerId: number) => void;
+  /** Open the full campaign card for this offer (stacked over Race picks). */
+  onViewOffer: (offerId: number) => void;
   dateLabel: string;
   dataSource?: "demo" | "racing-api" | "error";
 }
 
-type ConfidenceFilter = "all" | OfferConfidence;
-
-function ConfidenceBadge({
-  confidence,
-  oddsSource,
-  dataSource,
-}: {
-  confidence?: SuggestedRunner["confidence"];
-  oddsSource?: SuggestedRace["oddsSource"];
-  dataSource?: RacingIntelligenceDialogProps["dataSource"];
-}) {
-  if (dataSource === "demo") {
-    return (
-      <Badge variant="outline" className="border-violet-500/40 text-[9px] uppercase text-violet-700 dark:text-violet-300">
-        Demo
-      </Badge>
-    );
-  }
-
-  const label = confidence ? formatConfidenceLabel(confidence) : formatOddsSourceLabel(oddsSource, dataSource);
-  const variant =
-    confidence === "live" || oddsSource === "live"
-      ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
-      : confidence === "mixed"
-        ? "border-amber-500/40 text-amber-700 dark:text-amber-300"
-        : oddsSource === "proxy"
-          ? "border-amber-500/30 text-amber-700 dark:text-amber-300"
-          : "border-border text-muted-foreground";
-
-  return (
-    <Badge variant="outline" className={cn("text-[9px] uppercase", variant)}>
-      {label}
-    </Badge>
-  );
+interface OfferOption {
+  id: number;
+  title: string;
+  bookmaker: string | null;
+  pickCount: number;
+  bestEv: number | null;
 }
+
+type ConfidenceFilter = "all" | OfferConfidence;
 
 function EvLine({ runner }: { runner: SuggestedRunner }) {
   if (runner.totalEv == null) return null;
-  const positive = runner.totalEv > 0;
+  return <EvFigure value={runner.totalEv} />;
+}
+
+function EvFigure({ value, strong }: { value: number; strong?: boolean }) {
   return (
-    <span
-      className={cn(
-        "text-xs tabular-nums",
-        positive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-      )}
-    >
-      EV {positive ? "+" : ""}£{runner.totalEv.toFixed(2)}
+    <span className={cn("inline-flex items-baseline gap-1", strong ? "text-sm" : "text-xs")}>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">EV</span>
+      <MoneyFlow value={value} signColor signDisplay className={cn(strong && "font-semibold")} />
     </span>
+  );
+}
+
+function WarningLines({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      {warnings.map((warning) => (
+        <p key={warning} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <AlertTriangle className="mt-px size-3 shrink-0 text-muted-foreground" aria-hidden />
+          <span>{warning}</span>
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -106,142 +104,204 @@ function SuggestionRow({
   onSelectRace: (id: string) => void;
   onBackRunner: (raceId: string, runner: string, offerId: number) => void;
 }) {
+  const edge = suggestion.edge;
   const top = suggestion.topTarget ?? suggestion.suggestedRunners?.[0];
+  const runnerName = edge?.runner.name ?? top?.name;
+  const runnerPrice = edge?.runner.backDecimal ?? top?.bookieDecimal;
+  const reasons = edge?.reasons ?? [];
 
   return (
-    <li className="border-b border-border/60 last:border-0">
-      <div className="flex items-start gap-2 px-4 py-3">
-        <span className="w-5 shrink-0 pt-1 text-xs font-bold tabular-nums text-muted-foreground">
-          {rank}
-        </span>
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={() => onSelectRace(suggestion.externalId)}
-            className={cn("w-full text-left", listRowInteractive, "-mx-1 rounded-md px-1 py-0.5")}
-          >
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold tabular-nums">
-                {suggestion.startTime ? formatClockTime(suggestion.startTime) : suggestion.offTime}
-              </span>
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <RegionFlag code={suggestion.region} />
-                {suggestion.course}
-              </span>
-              <Badge variant="secondary" className="h-5 tabular-nums">
-                {suggestion.score}
-              </Badge>
-              <ConfidenceBadge
-                confidence={suggestion.confidence}
-                oddsSource={suggestion.oddsSource}
-                dataSource={dataSource}
-              />
+    <li>
+      <div className="rounded-lg border border-border/60 bg-card">
+        <button
+          type="button"
+          onClick={() => onSelectRace(suggestion.externalId)}
+          className={cn(
+            "group w-full rounded-lg px-4 py-3 text-left",
+            listRowInteractive
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-bold tabular-nums text-muted-foreground">
+              {rank}
             </span>
-            {!advanced && top && (
-              <span className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="text-sm">
-                  Back <span className="font-semibold">{top.name}</span>
-                  {top.bookieDecimal != null && (
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <span className="font-mono text-sm font-semibold tabular-nums">
+                  {formatClockTime(suggestion.startTime)}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                  <RegionFlag code={suggestion.region} />
+                  {suggestion.course}
+                </span>
+                <OfferConfidenceBadge
+                  confidence={suggestion.confidence}
+                  oddsSource={suggestion.oddsSource}
+                  dataSource={dataSource}
+                />
+                {suggestion.topEv != null && (
+                  <span className="sm:ml-auto">
+                    <EvFigure value={suggestion.topEv} strong />
+                  </span>
+                )}
+              </div>
+
+              {runnerName && (
+                <p className="mt-1.5 text-sm">
+                  Back <span className="font-semibold">{runnerName}</span>
+                  {runnerPrice != null && (
                     <span className="ml-1 text-muted-foreground">
-                      @ {formatDecimalOdds(top.bookieDecimal)}
+                      at {formatDecimalOdds(runnerPrice)}
                     </span>
                   )}
-                </span>
-                <EvLine runner={top} />
-                {top.confidence && dataSource !== "demo" && (
-                  <Badge variant="outline" className="h-4 text-[9px]">
-                    {formatConfidenceLabel(top.confidence)}
-                  </Badge>
-                )}
-              </span>
-            )}
-            {!advanced && !top && (
-              <span className="mt-1 block text-xs text-muted-foreground">{suggestion.summary}</span>
-            )}
-          </button>
-
-          {advanced && (
-            <>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{suggestion.raceName}</p>
-              <p className="text-[11px] text-muted-foreground">{suggestion.offerTitle}</p>
-              <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">{suggestion.summary}</p>
-              {(suggestion.suggestedRunners?.length ?? 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={onToggle}
-                  className="mt-2 flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronDown
-                    className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
-                  />
-                  {expanded ? "Hide" : "Show"} targets ({suggestion.suggestedRunners!.length})
-                </button>
+                  {!edge && top && (
+                    <span className="ml-2 inline-flex align-middle">
+                      <EvLine runner={top} />
+                    </span>
+                  )}
+                </p>
               )}
-              {expanded &&
-                suggestion.suggestedRunners?.map((runner) => (
-                  <div
-                    key={runner.horseId}
-                    className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border bg-selection-subtle/50 px-2.5 py-2"
-                  >
-                    <div className="min-w-0 text-xs">
-                      <span className="font-semibold">{runner.name}</span>
-                      <span className="ml-2 text-muted-foreground">#{runner.marketRank}</span>
-                      <ConfidenceBadge
-                        confidence={runner.confidence}
-                        oddsSource={runner.oddsSource}
-                        dataSource={dataSource}
-                      />
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">{runner.summary}</p>
-                      {runner.qualLoss != null && (
-                        <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
-                          Qual £{runner.qualLoss.toFixed(2)}
-                          {runner.freeBetEv != null && ` · FB EV £${runner.freeBetEv.toFixed(2)}`}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <EvLine runner={runner} />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 gap-1 px-2"
-                        onClick={() =>
-                          onBackRunner(suggestion.externalId, runner.name, suggestion.offerId)
-                        }
-                      >
-                        <Gift className="size-3 text-emerald-600" />
-                        Back
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-            </>
-          )}
-        </div>
-        {!advanced && top && (
+
+              {!runnerName && !edge && (
+                <p className="mt-1.5 text-xs text-muted-foreground">{suggestion.summary}</p>
+              )}
+
+              {reasons.length > 0 && (
+                <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                  {reasons.map((reason) => (
+                    <li key={reason} className="max-w-full">
+                      {reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {edge && <WarningLines warnings={edge.warnings} />}
+
+              {advanced && (
+                <div className="mt-2 space-y-1 border-t border-border/50 pt-2 text-[11px] text-muted-foreground">
+                  <p className="truncate">{suggestion.raceName}</p>
+                  {edge ? (
+                    <p className="tabular-nums">
+                      Lay {formatDecimalOdds(edge.runner.layDecimal)} · {edge.fieldSize} runners ·
+                      qual £{edge.qualLoss.toFixed(2)} · FB EV £{edge.freeBetEv.toFixed(2)}
+                    </p>
+                  ) : (
+                    <p>{suggestion.summary}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <ChevronRight
+              className="mt-1 size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+              aria-hidden
+            />
+          </div>
+        </button>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-2">
+          {runnerName ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => onBackRunner(suggestion.externalId, runnerName, suggestion.offerId)}
+            >
+              <Gift className="size-3.5 text-emerald-600" />
+              Back {runnerName}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
-            variant="outline"
-            className="h-8 shrink-0 gap-1"
-            onClick={() => onBackRunner(suggestion.externalId, top.name, suggestion.offerId)}
+            variant="ghost"
+            className="h-8"
+            onClick={() => onSelectRace(suggestion.externalId)}
           >
-            <Gift className="size-3 text-emerald-600" />
-            Back
+            Open race
           </Button>
-        )}
+          {advanced && (suggestion.suggestedRunners?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="ml-auto flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              <ChevronDown
+                className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
+              />
+              {expanded ? "Hide" : "Show"} targets ({suggestion.suggestedRunners!.length})
+            </button>
+          )}
+        </div>
+
+        {advanced &&
+          expanded &&
+          suggestion.suggestedRunners?.map((runner) => (
+            <div
+              key={runner.horseId}
+              className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 bg-selection-subtle/40 px-4 py-2.5"
+            >
+              <div className="min-w-0 text-xs">
+                <span className="font-semibold">{runner.name}</span>
+                <span className="ml-2 text-muted-foreground">#{runner.marketRank}</span>
+                <span className="ml-2 inline-flex align-middle">
+                  <OfferConfidenceBadge
+                    confidence={runner.confidence}
+                    oddsSource={runner.oddsSource}
+                    dataSource={dataSource}
+                  />
+                </span>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{runner.summary}</p>
+                {runner.qualLoss != null && (
+                  <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
+                    Qual £{runner.qualLoss.toFixed(2)}
+                    {runner.freeBetEv != null && ` · FB EV £${runner.freeBetEv.toFixed(2)}`}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <EvLine runner={runner} />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 px-2"
+                  onClick={() =>
+                    onBackRunner(suggestion.externalId, runner.name, suggestion.offerId)
+                  }
+                >
+                  <Gift className="size-3 text-emerald-600" />
+                  Back
+                </Button>
+              </div>
+            </div>
+          ))}
       </div>
     </li>
   );
 }
 
+// Labels come from the same helper the chips use, so a filter can never name a
+// tier differently from the badge it filters on.
 const CONFIDENCE_FILTERS: Array<{ id: ConfidenceFilter; label: string }> = [
   { id: "all", label: "All" },
-  { id: "live", label: "Live odds" },
-  { id: "mixed", label: "Partial" },
-  { id: "estimate", label: "Estimated" },
+  { id: "live", label: formatConfidenceLabel("live") },
+  { id: "mixed", label: formatConfidenceLabel("mixed") },
+  { id: "estimate", label: formatConfidenceLabel("estimate") },
 ];
+
+function bestOfferId(offers: OfferOption[]): number | null {
+  if (offers.length === 0) return null;
+  return [...offers].sort((a, b) => {
+    const evA = a.bestEv ?? Number.NEGATIVE_INFINITY;
+    const evB = b.bestEv ?? Number.NEGATIVE_INFINITY;
+    if (evA !== evB) return evB - evA;
+    return b.pickCount - a.pickCount;
+  })[0]!.id;
+}
 
 export function RacingIntelligenceDialog({
   open,
@@ -249,35 +309,108 @@ export function RacingIntelligenceDialog({
   suggestions,
   onSelectRace,
   onBackRunner,
+  onViewOffer,
   dateLabel,
   dataSource,
 }: RacingIntelligenceDialogProps) {
   const [advanced, setAdvanced] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
+  const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
+
+  // Picks are always scoped to one offer. The same race can be the best play for
+  // one campaign and useless for another, so there is no mixed "All offers" list.
+  const offerOptions = useMemo(() => {
+    const byId = new Map<number, OfferOption>();
+    for (const s of suggestions) {
+      const existing = byId.get(s.offerId);
+      if (!existing) {
+        byId.set(s.offerId, {
+          id: s.offerId,
+          title: s.offerTitle,
+          bookmaker: s.bookmaker,
+          pickCount: 1,
+          bestEv: s.topEv ?? null,
+        });
+        continue;
+      }
+      existing.pickCount += 1;
+      if (s.topEv != null && (existing.bestEv == null || s.topEv > existing.bestEv)) {
+        existing.bestEv = s.topEv;
+      }
+      if (!existing.bookmaker && s.bookmaker) existing.bookmaker = s.bookmaker;
+    }
+    return [...byId.values()];
+  }, [suggestions]);
+
+  // When the dialog opens, land on the offer with the strongest pick. Soft polls
+  // must not yank the user onto a different campaign mid-browse.
+  // Adjust-during-render (react-hooks/set-state-in-effect): reset on open only.
+  const [prevIntelOpen, setPrevIntelOpen] = useState(false);
+  if (open !== prevIntelOpen) {
+    setPrevIntelOpen(open);
+    if (open) {
+      setSelectedOfferId(bestOfferId(offerOptions));
+      setConfidenceFilter("all");
+      setExpandedId(null);
+    }
+  }
+
+  // Keep the selection valid if the suggestion set shrinks while open.
+  // Adjust-during-render: the condition itself prevents re-firing.
+  if (
+    open &&
+    selectedOfferId != null &&
+    !offerOptions.some((o) => o.id === selectedOfferId)
+  ) {
+    setSelectedOfferId(bestOfferId(offerOptions));
+  }
+
+  // Before the open-effect lands, fall back to the strongest offer so the header
+  // never flashes empty on the first paint.
+  const activeOfferId = selectedOfferId ?? bestOfferId(offerOptions);
+  const activeOffer = offerOptions.find((o) => o.id === activeOfferId) ?? null;
+
+  const scoped = useMemo(
+    () =>
+      activeOfferId == null
+        ? []
+        : suggestions.filter((s) => s.offerId === activeOfferId),
+    [suggestions, activeOfferId]
+  );
 
   const sorted = useMemo(() => {
-    const list = [...suggestions].sort((a, b) => {
-      const evA = a.topEv ?? a.score;
-      const evB = b.topEv ?? b.score;
-      return evB - evA;
+    // Modelled plays lead, then by expected value. `score` is only a last-resort
+    // tiebreak for races the model could not price.
+    const list = [...scoped].sort((a, b) => {
+      if (!!a.edge !== !!b.edge) return a.edge ? -1 : 1;
+      const evA = a.topEv ?? Number.NEGATIVE_INFINITY;
+      const evB = b.topEv ?? Number.NEGATIVE_INFINITY;
+      if (evA !== evB) return evB - evA;
+      return b.score - a.score;
     });
     if (confidenceFilter === "all") return list;
     return list.filter((s) => s.confidence === confidenceFilter);
-  }, [suggestions, confidenceFilter]);
+  }, [scoped, confidenceFilter]);
 
   const tierCounts = useMemo(() => {
     const counts: Record<ConfidenceFilter, number> = {
-      all: suggestions.length,
+      all: scoped.length,
       live: 0,
       mixed: 0,
       estimate: 0,
     };
-    for (const s of suggestions) {
+    for (const s of scoped) {
       if (s.confidence) counts[s.confidence] += 1;
     }
     return counts;
-  }, [suggestions]);
+  }, [scoped]);
+
+  function selectOffer(id: number) {
+    setSelectedOfferId(id);
+    setConfidenceFilter("all");
+    setExpandedId(null);
+  }
 
   function pickRace(externalId: string) {
     onSelectRace(externalId);
@@ -289,20 +422,22 @@ export function RacingIntelligenceDialog({
     onOpenChange(false);
   }
 
+  const useDropdown = offerOptions.length > 3;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(85vh,720px)] max-w-lg flex-col gap-0 p-0">
-        <DialogHeader className="border-b bg-selection-subtle px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
+      <DialogContent className="flex max-h-[min(90vh,840px)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-4xl">
+        <DialogHeader className="shrink-0 rounded-t-xl border-b bg-selection-subtle px-5 py-4 pr-14">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
               <DialogTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
-                <Sparkles className="size-4 text-violet-500" />
+                <Sparkles className="size-4 text-edge" />
                 Race picks
               </DialogTitle>
-              <DialogDescription className="text-[11px]">
-                Best qualifying races for your active offers on {dateLabel}
+              <DialogDescription className="mt-1 text-[11px]">
+                Best race and horse for this offer on {dateLabel}
                 {dataSource === "demo" && (
-                  <span className="ml-1 text-violet-600 dark:text-violet-400">· demo data</span>
+                  <span className="ml-1 text-edge">· demo data</span>
                 )}
               </DialogDescription>
             </div>
@@ -322,8 +457,79 @@ export function RacingIntelligenceDialog({
             </div>
           </div>
 
-          {suggestions.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
+          {offerOptions.length > 1 && (
+            <div className="mt-3">
+              {useDropdown ? (
+                <Select
+                  value={activeOfferId != null ? String(activeOfferId) : undefined}
+                  onValueChange={(value) => selectOffer(Number(value))}
+                >
+                  <SelectTrigger className="h-9 w-full max-w-md bg-card text-left text-xs">
+                    <SelectValue placeholder="Choose an offer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {offerOptions.map((offer) => (
+                      <SelectItem key={offer.id} value={String(offer.id)}>
+                        {(offer.bookmaker ? `${offer.bookmaker} · ` : "") + offer.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {offerOptions.map((offer) => (
+                    <button
+                      key={offer.id}
+                      type="button"
+                      onClick={() => selectOffer(offer.id)}
+                      className={cn(
+                        filterPillState(activeOfferId === offer.id),
+                        "max-w-[260px] text-[10px]"
+                      )}
+                      title={offer.title}
+                    >
+                      <span className="truncate">
+                        {offer.bookmaker
+                          ? `${offer.bookmaker}: ${offer.title}`
+                          : offer.title}
+                        <span className="ml-1 tabular-nums text-muted-foreground">
+                          ({offer.pickCount})
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeOffer && (
+            <div className="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border/50 bg-card px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                {activeOffer.bookmaker ? (
+                  <VenueBadge name={activeOffer.bookmaker} kind="bookie" size="md" />
+                ) : (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Offer
+                  </span>
+                )}
+                <p className="mt-1.5 text-sm font-semibold leading-snug">{activeOffer.title}</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 shrink-0 gap-1.5"
+                onClick={() => onViewOffer(activeOffer.id)}
+              >
+                <ExternalLink className="size-3.5" />
+                View offer
+              </Button>
+            </div>
+          )}
+
+          {scoped.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1">
               {CONFIDENCE_FILTERS.map((f) => {
                 const count = tierCounts[f.id];
                 if (f.id !== "all" && count === 0) return null;
@@ -343,21 +549,21 @@ export function RacingIntelligenceDialog({
           )}
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
           {sorted.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              <Sparkles className="mx-auto mb-2 size-8 text-violet-500/40" />
+            <div className="px-2 py-12 text-center text-sm text-muted-foreground">
+              <Sparkles className="mx-auto mb-2 size-8 text-edge/40" />
               <p className="font-medium text-foreground">
-                {suggestions.length === 0 ? "No suggestions yet" : "No picks in this tier"}
+                {suggestions.length === 0 ? "No picks yet" : "No picks in this tier"}
               </p>
               <p className="mt-1 text-xs">
                 {suggestions.length === 0
                   ? "Add an active place-refund offer to unlock ranked picks."
-                  : "Try another confidence filter - proxy estimates still rank by EV."}
+                  : "Try another confidence filter. Estimated prices are still ranked by EV."}
               </p>
             </div>
           ) : (
-            <ul>
+            <ul className="space-y-2.5">
               {sorted.map((s, idx) => (
                 <SuggestionRow
                   key={`${s.externalId}-${s.offerId}`}
@@ -387,60 +593,87 @@ export function RacingIntelligenceDialog({
 
 export function RacingIntelligenceTrigger({
   count,
-  topScore,
+  topEv,
+  topEvConfidence,
+  dataSource,
   onClick,
 }: {
   count: number;
-  topScore?: number;
+  /** Best expected value across the picks, in pounds. */
+  topEv?: number;
+  /** How much that best figure is worth trusting. */
+  topEvConfidence?: OfferConfidence;
+  dataSource?: RacingIntelligenceDialogProps["dataSource"];
   onClick: () => void;
 }) {
+  const showEv = count > 0 && topEv != null && topEv > 0;
   return (
     <Button type="button" variant="outline" {...pageSecondaryButtonProps} className="gap-1.5" onClick={onClick}>
-      <Sparkles className="size-4 text-violet-500" />
+      <Sparkles className="size-4 text-edge" />
       Race picks
       {count > 0 && (
         <Badge variant="secondary" className="h-5 min-w-5 px-1.5 tabular-nums">
           {count}
         </Badge>
       )}
-      {count > 0 && topScore != null && (
-        <span className="hidden text-xs text-muted-foreground sm:inline">· top {topScore}</span>
+      {showEv && (
+        <span className="hidden items-center gap-1 text-xs sm:inline-flex">
+          <span className={`tabular-nums ${moneyPositiveClass}`}>
+            · best +£{topEv.toFixed(2)}
+          </span>
+          {(topEvConfidence || dataSource === "demo") && (
+            <OfferConfidenceBadge confidence={topEvConfidence} dataSource={dataSource} />
+          )}
+        </span>
       )}
     </Button>
   );
 }
 
+export type DeskRaceFilter = "all" | "qualifying" | "recommended";
+
 export function DeskFilterPills({
-  qualifyingOnly,
-  onQualifyingOnlyChange,
+  filter,
+  onFilterChange,
   advancedMode,
   onAdvancedModeChange,
-  trailing,
 }: {
-  qualifyingOnly: boolean;
-  onQualifyingOnlyChange: (v: boolean) => void;
+  filter: DeskRaceFilter;
+  onFilterChange: (v: DeskRaceFilter) => void;
   advancedMode: boolean;
   onAdvancedModeChange: (v: boolean) => void;
-  trailing?: ReactNode;
 }) {
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 ring-1 ring-border/45">
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
-          onClick={() => onQualifyingOnlyChange(false)}
-          className={filterPillState(!qualifyingOnly)}
+          onClick={() => onFilterChange("all")}
+          className={filterPillState(filter === "all")}
         >
           All races
         </button>
         <button
           type="button"
-          onClick={() => onQualifyingOnlyChange(true)}
-          className={filterPillState(qualifyingOnly)}
+          onClick={() => onFilterChange("qualifying")}
+          className={filterPillState(filter === "qualifying")}
         >
           Qualifying
         </button>
-        {trailing}
+        <button
+          type="button"
+          onClick={() => onFilterChange("recommended")}
+          className={cn(
+            filterPillState(filter === "recommended"),
+            filter === "recommended" && "ring-1 ring-edge/40"
+          )}
+        >
+          <Sparkles
+            className={cn("size-3", filter !== "recommended" && "text-edge")}
+            aria-hidden
+          />
+          Recommended
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <Label htmlFor="desk-advanced-mode" className="text-xs font-medium text-muted-foreground">

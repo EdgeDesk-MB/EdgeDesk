@@ -209,7 +209,10 @@ interface MarketBookRow {
   runners?: Array<{
     selectionId: number;
     status: string;
-    ex?: { availableToLay?: Array<{ price: number; size: number }> };
+    ex?: {
+      availableToLay?: Array<{ price: number; size: number }>;
+      availableToBack?: Array<{ price: number; size: number }>;
+    };
   }>;
 }
 
@@ -351,6 +354,8 @@ export async function fetchBetfairLayOdds(
       exchangeName: string;
       layDecimal: number;
       laySize: number;
+      backDecimal?: number;
+      backSize?: number;
     }> = [];
     for (const bookRunner of book?.runners ?? []) {
       if (bookRunner.status !== "ACTIVE") continue;
@@ -358,10 +363,13 @@ export async function fetchBetfairLayOdds(
       if (!lay || lay.price <= 1) continue;
       const exchangeName = runnerNameById.get(bookRunner.selectionId) ?? "";
       if (!exchangeName) continue;
+      const back = bookRunner.ex?.availableToBack?.[0];
       activeLays.push({
         exchangeName,
         layDecimal: Math.round(lay.price * 100) / 100,
         laySize: lay.size,
+        backDecimal: back && back.price > 1 ? Math.round(back.price * 100) / 100 : undefined,
+        backSize: back && back.price > 1 ? back.size : undefined,
       });
     }
 
@@ -379,6 +387,8 @@ export async function fetchBetfairLayOdds(
         horseName: matchedRunner.name,
         layDecimal: lay.layDecimal,
         laySize: lay.laySize,
+        backDecimal: lay.backDecimal,
+        backSize: lay.backSize,
         source: "live",
       });
     }

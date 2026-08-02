@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +26,7 @@ import {
   DeskFilterPills,
   RacingIntelligenceDialog,
   RacingIntelligenceTrigger,
+  type DeskRaceFilter,
 } from "@/components/racing/racing-intelligence-dialog";
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
 import { useAddBet } from "@/components/add-bet-provider";
@@ -36,7 +39,10 @@ import { useExchanges } from "@/hooks/use-exchanges";
 import {
   formatOfferScopeLabel,
 } from "@/lib/offers/racing-offer-rules";
-import { findOfferTag } from "@/lib/racing/offer-tags";
+import {
+  countRecommendedRaces,
+  findOfferTag,
+} from "@/lib/racing/offer-tags";
 import {
   bookmakerFromOfferPrefs,
   stakeFromOfferPrefs,
@@ -52,18 +58,20 @@ import {
   Plus,
   RefreshCw,
   Tag,
+  Sparkles,
   Trophy,
 } from "lucide-react";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { RegionFlag } from "@/components/region-flag";
 import { cn } from "@/lib/utils";
-import { listRowSelected } from "@/lib/ui/surface-styles";
+import { edgeMarkerPill, listRowSelected } from "@/lib/ui/surface-styles";
 import {
   deskRaceToPendingSettle,
   isDeskRacePendingSettle,
 } from "@/lib/racing/pending-settle";
 
 const DESK_EXCHANGE_KEY = "edgedesk:racing-desk-exchange";
+const EMPTY_EDGE_PLAYS: NonNullable<RacingDeskPayload["edgePlays"]> = [];
 
 function readDeskExchangeOverride(): ExchangeProvider | null {
   if (typeof window === "undefined") return null;
@@ -78,6 +86,9 @@ function readDeskExchangeOverride(): ExchangeProvider | null {
   return null;
 }
 export function RacingDeskView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const raceParam = searchParams.get("race");
   const { openAddBet } = useAddBet();
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openOffer, viewOffer } = useOfferDialog();
@@ -102,7 +113,7 @@ export function RacingDeskView() {
   const [exchangePlaces, setExchangePlaces] = useState(3);
   const [epStake, setEpStake] = useState(10);
   const [intelligenceOpen, setIntelligenceOpen] = useState(false);
-  const [qualifyingOnly, setQualifyingOnly] = useState(false);
+  const [raceFilter, setRaceFilter] = useState<DeskRaceFilter>("all");
   const [advancedMode, setAdvancedMode] = useState(false);
   const [deskExchange, setDeskExchange] = useState<ExchangeProvider | "default">("default");
 
@@ -247,6 +258,54 @@ export function RacingDeskView() {
     return () => clearInterval(tick);
   }, []);
 
+  const selectRace = useCallback(
+    (externalId: string) => {
+      setSelectedId(externalId);
+      const params = new URLSearchParams(searchParams.toString());
+      if (params.get("race") === externalId) return;
+      params.set("race", externalId);
+      router.replace(`/racing?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  const clearRaceParam = useCallback(() => {
+    setSelectedId(null);
+    const params = new URLSearchParams(searchParams.toString());
+    if (!params.has("race")) return;
+    params.delete("race");
+    const qs = params.toString();
+    router.replace(qs ? `/racing?${qs}` : "/racing", { scroll: false });
+  }, [router, searchParams]);
+
+  // Deep links from Campaigns ("Best plays today") and shared URLs.
+  // Keep the active Qualifying/Recommended filter when the linked race still
+  // belongs in it (course clicks update ?race= and must not reset the tab).
+  // Adjust-during-render (react-hooks/set-state-in-effect): applied once per
+  // raceParam, so later polls never re-assert the linked race.
+  const [appliedRaceParam, setAppliedRaceParam] = useState<string | null>(null);
+  if (!raceParam && appliedRaceParam !== null) setAppliedRaceParam(null);
+  if (payload && raceParam && appliedRaceParam !== raceParam) {
+    const race = payload.races.find((r) => r.externalId === raceParam);
+    if (race) {
+      setAppliedRaceParam(raceParam);
+      setSelectedId(raceParam);
+      setRaceFilter((current) => {
+        if (current === "all") return current;
+        if (current === "qualifying" && race.offerTags.some((t) => t.qualifies)) {
+          return current;
+        }
+        if (
+          current === "recommended" &&
+          (payload.edgePlays ?? []).some((p) => p.raceExternalId === raceParam)
+        ) {
+          return current;
+        }
+        return "all";
+      });
+    }
+  }
+
   const selected = useMemo(
     () => payload?.races.find((r) => r.externalId === selectedId) ?? null,
     [payload, selectedId]
@@ -276,15 +335,52 @@ export function RacingDeskView() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [payload]);
 
+  const edgePlays = payload?.edgePlays ?? EMPTY_EDGE_PLAYS;
+
   const visibleCourses = useMemo(() => {
-    if (!qualifyingOnly) return courses;
+    if (raceFilter === "all") return courses;
+    const recommendedIds =
+      raceFilter === "recommended"
+        ? new Set(edgePlays.map((p) => p.raceExternalId))
+        : null;
     return courses
       .map(([course, races]) => {
-        const filtered = races.filter((r) => r.offerTags.some((t) => t.qualifies));
+        const filtered =
+          raceFilter === "qualifying"
+            ? races.filter((r) => r.offerTags.some((t) => t.qualifies))
+            : races.filter((r) => recommendedIds!.has(r.externalId));
         return [course, filtered] as [string, RacingDeskRace[]];
       })
       .filter(([, races]) => races.length > 0);
-  }, [courses, qualifyingOnly]);
+  }, [courses, raceFilter, edgePlays]);
+
+  // When the filter hides the current race, land on the first visible pick
+  // and keep ?race= in sync so the deep-link effect does not fight the tab.
+  useEffect(() => {
+    if (raceFilter === "all") return;
+    const visibleIds = new Set(
+      visibleCourses.flatMap(([, races]) => races.map((r) => r.externalId))
+    );
+    if (selectedId != null && visibleIds.has(selectedId)) return;
+    queueMicrotask(() => {
+      if (visibleIds.size === 0) {
+        clearRaceParam();
+        return;
+      }
+      const now = Date.now();
+      for (const [, races] of visibleCourses) {
+        const next =
+          races.find((r) => r.status === "live") ??
+          races.find((r) => r.status === "upcoming" && r.startTime > now) ??
+          races.find((r) => r.status === "upcoming") ??
+          races[races.length - 1];
+        if (next) {
+          selectRace(next.externalId);
+          return;
+        }
+      }
+    });
+  }, [raceFilter, visibleCourses, selectedId, selectRace, clearRaceParam]);
 
   async function trackRace(race: RacingDeskRace) {
     try {
@@ -300,6 +396,14 @@ export function RacingDeskView() {
           externalId: race.externalId,
           status: race.status,
           runners: race.runners.map((r) => r.name),
+          raceMeta: {
+            type: race.type,
+            distance: race.distance,
+            raceClass: race.raceClass,
+            prize: race.prize,
+            going: race.going,
+            fieldSize: race.fieldSize,
+          },
         },
       });
       await api(`/api/racing/sync-results?eventId=${res.event.id}`, { method: "POST" });
@@ -442,7 +546,10 @@ export function RacingDeskView() {
 
   const summary = payload?.summary;
   const suggestions = payload?.suggestedRaces ?? [];
-  const topSuggestionScore = suggestions[0]?.score;
+  const topSuggestion = suggestions.reduce<(typeof suggestions)[number] | undefined>(
+    (best, s) => (s.topEv != null && (best?.topEv == null || s.topEv > best.topEv) ? s : best),
+    undefined
+  );
 
   const refreshLabel = useMemo(() => {
     if (loadedAt == null) return undefined;
@@ -477,7 +584,9 @@ export function RacingDeskView() {
           <>
             <RacingIntelligenceTrigger
               count={suggestions.length}
-              topScore={topSuggestionScore}
+              topEv={topSuggestion?.topEv}
+              topEvConfidence={topSuggestion?.confidence}
+              dataSource={payload?.summary.source}
               onClick={() => setIntelligenceOpen(true)}
             />
             {(payload?.activeOffers.length ?? 0) > 0 && (
@@ -488,40 +597,10 @@ export function RacingDeskView() {
                 </Link>
               </Button>
             )}
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="desk-exchange" className="sr-only">
-                Desk exchange
-              </Label>
-              <Select
-                value={deskExchange}
-                onValueChange={onDeskExchangeChange}
-              >
-                <SelectTrigger id="desk-exchange" size="sm" className="h-9 w-[9.5rem]">
-                  <SelectValue placeholder="Exchange" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">
-                    Default
-                    {defaultExchange ? ` (${defaultExchange.name})` : ""}
-                  </SelectItem>
-                  {exchanges.map((ex) => {
-                    const provider = exchangeNameToProvider(ex.name);
-                    if (!provider) return null;
-                    return (
-                      <SelectItem key={ex.id} value={provider}>
-                        {ex.name}
-                        {ex.isDefault ? " · app default" : ""}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            <Input
-              type="date"
+            <DatePicker
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="h-9 w-36"
+              onChange={setDate}
+              className="h-9 w-40"
             />
             <Button
               variant="outline"
@@ -539,10 +618,15 @@ export function RacingDeskView() {
         open={intelligenceOpen}
         onOpenChange={setIntelligenceOpen}
         suggestions={suggestions}
-        onSelectRace={setSelectedId}
+        onSelectRace={selectRace}
         onBackRunner={(raceId, runnerName, offerId) => {
+          selectRace(raceId);
           const race = payload?.races.find((r) => r.externalId === raceId);
           if (race) void openBetForRunner(race, runnerName, "place_refund", offerId);
+        }}
+        onViewOffer={(offerId) => {
+          const offer = (state?.offers ?? []).find((o) => o.id === offerId);
+          if (offer) viewOffer(offer);
         }}
         dateLabel={new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
           weekday: "short",
@@ -567,8 +651,12 @@ export function RacingDeskView() {
           <StatTile label="Open positions" value={String(summary.openPositions)} />
           <StatTile
             label="Racing P&L today"
-            value={<MoneyFlow value={summary.racingPnlToday} />}
-            sub={summary.source === "demo" ? "Demo data" : "Racing API"}
+            value={<MoneyFlow value={summary.racingPnlToday} signColor />}
+            sub={
+              summary.openPositions > 0
+                ? "By race day · open at worst case"
+                : "By race day"
+            }
           />
         </StatStrip>
       )}
@@ -597,20 +685,10 @@ export function RacingDeskView() {
       )}
 
       <DeskFilterPills
-        qualifyingOnly={qualifyingOnly}
-        onQualifyingOnlyChange={setQualifyingOnly}
+        filter={raceFilter}
+        onFilterChange={setRaceFilter}
         advancedMode={advancedMode}
         onAdvancedModeChange={setAdvancedMode}
-        trailing={
-          <button
-            type="button"
-            onClick={() => openOffer({ category: "horse_racing", eventDate: date })}
-            className="inline-flex items-center gap-1 rounded-full border border-dashed border-border/80 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-          >
-            <Plus className="size-3" />
-            Add racing offer
-          </button>
-        }
       />
 
       <div className="grid gap-4 xl:grid-cols-12">
@@ -620,7 +698,11 @@ export function RacingDeskView() {
               <CardTitle section>Courses</CardTitle>
               <CardDescription compact>
                 {visibleCourses.length} meeting{visibleCourses.length === 1 ? "" : "s"}
-                {qualifyingOnly ? " · qualifying" : ""}
+                {raceFilter === "qualifying"
+                  ? " · qualifying"
+                  : raceFilter === "recommended"
+                    ? " · recommended"
+                    : ""}
               </CardDescription>
             </CardHeader>
             <CardContent
@@ -637,7 +719,11 @@ export function RacingDeskView() {
             >
               {visibleCourses.length === 0 && (
                 <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                  No qualifying races for your offers today.
+                  {raceFilter === "recommended"
+                    ? "No recommended races today - Offer Edge has no modelled plays."
+                    : raceFilter === "qualifying"
+                      ? "No qualifying races for your offers today."
+                      : "No meetings for this date."}
                 </p>
               )}
               {visibleCourses.map(([course, races]) => {
@@ -646,6 +732,7 @@ export function RacingDeskView() {
                 const qualifyingRaceCount = races.filter((r) =>
                   r.offerTags.some((t) => t.qualifies)
                 ).length;
+                const recommendedRaceCount = countRecommendedRaces(edgePlays, races);
                 return (
                   <button
                     key={course}
@@ -657,7 +744,8 @@ export function RacingDeskView() {
                         races.find((r) => r.status === "upcoming" && r.startTime > now) ??
                         races.find((r) => r.status === "upcoming") ??
                         races[races.length - 1];
-                      setSelectedId(nextRace?.externalId ?? null);
+                      if (nextRace) selectRace(nextRace.externalId);
+                      else setSelectedId(null);
                     }}
                     className={cn(
                       listRowSelected(active),
@@ -673,10 +761,19 @@ export function RacingDeskView() {
                       {races.length}
                       {qualifyingRaceCount > 0 && (
                         <span
-                          className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"
-                          title={`${qualifyingRaceCount} race${qualifyingRaceCount === 1 ? "" : "s"} with offers`}
+                          className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-success/15 px-1 text-[9px] font-bold tabular-nums text-success"
+                          title={`${qualifyingRaceCount} qualifying race${qualifyingRaceCount === 1 ? "" : "s"}`}
                         >
                           {qualifyingRaceCount}
+                        </span>
+                      )}
+                      {recommendedRaceCount > 0 && (
+                        <span
+                          className={edgeMarkerPill}
+                          title={`${recommendedRaceCount} recommended race${recommendedRaceCount === 1 ? "" : "s"} (Offer Edge)`}
+                        >
+                          <Sparkles className="size-2" aria-hidden />
+                          {recommendedRaceCount}
                         </span>
                       )}
                     </span>
@@ -684,45 +781,82 @@ export function RacingDeskView() {
                 );
               })}
             </CardContent>
+            <div className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Legend
+              </p>
+              <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground xl:flex-col xl:gap-y-1">
+                <li className="flex items-center gap-1.5">
+                  <span className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-success/15 px-1 text-[9px] font-bold tabular-nums text-success">
+                    n
+                  </span>
+                  Qualifies for an offer
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="inline-flex min-w-[1rem] items-center justify-center gap-0.5 rounded-full bg-edge/20 px-1 text-[9px] font-bold tabular-nums text-edge">
+                    <Sparkles className="size-2" aria-hidden />
+                    n
+                  </span>
+                  Recommended (modelled EV)
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground/60"
+                    aria-hidden
+                  />
+                  Near minimum runners
+                </li>
+              </ul>
+            </div>
           </Card>
 
-          {(payload?.activeOffers.length ?? 0) > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle section className="flex items-center gap-2">
-                  <Tag className="size-3.5" />
-                  Offers
-                </CardTitle>
-                <CardDescription compact>
-                  {payload!.activeOffers.length} active for {date}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                {payload!.activeOffers.map((offer) => {
-                  const offerSummary = (state?.offers ?? []).find((o) => o.id === offer.id);
-                  return (
-                    <button
-                      key={offer.id}
-                      type="button"
-                      className="w-full rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:bg-selection-subtle"
-                      onClick={() => offerSummary && viewOffer(offerSummary)}
-                    >
-                      <p className="font-medium leading-snug">{offer.title}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
-                        {offer.bookmaker ? (
-                          <VenueBadge name={offer.bookmaker} />
-                        ) : (
-                          <span>Any bookie</span>
-                        )}
-                        <span>·</span>
-                        <span>{formatOfferScopeLabel(offer.scopeCourse, offer.scopeRaceLabel)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle section className="flex items-center gap-2">
+                <Tag className="size-3.5" />
+                Offers
+              </CardTitle>
+              <CardDescription compact>
+                {(payload?.activeOffers.length ?? 0) > 0
+                  ? `${payload!.activeOffers.length} active for ${date}`
+                  : `None active for ${date}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {(payload?.activeOffers ?? []).map((offer) => {
+                const offerSummary = (state?.offers ?? []).find((o) => o.id === offer.id);
+                return (
+                  <button
+                    key={offer.id}
+                    type="button"
+                    className="w-full rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:bg-selection-subtle"
+                    onClick={() => offerSummary && viewOffer(offerSummary)}
+                  >
+                    <p className="font-medium leading-snug">{offer.title}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                      {offer.bookmaker ? (
+                        <VenueBadge name={offer.bookmaker} />
+                      ) : (
+                        <span>Any bookie</span>
+                      )}
+                      <span>·</span>
+                      <span>{formatOfferScopeLabel(offer.scopeCourse, offer.scopeRaceLabel)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-full justify-start gap-1.5"
+                onClick={() => openOffer({ category: "horse_racing", eventDate: date })}
+              >
+                <Plus className="size-3.5" />
+                Add racing offer
+              </Button>
+            </CardContent>
+          </Card>
 
           {advancedMode && (
             <Card>
@@ -796,7 +930,7 @@ export function RacingDeskView() {
             courses={visibleCourses}
             selected={selected}
             selectedId={selectedId}
-            onSelectRace={setSelectedId}
+            onSelectRace={selectRace}
             bookiePlaces={bookiePlaces}
             exchangePlaces={exchangePlaces}
             onTrack={trackRace}
@@ -810,6 +944,36 @@ export function RacingDeskView() {
             refreshing={refreshing}
             exchangeStatusLabel={exchangeStatusLabel}
             bookmakerColors={bookmakerColors}
+            edgePlays={edgePlays}
+            dataSource={summary?.source}
+            exchangeControl={
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="desk-exchange" className="sr-only">
+                  Desk exchange
+                </Label>
+                <Select value={deskExchange} onValueChange={onDeskExchangeChange}>
+                  <SelectTrigger id="desk-exchange" size="sm" className="h-7 w-28">
+                    <SelectValue placeholder="Exchange" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Default
+                      {defaultExchange ? ` (${defaultExchange.name})` : ""}
+                    </SelectItem>
+                    {exchanges.map((ex) => {
+                      const provider = exchangeNameToProvider(ex.name);
+                      if (!provider) return null;
+                      return (
+                        <SelectItem key={ex.id} value={provider}>
+                          {ex.name}
+                          {ex.isDefault ? " · app default" : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            }
           />
         </div>
       </div>

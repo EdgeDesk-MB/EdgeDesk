@@ -107,9 +107,26 @@ export const filterPillGroup = cn(
   "inline-flex flex-wrap items-center gap-1 rounded-full bg-muted/60 p-0.5 dark:bg-input/30"
 );
 
-/** Offer calendar / do-next cards — outer ring + white inset via .offer-campaign-card::after */
-export const offerCalendarCardShell = cn(
-  "offer-campaign-card offer-calendar-card group relative flex overflow-hidden rounded-lg bg-card text-left transition-colors",
+/**
+ * Campaign-style card chrome — outer ring + white 1px inset via
+ * `.offer-campaign-card::after` (see globals.css).
+ */
+export const offerCampaignCardShell = cn(
+  "offer-campaign-card group relative flex overflow-hidden rounded-lg bg-card text-left transition-colors",
   "ring-1 ring-border/50 dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100",
   "hover:brightness-[0.98] dark:hover:brightness-110"
 );
+
+/** Calendar cards — same shell; left inset skips the priority bar column */
+export const offerCalendarCardShell = cn(offerCampaignCardShell, "offer-calendar-card");
+
+/** Count pill for Offer Edge recommended races / offers (pro signature). */
+export const edgeMarkerPill =
+  "inline-flex min-w-[1rem] items-center justify-center gap-0.5 rounded-full bg-edge/15 px-1 text-[9px] font-bold tabular-nums text-edge";
+
+/** Soft panel chrome for Edge recommendations (workflow, Best plays). */
+export const edgePanel =
+  "rounded-md border border-edge/25 bg-edge/5";
+
+export const edgePanelStrong =
+  "rounded-md border border-edge/45 bg-edge/10 ring-1 ring-edge/30";

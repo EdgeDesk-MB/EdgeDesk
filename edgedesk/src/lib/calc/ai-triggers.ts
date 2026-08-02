@@ -13,13 +13,18 @@ import type { TriggerRule } from "./trigger";
 import { parseTrigger } from "./trigger";
 import { formatGbp } from "@/lib/format-money";
 import type { RaceResult } from "@/lib/racing";
-import { selectionPosition } from "@/lib/racing";
+import { selectionPosition, winnerIsSpFavourite } from "@/lib/racing";
 
 export type AiEffect = {
   kind: "free_bet_award";
   amount: number;
   /** Empty = award when bet settles. Otherwise finishing positions, e.g. [2, 3, 4]. */
   positions: number[];
+  /**
+   * QuinnBet-style: place only counts when the race winner was the SP favourite
+   * ("2nd to the SP favourite"). Settled from recorded result SP, never pre-race odds.
+   */
+  winnerMustBeSpFavourite?: boolean;
 };
 
 export interface TriggerBundle {
@@ -52,9 +57,21 @@ function formatPositions(positions: number[]): string {
 export function describeAiEffect(effect: AiEffect): string {
   if (effect.kind !== "free_bet_award") return "";
   if (effect.positions.length === 0) {
-    return `${formatGbp(effect.amount)} free bet - credits bookie balance when this bet settles`;
+    return `${formatGbp(effect.amount)} free bet - credits bookie balance when this bet settles (or mark awarded early if the bookie releases it on placement)`;
+  }
+  if (effect.winnerMustBeSpFavourite) {
+    return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} to the SP favourite - credits bookie balance`;
   }
   return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} - credits bookie balance`;
+}
+
+/** "2nd to (the) (SP) favourite" / "second to the favourite". */
+export function textRequiresSpFavouriteWinner(text: string): boolean {
+  return (
+    /\b(?:\d+(?:st|nd|rd|th)|second)\s+to\s+(?:the\s+)?(?:sp\s+|starting\s+price\s+)?favou?rite/i.test(
+      text
+    ) || /\b2nd\s+to\s+(?:the\s+)?(?:sp\s+)?fav\b/i.test(text)
+  );
 }
 
 /** Parse "2nd, 3rd, 4th" or "2 3 4" into [2,3,4]. */
@@ -85,8 +102,30 @@ function parsePlacePositionsFromText(text: string): number[] {
     }
   }
 
-  // Only scan the place clause - stop before runners / expiry noise
-  const clause = placePart.split(/[·•|]|\brunners?\b|\bexpires?\b|\bmin\b/i)[0] ?? placePart;
+  // Prefer · / • / | segments that look like the offer place clause. EdgeDesk
+  // labels are "Course · Horse · Offer (2nd, 3rd, 4th)" — taking only the first
+  // segment used to drop places. Ignore ordinals that are only horse names
+  // (e.g. "2nd Thought") by requiring free-bet / bet-get wording in the segment.
+  const segments = placePart.split(/\s*[·•|]\s*/);
+  const offerPlaceSegments = segments.filter(
+    (s) =>
+      /\b\d+(?:st|nd|rd|th)\b/i.test(s) &&
+      /\b(free\s*bet|fb\b|bet\s+£?\s*\d)/i.test(s)
+  );
+  let clauseBase: string;
+  if (offerPlaceSegments.length > 0) {
+    clauseBase = offerPlaceSegments.join(" ").trim();
+  } else if (ifMatch) {
+    // "if 2nd, 3rd, 4th · 8+ runners" — keep ordinal segments, drop noise tails.
+    const ordinalSegs = segments.filter((s) => /\b\d+(?:st|nd|rd|th)\b/i.test(s));
+    clauseBase = (ordinalSegs.length > 0 ? ordinalSegs.join(" ") : placePart).trim();
+  } else if (segments.length > 1) {
+    // Course · Horse · unconditional offer — do not scan horse-name ordinals.
+    return [];
+  } else {
+    clauseBase = placePart.trim();
+  }
+  const clause = clauseBase.split(/\brunners?\b|\bexpires?\b|\bmin\b/i)[0] ?? clauseBase;
   if (ifMatch) {
     // Within an explicit "if …" clause bare numbers are valid place positions
     const fromOrdinals = parsePlacePositions(clause).filter((n) => n >= 1 && n <= 10);
@@ -113,8 +152,21 @@ function hasExplicitPlaceCondition(text: string): boolean {
 
 function freeBetEffect(amount: number, text: string): AiEffect | null {
   if (!(amount > 0)) return null;
-  const positions = hasExplicitPlaceCondition(text) ? parsePlacePositionsFromText(text) : [];
-  return { kind: "free_bet_award", amount, positions };
+  const winnerMustBeSpFavourite = textRequiresSpFavouriteWinner(text);
+  let positions = hasExplicitPlaceCondition(text) ? parsePlacePositionsFromText(text) : [];
+  // "2nd to the favourite" is a place-2 constraint even when the clause is sparse.
+  if (winnerMustBeSpFavourite && positions.length === 0) positions = [2];
+  if (winnerMustBeSpFavourite && positions.length > 0) {
+    // Keep only the place ordinals; ignore stray numbers from odds like 6/4.
+    positions = positions.filter((n) => n >= 2 && n <= 6);
+    if (positions.length === 0) positions = [2];
+  }
+  return {
+    kind: "free_bet_award",
+    amount,
+    positions,
+    ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
+  };
 }
 
 /** Parse promo / offer patterns from trigger text or labels. */
@@ -290,13 +342,35 @@ export function evaluateFreeBetAward(
   if (pos <= 0) {
     return { met: false, reason: "Selection not found in result" };
   }
-  if (effect.positions.includes(pos)) {
+  if (!effect.positions.includes(pos)) {
     return {
-      met: true,
-      reason: `Finished ${ordinal(pos)}`,
+      met: false,
+      reason: `Finished ${ordinal(pos)} (needed ${formatPositions(effect.positions)})`,
     };
   }
-  return { met: false, reason: `Finished ${ordinal(pos)} (needed ${formatPositions(effect.positions)})` };
+  if (effect.winnerMustBeSpFavourite) {
+    const fav = winnerIsSpFavourite(race);
+    if (fav == null) {
+      return {
+        met: false,
+        reason: "SP favourite not recorded on result",
+      };
+    }
+    if (!fav) {
+      return {
+        met: false,
+        reason: `Finished ${ordinal(pos)} but winner was not the SP favourite`,
+      };
+    }
+    return {
+      met: true,
+      reason: `Finished ${ordinal(pos)} to the SP favourite`,
+    };
+  }
+  return {
+    met: true,
+    reason: `Finished ${ordinal(pos)}`,
+  };
 }
 
 export function evaluateUnconditionalFreeBet(

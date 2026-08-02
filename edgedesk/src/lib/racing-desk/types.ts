@@ -1,5 +1,6 @@
 /** Rich racecard + desk-specific enrichments for the Racing Desk page. */
 
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import type { OddsSource } from "@/lib/racing/odds";
 import type { ExchangeOddsSource, ExchangeProvider } from "@/lib/services/exchange/types";
 
@@ -48,6 +49,10 @@ export interface RacingRunnerDetail {
   exchangeDecimal?: number;
   /** Available £ at best lay (live exchange only) */
   exchangeLaySize?: number;
+  /** Best exchange BACK price, when the feed returns both sides (live exchange only) */
+  exchangeBackDecimal?: number;
+  /** Available £ at best back (live exchange only) */
+  exchangeBackSize?: number;
   /** How exchange price was sourced */
   exchangeSource?: ExchangeOddsSource;
   /** Exchange vs bookie gap % - lower = tighter match */
@@ -158,6 +163,7 @@ export interface SuggestedRace {
   region?: string;
   offerId: number;
   offerTitle: string;
+  bookmaker: string | null;
   score: number;
   summary: string;
   oddsSource?: OddsSource;
@@ -166,6 +172,8 @@ export interface SuggestedRace {
   topTarget?: SuggestedRunner;
   confidence?: "live" | "mixed" | "estimate";
   topEv?: number;
+  /** Offer Edge play backing this suggestion, when the field could be modelled */
+  edge?: OfferEdgePlay;
 }
 
 export interface RacingDeskSummary {
@@ -205,5 +213,7 @@ export interface RacingDeskPayload {
   races: RacingDeskRace[];
   activeOffers: RacingDeskActiveOffer[];
   suggestedRaces: SuggestedRace[];
+  /** Offer Edge plays across every active offer, best expected value first */
+  edgePlays: OfferEdgePlay[];
   error?: string;
 }

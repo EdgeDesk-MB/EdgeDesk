@@ -185,10 +185,21 @@ function mapResult(item: any): { raceId: string; result: RaceResult } | null {
   const raceId = String(item.race_id ?? "");
   if (!raceId) return null;
 
-  const runners: RaceRunnerResult[] = (item.runners ?? []).map((r: any) => ({
-    horse: String(r.horse ?? "").trim(),
-    position: runnerPosition(r.position),
-  }));
+  const runners: RaceRunnerResult[] = (item.runners ?? []).map((r: any) => {
+    const spDec = parseFloat(String(r.sp_dec ?? r.sp_decimal ?? ""));
+    const spDecimal = Number.isFinite(spDec) && spDec > 1 ? spDec : undefined;
+    const spRaw = r.sp ?? r.sp_fraction;
+    const spLabel =
+      spRaw != null && String(spRaw).trim() !== "" ? String(spRaw).trim() : undefined;
+    const favMarked = /\bj?fav\b/i.test(String(spLabel ?? ""));
+    return {
+      horse: String(r.horse ?? "").trim(),
+      position: runnerPosition(r.position),
+      ...(spDecimal != null ? { spDecimal } : {}),
+      ...(spLabel != null ? { spLabel } : {}),
+      ...(favMarked ? { isSpFavourite: true as const } : {}),
+    };
+  });
 
   const winner =
     runners.find((r) => r.position === 1)?.horse ??
@@ -341,11 +352,25 @@ export async function resultsToday(): Promise<ResultsTodayPayload> {
   }
 
   try {
-    const json = await apiGet("/v1/results/today?region=gb&region=ire&limit=200");
+    // API validates limit ≤ 100; page with skip so a full GB/IRE card is covered.
+    const pageSize = 100;
     const map = new Map<string, RaceResult>();
-    for (const item of json.results ?? []) {
-      const mapped = mapResult(item);
-      if (mapped) map.set(mapped.raceId, mapped.result);
+    let skip = 0;
+    let total = Number.POSITIVE_INFINITY;
+    while (skip < total) {
+      const json = await apiGet(
+        `/v1/results/today?region=gb&region=ire&limit=${pageSize}&skip=${skip}`
+      );
+      const page = json.results ?? [];
+      total = Number(json.total);
+      if (!Number.isFinite(total) || total < 0) total = skip + page.length;
+      for (const item of page) {
+        const mapped = mapResult(item);
+        if (mapped) map.set(mapped.raceId, mapped.result);
+      }
+      if (page.length === 0) break;
+      skip += page.length;
+      if (page.length < pageSize) break;
     }
     const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
     cache.set(cacheKey, { at: Date.now(), data });

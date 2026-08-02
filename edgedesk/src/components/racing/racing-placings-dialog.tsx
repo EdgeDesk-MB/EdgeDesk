@@ -11,25 +11,49 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import {
+  buildRaceResultDialogHeader,
   isRaceResultIncomplete,
   parseRaceResults,
   parseRacecardRunners,
 } from "@/lib/racing";
+import { formatDecimalOdds, fractionalToDecimal } from "@/lib/racing/odds";
 import { buildRacingResultsLinks } from "@/lib/racing/results-link";
-import { parseRaceResultText } from "@/lib/racing/parse-race-result-text";
+import {
+  parseRaceResultText,
+  type SpFavouritePlace,
+} from "@/lib/racing/parse-race-result-text";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
 import { ocrRaceResultScreenshot } from "@/lib/ocr/extract-text";
 import { cn } from "@/lib/utils";
-import { ClipboardPaste, ExternalLink, Loader2, ScanLine } from "lucide-react";
+import { ChevronDown, ClipboardPaste, ExternalLink, Loader2, ScanLine } from "lucide-react";
 
 export type PlacingsPayload = {
   winner: string;
-  runners: { horse: string; position: number }[];
+  runners: {
+    horse: string;
+    position: number;
+    spDecimal?: number;
+    spLabel?: string;
+    isSpFavourite?: boolean;
+  }[];
 };
+
+type PlaceRow = {
+  horse: string;
+  spText: string;
+};
+
+const EMPTY_ROWS: PlaceRow[] = [
+  { horse: "", spText: "" },
+  { horse: "", spText: "" },
+  { horse: "", spText: "" },
+  { horse: "", spText: "" },
+];
+
+const ghostInputClass =
+  "m-0 w-full min-w-0 border-0 bg-transparent p-0 text-sm font-semibold text-foreground shadow-none outline-none ring-0 placeholder:font-normal placeholder:text-muted-foreground/50 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0";
 
 function collectImageFiles(
   source: DataTransferItemList | FileList | null | undefined
@@ -53,6 +77,19 @@ function collectImageFiles(
 
 function horseEquals(a: string, b: string) {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function spTextFromDecimal(n: number | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 1) return "";
+  return formatDecimalOdds(n);
+}
+
+function parseSpInput(raw: string): number | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (t.includes("/")) return fractionalToDecimal(t);
+  const n = parseFloat(t);
+  return Number.isFinite(n) && n > 1 ? n : undefined;
 }
 
 export function RacingPlacingsDialog({
@@ -82,21 +119,22 @@ export function RacingPlacingsDialog({
     ...new Set(linkedBets.map((b) => b.selection?.trim()).filter(Boolean) as string[]),
   ];
 
-  const [first, setFirst] = useState("");
-  const [second, setSecond] = useState("");
-  const [third, setThird] = useState("");
-  const [fourth, setFourth] = useState("");
+  const [rows, setRows] = useState<PlaceRow[]>(EMPTY_ROWS);
+  /** Which of 1st–4th is the SP favourite (tag + settle mark). */
+  const [spFavouritePlace, setSpFavouritePlace] = useState<SpFavouritePlace | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsLinks = buildRacingResultsLinks(event);
 
+  function updateRow(index: number, patch: Partial<PlaceRow>) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
   function hydrate() {
-    const byPos = (n: number) =>
-      existing?.runners.find((r) => r.position === n)?.horse ?? "";
-    const winner = byPos(1) || existing?.winner || "";
-    setFirst(winner);
-    let secondVal = byPos(2);
+    const byPos = (n: number) => existing?.runners.find((r) => r.position === n);
+    const winner = byPos(1)?.horse || existing?.winner || "";
+    let secondVal = byPos(2)?.horse ?? "";
     if (
       !secondVal &&
       existing &&
@@ -106,9 +144,16 @@ export function RacingPlacingsDialog({
     ) {
       secondVal = selectionHints[0];
     }
-    setSecond(secondVal);
-    setThird(byPos(3));
-    setFourth(byPos(4));
+    setRows([
+      { horse: winner, spText: spTextFromDecimal(byPos(1)?.spDecimal) },
+      { horse: secondVal, spText: spTextFromDecimal(byPos(2)?.spDecimal) },
+      { horse: byPos(3)?.horse ?? "", spText: spTextFromDecimal(byPos(3)?.spDecimal) },
+      { horse: byPos(4)?.horse ?? "", spText: spTextFromDecimal(byPos(4)?.spDecimal) },
+    ]);
+    const favRunner = existing?.runners.find(
+      (r) => r.isSpFavourite && r.position >= 1 && r.position <= 4
+    );
+    setSpFavouritePlace(favRunner ? (favRunner.position as SpFavouritePlace) : null);
   }
 
   const applyParsed = useCallback(
@@ -130,16 +175,27 @@ export function RacingPlacingsDialog({
         const match = matchOcrToRunner(name, cardRunners);
         return match?.runner ?? name;
       };
-      setFirst(resolve(parsed.first));
-      if (parsed.second) setSecond(resolve(parsed.second));
-      if (parsed.third) setThird(resolve(parsed.third));
-      if (parsed.fourth) setFourth(resolve(parsed.fourth));
-      const filled = [parsed.first, parsed.second, parsed.third, parsed.fourth].filter(Boolean)
-        .length;
+      const names = [parsed.first, parsed.second, parsed.third, parsed.fourth];
+      setRows(
+        names.map((name, i) => {
+          const place = (i + 1) as SpFavouritePlace;
+          const sp = parsed.spDecimals?.[place];
+          return {
+            horse: name ? resolve(name) : "",
+            spText: spTextFromDecimal(sp),
+          };
+        })
+      );
+      if (parsed.spFavouritePlace) {
+        setSpFavouritePlace(parsed.spFavouritePlace);
+      } else if (parsed.winnerIsSpFavourite) {
+        setSpFavouritePlace(1);
+      }
+      const filled = names.filter(Boolean).length;
       toast.success(
         filled === 1
           ? "Filled the winner - check the rest"
-          : `Filled ${filled} placings - double-check before saving`
+          : `Filled ${filled} places - double-check before saving`
       );
     },
     [cardRunners]
@@ -185,6 +241,11 @@ export function RacingPlacingsDialog({
     return () => window.removeEventListener("paste", onPaste);
   }, [open, runOcr, applyParsed]);
 
+  const firstHorse = rows[0]?.horse.trim() ?? "";
+  const horseOptions = [...new Set([...selectionHints, ...cardRunners])];
+  const runnersListId = `runners-${event.id}`;
+  const raceHeader = buildRaceResultDialogHeader(event);
+
   return (
     <Dialog
       open={open}
@@ -198,11 +259,11 @@ export function RacingPlacingsDialog({
       }}
     >
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Race placings</DialogTitle>
+      <DialogContent className="max-w-md overflow-y-auto sm:max-w-md">
+        <DialogHeader className="pr-8">
+          <DialogTitle>Race result</DialogTitle>
           <DialogDescription>
-            Enter 1st–4th, or paste a result / screenshot. Place-refunds need finishing position.
+            Enter 1st–4th, or paste a result / screenshot. Click a # to mark SP favourite.
           </DialogDescription>
         </DialogHeader>
 
@@ -279,57 +340,179 @@ export function RacingPlacingsDialog({
           </div>
         </div>
 
-        <div className="grid gap-3">
-          {(
-            [
-              ["1st (winner)", first, setFirst],
-              ["2nd", second, setSecond],
-              ["3rd", third, setThird],
-              ["4th", fourth, setFourth],
-            ] as const
-          ).map(([label, value, setValue]) => (
-            <div key={label} className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">{label}</Label>
-              <Input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={label === "1st (winner)" ? "e.g. Constitution Hill" : "optional"}
-                list={`runners-${event.id}`}
-              />
-            </div>
-          ))}
-          {(cardRunners.length > 0 || selectionHints.length > 0) && (
-            <datalist id={`runners-${event.id}`}>
-              {[...new Set([...selectionHints, ...cardRunners])].map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-          )}
+        <div className="rounded-md border border-border/80 bg-card">
+          <div className="border-b border-border/50 bg-muted/30 px-2.5 py-2">
+            <p className="text-sm font-semibold uppercase leading-snug text-foreground">
+              {raceHeader.title}
+            </p>
+            {(raceHeader.metaParts.length > 0 || raceHeader.startLabel) && (
+              <div className="mt-1 flex items-baseline justify-between gap-2">
+                <p className="min-w-0 text-[11px] leading-relaxed text-muted-foreground">
+                  {raceHeader.metaParts.join(" · ")}
+                </p>
+                {raceHeader.startLabel ? (
+                  <p className="shrink-0 text-[11px] text-muted-foreground">
+                    Start {raceHeader.startLabel}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_4.5rem] gap-x-2 border-b border-border/50 bg-muted/40 px-2.5 py-1.5">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              #
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Horse
+            </span>
+            <span className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              SP
+            </span>
+          </div>
+          {rows.map((row, index) => {
+            const place = (index + 1) as SpFavouritePlace;
+            const isFav = spFavouritePlace === place;
+            return (
+              <div
+                key={place}
+                className={cn(
+                  "grid grid-cols-[2.5rem_minmax(0,1fr)_4.5rem] items-center gap-x-2 border-b border-border/40 px-2.5 py-2 last:border-b-0",
+                  index % 2 === 1 && "bg-muted/20"
+                )}
+              >
+                <button
+                  type="button"
+                  title={
+                    isFav
+                      ? "SP favourite, click to clear"
+                      : place === 1
+                        ? "Mark winner as SP favourite"
+                        : `Mark ${place} as SP favourite`
+                  }
+                  aria-pressed={isFav}
+                  onClick={() =>
+                    setSpFavouritePlace((prev) => (prev === place ? null : place))
+                  }
+                  className={cn(
+                    "flex h-7 w-full items-center justify-start gap-0.5 rounded text-left text-sm font-bold tabular-nums transition-colors",
+                    isFav
+                      ? "text-amber-700 dark:text-amber-300"
+                      : "text-foreground hover:text-amber-700 dark:hover:text-amber-300"
+                  )}
+                >
+                  <span>{place}.</span>
+                  {isFav ? (
+                    <span className="text-[9px] font-semibold uppercase tracking-wide">
+                      Fav
+                    </span>
+                  ) : null}
+                </button>
+                <div className="relative flex min-w-0 items-center gap-0.5">
+                  <input
+                    value={row.horse}
+                    onChange={(e) => updateRow(index, { horse: e.target.value })}
+                    placeholder={place === 1 ? "Winner" : "-"}
+                    list={horseOptions.length > 0 ? runnersListId : undefined}
+                    className={cn(ghostInputClass, "min-w-0 flex-1")}
+                    autoComplete="off"
+                    aria-label={`Horse for ${place}`}
+                  />
+                  {horseOptions.length > 0 ? (
+                    <label className="relative inline-flex size-5 shrink-0 cursor-pointer items-center justify-center text-muted-foreground/70 hover:text-foreground">
+                      <ChevronDown className="size-3.5" aria-hidden />
+                      <select
+                        aria-label={`Pick horse for ${place}`}
+                        title="Pick from runners"
+                        className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                        value={
+                          horseOptions.some((n) => horseEquals(n, row.horse))
+                            ? horseOptions.find((n) => horseEquals(n, row.horse))!
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          if (next) updateRow(index, { horse: next });
+                        }}
+                      >
+                        <option value="">Pick…</option>
+                        {horseOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+                <div className="flex min-w-0 items-baseline justify-end gap-1">
+                  <input
+                    value={row.spText}
+                    onChange={(e) => updateRow(index, { spText: e.target.value })}
+                    placeholder="-"
+                    inputMode="decimal"
+                    className={cn(
+                      ghostInputClass,
+                      "min-w-0 flex-1 text-right font-normal tabular-nums text-muted-foreground"
+                    )}
+                    autoComplete="off"
+                    aria-label={`SP for ${place}`}
+                  />
+                  {isFav ? (
+                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      Fav
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
+        {horseOptions.length > 0 ? (
+          <datalist id={runnersListId}>
+            {horseOptions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        ) : null}
+
         <Button
           className="mt-1"
-          disabled={!first.trim() || ocrBusy}
+          disabled={!firstHorse || ocrBusy}
           onClick={() => {
-            const places = [first, second, third, fourth]
-              .map((h, i) => ({ horse: h.trim(), position: i + 1 }))
+            const places = rows
+              .map((row, i) => {
+                const position = (i + 1) as SpFavouritePlace;
+                const spDecimal = parseSpInput(row.spText);
+                const runner: PlacingsPayload["runners"][number] = {
+                  horse: row.horse.trim(),
+                  position,
+                };
+                if (spDecimal != null) runner.spDecimal = spDecimal;
+                if (spFavouritePlace === position) runner.isSpFavourite = true;
+                return runner;
+              })
               .filter((r) => r.horse);
-            onRecord({ winner: first.trim(), runners: places });
+            onRecord({ winner: firstHorse, runners: places });
             setOpen(false);
           }}
         >
-          Save placings
+          Save result
         </Button>
       </DialogContent>
     </Dialog>
   );
 }
 
+/** Success-token CTA for Set / Edit result triggers (pairs with "Tracked"). */
+export const resultActionButtonClass =
+  "border-success/40 bg-success/10 text-success hover:bg-success/15";
+
 export function placingsTriggerLabel(
   event: EventRow,
   incomplete?: boolean
 ): string {
   const existing = parseRaceResults(event.goals);
-  if (incomplete) return "Fix placings";
-  if (existing) return "Edit placings";
-  return "Set placings";
+  if (incomplete) return "Fix result";
+  if (existing) return "Edit result";
+  return "Set result";
 }

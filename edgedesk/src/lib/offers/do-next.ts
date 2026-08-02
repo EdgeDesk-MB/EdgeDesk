@@ -9,8 +9,10 @@ import {
   listOfferNextActions,
   offerNextActionLabel,
   type OfferNextAction,
+  type OfferNextActionEdge,
   type OfferNextActionKind,
 } from "@/lib/offers/next-actions";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { estimateOfferRemainingEv, scoreOfferAdvantage, type AdvantageOpts, type EvBasis } from "@/lib/offers/advantage";
 import type { BookmakerHealth } from "@/lib/accounts/bookmaker-stats";
 import {
@@ -80,6 +82,8 @@ export type DoNextItem = {
   funding?: DoNextFunding;
   /** Effective bookie health (B9) - gubbed cards sink but stay visible */
   health?: BookmakerHealth;
+  /** The race and horse Offer Edge recommends, when it could name one */
+  edge?: OfferNextActionEdge;
 };
 
 /** Parse bet stake from offer rules JSON; null when absent. */
@@ -109,6 +113,8 @@ export type DoNextOpts = AdvantageOpts & {
   effortMinutes?: Record<string, number>;
   /** J5: bookies whose mug cadence is due - lowest-priority reminder items */
   mugDue?: Array<{ accountName: string; daysSince: number | null }>;
+  /** Best Offer Edge play per offer id, so qualifying actions can name a race. */
+  edgePlays?: Map<number, OfferEdgePlay>;
 };
 
 /**
@@ -123,7 +129,7 @@ export function buildDoNextItems(
   opts?: DoNextOpts,
   bookieBalances?: BookieBalanceMap
 ): DoNextItem[] {
-  const actions = listOfferNextActions(offers, now);
+  const actions = listOfferNextActions(offers, now, { edgePlays: opts?.edgePlays });
   const claimedLotIds = new Set<number>();
   const items: DoNextItem[] = [];
 
@@ -191,6 +197,7 @@ export function buildDoNextItems(
       convertLot,
       funding,
       health: advantage?.health,
+      edge: action.edge,
     });
   }
 

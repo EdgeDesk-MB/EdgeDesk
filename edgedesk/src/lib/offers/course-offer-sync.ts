@@ -12,10 +12,14 @@ import { eq } from "drizzle-orm";
 import "server-only";
 import { db, offers, bets } from "@/lib/db";
 import type { OfferRow } from "@/lib/db/schema";
-import { isRegionalScope, normalizeCourseName } from "@/lib/offers/racing-offer-rules";
+import {
+  isRegionalScope,
+  normalizeCourseName,
+  parseScopeCourses,
+} from "@/lib/offers/racing-offer-rules";
 import type { RacingRacecard } from "@/lib/services/theracingapi";
 
-/** True when the offer is locked to a specific named course (not all UK/IRE). */
+/** True when the offer is locked to specific named course(s) (not all UK/IRE). */
 export function isSpecificCourseOffer(
   offer: Pick<OfferRow, "sport" | "scopeCourse">
 ): boolean {
@@ -29,19 +33,34 @@ export function isSpecificCourseOffer(
 type GroupKey = string;
 
 function groupKey(offer: OfferRow): GroupKey {
+  const courses = parseScopeCourses(offer.scopeCourse)
+    .map(normalizeCourseName)
+    .sort()
+    .join(",");
   return [
-    normalizeCourseName(offer.scopeCourse!),
+    courses,
     offer.eventDate ?? "",
     (offer.bookmaker ?? "").toLowerCase().trim(),
     offer.title.toLowerCase().trim(),
   ].join("|");
 }
 
+/** Course-day multi-race cards only — a race-scoped campaign is a different mode. */
+function isCourseDayOffer(offer: OfferRow): boolean {
+  return isSpecificCourseOffer(offer) && !offer.scopeRaceId?.trim() && Boolean(offer.eventDate);
+}
+
 /**
  * Ensure there is always exactly one "fresh" (no linked bets) sibling offer for
- * each group of course-scoped offers that have all been used.
- * Call this at the end of syncOfferStatuses(), passing allOffers + allBets from
- * the same DB snapshot to avoid extra round-trips.
+ * each group of course-day offers that have all been used.
+ *
+ * Race-scoped campaigns are excluded: counting them as "used" was recreating a
+ * course-wide duplicate every time the user deleted the fresh sibling (delete
+ * appeared to do nothing after the next /api/state sync).
+ *
+ * Call only after a bet is created or linked to an offer, not on every
+ * syncOfferStatuses() / state poll. Otherwise deleting an unused fresh card
+ * immediately respawns an identical one while a used sibling still exists.
  */
 export function ensureCourseOfferSiblings(
   allOffers: OfferRow[],
@@ -53,12 +72,11 @@ export function ensureCourseOfferSiblings(
     betCountByOffer.set(bet.offerId, (betCountByOffer.get(bet.offerId) ?? 0) + 1);
   }
 
-  // Group active/planned course-scoped offers by (course, date, bookie, title)
+  // Group active/planned course-day offers by (course, date, bookie, title)
   const groups = new Map<GroupKey, OfferRow[]>();
   for (const offer of allOffers) {
     if (offer.status !== "active" && offer.status !== "planned") continue;
-    if (!isSpecificCourseOffer(offer)) continue;
-    if (!offer.eventDate) continue;
+    if (!isCourseDayOffer(offer)) continue;
 
     const key = groupKey(offer);
     const group = groups.get(key) ?? [];
@@ -74,7 +92,7 @@ export function ensureCourseOfferSiblings(
 
     if (withBets.length === 0 || fresh.length > 0) continue;
 
-    // Every card in this group has been used — spawn one fresh sibling
+    // Every course-day card in this group has been used — spawn one fresh sibling
     const source = withBets.sort((a, b) => b.createdAt - a.createdAt)[0];
     db.insert(offers)
       .values({
@@ -132,11 +150,17 @@ export function syncCourseOfferExpiryFromRaces(
   }
 
   for (const offer of courseOffers) {
-    const races = racesByCourse.get(normalizeCourseName(offer.scopeCourse!));
-    if (!races || races.length === 0) continue;
+    const keys = parseScopeCourses(offer.scopeCourse).map(normalizeCourseName);
+    let lastRace: RacingRacecard | null = null;
+    for (const key of keys) {
+      const races = racesByCourse.get(key);
+      if (!races?.length) continue;
+      const courseLast = races.reduce((a, b) => (b.startTime > a.startTime ? b : a));
+      if (!lastRace || courseLast.startTime > lastRace.startTime) lastRace = courseLast;
+    }
+    if (!lastRace) continue;
 
-    const lastRace = races.reduce((a, b) => (b.startTime > a.startTime ? b : a));
-    // 30-minute window after last scheduled off-time
+    // 30-minute window after last scheduled off-time across scoped courses
     const newExpiry = lastRace.startTime + 30 * 60 * 1000;
 
     db.update(offers).set({ expiresAt: newExpiry }).where(eq(offers.id, offer.id)).run();

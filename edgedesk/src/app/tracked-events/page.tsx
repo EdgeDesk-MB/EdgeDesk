@@ -27,14 +27,12 @@ import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { eventToPendingSettle, isEventPendingSettle } from "@/lib/racing/pending-settle";
 import { racingSyncToast } from "@/lib/racing/sync-toast";
-import { sortTrackedEvents } from "@/lib/events";
 import { RefreshCw, Radio } from "lucide-react";
 
 export default function TrackedEventsPage() {
   const router = useRouter();
   const { state, refresh } = useAppState(2000);
   const [syncingRacing, setSyncingRacing] = useState(false);
-  const [fetchingEventId, setFetchingEventId] = useState<number | null>(null);
 
   const myEvents = state?.events ?? [];
   const linkedBets = state?.bets ?? [];
@@ -62,7 +60,11 @@ export default function TrackedEventsPage() {
     [pendingRacingEvents]
   );
 
-  const sortedEvents = useMemo(() => sortTrackedEvents(myEvents), [myEvents]);
+  /** Latest kick-off first so Upcoming sits above Live/Finished. */
+  const sortedEvents = useMemo(
+    () => [...myEvents].sort((a, b) => (b.startTime ?? 0) - (a.startTime ?? 0)),
+    [myEvents]
+  );
 
   const syncRacingResults = useCallback(async () => {
     setSyncingRacing(true);
@@ -88,37 +90,6 @@ export default function TrackedEventsPage() {
       setSyncingRacing(false);
     }
   }, [refresh]);
-
-  const fetchEventResults = useCallback(
-    async (eventId: number) => {
-      setFetchingEventId(eventId);
-      try {
-        const result = await api<{
-          updated: number;
-          pending: number;
-          tierBlocked?: boolean;
-          tier?: "basic" | "free" | "none";
-        }>(`/api/racing/sync-results?eventId=${eventId}&force=1`, {
-          method: "POST",
-        });
-        await refresh();
-        const msg = racingSyncToast(result);
-        if (msg.kind === "success") {
-          toast.success(msg.title, {
-            description:
-              "Full placings saved - place-refund free bets will award if your horse finished 2nd–4th.",
-          });
-        } else {
-          toast.info(msg.title, msg.description ? { description: msg.description } : undefined);
-        }
-      } catch (e) {
-        toast.error("Could not fetch results", { description: String(e) });
-      } finally {
-        setFetchingEventId(null);
-      }
-    },
-    [refresh]
-  );
 
   async function startSim(preset: string, stars: { homeStar?: string; awayStar?: string }) {
     const names: Record<string, [string, string]> = {
@@ -211,8 +182,8 @@ export default function TrackedEventsPage() {
                   <>
                     {" "}
                     {pendingRacingEvents.length} race
-                    {pendingRacingEvents.length === 1 ? "" : "s"} need placings - use{" "}
-                    <span className="font-medium text-foreground">Set placings</span> (1st–4th) for
+                    {pendingRacingEvents.length === 1 ? "" : "s"} need a result - use{" "}
+                    <span className="font-medium text-foreground">Set result</span> (1st–4th) for
                     place-refund free bets. No paid API required.
                   </>
                 ) : null}
@@ -261,8 +232,6 @@ export default function TrackedEventsPage() {
                   liveModel={liveModelsById.get(event.id) ?? null}
                   onPatch={patchEvent}
                   onDelete={deleteEvent}
-                  onFetchResults={fetchEventResults}
-                  fetchingResults={fetchingEventId === event.id}
                 />
               ))}
             </TableBody>

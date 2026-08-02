@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { api, useAppState } from "@/hooks/use-app-state";
+import { apiGet, useAppState } from "@/hooks/use-app-state";
 import {
   offerMatchesAvailableBookies,
   visibleBookieNames,
@@ -22,6 +22,8 @@ import {
   type DoNextItem,
   type FreeBetLotInput,
 } from "@/lib/offers/do-next";
+import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 
 export function useDoNextItems(pollMs?: number): {
   items: DoNextItem[];
@@ -39,7 +41,7 @@ export function useDoNextItems(pollMs?: number): {
     .reduce((s, a) => s + (a.freeBets ?? 0), 0);
 
   useEffect(() => {
-    api<{ lots: FreeBetLotInput[] }>("/api/accounts/free-bets")
+    apiGet<{ lots: FreeBetLotInput[] }>("/api/accounts/free-bets")
       .then((r) => setLots(r.lots ?? []))
       .catch(() => setLots([]));
   }, [freeBetTotal]);
@@ -84,6 +86,41 @@ export function useDoNextItems(pollMs?: number): {
       .map(({ plan, due }) => ({ accountName: plan.accountName, daysSince: due.daysSince }));
   }, [state?.mugPlans, state?.balances?.accounts, now]);
 
+  // Offer Edge: the best race and horse per racing offer, so "place qualifying
+  // bet" can name the play instead of just the bookmaker. Refreshed on the same
+  // minute clock as the rest of this hook, and cached across callers.
+  const hasRacingOffer = useMemo(
+    () => scopedOffers.some((o) => o.sport === "horse_racing"),
+    [scopedOffers]
+  );
+  const [edgePlays, setEdgePlays] = useState<Map<number, OfferEdgePlay>>(new Map());
+
+  // Adjust-during-render (react-hooks/set-state-in-effect): drop plays as soon
+  // as no racing offer remains; the effect below only fetches.
+  const [prevHasRacingOffer, setPrevHasRacingOffer] = useState(hasRacingOffer);
+  if (hasRacingOffer !== prevHasRacingOffer) {
+    setPrevHasRacingOffer(hasRacingOffer);
+    if (!hasRacingOffer) setEdgePlays(new Map());
+  }
+
+  useEffect(() => {
+    if (!hasRacingOffer) return;
+    let cancelled = false;
+    const date = new Date().toISOString().slice(0, 10);
+    fetchOfferEdgePlays(date).then(({ plays }) => {
+      if (cancelled) return;
+      // Plays arrive best-EV first, so the first per offer is the one to show.
+      const best = new Map<number, OfferEdgePlay>();
+      for (const play of plays) {
+        if (!best.has(play.offerId)) best.set(play.offerId, play);
+      }
+      setEdgePlays(best);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasRacingOffer, now]);
+
   const items = useMemo(() => {
     const opts = {
       ...(retention
@@ -92,10 +129,20 @@ export function useDoNextItems(pollMs?: number): {
       bookmakerHealth: healthMap,
       effortMinutes,
       mugDue: mugDueList,
+      edgePlays,
     };
     // buildDoNextItems defaults `now` internally - keeps this memo pure.
     return buildDoNextItems(scopedOffers, lots, undefined, opts, bookieBalances);
-  }, [scopedOffers, lots, retention, healthMap, effortMinutes, mugDueList, bookieBalances]);
+  }, [
+    scopedOffers,
+    lots,
+    retention,
+    healthMap,
+    effortMinutes,
+    mugDueList,
+    bookieBalances,
+    edgePlays,
+  ]);
 
   return { items, lots, state };
 }

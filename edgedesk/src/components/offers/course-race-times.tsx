@@ -3,7 +3,11 @@
 import { useNow } from "@/hooks/use-now";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { normalizeCourseName } from "@/lib/offers/racing-offer-rules";
+import {
+  formatOfferScopeLabel,
+  normalizeCourseName,
+  parseScopeCourses,
+} from "@/lib/offers/racing-offer-rules";
 
 interface RacecardSlim {
   externalId: string;
@@ -24,6 +28,8 @@ export function CourseRaceTimes({
   minRunners?: number | null;
 }) {
   const [races, setRaces] = useState<RacecardSlim[] | null>(null);
+  const scopeLabel = formatOfferScopeLabel(scopeCourse);
+  const multi = parseScopeCourses(scopeCourse).length > 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -32,10 +38,8 @@ export function CourseRaceTimes({
       .then((data) => {
         if (cancelled) return;
         const cards: RacecardSlim[] = data.racecards ?? [];
-        const courseKey = normalizeCourseName(scopeCourse);
-        const matching = cards.filter(
-          (c) => normalizeCourseName(c.course) === courseKey
-        );
+        const keys = new Set(parseScopeCourses(scopeCourse).map(normalizeCourseName));
+        const matching = cards.filter((c) => keys.has(normalizeCourseName(c.course)));
         setRaces(matching.sort((a, b) => a.startTime - b.startTime));
       })
       .catch(() => {
@@ -53,7 +57,7 @@ export function CourseRaceTimes({
   return (
     <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {scopeCourse} races
+        {scopeLabel} races
       </p>
       <div className="flex flex-wrap gap-1.5">
         {races.map((race) => {
@@ -65,7 +69,13 @@ export function CourseRaceTimes({
           return (
             <span
               key={race.externalId}
-              title={belowMin ? `${race.fieldSize} runners (need ${minRunners}+)` : undefined}
+              title={
+                belowMin
+                  ? `${race.course} · ${race.fieldSize} runners (need ${minRunners}+)`
+                  : multi
+                    ? race.course
+                    : undefined
+              }
               className={cn(
                 "rounded px-1.5 py-0.5 text-xs font-mono tabular-nums",
                 live && !belowMin
@@ -77,7 +87,7 @@ export function CourseRaceTimes({
                       : "text-foreground"
               )}
             >
-              {race.offTime}
+              {multi ? `${race.course} ${race.offTime}` : race.offTime}
             </span>
           );
         })}

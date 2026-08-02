@@ -1,7 +1,7 @@
 "use client";
 
 import { useNow } from "@/hooks/use-now";
-import { useMemo, useState, type CSSProperties, type MouseEvent } from "react";
+import { useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { raceFairOdds, type RunnerFairOdds } from "@/lib/racing/fair-odds";
 import { formatHeadgear } from "@/lib/racing/runner-display";
 import { formatClockTime } from "@/lib/time-format";
 import type { RacingDeskRace, RacingRunnerDetail } from "@/lib/racing-desk/types";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { PriceMovementArrow, PriceMovementBadge } from "@/components/racing/price-movement-badge";
 import { RacingOfferGuide } from "@/components/racing/racing-offer-guide";
 import { RunnerCloth } from "@/components/racing/runner-cloth";
@@ -22,14 +23,19 @@ import {
   NotebookPen,
   Pin,
   RotateCcw,
+  Sparkles,
   TrendingDown,
 } from "lucide-react";
 import { formatExchangeMatchError } from "@/lib/services/exchange/format-exchange-error";
 import { cn } from "@/lib/utils";
 import { darken, lighten } from "@/lib/brands/exchanges";
 import { racingRegionLabel } from "@/lib/geo/region";
-import { qualifyingOfferTags } from "@/lib/racing/offer-tags";
 import {
+  countRecommendedOffersOnRace,
+  qualifyingOfferTags,
+} from "@/lib/racing/offer-tags";
+import {
+  edgeMarkerPill,
   listPillState,
   listRow,
   sectionBar,
@@ -69,8 +75,13 @@ export interface FlashscoreRacecardProps {
   refreshLabel?: string;
   refreshing?: boolean;
   exchangeStatusLabel?: string;
+  /** Desk exchange picker, rendered beside Track race */
+  exchangeControl?: ReactNode;
   /** Bookmaker name → brand hex color for near-minimum runner dots */
   bookmakerColors?: Map<string, string>;
+  /** Modelled Offer Edge plays (Race picks / workflow share this list). */
+  edgePlays?: OfferEdgePlay[];
+  dataSource?: "demo" | "racing-api" | "error";
 }
 
 function spreadTone(spreadPct?: number): string {
@@ -264,6 +275,7 @@ function RunnerRow({
   layColor,
   advancedMode = false,
   fairOdds,
+  isRecommended,
 }: {
   runner: RacingRunnerDetail;
   race: RacingDeskRace;
@@ -276,11 +288,13 @@ function RunnerRow({
   layColor?: string;
   advancedMode: boolean;
   fairOdds?: RunnerFairOdds | null;
+  /** Offer Edge recommended runner for this race. */
+  isRecommended?: boolean;
 }) {
   const isSteamer = runner.movement?.change != null && runner.movement.change < -0.05;
   const isDrifter = runner.movement?.change != null && runner.movement.change > 0.05;
   const hasSnapshots = (runner.movement?.snapshotCount ?? 0) >= 2;
-  const isOfferTarget = (runner.offerTargetScore ?? 0) >= 35;
+  const isOfferTarget = !isRecommended && (runner.offerTargetScore ?? 0) >= 35;
   const isLiveExchange = runner.exchangeSource === "live";
   const layStyle = oddsCellStyle(layColor);
   const laySizeLabel = formatLaySize(runner.exchangeLaySize);
@@ -293,7 +307,8 @@ function RunnerRow({
       className={cn(
         listRow,
         isSteamer && "bg-emerald-500/5",
-        isOfferTarget && "bg-emerald-500/8"
+        isRecommended && "bg-edge/8",
+        !isRecommended && isOfferTarget && "bg-muted/40"
       )}
     >
       <td className="w-12 px-2 py-2.5">
@@ -325,13 +340,23 @@ function RunnerRow({
               {formatHeadgear(runner.headgear)}
             </Badge>
           )}
+          {isRecommended && (
+            <Badge
+              variant="outline"
+              className="border-edge/50 text-[9px] text-edge"
+              title="Offer Edge recommended play"
+            >
+              <Sparkles className="mr-0.5 size-2.5" aria-hidden />
+              recommended
+            </Badge>
+          )}
           {isOfferTarget && (
             <Badge
               variant="outline"
-              className="border-emerald-500/50 text-[9px] text-emerald-700 dark:text-emerald-300"
+              className="border-border text-[9px] text-muted-foreground"
               title={runner.offerTargetSummary}
             >
-              offer target
+              estimate
             </Badge>
           )}
         </div>
@@ -464,11 +489,22 @@ export function FlashscoreRacecard({
   refreshLabel,
   refreshing = false,
   exchangeStatusLabel,
+  exchangeControl,
   bookmakerColors,
+  edgePlays = [],
+  dataSource,
 }: FlashscoreRacecardProps) {
   const now = useNow(30_000);
   const activeCourse = selected?.course ?? courses[0]?.[0] ?? "";
   const courseRaces = courses.find(([c]) => c === activeCourse)?.[1] ?? [];
+  const recommendedHorseIds = useMemo(() => {
+    if (!selected) return new Set<string>();
+    return new Set(
+      edgePlays
+        .filter((p) => p.raceExternalId === selected.externalId)
+        .map((p) => p.runner.horseId)
+    );
+  }, [edgePlays, selected]);
 
   // Mobile progressive disclosure: the runner grid sits behind a tap, per
   // race (switching race collapses it again). Desktop always shows it.
@@ -536,7 +572,7 @@ export function FlashscoreRacecard({
               <Button
                 size="sm"
                 variant="outline"
-                className="group h-7 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:text-emerald-300 dark:hover:text-destructive"
+                className="group h-7 border-success/40 bg-success/10 text-success hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive"
                 onClick={() => onUntrack(selected)}
                 title="Stop tracking this race"
               >
@@ -554,6 +590,7 @@ export function FlashscoreRacecard({
                 Track race
               </Button>
             )}
+            {exchangeControl}
           </div>
         </div>
         <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
@@ -562,7 +599,8 @@ export function FlashscoreRacecard({
             const isFinished =
               race.status === "finished" ||
               (race.status === "upcoming" && race.startTime < now);
-            const offerCount = qualifyingOfferTags(race).length;
+            const offerCount = qualifyingOfferTags(race, edgePlays).length;
+            const recommendedCount = countRecommendedOffersOnRace(edgePlays, race.externalId);
             const nearMinTags = race.offerTags.filter(
               (t) =>
                 t.qualifies &&
@@ -583,10 +621,19 @@ export function FlashscoreRacecard({
                 {race.startTime ? formatClockTime(race.startTime) : race.offTime || "-"}
                 {offerCount > 0 && (
                   <span
-                    className="ml-1 inline-flex min-w-[1rem] translate-y-[-1px] items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[9px] font-bold tabular-nums text-emerald-800 dark:text-emerald-300"
+                    className="ml-1 inline-flex min-w-[1rem] translate-y-[-1px] items-center justify-center rounded-full bg-success/15 px-1 text-[9px] font-bold tabular-nums text-success"
                     title={`${offerCount} qualifying offer${offerCount === 1 ? "" : "s"}`}
                   >
                     {offerCount}
+                  </span>
+                )}
+                {recommendedCount > 0 && (
+                  <span
+                    className={cn(edgeMarkerPill, "ml-1 translate-y-[-1px]")}
+                    title={`${recommendedCount} recommended play${recommendedCount === 1 ? "" : "s"} (Offer Edge)`}
+                  >
+                    <Sparkles className="size-2" aria-hidden />
+                    {recommendedCount}
                   </span>
                 )}
                 {nearMinTags.map((tag) => {
@@ -654,6 +701,8 @@ export function FlashscoreRacecard({
         {hasPlaceOffer && showOfferGuide && (
           <RacingOfferGuide
             race={selected}
+            edgePlays={edgePlays}
+            dataSource={dataSource}
             onBack={(runner, offerId) => onBet(selected, runner, "place_refund", offerId)}
             onLay={(runner, offerId) => onBet(selected, runner, "lay", offerId)}
             onTrack={() => onTrack(selected)}
@@ -661,28 +710,24 @@ export function FlashscoreRacecard({
         )}
         {hasPlaceOffer &&
           advancedMode &&
-          selected.offerTags
-            .flatMap((t) => t.suggestedRunners ?? [])
-            .filter((r, i, arr) => arr.findIndex((x) => x.horseId === r.horseId) === i)
-            .sort((a, b) => (b.totalEv ?? b.score) - (a.totalEv ?? a.score))
-            .slice(0, 3)
-            .length > 0 && (
-            <div className="mt-2 rounded border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                Offer targets
+          edgePlays.filter((p) => p.raceExternalId === selected.externalId).length > 0 && (
+            <div className="mt-2 rounded border border-edge/20 bg-edge/5 px-2 py-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-edge">
+                Recommended plays
               </p>
-              {selected.offerTags
-                .flatMap((t) => t.suggestedRunners ?? [])
-                .filter((r, i, arr) => arr.findIndex((x) => x.horseId === r.horseId) === i)
-                .sort((a, b) => (b.totalEv ?? b.score) - (a.totalEv ?? a.score))
+              {edgePlays
+                .filter((p) => p.raceExternalId === selected.externalId)
+                .slice()
+                .sort((a, b) => b.totalEv - a.totalEv)
                 .slice(0, 3)
-                .map((r) => (
-                  <p key={r.horseId} className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{r.name}</span>
-                    {r.totalEv != null && (
-                      <span className="tabular-nums"> · EV £{r.totalEv.toFixed(2)}</span>
-                    )}
-                    {` · ${r.summary}`}
+                .map((p) => (
+                  <p key={`${p.offerId}-${p.runner.horseId}`} className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{p.runner.name}</span>
+                    <span className="tabular-nums">
+                      {" "}
+                      · EV £{p.totalEv.toFixed(2)}
+                    </span>
+                    {p.reasons[0] ? ` · ${p.reasons[0]}` : ""}
                   </p>
                 ))}
             </div>
@@ -739,6 +784,7 @@ export function FlashscoreRacecard({
                 layColor={layColor}
                 advancedMode={advancedMode}
                 fairOdds={fairOddsMap?.get(runner.horseId) ?? null}
+                isRecommended={recommendedHorseIds.has(runner.horseId)}
               />
             ))}
           </tbody>

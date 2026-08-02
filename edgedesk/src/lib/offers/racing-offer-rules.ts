@@ -15,28 +15,72 @@ export interface BetGetFreePlaceRules {
   qualifyingPlaces: number[];
   betStake: number;
   freeBetAmount: number;
+  /** Place pays only when the race winner was the Starting Price favourite. */
+  winnerMustBeSpFavourite?: boolean;
 }
 
 export function normalizeCourseName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-/** All UK/IRE courses vs a single named track. */
+/** All UK/IRE courses vs one or more named tracks. */
 export function isRegionalScope(scopeCourse: string | null | undefined): boolean {
   const scope = scopeCourse?.trim().toLowerCase();
   return !scope || scope === "all" || scope === "uk_ire" || scope === "any";
+}
+
+/**
+ * Named courses from `scope_course` (comma / " & " / " and " / " or " separated).
+ * Regional sentinels yield []. Display forms are preserved; duplicates dropped.
+ */
+export function parseScopeCourses(scopeCourse: string | null | undefined): string[] {
+  if (!scopeCourse?.trim() || isRegionalScope(scopeCourse)) return [];
+  const parts = scopeCourse
+    .split(/\s*(?:,|&| and | or )\s*/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of parts) {
+    const key = normalizeCourseName(part);
+    if (!key || key === "all" || key === "uk_ire" || key === "any") continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(part);
+  }
+  return out;
+}
+
+/** Persist one or more courses in the existing `scope_course` text column. */
+export function encodeScopeCourses(courses: string[]): string {
+  return parseScopeCourses(courses.join(", ")).join(", ");
+}
+
+/** True when the race course is in the offer's named-course list (or scope is regional). */
+export function courseMatchesScope(
+  raceCourse: string | null | undefined,
+  scopeCourse: string | null | undefined
+): boolean {
+  if (isRegionalScope(scopeCourse)) return true;
+  const course = raceCourse?.trim();
+  if (!course) return false;
+  const key = normalizeCourseName(course);
+  return parseScopeCourses(scopeCourse).some((c) => normalizeCourseName(c) === key);
 }
 
 export function formatOfferScopeLabel(
   scopeCourse: string | null | undefined,
   scopeRaceLabel?: string | null
 ): string {
+  const courses = parseScopeCourses(scopeCourse);
+  const courseLabel = courses.length > 0 ? courses.join(", ") : null;
   if (scopeRaceLabel?.trim()) {
-    const course = !isRegionalScope(scopeCourse) ? scopeCourse!.trim() : null;
-    return course ? `${course} · ${scopeRaceLabel.trim()}` : scopeRaceLabel.trim();
+    return courseLabel
+      ? `${courseLabel} · ${scopeRaceLabel.trim()}`
+      : scopeRaceLabel.trim();
   }
   if (isRegionalScope(scopeCourse)) return "UK & Ireland";
-  return scopeCourse!.trim();
+  return courseLabel ?? scopeCourse!.trim();
 }
 
 export function parseOfferRules(offer: OfferRow): BetGetFreePlaceRules | null {
@@ -50,15 +94,47 @@ export function parseOfferRules(offer: OfferRow): BetGetFreePlaceRules | null {
   }
 }
 
+/**
+ * True when the free bet / refund depends on a finishing position (or SP-favourite
+ * place clause). Straight "bet £X get £Y" offers store empty `qualifyingPlaces`
+ * and must not drive Best plays / place-target intelligence.
+ */
+export function offerHasResultTrigger(
+  rules: Pick<BetGetFreePlaceRules, "qualifyingPlaces" | "winnerMustBeSpFavourite"> | null | undefined
+): boolean {
+  if (!rules) return false;
+  if (rules.winnerMustBeSpFavourite) return true;
+  return rules.qualifyingPlaces.some((p) => Number.isInteger(p) && p >= 1);
+}
+
+function placeOrdinal(n: number): string {
+  const suffix =
+    n % 100 >= 11 && n % 100 <= 13
+      ? "th"
+      : n % 10 === 1
+        ? "st"
+        : n % 10 === 2
+          ? "nd"
+          : n % 10 === 3
+            ? "rd"
+            : "th";
+  return `${n}${suffix}`;
+}
+
 export function formatBetGetFreePlaceSummary(
   rules: BetGetFreePlaceRules,
   opts?: { includeRegions?: boolean }
 ): string {
-  const places = rules.qualifyingPlaces.join(", ");
-  const parts = [
-    `Bet £${rules.betStake} get £${rules.freeBetAmount} free if places ${places}`,
-    `min ${rules.minRunners} runners`,
-  ];
+  const stakeClause = `Bet £${rules.betStake} get £${rules.freeBetAmount} free`;
+  let rewardClause = stakeClause;
+  if (offerHasResultTrigger(rules)) {
+    const places = rules.qualifyingPlaces.join(", ");
+    const placeClause = rules.winnerMustBeSpFavourite
+      ? `${rules.qualifyingPlaces.map(placeOrdinal).join(", ")} to SP favourite`
+      : `places ${places}`;
+    rewardClause = `${stakeClause} if ${placeClause}`;
+  }
+  const parts = [rewardClause, `min ${rules.minRunners} runners`];
   if (opts?.includeRegions !== false) {
     parts.push(rules.regions.join(" & "));
   }
@@ -66,7 +142,14 @@ export function formatBetGetFreePlaceSummary(
 }
 
 export function placeRefundTriggerText(rules: BetGetFreePlaceRules): string {
+  if (!offerHasResultTrigger(rules)) {
+    return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB`;
+  }
   const places = rules.qualifyingPlaces.join(", ");
+  if (rules.winnerMustBeSpFavourite) {
+    const ordinals = rules.qualifyingPlaces.map(placeOrdinal).join(", ");
+    return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB if ${ordinals} to SP favourite`;
+  }
   return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB if ${places}`;
 }
 
@@ -90,13 +173,9 @@ export function raceQualifiesForOffer(
     if (race.externalId !== raceId) {
       reasons.push(`Not the scoped race (${offer.scopeRaceLabel ?? raceId})`);
     }
-  } else {
-    const scope = offer.scopeCourse?.trim();
-    if (scope && !isRegionalScope(scope)) {
-      if (normalizeCourseName(race.course) !== normalizeCourseName(scope)) {
-        reasons.push(`Course ${race.course} not in scope (${scope})`);
-      }
-    }
+  } else if (!courseMatchesScope(race.course, offer.scopeCourse)) {
+    const scope = formatOfferScopeLabel(offer.scopeCourse);
+    reasons.push(`Course ${race.course} not in scope (${scope})`);
   }
 
   if (race.fieldSize < rules.minRunners) {
@@ -163,10 +242,9 @@ export function offerMatchesBetContext(
     return false;
   }
 
-  const scope = offer.scopeCourse?.trim();
-  if (scope && !isRegionalScope(scope)) {
+  if (!isRegionalScope(offer.scopeCourse)) {
     if (!ctx.course?.trim()) return false;
-    return normalizeCourseName(ctx.course) === normalizeCourseName(scope);
+    return courseMatchesScope(ctx.course, offer.scopeCourse);
   }
 
   // Regional UK/IRE - any racing event that day qualifies for picker

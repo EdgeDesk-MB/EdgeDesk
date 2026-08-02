@@ -97,7 +97,16 @@ export async function findOrCreateRacingEvent(opts: {
             source: "api",
             externalId: card.externalId,
             status: card.status,
-            goals: card.runners.length ? serializeRacecardRunners(card.runners) : null,
+            goals: card.runners.length
+              ? serializeRacecardRunners(card.runners, {
+                  type: card.type,
+                  distance: card.distance,
+                  raceClass: card.raceClass,
+                  prize: card.prize,
+                  going: card.going,
+                  fieldSize: card.fieldSize,
+                })
+              : null,
             createdAt: Date.now(),
           })
           .returning()
@@ -112,6 +121,13 @@ export async function findOrCreateRacingEvent(opts: {
   }
 
   const now = Date.now();
+  // Past offs are finished (late link from Profit Tracker); in-play window stays live.
+  const status =
+    opts.startTime <= now - 5 * 60_000
+      ? "finished"
+      : opts.startTime <= now
+        ? "live"
+        : "upcoming";
   const inserted = db
     .insert(events)
     .values({
@@ -121,7 +137,7 @@ export async function findOrCreateRacingEvent(opts: {
       awayTeam: formatEventTime(opts.startTime),
       startTime: opts.startTime,
       source: "manual",
-      status: opts.startTime <= now ? "live" : "upcoming",
+      status,
       createdAt: now,
     })
     .returning()

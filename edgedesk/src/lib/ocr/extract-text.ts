@@ -4,6 +4,7 @@
  */
 import type { BetOcrFields, ScreenshotSource } from "./types";
 import { parseBetScreenshot, summariseOcrFields } from "./parse-bet-screenshot";
+import { repairOcrRaceResultText } from "@/lib/racing/parse-race-result-text";
 
 export interface OcrResult {
   text: string;
@@ -15,7 +16,7 @@ export interface OcrResult {
 export type OcrLayout = "sparse" | "auto" | "block";
 
 export async function extractTextFromImage(
-  file: File | string | Buffer,
+  file: File | string | Buffer | Blob,
   layout: OcrLayout = "sparse"
 ): Promise<{ text: string; confidence: number }> {
   const { createWorker, PSM } = await import("tesseract.js");
@@ -47,14 +48,69 @@ export async function ocrOfferScreenshot(
   return extractTextFromImage(file, "auto");
 }
 
+/** Prefer OCR dumps that preserve fractional SPs after repair. */
+function scoreRaceResultOcrText(text: string): number {
+  const repaired = repairOcrRaceResultText(text);
+  const fracs = repaired.match(/\b\d+\s*\/\s*\d+/g)?.length ?? 0;
+  const favs = repaired.match(/\b(?:2Fav|J?Fav)\b/gi)?.length ?? 0;
+  return fracs * 4 + favs * 2 + Math.min(repaired.replace(/\s/g, "").length, 800) / 400;
+}
+
+/**
+ * Upscale screenshots so thin SP fractions (11/1, 20/1) survive Tesseract.
+ * Browser-only; returns the original file when canvas APIs are unavailable.
+ */
+async function upscaleImageForOcr(file: File, scale = 2): Promise<Blob | File> {
+  if (typeof createImageBitmap !== "function") return file;
+  const bmp = await createImageBitmap(file);
+  try {
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    if (typeof OffscreenCanvas !== "undefined") {
+      const canvas = new OffscreenCanvas(w, h);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(bmp, 0, 0, w, h);
+      return await canvas.convertToBlob({ type: "image/png" });
+    }
+    if (typeof document === "undefined") return file;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
+    return blob ?? file;
+  } finally {
+    bmp.close?.();
+  }
+}
+
 /** OCR for race-result tables (Sporting Life / ATR Full Result screenshots). */
 export async function ocrRaceResultScreenshot(
   file: File
 ): Promise<{ text: string; confidence: number }> {
-  // Try block layout first (better for tables), fall back to auto if thin.
-  const block = await extractTextFromImage(file, "block");
-  if (block.text.replace(/\s/g, "").length >= 40) return block;
-  return extractTextFromImage(file, "auto");
+  const upscaled = await upscaleImageForOcr(file, 2);
+  const [block, blockUp] = await Promise.all([
+    extractTextFromImage(file, "block"),
+    upscaled === file
+      ? Promise.resolve(null)
+      : extractTextFromImage(upscaled, "block"),
+  ]);
+  const candidates = [block, blockUp].filter(
+    (c): c is { text: string; confidence: number } => c != null
+  );
+  candidates.sort(
+    (a, b) => scoreRaceResultOcrText(b.text) - scoreRaceResultOcrText(a.text)
+  );
+  const best = candidates[0]!;
+  if (best.text.replace(/\s/g, "").length >= 40) return best;
+  return extractTextFromImage(upscaled, "auto");
 }
 
 /**
