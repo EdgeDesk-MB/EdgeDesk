@@ -100,7 +100,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "You record what happened in the real world - a score, a race winner - and EdgeDesk derives every market from it. One England 2-1 result settles match odds, BTTS, over/under and a 2UP trigger together, because they are all views of the same fact.",
         ],
         bullets: [
-          "Bets linked to a tracked event settle themselves when the result lands; unlinked bets get manual Won/Lost/Void buttons.",
+          "Bets linked to a tracked event settle themselves when the result lands (Set result on the race from Tracked Events or Profit Tracker). Unlinked bets use Set result for Won/Lost/Void.",
           "Corrections re-derive: fix a score and every dependent market re-settles the same way.",
           "The same engine powers the Acca Desk (linked legs auto-result) and goalscorer/combo triggers (settle at the decisive moment, not full time).",
         ],
@@ -175,6 +175,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Offers: the campaign lifecycle",
         bullets: [
           "Capture: New offer → type it, paste the promo text, drop screenshots, or drop a promo EMAIL (.eml) - all parse on-device into the same preview. Or forward emails to your intake folder (Settings → Data & API) and drafts arrive as Planned campaigns.",
+          "Repeats: tick Repeats when creating for daily/weekly/monthly promos - each occurrence is a separate offer with its own ID. Delete asks whether to remove this occurrence only or this and future. Stop from any instance when the series ends. Casino campaigns use the same control.",
           "Planned → Active: activating LOCKS the expected EV (the baseline your execution is judged against).",
           "Work it: Do next tells you the next action; opening a card starts the effort timer; logging the bet stops it.",
           "Settle: results land, capture % is computed, and anything below 100% can be tagged in the mistake ledger (laid late, odds moved, wrong market…).",
@@ -199,11 +200,16 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
-        heading: "Casino: wagering offers with honest variance",
+        heading: "Casino: wagering campaigns with honest variance",
         bullets: [
-          "Log offer (paste prefills it): bonus, wagering ×, game RTP, contribution → EV = bonus minus expected drag.",
+          "Log offer (nav quick action or Casino → Log): name the campaign, then add its first step. Paste the promo text to prefill. Add more steps on the card if the offer bundles several rewards.",
+          "Steps: qualifying wager (cost drag), cash, bonus, free spins, golden chips, cashback - each has its own EV; the card header shows the campaign total.",
+          "Repeats: on create, tick Repeats and pick daily / weekly / monthly. The first occurrence appears immediately; later days materialise automatically with the same steps and freshly derived EV. Each occurrence has its own ID so you can complete or delete one without touching the rest.",
+          "Delete a repeating card: choose this occurrence only (that date will not come back) or this and future occurrences (stops the series; past history stays).",
+          "Stop repeating: on any recurring card, tick \"Stop repeating from this occurrence forward\" - future empty instances are removed; history stays.",
+          "Calendar / Campaigns: same split as Offers - calendar by expiry day, campaigns for the working list.",
           "The eligible-games picker stars the highest published RTP; the Game library holds base RTPs (operators can license lower variants - verify in game info).",
-          "Simulate: 10,000 runs at a volatility preset → bust %, median, the 10-90% band, and the distribution. Heavy-wagering offers often simulate ABOVE the static EV because busting truncates losses - both figures are shown.",
+          "Simulate: 10,000 runs of the whole campaign at a volatility preset → bust %, median, the 10-90% band, and the distribution. Heavy-wagering offers often simulate ABOVE the static EV because busting truncates losses - both figures are shown.",
         ],
       },
       {
@@ -332,6 +338,19 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "General offers",
         paragraphs: [
           "For sign-ups, reloads and football promos, add a general offer with expected profit. Link bets manually or via trigger text in the Tracker.",
+        ],
+      },
+      {
+        heading: "Recurring offers",
+        paragraphs: [
+          "Daily, weekly or monthly reloads get a Repeats checkbox on create. EdgeDesk materialises each occurrence as its own offer (own ID, own bets, own completion) so history never collides.",
+        ],
+        bullets: [
+          "Create with Repeats on → the first matching date appears immediately (today if the rule matches); the next ~14 days fill in automatically",
+          "Edit one occurrence without changing the series template; future materialisations still use the original rule",
+          "Delete asks this occurrence only (skipped so it does not come back) or this and future (stops the series; past history stays)",
+          "Stop repeating from this occurrence forward removes untouched future Planned instances and leaves history intact",
+          "Casino campaigns use the same pattern: Repeats on Log a casino offer, then stop or delete from any recurring card",
         ],
       },
       {
@@ -533,6 +552,12 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Where is my data stored?",
         paragraphs: [
           "SQLite at data/edgedesk.db in the project folder. Export CSV anytime from Settings → Data & API.",
+        ],
+      },
+      {
+        heading: "Can casino (or sports) offers repeat automatically?",
+        paragraphs: [
+          "Yes. Tick Repeats when creating a sports offer or logging a casino campaign, then choose daily, weekly or monthly. Each day/week gets its own campaign so you can complete one without affecting the others. Delete asks this occurrence only or this and future. On a recurring card, tick Stop repeating from this occurrence forward when the promo ends.",
         ],
       },
       {

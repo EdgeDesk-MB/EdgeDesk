@@ -10,11 +10,8 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-07-22 (Phase 12 — K1/K2 ✅ DONE, K3 recurring casino offers still not started;
-Phase 13 — styling pass, L1 outcome-probability calc, L2 history/richer-columns view and L3
-boosted odds ALL ✅ DONE same day - the Acca Desk gained a live Campaign P&L header, an
-ALL WIN/1 LOSE/1+ LOSE probability meter, an Active/History split with collapsible history cards,
-and native bookmaker-boost support end to end from create form to real settlement)
+Last updated: 2026-07-31 (Phase 14 Offer Edge + `--edge` token; N0 entitlement scaffolding
+brief ⏸ gated. Phase 12–13 ✅ DONE)
 
 ---
 
@@ -1572,7 +1569,7 @@ Grosvenor combined-vector test, run through simulation instead of the analytic p
 pass; harness check that a multi-component campaign's "Simulate" produces one histogram, not one
 per component; suite + build green.
 
-## K3. Recurring casino offers `[strong]` — needs K1
+## K3. Recurring casino offers `[strong]` — needs K1 — ✅ DONE 2026-07-28
 
 **Objective.** Sports offers already support recurrence (Sam asked 2026-07-21 whether casino
 offers should too, "we do this for Bet offers"): a template row (`offer_series`) plus a
@@ -1826,6 +1823,376 @@ final-leg lock and campaign P&L) verifying every call site that reads `combined(
 purposes was updated consistently, not just the ones on the happy path; harness check: create a
 boosted 2-leg run matching Sam's real slip, confirm the final-leg lock stake and the Campaign P&L
 figure match hand-computed numbers at both conventions' worth of scrutiny; suite + build green.
+
+---
+
+# PHASE 14 — OFFER EDGE
+
+Promoted from §9 on 2026-07-31. Trigger: Sam's daily "Bet £50 get £50 free bet if your horse
+finishes 2nd, 3rd or 4th" offer, and the observation that the Racing Desk currently picks the
+target horse from market rank rather than from price.
+
+**The decisions taken in planning, so no agent re-litigates them.**
+1. The objective is `P(finishes exactly 2nd, 3rd or 4th)`. **A win is a miss** — the free bet is a
+   consolation for narrowly losing, confirmed by Sam. So the target quantity is
+   `P(top four) − P(wins)`, not `P(top four)`.
+2. Full stake on ONE horse in ONE race. No dutching across two runners in v1 (Sam's call).
+3. Model only. Do NOT add a Betfair "To Be Placed" (`marketTypeCodes: ["PLACE"]`) call in v1 — API
+   cost stays flat (Sam's call). It is the obvious v2 calibration anchor; leave it out.
+4. Racing only, but the offer's target outcome is a general concept other sports plug into later.
+5. Surfaces show **£EV, plain-English reasons and the existing confidence chip**. Never a
+   probability table (Sam: the maths is the secret sauce). The confidence chip stays because §1's
+   north star and A2's provenance rule are non-negotiable — hiding the working is fine, hiding how
+   much to trust the number is not.
+
+**Why the current code is wrong.** `scorePlaceRefundRunners()`
+(`src/lib/offers/racing-offer-rules.ts:284`) scores by market *rank* with flat bonuses (rank 2 gets
+`+40`, rank 3 `+30`, rank 4 `+25`), hard-excludes the favourite (`p.rank >= 2 && p.rank <= 5`), and
+never looks at field size. `estimatePlaceRefundTriggerProb()`
+(`src/lib/offers/place-refund-ev.ts:11`) then turns rank into a probability via multipliers clamped
+to `[0.03, 0.45]`. Rank is the wrong variable: a 2nd favourite at 5.0 behind a 1.4 shot and a 2nd
+favourite at 3.4 behind a 3.0 shot score identically today but are completely different bets.
+
+**The maths, once, for every brief below.** Harville (Plackett-Luce with exponent 1) over the
+no-vig win probabilities `p_i`:
+
+```
+P(i finishes 2nd) = Σ_{j≠i}  p_j · p_i/(1 − p_j)
+```
+
+The `1/(1 − p_j)` term is why a dominant favourite roughly doubles a mid-priced horse's chance of
+running second (worked example: a horse with a 12% win chance sits at ~27% to finish 2nd behind a
+1.5 favourite, but only ~13% behind a weak 5.0 favourite). The same formula concentrates top-four
+mass when the field thins out after 4th, and it captures field size for free — three target
+positions out of 8 runners is roughly double the hit rate of three out of 16. All three of Sam's
+stated instincts are therefore consequences of one model, not three hand-tuned bonuses.
+
+## M0. Capture the exchange back price `[local]` — prerequisite for M1
+
+**Objective.** Stop throwing away half the Betfair order book.
+
+**Why.** `src/lib/services/exchange/betfair.ts` requests `EX_BEST_OFFERS` and reads only
+`bookRunner.ex?.availableToLay?.[0]` (the `MarketBookRow` interface at line ~212 does not even
+declare `availableToBack`). `availableToBack` arrives in the **same response** at **zero extra API
+cost**. `trueProbabilityFromExchange(back, lay)` already exists in `src/lib/calc/ev.ts:47` and
+computes exactly the midpoint the model wants — it is simply never given a real back price.
+
+**Files.**
+- `src/lib/services/exchange/betfair.ts` — add `availableToBack?: Array<{ price; size }>` to the
+  `MarketBookRow` runner shape; populate a new optional `backDecimal` / `backSize` on the emitted
+  quote. A runner with a lay but no back (or vice versa) must still emit its quote.
+- `src/lib/services/exchange/types.ts` — `ExchangeLayQuote` gains optional `backDecimal`,
+  `backSize`. **Optional and additive** so the Betdaq stub and every existing caller compile
+  untouched.
+- `src/lib/racing-desk/types.ts` — `RacingRunnerDetail` gains optional `exchangeBackDecimal`,
+  `exchangeBackSize`.
+- `src/lib/services/racing-desk.ts` — thread the new fields through the enrichment step that
+  already maps quotes onto runners.
+
+**Nuance.** Do NOT change `exchangeDecimal` semantics: it stays the lay price, because the whole
+desk, the offer guide and the qualifying-loss maths read it as the lay. The back price is
+additive context for the probability model only.
+
+**Acceptance.** Existing exchange tests unchanged and green; a runner with both sides present
+carries both on the desk payload; nothing that reads `exchangeDecimal` changes behaviour.
+
+## M1. Finishing-position model `[strong]` — pure calc, /calc-change
+
+**Objective.** New `src/lib/calc/racing/finish-positions.ts`: given win probabilities, return each
+runner's probability of finishing 1st, 2nd, 3rd and 4th.
+
+**API.**
+```ts
+export interface FinishPositionProbs {
+  /** probs[runnerIndex][position - 1] */
+  byRunner: number[][];
+}
+export function finishPositionProbs(
+  winProbs: number[],
+  opts?: { maxPosition?: number; exponent?: number }
+): FinishPositionProbs;
+```
+
+**Algorithm.** Exact enumeration, no simulation. Enumerate ordered triples `(a, b, c)` of distinct
+runners as the first three finishers; each triple's probability is
+`p_a · p_b/(1−p_a) · p_c/(1−p_a−p_b)`. Accumulate positions 1–3 from the triple, then for every
+remaining runner `i` add `tripleProb · p_i/(1−p_a−p_b−p_c)` to its 4th-place total. A 24-runner
+field is ~12k triples × 24 runners ≈ 290k operations, microseconds. Guard against a zero or
+negative remaining denominator (possible with floating point when probabilities are extreme).
+
+**The exponent parameter.** Harville is documented to overstate the place chances of short-priced
+horses; the standard correction is a Stern exponent applied to positions after the first
+(`p_j^λ / Σ_{k∈S} p_k^λ` when drawing from remaining set `S`, with position 1 left at λ=1 so the
+model reproduces the market's win probabilities exactly). **Ship v1 at `exponent: 1` (pure
+Harville).** Plumb the parameter and test that `λ < 1` shifts mass toward longshots, but do NOT
+invent a default constant and do NOT expose a Settings knob yet — the honest way to set it is to
+calibrate from Sam's own realised hit rate once results accumulate, which is a §7.4 data-moat
+feature in its own right. Record that as the follow-up.
+
+**Companion helper in the same file.**
+```ts
+export function winProbsFromRunners(
+  runners: Array<{ backDecimal?: number | null; layDecimal?: number | null; nonRunner?: boolean }>,
+  opts?: { minCoverage?: number }
+): { probs: number[]; indexes: number[] } | null;
+```
+- Per runner, prefer `trueProbabilityFromExchange(back, lay)` when both sides exist; fall back to
+  `1 / lay` when only the lay is available.
+- Normalise with `noVig()` from `src/lib/calc/ev.ts`. Note `noVig()` divides by the implied sum, so
+  it already tolerates an **underround** book (a lay-only book sums below 1) — no change needed
+  there, but assert it in a test so nobody "fixes" it later.
+- Return `null` when fewer than `minCoverage` (default **0.9**) of active runners are priced,
+  mirroring the 0.8 guard in `src/lib/racing/fair-odds.ts:26`. A partial book produces nonsense.
+
+**Test vectors (hand-worked, in `finish-positions.test.ts`).**
+- Three runners `p = [0.5, 0.3, 0.2]`:
+  `P(A finishes 2nd) = 0.3·(0.5/0.7) + 0.2·(0.5/0.8) = 0.214285… + 0.125 = 0.339285…`
+- Same field: `P(A finishes 1st) = 0.5` exactly (the model must reproduce the market at position 1).
+- Invariants on a larger random-ish field: each **position column** sums to 1; each **runner's**
+  positions sum to ≤ 1; every value is in `[0, 1]`.
+- The dominant-favourite effect, asserted as a relationship not a magic number: hold one runner's
+  `p` fixed at 0.12, and assert its `P(2nd)` is materially higher when the rest of the book is
+  concentrated in a 1.5 favourite than when it is spread across a weak book.
+- Field-size effect: the same `p_i` in an 8-runner field has a higher `P(2nd)+P(3rd)+P(4th)` than
+  in a 16-runner field.
+- `winProbsFromRunners` returns `null` below 90% coverage, and uses the back/lay midpoint when both
+  sides exist.
+
+**Guardrails.** This is probability, not money — floats are fine here. Any conversion of a
+probability into pounds happens downstream in M2 and MUST use `src/lib/calc/money.ts`. Do not touch
+`src/lib/calc/ep/engine.ts`.
+
+## M2a. Target outcome + modelled trigger probability `[strong]` — /calc-change
+
+**Objective.** Give an offer a machine-readable statement of what result it pays on, and use the M1
+model to price it, without weakening a single existing test.
+
+**Files.**
+- NEW `src/lib/offers/target-outcome.ts`:
+  ```ts
+  export type TargetOutcome = { kind: "finish_positions"; positions: number[] };
+  export function offerTargetOutcome(rules: BetGetFreePlaceRules): TargetOutcome;
+  export function describeTargetOutcome(t: TargetOutcome): string; // "finishes 2nd, 3rd or 4th"
+  ```
+  `positions` comes straight from `rules.qualifyingPlaces`. This is the seam other sports extend by
+  adding members to the union — do not build football members now.
+- `src/lib/offers/place-refund-ev.ts`:
+  - **KEEP `estimatePlaceRefundTriggerProb()` exactly as it is.** Its tests in
+    `place-refund-ev.test.ts` must stay green and untouched. It becomes the documented degraded
+    fallback for the free Racing API tier, where the price book is often too sparse for the model.
+  - Add `triggerProbFromModel(positionProbs: number[], target: TargetOutcome): number` — sum the
+    model's probabilities for the target positions.
+  - `PlaceRefundEvInput` gains an optional `triggerProb?: number`. When supplied, use it; when
+    absent, fall back to `estimatePlaceRefundTriggerProb()` as today. `PlaceRefundEvResult` gains
+    `triggerBasis: "model" | "heuristic"` so the UI can badge honestly.
+
+**Why the fallback is kept rather than replaced.** Two reasons, both hard rules: the calc guardrail
+forbids weakening a passing test to make new code pass, and the free tier genuinely cannot price a
+full book, so a graceful degradation path is required behaviour rather than a compromise.
+
+**Acceptance.** Every existing `place-refund-ev.test.ts` assertion passes unmodified; new tests
+cover `triggerProbFromModel` (positions `[2,3,4]` sums the right three columns), the
+`triggerProb`-supplied path, and `triggerBasis` on both branches.
+
+## M2b. The Offer Edge engine `[strong]`
+
+**Objective.** NEW `src/lib/offers/offer-edge.ts` — for one offer and today's races, return the
+ranked plays.
+
+```ts
+export interface OfferEdgePlay {
+  offerId: number;
+  raceExternalId: string;
+  course: string;
+  offTime: string;
+  startTime: number;
+  region?: string;
+  fieldSize: number;
+  runner: { horseId: string; name: string; backDecimal: number; layDecimal: number };
+  triggerProb: number;
+  triggerBasis: "model" | "heuristic";
+  qualLoss: number;
+  freeBetEv: number;
+  totalEv: number;
+  confidence: OfferConfidence;
+  reasons: string[];
+  warnings: string[];
+}
+export function buildOfferEdgePlays(
+  offer: { id; rules: BetGetFreePlaceRules; bookmaker },
+  races: RacingDeskRace[],
+  opts: { date: string; retention: number; commission?: number; limit?: number }
+): OfferEdgePlay[];
+```
+
+**Rules.**
+- Only races passing the existing `raceQualifiesForOffer()` are considered. Reuse it, do not
+  reimplement scope/region/min-runner matching.
+- **Every** active runner is a candidate, including the favourite. The old `rank >= 2` exclusion is
+  deleted: in a competitive handicap where the favourite is 6.0 and nothing else is under 8.0, the
+  favourite frames often, wins rarely, and has the tightest spread, so it is frequently the best
+  play. Let EV decide.
+- Probability comes from the **exchange** book (M1's `winProbsFromRunners`). The **bookie** price is
+  the back leg of the qualifying calc only. Where no bookie price exists (free tier), use the
+  runner's resolved `bookieDecimal`; where that is absent too, skip the runner rather than invent.
+- Rank by `totalEv` descending. Return the best runner per race, then the best `limit` races
+  (default 5).
+- Retention comes from A1's measured rate passed in by the caller, never hardcoded.
+- Pounds via `src/lib/calc/money.ts`.
+
+**Reasons (plain English, generated by inspecting model inputs — never by scoring).** British
+English, sentence case, commas not em dashes. Examples of the vocabulary:
+- `"Only 8 runners, the minimum this offer allows"` when `fieldSize` is at or within one of
+  `rules.minRunners`.
+- `"The 1.5 favourite should take the win"` when the favourite's modelled win probability is
+  dominant.
+- `"Field thins out sharply after 4th"` when the tail beyond the fourth-shortest carries little
+  probability mass.
+- `"Tight lay, qualifying costs 62p"` when `qualLoss` is small relative to stake.
+Cap at three reasons per play so the UI line stays readable.
+
+**Warnings (the execution-truth angle no competitor covers).**
+- `"Exactly 8 runners, one non-runner and this offer no longer qualifies"` when
+  `fieldSize === rules.minRunners`. This is the trap that costs real money: the field drops after
+  you have already placed and the offer silently stops applying.
+- `"Only £120 available at the lay price"` when `exchangeLaySize` is below the required lay stake.
+- `"Prices are estimates, no live exchange match for this race"` when `exchangeSource !== "live"`.
+
+**Acceptance.** `offer-edge.test.ts` with a constructed race fixture: the favourite CAN win the
+ranking when the book justifies it; a race at exactly `minRunners` carries the non-runner warning;
+a race below `minRunners` is excluded entirely; plays are ordered by `totalEv`; `triggerBasis`
+degrades to `"heuristic"` when the book is too sparse for M1.
+
+## M3. Three surfaces `[strong]`
+
+Built-then-screenshotted, not mock-first (standing convention, see L2). Read
+`docs/design-system.md` first. Design tokens only, no ad-hoc colours,
+`formatClockTime`/`formatClockString` for every time of day.
+
+**M3a — offer campaign card.** `src/components/offers/offer-campaign-card.tsx` gains an Edge panel
+for `sport === "horse_racing"` + `offerType === "bet_get_free_place"` offers: the top three plays,
+each showing time and course, the horse and its back price, `£EV`, the reason line and the
+confidence chip. One click through to the race on the Racing Desk, one to the prefilled add-bet
+dialog. Hidden entirely when there are no plays (do not render an empty shell).
+
+**M3b — Do Next / Daily Plan.** `src/lib/offers/next-actions.ts`: the `place_qualifying` branch
+currently emits the generic `"No bets linked yet - start the qualifying leg at Bet365."`. When an
+edge play exists, it becomes specific: `"Chepstow 15:20, back Horse X at 6.5, EV +£12.40."`
+`OfferNextAction` gains an optional `edge?: { raceExternalId; course; offTime; runnerName;
+backDecimal; totalEv }` and `deriveOfferNextAction()` an optional `opts?: { edgePlay?: ... }` so
+every existing call site and test compiles unchanged. Plays are computed in
+`src/lib/services/state.ts` (which already builds Do Next) and threaded through.
+
+**M3c — Racing Desk picks.** `src/components/racing/racing-intelligence-dialog.tsx`: "Race picks"
+becomes offer-scoped and EV-ranked. The opaque 0–100 `Badge` is replaced by the reason line and
+`£EV`; warnings render as a distinct, quieter line. The existing confidence filter pills and
+Advanced switch stay.
+
+**Acceptance for M3.** `npx vitest run` green; `npm run build` green; design-reviewer pass; every
+new £ figure carries a basis/confidence indicator (hard rule since A2); no probability percentages
+rendered anywhere in the UI.
+
+## M3d. Racing Desk cohesion — workflow + markers `[strong]` ✅ DONE (2026-07-31)
+
+**Objective.** Stop Offer Workflow disagreeing with Race picks. One play model (Offer Edge) drives
+both; the desk visually separates **qualifying** (rules pass) from **recommended** (modelled EV).
+
+**Why.** Workflow was still using heuristic `suggestedRunners[0]` (ranks 2–5 only) while Race picks
+used `edge.runner` (favourite allowed). Green tab/course counters read as "must bet" when they
+only meant "qualifies." Sam asked (2026-07-31) for a cohesive desk: workflow shows the recommended
+play + EV; markers and a COURSES legend make the colour language explicit.
+
+**Files.**
+- `src/lib/racing/offer-tags.ts` (+ tests) — `edgePlayForRaceOffer`, `offerTagDisplayEv`,
+  `countRecommendedRaces`, `countRecommendedOffersOnRace`; `qualifyingOfferTags` / `findOfferTag`
+  prefer Edge EV when plays are supplied.
+- `src/components/racing/racing-offer-guide.tsx` — Recommended / Estimate / Qualifies guidance
+  from `edgePlays`; Back/Lay target `edge.runner`; MoneyFlow EV + confidence + reasons/warnings.
+- `src/components/racing/flashscore-racecard.tsx` — pass `edgePlays`; race-tab emerald = qualifies,
+  warning+sparkles = recommended count; runner row "recommended" badge for Edge horses.
+- `src/components/racing/racing-desk-view.tsx` — course pills mirror the same two markers; COURSES
+  legend (qualifies / recommended / near-min dots).
+
+**Rules.**
+- Heuristic `suggestedRunners` / `offerTargetScore` are fallback only, labelled Estimate — never
+  silently override an Edge play.
+- Near-min bookie-coloured dots stay (NR trap); they are not "recommended."
+- Recommended chrome uses `--edge` (violet), never `--warning` (amber = caution only). See D5.
+- No probability percentages in the UI (M3 acceptance still holds).
+
+**Acceptance.** Workflow Back horse matches Race picks for the same race+offer when an Edge play
+exists; legend present under Courses; `offer-tags` tests cover Edge sort preference;
+`npx vitest run src/lib/racing/offer-tags.test.ts` green.
+
+---
+
+# PHASE — MONETISATION SCAFFOLDING (gated)
+
+> Do **not** start N0 billing/auth work until D1 gate criteria in `product-roadmap.md` §7.1 are met.
+> The matrix + preview switch may ship earlier as personal product-design scaffolding if Sam asks.
+
+## N0. Entitlement scaffolding (Free / Core / Edge) `[strong]` ⏸ GATED
+
+**Objective.** Make the §7.5 tier split *real in code* as a feature-entitlement matrix, with Edge
+chrome (`--edge`) reserved for Edge-tier capabilities, without building multi-tenant SaaS yet.
+
+**Why now (document, measure readiness).** As of 2026-07-31 the app is a single unlocked local
+install: every desk, Offer Edge, and live feed path is available once env keys exist. We cannot
+"sell Core vs Edge" today. We *can* define what each tier includes, wire `can(feature)` checks,
+and optionally preview the locked UX. Auth + Stripe wait for the business gate (D1).
+
+**Readiness today**
+
+| Layer | Status | Notes |
+|-------|--------|-------|
+| Product features (calcs, offers, tracker, Offer Edge engine) | ✅ Built | One binary; no plan check |
+| Visual signature for Edge (`--edge` violet) | ✅ Built (D5) | Race picks, recommended markers, Best plays, Do Next edge line |
+| Feature entitlement matrix | ❌ Missing | No `PlanId` / `entitlements.ts` |
+| UI lock / upgrade prompts | ❌ Missing | Nothing is gated |
+| Settings "preview as Free/Core/Edge" | ❌ Missing | Useful pre-gate for Sam |
+| Auth / accounts / multi-tenant data | ❌ Deferred (D1) | Local-first single user |
+| Billing (Stripe) | ❌ Deferred (D1) | No customer identity yet |
+| Per-subscriber API keys / pooled feeds | ❌ Deferred | See `docs/api-dependencies-and-tiers.md` |
+
+**Proposed entitlement matrix (v1 draft — confirm with Sam before coding)**
+
+| Capability | Free | Core | Edge |
+|------------|------|------|------|
+| Calculators + manual bet log | ✓ | ✓ | ✓ |
+| Demo Racing Desk / demo data | ✓ | ✓ | ✓ |
+| Offers pipeline, tracker, free-bet lots | | ✓ | ✓ |
+| Do Next / Daily Plan / Edge Report / EV analytics | | ✓ | ✓ |
+| Offer Edge model + Race picks + recommended desk chrome | | | ✓ |
+| Live/delayed Racing Desk feeds (when keys present) | | | ✓ |
+| 2UP sentinel + web push | | | ✓ |
+| Exchange lay integration on desk | | | ✓ |
+
+Core must remain useful without feeds. Edge is where API cost and modelled picks live.
+
+**Files (when unblocked).**
+- NEW `src/lib/entitlements/plans.ts` — `PlanId = "free" | "core" | "edge"`,
+  `ENTITLEMENTS: Record<PlanId, FeatureFlag[]>`, `can(plan, feature): boolean`.
+- NEW `src/lib/entitlements/features.ts` — string union of feature ids
+  (`offer_edge`, `racing_live_feeds`, `push_alerts`, `do_next`, …).
+- `src/lib/services/settings-shared.ts` + settings API — `planPreview?: PlanId | "unlocked"`
+  (default `"unlocked"` for Sam's daily use). Persist in `app_settings`.
+- Thin wrappers at UI entry points (not deep in calc): Race picks trigger, Offer Edge panel,
+  recommended markers, push settings — if `!can(plan, feature)` show a compact Edge lock
+  using `--edge` chrome + one-line "Edge plan" copy (no fake paywall animation).
+- Do **not** put entitlement checks inside `src/lib/calc/**` or settlement.
+
+**Out of scope for N0.** Stripe Checkout, webhooks, user accounts, cloud DB, per-user API key
+vaults, oddsmatcher. Those are post-gate (§7.2–7.6).
+
+**Acceptance (scaffolding slice).**
+1. Matrix + `can()` unit tests for every feature id.
+2. With `planPreview: "free"`, Race picks / Offer Edge panel / recommended pills hide or show
+   the Edge lock; calcs still work.
+3. With `planPreview: "unlocked"` (default), behaviour identical to today.
+4. Design-system: lock chrome uses `--edge`, never `--warning`.
+5. `npx vitest run` green; no auth dependency.
+
+**Sizing note.** Full Stripe path is a later brief (N1+) after D1. Do not merge N0 and billing.
 
 ---
 

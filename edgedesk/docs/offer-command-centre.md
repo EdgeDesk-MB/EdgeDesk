@@ -34,7 +34,7 @@ EdgeDesk answers three questions every day:
 - Next: richer campaign P&L header per offer
 
 ### A3 - Bet Desk queues ✅
-- Tracker views: All · Open · Needs lay · Offer campaigns · Orphans
+- Tracker views: All · Open · Unlayed · Offer campaigns · Orphans
 - Campaign grouping by `offerId` with campaign P&L
 - Deep-link from Home next actions via `?offer=&queue=offers`
 

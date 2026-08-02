@@ -1,0 +1,32 @@
+---
+description: Recommend the right Cursor/Claude/local model for the task shape
+alwaysApply: true
+---
+
+# Model routing
+
+You cannot change the user's model picker. At the **start of a non-trivial task**,
+if the current model is a poor fit, say so in one short line and recommend the
+right lane. Do not nag on every turn. Full matrix: `docs/Local-vs-Cloud-Model-Strategy.md`.
+
+## Lanes (prefer in this order for cost)
+
+1. **Local** `qwen3-coder-ctx` — bounded edits, privacy, unlimited grind.
+2. **Cursor Models** — Composer 2.5 or Grok 4.5 for routine cloud agent work.
+3. **Kimi K3** — serious multi-file Cursor agent runs (Other Models pool).
+4. **Claude Sonnet 5** — mid Claude quality when Opus is overkill.
+5. **Claude Opus 5 / Fable 5** — peak architecture, hard bugs, stakeholder writing.
+6. **Claude Code + Opus** — long autonomous explore → edit → test → fix loops.
+
+## Hard escalations (do not stay on local / cheap for these)
+
+- Any change to calc/settlement / money maths → frontier + `/calc-change` + audit.
+- Architecture / migrations spanning many files → Opus/Fable or Claude Code.
+- Stakeholder-facing prose → Claude.
+- Long-horizon agent jobs with many tool calls → K3 minimum; prefer Claude Code for the longest loops.
+
+## EdgeDesk-specific
+
+- Calc/offers money paths: never treat local-only as sufficient for landing changes.
+- UI work: Composer/Grok or local coder is fine; finish with design-review on frontier if non-trivial.
+- Prefer recommending **Grok/Composer** over K3/Opus when the task is routine, so Other Models budget lasts.

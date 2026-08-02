@@ -64,4 +64,19 @@ Project skills and subagents live in `../.claude/` at the git root.
 - `/delegate-local`: hand bounded, mechanical tasks to the local Ollama backbone.
 - Subagents: `calc-auditor` (audits money-maths diffs before commit) and
   `design-reviewer` (checks UI diffs against the design system).
-- Model routing strategy: `../docs/Local-vs-Cloud-Model-Strategy.md`.
+- Model routing: `../docs/Local-vs-Cloud-Model-Strategy.md`, playbook
+  `../docs/ai-playbook.md`, always-on rule `../.cursor/rules/model-routing.mdc`.
+
+## Model routing (agents)
+
+You cannot switch the user's model picker. For non-trivial EdgeDesk work, if
+the current model is a poor fit, say so briefly once and recommend:
+
+- **Composer 2.5 / Grok 4.5** — routine cloud agent (Cursor Models pool).
+- **Kimi K3** — serious multi-file agent runs.
+- **Claude Opus 5 / Fable 5** — architecture, hard bugs, calc review, prose.
+- **Claude Code + Opus** — long autonomous harness loops.
+- **Local `qwen3-coder-ctx`** — bounded edits when the Ollama bridge is up.
+
+Calc/settlement: frontier + `/calc-change` + audit only. Prefer Composer/Grok
+over K3/Opus when the task is routine so Other Models budget lasts.

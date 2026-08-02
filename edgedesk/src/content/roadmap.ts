@@ -79,6 +79,13 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         status: "done",
       },
       {
+        id: "race-offer-edge",
+        title: "Offer Edge - modelled runner targeting",
+        description:
+          "Finishing-position model ranks race and horse by EV; Race picks and Offer Workflow share the same play; desk marks qualifying vs recommended",
+        status: "in_progress",
+      },
+      {
         id: "race-live-odds",
         title: "Live bookie odds (Racing API Standard)",
         description: "Paid upgrade path - not required for personal free stack",
@@ -187,7 +194,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       {
         id: "trk-campaigns",
         title: "Bet campaigns & offer queues",
-        description: "Group bets by offer; Open / Needs lay / Orphans views",
+        description: "Group bets by offer; Open / Unlayed / Orphans views",
         status: "done",
       },
       {

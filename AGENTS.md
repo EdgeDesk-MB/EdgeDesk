@@ -14,7 +14,24 @@ MV3, no build step; see `extension/README.md` for the install and the manual
 test protocol.
 
 Other pointers:
-- Model routing strategy (local Ollama backbone vs cloud frontier):
-  `docs/Local-vs-Cloud-Model-Strategy.md`.
+- Model routing strategy (local Ollama backbone vs Cursor Ultra / Claude Code):
+  `docs/Local-vs-Cloud-Model-Strategy.md`. Day-to-day habits: `docs/ai-playbook.md`.
+  Enable-list: `docs/cursor-setup.md`. Always-on rule: `.cursor/rules/model-routing.mdc`.
 - Claude Code skills and subagents: `.claude/skills/`, `.claude/agents/`.
 - Run all npm commands from `edgedesk/`, not from this directory.
+
+## Model routing (agents)
+
+You cannot switch the user's model picker. For non-trivial work, if the current
+model is a poor fit, say so briefly once and recommend a lane:
+
+| Lane | Models | Use for |
+| --- | --- | --- |
+| Local | `qwen3-coder-ctx` | Bounded edits, privacy, unlimited grind |
+| Cursor Models | Composer 2.5, Grok 4.5 | Default daily cloud agents (protect Other Models $) |
+| Volume frontier | Kimi K3 | Serious multi-file Cursor agent runs |
+| Peak | Claude Opus 5 / Fable 5 | Architecture, hard bugs, calc review, prose |
+| Specialist harness | Claude Code + Opus | Long autonomous explore → edit → test loops |
+
+Hard rules: calc/settlement changes need frontier + `/calc-change` + audit, never
+local-unreviewed. Prefer Composer/Grok over K3/Opus when the task is routine.

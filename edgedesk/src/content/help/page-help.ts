@@ -98,14 +98,16 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   casino: {
     title: "Casino",
     summary:
-      "Wagering offers with honest EV - bonus value minus the expected drag of cycling wagering through a game.",
+      "Wagering campaigns with honest EV - each step (qualifying wager, bonus, spins, chips, cashback) has its own verdict, summed to a campaign total.",
     bullets: [
-      "Log offer: bonus, wagering (×), game RTP and contribution set the verdict - or paste the promo and let it prefill.",
-      "The eligible-games picker stars the highest-RTP slot and drives the RTP field; the Game library holds published base RTPs - operators can license lower variants, so verify in the game info.",
-      "EV here is an expectation across many attempts, never a lock - the variance tier says how far one session can stray.",
-      "Simulate runs 10,000 sessions of an offer (pick a volatility preset): bust probability, median, the 10-90% band and the distribution - a stylised model calibrated to the RTP, not real game maths.",
+      "Log offer: name the campaign, then add steps - qualifying wager, cash, bonus, free spins, golden chips or cashback. Paste the promo to prefill.",
+      "Repeats: tick Repeats on create for daily/weekly/monthly reloads - each occurrence is its own campaign with the same steps and freshly derived EV. Stop from any card when the promo ends.",
+      "Calendar / Campaigns: the desk splits like Offers - calendar by expiry, campaigns for the full list.",
+      "The eligible-games picker stars the highest-RTP slot; the Game library holds published base RTPs - operators can license lower variants, so verify in the game info.",
+      "EV here is an expectation across many attempts, never a lock - Simulate runs the whole campaign (10,000 sessions) with a volatility preset.",
       "Casino money stays out of the matched P&L on purpose - this desk keeps its own score.",
     ],
+    guideSlug: "desk-how-tos",
   },
   offers: {
     title: "Offers",
