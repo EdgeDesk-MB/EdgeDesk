@@ -209,6 +209,8 @@ export const offerSeries = sqliteTable("offer_series", {
   recurrenceEnabled: integer("recurrence_enabled").notNull().default(1),
   /** No new instances on/after this date (YYYY-MM-DD) when recurrence stopped */
   recurrenceStoppedFrom: text("recurrence_stopped_from"),
+  /** JSON string[] of YYYY-MM-DD dates deleted as single occurrences (not re-materialised) */
+  skippedDatesJson: text("skipped_dates_json"),
   ruleJson: text("rule_json").notNull(),
   /** Reference expiry used to derive each instance deadline (time-of-day) */
   templateExpiresAt: integer("template_expires_at"),
@@ -432,8 +434,58 @@ export const casinoOffers = sqliteTable("casino_offers", {
   game: text("game"),
   /** When the offer/wagering window closes (epoch ms); null = no known expiry. Drives the Casino calendar. */
   expiresAt: integer("expires_at"),
+  /** FK when this row is one occurrence of a recurring casino series (K3) */
+  seriesId: integer("series_id"),
+  /** YYYY-MM-DD occurrence date for recurring instances */
+  instanceDate: text("instance_date"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
+});
+
+/** Recurring casino offer template - instances are materialised as separate casino_offers rows (K3). */
+export const casinoOfferSeries = sqliteTable("casino_offer_series", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  recurrenceEnabled: integer("recurrence_enabled").notNull().default(1),
+  /** No new instances on/after this date (YYYY-MM-DD) when recurrence stopped */
+  recurrenceStoppedFrom: text("recurrence_stopped_from"),
+  /** JSON string[] of YYYY-MM-DD dates deleted as single occurrences (not re-materialised) */
+  skippedDatesJson: text("skipped_dates_json"),
+  ruleJson: text("rule_json").notNull(),
+  /** Reference expiry used to derive each instance deadline (time-of-day) */
+  templateExpiresAt: integer("template_expires_at"),
+  horizonDays: integer("horizon_days").notNull().default(14),
+  casino: text("casino"),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/**
+ * Component template for a casino offer series (K3). Same shape as
+ * casino_offer_components minus expectedEv (derived fresh per instance) and
+ * casinoOfferId (replaced by seriesId).
+ */
+export const casinoOfferSeriesComponents = sqliteTable("casino_offer_series_components", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  seriesId: integer("series_id").notNull(),
+  componentType: text("component_type", {
+    enum: ["qualifying_wager", "cash", "bonus", "free_spins", "golden_chips", "cashback"],
+  }).notNull(),
+  amount: real("amount"),
+  wageringMultiplier: real("wagering_multiplier"),
+  rtp: real("rtp"),
+  contributionPct: real("contribution_pct"),
+  spins: real("spins"),
+  spinValue: real("spin_value"),
+  chipCount: real("chip_count"),
+  chipValue: real("chip_value"),
+  houseEdgePreset: text("house_edge_preset", { enum: ["european", "american", "custom"] }),
+  cashbackPct: real("cashback_pct"),
+  cashbackCap: real("cashback_cap"),
+  game: text("game"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
 });
 
 /**
@@ -520,6 +572,8 @@ export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;
 export type CasinoOfferComponentRow = typeof casinoOfferComponents.$inferSelect;
 export type NewCasinoOfferComponentRow = typeof casinoOfferComponents.$inferInsert;
+export type CasinoOfferSeriesRow = typeof casinoOfferSeries.$inferSelect;
+export type CasinoOfferSeriesComponentRow = typeof casinoOfferSeriesComponents.$inferSelect;
 export type CasinoGameRow = typeof casinoGames.$inferSelect;
 export type OfferEffortSampleRow = typeof offerEffortSamples.$inferSelect;
 export type BoostDiaryRow = typeof boostDiary.$inferSelect;

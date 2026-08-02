@@ -1,28 +1,31 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { TimePicker } from "@/components/time-picker";
 
-/** Native time input - same shell and behaviour as the date field (`type="date"`). */
+/** Event time field — shared TimePicker (same chrome as DatePicker). */
 export function EventTimeInput({
   value,
   onChange,
   className,
+  placeholder = "12:00",
+  id,
+  disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  placeholder?: string;
+  id?: string;
+  disabled?: boolean;
 }) {
   return (
-    <Input
-      type="time"
-      step={60}
+    <TimePicker
+      id={id}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn(
-        "tabular-nums appearance-none [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
-        className
-      )}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={className}
+      disabled={disabled}
     />
   );
 }

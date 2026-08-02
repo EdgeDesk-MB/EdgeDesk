@@ -147,3 +147,25 @@ export function instanceExpiresAt(
     0
   ).getTime();
 }
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** How far a delete of a recurring instance should reach. */
+export type OfferDeleteScope = "instance" | "future";
+
+/** Parse series skippedDatesJson into sorted unique YYYY-MM-DD keys. */
+export function parseSkippedDates(json: string | null | undefined): string[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const dates = parsed.filter((d): d is string => typeof d === "string" && YMD_RE.test(d));
+    return [...new Set(dates)].sort();
+  } catch {
+    return [];
+  }
+}
+
+export function encodeSkippedDates(dates: string[]): string {
+  return JSON.stringify([...new Set(dates.filter((d) => YMD_RE.test(d)))].sort());
+}

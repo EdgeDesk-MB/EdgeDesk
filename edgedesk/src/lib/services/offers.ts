@@ -542,10 +542,33 @@ export function syncOfferStatuses(): void {
   const promoAwards = getPromoAwardsByBetId();
 
   for (const offer of allOffers) {
-    if (offer.status === "expired") continue;
-
     const linkedBets = allBets.filter((b) => b.offerId === offer.id);
     const profit = computeOfferProfitBreakdown(linkedBets, promoAwards);
+
+    // Repair: expired against a deadline that has since moved, e.g. a race
+    // off-time that used to be misread as the small hours. A manual expire
+    // stamps expiresAt to now (see PATCH /api/offers), so it is not revived.
+    // Played campaigns that finished cleanly upgrade Missed race → completed.
+    // Do NOT reopen incomplete expired campaigns (awarded FB, etc.) - that
+    // undid Expire in the UI the moment state refreshed.
+    if (offer.status === "expired") {
+      const deadline = effectiveOfferExpiryMs(offer);
+      if (deadline != null && deadline > now) {
+        const notYetStarted = offer.startsOn != null && offer.startsOn > todayKey;
+        db.update(offers)
+          .set({ status: notYetStarted ? "planned" : "active" })
+          .where(eq(offers.id, offer.id))
+          .run();
+        continue;
+      }
+      if (linkedBets.length > 0 && isOfferCampaignComplete(linkedBets, profit)) {
+        db.update(offers)
+          .set({ status: "completed", completedAt: now })
+          .where(eq(offers.id, offer.id))
+          .run();
+      }
+      continue;
+    }
 
     // Repair: completed too early (qualifying settled, free bet never converted).
     if (offer.status === "completed") {
@@ -581,9 +604,20 @@ export function syncOfferStatuses(): void {
       profit.freeBetStage === "awaiting_result";
 
     const deadline = effectiveOfferExpiryMs(offer);
+    // Missed race / expired = window passed with no play. Settled campaigns
+    // (e.g. place-refund horse won → free bet not awarded) complete instead.
     if (!busy && deadline != null && deadline < now) {
-      db.update(offers).set({ status: "expired" }).where(eq(offers.id, offer.id)).run();
-      continue;
+      if (linkedBets.length === 0) {
+        db.update(offers).set({ status: "expired" }).where(eq(offers.id, offer.id)).run();
+        continue;
+      }
+      if (isOfferCampaignComplete(linkedBets, profit)) {
+        db.update(offers)
+          .set({ status: "completed", completedAt: now })
+          .where(eq(offers.id, offer.id))
+          .run();
+        continue;
+      }
     }
 
     if (offer.status === "planned" && linkedBets.length === 0) continue;
@@ -596,7 +630,16 @@ export function syncOfferStatuses(): void {
     }
   }
 
-  ensureCourseOfferSiblings(allOffers, allBets);
+}
+
+/**
+ * Spawn a fresh course-day campaign when every live sibling in the group already
+ * has a linked bet. Call only after bet create/link, not on every status sync,
+ * otherwise deleting an unused fresh card immediately respawns an identical one.
+ */
+export function spawnCourseOfferSiblingsIfNeeded(): void {
+  const allBets = db.select().from(bets).all();
+  ensureCourseOfferSiblings(db.select().from(offers).all(), allBets);
 }
 
 /** Backfill offers for existing bets that look like promos but have no offer_id. */

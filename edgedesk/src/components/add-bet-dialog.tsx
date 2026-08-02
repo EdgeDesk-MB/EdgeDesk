@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,13 +16,26 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { AdvancedLaySection } from "@/components/calc/advanced-lay";
-import { BackBookieBalanceStrip, bookieFreeBetBalance, bookieNeedsCashFunding, isFreeBetBetType } from "@/components/add-bet/back-bookie-balance-strip";
+import {
+  BackBookieBalanceStrip,
+  bookieCashTopUpNeeded,
+  bookieFreeBetBalance,
+  bookieNeedsCashFunding,
+  editBetReservedCredit,
+  isFreeBetBetType,
+  noLayFreeBetFromStored,
+  noLaySaveBetType,
+  type FreeBetKind,
+} from "@/components/add-bet/back-bookie-balance-strip";
 import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { MoneyFlow } from "@/components/money-flow";
 import { VenueBadge } from "@/components/venue-badge";
@@ -30,8 +43,8 @@ import {
   BackPanel,
   LayPanel,
   LayStakeBanner,
+  PanelIconSelect,
   PanelInput,
-  PanelSelect,
   PanelTextInput,
   ProfitTable,
 } from "@/components/calc/bet-panels";
@@ -54,7 +67,17 @@ import {
 } from "@/lib/calc";
 import { DutchOutcomesBuilder, inferMatchOddsSelection } from "@/components/calc/dutch-outcomes-builder";
 import { contrastText } from "@/lib/brands/exchanges";
-import { defaultSelection, formatCorrectScore, inferSportFromBet, marketDef, MARKETS, parseCorrectScore, SPORTS, teamSelectionLabel } from "@/lib/markets";
+import {
+  capitaliseSelectionLabel,
+  defaultSelection,
+  formatCorrectScore,
+  inferSportFromBet,
+  marketDef,
+  MARKETS,
+  parseCorrectScore,
+  SPORTS,
+  teamSelectionLabel,
+} from "@/lib/markets";
 import type { BetRow, ExchangeRow } from "@/lib/db/schema";
 import {
   defaultEventDateTime,
@@ -63,7 +86,7 @@ import {
   findTrackedEvent,
   formatEventDate,
   formatEventTime,
-  formatTrackedEventOption,
+  localCalendarDate,
   parseEventStartTime,
   parseRacingCourseFromEventName,
   sortTrackedEvents,
@@ -71,6 +94,24 @@ import {
   type TrackedEventLike,
 } from "@/lib/events";
 import {
+  bandNotTrackedFixtures,
+  bandTrackedEvents,
+  filterByOfferCourseScope,
+  fixtureSelectValue,
+  formatKnownFixtureOption,
+  formatTrackedEventOption,
+  isFixtureSelectValue,
+  knownFromFootballFixtures,
+  knownFromRacingFixtures,
+  parseFixtureSelectValue,
+  resolveRaceRunnerOptions,
+  tomorrowCalendarDate,
+  type KnownFixtureOption,
+} from "@/lib/add-bet-event-options";
+import type { Fixture, RacingFixture } from "@/components/events/types";
+import {
+  formatOfferScopeLabel,
+  isRegionalScope,
   offerMatchesBetContext,
   parseOfferRules,
   placeRefundTriggerText,
@@ -80,6 +121,7 @@ import {
   stakeFromOfferPrefs,
 } from "@/lib/services/settings-shared";
 import { liveEventInlineLabel } from "@/components/events/live-event-status";
+import { DatePicker } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
 import { SportIcon, SportLabel } from "@/components/sport-icon";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
@@ -124,6 +166,15 @@ export interface AddBetPrefill {
   homeTeam?: string;
   awayTeam?: string;
   eventId?: number;
+  /**
+   * Racing: pre-select this racecard in Events (tracked id or not-yet-tracked
+   * fixture). Used when placing from a race-scoped campaign.
+   */
+  raceExternalId?: string;
+  /** Calendar day for raceExternalId / course scope when outside today/tomorrow. */
+  raceEventDate?: string;
+  /** Racing: limit Events to this course (course-scoped or race-scoped campaigns). */
+  scopeCourse?: string;
   earlyPayout?: boolean;
   /** Dutching calculator: saved as betType dutch with legs on POST */
   dutchLegs?: Array<{
@@ -213,6 +264,11 @@ export function AddBetDialog({
 
   const [fetchedEvents, setFetchedEvents] = useState<EventLite[]>([]);
   const events = eventsProp ?? fetchedEvents;
+  const [knownFixtures, setKnownFixtures] = useState<KnownFixtureOption[]>([]);
+  const [pendingFixture, setPendingFixture] = useState<KnownFixtureOption | null>(null);
+  /** Runners fetched for a tracked race when goals has no racecard yet. */
+  const [fetchedRunners, setFetchedRunners] = useState<string[]>([]);
+  const [runnersFetchDone, setRunnersFetchDone] = useState(false);
 
   const [label, setLabel] = useState("");
   const [bookmaker, setBookmaker] = useState("");
@@ -232,6 +288,10 @@ export function AddBetDialog({
     betType === "no_lay" || betType === "dutch" ? "qualifying" : betType;
   const noLay = betType === "no_lay";
   const isDutch = betType === "dutch";
+  /** No-lay overlay: stake from free-bet balance without leaving No lay mode. */
+  const [noLayFreeBet, setNoLayFreeBet] = useState<FreeBetKind | null>(null);
+  const stakingFreeBet =
+    isFreeBetBetType(calcBetType) || (noLay && noLayFreeBet != null);
   const [mugBet, setMugBet] = useState(false);
   const [backStake, setBackStake] = useState(NaN);
   const [backOdds, setBackOdds] = useState(NaN);
@@ -264,6 +324,7 @@ export function AddBetDialog({
     setMarket("match_odds");
     setSelection("home");
     setBetType(appSettings?.defaultBetType ?? "qualifying");
+    setNoLayFreeBet(null);
     setBackStake(appSettings?.defaultBackStake ?? NaN);
     setBookmaker(appSettings?.defaultBookmaker ?? "");
     setBackOdds(NaN);
@@ -279,9 +340,13 @@ export function AddBetDialog({
     setDutchLegs(undefined);
     setAddBalance(false);
     setSelectedOfferId(null);
+    setPendingFixture(null);
+    setKnownFixtures([]);
+    setFetchedRunners([]);
+    setRunnersFetchDone(false);
   }
 
-  // Refresh tracked-events list and default date/time when the dialog opens
+  // Refresh tracked-events list, known fixtures, and default date/time when the dialog opens
   useEffect(() => {
     if (!open) {
       hydratedKeyRef.current = null;
@@ -302,6 +367,54 @@ export function AddBetDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editBet?.id]);
 
+  // Load today + tomorrow fixtures for football / horse racing Event dropdown
+  // (plus the race-scoped campaign day when prefill asks for a specific card).
+  useEffect(() => {
+    if (!open) return;
+    if (sport !== "football" && sport !== "horse_racing") return;
+    let cancelled = false;
+    const today = localCalendarDate();
+    const tomorrow = tomorrowCalendarDate();
+    const extraDate = prefill?.raceEventDate?.trim();
+
+    async function load() {
+      try {
+        if (sport === "football") {
+          const [a, b] = await Promise.all([
+            api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${today}`),
+            api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${tomorrow}`),
+          ]);
+          if (cancelled) return;
+          const byId = new Map<string, Fixture>();
+          for (const f of [...(a.fixtures ?? []), ...(b.fixtures ?? [])]) {
+            if (f.externalId) byId.set(f.externalId, f);
+          }
+          setKnownFixtures(knownFromFootballFixtures([...byId.values()]));
+          return;
+        }
+        const dates = [...new Set([today, tomorrow, ...(extraDate ? [extraDate] : [])])];
+        const batches = await Promise.all(
+          dates.map((d) => api<{ racecards: RacingFixture[] }>(`/api/racing/racecards?date=${d}`))
+        );
+        if (cancelled) return;
+        const byId = new Map<string, RacingFixture>();
+        for (const batch of batches) {
+          for (const r of batch.racecards ?? []) {
+            if (r.externalId) byId.set(r.externalId, r);
+          }
+        }
+        setKnownFixtures(knownFromRacingFixtures([...byId.values()]));
+      } catch {
+        if (!cancelled) setKnownFixtures([]);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sport, prefill?.raceEventDate]);
+
   // Populate fields when editing an existing bet (once per open, when events are ready)
   useEffect(() => {
     if (!open || !editBet) return;
@@ -320,13 +433,21 @@ export function AddBetDialog({
       setSport(resolvedSport);
       setLabel(editBet.label);
       setBookmaker(editBet.bookmaker ?? "");
+      const unhedgedFree = noLayFreeBetFromStored(
+        editBet.betType,
+        editBet.layStake,
+        editBet.layOdds
+      );
       setBetType(
         editBet.betType === "dutch"
           ? "dutch"
           : editBet.betType === "qualifying" && editBet.layStake === 0 && editBet.layOdds === 0
             ? "no_lay"
-            : (editBet.betType as BetMode)
+            : unhedgedFree
+              ? "no_lay"
+              : (editBet.betType as BetMode)
       );
+      setNoLayFreeBet(unhedgedFree);
       // Bug fix: a dutch bet's legs were never restored on edit, so saving
       // silently overwrote it as a plain single bet and lost the legs.
       setDutchLegs(
@@ -334,7 +455,7 @@ export function AddBetDialog({
           ? (JSON.parse(editBet.legs) as AddBetPrefill["dutchLegs"])
           : undefined
       );
-      setMugBet(editBet.purpose === "mug");
+      setMugBet(editBet.purpose === "mug" && !unhedgedFree);
       setBackStake(editBet.backStake);
       setBackOdds(editBet.backOdds);
       setLayOdds(editBet.layOdds);
@@ -521,38 +642,143 @@ export function AddBetDialog({
     },
   ];
 
+  /** Course/race-scoped campaign CTA: stay on that meeting, no freehand escape. */
+  const courseScopeLocked =
+    !editBet &&
+    !!prefill?.scopeCourse?.trim() &&
+    !isRegionalScope(prefill.scopeCourse);
+  const courseScopeLabel = courseScopeLocked
+    ? formatOfferScopeLabel(prefill?.scopeCourse)
+    : null;
+
   const trackedEvents = useMemo(() => {
-    const base = events.filter(
+    let base = events.filter(
       (e) => (e.sport ?? "football") === sport && e.status !== "finished"
     );
-    const linkedId = editBet?.eventId ?? (eventId !== "none" ? Number(eventId) : null);
+    if (sport === "horse_racing" && prefill?.scopeCourse) {
+      base = filterByOfferCourseScope(base, prefill.scopeCourse);
+    }
+    const linkedId =
+      editBet?.eventId ??
+      (eventId !== "none" && !isFixtureSelectValue(eventId) ? Number(eventId) : null);
     if (linkedId && !base.some((e) => e.id === linkedId)) {
       const linked = events.find((e) => e.id === linkedId);
       if (linked && (linked.sport ?? "football") === sport) {
+        // Keep a linked event visible even if it falls outside course scope
+        // (edit mode / already-attached bet).
         return sortTrackedEvents([linked, ...base]);
       }
     }
     return sortTrackedEvents(base);
-  }, [events, sport, editBet?.eventId, eventId]);
+  }, [events, sport, editBet?.eventId, eventId, prefill?.scopeCourse]);
+
+  const trackedExternalIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of events) {
+      if (e.externalId) ids.add(e.externalId);
+    }
+    return ids;
+  }, [events]);
+
+  const scopedKnownFixtures = useMemo(() => {
+    if (sport !== "horse_racing" || !prefill?.scopeCourse) return knownFixtures;
+    return filterByOfferCourseScope(knownFixtures, prefill.scopeCourse);
+  }, [sport, knownFixtures, prefill?.scopeCourse]);
+
+  const linkedEventKeepIds = useMemo(() => {
+    const linkedId =
+      editBet?.eventId ??
+      (eventId !== "none" && !isFixtureSelectValue(eventId) ? Number(eventId) : null);
+    return linkedId != null && Number.isFinite(linkedId) ? new Set([linkedId]) : undefined;
+  }, [editBet?.eventId, eventId]);
+
+  const trackedDayBands = useMemo(
+    () => bandTrackedEvents(trackedEvents, Date.now(), linkedEventKeepIds),
+    [trackedEvents, linkedEventKeepIds]
+  );
+  const notTrackedDayBands = useMemo(() => {
+    if (sport !== "football" && sport !== "horse_racing") return [];
+    return bandNotTrackedFixtures(scopedKnownFixtures, trackedExternalIds);
+  }, [sport, scopedKnownFixtures, trackedExternalIds]);
+
   const selectedEvent = events.find((e) => String(e.id) === eventId);
   const effectiveHome = homeTeam.trim() || selectedEvent?.homeTeam || "";
   const effectiveAway = awayTeam.trim() || selectedEvent?.awayTeam || "";
+
+  const eventLinked = eventId !== "none";
+  /** Odds order from the loaded racecard (pending fixture or matching known race). */
+  const raceOddsOrder = useMemo(() => {
+    if (pendingFixture?.runners?.length) return pendingFixture.runners;
+    const ext = selectedEvent?.externalId;
+    if (!ext) return null;
+    return knownFixtures.find((f) => f.externalId === ext)?.runners ?? null;
+  }, [pendingFixture?.runners, selectedEvent?.externalId, knownFixtures]);
+  const raceRunnerOptions = useMemo(() => {
+    if (sport !== "horse_racing") return [];
+    return resolveRaceRunnerOptions({
+      eventLinked,
+      pendingRunners: pendingFixture?.runners,
+      trackedGoals: selectedEvent?.goals,
+      fetchedRunners,
+      oddsOrder: raceOddsOrder,
+      currentSelection: selection,
+    });
+  }, [
+    sport,
+    eventLinked,
+    pendingFixture?.runners,
+    selectedEvent?.goals,
+    fetchedRunners,
+    raceOddsOrder,
+    selection,
+  ]);
+  const useRaceRunnerSelect = raceRunnerOptions.length > 0;
+  /** Linked race with a known card (or still loading): Selection is a dropdown, not free text. */
+  const lockRaceSelection =
+    sport === "horse_racing" && eventLinked && (useRaceRunnerSelect || !runnersFetchDone);
+
+  // Keep Selection value on the capitalised card spelling so the Select control
+  // stays valid. Adjust-during-render: re-checked when the options or the typed
+  // selection change (react-hooks/set-state-in-effect).
+  const runnerNormKey = useRaceRunnerSelect
+    ? `${raceRunnerOptions.join(" ")} ${selection}`
+    : "";
+  const [prevRunnerNormKey, setPrevRunnerNormKey] = useState(runnerNormKey);
+  if (runnerNormKey !== prevRunnerNormKey) {
+    setPrevRunnerNormKey(runnerNormKey);
+    const hit = selection.trim()
+      ? raceRunnerOptions.find(
+          (r) => r.toLowerCase() === selection.trim().toLowerCase()
+        )
+      : undefined;
+    if (hit && hit !== selection) setSelection(hit);
+  }
 
   const raceCourseForOffers = useMemo(() => {
     if (sport !== "horse_racing") return "";
     return (
       parseRacingCourseFromEventName(eventName) ||
+      pendingFixture?.course?.trim() ||
+      pendingFixture?.competition?.trim() ||
       selectedEvent?.competition?.trim() ||
       homeTeam.trim() ||
       ""
     );
-  }, [sport, eventName, selectedEvent?.competition, homeTeam]);
+  }, [
+    sport,
+    eventName,
+    pendingFixture?.course,
+    pendingFixture?.competition,
+    selectedEvent?.competition,
+    homeTeam,
+  ]);
 
   const matchingOffers = useMemo(() => {
     if (sport !== "horse_racing") return [];
     const offers = appState?.offers ?? [];
     const course = raceCourseForOffers || null;
-    const raceExternalId = selectedEvent?.externalId ?? null;
+    const raceExternalId =
+      selectedEvent?.externalId ?? pendingFixture?.externalId ?? null;
     const offTime = eventTime.trim() || null;
     return offers.filter((o) =>
       offerMatchesBetContext(o, {
@@ -568,18 +794,28 @@ export function AddBetDialog({
     appState?.offers,
     raceCourseForOffers,
     selectedEvent?.externalId,
+    pendingFixture?.externalId,
     eventDate,
     eventTime,
     bookmaker,
   ]);
 
+  const reservedCashCredit = editBetReservedCredit(editBet, bookmaker, "cash");
+  const reservedFreeBetCredit = editBetReservedCredit(editBet, bookmaker, "free_bet");
+
   const needsAddBalance =
-    !isFreeBetBetType(calcBetType) &&
-    bookieNeedsCashFunding(appState?.balances?.accounts, bookmaker, backStake);
+    !stakingFreeBet &&
+    bookieNeedsCashFunding(
+      appState?.balances?.accounts,
+      bookmaker,
+      backStake,
+      reservedCashCredit
+    );
 
   const bookieFbAvailable = bookieFreeBetBalance(
     appState?.balances?.accounts,
-    bookmaker
+    bookmaker,
+    reservedFreeBetCredit
   );
 
   // Derived: the top-up option only holds while the shortfall exists.
@@ -609,17 +845,28 @@ export function AddBetDialog({
     if (rules) {
       setTriggerText(placeRefundTriggerText(rules));
       setTriggerLinkedFromLabel(false);
+    } else if (
+      offer.title.trim() &&
+      /\bbet\s+£?\d+/i.test(offer.title) &&
+      /\b(get|gives?)\b/i.test(offer.title)
+    ) {
+      // Unconditional bet&get (and similar) - copy offer title into the AI trigger
+      // so settlement / early-award can see the reward without place-refund rules.
+      setTriggerText(offer.title.trim());
+      setTriggerLinkedFromLabel(false);
     }
-    if (betType !== "qualifying" && betType !== "risk_free") setBetType("qualifying");
+    if (betType !== "qualifying" && betType !== "risk_free") {
+      setBetType("qualifying");
+      setNoLayFreeBet(null);
+    }
   }
 
-  const backOnlyReturns = useMemo(
-    () =>
-      noLay && backStake > 0 && backOdds > 1
-        ? matchedBackReturns({ mode: "qualifying", backStake, backOdds })
-        : null,
-    [noLay, backStake, backOdds]
-  );
+  const backOnlyReturns = useMemo(() => {
+    if (!noLay || !(backStake > 0 && backOdds > 1)) return null;
+    const mode: BetMode =
+      noLayFreeBet === "sr" ? "free_sr" : noLayFreeBet === "snr" ? "free_snr" : "qualifying";
+    return matchedBackReturns({ mode, backStake, backOdds });
+  }, [noLay, noLayFreeBet, backStake, backOdds]);
 
   const csParsed = parseCorrectScore(selection);
   const aiTriggerPreview = useMemo(
@@ -670,6 +917,9 @@ export function AddBetDialog({
     highlightEmpty && empty ? "ring-2 ring-black dark:ring-white" : "";
 
   function applyTrackedEvent(ev: EventLite, sportOverride?: string) {
+    setPendingFixture(null);
+    setFetchedRunners([]);
+    setRunnersFetchDone(false);
     setManualEntry(false);
     setEventId(String(ev.id));
     setHomeTeam(ev.homeTeam);
@@ -683,20 +933,81 @@ export function AddBetDialog({
     if (nextSport) setSport(nextSport);
   }
 
+  function applyPendingFixture(fixture: KnownFixtureOption) {
+    setManualEntry(false);
+    setFetchedRunners([]);
+    // Pending fixtures already carry racecard payload (possibly empty).
+    setRunnersFetchDone(true);
+    setPendingFixture(fixture);
+    setEventId(fixtureSelectValue(fixture.externalId));
+    if (fixture.sport === "horse_racing") {
+      setHomeTeam(fixture.raceName ?? fixture.homeTeam);
+      setAwayTeam(fixture.offTime ?? fixture.awayTeam);
+      setEventName(
+        eventDisplayName({
+          sport: "horse_racing",
+          homeTeam: fixture.raceName ?? fixture.homeTeam,
+          awayTeam: fixture.offTime ?? fixture.awayTeam,
+          competition: fixture.course ?? fixture.competition,
+          startTime: fixture.startTime,
+        })
+      );
+    } else {
+      setHomeTeam(fixture.homeTeam);
+      setAwayTeam(fixture.awayTeam);
+      setEventName(
+        eventDisplayName({
+          sport: "football",
+          homeTeam: fixture.homeTeam,
+          awayTeam: fixture.awayTeam,
+          competition: fixture.competition,
+          startTime: fixture.startTime,
+        })
+      );
+    }
+    setEventDate(formatEventDate(fixture.startTime));
+    setEventTime(formatEventTime(fixture.startTime));
+  }
+
   function changeEvent(id: string) {
+    if (id === "__scope_pending__") return;
     if (id === "none") {
+      if (courseScopeLocked) return;
       setEventId("none");
+      setPendingFixture(null);
+      setFetchedRunners([]);
+      setRunnersFetchDone(false);
       setManualEntry(true);
+      if (sport === "horse_racing") setSelection("");
+      return;
+    }
+    const externalId = parseFixtureSelectValue(id);
+    if (externalId) {
+      const fixture =
+        knownFixtures.find((f) => f.externalId === externalId) ??
+        (pendingFixture?.externalId === externalId ? pendingFixture : null);
+      if (fixture) {
+        applyPendingFixture(fixture);
+        if (fixture.sport === "horse_racing") setSelection("");
+      }
       return;
     }
     setManualEntry(false);
     const ev = events.find((e) => String(e.id) === id);
-    if (ev) applyTrackedEvent(ev);
+    if (ev) {
+      applyTrackedEvent(ev);
+      if ((ev.sport ?? sport) === "horse_racing") setSelection("");
+    }
   }
 
   function changeHomeTeam(value: string) {
     setHomeTeam(value);
-    if (selectedEvent && !teamsMatch(value, selectedEvent.homeTeam)) setEventId("none");
+    if (pendingFixture) {
+      setPendingFixture(null);
+      setEventId("none");
+    } else if (selectedEvent && !teamsMatch(value, selectedEvent.homeTeam)) {
+      setEventId("none");
+    }
     if (!eventName.trim() && value.trim() && awayTeam.trim()) {
       setEventName(`${value.trim()} v ${awayTeam.trim()}`);
     }
@@ -704,7 +1015,12 @@ export function AddBetDialog({
 
   function changeAwayTeam(value: string) {
     setAwayTeam(value);
-    if (selectedEvent && !teamsMatch(value, selectedEvent.awayTeam)) setEventId("none");
+    if (pendingFixture) {
+      setPendingFixture(null);
+      setEventId("none");
+    } else if (selectedEvent && !teamsMatch(value, selectedEvent.awayTeam)) {
+      setEventId("none");
+    }
     if (!eventName.trim() && homeTeam.trim() && value.trim()) {
       setEventName(`${homeTeam.trim()} v ${value.trim()}`);
     }
@@ -713,27 +1029,117 @@ export function AddBetDialog({
   // Auto-link when typed teams match an event on the track list (football / tennis only)
   useEffect(() => {
     if (sport === "horse_racing") return;
+    if (pendingFixture) return;
     if (manualEntry || eventId !== "none" || !homeTeam.trim() || !awayTeam.trim()) return;
     const match = findTrackedEvent(events, homeTeam, awayTeam, sport);
     if (match) applyTrackedEvent(match as EventLite);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [homeTeam, awayTeam, sport, events, manualEntry]);
+  }, [homeTeam, awayTeam, sport, events, manualEntry, pendingFixture]);
 
   // When dialog opens with a pre-selected event id, apply its details once events load
   useEffect(() => {
-    if (!open || eventId === "none") return;
+    if (!open || eventId === "none" || isFixtureSelectValue(eventId)) return;
     const ev = events.find((e) => String(e.id) === eventId);
     if (ev && !eventName) applyTrackedEvent(ev);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, events, eventId]);
 
+  // Race-scoped campaign: select the meeting race once tracked events / racecards load.
+  const racePrefillKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      racePrefillKeyRef.current = null;
+      return;
+    }
+    if (!prefill?.raceExternalId || editBet) return;
+    const ext = prefill.raceExternalId;
+    if (racePrefillKeyRef.current === ext) return;
+
+    const tracked = events.find((e) => e.externalId === ext);
+    if (tracked) {
+      racePrefillKeyRef.current = ext;
+      queueMicrotask(() => applyTrackedEvent(tracked, "horse_racing"));
+      return;
+    }
+    const fixture = knownFixtures.find((f) => f.externalId === ext);
+    if (fixture) {
+      racePrefillKeyRef.current = ext;
+      queueMicrotask(() => {
+        setSport("horse_racing");
+        if (prefill.market) setMarket(prefill.market);
+        applyPendingFixture(fixture);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prefill?.raceExternalId, editBet, events, knownFixtures]);
+
+  // Fetch Racing Desk odds-order for the linked race (tracked or pending fixture)
+  useEffect(() => {
+    if (!open || sport !== "horse_racing") {
+      queueMicrotask(() => setRunnersFetchDone(false));
+      return;
+    }
+
+    const trackedId =
+      eventId !== "none" && !isFixtureSelectValue(eventId) ? Number(eventId) : NaN;
+    const hasTrackedId = Number.isFinite(trackedId) && trackedId > 0;
+    const externalId =
+      pendingFixture?.externalId ??
+      (hasTrackedId ? selectedEvent?.externalId : null) ??
+      (isFixtureSelectValue(eventId) ? parseFixtureSelectValue(eventId) : null);
+
+    if (!externalId && !hasTrackedId) {
+      queueMicrotask(() => {
+        setFetchedRunners([]);
+        setRunnersFetchDone(false);
+      });
+      return;
+    }
+
+    const startMs = pendingFixture?.startTime ?? selectedEvent?.startTime ?? Date.now();
+    const date = localCalendarDate(new Date(startMs));
+    const params = new URLSearchParams({ date });
+    if (hasTrackedId) params.set("eventId", String(trackedId));
+    if (externalId) params.set("externalId", externalId);
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setFetchedRunners([]);
+      setRunnersFetchDone(false);
+    });
+    api<{ runners: string[] }>(`/api/racing/runners?${params}`)
+      .then((res) => {
+        if (cancelled) return;
+        setFetchedRunners(res.runners ?? []);
+        setRunnersFetchDone(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFetchedRunners([]);
+        setRunnersFetchDone(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    sport,
+    eventId,
+    pendingFixture?.externalId,
+    pendingFixture?.startTime,
+    selectedEvent?.externalId,
+    selectedEvent?.startTime,
+  ]);
+
   function changeSport(s: string) {
-    if (editBet) return;
+    if (editBet || courseScopeLocked) return;
     setSport(s);
     const first = (MARKETS[s] ?? MARKETS.other)[0].value;
     setMarket(first);
     setSelection(defaultSelection(s, first));
     setEventId("none");
+    setPendingFixture(null);
     setEventName("");
     const { date, time } = defaultEventDateTime();
     setEventDate(date);
@@ -863,6 +1269,7 @@ export function AddBetDialog({
       } else if (fields.eventName?.trim()) {
         setEventName(fields.eventName.trim());
         setEventId("none");
+        setPendingFixture(null);
         setManualEntry(true);
       }
       if (fields.eventDate?.trim()) setEventDate(fields.eventDate.trim());
@@ -900,7 +1307,15 @@ export function AddBetDialog({
 
   async function creditBackStakeIfNeeded(bookie: string, stake: number) {
     if (!effectiveAddBalance || !(stake > 0) || !bookie.trim()) return;
-    if (isFreeBetBetType(calcBetType)) return;
+    if (stakingFreeBet) return;
+    const reserved = editBetReservedCredit(editBet, bookie, "cash");
+    const topUp = bookieCashTopUpNeeded(
+      appState?.balances?.accounts,
+      bookie,
+      stake,
+      reserved
+    );
+    if (!(topUp > 0.001)) return;
     const ensured = await api<{ account: { id: number } }>("/api/accounts/ensure", {
       method: "POST",
       json: { name: bookie.trim(), kind: "bookie" },
@@ -911,7 +1326,7 @@ export function AddBetDialog({
         entries: [
           {
             accountId: ensured.account.id,
-            amount: stake,
+            amount: topUp,
             category: "top_up",
             note: "Add balance from Add bet",
           },
@@ -921,25 +1336,109 @@ export function AddBetDialog({
     await refreshAppState();
   }
 
+  /** Resolve / create a tracked event id for save. Pending fixtures auto-track here only. */
+  async function resolveEventIdForSave(): Promise<number | undefined> {
+    if (pendingFixture) {
+      const f = pendingFixture;
+      if (f.sport === "horse_racing") {
+        const tracked = await api<{ event: { id: number }; existing?: boolean }>("/api/events", {
+          method: "POST",
+          json: {
+            sport: "horse_racing",
+            homeTeam: f.raceName ?? f.homeTeam,
+            awayTeam: f.offTime ?? f.awayTeam,
+            competition: f.course ?? f.competition,
+            startTime: f.startTime,
+            source: "api",
+            externalId: f.externalId,
+            status: f.status,
+            runners: f.runners,
+          },
+        });
+        return tracked.event.id;
+      }
+      const tracked = await api<{ event: { id: number }; existing?: boolean }>("/api/events", {
+        method: "POST",
+        json: {
+          sport: "football",
+          homeTeam: f.homeTeam,
+          awayTeam: f.awayTeam,
+          competition: f.competition,
+          startTime: f.startTime,
+          source: "api",
+          externalId: f.externalId,
+          status: f.status,
+        },
+      });
+      return tracked.event.id;
+    }
+
+    if (eventId !== "none" && !isFixtureSelectValue(eventId)) {
+      const id = Number(eventId);
+      if (Number.isFinite(id)) return id;
+    }
+
+    let resolvedEventId = editBet?.eventId ?? undefined;
+
+    if (!resolvedEventId && sport === "horse_racing") {
+      const course =
+        parseRacingCourseFromEventName(eventName) ||
+        homeTeam.trim() ||
+        selectedEvent?.competition?.trim() ||
+        "";
+      const startTime = parseEventStartTime(eventDate, eventTime);
+      if (course && startTime) {
+        const tracked = await api<{ event: { id: number }; mode: string }>(
+          "/api/events/track-racing",
+          {
+            method: "POST",
+            json: {
+              course,
+              startTime,
+              raceName: homeTeam.trim() || selectedEvent?.homeTeam || undefined,
+            },
+          }
+        );
+        resolvedEventId = tracked.event.id;
+        if (tracked.mode === "api") {
+          toast.info("Linked to race", { description: `${course} · ${eventTime}` });
+        }
+      }
+    }
+
+    if (!resolvedEventId && homeTeam.trim() && awayTeam.trim()) {
+      const tracked = await api<{ event: { id: number }; mode: string }>("/api/events/track", {
+        method: "POST",
+        json: {
+          homeTeam: homeTeam.trim(),
+          awayTeam: awayTeam.trim(),
+          sport,
+          startTime: parseEventStartTime(eventDate, eventTime),
+          competition: eventName.includes("·")
+            ? eventName.split("·")[0]?.trim()
+            : undefined,
+        },
+      });
+      resolvedEventId = tracked.event.id;
+      if (tracked.mode === "existing") {
+        toast.info("Linked to tracked event", {
+          description: `${homeTeam.trim()} v ${awayTeam.trim()} is already on your track list.`,
+        });
+      }
+    }
+
+    return resolvedEventId;
+  }
+
   async function save() {
+    if (courseScopeLocked && eventId === "none" && !pendingFixture) {
+      toast.error(`Pick a ${courseScopeLabel ?? "scoped"} race for this campaign`);
+      return;
+    }
     if (dutchLegs?.length) {
       setSaving(true);
       try {
-        const totalStake = dutchLegs.reduce((a, l) => a + l.stake, 0);
-        let resolvedEventId =
-          eventId !== "none" ? Number(eventId) : editBet?.eventId ?? undefined;
-        if (!resolvedEventId && homeTeam.trim() && awayTeam.trim()) {
-          const tracked = await api<{ event: { id: number } }>("/api/events/track", {
-            method: "POST",
-            json: {
-              homeTeam: homeTeam.trim(),
-              awayTeam: awayTeam.trim(),
-              sport,
-              startTime: parseEventStartTime(eventDate, eventTime),
-            },
-          });
-          resolvedEventId = tracked.event.id;
-        }
+        const resolvedEventId = await resolveEventIdForSave();
         const payload = {
           label:
             label ||
@@ -949,7 +1448,7 @@ export function AddBetDialog({
           selection: "",
           betType: "dutch",
           bookmaker: bookmaker || prefill?.bookmaker || undefined,
-          backStake: totalStake,
+          backStake: dutchLegs.reduce((a, l) => a + l.stake, 0),
           legs: dutchLegs,
           homeTeam: sport === "football" ? effectiveHome || undefined : undefined,
           awayTeam: sport === "football" ? effectiveAway || undefined : undefined,
@@ -997,53 +1496,7 @@ export function AddBetDialog({
     }
     setSaving(true);
     try {
-      let resolvedEventId =
-        eventId !== "none" ? Number(eventId) : editBet?.eventId ?? undefined;
-      if (!resolvedEventId && sport === "horse_racing") {
-        const course =
-          parseRacingCourseFromEventName(eventName) ||
-          homeTeam.trim() ||
-          selectedEvent?.competition?.trim() ||
-          "";
-        const startTime = parseEventStartTime(eventDate, eventTime);
-        if (course && startTime) {
-          const tracked = await api<{ event: { id: number }; mode: string }>(
-            "/api/events/track-racing",
-            {
-              method: "POST",
-              json: {
-                course,
-                startTime,
-                raceName: homeTeam.trim() || selectedEvent?.homeTeam || undefined,
-              },
-            }
-          );
-          resolvedEventId = tracked.event.id;
-          if (tracked.mode === "api") {
-            toast.info("Linked to race", { description: `${course} · ${eventTime}` });
-          }
-        }
-      }
-      if (!resolvedEventId && homeTeam.trim() && awayTeam.trim()) {
-        const tracked = await api<{ event: { id: number }; mode: string }>("/api/events/track", {
-          method: "POST",
-          json: {
-            homeTeam: homeTeam.trim(),
-            awayTeam: awayTeam.trim(),
-            sport,
-            startTime: parseEventStartTime(eventDate, eventTime),
-            competition: eventName.includes("·")
-              ? eventName.split("·")[0]?.trim()
-              : undefined,
-          },
-        });
-        resolvedEventId = tracked.event.id;
-        if (tracked.mode === "existing") {
-          toast.info("Linked to tracked event", {
-            description: `${homeTeam.trim()} v ${awayTeam.trim()} is already on your track list.`,
-          });
-        }
-      }
+      const resolvedEventId = await resolveEventIdForSave();
 
       const resolvedBookmaker = bookmaker || prefill?.bookmaker || "";
       const resolvedOfferId =
@@ -1059,7 +1512,7 @@ export function AddBetDialog({
         eventId: resolvedEventId ?? null,
         market,
         selection,
-        betType: calcBetType,
+        betType: noLay ? noLaySaveBetType(noLayFreeBet) : calcBetType,
         bookmaker: resolvedBookmaker || undefined,
         // POST rejects null (optional-only); PATCH needs null to CLEAR the
         // exchange link when a laid bet is edited into a no-lay bet.
@@ -1193,7 +1646,11 @@ export function AddBetDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">Sport</Label>
-                <Select value={sport} onValueChange={changeSport} disabled={!!editBet}>
+                <Select
+                  value={sport}
+                  onValueChange={changeSport}
+                  disabled={!!editBet || courseScopeLocked}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -1205,6 +1662,11 @@ export function AddBetDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {courseScopeLocked ? (
+                  <span className="text-[10px] leading-tight text-muted-foreground">
+                    Locked to horse racing for this campaign.
+                  </span>
+                ) : null}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1227,6 +1689,8 @@ export function AddBetDialog({
                     // Leaving Dutch clears the legs so the plain back/lay
                     // panels become the save-path source of truth again.
                     if (next !== "dutch") setDutchLegs(undefined);
+                    // Free-bet funding overlay only applies while No lay is selected.
+                    if (next !== "no_lay") setNoLayFreeBet(null);
                   }}
                 >
                   <SelectTrigger className="w-full">
@@ -1273,26 +1737,102 @@ export function AddBetDialog({
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Events</Label>
-              <Select value={eventId} onValueChange={changeEvent}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a tracked event" />
+              <Label className="text-xs text-muted-foreground">
+                {courseScopeLocked ? `Events · ${courseScopeLabel}` : "Events"}
+              </Label>
+              <Select
+                value={courseScopeLocked && eventId === "none" ? "__scope_pending__" : eventId}
+                onValueChange={changeEvent}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "w-full",
+                    ring(!!highlightEmpty && courseScopeLocked && eventId === "none" && !pendingFixture)
+                  )}
+                >
+                  <SelectValue
+                    placeholder={
+                      courseScopeLocked
+                        ? `Select a ${courseScopeLabel} race`
+                        : "Select an event"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Manual entry</SelectItem>
-                  {trackedEvents.map((e) => (
-                    <SelectItem key={e.id} value={String(e.id)}>
-                      <span className="flex items-center gap-2">
-                        <SportIcon sport={e.sport} size={14} className="text-muted-foreground" />
-                        {formatTrackedEventOption(e)}
-                      </span>
+                  {courseScopeLocked ? (
+                    <SelectItem value="__scope_pending__" disabled>
+                      Select a {courseScopeLabel} race
                     </SelectItem>
-                  ))}
+                  ) : (
+                    <SelectItem value="none">Manual entry</SelectItem>
+                  )}
+                  {trackedDayBands.length > 0 && (
+                    <>
+                      {!courseScopeLocked ? <SelectSeparator /> : null}
+                      <SelectGroup className="p-0">
+                        <SelectLabel className="text-foreground">Tracked</SelectLabel>
+                        {trackedDayBands.map((band, bandIdx) => (
+                          <Fragment key={`tracked-${band.key}`}>
+                            {bandIdx > 0 ? <SelectSeparator /> : null}
+                            <SelectLabel>{band.label}</SelectLabel>
+                            {band.items.map((e) => (
+                              <SelectItem key={e.id} value={String(e.id)}>
+                                <span className="flex items-center gap-2">
+                                  <SportIcon
+                                    sport={e.sport}
+                                    size={14}
+                                    className="text-muted-foreground"
+                                  />
+                                  {formatTrackedEventOption(e)}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </SelectGroup>
+                    </>
+                  )}
+                  {notTrackedDayBands.length > 0 && (
+                    <>
+                      <SelectSeparator />
+                      <SelectGroup className="p-0">
+                        <SelectLabel className="text-foreground">Not tracked</SelectLabel>
+                        {notTrackedDayBands.map((band, bandIdx) => (
+                          <Fragment key={`not-tracked-${band.key}`}>
+                            {bandIdx > 0 ? <SelectSeparator /> : null}
+                            <SelectLabel>{band.label}</SelectLabel>
+                            {band.items.map((f) => (
+                              <SelectItem
+                                key={f.externalId}
+                                value={fixtureSelectValue(f.externalId)}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <SportIcon
+                                    sport={f.sport}
+                                    size={14}
+                                    className="text-muted-foreground"
+                                  />
+                                  {formatKnownFixtureOption(f)}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </SelectGroup>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
-              {trackedEvents.length === 0 && (
+              {courseScopeLocked ? (
                 <span className="text-[10px] leading-tight text-muted-foreground">
-                  No tracked events - track one on Tracked Events, or enter details below.
+                  Limited to {courseScopeLabel} races for this campaign.
+                </span>
+              ) : null}
+              {trackedDayBands.length === 0 && notTrackedDayBands.length === 0 && (
+                <span className="text-[10px] leading-tight text-muted-foreground">
+                  {courseScopeLocked
+                    ? `No ${courseScopeLabel} races loaded yet for this day.`
+                    : "No events loaded. Track one on Tracked Events, or enter details below."}
                 </span>
               )}
               {selectedEvent && effectiveEventStatus(selectedEvent) === "live" && (
@@ -1301,25 +1841,38 @@ export function AddBetDialog({
                 </span>
               )}
             </div>
+            {!courseScopeLocked || eventLinked ? (
+              <>
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Event name</Label>
               <Input
-                placeholder={sport === "football" ? "e.g. World Cup" : "e.g. Premier League · Arsenal v Liverpool"}
+                placeholder={
+                  sport === "horse_racing"
+                    ? "e.g. Galway · 14:30 Handicap"
+                    : sport === "football"
+                      ? "e.g. Premier League · Arsenal v Liverpool"
+                      : "e.g. Event name"
+                }
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
+                readOnly={courseScopeLocked}
                 className={ring(!!highlightEmpty && !eventName.trim() && eventId === "none")}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">Date</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={eventDate}
-                  onChange={(e) => {
-                    setEventDate(e.target.value);
-                    if (eventId !== "none") setEventId("none");
+                  onChange={(date) => {
+                    if (courseScopeLocked) return;
+                    setEventDate(date);
+                    if (eventId !== "none") {
+                      setEventId("none");
+                      setPendingFixture(null);
+                    }
                   }}
+                  disabled={courseScopeLocked}
                   className={ring(!!highlightEmpty && !eventDate && eventId === "none")}
                 />
               </div>
@@ -1328,14 +1881,23 @@ export function AddBetDialog({
                 <EventTimeInput
                   value={eventTime}
                   onChange={(time) => {
+                    if (courseScopeLocked) return;
                     setEventTime(time);
-                    if (eventId !== "none") setEventId("none");
+                    if (eventId !== "none") {
+                      setEventId("none");
+                      setPendingFixture(null);
+                    }
                   }}
+                  disabled={courseScopeLocked}
                   className={ring(!!highlightEmpty && !eventTime && eventId === "none")}
                 />
               </div>
             </div>
-            {sport === "horse_racing" && matchingOffers.length > 0 && (
+              </>
+            ) : null}
+            {sport === "horse_racing" &&
+              matchingOffers.length > 0 &&
+              !stakingFreeBet && (
               <div className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2.5 dark:bg-input/25">
                 <div className="mb-1.5 flex items-center gap-1.5">
                   <Gift className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -1513,21 +2075,33 @@ export function AddBetDialog({
                     </span>
                   </div>
                 </div>
-              ) : currentMarket?.options ? (
-                <PanelSelect
+              ) : lockRaceSelection ? (
+                <PanelIconSelect
                   label="Selection"
                   value={selection}
                   onChange={setSelection}
+                  sport={sport}
+                  placeholder={useRaceRunnerSelect ? "Select runner" : "Loading runners…"}
                   selectClassName={ring(!selection.trim())}
-                >
-                  {currentMarket.options.map((option) => (
-                    <option key={option} value={option}>
-                      {usesTeamLabels
-                        ? teamSelectionLabel(option, effectiveHome, effectiveAway)
-                        : option}
-                    </option>
-                  ))}
-                </PanelSelect>
+                  options={raceRunnerOptions.map((runner) => ({
+                    value: runner,
+                    label: capitaliseSelectionLabel(runner),
+                  }))}
+                />
+              ) : currentMarket?.options ? (
+                <PanelIconSelect
+                  label="Selection"
+                  value={selection}
+                  onChange={setSelection}
+                  sport={sport}
+                  selectClassName={ring(!selection.trim())}
+                  options={currentMarket.options.map((option) => ({
+                    value: option,
+                    label: usesTeamLabels
+                      ? teamSelectionLabel(option, effectiveHome, effectiveAway)
+                      : capitaliseSelectionLabel(option),
+                  }))}
+                />
               ) : (
                 <PanelTextInput
                   label="Selection"
@@ -1544,16 +2118,34 @@ export function AddBetDialog({
                 betType={calcBetType}
                 backStake={backStake}
                 accounts={appState?.balances?.accounts}
+                reservedCredit={
+                  stakingFreeBet ? reservedFreeBetCredit : reservedCashCredit
+                }
+                usingFreeBet={noLay && noLayFreeBet != null}
                 addBalance={effectiveAddBalance}
                 onAddBalanceChange={needsAddBalance ? setAddBalance : undefined}
                 onUseFreeBet={(amount) => {
-                  setBetType("free_snr");
+                  if (noLay) {
+                    // Stay in No lay; stake from free-bet balance (SNR default).
+                    setNoLayFreeBet((prev) => prev ?? "snr");
+                    setMugBet(false);
+                  } else if (!isFreeBetBetType(calcBetType)) {
+                    // Qualifying / risk-free cannot stake FB - switch into SNR mode.
+                    setBetType("free_snr");
+                  }
                   setBackStake(amount);
                   setAddBalance(false);
                 }}
+                onUseCash={
+                  noLay && noLayFreeBet != null
+                    ? () => {
+                        setNoLayFreeBet(null);
+                      }
+                    : undefined
+                }
               />
-              {isFreeBetBetType(calcBetType) && bookieFbAvailable > 0.001 ? (
-                <div className="flex flex-wrap gap-1.5">
+              {stakingFreeBet && bookieFbAvailable > 0.001 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setBackStake(bookieFbAvailable)}
@@ -1561,11 +2153,30 @@ export function AddBetDialog({
                   >
                     Use £{bookieFbAvailable.toFixed(2)} available
                   </button>
+                  {noLay && noLayFreeBet != null ? (
+                    <div className="flex h-7 overflow-hidden rounded-full text-[11px] font-semibold">
+                      {(["snr", "sr"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setNoLayFreeBet(t)}
+                          className={cn(
+                            "h-full px-2.5 uppercase",
+                            noLayFreeBet === t
+                              ? "bg-violet-600/25 text-violet-950 dark:bg-violet-500/30 dark:text-violet-100"
+                              : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div className="grid grid-cols-2 gap-3">
                 <PanelInput
-                  label={isFreeBetBetType(calcBetType) ? "Free bet stake" : "Back stake"}
+                  label={stakingFreeBet ? "Free bet stake" : "Back stake"}
                   prefix="£"
                   value={backStake}
                   onChange={setBackStake}
@@ -1573,7 +2184,7 @@ export function AddBetDialog({
                   placeholder="10.00"
                   inputClassName={cn(
                     ring(!(backStake > 0)),
-                    isFreeBetBetType(calcBetType) &&
+                    stakingFreeBet &&
                       "bg-violet-500/10 ring-violet-500/30 focus:ring-violet-500/45 dark:bg-violet-500/15"
                   )}
                 />
@@ -1666,7 +2277,7 @@ export function AddBetDialog({
             </LayPanel>
             )}
 
-            {(betType === "qualifying" || betType === "no_lay") && (
+            {(betType === "qualifying" || (betType === "no_lay" && !noLayFreeBet)) && (
               <div className="flex items-center justify-between rounded-md border px-3 py-2">
                 <div>
                   <div className="text-sm font-medium">Mug bet (camouflage)</div>

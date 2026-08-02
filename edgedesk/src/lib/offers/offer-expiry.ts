@@ -14,7 +14,15 @@ type OfferExpiryFields = Pick<
   "expiresAt" | "eventDate" | "scopeRaceLabel" | "scopeRaceId" | "sport" | "status"
 >;
 
-/** Extract off-time from labels like "3:00 · Betway Handicap" or "15:00 · Feature". */
+/**
+ * Extract off-time from labels like "3:00 · Betway Handicap" or "15:00 · Feature".
+ *
+ * Scope labels are built from the Racing API's `off_time`, which prints UK
+ * cards on a 12-hour clock with no am/pm: "1:50" is a 13:50 race. Racing runs
+ * from about 11:00 to 21:30, so 1-10 can only mean the afternoon or evening,
+ * while 11 and 12 are already the right side of noon. Anything from 13 up is
+ * an explicit 24-hour label and passes through untouched.
+ */
 export function parseScopeRaceOffTime(label: string | null | undefined): {
   hours: number;
   minutes: number;
@@ -22,10 +30,11 @@ export function parseScopeRaceOffTime(label: string | null | undefined): {
   if (!label?.trim()) return null;
   const m = label.trim().match(/^(\d{1,2}):(\d{2})\b/);
   if (!m) return null;
-  const hours = Number(m[1]);
+  const rawHours = Number(m[1]);
   const minutes = Number(m[2]);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  if (!Number.isFinite(rawHours) || !Number.isFinite(minutes)) return null;
+  if (rawHours < 0 || rawHours > 23 || minutes < 0 || minutes > 59) return null;
+  const hours = rawHours >= 1 && rawHours <= 10 ? rawHours + 12 : rawHours;
   return { hours, minutes };
 }
 

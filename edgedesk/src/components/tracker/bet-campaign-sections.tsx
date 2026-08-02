@@ -24,6 +24,7 @@ export function BetCampaignSections({
   highlightId,
   onEdit,
   onPatch,
+  onPatchEvent,
   onLogged,
 }: {
   groups: BetCampaignGroup[];
@@ -34,6 +35,7 @@ export function BetCampaignSections({
   highlightId: number | null;
   onEdit: (bet: BetRow) => void;
   onPatch: (id: number, json: Record<string, unknown>, message: string) => void;
+  onPatchEvent: (id: number, json: Record<string, unknown>, message: string) => void;
   onLogged: () => void;
 }) {
   return (
@@ -76,7 +78,7 @@ export function BetCampaignSections({
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {group.bets.length} bet{group.bets.length === 1 ? "" : "s"}
                 {group.openCount > 0 ? ` · ${group.openCount} open` : ""}
-                {group.needsLayCount > 0 ? ` · ${group.needsLayCount} need lay` : ""}
+                {group.needsLayCount > 0 ? ` · ${group.needsLayCount} unlayed` : ""}
               </p>
             </div>
             {group.offer ? (
@@ -110,6 +112,7 @@ export function BetCampaignSections({
               highlightId={highlightId}
               onEdit={onEdit}
               onPatch={onPatch}
+              onPatchEvent={onPatchEvent}
               onLogged={onLogged}
             />
           </div>

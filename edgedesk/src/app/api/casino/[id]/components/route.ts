@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, casinoOfferComponents, casinoOffers } from "@/lib/db";
 import { deriveComponentEv } from "@/lib/calc/casino-reward-ev";
+import { maybeSealCasinoSeriesTemplate } from "@/lib/offers/casino-offer-recurrence";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { componentFieldsSchema, toComponentRowValues } from "./schema";
 
@@ -36,6 +37,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       createdAt: Date.now(),
     })
     .run();
+
+  // K3: first component on a recurring seed instance seals the series template
+  // and materialises the horizon with freshly derived EVs.
+  maybeSealCasinoSeriesTemplate(offerId);
 
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
 }

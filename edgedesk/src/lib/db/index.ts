@@ -379,6 +379,45 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("bets", "balance_settled INTEGER NOT NULL DEFAULT 0");
   addColumn("casino_offers", "game TEXT");
   addColumn("casino_offers", "expires_at INTEGER");
+  addColumn("casino_offers", "series_id INTEGER");
+  addColumn("casino_offers", "instance_date TEXT");
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS casino_offer_series (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  recurrence_enabled INTEGER NOT NULL DEFAULT 1,
+  recurrence_stopped_from TEXT,
+  skipped_dates_json TEXT,
+  rule_json TEXT NOT NULL,
+  template_expires_at INTEGER,
+  horizon_days INTEGER NOT NULL DEFAULT 14,
+  casino TEXT,
+  title TEXT NOT NULL,
+  notes TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS casino_offer_series_components (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  series_id INTEGER NOT NULL,
+  component_type TEXT NOT NULL,
+  amount REAL,
+  wagering_multiplier REAL,
+  rtp REAL,
+  contribution_pct REAL,
+  spins REAL,
+  spin_value REAL,
+  chip_count REAL,
+  chip_value REAL,
+  house_edge_preset TEXT,
+  cashback_pct REAL,
+  cashback_cap REAL,
+  game TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_casino_offer_series_components_series
+  ON casino_offer_series_components(series_id, sort_order);
+`);
   addColumn("bets", "offer_id INTEGER");
   addColumn("bets", "source TEXT");
   addColumn("offers", "sport TEXT");
@@ -396,6 +435,7 @@ CREATE TABLE IF NOT EXISTS offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   recurrence_enabled INTEGER NOT NULL DEFAULT 1,
   recurrence_stopped_from TEXT,
+  skipped_dates_json TEXT,
   rule_json TEXT NOT NULL,
   template_expires_at INTEGER,
   horizon_days INTEGER NOT NULL DEFAULT 14,
@@ -413,6 +453,8 @@ CREATE TABLE IF NOT EXISTS offer_series (
   updated_at INTEGER NOT NULL
 );
 `);
+  addColumn("offer_series", "skipped_dates_json TEXT");
+  addColumn("casino_offer_series", "skipped_dates_json TEXT");
   addColumn("accounts", "access_status TEXT NOT NULL DEFAULT 'available'");
   addColumn("accounts", "notes TEXT");
   addColumn("accounts", "funded_by_account_id INTEGER");

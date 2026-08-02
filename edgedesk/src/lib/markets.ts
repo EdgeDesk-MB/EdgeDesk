@@ -134,13 +134,23 @@ const OUTRIGHT_MARKETS = new Set(["outright", "top_finish"]);
 /** Infer sport from a stored market when the linked event is missing or not loaded yet. */
 export function inferSportFromBet(
   market: string,
-  eventSport?: string | null
+  eventSport?: string | null,
+  /** Campaign sport when the bet has no linked event yet (e.g. cricket offer + match_winner). */
+  offerSport?: string | null
 ): string {
   if (eventSport) return eventSport;
+  if (offerSport?.trim()) return offerSport.trim();
   if (HORSE_RACING_MARKETS.has(market)) return "horse_racing";
   if (TENNIS_MARKETS.has(market)) return "tennis";
   if (OUTRIGHT_MARKETS.has(market)) return "golf";
   return "football";
+}
+
+/** Events eligible for "Link event" on a bet of this sport (includes finished / past). */
+export function linkableEventsForSport<
+  T extends { sport: string; status: string },
+>(events: T[], sport: string): T[] {
+  return events.filter((e) => e.sport === sport);
 }
 
 /** Whether this market value only exists under a single sport catalogue. */
@@ -164,16 +174,23 @@ export function formatCorrectScore(home: number, away: number): string {
   return `${Math.max(0, Math.floor(home))}-${Math.max(0, Math.floor(away))}`;
 }
 
+/** Ensure the first letter of a selection label is capitalised for display. */
+export function capitaliseSelectionLabel(label: string): string {
+  const t = label.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 /** Human label for match-odds style selections using team names. */
 export function teamSelectionLabel(
   value: string,
   homeTeam: string,
   awayTeam: string
 ): string {
-  if (value === "home") return homeTeam.trim() || "Home";
-  if (value === "away") return awayTeam.trim() || "Away";
+  if (value === "home") return capitaliseSelectionLabel(homeTeam.trim() || "Home");
+  if (value === "away") return capitaliseSelectionLabel(awayTeam.trim() || "Away");
   if (value === "draw") return "Draw";
-  return value;
+  return capitaliseSelectionLabel(value);
 }
 
 /** Display a correct-score pick with team names, e.g. "Arsenal 2–1 Liverpool". */

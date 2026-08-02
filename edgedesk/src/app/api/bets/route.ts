@@ -142,8 +142,11 @@ export async function POST(req: NextRequest) {
     await syncRacingResultsForEvents([inserted.eventId]);
   }
 
-  const { syncOfferStatuses } = await import("@/lib/services/offers");
+  const { spawnCourseOfferSiblingsIfNeeded, syncOfferStatuses } = await import(
+    "@/lib/services/offers"
+  );
   syncOfferStatuses();
+  if (inserted.offerId != null) spawnCourseOfferSiblingsIfNeeded();
 
   return NextResponse.json({ bet: inserted });
 }

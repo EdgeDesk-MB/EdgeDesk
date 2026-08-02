@@ -5,6 +5,7 @@ import {
   instanceExpiresAt,
   localYmd,
   parseRecurrenceRule,
+  parseSkippedDates,
 } from "./offer-recurrence-shared";
 
 describe("expandRecurrenceDates", () => {
@@ -133,5 +134,19 @@ describe("parseRecurrenceRule", () => {
 describe("localYmd", () => {
   it("formats YYYY-MM-DD", () => {
     expect(localYmd(new Date(2026, 6, 9, 15, 30))).toBe("2026-07-09");
+  });
+});
+
+describe("parseSkippedDates", () => {
+  it("parses unique sorted YYYY-MM-DD keys", () => {
+    expect(parseSkippedDates('["2026-07-11","2026-07-09","2026-07-09"]')).toEqual([
+      "2026-07-09",
+      "2026-07-11",
+    ]);
+  });
+
+  it("returns empty for invalid JSON", () => {
+    expect(parseSkippedDates("nope")).toEqual([]);
+    expect(parseSkippedDates(null)).toEqual([]);
   });
 });

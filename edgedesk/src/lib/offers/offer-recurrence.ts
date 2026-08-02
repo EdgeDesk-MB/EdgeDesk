@@ -5,27 +5,41 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
-import { db, bets, offers, offerSeries, type OfferRow } from "@/lib/db";
+import {
+  db,
+  bets,
+  offers,
+  offerSeries,
+  offerEvSnapshots,
+  offerEffortSamples,
+  type OfferRow,
+} from "@/lib/db";
 
 type OfferSeriesRow = typeof offerSeries.$inferSelect;
 
 import type { OfferRecurrenceMeta, OfferRecurrenceRule } from "@/lib/services/offers.types";
 import {
   addDaysYmd,
+  encodeSkippedDates,
   expandRecurrenceDates,
   instanceExpiresAt,
   localYmd,
   parseRecurrenceRule,
+  parseSkippedDates,
+  type OfferDeleteScope,
 } from "@/lib/offers/offer-recurrence-shared";
 
 export type { OfferRecurrenceFreq, OfferRecurrenceMeta, OfferRecurrenceRule } from "@/lib/services/offers.types";
+export type { OfferDeleteScope };
 export {
   DEFAULT_RECURRENCE_RULE,
   addDaysYmd,
+  encodeSkippedDates,
   expandRecurrenceDates,
   instanceExpiresAt,
   localYmd,
   parseRecurrenceRule,
+  parseSkippedDates,
   recurringDetailPrefix,
 } from "@/lib/offers/offer-recurrence-shared";
 
@@ -166,11 +180,12 @@ export function syncOfferSeriesInstances(now = Date.now()): number {
       (d) => !stoppedFrom || d < stoppedFrom
     );
 
+    const skipped = new Set(parseSkippedDates(series.skippedDatesJson));
     const existing = db.select().from(offers).where(eq(offers.seriesId, series.id)).all();
     const existingDates = new Set(existing.map((o) => o.instanceDate).filter(Boolean) as string[]);
 
     for (const dateKey of dates) {
-      if (existingDates.has(dateKey)) continue;
+      if (existingDates.has(dateKey) || skipped.has(dateKey)) continue;
       insertInstance(series, dateKey, todayKey, now, rule);
       created += 1;
     }
@@ -279,4 +294,47 @@ export function stopRecurrenceForOffer(offer: Pick<OfferRow, "id" | "seriesId" |
   if (offer.seriesId == null) return;
   const fromKey = offer.instanceDate ?? localYmd(new Date());
   stopOfferRecurrence(offer.seriesId, fromKey);
+}
+
+function skipOfferSeriesDate(seriesId: number, dateKey: string): void {
+  const series = db.select().from(offerSeries).where(eq(offerSeries.id, seriesId)).get();
+  if (!series) return;
+  const skipped = parseSkippedDates(series.skippedDatesJson);
+  if (skipped.includes(dateKey)) return;
+  skipped.push(dateKey);
+  db.update(offerSeries)
+    .set({
+      skippedDatesJson: encodeSkippedDates(skipped),
+      updatedAt: Date.now(),
+    })
+    .where(eq(offerSeries.id, seriesId))
+    .run();
+}
+
+/**
+ * Delete an offer. For recurring instances:
+ * - `instance`: remove this occurrence only and skip that date so sync does not recreate it
+ * - `future`: remove this occurrence and stop the series from its date forward
+ */
+export function deleteOfferWithScope(
+  offer: Pick<OfferRow, "id" | "seriesId" | "instanceDate">,
+  scope: OfferDeleteScope = "instance"
+): void {
+  db.update(bets).set({ offerId: null }).where(eq(bets.offerId, offer.id)).run();
+  // No FK cascade in SQLite bootstrap — clear dependent rows explicitly.
+  db.delete(offerEvSnapshots).where(eq(offerEvSnapshots.offerId, offer.id)).run();
+  db.delete(offerEffortSamples).where(eq(offerEffortSamples.offerId, offer.id)).run();
+  db.delete(offers).where(eq(offers.id, offer.id)).run();
+
+  if (offer.seriesId == null) return;
+
+  const fromKey = offer.instanceDate ?? localYmd(new Date());
+  if (scope === "future") {
+    stopOfferRecurrence(offer.seriesId, fromKey);
+    return;
+  }
+
+  if (offer.instanceDate) {
+    skipOfferSeriesDate(offer.seriesId, offer.instanceDate);
+  }
 }

@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/help/page-header";
 import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { CasinoDayCalendar } from "@/components/casino/casino-day-calendar";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
-import { api, useAppState } from "@/hooks/use-app-state";
+import { apiGet, useAppState } from "@/hooks/use-app-state";
 import {
   availableBookieNames,
   offerMatchesAvailableBookies,
@@ -26,7 +26,7 @@ export default function CasinoCalendarPage() {
   const [availableOnly, setAvailableOnly] = useState(false);
 
   const load = useCallback(() => {
-    api<{ offers: CasinoOfferSummary[] }>("/api/casino")
+    apiGet<{ offers: CasinoOfferSummary[] }>("/api/casino")
       .then((r) => setOffers(r.offers))
       .catch(() => setOffers([]));
   }, []);

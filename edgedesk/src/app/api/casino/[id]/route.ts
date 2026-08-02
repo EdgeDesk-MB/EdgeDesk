@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { db, casinoOfferComponents, casinoOffers } from "@/lib/db";
+import { db, casinoOffers } from "@/lib/db";
+import {
+  deleteCasinoOfferWithScope,
+  stopRecurrenceForCasinoOffer,
+} from "@/lib/offers/casino-offer-recurrence";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +18,11 @@ const patchSchema = z.object({
   actualProfit: z.number().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   expiresAt: z.number().nullable().optional(),
+  /** K3: stop repeating from this occurrence forward */
+  stopRecurrence: z.boolean().optional(),
 });
+
+const deleteScopeSchema = z.enum(["instance", "future"]).default("instance");
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -26,6 +34,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const offerId = Number(id);
   const existing = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (p.stopRecurrence) {
+    stopRecurrenceForCasinoOffer(existing);
+    return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
+  }
 
   db.update(casinoOffers)
     .set({
@@ -42,13 +55,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const offerId = Number(id);
   const existing = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  // No FK cascade in the SQLite bootstrap - delete components before the campaign.
-  db.delete(casinoOfferComponents).where(eq(casinoOfferComponents.casinoOfferId, offerId)).run();
-  db.delete(casinoOffers).where(eq(casinoOffers.id, offerId)).run();
+
+  const scopeParsed = deleteScopeSchema.safeParse(req.nextUrl.searchParams.get("scope") ?? "instance");
+  if (!scopeParsed.success) {
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
+
+  deleteCasinoOfferWithScope(existing, scopeParsed.data);
   return NextResponse.json({ ok: true });
 }

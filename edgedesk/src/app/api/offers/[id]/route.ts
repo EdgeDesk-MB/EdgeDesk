@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, bets, offers } from "@/lib/db";
-import { stopRecurrenceForOffer } from "@/lib/offers/offer-recurrence";
+import { deleteOfferWithScope, stopRecurrenceForOffer } from "@/lib/offers/offer-recurrence";
 import { summariseOffer } from "@/lib/services/offers";
 import { MISTAKE_TAGS, setMistakeTag, writeEvLock, type MistakeTag } from "@/lib/services/ev-snapshot";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
@@ -30,6 +30,8 @@ const patchSchema = z.object({
   mistakeTag: z.enum(MISTAKE_TAGS).nullable().optional(),
 });
 
+const deleteScopeSchema = z.enum(["instance", "future"]).default("instance");
+
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
@@ -49,6 +51,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     setMistakeTag(offerId, p.mistakeTag as MistakeTag | null);
   }
 
+  // Manual expire: stamp a past deadline so syncOfferStatuses does not revive
+  // the campaign when an explicit expiresAt / race scope is still in the future.
+  const expireStamp =
+    p.status === "expired" && p.expiresAt === undefined
+      ? { expiresAt: Date.now(), completedAt: null as number | null }
+      : {};
+
   const updated = db
     .update(offers)
     .set({
@@ -67,6 +76,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.scopeRaceLabel !== undefined ? { scopeRaceLabel: p.scopeRaceLabel } : {}),
       ...(p.rules !== undefined ? { rules: p.rules } : {}),
       ...(p.status === "completed" ? { completedAt: Date.now() } : {}),
+      ...expireStamp,
     })
     .where(eq(offers.id, offerId))
     .returning()
@@ -92,13 +102,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   return NextResponse.json({ offer: updated });
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const offerId = Number(id);
   const existing = db.select().from(offers).where(eq(offers.id, offerId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  db.update(bets).set({ offerId: null }).where(eq(bets.offerId, offerId)).run();
-  db.delete(offers).where(eq(offers.id, offerId)).run();
+  const scopeParsed = deleteScopeSchema.safeParse(req.nextUrl.searchParams.get("scope") ?? "instance");
+  if (!scopeParsed.success) {
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
+
+  deleteOfferWithScope(existing, scopeParsed.data);
   return NextResponse.json({ ok: true });
 }

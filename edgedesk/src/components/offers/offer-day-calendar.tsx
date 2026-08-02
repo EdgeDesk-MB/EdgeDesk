@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildOfferCalendarBoard,
@@ -41,13 +41,15 @@ const PRIORITY_LABELS: Record<OfferCalendarPriority, string> = {
 };
 
 function readStoredView(): CalendarView {
-  if (typeof window === "undefined") return "board";
-  const raw = localStorage.getItem(VIEW_STORAGE_KEY);
-  return raw === "agenda" || raw === "board" ? raw : "board";
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    return raw === "agenda" || raw === "board" ? raw : "board";
+  } catch {
+    return "board";
+  }
 }
 
 function readStoredPriorityFilter(): Set<OfferCalendarPriority> | null {
-  if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(PRIORITY_FILTER_STORAGE_KEY);
     if (!raw) return null;
@@ -227,15 +229,12 @@ function DayEstPill({ amount }: { amount: number }) {
   );
 }
 
-function calendarHeaderTint(offer: OfferSummary): string | null {
-  const isExpired = isOfferExpired(offer);
-  const tintValue =
-    Math.abs(offer.profit.totalProfit) > 0.005
-      ? offer.profit.totalProfit
-      : (offer.expectedProfit ?? offer.expectedFromBets);
-  if (isExpired) return "offer-header-tint-expired";
-  if (tintValue > 0.005) return "offer-header-tint-win";
-  if (tintValue < -0.005) return "offer-header-tint-loss";
+function calendarHeaderTint(offer: OfferSummary, remainingEv: number): string | null {
+  if (isOfferExpired(offer)) return "offer-header-tint-expired";
+  // Tint follows the Est. remaining EV shown on the card, not realised
+  // totalProfit (which includes sunk qualifying losses mid-pipeline).
+  if (remainingEv > 0.5) return "offer-header-tint-win";
+  if (remainingEv < -0.005) return "offer-header-tint-loss";
   return null;
 }
 
@@ -250,7 +249,7 @@ function CalendarItemCard({
 }) {
   const p = priorityStyles(item.priority);
   const expiry = formatOfferDaysLeftLabel(item.daysLeft);
-  const headerTint = calendarHeaderTint(item.offer);
+  const headerTint = calendarHeaderTint(item.offer, item.remainingEv);
   const categoryId = offerCategoryFromSport(item.offer.sport);
   const categoryLabel = offerCategoryLabel(item.offer.sport);
 
@@ -483,10 +482,18 @@ export function OfferDayCalendar({
   onOfferClick?: (offer: OfferSummary) => void;
   standalone?: boolean;
 }) {
-  const [view, setView] = useState<CalendarView>(() => readStoredView());
-  const [priorityFilter, setPriorityFilter] = useState<Set<OfferCalendarPriority> | null>(() =>
-    readStoredPriorityFilter()
-  );
+  // Stored preferences load after mount: reading localStorage during the first
+  // render would disagree with the server HTML and break hydration.
+  const [view, setView] = useState<CalendarView>("board");
+  const [priorityFilter, setPriorityFilter] = useState<Set<OfferCalendarPriority> | null>(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setView(readStoredView());
+      setPriorityFilter(readStoredPriorityFilter());
+    });
+  }, []);
+
   const hasItems = useMemo(
     () => buildOfferCalendarDays(offers, { horizonDays: 14 }).length > 0,
     [offers]

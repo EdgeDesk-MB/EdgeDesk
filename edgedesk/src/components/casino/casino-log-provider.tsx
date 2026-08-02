@@ -11,6 +11,9 @@
  * common single-component case (a plain Bonus offer) still feels like one
  * dialog even though it's technically two API calls.
  *
+ * K3: step 1 can enable Repeats; the first component seals the series template
+ * and materialises the horizon.
+ *
  * Saving fires CASINO_CHANGED_EVENT so the Casino page refreshes if mounted.
  */
 
@@ -28,9 +31,16 @@ import { Label } from "@/components/ui/label";
 import { CasinoComponentForm } from "@/components/casino/casino-component-form";
 import { CasinoPasteDialog } from "@/components/casino/casino-paste-dialog";
 import { CASINO_CHANGED_EVENT } from "@/components/casino/casino-ui";
+import {
+  DEFAULT_RECURRENCE_FIELDS,
+  RecurrenceRuleFields,
+  buildRecurrenceRule,
+  type RecurrenceRuleFieldsValue,
+} from "@/components/offers/recurrence-rule-fields";
 import { VenueSelect } from "@/components/venue-select";
 import { api } from "@/hooks/use-app-state";
 import { fromDatetimeLocalValue } from "@/lib/offers/offer-terms";
+import { localYmd, parseYmd } from "@/lib/offers/offer-recurrence-shared";
 import type { ParsedCasinoOfferDraft } from "@/lib/offers/parse-casino-offer-text";
 
 type CasinoLogContextValue = {
@@ -53,6 +63,9 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
   const [saving, setSaving] = useState(false);
   const [createdOfferId, setCreatedOfferId] = useState<number | null>(null);
   const [draft, setDraft] = useState<ParsedCasinoOfferDraft | null>(null);
+  const [repeatsEnabled, setRepeatsEnabled] = useState(false);
+  const [repeatFields, setRepeatFields] =
+    useState<RecurrenceRuleFieldsValue>(DEFAULT_RECURRENCE_FIELDS);
 
   const openCasinoLog = useCallback(() => setOpen(true), []);
 
@@ -62,19 +75,35 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
     setExpires("");
     setCreatedOfferId(null);
     setDraft(null);
+    setRepeatsEnabled(false);
+    setRepeatFields(DEFAULT_RECURRENCE_FIELDS);
   }
 
   async function createCampaign() {
     if (!title.trim()) return;
     setSaving(true);
     try {
+      const expiresAt = fromDatetimeLocalValue(expires);
+      const expiryOffsetDays = (() => {
+        if (expiresAt == null || !repeatsEnabled) return undefined;
+        const anchor = localYmd(new Date());
+        const expiresYmd = localYmd(new Date(expiresAt));
+        const diffDays = Math.round(
+          (parseYmd(expiresYmd).getTime() - parseYmd(anchor).getTime()) / 86_400_000
+        );
+        return diffDays > 0 ? diffDays : undefined;
+      })();
+
       const res = await api<{ offer: { id: number } }>("/api/casino", {
         method: "POST",
         json: {
           casino: casino.trim() || undefined,
           title: title.trim(),
           status: "active",
-          expiresAt: fromDatetimeLocalValue(expires),
+          expiresAt,
+          ...(repeatsEnabled
+            ? { recurrence: buildRecurrenceRule(repeatFields, { expiryOffsetDays }) }
+            : {}),
         },
       });
       setCreatedOfferId(res.offer.id);
@@ -152,6 +181,28 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                     onChange={(e) => setExpires(e.target.value)}
                   />
                 </div>
+                <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={repeatsEnabled}
+                    onChange={(e) => setRepeatsEnabled(e.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium text-foreground">Repeats</span>
+                    <span className="mt-0.5 block text-muted-foreground">
+                      Creates a new campaign each occurrence. Each gets its own ID so steps
+                      and completion stay separate.
+                    </span>
+                  </span>
+                </label>
+                {repeatsEnabled ? (
+                  <RecurrenceRuleFields
+                    value={repeatFields}
+                    onChange={setRepeatFields}
+                    helpText="Each occurrence uses the same steps you add next, with EV derived fresh."
+                  />
+                ) : null}
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>

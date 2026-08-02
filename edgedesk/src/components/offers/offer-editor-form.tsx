@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { DatePicker } from "@/components/date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,13 +18,18 @@ import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import { RegionFlag } from "@/components/region-flag";
 import { VenueSelect, inferVenueKind } from "@/components/venue-select";
 import { api } from "@/hooks/use-app-state";
+import { useNow } from "@/hooks/use-now";
 import { useVenueAccounts } from "@/hooks/use-venue-accounts";
 import type { OfferRecurrenceRule, OfferSummary } from "@/lib/services/offers.types";
 import type { RacingRacecard } from "@/lib/services/theracingapi";
 import {
+  encodeScopeCourses,
   formatBetGetFreePlaceSummary,
+  formatOfferScopeLabel,
   isRegionalScope,
+  normalizeCourseName,
   parseOfferRules,
+  parseScopeCourses,
 } from "@/lib/offers/racing-offer-rules";
 import {
   OFFER_CATEGORIES,
@@ -182,9 +188,11 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
       betStake: rules ? String(rules.betStake) : "50",
       freeBetAmount: rules ? String(rules.freeBetAmount) : "50",
       minRunners: rules ? String(rules.minRunners) : "8",
-      qualifyingPlaces: (rules?.qualifyingPlaces?.length
-        ? rules.qualifyingPlaces
-        : [2, 3, 4]) as number[],
+      qualifyingPlaces: (rules?.qualifyingPlaces ?? []) as number[],
+      winnerMustBeSpFavourite: rules?.winnerMustBeSpFavourite === true,
+      resultConditional:
+        (rules?.qualifyingPlaces?.length ?? 0) > 0 ||
+        rules?.winnerMustBeSpFavourite === true,
       scopeMode,
       scopeCourse: raceScoped || courseScoped ? (offer.scopeCourse ?? "") : "",
       scopeRaceId: offer.scopeRaceId ?? "",
@@ -219,7 +227,10 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     betStake: "50",
     freeBetAmount: "50",
     minRunners: "8",
-    qualifyingPlaces: [2, 3, 4] as number[],
+    qualifyingPlaces: [] as number[],
+    winnerMustBeSpFavourite: false,
+    /** Off = straight bet&get; on = place/trigger refund (Best plays). */
+    resultConditional: false,
     scopeMode: "uk_ire" as ScopeMode,
     scopeCourse: "",
     scopeRaceId: "",
@@ -264,6 +275,10 @@ export function OfferEditorForm({
   const [freeBetAmount, setFreeBetAmount] = useState(boot.freeBetAmount);
   const [minRunners, setMinRunners] = useState(boot.minRunners);
   const [qualifyingPlaces, setQualifyingPlaces] = useState<number[]>(boot.qualifyingPlaces);
+  const [winnerMustBeSpFavourite, setWinnerMustBeSpFavourite] = useState(
+    boot.winnerMustBeSpFavourite
+  );
+  const [resultConditional, setResultConditional] = useState(boot.resultConditional);
   const [scopeMode, setScopeMode] = useState<ScopeMode>(boot.scopeMode);
   const [scopeCourse, setScopeCourse] = useState(boot.scopeCourse);
   const [scopeRaceId, setScopeRaceId] = useState(boot.scopeRaceId);
@@ -298,6 +313,12 @@ export function OfferEditorForm({
   // uncheck for the venue currently shown.
   const [autoAddAccountFor, setAutoAddAccountFor] = useState(bookmaker.trim());
 
+  const now = useNow(60_000);
+  // A pasted promo often carries yesterday's deadline. Saving it works, but the
+  // server files it straight under Expired, which reads as "nothing saved".
+  const expiryMs = fromDatetimeLocalValue(expires);
+  const expiryAlreadyPassed = expiryMs != null && now > 0 && expiryMs < now;
+
   const { bookieWallets, exchangeWallets, exchangeDirectory, ensureVenue } = useVenueAccounts();
   const bookmakerTrimmed = bookmaker.trim();
   const bookmakerIsKnownAccount = useMemo(() => {
@@ -329,6 +350,8 @@ export function OfferEditorForm({
     setFreeBetAmount(next.freeBetAmount);
     setMinRunners(next.minRunners);
     setQualifyingPlaces(next.qualifyingPlaces);
+    setWinnerMustBeSpFavourite(next.winnerMustBeSpFavourite);
+    setResultConditional(next.resultConditional);
     setScopeMode(next.scopeMode);
     setScopeCourse(next.scopeCourse);
     setScopeRaceId(next.scopeRaceId);
@@ -389,6 +412,10 @@ export function OfferEditorForm({
     };
   }, [open, isRacingCategory, eventDate]);
 
+  const selectedCourses = useMemo(() => parseScopeCourses(scopeCourse), [scopeCourse]);
+  /** Race mode needs a single course for the race-time picker. */
+  const primaryCourse = selectedCourses[0] ?? "";
+
   const courses = useMemo(() => {
     const byName = new Map<string, string | undefined>();
     for (const c of racecards) {
@@ -396,28 +423,29 @@ export function OfferEditorForm({
       if (!name) continue;
       if (!byName.has(name)) byName.set(name, c.region);
     }
-    if (scopeCourse.trim()) {
+    for (const name of selectedCourses) {
       const hit = [...byName.keys()].find(
-        (c) => c.toLowerCase() === scopeCourse.trim().toLowerCase()
+        (c) => normalizeCourseName(c) === normalizeCourseName(name)
       );
-      if (!hit) byName.set(scopeCourse.trim(), undefined);
+      if (!hit) byName.set(name, undefined);
     }
     return [...byName.entries()]
       .map(([name, region]) => ({ name, region }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [racecards, scopeCourse]);
+  }, [racecards, selectedCourses]);
 
   const racesAtCourse = useMemo(() => {
-    if (!scopeCourse.trim()) return [];
+    if (!primaryCourse) return [];
+    const key = normalizeCourseName(primaryCourse);
     return racecards
-      .filter((c) => c.course.trim().toLowerCase() === scopeCourse.trim().toLowerCase())
+      .filter((c) => normalizeCourseName(c.course) === key)
       .slice()
       .sort((a, b) => a.offTime.localeCompare(b.offTime));
-  }, [racecards, scopeCourse]);
+  }, [racecards, primaryCourse]);
 
   // Resolve preferred off-time (from paste) → race id once cards load
   useEffect(() => {
-    if (scopeMode !== "race" || !preferredOffTime || !scopeCourse.trim()) return;
+    if (scopeMode !== "race" || !preferredOffTime || !primaryCourse) return;
     if (scopeRaceId) return;
     const want = normalizeOffTime(preferredOffTime);
     const hit =
@@ -430,7 +458,7 @@ export function OfferEditorForm({
         setPreferredOffTime(null);
       });
     }
-  }, [scopeMode, preferredOffTime, scopeCourse, scopeRaceId, racesAtCourse]);
+  }, [scopeMode, preferredOffTime, primaryCourse, scopeRaceId, racesAtCourse]);
 
   function setImportantFromTerms(terms: OfferImportantTerms) {
     setMinOdds(terms.minOdds != null ? String(terms.minOdds) : "");
@@ -450,7 +478,25 @@ export function OfferEditorForm({
       setScopeRaceId("");
       setScopeRaceLabel("");
       setPreferredOffTime(null);
+    } else if (next === "race") {
+      // Race lock is one meeting - keep the first selected course only.
+      const first = parseScopeCourses(scopeCourse)[0];
+      if (first) setScopeCourse(first);
+      else setScopeCourse("");
     }
+  }
+
+  function toggleScopeCourse(name: string) {
+    const key = normalizeCourseName(name);
+    const current = parseScopeCourses(scopeCourse);
+    const exists = current.some((c) => normalizeCourseName(c) === key);
+    const next = exists
+      ? current.filter((c) => normalizeCourseName(c) !== key)
+      : [...current, name];
+    setScopeCourse(encodeScopeCourses(next));
+    setScopeRaceId("");
+    setScopeRaceLabel("");
+    setPreferredOffTime(null);
   }
 
   function buildOfferPayload() {
@@ -463,15 +509,26 @@ export function OfferEditorForm({
     };
     const stake = parseFloat(betStake) || 50;
     const free = parseFloat(freeBetAmount) || stake;
-    const places = qualifyingPlaces.length > 0 ? qualifyingPlaces : ([2, 3, 4] as number[]);
+    const places = resultConditional
+      ? qualifyingPlaces.length > 0
+        ? qualifyingPlaces
+        : winnerMustBeSpFavourite
+          ? ([2] as number[])
+          : ([] as number[])
+      : ([] as number[]);
     const placeLabel =
       places.length === 2 && places[0] === 2 && places[1] === 3
         ? "2nd & 3rd"
         : places.length === 3 && places[0] === 2 && places[2] === 4
           ? "2nd–4th place"
-          : `places ${places.join(", ")}`;
+          : places.length > 0
+            ? `places ${places.join(", ")}`
+            : null;
     const racingTitle =
-      title.trim() || `Bet £${stake} get £${free} free bet (${placeLabel})`;
+      title.trim() ||
+      (placeLabel
+        ? `Bet £${stake} get £${free} free bet (${placeLabel})`
+        : `Bet £${stake} get £${free} free bet`);
     const regions =
       scopeMode === "uk_ire"
         ? scopeRegions.length > 0
@@ -487,6 +544,9 @@ export function OfferEditorForm({
           qualifyingPlaces: places,
           betStake: stake,
           freeBetAmount: free,
+          ...(resultConditional && winnerMustBeSpFavourite
+            ? { winnerMustBeSpFavourite: true as const }
+            : {}),
         }
       : null;
 
@@ -505,7 +565,9 @@ export function OfferEditorForm({
     );
 
     const courseValue =
-      scopeMode === "uk_ire" ? "uk_ire" : scopeCourse.trim() || "uk_ire";
+      scopeMode === "uk_ire"
+        ? "uk_ire"
+        : encodeScopeCourses(parseScopeCourses(scopeCourse)) || "uk_ire";
 
     const startsOnTrimmed = startsOn.trim();
     // The offset an occurrence expires after its own date, derived from the gap
@@ -586,13 +648,22 @@ export function OfferEditorForm({
         setSectionRacing(true);
         return "Enter a free bet amount greater than 0.";
       }
+      if (resultConditional && qualifyingPlaces.length === 0 && !winnerMustBeSpFavourite) {
+        setSectionRacing(true);
+        return "Pick at least one qualifying place, or turn off result-dependent reward.";
+      }
       if (!eventDate.trim()) {
         setSectionScope(true);
         return "Pick a racing day.";
       }
-      if ((scopeMode === "course" || scopeMode === "race") && !scopeCourse.trim()) {
+      if (
+        (scopeMode === "course" || scopeMode === "race") &&
+        parseScopeCourses(scopeCourse).length === 0
+      ) {
         setSectionScope(true);
-        return "Pick a course from the Racing Desk list.";
+        return scopeMode === "course"
+          ? "Pick at least one course from the Racing Desk list."
+          : "Pick a course from the Racing Desk list.";
       }
       if (scopeMode === "race" && !scopeRaceId.trim()) {
         setSectionScope(true);
@@ -649,9 +720,13 @@ export function OfferEditorForm({
       setBetStake(draft.betStake != null ? String(draft.betStake) : "");
       setFreeBetAmount(draft.freeBetAmount != null ? String(draft.freeBetAmount) : "");
       setMinRunners(draft.minRunners != null ? String(draft.minRunners) : "8");
+      const pastedPlaces = draft.qualifyingPlaces;
+      const pastedSpFav = draft.rules?.winnerMustBeSpFavourite === true;
       setQualifyingPlaces(
-        draft.qualifyingPlaces.length > 0 ? draft.qualifyingPlaces : [2, 3, 4]
+        pastedPlaces.length > 0 ? pastedPlaces : pastedSpFav ? [2] : []
       );
+      setWinnerMustBeSpFavourite(pastedSpFav);
+      setResultConditional(pastedPlaces.length > 0 || pastedSpFav);
       setScopeMode(draft.scopeMode);
       setScopeCourse(draft.scopeCourse);
       setScopeRaceId("");
@@ -684,12 +759,15 @@ export function OfferEditorForm({
     setSaving(true);
     try {
       const payload = buildOfferPayload();
+      const expiredOnArrival = expiryAlreadyPassed
+        ? { description: "The expiry has already passed, so it's under the Expired filter." }
+        : undefined;
       if (editingId != null) {
         await api(`/api/offers/${editingId}`, { method: "PATCH", json: payload });
-        toast.success("Offer updated");
+        toast.success("Offer updated", expiredOnArrival);
       } else {
         await api("/api/offers", { method: "POST", json: payload });
-        toast.success("Offer added");
+        toast.success("Offer added", expiredOnArrival);
       }
       if (showAutoAddAccount && autoAddAccount) {
         try {
@@ -721,8 +799,8 @@ export function OfferEditorForm({
     scopeMode === "uk_ire"
       ? `UK & IRE · ${eventDate}`
       : scopeMode === "race"
-        ? `${scopeCourse || "Course"} · ${scopeRaceLabel || "pick race"} · ${eventDate}`
-        : `${scopeCourse || "Course"} · ${eventDate}`;
+        ? `${primaryCourse || "Course"} · ${scopeRaceLabel || "pick race"} · ${eventDate}`
+        : `${formatOfferScopeLabel(scopeCourse) || "Courses"} · ${eventDate}`;
 
   return (
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={saveOffer}>
@@ -781,7 +859,15 @@ export function OfferEditorForm({
           title="Racing terms"
           open={sectionRacing}
           onOpenChange={setSectionRacing}
-          summary={`£${betStake || "-"} → £${freeBetAmount || "-"} · min ${minRunners || "-"}`}
+          summary={`£${betStake || "-"} → £${freeBetAmount || "-"} · min ${minRunners || "-"}${
+            resultConditional
+              ? winnerMustBeSpFavourite
+                ? " · result trigger · 2nd to SP fav"
+                : qualifyingPlaces.length > 0
+                  ? ` · result trigger · ${qualifyingPlaces.join(",")}`
+                  : " · result trigger"
+              : " · straight reward"
+          }`}
         >
           <div className="grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-1">
@@ -821,6 +907,84 @@ export function OfferEditorForm({
               />
             </div>
           </div>
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={resultConditional}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setResultConditional(on);
+                if (on) {
+                  if (qualifyingPlaces.length === 0) setQualifyingPlaces([2, 3, 4]);
+                } else {
+                  setQualifyingPlaces([]);
+                  setWinnerMustBeSpFavourite(false);
+                }
+              }}
+            />
+            <span>
+              <span className="font-medium text-foreground">
+                Reward depends on result (trigger / conditional)
+              </span>
+              <span className="mt-0.5 block text-muted-foreground">
+                On for place refunds and similar. Off for straight bet & get, where the free bet
+                lands after the qualifying bet regardless of result. Best plays only appears when
+                this is on.
+              </span>
+            </span>
+          </label>
+          {resultConditional ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-[11px] text-muted-foreground">Qualifying places</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {([2, 3, 4, 5, 6] as const).map((place) => {
+                    const on = qualifyingPlaces.includes(place);
+                    return (
+                      <button
+                        key={place}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          setQualifyingPlaces((prev) =>
+                            on ? prev.filter((p) => p !== place) : [...prev, place].sort((a, b) => a - b)
+                          );
+                        }}
+                        className={cn(filterPillState(on), "tabular-nums")}
+                      >
+                        {place === 2 ? "2nd" : place === 3 ? "3rd" : `${place}th`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={winnerMustBeSpFavourite}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setWinnerMustBeSpFavourite(on);
+                    if (on && qualifyingPlaces.length !== 1) setQualifyingPlaces([2]);
+                  }}
+                />
+                <span>
+                  <span className="font-medium text-foreground">2nd to SP favourite</span>
+                  <span className="mt-0.5 block text-muted-foreground">
+                    Free bet only if the selection finishes in the qualifying places and the winner
+                    was the Starting Price favourite (QuinnBet-style).
+                  </span>
+                </span>
+              </label>
+            </>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Qualifying tip: match back and lay as closely as you can. Free bet tip: extract at
+              reasonably high odds with a tight lay.
+            </p>
+          )}
         </FormSection>
       )}
 
@@ -836,12 +1000,11 @@ export function OfferEditorForm({
               <Label htmlFor="offer-event-date" className="text-[11px] text-muted-foreground">
                 Racing day
               </Label>
-              <Input
+              <DatePicker
                 id="offer-event-date"
-                type="date"
                 value={eventDate}
-                onChange={(e) => {
-                  setEventDate(e.target.value);
+                onChange={(date) => {
+                  setEventDate(date);
                   setScopeRaceId("");
                   setScopeRaceLabel("");
                 }}
@@ -899,14 +1062,64 @@ export function OfferEditorForm({
             </div>
           )}
 
-          {(scopeMode === "course" || scopeMode === "race") && (
+          {scopeMode === "course" && (
+            <div className="flex flex-col gap-1">
+              <Label className="text-[11px] text-muted-foreground">Courses</Label>
+              {courses.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {courses.map((c) => {
+                    const active = selectedCourses.some(
+                      (name) => normalizeCourseName(name) === normalizeCourseName(c.name)
+                    );
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => toggleScopeCourse(c.name)}
+                        className={filterPillState(active)}
+                        aria-pressed={active}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <RegionFlag code={c.region} />
+                          {c.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Input
+                  placeholder={
+                    cardsLoading
+                      ? "Loading courses…"
+                      : "No cards - type courses, e.g. Galway, Goodwood"
+                  }
+                  value={scopeCourse}
+                  onChange={(e) => setScopeCourse(e.target.value)}
+                />
+              )}
+              {selectedCourses.length > 1 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {selectedCourses.length} courses selected · {formatOfferScopeLabel(scopeCourse)}
+                </p>
+              ) : null}
+              {!cardsLoading && courses.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Racecards available for today/tomorrow when Racing API is connected.
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {scopeMode === "race" && (
             <div className="flex flex-col gap-1">
               <Label className="text-[11px] text-muted-foreground">Course</Label>
               {courses.length > 0 ? (
                 <Select
                   value={
-                    courses.find((c) => c.name.toLowerCase() === scopeCourse.trim().toLowerCase())
-                      ?.name ?? (scopeCourse || undefined)
+                    courses.find(
+                      (c) => normalizeCourseName(c.name) === normalizeCourseName(primaryCourse)
+                    )?.name ?? (primaryCourse || undefined)
                   }
                   onValueChange={(v) => {
                     setScopeCourse(v);
@@ -936,11 +1149,6 @@ export function OfferEditorForm({
                   onChange={(e) => setScopeCourse(e.target.value)}
                 />
               )}
-              {!cardsLoading && courses.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
-                  Racecards available for today/tomorrow when Racing API is connected.
-                </p>
-              ) : null}
             </div>
           )}
 
@@ -960,7 +1168,7 @@ export function OfferEditorForm({
                   <SelectTrigger className="w-full">
                     <SelectValue
                       placeholder={
-                        scopeCourse ? "Pick race time" : "Pick a course first"
+                        primaryCourse ? "Pick race time" : "Pick a course first"
                       }
                     />
                   </SelectTrigger>
@@ -977,7 +1185,7 @@ export function OfferEditorForm({
                 </Select>
               ) : (
                 <p className="rounded-md border border-dashed px-3 py-2 text-[11px] text-muted-foreground">
-                  {scopeCourse
+                  {primaryCourse
                     ? cardsLoading
                       ? "Loading races…"
                       : "No races listed for this course on that day."
@@ -1057,12 +1265,11 @@ export function OfferEditorForm({
             <Label htmlFor="offer-starts-on" className="text-[11px] text-muted-foreground">
               Starts on
             </Label>
-            <Input
+            <DatePicker
               id="offer-starts-on"
-              type="date"
               placeholder="Today"
               value={startsOn}
-              onChange={(e) => setStartsOn(e.target.value)}
+              onChange={setStartsOn}
             />
           </div>
         </div>
@@ -1076,7 +1283,12 @@ export function OfferEditorForm({
             value={expires}
             onChange={(e) => setExpires(e.target.value)}
           />
-          {startsOn.trim() && startsOn.trim() > localYmd(new Date()) ? (
+          {expiryAlreadyPassed ? (
+            <p className="text-[11px] font-medium text-warning">
+              This deadline has already passed, so the offer is filed under Expired as soon as
+              you save it. Clear or update the date to keep it in the main feed.
+            </p>
+          ) : startsOn.trim() && startsOn.trim() > localYmd(new Date()) ? (
             <p className="text-[11px] text-muted-foreground">
               Stays &ldquo;Planned&rdquo; until {startsOn}, then goes live automatically.
             </p>

@@ -47,12 +47,13 @@ import { PageShell } from "@/components/page-shell";
 import { VenueBadge } from "@/components/venue-badge";
 import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
-import { api } from "@/hooks/use-app-state";
+import { api, apiGet } from "@/hooks/use-app-state";
 import {
   daysUntilOfferExpiry,
   formatOfferDaysLeftLabel,
   offerExpiryUrgency,
 } from "@/lib/offers/offer-expiry";
+import { formatRecurrenceLabel } from "@/lib/offers/offer-recurrence-shared";
 import { offerStatusBadgeVariant } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
 import type { CasinoOfferComponentRow, CasinoOfferRow } from "@/lib/db/schema";
@@ -84,6 +85,107 @@ function DeleteButton({ onConfirm, label }: { onConfirm: () => void; label: stri
     >
       <Trash2 className="size-3.5" />
     </Button>
+  );
+}
+
+function DeleteCampaignDialog({
+  offer,
+  onRemoved,
+}: {
+  offer: CasinoOfferSummary;
+  onRemoved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const recurring = Boolean(offer.seriesId && offer.recurrence?.enabled);
+  const [scope, setScope] = useState<"instance" | "future">("instance");
+
+  async function confirmDelete() {
+    setBusy(true);
+    try {
+      const qs = recurring && scope === "future" ? "?scope=future" : "";
+      await api(`/api/casino/${offer.id}${qs}`, { method: "DELETE" });
+      setOpen(false);
+      onRemoved();
+    } catch {
+      // keep dialog open so the user can retry
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!recurring) {
+    return <DeleteButton onConfirm={() => void confirmDelete()} label="Delete campaign" />;
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setScope("instance");
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground"
+          aria-label="Delete campaign"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent mobile="center" className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Delete campaign?</DialogTitle>
+          <DialogDescription>
+            This permanently removes &ldquo;{offer.title}&rdquo;. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <fieldset className="space-y-2 text-sm">
+          <legend className="sr-only">Delete scope</legend>
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="radio"
+              name={`casino-delete-scope-${offer.id}`}
+              className="mt-1"
+              checked={scope === "instance"}
+              onChange={() => setScope("instance")}
+            />
+            <span>
+              <span className="font-medium text-foreground">This occurrence only</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                The series keeps repeating. This date will not come back.
+              </span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="radio"
+              name={`casino-delete-scope-${offer.id}`}
+              className="mt-1"
+              checked={scope === "future"}
+              onChange={() => setScope("future")}
+            />
+            <span>
+              <span className="font-medium text-foreground">This and future occurrences</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Stops the series from this date. Past history stays.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="destructive" disabled={busy} onClick={() => void confirmDelete()}>
+            Delete
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -190,11 +292,6 @@ function CampaignCard({
         ? "offer-header-tint-loss"
         : null;
 
-  async function remove() {
-    await api(`/api/casino/${offer.id}`, { method: "DELETE" }).catch(() => {});
-    onRemoved();
-  }
-
   return (
     <Card className="gap-0 overflow-hidden py-0">
       <CardHeader className={cn("space-y-0 pt-(--card-spacing) pb-3", headerTintClass ?? "bg-card")}>
@@ -261,6 +358,30 @@ function CampaignCard({
         </div>
       </CardContent>
 
+      {offer.recurrence?.enabled ? (
+        <CardContent className="border-t border-border/50 py-2.5">
+          <div className="rounded-md border border-dashed bg-muted/20 px-3 py-2.5 text-xs">
+            <p className="font-medium text-foreground">
+              {formatRecurrenceLabel(offer.recurrence.rule)}
+              {offer.recurrence.instanceDate ? ` · ${offer.recurrence.instanceDate}` : ""}
+            </p>
+            <label className="mt-2 flex cursor-pointer items-center gap-2 text-muted-foreground">
+              <input
+                type="checkbox"
+                onChange={(e) => {
+                  if (!e.target.checked) return;
+                  void api<{ offer: CasinoOfferSummary }>(`/api/casino/${offer.id}`, {
+                    method: "PATCH",
+                    json: { stopRecurrence: true },
+                  }).then((r) => onChanged(r.offer));
+                }}
+              />
+              Stop repeating from this occurrence forward
+            </label>
+          </div>
+        </CardContent>
+      ) : null}
+
       <CardContent className="offer-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
         <span className="text-xs text-muted-foreground">
           {offer.components.length} step{offer.components.length === 1 ? "" : "s"}
@@ -279,7 +400,7 @@ function CampaignCard({
           ) : null}
         </span>
         <div className="flex flex-wrap gap-1.5">
-          <DeleteButton onConfirm={() => void remove()} label="Delete campaign" />
+          <DeleteCampaignDialog offer={offer} onRemoved={onRemoved} />
           <div className={outlineButtonGroup}>
             <CasinoOfferEditDialog offer={offer} onSaved={onChanged} />
             {offer.components.length > 0 ? (
@@ -319,7 +440,7 @@ export default function CasinoPage() {
   const [offers, setOffers] = useState<CasinoOfferSummary[] | null>(null);
 
   const load = useCallback(() => {
-    api<{ offers: CasinoOfferSummary[] }>("/api/casino")
+    apiGet<{ offers: CasinoOfferSummary[] }>("/api/casino")
       .then((r) => setOffers(r.offers))
       .catch(() => setOffers([]));
   }, []);
