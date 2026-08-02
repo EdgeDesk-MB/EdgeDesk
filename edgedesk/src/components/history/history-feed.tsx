@@ -25,6 +25,11 @@ import {
 } from "@/lib/history-display";
 import { SportIcon } from "@/components/sport-icon";
 import { HistoryEntryIcon } from "@/components/history/history-entry-icon";
+import { EarlyFreeBetAwardButton } from "@/components/history/early-free-bet-award-button";
+import {
+  showEarlyFreeBetAwardButton,
+  unconditionalFreeBetEffect,
+} from "@/lib/offers/early-free-bet-award";
 import { cn } from "@/lib/utils";
 import { Gift } from "lucide-react";
 
@@ -93,15 +98,12 @@ function HistoryTimeBadgeDisplay({
   entry,
   ctx,
   className,
-  spanSubtitleRow = false,
-  /** Single-line "Yesterday, 20:43" - History page. Home keeps the stacked two-line badge. */
+  /** Single-line "Today, 08:56" / "Yesterday, 20:43" - History page. Home keeps the stacked two-line badge. */
   inline = false,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   className?: string;
-  /** When the row already has a subtitle line, stack the date/time in that space. */
-  spanSubtitleRow?: boolean;
   inline?: boolean;
 }) {
   if (inline) {
@@ -120,22 +122,11 @@ function HistoryTimeBadgeDisplay({
     );
   }
 
-  const stacked = (
-    <span className="flex flex-col leading-tight tabular-nums">
+  return (
+    <span className={cn("flex flex-col leading-tight tabular-nums", className)}>
       <span className="whitespace-nowrap">{primary}</span>
       <span className="whitespace-nowrap">{secondary}</span>
     </span>
-  );
-
-  if (spanSubtitleRow) {
-    return <span className={cn("self-center tabular-nums", className)}>{stacked}</span>;
-  }
-
-  // Keep two-line badges out of document flow so row height stays title-driven.
-  return (
-    <div className={cn("relative h-0 self-start overflow-visible", className)}>
-      <div className="absolute left-0 top-0">{stacked}</div>
-    </div>
   );
 }
 
@@ -160,8 +151,12 @@ function historyHeaderTint(entry: HistoryRow): string | null {
 
 function historyRowShellClass(entry: HistoryRow, compact: boolean) {
   return cn(
-    "flex w-full min-w-0 items-start gap-2 rounded-md border border-transparent transition-colors hover:border-border/60 hover:bg-selection-subtle cursor-pointer",
-    compact ? "box-border max-w-full px-2 py-2" : "self-stretch px-2 py-1.5",
+    // Min height matches title + subtitle so single-line rows (e.g. bare "Bet placed")
+    // align with double-line settlements and event rows.
+    "flex w-full min-w-0 items-center gap-2 rounded-md border border-transparent transition-colors hover:border-border/60 hover:bg-selection-subtle",
+    compact
+      ? "box-border max-w-full min-h-[3.25rem] px-2 py-2"
+      : "self-stretch min-h-[3rem] px-2 py-1.5",
     entryTint(entry)
   );
 }
@@ -170,10 +165,12 @@ export function HistoryEntryRow({
   entry,
   ctx,
   compact = false,
+  onFreeBetAwarded,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   compact?: boolean;
+  onFreeBetAwarded?: () => void;
 }) {
   const isSettlement = entry.kind === "settlement";
   const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
@@ -188,94 +185,120 @@ export function HistoryEntryRow({
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
   const href = historyEntryHref(entry, ctx);
   const linkLabel = historyEntryLinkLabel(entry, ctx);
+  const offerTitle =
+    bet?.offerId != null ? ctx.offerTitleById.get(bet.offerId) : undefined;
+  const showEarlyAward = showEarlyFreeBetAwardButton(entry, bet, promo, offerTitle);
+  const earlyAwardAmount = bet
+    ? unconditionalFreeBetEffect(bet, offerTitle)?.amount
+    : undefined;
+  // Feed rows always use compact prompt density (text-xs) to match other subtitles.
+  const earlyAwardPrompt =
+    showEarlyAward && bet ? (
+      <EarlyFreeBetAwardButton
+        betId={bet.id}
+        amount={earlyAwardAmount}
+        compact
+        onAwarded={onFreeBetAwarded}
+      />
+    ) : null;
 
   if (compact) {
     return (
-      <Link href={href} className={historyRowShellClass(entry, true)} aria-label={linkLabel}>
-        <HistoryTimeBadgeDisplay
-          entry={entry}
-          ctx={ctx}
-          spanSubtitleRow={Boolean(compactDescription)}
-          className={cn(
-            "w-[4.75rem] shrink-0 self-start text-left text-[11px] font-semibold text-muted-foreground",
-            compactDescription && "self-center"
-          )}
-        />
-        <div className="flex w-4 shrink-0 justify-center self-start pt-0.5">
-          <HistoryEntryIcon entry={entry} ctx={ctx} />
-        </div>
-        <div className="min-w-0 flex-1 text-left">
-          <HistoryEntryTitleDisplay
-            title={title}
-            freeBetPlaced={freeBetPlaced}
-            freeBetWon={freeBetWon}
-            className="block text-[13px] font-medium leading-snug"
+      <div className={historyRowShellClass(entry, true)}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <HistoryTimeBadgeDisplay
+            entry={entry}
+            ctx={ctx}
+            className="w-[4.75rem] shrink-0 text-left text-[11px] font-semibold text-muted-foreground"
           />
-          {compactDescription ? (
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              {compactDescription}
-            </span>
-          ) : null}
+          <div className="flex w-4 shrink-0 justify-center">
+            <HistoryEntryIcon entry={entry} ctx={ctx} />
+          </div>
+          <div className="min-w-0 flex-1 text-left">
+            <Link
+              href={href}
+              className="cursor-pointer"
+              aria-label={linkLabel}
+            >
+              <HistoryEntryTitleDisplay
+                title={title}
+                freeBetPlaced={freeBetPlaced}
+                freeBetWon={freeBetWon}
+                className="block text-[13px] font-medium leading-snug"
+              />
+            </Link>
+            {compactDescription ? (
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                {compactDescription}
+              </span>
+            ) : null}
+            {earlyAwardPrompt}
+          </div>
         </div>
         {isSettlement && entry.amount != null ? (
-          <span className="ml-auto shrink-0 self-start text-right text-[13px] font-semibold tabular-nums">
+          <span className="shrink-0 text-right text-[13px] font-semibold tabular-nums">
             <MoneyFlow value={entry.amount} signColor signDisplay />
           </span>
         ) : null}
-      </Link>
+      </div>
     );
   }
 
   return (
-    <Link href={href} className={historyRowShellClass(entry, false)} aria-label={linkLabel}>
-      <HistoryTimeBadgeDisplay
-        entry={entry}
-        ctx={ctx}
-        className="w-[4.5rem] shrink-0 pt-0.5 text-left text-[11px] font-semibold text-muted-foreground"
-      />
-      <div className="flex w-4 shrink-0 justify-center pt-0.5">
-        <HistoryEntryIcon entry={entry} ctx={ctx} />
-      </div>
-      <span className="min-w-0 flex-1 text-left">
-        <HistoryEntryTitleDisplay
-          title={title}
-          freeBetPlaced={freeBetPlaced}
-          freeBetWon={freeBetWon}
-          className="block text-[13px] font-medium"
+    <div className={historyRowShellClass(entry, false)}>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <HistoryTimeBadgeDisplay
+          entry={entry}
+          ctx={ctx}
+          className="w-[4.5rem] shrink-0 text-left text-[11px] font-semibold text-muted-foreground"
         />
-        {subtitle && (
-          <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
-        )}
-        {event && eventLine && (
-          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/80">
-            <SportIcon sport={event.sport} size={11} className="shrink-0 text-muted-foreground/70" />
-            <span className="truncate">{eventLine}</span>
-          </span>
-        )}
-        {settledNote && (
-          <span className="mt-0.5 block text-[10px] text-muted-foreground">{settledNote}</span>
-        )}
-        {bet && isSettlement && (
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-            {formatBetMeta(bet).map((line) => (
-              <span key={line}>{line}</span>
-            ))}
-          </div>
-        )}
-        {bet && entry.kind === "bet_placed" && (
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-            {formatBetMeta(bet).slice(0, 3).map((line) => (
-              <span key={line}>{line}</span>
-            ))}
-          </div>
-        )}
-      </span>
-      {isSettlement && entry.amount != null && (
-        <span className="shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums">
+        <div className="flex w-4 shrink-0 justify-center">
+          <HistoryEntryIcon entry={entry} ctx={ctx} />
+        </div>
+        <span className="min-w-0 flex-1 text-left">
+          <Link href={href} className="cursor-pointer" aria-label={linkLabel}>
+            <HistoryEntryTitleDisplay
+              title={title}
+              freeBetPlaced={freeBetPlaced}
+              freeBetWon={freeBetWon}
+              className="block text-[13px] font-medium"
+            />
+          </Link>
+          {subtitle ? (
+            <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+          ) : null}
+          {event && eventLine ? (
+            <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/80">
+              <SportIcon sport={event.sport} size={11} className="shrink-0 text-muted-foreground/70" />
+              <span className="truncate">{eventLine}</span>
+            </span>
+          ) : null}
+          {earlyAwardPrompt}
+          {settledNote && (
+            <span className="mt-0.5 block text-[10px] text-muted-foreground">{settledNote}</span>
+          )}
+          {bet && isSettlement && (
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+              {formatBetMeta(bet).map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </div>
+          )}
+          {bet && entry.kind === "bet_placed" && !showEarlyAward && (
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+              {formatBetMeta(bet).slice(0, 3).map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </div>
+          )}
+        </span>
+      </div>
+      {isSettlement && entry.amount != null ? (
+        <span className="shrink-0 text-right text-[13px] font-semibold tabular-nums">
           <MoneyFlow value={entry.amount} signColor signDisplay />
         </span>
-      )}
-    </Link>
+      ) : null}
+    </div>
   );
 }
 
@@ -284,12 +307,14 @@ export function HistoryEntryCard({
   ctx,
   bet,
   collapsed = false,
+  onFreeBetAwarded,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   bet?: BetRow;
   /** Hide bet details band — header summary only */
   collapsed?: boolean;
+  onFreeBetAwarded?: () => void;
 }) {
   const settledNote = historySettledNote(entry, ctx);
   const promo = entry.betId != null ? ctx.promoByBetId[entry.betId] : undefined;
@@ -301,16 +326,22 @@ export function HistoryEntryCard({
   const title = historyEntryTitle(entry, ctx);
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
+  const offerTitle =
+    bet?.offerId != null ? ctx.offerTitleById.get(bet.offerId) : undefined;
+  const showEarlyAward = showEarlyFreeBetAwardButton(entry, bet, promo, offerTitle);
+  const earlyAwardAmount = bet
+    ? unconditionalFreeBetEffect(bet, offerTitle)?.amount
+    : undefined;
 
   return (
     <article className="offer-campaign-card overflow-hidden rounded-lg ring-1 ring-border/50 dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100">
       <div
         className={cn(
-          collapsed ? "px-3 py-2.5" : "px-4 pt-4 pb-3",
+          collapsed ? "flex min-h-[3.75rem] items-center px-3 py-2.5" : "px-4 pt-4 pb-3",
           historyHeaderTint(entry) ?? "bg-card"
         )}
       >
-        <div className={cn("flex items-start", collapsed ? "gap-2" : "gap-3")}>
+        <div className={cn("flex w-full min-w-0 items-start", collapsed ? "gap-2" : "gap-3")}>
           <div
             className={cn(
               "flex w-4 shrink-0 flex-col items-center pt-0.5",
@@ -324,7 +355,7 @@ export function HistoryEntryCard({
           </div>
 
           <div className="min-w-0 flex-1 text-left">
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex w-full items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -355,24 +386,34 @@ export function HistoryEntryCard({
                 {!collapsed && eventLine ? (
                   <p className="mt-1 text-sm text-foreground/80">{eventLine}</p>
                 ) : null}
-                {!collapsed && settledNote ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{settledNote}</p>
-                ) : null}
                 {collapsed && eventLine ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{eventLine}</p>
                 ) : null}
+                {showEarlyAward && bet ? (
+                  <EarlyFreeBetAwardButton
+                    betId={bet.id}
+                    amount={earlyAwardAmount}
+                    compact={collapsed}
+                    onAwarded={onFreeBetAwarded}
+                  />
+                ) : null}
+                {!collapsed && settledNote ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{settledNote}</p>
+                ) : null}
               </div>
-              {entry.kind === "settlement" && entry.amount != null && (
-                <MoneyFlow
-                  value={entry.amount}
-                  signColor
-                  signDisplay
-                  className={cn(
-                    "shrink-0 font-bold tabular-nums",
-                    collapsed ? "text-base" : "text-xl"
-                  )}
-                />
-              )}
+              {entry.kind === "settlement" && entry.amount != null ? (
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <MoneyFlow
+                    value={entry.amount}
+                    signColor
+                    signDisplay
+                    className={cn(
+                      "shrink-0 font-bold tabular-nums",
+                      collapsed ? "text-base" : "text-xl"
+                    )}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -445,11 +486,13 @@ export function HistoryFeed({
   ctx,
   compact = false,
   emptyMessage = "Nothing yet - key match moments and bet results land here in real time.",
+  onFreeBetAwarded,
 }: {
   entries: HistoryRow[];
   ctx: HistoryContext;
   compact?: boolean;
   emptyMessage?: string;
+  onFreeBetAwarded?: () => void;
 }) {
   if (entries.length === 0) {
     return (
@@ -467,7 +510,13 @@ export function HistoryFeed({
       )}
     >
       {entries.map((entry) => (
-        <HistoryEntryRow key={entry.id} entry={entry} ctx={ctx} compact={compact} />
+        <HistoryEntryRow
+          key={entry.id}
+          entry={entry}
+          ctx={ctx}
+          compact={compact}
+          onFreeBetAwarded={onFreeBetAwarded}
+        />
       ))}
     </div>
   );

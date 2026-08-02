@@ -5,7 +5,7 @@ import { HistoryEntryCard } from "@/components/history/history-feed";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
-import { api } from "@/hooks/use-app-state";
+import { apiGet } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import {
@@ -25,9 +25,12 @@ export type HistoryViewDensity = "expanded" | "collapsed";
 const HISTORY_VIEW_STORAGE_KEY = "edgedesk:history-view-density";
 
 function readStoredViewDensity(): HistoryViewDensity {
-  if (typeof window === "undefined") return "expanded";
-  const raw = localStorage.getItem(HISTORY_VIEW_STORAGE_KEY);
-  return raw === "collapsed" ? "collapsed" : "expanded";
+  try {
+    const raw = localStorage.getItem(HISTORY_VIEW_STORAGE_KEY);
+    return raw === "collapsed" ? "collapsed" : "expanded";
+  } catch {
+    return "expanded";
+  }
 }
 
 function storeViewDensity(density: HistoryViewDensity) {
@@ -49,15 +52,22 @@ interface HistoryPayload {
   events: EventRow[];
   bets: BetRow[];
   promoAwards: Record<number, { amount: number; reason: string }>;
+  offerTitles?: Array<{ id: number; title: string }>;
   filter: HistoryFilter;
 }
 
 export default function HistoryPage() {
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const [viewDensity, setViewDensity] = useState<HistoryViewDensity>(() => readStoredViewDensity());
+  // Loaded after mount: reading localStorage during the first render would
+  // disagree with the server HTML and break hydration.
+  const [viewDensity, setViewDensity] = useState<HistoryViewDensity>("expanded");
   const [data, setData] = useState<HistoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const collapsed = viewDensity === "collapsed";
+
+  useEffect(() => {
+    queueMicrotask(() => setViewDensity(readStoredViewDensity()));
+  }, []);
 
   function changeViewDensity(next: HistoryViewDensity) {
     setViewDensity(next);
@@ -70,9 +80,21 @@ export default function HistoryPage() {
     setLoading(true);
   }
 
+  const loadHistory = useCallback((nextFilter: HistoryFilter, opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
+    return apiGet<HistoryPayload>(`/api/history?filter=${nextFilter}&limit=200`)
+      .then((res) => {
+        setData(res);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     let live = true;
-    api<HistoryPayload>(`/api/history?filter=${filter}&limit=200`)
+    apiGet<HistoryPayload>(`/api/history?filter=${filter}&limit=200`)
       .then((res) => {
         if (!live) return;
         setData(res);
@@ -89,7 +111,12 @@ export default function HistoryPage() {
   const ctx = useMemo(
     () =>
       data
-        ? buildHistoryContext(data.events, data.bets, data.promoAwards)
+        ? buildHistoryContext(
+            data.events,
+            data.bets,
+            data.promoAwards,
+            data.offerTitles ?? []
+          )
         : buildHistoryContext([], [], {}),
     [data]
   );
@@ -177,6 +204,7 @@ export default function HistoryPage() {
                   ctx={ctx}
                   bet={entry.betId != null ? ctx.betsById.get(entry.betId) : undefined}
                   collapsed={collapsed}
+                  onFreeBetAwarded={() => void loadHistory(filter, { quiet: true })}
                 />
               ))}
             </div>

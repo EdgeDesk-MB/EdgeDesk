@@ -28,17 +28,21 @@ export interface HistoryContext {
   eventsById: Map<number, EventRow>;
   betsById: Map<number, BetRow>;
   promoByBetId: Record<number, { amount: number; reason: string }>;
+  /** Linked offer titles for early free-bet award eligibility on bet_placed rows. */
+  offerTitleById: Map<number, string>;
 }
 
 export function buildHistoryContext(
   events: EventRow[],
   bets: BetRow[],
-  promoByBetId: Record<number, { amount: number; reason: string }> = {}
+  promoByBetId: Record<number, { amount: number; reason: string }> = {},
+  offerTitles: Array<{ id: number; title: string }> = []
 ): HistoryContext {
   return {
     eventsById: new Map(events.map((e) => [e.id, e])),
     betsById: new Map(bets.map((b) => [b.id, b])),
     promoByBetId,
+    offerTitleById: new Map(offerTitles.map((o) => [o.id, o.title])),
   };
 }
 
@@ -124,7 +128,7 @@ export function historyUsesMinuteBadge(entry: HistoryRow, ctx: HistoryContext): 
   );
 }
 
-/** Left-column time badge parts - two lines for yesterday and older. */
+/** Left-column time badge parts - two lines for today, yesterday and older. */
 export interface HistoryTimeBadgeParts {
   primary: string;
   secondary?: string;
@@ -145,7 +149,7 @@ export function formatHistoryTimeBadgeParts(
   const time = formatHistoryClock(when);
 
   if (isSameCalendarDay(when, now)) {
-    return { primary: time };
+    return { primary: "Today", secondary: time };
   }
 
   if (isYesterday(when, now)) {

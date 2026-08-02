@@ -1,5 +1,14 @@
 import { desc, eq, isNotNull, and, notInArray } from "drizzle-orm";
-import { db, history, events, bets, type HistoryRow, type EventRow, type BetRow } from "@/lib/db";
+import {
+  db,
+  history,
+  events,
+  bets,
+  offers,
+  type HistoryRow,
+  type EventRow,
+  type BetRow,
+} from "@/lib/db";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
 import {
   buildHistoryContext,
@@ -66,6 +75,14 @@ export interface HistoryFeedResult {
   bets: BetRow[];
   context: HistoryContext;
   promoAwards: Record<number, { amount: number; reason: string }>;
+  offerTitles: Array<{ id: number; title: string }>;
+}
+
+function loadOfferTitles(): Array<{ id: number; title: string }> {
+  return db
+    .select({ id: offers.id, title: offers.title })
+    .from(offers)
+    .all();
 }
 
 export function getHistoryFeed(options?: {
@@ -77,7 +94,8 @@ export function getHistoryFeed(options?: {
   const allEvents = db.select().from(events).all();
   const allBets = db.select().from(bets).all();
   const promoAwards = getPromoAwardsByBetId();
-  const context = buildHistoryContext(allEvents, allBets, promoAwards);
+  const offerTitles = loadOfferTitles();
+  const context = buildHistoryContext(allEvents, allBets, promoAwards, offerTitles);
 
   const raw = dedupeHistoryForDisplay(
     db.select().from(history).orderBy(desc(history.createdAt), desc(history.id)).limit(limit * 2).all(),
@@ -90,7 +108,7 @@ export function getHistoryFeed(options?: {
   }
   entries = entries.slice(0, limit);
 
-  return { entries, events: allEvents, bets: allBets, context, promoAwards };
+  return { entries, events: allEvents, bets: allBets, context, promoAwards, offerTitles };
 }
 
 /** All feed rows that qualify as chart money-position annotations (not limited to feed page size). */
@@ -99,7 +117,7 @@ export function getChartAnnotationHistory(
   allBets: BetRow[],
   promoAwards: Record<number, { amount: number; reason: string }>
 ): HistoryRow[] {
-  const context = buildHistoryContext(allEvents, allBets, promoAwards);
+  const context = buildHistoryContext(allEvents, allBets, promoAwards, loadOfferTitles());
   const rows = db.select().from(history).all();
   return rows.filter((entry) => isChartAnnotationEntry(entry, context));
 }

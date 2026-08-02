@@ -154,7 +154,11 @@ function AddBalanceForm({
               : categoryForRow(r) === "adjustment"
                 ? `Balance set to ${formatGbp(r.amount)}`
                 : undefined),
-          ...(mode === "adjustment" && affectPnl ? { affectPnl: true } : {}),
+          ...((mode === "adjustment" || mode === "top_up") &&
+          affectPnl &&
+          categoryForRow(r) !== "free_bet"
+            ? { affectPnl: true }
+            : {}),
         };
       })
       .filter((e): e is NonNullable<typeof e> => e != null);
@@ -403,7 +407,7 @@ function AddBalanceForm({
             );
           })}
 
-          {mode === "adjustment" && (
+          {(mode === "adjustment" || mode === "top_up") && (
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -413,7 +417,9 @@ function AddBalanceForm({
               />
               <span>Include in P&amp;L</span>
               <span className="text-xs text-muted-foreground">
-                — records this correction in your profit &amp; loss history
+                {mode === "top_up"
+                  ? "records this top-up in your profit & loss history"
+                  : "records this correction in your profit & loss history"}
               </span>
             </label>
           )}

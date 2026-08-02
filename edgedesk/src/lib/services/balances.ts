@@ -17,6 +17,10 @@ import { ensureVenueAccount } from "@/lib/accounts/ensure-venue";
 import { sumFreeBetLotBalance } from "@/lib/accounts/free-bet-lot-balance";
 import { applyWageringRequirement } from "@/lib/accounts/wagering";
 import type { DutchLegRecord } from "@/lib/calc/settlement";
+import {
+  EARLY_FREE_BET_AWARD_REASON,
+  unconditionalFreeBetEffect,
+} from "@/lib/offers/early-free-bet-award";
 
 export type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
 import type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
@@ -321,16 +325,21 @@ export function recordManualTransaction(
     affectPnl: opts?.affectPnl,
   });
 
-  if (opts?.affectPnl && category === "adjustment" && amount !== 0) {
+  if (
+    opts?.affectPnl &&
+    amount !== 0 &&
+    (category === "adjustment" || category === "top_up")
+  ) {
     const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
     const accountName = account?.name ?? "Account";
     const sign = amount > 0 ? "+" : "";
     const formattedAmount = `${sign}GBP ${Math.abs(amount).toFixed(2)}`;
+    const isTopUp = category === "top_up";
     db.insert(history)
       .values({
-        dedupe: `adj:${accountId}:${now}`,
+        dedupe: `${isTopUp ? "topup" : "adj"}:${accountId}:${now}`,
         kind: "balance_adjustment",
-        title: "Balance correction",
+        title: isTopUp ? "Top-up" : "Balance correction",
         detail: `${accountName} - ${formattedAmount}`,
         amount,
         createdAt: now,
@@ -485,8 +494,47 @@ export function reledgerDutchFreeLegs(bet: BetRow): void {
   ledgerDutchFreeLegs(bet);
 }
 
+/**
+ * Clear placement debits for an open bet (cash stake, free-bet used, lay
+ * liability). Leaves promo free-bet credits (positive free_bet) untouched.
+ */
+function clearOpenBetPlacementDebits(betId: number): void {
+  const txs = db
+    .select()
+    .from(balanceTransactions)
+    .where(eq(balanceTransactions.betId, betId))
+    .all();
+  for (const t of txs) {
+    const placementDebit =
+      t.category === "bet_stake" || (t.category === "free_bet" && t.amount < 0);
+    if (!placementDebit) continue;
+    db.delete(balanceTransactions).where(eq(balanceTransactions.id, t.id)).run();
+  }
+}
+
+/**
+ * Re-sync placement ledger after an open bet is edited (stake, lay, bookie,
+ * or cash ↔ free funding). Skips wagering-requirement updates: WR burn is not
+ * stored per bet, so an inverse would guess wrong after the remaining hits 0.
+ * Create-time `ledgerBetPlacement` still applies WR as before.
+ */
+export function reledgerOpenBetPlacement(_previous: BetRow, next: BetRow): void {
+  if (next.status !== "open" || next.balanceSettled) return;
+  if (next.betType === "dutch") {
+    reledgerDutchFreeLegs(next);
+    return;
+  }
+
+  clearOpenBetPlacementDebits(next.id);
+  db.update(bets).set({ balanceLedgered: 0 }).where(eq(bets.id, next.id)).run();
+  ledgerBetPlacement({ ...next, balanceLedgered: 0 }, { applyWagering: false });
+}
+
 /** Debit back stake and lay liability when a bet is saved. */
-export function ledgerBetPlacement(bet: BetRow): boolean {
+export function ledgerBetPlacement(
+  bet: BetRow,
+  opts?: { applyWagering?: boolean }
+): boolean {
   if (bet.balanceLedgered) return false;
   if (bet.betType === "dutch") return ledgerDutchFreeLegs(bet);
 
@@ -499,6 +547,7 @@ export function ledgerBetPlacement(bet: BetRow): boolean {
 
   const liability = bet.layStake * (bet.layOdds - 1);
   const isFree = bet.betType === "free_snr" || bet.betType === "free_sr";
+  const applyWagering = opts?.applyWagering !== false;
 
   if (bookie && bet.backStake > 0 && isFree) {
     insertTx(
@@ -517,7 +566,7 @@ export function ledgerBetPlacement(bet: BetRow): boolean {
       `Back stake - ${bet.label}`,
       bet.id
     );
-    applyWageringRequirement(bet, bookie.id);
+    if (applyWagering) applyWageringRequirement(bet, bookie.id);
   }
   if (exchange && liability > 0) {
     insertTx(
@@ -648,6 +697,35 @@ export function ledgerPromoAward(bet: BetRow, amount: number, reason: string): b
     bet.id
   );
   return true;
+}
+
+/**
+ * Credit an unconditional free bet before settlement (bookie released it on placement).
+ * Idempotent: a later settlement pass will not credit again.
+ */
+export function awardUnconditionalFreeBetEarly(
+  bet: BetRow,
+  offerTitle?: string | null
+): { ok: true; amount: number } | { ok: false; error: string } {
+  if (bet.status === "void") {
+    return { ok: false, error: "Void bets cannot award a free bet" };
+  }
+  if (bet.betType === "free_snr" || bet.betType === "free_sr") {
+    return { ok: false, error: "Conversion bets cannot award a free bet" };
+  }
+  const effect = unconditionalFreeBetEffect(bet, offerTitle);
+  if (!effect) {
+    return { ok: false, error: "Bet has no unconditional free-bet reward" };
+  }
+  if (!bet.bookmaker?.trim()) {
+    return { ok: false, error: "Bookmaker is required to credit the free bet" };
+  }
+
+  const credited = ledgerPromoAward(bet, effect.amount, EARLY_FREE_BET_AWARD_REASON);
+  if (!credited) {
+    return { ok: false, error: "Free bet already credited for this bet" };
+  }
+  return { ok: true, amount: effect.amount };
 }
 
 /** Apply ledger when a bet moves to a settled status. */

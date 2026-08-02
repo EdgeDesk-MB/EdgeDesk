@@ -35,7 +35,7 @@ import { useAddBalance } from "@/components/add-balance-provider";
 import { TransferFundsDialog } from "@/components/accounts/transfer-funds-dialog";
 import { ManageVenuesDialog } from "@/components/accounts/venue-admin-panel";
 import { MoneyFlow } from "@/components/money-flow";
-import { api, useAppState } from "@/hooks/use-app-state";
+import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { NumField } from "@/components/calc/num-field";
 import { mugDue } from "@/lib/accounts/mug-plan";
 import { ALL_OWNERS, OwnerFilter } from "@/components/accounts/owner-filter";
@@ -134,7 +134,7 @@ function AccountsContent() {
   );
 
   useEffect(() => {
-    api<{ pending: PendingTx[] }>("/api/accounts/pending")
+    apiGet<{ pending: PendingTx[] }>("/api/accounts/pending")
       .then((r) => setPending(r.pending ?? []))
       .catch(() => setPending([]));
   }, [state?.balances?.total, state?.balances?.pendingBankCredits]);

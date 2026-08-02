@@ -3,9 +3,17 @@ import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, accounts, bets, events, mugPlans } from "@/lib/db";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
-import { ledgerFromSettledBet, reledgerDutchFreeLegs } from "@/lib/services/balances";
+import {
+  ledgerFromSettledBet,
+  reledgerDutchFreeLegs,
+  reledgerOpenBetPlacement,
+} from "@/lib/services/balances";
 import { purgeHistoryForBet } from "@/lib/services/history-feed";
-import { resolveOfferForBet, syncOfferStatuses } from "@/lib/services/offers";
+import {
+  resolveOfferForBet,
+  spawnCourseOfferSiblingsIfNeeded,
+  syncOfferStatuses,
+} from "@/lib/services/offers";
 
 export const dynamic = "force-dynamic";
 
@@ -148,9 +156,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       }
     }
   }
-  if (p.legs !== undefined) reledgerDutchFreeLegs(updated);
+  const placementTouched =
+    p.betType !== undefined ||
+    p.backStake !== undefined ||
+    p.layStake !== undefined ||
+    p.layOdds !== undefined ||
+    p.bookmaker !== undefined ||
+    p.exchangeId !== undefined;
+  if (p.legs !== undefined) {
+    reledgerDutchFreeLegs(updated);
+  } else if (placementTouched && updated.status === "open") {
+    reledgerOpenBetPlacement(existing, updated);
+  }
   if (updated.status !== "open") ledgerFromSettledBet(updated);
   syncOfferStatuses();
+  if (updated.offerId != null || existing.offerId != null) {
+    spawnCourseOfferSiblingsIfNeeded();
+  }
   return NextResponse.json({ bet: updated });
 }
 

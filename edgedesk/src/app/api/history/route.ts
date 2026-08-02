@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { HistoryFilter } from "@/lib/history-display";
 import { getHistoryFeed } from "@/lib/services/history-feed";
-import { getAppState } from "@/lib/services/state";
 
 const FILTERS: HistoryFilter[] = [
   "all",
@@ -14,8 +13,6 @@ const FILTERS: HistoryFilter[] = [
 ];
 
 export async function GET(req: Request) {
-  await getAppState();
-
   const { searchParams } = new URL(req.url);
   const filterParam = searchParams.get("filter") ?? "all";
   const filter = FILTERS.includes(filterParam as HistoryFilter)
@@ -30,6 +27,7 @@ export async function GET(req: Request) {
     events: feed.events,
     bets: feed.bets,
     promoAwards: feed.promoAwards,
+    offerTitles: feed.offerTitles,
     filter,
   });
 }

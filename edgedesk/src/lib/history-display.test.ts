@@ -158,7 +158,11 @@ describe("formatHistoryTimeBadge", () => {
     });
 
     expect(historyUsesMinuteBadge(entry, ctx)).toBe(false);
-    expect(formatHistoryTimeBadge(entry, ctx)).toBe("19:30");
+    expect(formatHistoryTimeBadgeParts(entry, ctx)).toEqual({
+      primary: "Today",
+      secondary: "19:30",
+    });
+    expect(formatHistoryTimeBadge(entry, ctx)).toBe("Today, 19:30");
     expect(historyOccurredAt(entry, ctx)).toBe(kickoffAt.getTime());
 
     vi.useRealTimers();
@@ -177,8 +181,28 @@ describe("formatHistoryTimeBadge", () => {
     });
 
     expect(historyUsesMinuteBadge(entry, ctx)).toBe(false);
-    expect(formatHistoryTimeBadge(entry, ctx)).toBe("21:00");
+    expect(formatHistoryTimeBadge(entry, ctx)).toBe("Today, 21:00");
     expect(historyOccurredAt(entry, ctx)).toBe(kickoffAt.getTime() + 90 * 60 * 1000);
+
+    vi.useRealTimers();
+  });
+
+  it("shows Today on one line and time on the next", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-08T21:00:00"));
+
+    const entry = row({
+      kind: "bet_placed",
+      title: "Bet placed",
+      betId: undefined,
+      createdAt: new Date("2026-07-08T08:56:00").getTime(),
+    });
+
+    expect(formatHistoryTimeBadgeParts(entry, ctx)).toEqual({
+      primary: "Today",
+      secondary: "08:56",
+    });
+    expect(formatHistoryTimeBadge(entry, ctx)).toBe("Today, 08:56");
 
     vi.useRealTimers();
   });
