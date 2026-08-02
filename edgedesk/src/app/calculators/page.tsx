@@ -72,12 +72,7 @@ const sections = [
   },
 ];
 
-const phase2 = [
-  "Arbitrage",
-  "Kelly criterion",
-  "Asian handicap",
-  "Exchange bonus lock-in",
-];
+const phase2 = ["Asian handicap", "Exchange bonus lock-in"];
 
 export default function CalculatorsPage() {
   return (
