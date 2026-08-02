@@ -236,8 +236,9 @@ export function VenueSelect({
     if (exWallet?.brandColor) return exWallet.brandColor;
     const exDir = exchangeDirectory.find((e) => e.name.toLowerCase() === key);
     if (exDir?.brandColor) return exDir.brandColor;
-    return bookieBrandColor(value);
-  }, [value, exchangeWallets, exchangeDirectory]);
+    const bookieWallet = bookieWallets.find((b) => b.name.toLowerCase() === key);
+    return bookieBrandColor(value, bookieWallet?.brandColor);
+  }, [value, bookieWallets, exchangeWallets, exchangeDirectory]);
 
   function updatePosition(root?: HTMLElement | null) {
     const trigger = triggerRef.current;

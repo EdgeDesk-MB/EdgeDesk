@@ -23,14 +23,26 @@ type AppStateContextValue = {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
+/** Abandon a coalesced poll that has been stuck this long (dev compile / API hang). */
+const STALE_INFLIGHT_MS = 15_000;
+
 /** One poll loop for the whole app - avoids N duplicate /api/state fetches per page. */
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
+  const inFlightStartedAt = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (inFlight.current) return inFlight.current;
+    // Coalesce duplicate polls, but do not wedge Delete/Expire refresh behind a
+    // zombie /api/state that has been hanging for tens of seconds (seen when
+    // Racing Desk / Offer Edge saturates the Next process).
+    if (
+      inFlight.current &&
+      Date.now() - inFlightStartedAt.current < STALE_INFLIGHT_MS
+    ) {
+      return inFlight.current;
+    }
 
     const run = (async () => {
       try {
@@ -42,12 +54,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setError(null);
       } catch (e) {
         setError(String(e));
+        // Keep the last good snapshot - never blank the desk on a failed poll.
       } finally {
-        inFlight.current = null;
+        if (inFlight.current === run) inFlight.current = null;
       }
     })();
 
     inFlight.current = run;
+    inFlightStartedAt.current = Date.now();
     return run;
   }, []);
 

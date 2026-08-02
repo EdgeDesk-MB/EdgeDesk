@@ -21,6 +21,10 @@ interface NumFieldProps {
   tint?: string;
   /** Extra node rendered to the right of the label */
   labelExtra?: React.ReactNode;
+  /** Applied to the input value only (prefix stays neutral unless prefixClassName is set) */
+  inputClassName?: string;
+  /** Applied to the prefix (defaults to muted) */
+  prefixClassName?: string;
 }
 
 export function NumField({
@@ -35,6 +39,8 @@ export function NumField({
   placeholder,
   tint,
   labelExtra,
+  inputClassName,
+  prefixClassName,
 }: NumFieldProps) {
   const id = useId();
   return (
@@ -47,7 +53,12 @@ export function NumField({
       </span>
       <div className="relative">
         {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+          <span
+            className={cn(
+              "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground",
+              prefixClassName
+            )}
+          >
             {prefix}
           </span>
         )}
@@ -63,7 +74,8 @@ export function NumField({
           className={cn(
             "tabular-nums",
             prefix && "pl-7",
-            tint && "border-0 bg-[var(--nf)] font-semibold dark:bg-[var(--nf-dark)]"
+            tint && "border-0 bg-[var(--nf)] font-semibold dark:bg-[var(--nf-dark)]",
+            inputClassName
           )}
           style={
             tint ? ({ "--nf": tint, "--nf-dark": darken(tint, 0.55) } as React.CSSProperties) : undefined

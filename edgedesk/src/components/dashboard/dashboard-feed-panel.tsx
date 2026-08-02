@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { HistoryFeed } from "@/components/history/history-feed";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { useAppState } from "@/hooks/use-app-state";
 import type { AppState } from "@/lib/services/state.types";
 import { buildHistoryContext } from "@/lib/history-display";
 import { dashboardPanelBody, dashboardSection } from "@/lib/ui/dashboard-layout";
@@ -27,11 +28,17 @@ export function DashboardFeedPanel({
   className?: string;
 }) {
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
+  const { refresh } = useAppState(10_000);
 
   const historyContext = useMemo(
     () =>
       state
-        ? buildHistoryContext(state.events, state.bets, state.promoAwards)
+        ? buildHistoryContext(
+            state.events,
+            state.bets,
+            state.promoAwards,
+            (state.offers ?? []).map((o) => ({ id: o.id, title: o.title }))
+          )
         : buildHistoryContext([], [], {}),
     [state]
   );
@@ -83,6 +90,7 @@ export function DashboardFeedPanel({
           }
           ctx={historyContext}
           compact
+          onFreeBetAwarded={() => void refresh()}
         />
       </ScrollFadeEdges>
     </section>

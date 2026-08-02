@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils";
 import {
   deriveOfferPipelineStage,
+  formatOfferPipelineStageLabel,
   isTerminalPipelineStage,
   OFFER_PIPELINE_PROGRESS_STAGES,
+  OFFER_PIPELINE_STAGES,
   pipelineProgressIndex,
   type OfferPipelineStage,
 } from "@/lib/offers/pipeline";
@@ -110,15 +112,15 @@ export function OfferPipelineStrip({
   const activeIdx = pipelineProgressIndex(stage);
   const total = OFFER_PIPELINE_PROGRESS_STAGES.length;
   const pct = Math.round(((activeIdx + 1) / total) * 100);
-  const current = OFFER_PIPELINE_PROGRESS_STAGES[activeIdx];
+  const currentLabel = formatOfferPipelineStageLabel(offer, stage);
   const next =
     activeIdx < total - 1 ? OFFER_PIPELINE_PROGRESS_STAGES[activeIdx + 1] : null;
 
   return (
-    <div className={className} aria-label={`Offer stage: ${current?.label ?? stage}`}>
+    <div className={className} aria-label={`Offer stage: ${currentLabel}`}>
       <div className="flex items-baseline justify-between gap-2">
         <p className={cn("text-xs font-semibold", stageLabelClass(stage))}>
-          {current?.label ?? stage}
+          {currentLabel}
         </p>
         <p className="text-[10px] tabular-nums text-muted-foreground">
           {activeIdx + 1}/{total}
@@ -147,10 +149,5 @@ export function OfferPipelineStrip({
 
 export function offerPipelineStageLabel(stage: OfferPipelineStage): string {
   if (stage === "expired") return "Expired";
-  if (stage === "planned") return "Planned";
-  if (stage === "completed") return "Completed";
-  if (stage === "settled") return "Settled";
-  return (
-    OFFER_PIPELINE_PROGRESS_STAGES.find((s) => s.id === stage)?.label ?? stage
-  );
+  return OFFER_PIPELINE_STAGES.find((s) => s.id === stage)?.label ?? stage;
 }

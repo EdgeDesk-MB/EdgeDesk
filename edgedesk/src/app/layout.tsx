@@ -65,8 +65,8 @@ export default function RootLayout({
     >
       <body className="h-full overflow-hidden bg-canvas">
         <ThemeProvider>
-          <OnboardingProvider>
-            <AppStateProvider>
+          <AppStateProvider>
+            <OnboardingProvider>
               <AddBalanceProvider>
                 <AddBetProvider>
                   <TrackFixtureProvider>
@@ -116,8 +116,8 @@ export default function RootLayout({
                   </TrackFixtureProvider>
                 </AddBetProvider>
               </AddBalanceProvider>
-            </AppStateProvider>
-          </OnboardingProvider>
+            </OnboardingProvider>
+          </AppStateProvider>
         </ThemeProvider>
       </body>
     </html>

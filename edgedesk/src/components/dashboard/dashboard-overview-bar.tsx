@@ -65,11 +65,7 @@ function OverviewMetric({
     </>
   );
 
-  const shell = cn(
-    "flex min-w-0 flex-1 flex-col",
-    (href || onClick) && "rounded-md transition-colors hover:bg-selection-subtle/60",
-    className
-  );
+  const shell = cn("flex min-w-0 flex-1 flex-col", className);
 
   if (href) {
     return (
@@ -97,6 +93,8 @@ export function DashboardOverviewBar({
   openBets,
   offers,
   bets,
+  /** Offer / Monthly P&L side chips (home only; tracker has a Monthly tab). */
+  showSideSummaries = true,
 }: {
   liveTotal: number;
   settled: number;
@@ -104,6 +102,7 @@ export function DashboardOverviewBar({
   openBets: number;
   offers: OfferSummary[];
   bets: BetRow[];
+  showSideSummaries?: boolean;
 }) {
   const [paceOpen, setPaceOpen] = useState(false);
   const [paceTab, setPaceTab] = useState<"daily" | "yearly">("daily");
@@ -167,9 +166,11 @@ export function DashboardOverviewBar({
           ) : null}
         </div>
 
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <DashboardPnlSummaries offers={offers} bets={bets} />
-        </div>
+        {showSideSummaries ? (
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <DashboardPnlSummaries offers={offers} bets={bets} />
+          </div>
+        ) : null}
       </div>
 
       {pace.dayCount > 0 ? (

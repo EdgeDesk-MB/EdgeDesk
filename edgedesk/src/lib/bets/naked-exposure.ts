@@ -10,6 +10,11 @@ import type { BetRow } from "@/lib/db/schema";
 
 export const INTENTIONAL_NOHEDGE_MARKER = "[intentional-nohedge]";
 
+/** Stable AlertWatcher / inbox dedupe key for one unhedged bet. */
+export function nakedExposureAlertKey(betId: number): string {
+  return `naked_exposure:${betId}`;
+}
+
 /** Default grace period between logging the back and logging the lay. */
 const DEFAULT_THRESHOLD_MS = 10 * 60_000;
 /** Tightened threshold when the event starts within the hour. */

@@ -44,26 +44,30 @@ export function MonthlyPnlSection({
     [bets, exchanges]
   );
 
+  const plain = variant === "plain" || embedded;
+
   if (monthly.length === 0 && accounts.length === 0) {
     if (compact) return null;
+    const emptyBody = (
+      <div className="py-6 text-center text-sm text-muted-foreground">
+        No settled bets yet.{" "}
+        <Link href="/tracker" className="font-medium text-primary underline-offset-2 hover:underline">
+          Log your first bet
+        </Link>
+        .
+      </div>
+    );
+    if (plain) return emptyBody;
     return (
       <Card>
         <SectionHeader
           title="Monthly P&L"
           description="Settle bets to see profit by month and bookmaker."
         />
-        <CardContent className="py-6 text-center text-sm text-muted-foreground">
-          No settled bets yet.{" "}
-          <Link href="/tracker" className="font-medium text-primary underline-offset-2 hover:underline">
-            Log your first bet
-          </Link>
-          .
-        </CardContent>
+        <CardContent>{emptyBody}</CardContent>
       </Card>
     );
   }
-
-  const plain = variant === "plain" || embedded;
 
   const monthTable = (
     <div>

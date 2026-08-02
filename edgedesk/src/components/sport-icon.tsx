@@ -58,15 +58,16 @@ export function FootballIcon(props: SvgIconProps) {
   );
 }
 
-/** Horse racing - side-profile horse. */
+/**
+ * Horse racing - Lucide Lab `horse-head` (main Lucide has no horse icon).
+ * https://lucide.dev/icons/lab/horse-head
+ */
 function HorseRacingIcon(props: SvgIconProps) {
   return (
     <svg {...svgProps(props)}>
-      <path d="M4 19v-2.5c0-1 .8-2.5 2.2-3.2l2.3-1.2 1.8-3.5 2.2-.8 1.4 1.6 2.1-.3c.8-.1 1.5.3 1.8 1l.7 1.8" />
-      <path d="M6 19h12" />
-      <path d="M9.5 8.5 11 6l2.5 1" />
-      <path d="M16.5 6.5c.5 1 .2 2.2-.8 3" />
-      <circle cx="17.5" cy="5" r=".75" fill="currentColor" stroke="none" />
+      <path d="M11.5 12H11" />
+      <path d="M5 15a4 4 0 0 0 4 4h7.8l.3.3a3 3 0 0 0 4-4.46L12 7c0-3-1-5-1-5S8 3 8 7c-4 1-6 3-6 3" />
+      <path d="M6.14 17.8S4 19 2 22" />
     </svg>
   );
 }

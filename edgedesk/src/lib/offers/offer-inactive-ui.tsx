@@ -25,11 +25,11 @@ export function OfferInactiveCurrencyText({
 }) {
   if (!inactive) return <>{text}</>;
 
-  const parts = text.split(/(£[\d,.]+)/g);
+  const parts = text.split(/([+-]?£[\d,.]+)/g);
   const nodes: ReactNode[] = [];
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]!;
-    if (/^£[\d,.]+$/.test(part)) {
+    if (/^[+-]?£[\d,.]+$/.test(part)) {
       nodes.push(
         <span key={i} className={OFFER_INACTIVE_FIGURE_CLASS}>
           {part}

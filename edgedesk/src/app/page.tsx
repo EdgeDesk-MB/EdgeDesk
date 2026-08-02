@@ -15,6 +15,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { effectiveEventStatus } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
+import { shouldShowDashboardEmptyCta } from "@/lib/dashboard-empty";
 import {
   dashboardMainGrid,
   dashboardPage,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/ui/dashboard-layout";
 import { DEFAULT_HOME_LAYOUT, applyDeckLayout } from "@/lib/ui/home-layout";
 import { cn } from "@/lib/utils";
-import { TrendingUp } from "lucide-react";
+import { Loader2, TrendingUp } from "lucide-react";
 
 export default function DashboardPage() {
   const { state } = useAppState();
@@ -30,27 +31,41 @@ export default function DashboardPage() {
   // container stays mounted so hidden copies don't poll or drift local state.
   const isMobile = useIsMobile();
 
-  const settled = state?.settledProfit ?? 0;
-  const provisional = state?.provisionalProfit ?? 0;
-  const liveTotal = settled + provisional;
-
   const liveEvents = useMemo(
     () => (state?.events ?? []).filter((e) => effectiveEventStatus(e) === "live"),
     [state]
   );
   const openBets = useMemo(() => (state?.bets ?? []).filter((b) => b.status === "open"), [state]);
-  const betCount = (state?.bets ?? []).length;
-  const livePositionCount = state?.livePositions.length ?? 0;
-  const showLive = liveEvents.length > 0 || livePositionCount > 0;
-
   const offers = state?.offers ?? [];
   const nextActions = useMemo(() => listOfferNextActions(offers), [offers]);
-  const showEmptyCta =
-    openBets.length === 0 && betCount === 0 && nextActions.length === 0;
+
+  // Wait for /api/state so profit never paints as £0.00 before real figures land.
+  if (state == null) {
+    return (
+      <PageShell fullHeight>
+        <div
+          className={cn(dashboardPage, "items-center justify-center")}
+          role="status"
+          aria-live="polite"
+          aria-label="Loading desk"
+        >
+          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
+        </div>
+      </PageShell>
+    );
+  }
+
+  const settled = state.settledProfit;
+  const provisional = state.provisionalProfit;
+  const liveTotal = settled + provisional;
+  const betCount = state.bets.length;
+  const livePositionCount = state.livePositions.length;
+  const showLive = liveEvents.length > 0 || livePositionCount > 0;
+  const showEmptyCta = shouldShowDashboardEmptyCta(state);
   const showActivity = betCount > 0 || liveEvents.length > 0 || Math.abs(liveTotal) > 0.01;
 
   const planSignals =
-    (state?.planRaces?.length ?? 0) + (state?.planFixtures?.length ?? 0) + nextActions.length;
+    state.planRaces.length + state.planFixtures.length + nextActions.length;
 
   const overviewBar = (
     <DashboardOverviewBar
@@ -59,16 +74,16 @@ export default function DashboardPage() {
       provisional={provisional}
       openBets={openBets.length}
       offers={offers}
-      bets={state?.bets ?? []}
+      bets={state.bets}
     />
   );
 
   const pnlChart = (
     <LivePnlChart
       liveTotal={liveTotal}
-      historicSeries={state?.series ?? []}
-      bets={state?.bets ?? []}
-      adjustments={state?.pnlAdjustments ?? []}
+      historicSeries={state.series}
+      bets={state.bets}
+      adjustments={state.pnlAdjustments}
       liveInPlay={showLive}
       hasLiveEvent={liveEvents.length > 0}
       panel
@@ -76,7 +91,7 @@ export default function DashboardPage() {
     />
   );
 
-  const homeLayout = state?.settings.homeLayout ?? DEFAULT_HOME_LAYOUT;
+  const homeLayout = state.settings.homeLayout ?? DEFAULT_HOME_LAYOUT;
   const desktopHidden = new Set<string>(homeLayout.desktopHidden);
 
   // Data-driven conditionals first (no plan signals = no plan card), then the
@@ -121,11 +136,11 @@ export default function DashboardPage() {
             description="Try the 60-second demo loop: simulate a 2UP match, add a dutch bet, link it in the tracker, and watch this dashboard move as goals go in."
             action={{ label: "Start simulated match", href: "/tracked-events" }}
             secondaryAction={{ label: "Read getting started", href: "/help?guide=getting-started" }}
-            className="mx-auto w-full max-w-lg flex-1 border-t border-border/60 px-[var(--layout-page-x)] py-8"
+            className="mx-auto w-full max-w-lg flex-1 rounded-none border-0 bg-transparent px-[var(--layout-page-x)] py-0 shadow-none ring-0 [&_[data-slot=card-content]]:pt-16 [&_[data-slot=card-content]]:pb-10"
           />
         ) : (
           <>
-            {state && isMobile === true ? (
+            {isMobile === true ? (
               <MobileHomeDeck
                 cards={deckCards}
                 pin={state.settings.mobileDeckPin}

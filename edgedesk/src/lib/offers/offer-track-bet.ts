@@ -1,7 +1,11 @@
 import type { AddBetPrefill } from "@/components/add-bet-dialog";
 import type { BetMode } from "@/lib/calc";
 import { deriveOfferNextAction } from "@/lib/offers/next-actions";
-import { parseOfferRules, placeRefundTriggerText } from "@/lib/offers/racing-offer-rules";
+import {
+  isRegionalScope,
+  parseOfferRules,
+  placeRefundTriggerText,
+} from "@/lib/offers/racing-offer-rules";
 import {
   bookmakerFromOfferPrefs,
   stakeFromOfferPrefs,
@@ -122,11 +126,20 @@ export function deriveTrackBetAction(
   if (offer.sport === "horse_racing") {
     prefill.sport = "horse_racing";
     prefill.market = "win";
+    const course = offer.scopeCourse?.trim();
+    if (course && !isRegionalScope(course)) {
+      prefill.scopeCourse = course;
+      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
+    }
     if (offer.scopeRaceLabel?.trim()) {
-      const course = offer.scopeCourse?.trim();
       prefill.labelSuggestion = course
         ? `${course} · ${offer.scopeRaceLabel.trim()}`
         : offer.scopeRaceLabel.trim();
+    }
+    // Race-scoped campaigns must open Add bet on that exact meeting race.
+    if (offer.scopeRaceId?.trim()) {
+      prefill.raceExternalId = offer.scopeRaceId.trim();
+      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
     }
   }
 

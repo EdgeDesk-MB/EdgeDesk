@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddBetDialog } from "@/components/add-bet-dialog";
 import { useAddBet } from "@/components/add-bet-provider";
 import { PAGE_SHELL_CLASS, PageShell } from "@/components/page-shell";
@@ -25,6 +26,7 @@ import type { BetMode } from "@/lib/calc";
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
 import { MonthlyPnlSection } from "@/components/tracker/monthly-pnl-section";
 import { BetLogTable } from "@/components/tracker/bet-log-table";
 import { BetCampaignSections } from "@/components/tracker/bet-campaign-sections";
@@ -77,6 +79,14 @@ function TrackerContent() {
     [state]
   );
   const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+  const offers = useMemo(() => state?.offers ?? [], [state]);
+  const openBetCount = useMemo(
+    () => bets.filter((b) => b.status === "open").length,
+    [bets]
+  );
+  const settled = state?.settledProfit ?? 0;
+  const provisional = state?.provisionalProfit ?? 0;
+  const liveTotal = settled + provisional;
 
   const scopedBets = useMemo(() => {
     let list = bets;
@@ -99,6 +109,23 @@ function TrackerContent() {
   const useCampaignView =
     (deskQueue === "offers" || deskQueue === "all") &&
     campaignGroups.some((g) => g.offerId != null);
+
+  const queueSourceBets =
+    offerFilterId != null && Number.isFinite(offerFilterId)
+      ? bets.filter((b) => b.offerId === offerFilterId)
+      : bets;
+
+  function setActiveTab(tab: "bets" | "pnl") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "pnl") {
+      params.set("tab", "pnl");
+      params.delete("queue");
+    } else {
+      params.delete("tab");
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+  }
 
   function setDeskQueue(queue: BetDeskQueue) {
     const params = new URLSearchParams(searchParams.toString());
@@ -193,6 +220,19 @@ function TrackerContent() {
     }
   }
 
+  async function patchEvent(id: number, json: Record<string, unknown>, message: string) {
+    try {
+      await api(`/api/events/${id}`, { method: "PATCH", json });
+      toast.success(message, {
+        description:
+          "Place-refund free bets will award if your horse finished 2nd–4th.",
+      });
+      refresh();
+    } catch (e) {
+      toast.error("Could not save result", { description: String(e) });
+    }
+  }
+
   async function clearAllBets() {
     try {
       const res = await api<{ deleted: number }>("/api/bets", { method: "DELETE" });
@@ -204,18 +244,22 @@ function TrackerContent() {
     }
   }
 
+  const exportHref =
+    activeTab === "pnl" ? "/api/export/csv?type=monthly" : "/api/export/csv?type=bets";
+  const exportLabel = activeTab === "pnl" ? "Export" : "Export CSV";
+
   return (
     <TooltipProvider delayDuration={200}>
     <PageShell>
       <PageHeader
         helpId="tracker"
         title="Profit Tracker"
-        description="Bet Desk - organise positions by queue and offer campaign. Results settle derived markets automatically."
+        description="Organise positions by queue and offer campaign. Results settle derived markets automatically."
         action={
           <>
             <Button variant="outline" {...pageSecondaryButtonProps} asChild>
-              <a href="/api/export/csv?type=bets" download>
-                <Download className="size-4" /> Export CSV
+              <a href={exportHref} download>
+                <Download className="size-4" /> {exportLabel}
               </a>
             </Button>
             {bets.length > 0 && (
@@ -230,29 +274,6 @@ function TrackerContent() {
                 </Button>
               }
             />
-          </>
-        }
-        toolbar={
-          <>
-            <button
-              type="button"
-              className={filterPillState(activeTab === "bets")}
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete("tab");
-                const qs = params.toString();
-                router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
-              }}
-            >
-              Bet log
-            </button>
-            <button
-              type="button"
-              className={filterPillState(activeTab === "pnl")}
-              onClick={() => router.replace("/tracker?tab=pnl", { scroll: false })}
-            >
-              Monthly P&L
-            </button>
           </>
         }
       />
@@ -273,14 +294,58 @@ function TrackerContent() {
           }}
         />
 
-      {activeTab === "pnl" ? (
-        <MonthlyPnlSection />
-      ) : (
+      {/* Homepage pace strip; monthly breakdown stays on the Monthly P&L tab. */}
+      <div className="-mx-[var(--layout-page-x)]">
+        <DashboardOverviewBar
+          liveTotal={liveTotal}
+          settled={settled}
+          provisional={provisional}
+          openBets={openBetCount}
+          offers={offers}
+          bets={bets}
+          showSideSummaries={false}
+        />
+      </div>
+
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle section>Bet Desk</CardTitle>
+        <CardHeader className="pb-0">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v === "pnl" ? "pnl" : "bets")}
+            className="gap-0"
+          >
+            <TabsLineBar bleed="card">
+              <TabsList variant="line" className="justify-start">
+                <TabsTrigger value="bets">Bet log</TabsTrigger>
+                <TabsTrigger value="pnl">Monthly P&L</TabsTrigger>
+              </TabsList>
+            </TabsLineBar>
+          </Tabs>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {activeTab === "bets" ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-1.5">
+                {BET_DESK_QUEUES.map((q) => {
+                  const count = countDeskQueue(queueSourceBets, q.id, eventById);
+                  if (q.id === "quick_logged" && count === 0 && deskQueue !== "quick_logged") {
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => setDeskQueue(q.id)}
+                      className={cn(filterPillState(deskQueue === q.id))}
+                    >
+                      {q.label}
+                      {q.id !== "all" ? (
+                        <span className="ml-1 tabular-nums opacity-70">{count}</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
               {offerFilterId != null && Number.isFinite(offerFilterId) ? (
                 <button
                   type="button"
@@ -297,38 +362,10 @@ function TrackerContent() {
                 </button>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {BET_DESK_QUEUES.map((q) => {
-                const count = countDeskQueue(
-                  offerFilterId != null && Number.isFinite(offerFilterId)
-                    ? bets.filter((b) => b.offerId === offerFilterId)
-                    : bets,
-                  q.id,
-                  eventById
-                );
-                // Review chip only earns its place when quick-logged bets exist.
-                if (q.id === "quick_logged" && count === 0 && deskQueue !== "quick_logged") {
-                  return null;
-                }
-                return (
-                  <button
-                    key={q.id}
-                    type="button"
-                    onClick={() => setDeskQueue(q.id)}
-                    className={cn(filterPillState(deskQueue === q.id))}
-                  >
-                    {q.label}
-                    {q.id !== "all" ? (
-                      <span className="ml-1 tabular-nums opacity-70">{count}</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {scopedBets.length === 0 ? (
+          ) : null}
+          {activeTab === "pnl" ? (
+            <MonthlyPnlSection variant="plain" />
+          ) : scopedBets.length === 0 ? (
             <EmptyState
               icon={NotebookPen}
               title={deskQueueEmptyCopy(deskQueue).title}
@@ -346,6 +383,7 @@ function TrackerContent() {
               highlightId={highlightId}
               onEdit={setEditingBet}
               onPatch={patchBet}
+              onPatchEvent={patchEvent}
               onLogged={() => refresh()}
             />
           ) : (
@@ -358,12 +396,12 @@ function TrackerContent() {
               highlightId={highlightId}
               onEdit={setEditingBet}
               onPatch={patchBet}
+              onPatchEvent={patchEvent}
               onLogged={() => refresh()}
             />
           )}
         </CardContent>
       </Card>
-      )}
     </PageShell>
     </TooltipProvider>
   );
@@ -416,4 +454,3 @@ function ClearAllBetsDialog({
     </Dialog>
   );
 }
-

@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { MoneyFlow } from "@/components/money-flow";
+import { SportIcon } from "@/components/sport-icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { bookiePanelTint } from "@/lib/brands/bookies";
 import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
 import type { ExchangeRow } from "@/lib/db/schema";
@@ -236,6 +244,67 @@ export function PanelSelect({
         <ChevronDown className="pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-black/60 dark:text-white/70" />
       </span>
     </label>
+  );
+}
+
+/**
+ * Panel-styled selection dropdown with a sport icon on each row (and in the
+ * closed trigger). Used for Add bet Selection when the market has fixed options
+ * or a known racecard.
+ */
+export function PanelIconSelect({
+  label,
+  value,
+  onChange,
+  sport,
+  placeholder,
+  options,
+  selectClassName,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  sport?: string | null;
+  placeholder?: string;
+  options: Array<{ value: string; label: string }>;
+  selectClassName?: string;
+}) {
+  const selectedLabel = options.find((o) => o.value === value)?.label;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">{label}</span>
+      <Select value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger
+          className={cn(
+            "w-full rounded-md border-0 bg-[var(--pi)] py-0 pl-3 text-lg font-bold text-black/85 shadow-none outline-none ring-primary/40 focus:ring-2 focus-visible:border-transparent focus-visible:ring-2 data-[size=default]:h-11 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:hover:bg-[var(--pi-dark)] [&_svg]:text-black/60 dark:[&_svg]:text-white/70",
+            selectClassName
+          )}
+        >
+          <SelectValue placeholder={placeholder}>
+            {selectedLabel ? (
+              <span className="flex min-w-0 items-center gap-2">
+                <SportIcon
+                  sport={sport}
+                  size={16}
+                  className="shrink-0 text-black/50 dark:text-white/60"
+                />
+                <span className="truncate">{selectedLabel}</span>
+              </span>
+            ) : null}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              <span className="flex items-center gap-2">
+                <SportIcon sport={sport} size={14} className="text-muted-foreground" />
+                {option.label}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 

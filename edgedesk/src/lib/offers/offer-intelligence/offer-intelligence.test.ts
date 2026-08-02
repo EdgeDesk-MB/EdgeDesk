@@ -64,6 +64,8 @@ describe("analyzeOfferIntelligence", () => {
     expect(result.archetype).toBe("bet_get_free_bet");
     expect(result.expectedProfit).toBeGreaterThan(20);
     expect(result.instructions.some((s) => /qualifying/i.test(s))).toBe(true);
+    expect(result.instructions.some((s) => /closest back\/lay/i.test(s))).toBe(true);
+    expect(result.instructions.some((s) => /reasonably high odds/i.test(s))).toBe(true);
   });
 
   it("classifies racing place refund", () => {

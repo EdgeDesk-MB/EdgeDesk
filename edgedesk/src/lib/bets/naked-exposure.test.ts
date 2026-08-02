@@ -5,6 +5,7 @@ import {
   detectNakedExposure,
   isNakedExposed,
   markIntentionalNoHedge,
+  nakedExposureAlertKey,
 } from "./naked-exposure";
 
 const NOW = new Date(2026, 6, 14, 9, 0, 0).getTime();
@@ -147,5 +148,9 @@ describe("markIntentionalNoHedge", () => {
     expect(markIntentionalNoHedge(INTENTIONAL_NOHEDGE_MARKER)).toBe(
       INTENTIONAL_NOHEDGE_MARKER
     );
+  });
+
+  it("matches the alert dedupe key used by AlertWatcher", () => {
+    expect(nakedExposureAlertKey(97)).toBe("naked_exposure:97");
   });
 });

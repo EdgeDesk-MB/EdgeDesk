@@ -13,7 +13,7 @@ export type BetDeskQueue =
 export const BET_DESK_QUEUES: { id: BetDeskQueue; label: string }[] = [
   { id: "all", label: "All" },
   { id: "open", label: "Open" },
-  { id: "needs_lay", label: "Needs lay" },
+  { id: "needs_lay", label: "Unlayed" },
   { id: "settle", label: "Settle" },
   { id: "offers", label: "Offer campaigns" },
   { id: "orphans", label: "Orphans" },

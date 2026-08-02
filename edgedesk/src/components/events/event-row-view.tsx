@@ -36,13 +36,16 @@ import { formatPillLabel } from "@/lib/ui/status-badges";
 import {
   placingsTriggerLabel,
   RacingPlacingsDialog,
+  resultActionButtonClass,
 } from "@/components/racing/racing-placings-dialog";
+import { cn } from "@/lib/utils";
 import {
   Goal,
   Minus,
+  Pencil,
   Plus,
   Radio,
-  RefreshCw,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 
@@ -53,8 +56,6 @@ export function EventRowView({
   liveModel,
   onPatch,
   onDelete,
-  onFetchResults,
-  fetchingResults,
 }: {
   event: EventRow;
   linkedBets: BetRow[];
@@ -63,9 +64,6 @@ export function EventRowView({
   liveModel?: { marketsLabel: string } | null;
   onPatch: (id: number, json: Record<string, unknown>) => void;
   onDelete: (id: number) => void;
-  /** Manual Racing API results pull (force overwrite) */
-  onFetchResults?: (id: number) => void;
-  fetchingResults?: boolean;
 }) {
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
@@ -212,27 +210,29 @@ export function EventRowView({
                 })
               }
               trigger={
-                <Button variant="outline" size="sm" className="text-xs">
-                  {placingsTriggerLabel(
-                    event,
-                    !!raceResult && isRaceResultIncomplete(raceResult)
-                  )}
-                </Button>
+                raceResult && !isRaceResultIncomplete(raceResult) ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-muted-foreground"
+                    aria-label="Edit result"
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn("text-xs", resultActionButtonClass)}
+                  >
+                    {placingsTriggerLabel(
+                      event,
+                      !!raceResult && isRaceResultIncomplete(raceResult)
+                    )}
+                  </Button>
+                )
               }
             />
-          )}
-          {isRacing && event.externalId && onFetchResults && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1 text-xs text-muted-foreground"
-              disabled={fetchingResults}
-              title="Optional - try The Racing API if your plan includes results"
-              onClick={() => onFetchResults(event.id)}
-            >
-              <RefreshCw className={fetchingResults ? "size-3 animate-spin" : "size-3"} />
-              API
-            </Button>
           )}
           {!isRacing && isManual && event.status !== "finished" && (
             <GoalDialog event={event} onRecord={(goal) => onPatch(event.id, { addGoal: goal })} />
@@ -250,8 +250,14 @@ export function EventRowView({
           {!isRacing && status === "finished" && (
             <CorrectResultDialog event={event} onCorrect={(payload) => onPatch(event.id, { correctResult: payload })} />
           )}
-          <Button variant="ghost" size="sm" className="text-xs" onClick={() => onDelete(event.id)}>
-            Remove
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-destructive hover:text-destructive"
+            onClick={() => onDelete(event.id)}
+            aria-label="Remove event"
+          >
+            <Trash2 className="size-3.5" />
           </Button>
         </div>
       </TableCell>

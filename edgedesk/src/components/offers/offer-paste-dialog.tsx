@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useNow } from "@/hooks/use-now";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ export function OfferPasteDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const now = useNow(60_000);
 
   const draft = useMemo(
     () => (text.trim() ? parseOfferFromText(text) : null),
@@ -119,9 +121,16 @@ Expires 31 Jul 2026 at 11:59pm`}
                 </p>
               )}
               {draft.expiresAt != null ? (
-                <p className="mt-1 text-[11px] font-medium text-sky-800 dark:text-sky-300">
-                  Expires {formatOfferExpiry(draft.expiresAt)}
-                </p>
+                now > 0 && draft.expiresAt < now ? (
+                  <p className="mt-1 text-[11px] font-medium text-warning">
+                    Expired {formatOfferExpiry(draft.expiresAt)} - this promo has already
+                    closed. Update the deadline in Details before saving.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] font-medium text-sky-800 dark:text-sky-300">
+                    Expires {formatOfferExpiry(draft.expiresAt)}
+                  </p>
+                )
               ) : /\b(?:valid|until|expires?|deadline|11[.:]00|10am)\b/i.test(text) ? (
                 <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
                   Expiry not detected - set the deadline manually in Details.

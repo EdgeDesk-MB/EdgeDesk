@@ -28,8 +28,8 @@ import {
 } from "@/lib/services/exchange";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
+import { freeBetEffectsForBet } from "@/lib/offers/early-free-bet-award";
 import {
-  aiEffectsForBet,
   betWinRuleForBet,
   evaluateFreeBetAward,
   evaluateUnconditionalFreeBet,
@@ -73,6 +73,9 @@ import { accounts as accountsTable, mugPlans, offerEffortSamples } from "@/lib/d
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
+import { repairMisparsedPlaceFreeBetTriggers } from "@/lib/offers/repair-place-free-bet-triggers";
+import { repairInventedPlaceRulesOnUnconditionalOffers } from "@/lib/offers/repair-invented-place-rules";
+import { syncCasinoOfferSeriesInstances } from "@/lib/offers/casino-offer-recurrence";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { getRealizedRetention } from "@/lib/services/retention";
 import { unreadCount } from "@/lib/services/alerts-inbox";
@@ -401,11 +404,15 @@ function autoSettle(): void {
 
 /** Apply AI trigger side-effects (e.g. free bet awards on place finishes). */
 function processAiEffects(): void {
+  // Settlement awards only from the bet's own trigger/label/triggerText.
+  // Offer-title fallback is for early placement credits only - using it here
+  // re-awards historical quals (and used to hit free_snr conversions too).
   const candidates = db
     .select()
     .from(bets)
     .all()
-    .filter((b) => aiEffectsForBet(b.triggerRule, b.label).length > 0);
+    .filter((b) => b.betType !== "free_snr" && b.betType !== "free_sr")
+    .filter((b) => freeBetEffectsForBet(b).length > 0);
 
   if (candidates.length === 0) return;
 
@@ -420,7 +427,7 @@ function processAiEffects(): void {
   );
 
   for (const bet of candidates) {
-    for (const effect of aiEffectsForBet(bet.triggerRule, bet.label)) {
+    for (const effect of freeBetEffectsForBet(bet)) {
       if (effect.kind !== "free_bet_award") continue;
 
       if (!isPlaceFreeBetEffect(effect)) {
@@ -650,17 +657,49 @@ function triggerProvisional(bet: BetRow, rule: TriggerRule, event: EventRow): nu
   return settleFromOutcome(toSettleable(bet), wouldWin).profit;
 }
 
+/**
+ * Live football + racing result syncs hit external APIs. Running them on every
+ * dashboard poll (default 3s) blocks the Node event loop and makes client
+ * navigations wait. Local settle/derive still runs every poll.
+ */
+const EXTERNAL_SYNC_MIN_MS = 20_000;
+let lastExternalSyncAt = 0;
+
 export async function getAppState(): Promise<AppState> {
   tickSimulations();
-  await refreshApiEvents();
-  const racingSync = await refreshRacingApiEvents();
-  const racingResultsTier = hasRacingApiKey()
-    ? await resolveRacingResultsTier().catch(() => getCachedRacingResultsTier())
+
+  const now = Date.now();
+  const runExternalSync = now - lastExternalSyncAt >= EXTERNAL_SYNC_MIN_MS;
+  let racingSync: { updated: number; settledLabels: string[] } = {
+    updated: 0,
+    settledLabels: [],
+  };
+  let racingResultsTier: RacingResultsTier = hasRacingApiKey()
+    ? getCachedRacingResultsTier()
     : ("none" as const);
+
+  if (runExternalSync) {
+    lastExternalSyncAt = now;
+    await refreshApiEvents();
+    racingSync = await refreshRacingApiEvents();
+    if (hasRacingApiKey()) {
+      racingResultsTier = await resolveRacingResultsTier().catch(() =>
+        getCachedRacingResultsTier()
+      );
+    }
+  }
+
   settleTriggers();
   autoSettle();
+  // Fix place-refund triggers stored as unconditional (Course · Horse · offer
+  // labels) before settlement side-effects re-credit "Offer unlocked".
+  repairMisparsedPlaceFreeBetTriggers();
+  // Clear place targets the editor invented on straight bet & get (stops Best
+  // plays / favourite-frame copy on unconditional rewards).
+  repairInventedPlaceRulesOnUnconditionalOffers();
   processAiEffects();
   syncOfferSeriesInstances();
+  syncCasinoOfferSeriesInstances();
   syncOfferStatuses();
   backfillOffersFromBets();
   maybeSendWeeklyDigest();

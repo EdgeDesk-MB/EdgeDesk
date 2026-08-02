@@ -32,6 +32,16 @@ export interface RacingFixture {
   winner?: string;
   /** The Racing API region: GB / IRE */
   region?: string;
+  /** Present on racecard API payloads; used to order Add bet Selection by odds. */
+  runnerDetails?: Array<{
+    name: string;
+    nonRunner?: boolean;
+    spDecimal?: number;
+    spFraction?: string;
+    oddsList?: unknown[];
+    bookieDecimal?: number;
+    exchangeDecimal?: number;
+  }>;
 }
 
 export const FIXTURE_SPORTS = [

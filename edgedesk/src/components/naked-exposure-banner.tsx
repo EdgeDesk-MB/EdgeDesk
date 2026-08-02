@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Naked-exposure banner (B5) - prominent Home warning for open backs with no
- * lay past the threshold. One tap marks a bet as intentionally unhedged
- * (mute marker in notes); "Add lay" deep-links to the tracker row.
+ * Naked-exposure banner (B5) - in-page contextual warning for open backs with
+ * no lay past the threshold. Styled like History settlement rows (inset,
+ * rounded tint) rather than a full-bleed strip. One tap marks a bet as
+ * intentionally unhedged; "Add lay" deep-links to the tracker row.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,8 +14,13 @@ import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, useAppState } from "@/hooks/use-app-state";
 import {
+  dismissBrowserNotifications,
+  suppressAlertKeys,
+} from "@/lib/alerts/seen";
+import {
   detectNakedExposure,
   markIntentionalNoHedge,
+  nakedExposureAlertKey,
 } from "@/lib/bets/naked-exposure";
 import { cn } from "@/lib/utils";
 
@@ -47,11 +53,21 @@ export function NakedExposureBanner({ className }: { className?: string }) {
 
   async function muteIntentional() {
     setMuting(true);
+    const alertKey = nakedExposureAlertKey(primary.id);
+    // Suppress before the PATCH returns so the next AlertWatcher poll cannot
+    // race and toast/push again for a prompt the user has already answered.
+    suppressAlertKeys([alertKey]);
+    void dismissBrowserNotifications([alertKey]);
     try {
       await api(`/api/bets/${primary.id}`, {
         method: "PATCH",
         json: { notes: markIntentionalNoHedge(primary.notes) },
       });
+      // Clear any inbox row that already fired for this bet.
+      void api("/api/alerts", {
+        method: "PATCH",
+        json: { dedupe: alertKey, read: true },
+      }).catch(() => {});
       toast.message("Marked intentional", {
         description: `${primary.label} will not alert again.`,
       });
@@ -64,43 +80,45 @@ export function NakedExposureBanner({ className }: { className?: string }) {
   }
 
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 border-b border-amber-500/30 bg-amber-500/10 px-[var(--layout-page-x)] py-2.5 text-sm",
-        className
-      )}
-      role="status"
-    >
-      <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-amber-900 dark:text-amber-100">
-          {exposed.length === 1
-            ? "Unhedged back bet"
-            : `${exposed.length} unhedged back bets`}
-        </p>
-        <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-200/90">
-          <span className="font-medium">{primary.label}</span>
-          {primary.bookmaker ? ` at ${primary.bookmaker}` : ""} has no lay logged - your
-          full stake is riding on the result.
-          {moreCount > 0 && (
-            <span className="text-amber-700/80 dark:text-amber-300/80"> +{moreCount} more</span>
-          )}
-        </p>
-      </div>
-      <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-        <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
-          <Link href={`/tracker?highlight=${primary.id}`}>Add lay</Link>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label="Mark as intentionally unhedged"
-          className="h-8 text-xs text-amber-700 hover:text-amber-900 dark:text-amber-300"
-          onClick={muteIntentional}
-          disabled={muting}
-        >
-          Intentional
-        </Button>
+    <div className={cn("shrink-0 p-3 sm:p-4", className)}>
+      <div
+        className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-4 text-sm sm:items-center sm:gap-3"
+        role="status"
+      >
+        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning sm:mt-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-amber-900 dark:text-amber-100">
+            {exposed.length === 1
+              ? "Unhedged back bet"
+              : `${exposed.length} unhedged back bets`}
+          </p>
+          <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-200/90">
+            <span className="font-medium">{primary.label}</span>
+            {primary.bookmaker ? ` at ${primary.bookmaker}` : ""} has no lay logged - your
+            full stake is riding on the result.
+            {moreCount > 0 && (
+              <span className="text-amber-700/80 dark:text-amber-300/80">
+                {" "}
+                +{moreCount} more
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row sm:items-center">
+          <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+            <Link href={`/tracker?highlight=${primary.id}`}>Add lay</Link>
+          </Button>
+          <Button
+            variant="pagePrimary"
+            size="sm"
+            aria-label="Mark as intentionally unhedged"
+            className="h-8 text-xs"
+            onClick={muteIntentional}
+            disabled={muting}
+          >
+            Intentional
+          </Button>
+        </div>
       </div>
     </div>
   );

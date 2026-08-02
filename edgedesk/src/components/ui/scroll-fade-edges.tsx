@@ -24,6 +24,7 @@ export function ScrollFadeEdges({
   fadeSize = 28,
   orientation = "vertical",
   dragToScroll = false,
+  springSnap = false,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -33,6 +34,8 @@ export function ScrollFadeEdges({
   fadeSize?: number;
   orientation?: "vertical" | "horizontal";
   dragToScroll?: boolean;
+  /** With dragToScroll: ease to the nearest snap child on mouse-drag release */
+  springSnap?: boolean;
 }) {
   const horizontal = orientation === "horizontal";
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -40,7 +43,7 @@ export function ScrollFadeEdges({
   const [showEnd, setShowEnd] = useState(false);
 
   const canDrag = horizontal && dragToScroll;
-  const drag = useDragToScroll(scrollRef);
+  const drag = useDragToScroll(scrollRef, { springSnap: canDrag && springSnap });
 
   const update = useCallback(() => {
     const el = scrollRef.current;

@@ -195,57 +195,61 @@ export function AppTopBar() {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          {state?.demoMode ? (
-            <span className="shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warning">
-              Demo data
-            </span>
-          ) : null}
-          {showFreeBets ? (
-            <TopBarStat
-              label="Free bets"
-              value={freeBetsTotal}
-              freeBetTone
-              onClick={openFreeBets}
-            />
-          ) : null}
-          <TopBarStat href="/tracker?tab=pnl" label="Profit" value={profit} profitTone />
-          <TopBarBankroll
-            exchange={exchange}
-            inBets={inBets}
-            total={bankroll}
-            ownerLines={ownerBalances}
-          />
-
-          {showFreeBets ? (
-            <button
-              type="button"
-              onClick={openFreeBets}
-              className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
-              aria-label={`Free bets ${freeBetsTotal.toFixed(2)}`}
-            >
-              <MoneyFlow
-                value={freeBetsTotal}
-                className="text-sm font-bold tabular-nums text-violet-400"
+          {state == null ? null : (
+            <>
+              {state.demoMode ? (
+                <span className="shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warning">
+                  Demo data
+                </span>
+              ) : null}
+              {showFreeBets ? (
+                <TopBarStat
+                  label="Free bets"
+                  value={freeBetsTotal}
+                  freeBetTone
+                  onClick={openFreeBets}
+                />
+              ) : null}
+              <TopBarStat href="/tracker?tab=pnl" label="Profit" value={profit} profitTone />
+              <TopBarBankroll
+                exchange={exchange}
+                inBets={inBets}
+                total={bankroll}
+                ownerLines={ownerBalances}
               />
-            </button>
-          ) : null}
-          <Link
-            href="/tracker?tab=pnl"
-            className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
-            aria-label="View profit"
-          >
-            <MoneyFlow
-              value={profit}
-              className={cn("text-sm font-bold tabular-nums", profitToneClass(profit))}
-            />
-          </Link>
-          <Link
-            href="/accounts"
-            className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
-            aria-label={`Bankroll total ${bankroll.toFixed(2)}`}
-          >
-            <MoneyFlow value={bankroll} className="text-sm font-bold tabular-nums" />
-          </Link>
+
+              {showFreeBets ? (
+                <button
+                  type="button"
+                  onClick={openFreeBets}
+                  className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
+                  aria-label={`Free bets ${freeBetsTotal.toFixed(2)}`}
+                >
+                  <MoneyFlow
+                    value={freeBetsTotal}
+                    className="text-sm font-bold tabular-nums text-violet-400"
+                  />
+                </button>
+              ) : null}
+              <Link
+                href="/tracker?tab=pnl"
+                className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
+                aria-label="View profit"
+              >
+                <MoneyFlow
+                  value={profit}
+                  className={cn("text-sm font-bold tabular-nums", profitToneClass(profit))}
+                />
+              </Link>
+              <Link
+                href="/accounts"
+                className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
+                aria-label={`Bankroll total ${bankroll.toFixed(2)}`}
+              >
+                <MoneyFlow value={bankroll} className="text-sm font-bold tabular-nums" />
+              </Link>
+            </>
+          )}
 
           <TopBarButton
             className="gap-2 px-2.5 text-xs font-extrabold uppercase tracking-wide"

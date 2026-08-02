@@ -208,6 +208,32 @@ Bets placed with free bets do not qualify.`,
     expect(draft.scopeCourse).not.toMatch(/opt-in/i);
   });
 
+  it("parses multi-course money-back paste as course scope", () => {
+    const now = new Date(2026, 7, 1, 12, 0, 0);
+    const draft = parseOfferFromText(
+      `MONEY BACK AS A FREE BET if 2nd, 3rd or 4th on any Galway or Goodwood race on Saturday.
+Min 8 runners. Max free bet £10. Expires 18:05 Saturday 1st August.`,
+      now
+    );
+    expect(draft.category).toBe("horse_racing");
+    expect(draft.scopeMode).toBe("course");
+    expect(draft.scopeCourse).toBe("Galway, Goodwood");
+    expect(draft.qualifyingPlaces).toEqual([2, 3, 4]);
+  });
+
+  it("parses QuinnBet 2nd to SP favourite paste", () => {
+    const draft = parseOfferFromText(
+      `QuinnBet HORSE RACING SPECIAL
+2ND TO THE FAVOURITE Every UK/IRE Race, Every Day
+Bet £10 get £10 FB if 2nd to SP favourite. Min 6 runners. Max £10 per day.`
+    );
+    expect(draft.category).toBe("horse_racing");
+    expect(draft.bookmaker).toMatch(/Quinn/i);
+    expect(draft.qualifyingPlaces).toEqual([2]);
+    expect(draft.rules?.winnerMustBeSpFavourite).toBe(true);
+    expect(draft.freeBetAmount).toBe(10);
+  });
+
   it("parses Betfair extra-place paste with 16:45 Newmarket race time", () => {
     const now = new Date(2026, 6, 10, 12, 0, 0);
     const draft = parseOfferFromText(
@@ -224,5 +250,49 @@ Paying 4 Places instead of 3 in the 16:45 Newmarket. 1/5 odds on EW bets. Applie
     expect(draft.minRunners).toBe(11);
     expect(draft.intelligence?.archetype).toBe("extra_place");
     expect(draft.preferredOffTime).not.toBe("10:00");
+  });
+
+  it("reads £/€ dual-currency stakes and ignores T&C 'bet £10 get £10' examples", () => {
+    const now = new Date(2026, 7, 2, 12, 0, 0);
+    const draft = parseOfferFromText(
+      `Galway\u202fBet\u202f£/€5\u202fGet\u202f£/€5
+
+Get a\u202f£/€5\u202fFree Bet for\u202fany\u202fHorse\u202fracing\u202fmarket\u202fwhen you place a\u202f£/€5+ bet\u202fon\u202fany Galway Horse\u202fRacing\u202fmarket.
+
+You can claim the offer once during the promotional period and your Free\u202fBet\u202fwill be credited to your account upon qualification\u202fand will remain\u202fvalid\u202funtil 23:59 on 02/08/26.
+
+If my\u202fbet\u202fis over\u202f£/€5, will I qualify?Yes, however, you would only be eligible to receive a\u202f£/€5\u202fFree\u202fBet\u202fto use\u202fon any\u202fHorse\u202fracing\u202fmarket until 23:59 on 02/08/26.
+
+What are the\u202fminimum\u202fodds for the qualifying\u202fbets?\u202fEach\u202fbet\u202fmust be a minimum of 1/4.
+
+These Promotional Terms & Conditions apply to this Bet £/€5 Get a £/€5 Free Bet Promotion (the “Promotion”).
+If a promotion is advertised in a different currency to an Eligible Player’s Website account, the qualifying spend and any bonus will be in that account currency (for example a promotion advertised as "bet £10 get £10" this will be "bet €10 get €10")
+To participate in this Promotion an Eligible Player must opt in and place a £/€5+ bet on any Galway Horse Racing market at min odds of 1/4 during the Promotional Period (a “Qualifying Bet”).
+Once an Eligible Player has placed a Qualifying Bet, they will automatically be credited with a £/€5 Free Bet on any Horse racing market.
+www.ladbrokes.com`,
+      now
+    );
+    expect(draft.bookmaker).toBe("Ladbrokes");
+    expect(draft.category).toBe("horse_racing");
+    expect(draft.betStake).toBe(5);
+    expect(draft.freeBetAmount).toBe(5);
+    expect(draft.title).toBe("Bet £5 get £5 free bet");
+    expect(draft.qualifyingPlaces).toEqual([]);
+    expect(draft.rules?.type).toBe("bet_get_free_place");
+    expect(draft.rules?.qualifyingPlaces).toEqual([]);
+    expect(draft.important.minOdds).toBe(1.25);
+    expect(draft.scopeCourse).toMatch(/Galway/i);
+    expect(draft.confidence).toBe("high");
+  });
+
+  it("parses plain Bet £5 Get £5 even when T&Cs contain a £10 example", () => {
+    const draft = parseOfferFromText(
+      `Coral
+Bet £5 Get £5 free bet
+Min odds 1/4.
+(for example a promotion advertised as "bet £10 get £10" this will be "bet €10 get €10")`
+    );
+    expect(draft.betStake).toBe(5);
+    expect(draft.freeBetAmount).toBe(5);
   });
 });

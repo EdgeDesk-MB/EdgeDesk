@@ -2,7 +2,11 @@
  * Parse Matched Betting Blog / promo email paste into offer form fields.
  * Deterministic - reuses ai-triggers for stake/place patterns.
  */
-import { inferAiEffectsFromText, parsePlacePositions } from "@/lib/calc/ai-triggers";
+import {
+  inferAiEffectsFromText,
+  parsePlacePositions,
+  textRequiresSpFavouriteWinner,
+} from "@/lib/calc/ai-triggers";
 import { matchBookmakerFromText } from "@/lib/bookmakers";
 import { formatClockTime } from "@/lib/time-format";
 import type { OfferCategoryId } from "@/lib/offers/offer-categories";
@@ -270,13 +274,28 @@ const KNOWN_COURSES = [
   "Dundalk",
 ].sort((a, b) => b.length - a.length);
 
-function findKnownCourse(text: string): string | null {
+function findKnownCourses(text: string): string[] {
   const lower = text.toLowerCase();
+  const hits: { course: string; index: number }[] = [];
   for (const course of KNOWN_COURSES) {
     const re = new RegExp(`\\b${course.replace(/\s+/g, "\\s+")}\\b`, "i");
-    if (re.test(lower)) return course;
+    const m = re.exec(lower);
+    if (m) hits.push({ course, index: m.index });
   }
-  return null;
+  hits.sort((a, b) => a.index - b.index);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const hit of hits) {
+    const key = hit.course.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(hit.course);
+  }
+  return out;
+}
+
+function findKnownCourse(text: string): string | null {
+  return findKnownCourses(text)[0] ?? null;
 }
 
 function parseScopeCourse(text: string): {
@@ -288,18 +307,33 @@ function parseScopeCourse(text: string): {
     return { mode: "uk_ire", course: "", preferredOffTime: null };
   }
 
-  const known = findKnownCourse(text);
+  const knownCourses = findKnownCourses(text);
+  const known = knownCourses[0] ?? null;
   const offTime = parsePreferredOffTime(text);
+
+  // Multi-course promo: "any Galway or Goodwood race"
+  if (knownCourses.length > 1 && !offTime) {
+    return {
+      mode: "course",
+      course: knownCourses.join(", "),
+      preferredOffTime: null,
+    };
+  }
 
   // "3pm at Newmarket" / "in the 3pm at Newmarket today"
   if (known && offTime) {
     return { mode: "race", course: known, preferredOffTime: offTime };
   }
 
-  const courseScoped =
-    known != null &&
-    /\b(?:at|only\s+at|course[:\s]+|in\s+the\s+\d)/i.test(text) &&
-    !/\b(all\s+courses?|uk\s*&\s*ireland|uk\s*and\s*ireland)\b/i.test(text);
+  const courseCue = new RegExp(
+    String.raw`\b(?:at|only\s+at|course[:\s]+|in\s+the\s+\d|on\s+any)\b`,
+    "i"
+  );
+  const regionalCue = new RegExp(
+    String.raw`\b(all\s+courses?|uk\s*&\s*ireland|uk\s*and\s*ireland)\b`,
+    "i"
+  );
+  const courseScoped = known != null && courseCue.test(text) && !regionalCue.test(text);
   if (known && courseScoped) {
     return { mode: "course", course: known, preferredOffTime: null };
   }
@@ -448,9 +482,27 @@ function parseClockToken(raw: string): ParsedTod | null {
   return { hours, minutes };
 }
 
-/** Fix common OCR glitches in promo date lines before parsing. */
+/**
+ * Currency amount prefix used by UK/ROI bookies: £5, €5, £/€5, €/£5.
+ * Optional so "Bet 5 get 5" still matches.
+ */
+const MONEY_PREFIX = String.raw`(?:£\s*/\s*€|€\s*/\s*£|£|€)?\s*`;
+const MONEY_AMOUNT = String.raw`(\d+(?:\.\d{1,2})?)`;
+
+/** True when a bet-get match sits inside a T&C currency-conversion example. */
+function isStakeExampleContext(text: string, matchIndex: number): boolean {
+  const windowStart = Math.max(0, matchIndex - 120);
+  const before = text.slice(windowStart, matchIndex);
+  return /\b(?:for\s+example|e\.g\.|eg\.|advertised\s+as|such\s+as|this\s+will\s+be)\b/i.test(
+    before
+  );
+}
+
+/** Fix common OCR / paste glitches before parsing. */
 function normalizeOfferOcrText(text: string): string {
   return text
+    // Narrow NBSP / other exotic spaces from web pastes
+    .replace(/[\u00a0\u202f\u2007\u2009\u200a\ufeff]/g, " ")
     .replace(/(\d{1,2})t(\s+of\s+)/gi, "$1th$2")
     .replace(/(\d{1,2})t(\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))/gi, "$1th$2");
 }
@@ -845,23 +897,36 @@ function extractBetGetStakes(text: string): {
   betStake: number | null;
   freeBetAmount: number | null;
 } {
-  const betGet = text.match(
-    /\bbet\s+£?\s*(\d+(?:\.\d{1,2})?)\s+get\s+£?\s*(\d+(?:\.\d{1,2})?)/i
+  // "Bet £5 get £5" / "Bet £/€5 Get a £/€5 Free Bet" — first non-example wins
+  const betGetRe = new RegExp(
+    String.raw`\bbet\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s+get\s+(?:a\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}`,
+    "gi"
   );
-  if (betGet) {
-    return { betStake: parseMoney(betGet[1]), freeBetAmount: parseMoney(betGet[2]) };
+  for (const m of text.matchAll(betGetRe)) {
+    if (m.index != null && isStakeExampleContext(text, m.index)) continue;
+    const betStake = parseMoney(m[1]);
+    const freeBetAmount = parseMoney(m[2]);
+    if (betStake != null && freeBetAmount != null) {
+      return { betStake, freeBetAmount };
+    }
   }
 
   // Money-back / refund: "up to £10 back", "up to £/€10 in Tote Credit", "get … £10 … free bet"
   const moneyBack =
     text.match(
-      /\bup\s+to\s+£\s*\/?\s*€?\s*(\d+(?:\.\d{1,2})?)\s*(?:back\b|in\s+\w+\s+credit\b|as\s+a\s+free\s*bet\b)?/i
+      new RegExp(
+        String.raw`\bup\s+to\s+${MONEY_PREFIX}${MONEY_AMOUNT}\s*(?:back\b|in\s+\w+\s+credit\b|as\s+a\s+free\s*bet\b)?`,
+        "i"
+      )
     ) ||
     text.match(
-      /\bget\s+(?:up\s+to\s+)?£\s*\/?\s*€?\s*(\d+(?:\.\d{1,2})?)\s+(?:back\b|in\s+\w+\s+credit\b)/i
+      new RegExp(
+        String.raw`\bget\s+(?:up\s+to\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\s+(?:back\b|in\s+\w+\s+credit\b)`,
+        "i"
+      )
     ) ||
     text.match(
-      /\bsame\s+value\s+up\s+to\s+£\s*\/?\s*€?\s*(\d+(?:\.\d{1,2})?)/i
+      new RegExp(String.raw`\bsame\s+value\s+up\s+to\s+${MONEY_PREFIX}${MONEY_AMOUNT}`, "i")
     );
   if (moneyBack) {
     const amount = parseMoney(moneyBack[1]);
@@ -869,17 +934,58 @@ function extractBetGetStakes(text: string): {
     return { betStake: amount, freeBetAmount: amount };
   }
 
+  // "Get a £/€5 Free Bet … place a £/€5+ bet" (headline without Bet X Get Y order)
+  const getFree =
+    text.match(
+      new RegExp(
+        String.raw`\bget\s+(?:a\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\s+free\s*bets?\b`,
+        "i"
+      )
+    ) ||
+    text.match(
+      new RegExp(
+        String.raw`\b(?:credited\s+with|receive)\s+(?:a\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\s+free\s*bets?\b`,
+        "i"
+      )
+    );
+  if (getFree) {
+    const freeBetAmount = parseMoney(getFree[1]);
+    const stakeOnly =
+      text.match(
+        new RegExp(
+          String.raw`\bplace\s+a\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s*bets?\b`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\b(?:qualifying\s+)?(?:bet|stake)\s+(?:of\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\+?`,
+          "i"
+        )
+      );
+    const betStake = stakeOnly ? parseMoney(stakeOnly[1]) : freeBetAmount;
+    if (freeBetAmount != null) return { betStake, freeBetAmount };
+  }
+
   // "Free Bet value is £10" / "free bet of £10" / "£10 free bet"
   const freeValue =
     text.match(
-      /\bfree\s*bets?\s*(?:value|amount|worth)?\s*(?:is|of|=|:)?\s*£\s*(\d+(?:\.\d{1,2})?)/i
+      new RegExp(
+        String.raw`\bfree\s*bets?\s*(?:value|amount|worth)?\s*(?:is|of|=|:)?\s*${MONEY_PREFIX}${MONEY_AMOUNT}`,
+        "i"
+      )
     ) ||
-    text.match(/\b£\s*(\d+(?:\.\d{1,2})?)\s*(?:free\s*bets?|fb|back)\b/i) ||
+    text.match(
+      new RegExp(String.raw`\b${MONEY_PREFIX}${MONEY_AMOUNT}\s*(?:free\s*bets?|fb|back)\b`, "i")
+    ) ||
     text.match(/\b(\d+(?:\.\d{1,2})?)\s*(?:free\s*bets?|fb)\b/i);
   if (freeValue) {
     const freeBetAmount = parseMoney(freeValue[1]);
     const stakeOnly = text.match(
-      /\b(?:qualifying\s+)?(?:bet|stake)\s+(?:of\s+)?£?\s*(\d+(?:\.\d{1,2})?)/i
+      new RegExp(
+        String.raw`\b(?:qualifying\s+)?(?:bet|stake)\s+(?:of\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\+?`,
+        "i"
+      )
     );
     return {
       betStake: stakeOnly ? parseMoney(stakeOnly[1]) : null,
@@ -890,7 +996,9 @@ function extractBetGetStakes(text: string): {
   const effects = inferAiEffectsFromText(text);
   const award = effects.find((e) => e.kind === "free_bet_award");
   if (award) {
-    const stakeOnly = text.match(/\bbet\s+£?\s*(\d+(?:\.\d{1,2})?)/i);
+    const stakeOnly = text.match(
+      new RegExp(String.raw`\bbet\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?`, "i")
+    );
     return {
       betStake: stakeOnly ? parseMoney(stakeOnly[1]) : award.amount,
       freeBetAmount: award.amount,
@@ -925,8 +1033,10 @@ function buildOfferTitle(
   if (moneyBackTitle) return moneyBackTitle;
 
   if (offerCategoryById(category).isRacing && betStake != null && freeBetAmount != null) {
-    const placeLabel = places.length > 0 ? formatPlaceLabel(places) : "place";
-    return `Bet £${betStake} get £${freeBetAmount} free bet (${placeLabel})`;
+    if (places.length > 0) {
+      return `Bet £${betStake} get £${freeBetAmount} free bet (${formatPlaceLabel(places)})`;
+    }
+    return `Bet £${betStake} get £${freeBetAmount} free bet`;
   }
   if (freeBetAmount != null) {
     if (/\bcricket\b/i.test(text)) return `£${freeBetAmount} free bet - Cricket`;
@@ -999,7 +1109,7 @@ function extractQualifyingPlaces(text: string, awardPositions: number[]): number
 
 /** Parse pasted promo / MBB text into an offer draft for the Offers form. */
 export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDraft {
-  const text = normalizeOfferOcrText(raw.replace(/\u00a0/g, " ").trim());
+  const text = normalizeOfferOcrText(raw).trim();
   const notes: string[] = [];
 
   if (!text) {
@@ -1011,6 +1121,8 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
 
   const effects = inferAiEffectsFromText(text);
   const award = effects.find((e) => e.kind === "free_bet_award");
+  const winnerMustBeSpFavourite =
+    award?.winnerMustBeSpFavourite === true || textRequiresSpFavouriteWinner(text);
   const places = extractQualifyingPlaces(
     text,
     award && award.positions.length > 0 ? award.positions : []
@@ -1085,7 +1197,13 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
   } else if (freeBetAmount != null) {
     notes.push(`Free bet £${freeBetAmount}`);
   }
-  if (places.length > 0) notes.push(`Places: ${places.join(", ")}`);
+  if (places.length > 0) {
+    notes.push(
+      winnerMustBeSpFavourite
+        ? `Places: ${places.join(", ")} to SP favourite`
+        : `Places: ${places.join(", ")}`
+    );
+  }
   if (minRunners != null && isRacing) notes.push(`Min ${minRunners} runners`);
   if (statedProfit != null) notes.push(`Expected profit £${statedProfit}`);
   else if (intelligence.epExplanation) notes.push(intelligence.epExplanation);
@@ -1125,14 +1243,19 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
   const title = buildOfferTitle(text, category, freeBetAmount, betStake, places);
 
   let rules: BetGetFreePlaceRules | null = null;
+  // Racing bet&get stores structured rules even when unconditional. Empty
+  // qualifyingPlaces means straight reward (no Best plays / place targeting).
+  // Never invent 2nd–4th for "bet £5 get £5".
   if (isRacing && betStake != null && freeBetAmount != null) {
     rules = {
       type: "bet_get_free_place",
       minRunners: minRunners ?? 8,
       regions,
-      qualifyingPlaces: places.length > 0 ? places : [2, 3, 4],
+      qualifyingPlaces:
+        places.length > 0 ? places : winnerMustBeSpFavourite ? [2] : [],
       betStake,
       freeBetAmount,
+      ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
     };
     notes.push(formatBetGetFreePlaceSummary(rules));
   } else if (isRacing && freeBetAmount != null && places.length > 0) {
@@ -1144,6 +1267,7 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
       qualifyingPlaces: places,
       betStake: betStake ?? freeBetAmount,
       freeBetAmount,
+      ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
     };
     notes.push(formatBetGetFreePlaceSummary(rules));
   }

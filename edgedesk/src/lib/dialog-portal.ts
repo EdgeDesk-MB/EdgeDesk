@@ -2,6 +2,7 @@
 export const DIALOG_PORTAL_SELECTORS = [
   "[data-bookmaker-select-menu]",
   '[data-slot="select-content"]',
+  '[data-slot="popover-content"]',
 ] as const;
 
 export function isDialogPortalTarget(target: EventTarget | null): boolean {

@@ -20,9 +20,9 @@ function offer(
     offerType: rest.offerType ?? "bet_get_free_place",
     rules: rest.rules ?? null,
     scopeCourse: rest.scopeCourse ?? "Newmarket",
-    scopeRaceId: null,
-    scopeRaceLabel: null,
-    eventDate: null,
+    scopeRaceId: rest.scopeRaceId ?? null,
+    scopeRaceLabel: rest.scopeRaceLabel ?? null,
+    eventDate: rest.eventDate ?? null,
     expiresAt: null,
     completedAt: null,
     seriesId: null,
@@ -114,5 +114,81 @@ describe("deriveTrackBetAction", () => {
     expect(action.enabled).toBe(false);
     expect(action.label).toBe("Awaiting result");
     expect(action.prefill).toBeNull();
+  });
+
+  it("prefills raceExternalId for a race-scoped campaign", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 4,
+        title: "Bet £10 get £10 free bet (2nd & 3rd)",
+        rules,
+        betCount: 0,
+        scopeCourse: "Goodwood",
+        scopeRaceId: "rac_32293062958",
+        scopeRaceLabel: "1:50 · Highclere Castle Gin Summer Handicap Stakes",
+        eventDate: "2026-08-01",
+      })
+    );
+    expect(action.prefill?.raceExternalId).toBe("rac_32293062958");
+    expect(action.prefill?.raceEventDate).toBe("2026-08-01");
+    expect(action.prefill?.scopeCourse).toBe("Goodwood");
+    expect(action.prefill?.labelSuggestion).toContain("Goodwood");
+    expect(action.prefill?.labelSuggestion).toContain("1:50");
+  });
+
+  it("prefills scopeCourse for a course-scoped campaign (no race)", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 5,
+        title: "Bet £50 get £50 free bet (3rd, 4th)",
+        rules,
+        betCount: 0,
+        scopeCourse: "Goodwood",
+        eventDate: "2026-08-01",
+      })
+    );
+    expect(action.prefill?.scopeCourse).toBe("Goodwood");
+    expect(action.prefill?.raceEventDate).toBe("2026-08-01");
+    expect(action.prefill?.raceExternalId).toBeUndefined();
+  });
+
+  it("prefills horse racing + Galway course for an unconditional course-scoped bet&get", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 126,
+        title: "Bet £5 get £5 free bet",
+        bookmaker: "Ladbrokes",
+        rules: JSON.stringify({
+          type: "bet_get_free_place",
+          minRunners: 8,
+          regions: ["GB", "IRE"],
+          qualifyingPlaces: [],
+          betStake: 5,
+          freeBetAmount: 5,
+        }),
+        betCount: 0,
+        scopeCourse: "Galway",
+        eventDate: "2026-08-02",
+      })
+    );
+    expect(action.prefill?.sport).toBe("horse_racing");
+    expect(action.prefill?.market).toBe("win");
+    expect(action.prefill?.scopeCourse).toBe("Galway");
+    expect(action.prefill?.raceEventDate).toBe("2026-08-02");
+    expect(action.prefill?.bookmaker).toBe("Ladbrokes");
+  });
+
+  it("does not prefill scopeCourse for regional UK & IRE scope", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 6,
+        title: "Bet £50 get £50 free bet",
+        rules,
+        betCount: 0,
+        scopeCourse: "uk_ire",
+        eventDate: "2026-08-01",
+      })
+    );
+    expect(action.prefill?.scopeCourse).toBeUndefined();
   });
 });

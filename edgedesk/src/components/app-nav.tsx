@@ -338,6 +338,7 @@ export function AppNav() {
       <div key={href} className="relative w-full min-w-0">
         <Link
           href={href}
+          prefetch
           className={cn(navLinkState(active), quickAction && "pr-10")}
         >
           <Icon
@@ -408,6 +409,7 @@ export function AppNav() {
         <div className="relative w-full min-w-0">
           <Link
             href={firstChildHref}
+            prefetch
             onClick={onParentClick}
             className={cn(navLinkState(parentActive), "pr-10")}
             aria-expanded={expanded}
@@ -443,6 +445,7 @@ export function AppNav() {
                   <Link
                     key={child.href}
                     href={child.href}
+                    prefetch
                     className={cn(navLinkState(active), "py-1.5 pl-9 text-[13px]")}
                     tabIndex={expanded ? undefined : -1}
                   >

@@ -17,6 +17,7 @@ import {
 } from "@/lib/offers/offer-calendar";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { localYmd } from "@/lib/offers/offer-recurrence-shared";
+import { formatClockTime } from "@/lib/time-format";
 
 export type DailyPlanSlotKind = "offer_action" | "race" | "kickoff" | "anytime";
 
@@ -156,8 +157,11 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
       doKind: item.kind,
       title: item.title,
       // Campaign name first: four "Place qualifying bet" rows are useless
-      // unless each says WHICH offer it belongs to.
-      detail: item.offerTitle || item.detail,
+      // unless each says WHICH offer it belongs to. Offer Edge's race and horse
+      // then turns "which offer" into "what to actually do".
+      detail: item.edge
+        ? `${item.offerTitle ? `${item.offerTitle} · ` : ""}${item.edge.course} ${formatClockTime(item.edge.startTime)}, ${item.edge.runnerName}`
+        : item.offerTitle || item.detail,
       ev: item.remainingEv > 0 ? item.remainingEv : undefined,
       basis: item.basis,
       priority,

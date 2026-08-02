@@ -220,9 +220,10 @@ export function buildInstructions(
     case "bet_get_free_bet":
       return [
         `Place qualifying cash bet${ctx.betStake != null ? ` of £${ctx.betStake}` : ""} on ${bookie}${minOdds != null ? ` at min odds ${minOdds}` : ""}.`,
-        "Lay the same selection on the exchange to minimise qualifying loss.",
-        `When the free bet lands, extract it SNR on ${bookie} and lay again.`,
-        signals.snrFreeBet ? "Free bet is SNR - lay at high odds for best return." : "",
+        "Pick a market with the closest back/lay match to keep qualifying loss tiny.",
+        "Lay the same selection on the exchange at nearly the same odds.",
+        `When the free bet lands, extract it SNR on ${bookie}: back at reasonably high odds and lay close to that price for best retention.`,
+        signals.snrFreeBet ? "Free bet is SNR - higher matched odds improve extraction." : "",
       ].filter((s) => s.length > 0);
 
     case "place_refund":
