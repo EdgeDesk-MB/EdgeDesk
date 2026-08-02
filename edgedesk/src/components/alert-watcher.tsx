@@ -13,59 +13,58 @@ import {
   type SettledBetNotice,
   type TwoUpLockNotice,
 } from "@/lib/alerts/rules";
+import {
+  readSeenAlertKeys,
+  storeSeenAlertKeys,
+} from "@/lib/alerts/seen";
 import { detectNakedExposure } from "@/lib/bets/naked-exposure";
 import { suggestTwoUpLock } from "@/lib/calc/two-up-lock";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
-
-const SEEN_KEY = "edgedesk-alerts-seen";
-
-function readSeen(): Set<string> {
-  try {
-    return new Set(JSON.parse(sessionStorage.getItem(SEEN_KEY) ?? "[]") as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-function storeSeen(seen: Set<string>): void {
-  try {
-    sessionStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-500)));
-  } catch {
-    /* private mode */
-  }
-}
 
 export function AlertWatcher() {
   const { items: doNext, state } = useDoNextItems();
   const channel = useMemo(() => createLocalAlertChannel(), []);
   const seenRef = useRef<Set<string> | null>(null);
-  const settledIdsRef = useRef<Set<number> | null>(null);
+  /** Settled bet id → status; detects new settles and later void/push revisions. */
+  const settledStatusRef = useRef<Map<number, string> | null>(null);
 
   useEffect(() => {
     if (!state) return;
-    if (seenRef.current == null) seenRef.current = readSeen();
+    if (seenRef.current == null) seenRef.current = readSeenAlertKeys();
 
     // Newly settled bets: transitions since the previous poll. The first poll
     // seeds silently so a page load doesn't announce history.
     const settledNow = (state.bets ?? []).filter(
       (b) => b.status !== "open" && b.settledAt != null
     );
-    const previous = settledIdsRef.current;
-    settledIdsRef.current = new Set(settledNow.map((b) => b.id));
-    const settledSinceLastPoll: SettledBetNotice[] =
-      previous == null
-        ? []
-        : settledNow
-            .filter((b) => !previous.has(b.id) && b.status !== "void")
-            .map((b) => ({
-              betId: b.id,
-              label: b.label,
-              profit: b.actualProfit ?? 0,
-            }));
+    const previous = settledStatusRef.current;
+    settledStatusRef.current = new Map(settledNow.map((b) => [b.id, b.status]));
+    const settledSinceLastPoll: SettledBetNotice[] = [];
+    if (previous != null) {
+      for (const b of settledNow) {
+        const prev = previous.get(b.id);
+        const notice: SettledBetNotice = {
+          betId: b.id,
+          label: b.label,
+          profit: b.status === "void" || b.status === "push" ? 0 : (b.actualProfit ?? 0),
+          status: b.status,
+        };
+        if (prev == null) {
+          // First settle: skip pure void/push (no toast); won/lost etc. announce.
+          if (b.status !== "void" && b.status !== "push") {
+            settledSinceLastPoll.push(notice);
+          }
+        } else if (prev !== b.status && (b.status === "void" || b.status === "push")) {
+          // Settled then voided (or pushed): revise the existing result alert.
+          settledSinceLastPoll.push(notice);
+        }
+      }
+    }
 
     const now = Date.now();
 
     // B5: unhedged backs past their threshold (windows tunable via E1).
+    // Intentional-nohedge notes are excluded inside detectNakedExposure.
     const eventStarts = new Map(state.events.map((e) => [e.id, e.startTime]));
     const nakedExposed = detectNakedExposure(state.bets ?? [], eventStarts, now, {
       thresholdMs: state.settings.tuning.nakedExposureMinutes * 60_000,
@@ -116,6 +115,13 @@ export function AlertWatcher() {
       });
     }
 
+    // Drop Do Next rows for offers that no longer exist (deleted mid-session /
+    // stale memo) so offer_expiring cannot fire after a campaign is gone.
+    const liveOfferIds = new Set((state.offers ?? []).map((o) => o.id));
+    const liveDoNext = doNext.filter(
+      (item) => item.offerId == null || liveOfferIds.has(item.offerId)
+    );
+
     const alerts = evaluateAlertRules({
       now,
       prefs: {
@@ -125,7 +131,17 @@ export function AlertWatcher() {
         nakedExposure: state.settings.alertsNakedExposure,
         twoUpLock: state.settings.alertsTwoUpLock,
       },
-      doNext,
+      doNext: liveDoNext,
+      offers: (state.offers ?? []).map((o) => ({
+        id: o.id,
+        title: o.title,
+        sport: o.sport,
+        eventDate: o.eventDate,
+        scopeCourse: o.scopeCourse,
+        scopeRaceId: o.scopeRaceId,
+        scopeRaceLabel: o.scopeRaceLabel,
+        expiresAt: o.expiresAt,
+      })),
       races: (state.planRaces ?? []).map((r) => ({
         ...r,
         hasOpenBet: r.hasOpenBet ?? false,
@@ -135,7 +151,16 @@ export function AlertWatcher() {
       twoUpTriggered,
     });
 
-    const seen = seenRef.current;
+    // Re-read seen each pass so Intentional (banner) can suppress mid-session
+    // before this effect's next run sees a stale in-memory set.
+    const seen = readSeenAlertKeys();
+    seenRef.current = seen;
+    // Void/push revisions reuse result_settled:{id}; clear seen so inbox + toast update.
+    for (const notice of settledSinceLastPoll) {
+      if (notice.status === "void" || notice.status === "push") {
+        seen.delete(`result_settled:${notice.betId}`);
+      }
+    }
     let dirty = false;
     const fresh: typeof alerts = [];
     for (const alert of alerts) {
@@ -146,7 +171,7 @@ export function AlertWatcher() {
       channel.notify(alert);
     }
     if (dirty) {
-      storeSeen(seen);
+      storeSeenAlertKeys(seen);
       // F2: toasts/notifications deliver; the inbox is the record. Batched,
       // fire-and-forget - a failed write never blocks delivery.
       void fetch("/api/alerts", {

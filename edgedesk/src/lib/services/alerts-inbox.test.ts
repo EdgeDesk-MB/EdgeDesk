@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { db, bets } from "@/lib/db";
 import {
   listInbox,
   markAllRead,
   markRead,
+  markReadByDedupe,
+  markReadByDedupePrefix,
+  reconcileVoidedSettlementAlerts,
   recordAlerts,
   unreadCount,
 } from "./alerts-inbox";
@@ -50,5 +55,91 @@ describe("alerts inbox", () => {
       { key: "test:no-title", kind: "x", title: "" },
     ]);
     expect(n).toBe(0);
+  });
+
+  it("marks read by dedupe key (Intentional mute)", () => {
+    const before = unreadCount();
+    recordAlerts(
+      [{ key: "naked_exposure:97", kind: "naked_exposure", title: "Unhedged back bet" }],
+      T0
+    );
+    expect(unreadCount()).toBe(before + 1);
+    expect(markReadByDedupe("naked_exposure:97", T0 + 1000)).toBe(1);
+    expect(unreadCount()).toBe(before);
+    const row = listInbox().find((r) => r.dedupe === "naked_exposure:97");
+    expect(row?.readAt).toBe(T0 + 1000);
+  });
+
+  it("marks offer_expiring rows read by prefix when an offer is deleted", () => {
+    const before = unreadCount();
+    recordAlerts(
+      [
+        {
+          key: "offer_expiring:offer-5-place_qualifying:2026-07-13",
+          kind: "offer_expiring",
+          title: "Offer ends today",
+        },
+        {
+          key: "offer_expiring:offer-50-place_qualifying:2026-07-13",
+          kind: "offer_expiring",
+          title: "Other offer",
+        },
+      ],
+      T0
+    );
+    expect(unreadCount()).toBe(before + 2);
+    expect(markReadByDedupePrefix("offer_expiring:offer-5-", T0 + 1000)).toBe(1);
+    expect(unreadCount()).toBe(before + 1);
+    expect(
+      listInbox().find((r) => r.dedupe === "offer_expiring:offer-5-place_qualifying:2026-07-13")
+        ?.readAt
+    ).toBe(T0 + 1000);
+    expect(
+      listInbox().find((r) => r.dedupe === "offer_expiring:offer-50-place_qualifying:2026-07-13")
+        ?.readAt
+    ).toBeNull();
+  });
+
+  it("rewrites result_settled inbox rows when the bet is later voided", () => {
+    const bet = db
+      .insert(bets)
+      .values({
+        label: "Winner Regal Desire",
+        market: "win",
+        selection: "Regal Desire",
+        betType: "qualifying",
+        bookmaker: "Paddy Power",
+        backStake: 10,
+        backOdds: 3,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        status: "void",
+        actualProfit: 0,
+        createdAt: T0,
+        settledAt: T0,
+      })
+      .returning()
+      .get();
+
+    recordAlerts(
+      [
+        {
+          key: `result_settled:${bet.id}`,
+          kind: "result_settled",
+          title: `Settled: ${bet.label}`,
+          body: `+£6.52 on ${bet.label}.`,
+        },
+      ],
+      T0
+    );
+
+    expect(reconcileVoidedSettlementAlerts(T0 + 5000)).toBe(1);
+    const row = listInbox().find((r) => r.dedupe === `result_settled:${bet.id}`);
+    expect(row?.title).toBe(`Voided: ${bet.label}`);
+    expect(row?.body).toBe(`Void · stakes returned on ${bet.label}.`);
+    expect(row?.updatedAt).toBeGreaterThanOrEqual(T0 + 5000);
+
+    db.delete(bets).where(eq(bets.id, bet.id)).run();
   });
 });

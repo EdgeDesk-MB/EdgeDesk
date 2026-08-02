@@ -4,8 +4,9 @@
  * missed alert is never a lost alert. Rows key on the rules' stable dedupe
  * keys: a re-firing rule updates its row instead of stacking copies.
  */
-import { desc, eq, isNull, sql } from "drizzle-orm";
-import { db, alertsInbox, type AlertsInboxRow } from "@/lib/db";
+import { desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { settledResultAlertCopy } from "@/lib/alerts/rules";
+import { db, alertsInbox, bets, type AlertsInboxRow } from "@/lib/db";
 
 export interface IncomingAlert {
   key: string;
@@ -45,7 +46,54 @@ export function recordAlerts(alerts: IncomingAlert[], now = Date.now()): number 
   return recorded;
 }
 
+/**
+ * When a previously settled bet is later voided/pushed, rewrite any existing
+ * result_settled inbox row so Alerts matches Profit Tracker (no signed P&L).
+ * Does not create rows for bets that never had a settlement alert.
+ */
+export function reconcileVoidedSettlementAlerts(now = Date.now()): number {
+  const revised = db
+    .select({
+      id: bets.id,
+      label: bets.label,
+      status: bets.status,
+    })
+    .from(bets)
+    .where(inArray(bets.status, ["void", "push"]))
+    .all();
+  if (revised.length === 0) return 0;
+
+  let updated = 0;
+  for (const bet of revised) {
+    const dedupe = `result_settled:${bet.id}`;
+    const existing = db
+      .select()
+      .from(alertsInbox)
+      .where(eq(alertsInbox.dedupe, dedupe))
+      .get();
+    if (!existing) continue;
+    const copy = settledResultAlertCopy({
+      betId: bet.id,
+      label: bet.label,
+      profit: 0,
+      status: bet.status,
+    });
+    if (existing.title === copy.title && (existing.body ?? "") === copy.body) continue;
+    db.update(alertsInbox)
+      .set({
+        title: copy.title,
+        body: copy.body,
+        updatedAt: now,
+      })
+      .where(eq(alertsInbox.dedupe, dedupe))
+      .run();
+    updated++;
+  }
+  return updated;
+}
+
 export function listInbox(limit = 100): AlertsInboxRow[] {
+  reconcileVoidedSettlementAlerts();
   return db
     .select()
     .from(alertsInbox)
@@ -65,6 +113,33 @@ export function unreadCount(): number {
 
 export function markRead(id: number, now = Date.now()): void {
   db.update(alertsInbox).set({ readAt: now }).where(eq(alertsInbox.id, id)).run();
+}
+
+/** Mark the inbox row for a rules dedupe key as read (0 if none / already read). */
+export function markReadByDedupe(dedupe: string, now = Date.now()): number {
+  const key = dedupe.trim();
+  if (!key) return 0;
+  const res = db
+    .update(alertsInbox)
+    .set({ readAt: now })
+    .where(eq(alertsInbox.dedupe, key))
+    .run();
+  return res.changes;
+}
+
+/**
+ * Mark every inbox row whose dedupe starts with `prefix` as read.
+ * Used when an offer is deleted so offer_expiring rows for it go quiet.
+ */
+export function markReadByDedupePrefix(prefix: string, now = Date.now()): number {
+  const p = prefix.trim();
+  if (!p) return 0;
+  const res = db
+    .update(alertsInbox)
+    .set({ readAt: now })
+    .where(like(alertsInbox.dedupe, `${p.replace(/%/g, "")}%`))
+    .run();
+  return res.changes;
 }
 
 export function markAllRead(now = Date.now()): number {

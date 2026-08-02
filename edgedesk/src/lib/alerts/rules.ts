@@ -2,10 +2,22 @@
  * Pure alert rules (C4). Evaluated against app state every poll; the watcher
  * dedupes on `key` so each alert fires once. Rules never talk to a channel -
  * delivery is AlertChannel's job.
+ *
+ * Offer reminders fire close to impact (first race / promo deadline), not as
+ * soon as an offer is created on the same calendar day.
  */
 
+import { nakedExposureAlertKey } from "@/lib/bets/naked-exposure";
+import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import type { DoNextItem } from "@/lib/offers/do-next";
+import type { OfferNextActionKind } from "@/lib/offers/next-actions";
 import type { DailyPlanRaceInput } from "@/lib/plan/daily-plan";
+import {
+  isOfferImpactAlertDue,
+  offerExpiringAlertCopy,
+  resolveOfferImpact,
+  type OfferImpactOffer,
+} from "./offer-impact";
 import type { AlertPrefs, EdgeAlert } from "./types";
 
 /** Ignore sub-£1 edges - a notification interrupt has a price. */
@@ -13,10 +25,20 @@ const OFFER_EV_FLOOR = 1;
 /** "Race off soon" window before the off. */
 const RACE_WINDOW_MS = 15 * 60_000;
 
+/** Action kinds that can produce an offer_expiring alert (see evaluateAlertRules). */
+const OFFER_EXPIRING_ACTION_KINDS: OfferNextActionKind[] = [
+  "place_qualifying",
+  "convert_free_bet",
+  "start_planned",
+  "review_expiry",
+];
+
 export interface SettledBetNotice {
   betId: number;
   label: string;
   profit: number;
+  /** When void/push, copy mirrors Profit Tracker (no signed P&L). */
+  status?: string;
 }
 
 export interface NakedExposureNotice {
@@ -37,6 +59,8 @@ export interface AlertRuleInput {
   now: number;
   prefs: AlertPrefs;
   doNext: DoNextItem[];
+  /** Offer rows used to resolve race/course/expiry impact times. */
+  offers: OfferImpactOffer[];
   races: Array<DailyPlanRaceInput & { hasOpenBet: boolean }>;
   settledSinceLastPoll: SettledBetNotice[];
   nakedExposed: NakedExposureNotice[];
@@ -50,20 +74,76 @@ function dayKey(now: number): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+/** Dedupe keys AlertWatcher may have used for this offer today. */
+export function offerExpiringAlertKeys(offerId: number, now = Date.now()): string[] {
+  const day = dayKey(now);
+  return OFFER_EXPIRING_ACTION_KINDS.map(
+    (kind) => `offer_expiring:offer-${offerId}-${kind}:${day}`
+  );
+}
+
+/** Inbox LIKE pattern covering every offer_expiring key for one offer. */
+export function offerExpiringAlertDedupePrefix(offerId: number): string {
+  return `offer_expiring:offer-${offerId}-`;
+}
+
 function formatSignedGbp(value: number): string {
   const sign = value >= 0 ? "+" : "-";
   return `${sign}£${Math.abs(value).toFixed(2)}`;
 }
 
+/** Title/body for a settlement alert (void/push match Profit Tracker treatment). */
+export function settledResultAlertCopy(settled: SettledBetNotice): {
+  title: string;
+  body: string;
+} {
+  if (settled.status === "void") {
+    return {
+      title: `Voided: ${settled.label}`,
+      body: `Void · stakes returned on ${settled.label}.`,
+    };
+  }
+  if (settled.status === "push") {
+    return {
+      title: `Push: ${settled.label}`,
+      body: `Push · stakes returned on ${settled.label}.`,
+    };
+  }
+  return {
+    title: `Settled: ${settled.label}`,
+    body: `${formatSignedGbp(settled.profit)} on ${settled.label}.`,
+  };
+}
+
+export function settledResultAlert(settled: SettledBetNotice): EdgeAlert {
+  const copy = settledResultAlertCopy(settled);
+  return {
+    key: `result_settled:${settled.betId}`,
+    kind: "result_settled",
+    title: copy.title,
+    body: copy.body,
+    href: `/tracker?highlight=${settled.betId}`,
+  };
+}
+
 export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
-  const { now, prefs, doNext, races, settledSinceLastPoll, nakedExposed, twoUpTriggered } =
-    input;
+  const {
+    now,
+    prefs,
+    doNext,
+    offers,
+    races,
+    settledSinceLastPoll,
+    nakedExposed,
+    twoUpTriggered,
+  } = input;
   const alerts: EdgeAlert[] = [];
+  const offersById = new Map(offers.map((o) => [o.id, o]));
 
   if (prefs.nakedExposure) {
     for (const exposed of nakedExposed) {
       alerts.push({
-        key: `naked_exposure:${exposed.betId}`,
+        key: nakedExposureAlertKey(exposed.betId),
         kind: "naked_exposure",
         title: "Unhedged back bet",
         body: `${exposed.label}${exposed.bookmaker ? ` at ${exposed.bookmaker}` : ""} has no lay logged - full stake exposed.`,
@@ -91,12 +171,37 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
     for (const item of doNext) {
       if (item.kind === "await_result" || item.kind === "fund_account") continue;
       if (item.remainingEv < OFFER_EV_FLOOR) continue;
-      if (item.daysLeft == null || item.daysLeft > 1 || item.daysLeft < 0) continue;
+      // Still require a same-day (or overdue) window so multi-day promos stay quiet.
+      if (item.daysLeft == null || item.daysLeft > 1) continue;
+
+      const offer = item.offerId != null ? offersById.get(item.offerId) : undefined;
+      const impact = offer
+        ? resolveOfferImpact(offer, races, item.edge?.startTime ?? null, item.kind)
+        : item.daysLeft < 0
+          ? null
+          : {
+              at: now + item.daysLeft * 24 * 60 * 60_000,
+              source: "expiry" as const,
+              label: null,
+            };
+      if (impact == null) continue;
+
+      const hardExpiry = offer != null ? effectiveOfferExpiryMs(offer) : impact.at;
+      if (!isOfferImpactAlertDue(impact, now, hardExpiry)) continue;
+      // Fully expired with nothing left to do.
+      if (item.daysLeft < 0 && (hardExpiry == null || now >= hardExpiry)) continue;
+
+      const copy = offerExpiringAlertCopy({
+        remainingEv: item.remainingEv,
+        offerTitle: item.offerTitle ?? item.title,
+        impact,
+        now,
+      });
       alerts.push({
         key: `offer_expiring:${item.id}:${dayKey(now)}`,
         kind: "offer_expiring",
-        title: `Offer ends today - £${item.remainingEv.toFixed(0)} unclaimed`,
-        body: `${item.offerTitle ?? item.title}: £${item.remainingEv.toFixed(2)} of edge expires with it.`,
+        title: copy.title,
+        body: copy.body,
         // P1: land on the campaign details modal, not the add-bet flow
         href: item.offerId != null ? `/offers?view=${item.offerId}` : (item.href ?? "/offers"),
       });
@@ -121,13 +226,7 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
 
   if (prefs.resultSettled) {
     for (const settled of settledSinceLastPoll) {
-      alerts.push({
-        key: `result_settled:${settled.betId}`,
-        kind: "result_settled",
-        title: `Settled: ${settled.label}`,
-        body: `${formatSignedGbp(settled.profit)} on ${settled.label}.`,
-        href: `/tracker?highlight=${settled.betId}`,
-      });
+      alerts.push(settledResultAlert(settled));
     }
   }
 

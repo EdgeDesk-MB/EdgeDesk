@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "@/hooks/use-app-state";
+import { api, apiGet } from "@/hooks/use-app-state";
 import {
   compareByAccessThenName,
   normalizeAccessStatus,
@@ -32,8 +32,8 @@ export function useVenueAccounts(pollMs = 0) {
   const refresh = useCallback(async () => {
     try {
       const [bal, ex] = await Promise.all([
-        api<{ accounts: AccountBalance[] }>("/api/accounts"),
-        api<{ exchanges: ExchangeRow[] }>("/api/exchanges"),
+        apiGet<{ accounts: AccountBalance[] }>("/api/accounts"),
+        apiGet<{ exchanges: ExchangeRow[] }>("/api/exchanges"),
       ]);
       setAccounts(bal.accounts.filter((a) => a.isActive));
       setExchanges(ex.exchanges);

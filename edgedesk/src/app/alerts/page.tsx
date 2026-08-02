@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlarmClock,
+  Ban,
   BellRing,
   Check,
   CheckCheck,
@@ -23,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
-import { api, useAppState } from "@/hooks/use-app-state";
+import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import type { AlertsInboxRow } from "@/lib/db/schema";
 import { formatClockTime } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,7 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertsInboxRow[] | null>(null);
 
   const load = useCallback(() => {
-    api<{ alerts: AlertsInboxRow[] }>("/api/alerts")
+    apiGet<{ alerts: AlertsInboxRow[] }>("/api/alerts")
       .then((r) => setAlerts(r.alerts))
       .catch(() => setAlerts([]));
   }, []);
@@ -114,7 +115,10 @@ export default function AlertsPage() {
           />
         ) : (
           alerts.map((alert) => {
-            const Icon = KIND_ICONS[alert.kind] ?? BellRing;
+            const voided =
+              alert.kind === "result_settled" &&
+              (alert.title.startsWith("Voided:") || alert.title.startsWith("Push:"));
+            const Icon = voided ? Ban : (KIND_ICONS[alert.kind] ?? BellRing);
             const isUnread = alert.readAt == null;
             return (
               <div
@@ -136,11 +140,20 @@ export default function AlertsPage() {
                 <Icon
                   className={cn(
                     "mt-0.5 size-4 shrink-0",
-                    isUnread ? "text-primary" : "text-muted-foreground"
+                    voided
+                      ? "text-muted-foreground"
+                      : isUnread
+                        ? "text-primary"
+                        : "text-muted-foreground"
                   )}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className={cn("block text-sm", isUnread ? "font-semibold" : "font-medium")}>
+                  <span
+                    className={cn(
+                      "block text-sm",
+                      voided ? "font-medium text-muted-foreground" : isUnread ? "font-semibold" : "font-medium"
+                    )}
+                  >
                     {alert.title}
                   </span>
                   {alert.body ? (

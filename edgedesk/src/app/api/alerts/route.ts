@@ -4,6 +4,8 @@ import {
   listInbox,
   markAllRead,
   markRead,
+  markReadByDedupe,
+  markReadByDedupePrefix,
   recordAlerts,
 } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest) {
 
 const patchSchema = z.union([
   z.object({ id: z.number().int().positive(), read: z.literal(true) }),
+  z.object({ dedupe: z.string().min(1).max(300), read: z.literal(true) }),
+  z.object({ dedupePrefix: z.string().min(1).max(300), read: z.literal(true) }),
   z.object({ all: z.literal(true), read: z.literal(true) }),
 ]);
 
@@ -55,6 +59,14 @@ export async function PATCH(req: NextRequest) {
   }
   if ("all" in parsed.data) {
     return NextResponse.json({ updated: markAllRead() });
+  }
+  if ("dedupePrefix" in parsed.data) {
+    return NextResponse.json({
+      updated: markReadByDedupePrefix(parsed.data.dedupePrefix),
+    });
+  }
+  if ("dedupe" in parsed.data) {
+    return NextResponse.json({ updated: markReadByDedupe(parsed.data.dedupe) });
   }
   markRead(parsed.data.id);
   return NextResponse.json({ updated: 1 });
