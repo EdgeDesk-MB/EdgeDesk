@@ -56,7 +56,9 @@ Decisions for Sam:
 
 | Token | Light | Dark | Meaning |
 | --- | --- | --- | --- |
-| `--primary` | `oklch(0.178 0 0)` (#111111) | `oklch(0.856 0.17 87.3)` (#FFC71E) | Ink in light, brand yellow in dark |
+| `--primary` | `oklch(0.856 0.17 87.3)` (#FFC71E) | same | Brand yellow buttons (bold ink text) both themes |
+| `--highlight` | `#FFC71E` | same | Line-tab underlines |
+| `--chip` / `--chip-foreground` | `#111` / `#FFC71E` | same | Active pills, segmented tabs, primary badges |
 | `--success` | `oklch(0.45 0.12 150)` | `oklch(0.62 0.14 150)` | Qualifying / completed / affirmative |
 | `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |

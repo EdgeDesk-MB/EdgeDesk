@@ -9,9 +9,10 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        default:
+          "bg-chip font-bold text-chip-foreground [a]:hover:bg-chip/90",
         active:
-          "border-primary/30 bg-primary text-primary-foreground shadow-sm [a]:hover:bg-primary/90",
+          "border-transparent bg-chip font-bold text-chip-foreground shadow-sm [a]:hover:bg-chip/90",
         success:
           "border-success/25 bg-success/10 text-success dark:border-success/30 dark:bg-success/15 dark:text-success [a]:hover:bg-success/15",
         warning:

@@ -33,13 +33,13 @@ export function PageHeaderStat({
   );
 }
 
-/** Primary page CTA - larger than default toolbar buttons; brand primary with shine */
+/** Primary page CTA - same h-8 as outline siblings; brand yellow with shine */
 export const pagePrimaryButtonProps = {
-  size: "lg" as const,
+  size: "default" as const,
   variant: "pagePrimary" as const,
 };
 
-/** Secondary page action (outline, export, etc.) */
+/** Secondary page action (outline, export, etc.) - matches primary height */
 export const pageSecondaryButtonProps = { size: "default" as const };
 
 /**

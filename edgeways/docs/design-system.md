@@ -8,7 +8,9 @@ Defined in `src/app/globals.css`:
 
 | Token | Use |
 |-------|-----|
-| `--primary` | Links, focus rings, chart accent - muted slate-blue (not loud brand blue) |
+| `--primary` | Brand yellow `#FFC71E` — primary buttons (bold ink text) in both themes |
+| `--highlight` | Brand yellow `#FFC71E` — line-tab underlines and accent marks |
+| `--chip` / `--chip-foreground` | Ink `#111` plate + yellow type — active filter pills, segmented tabs, primary badges/counters |
 | `--selection-subtle` / `--selection-subdued` | Hover and selected list rows, header bands |
 | `--border` | Tightened neutral borders (`border-border/80` on cards and tables) |
 | `--negative` | Loss P&L (dark mode uses a lighter red) |
@@ -38,11 +40,12 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 
 Page section navigation (Settings, Profit Tracker, Fixtures) uses **underline line tabs**:
 `TabsList variant="line"` inside `TabsLineBar` (`src/components/ui/tabs.tsx`). Active tab is
-bold with a thick black underline on a full-width hairline, not a filled pill.
+bold with a brand-yellow (`--highlight`) underline on a full-width hairline, not a filled pill.
 
 Use line tabs for primary page sections. When a section needs a second filter row underneath
 (e.g. Tracker queues: All / Open / Unlayed), keep those as **`filterPillState`** pills, not a
-second underline tab strip.
+second underline tab strip. Active pills use the brand chip style (`--chip` / `--chip-foreground`:
+ink plate + yellow type).
 
 ## Pills & lists
 
@@ -50,8 +53,8 @@ From `src/lib/ui/surface-styles.ts`:
 
 - **`filterPillState(active)`** - compact filter toggles under a primary line-tab section
   (e.g. Tracker queues, history filters). Inactive pills use muted fill
-  (`bg-muted/60` / `dark:bg-input/30`); active is mono accent. Prefer line tabs for
-  page-level section switching.
+  (`bg-muted/60` / `dark:bg-input/30`); active is brand chip (`bg-chip text-chip-foreground`).
+  Prefer line tabs for page-level section switching.
 - **`listPillState(active)`** - time/selection pills on racecards
 - **`listRowSelected(active)`** - grey selection for sidebar lists
 - **`sectionBar` / `sectionMeta`** - panel section headers

@@ -88,16 +88,22 @@ export function navLinkState(active: boolean) {
   );
 }
 
-/** Monochrome accent - matches page-primary CTAs (#111 light, white dark) */
-export const monoAccentActive =
-  "bg-[#111] text-white shadow-sm dark:bg-white dark:text-[#111]";
+/**
+ * Brand secondary accent — ink plate (#111) + yellow type (#FFC71E).
+ * Active filter pills, segmented tabs, primary chips/counters.
+ */
+export const brandChipActive =
+  "bg-chip font-bold text-chip-foreground shadow-sm";
+
+/** @deprecated Prefer brandChipActive — kept for any stray imports */
+export const monoAccentActive = brandChipActive;
 
 /** Flashscore-style filter / tab pills — inactive chips use muted fill (dark: input tint) */
 export function filterPillState(active: boolean) {
   return cn(
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
     active
-      ? monoAccentActive
+      ? brandChipActive
       : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground dark:bg-input/30 dark:hover:bg-input/50"
   );
 }
