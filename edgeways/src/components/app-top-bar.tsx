@@ -40,99 +40,94 @@ function profitToneClass(value: number): string {
   return value < -0.004 ? "text-red-700" : "text-emerald-700";
 }
 
-function TopBarStat({
-  href,
+const stackShell =
+  "flex min-h-8 flex-col justify-center gap-0.5 rounded-lg px-1.5 py-0.5 text-[11px] transition-colors hover:bg-topbar-accent";
+
+function StackRow({
   label,
   value,
-  profitTone,
-  freeBetTone,
-  onClick,
-  className,
+  amountClass,
 }: {
-  href?: string;
   label: string;
   value: number;
-  profitTone?: boolean;
-  freeBetTone?: boolean;
-  onClick?: () => void;
-  className?: string;
+  amountClass?: string;
 }) {
-  const amountClass = cn(
-    "font-bold tabular-nums",
-    freeBetTone
-      ? "text-violet-700"
-      : profitTone
-        ? profitToneClass(value)
-        : "text-topbar-foreground"
-  );
-  const shell = cn(
-    "hidden h-8 items-center gap-1.5 rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:flex",
-    className
-  );
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={shell}>
-        <span className="text-topbar-muted">{label}</span>
-        <MoneyFlow value={value} className={amountClass} />
-      </button>
-    );
-  }
-
   return (
-    <Link href={href ?? "/"} className={shell}>
+    <span className="flex items-baseline gap-1 leading-none">
       <span className="text-topbar-muted">{label}</span>
-      <MoneyFlow value={value} className={amountClass} />
-    </Link>
+      <MoneyFlow
+        value={value}
+        className={cn("font-bold tabular-nums text-topbar-foreground", amountClass)}
+      />
+    </span>
   );
 }
 
-function TopBarBankroll({
+/** Profit above Free bets. Profit alone centres vertically when free bets are hidden. */
+function TopBarProfitStack({
+  profit,
+  freeBets,
+  showFreeBets,
+  onFreeBets,
+}: {
+  profit: number;
+  freeBets: number;
+  showFreeBets: boolean;
+  onFreeBets: () => void;
+}) {
+  return (
+    <div className={cn(stackShell, "hidden sm:flex")}>
+      <Link
+        href="/tracker?tab=pnl"
+        className="rounded-sm leading-none transition-opacity hover:opacity-80"
+        aria-label={`Profit ${profit.toFixed(2)}`}
+      >
+        <StackRow label="Profit" value={profit} amountClass={profitToneClass(profit)} />
+      </Link>
+      {showFreeBets ? (
+        <button
+          type="button"
+          onClick={onFreeBets}
+          className="rounded-sm text-left leading-none transition-opacity hover:opacity-80"
+          aria-label={`Free bets ${freeBets.toFixed(2)}`}
+        >
+          <StackRow label="Free bets" value={freeBets} amountClass="text-violet-700" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Total above Exchange. Total alone centres vertically when exchange is hidden. */
+function TopBarBankrollStack({
   exchange,
   inBets,
   total,
+  showExchange,
   ownerLines,
 }: {
   exchange: number;
   inBets: number;
   total: number;
-  /** J8: per-owner bookie balances; tooltip renders when >1 owner */
+  showExchange: boolean;
   ownerLines: Array<{ owner: string; balance: number }>;
 }) {
   const showInBets = inBets > 0.005;
-  const parts = [
-    { label: "Exchange", value: exchange },
-    ...(showInBets ? [{ label: "In-bets", value: inBets }] : []),
-    { label: "Total", value: total },
-  ] as const;
-
   const chip = (
     <Link
       href="/accounts"
-      className="hidden h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:flex"
+      className={cn(stackShell, "hidden sm:flex")}
       aria-label={
-        showInBets
-          ? `Bankroll: exchange ${exchange.toFixed(2)}, in-bets ${inBets.toFixed(2)}, total ${total.toFixed(2)}`
-          : `Bankroll: exchange ${exchange.toFixed(2)}, total ${total.toFixed(2)}`
+        showExchange
+          ? showInBets
+            ? `Bankroll: total ${total.toFixed(2)}, exchange ${exchange.toFixed(2)}, in-bets ${inBets.toFixed(2)}`
+            : `Bankroll: total ${total.toFixed(2)}, exchange ${exchange.toFixed(2)}`
+          : `Bankroll total ${total.toFixed(2)}`
       }
     >
-      {parts.map((part, i) => (
-        <span key={part.label} className="flex items-center">
-          {i > 0 ? (
-            <span
-              className="mx-1.5 h-[1em] w-px shrink-0 self-center bg-topbar-muted/50"
-              aria-hidden
-            />
-          ) : null}
-          <span className="flex items-center gap-1 leading-none">
-            <span className="text-topbar-muted">{part.label}</span>
-            <MoneyFlow
-              value={part.value}
-              className="font-bold tabular-nums text-topbar-foreground"
-            />
-          </span>
-        </span>
-      ))}
+      <StackRow label="Total" value={total} />
+      {showExchange ? <StackRow label="Exchange" value={exchange} /> : null}
+      {showInBets ? <StackRow label="In-bets" value={inBets} /> : null}
     </Link>
   );
 
@@ -151,6 +146,48 @@ function TopBarBankroll({
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  );
+}
+
+/** Compact mobile: same stack order, tighter. */
+function MobileStatStacks({
+  profit,
+  freeBets,
+  showFreeBets,
+  onFreeBets,
+  total,
+  exchange,
+  showExchange,
+}: {
+  profit: number;
+  freeBets: number;
+  showFreeBets: boolean;
+  onFreeBets: () => void;
+  total: number;
+  exchange: number;
+  showExchange: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1 sm:hidden">
+      <div className={stackShell}>
+        <Link href="/tracker?tab=pnl" aria-label={`Profit ${profit.toFixed(2)}`}>
+          <StackRow label="Profit" value={profit} amountClass={profitToneClass(profit)} />
+        </Link>
+        {showFreeBets ? (
+          <button type="button" onClick={onFreeBets} aria-label={`Free bets ${freeBets.toFixed(2)}`}>
+            <StackRow label="Free bets" value={freeBets} amountClass="text-violet-700" />
+          </button>
+        ) : null}
+      </div>
+      <Link
+        href="/accounts"
+        className={stackShell}
+        aria-label={`Bankroll total ${total.toFixed(2)}`}
+      >
+        <StackRow label="Total" value={total} />
+        {showExchange ? <StackRow label="Exchange" value={exchange} /> : null}
+      </Link>
+    </div>
   );
 }
 
@@ -178,12 +215,13 @@ export function AppTopBar() {
       ?.filter((a) => a.type === "bookie")
       .reduce((s, a) => s + (a.freeBets ?? 0), 0) ?? 0;
   const showFreeBets = freeBetsTotal > 0.005;
+  const showExchange = exchange > 0.005;
 
   return (
     <header className="relative z-[45] shrink-0 border-b border-topbar-border bg-topbar text-topbar-foreground">
       <div
         className={cn(
-          "flex h-12 w-full items-center",
+          "flex h-14 w-full items-center",
           appShellGap,
           appShellPadding,
           appShellMaxWidth
@@ -202,52 +240,28 @@ export function AppTopBar() {
                   Demo data
                 </span>
               ) : null}
-              {showFreeBets ? (
-                <TopBarStat
-                  label="Free bets"
-                  value={freeBetsTotal}
-                  freeBetTone
-                  onClick={openFreeBets}
-                />
-              ) : null}
-              <TopBarStat href="/tracker?tab=pnl" label="Profit" value={profit} profitTone />
-              <TopBarBankroll
+              <TopBarProfitStack
+                profit={profit}
+                freeBets={freeBetsTotal}
+                showFreeBets={showFreeBets}
+                onFreeBets={openFreeBets}
+              />
+              <TopBarBankrollStack
                 exchange={exchange}
                 inBets={inBets}
                 total={bankroll}
+                showExchange={showExchange}
                 ownerLines={ownerBalances}
               />
-
-              {showFreeBets ? (
-                <button
-                  type="button"
-                  onClick={openFreeBets}
-                  className="flex h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:hidden"
-                  aria-label={`Free bets ${freeBetsTotal.toFixed(2)}`}
-                >
-                  <MoneyFlow
-                    value={freeBetsTotal}
-                    className="font-bold tabular-nums text-violet-700"
-                  />
-                </button>
-              ) : null}
-              <Link
-                href="/tracker?tab=pnl"
-                className="flex h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:hidden"
-                aria-label="View profit"
-              >
-                <MoneyFlow
-                  value={profit}
-                  className={cn("font-bold tabular-nums", profitToneClass(profit))}
-                />
-              </Link>
-              <Link
-                href="/accounts"
-                className="flex h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:hidden"
-                aria-label={`Bankroll total ${bankroll.toFixed(2)}`}
-              >
-                <MoneyFlow value={bankroll} className="font-bold tabular-nums" />
-              </Link>
+              <MobileStatStacks
+                profit={profit}
+                freeBets={freeBetsTotal}
+                showFreeBets={showFreeBets}
+                onFreeBets={openFreeBets}
+                total={bankroll}
+                exchange={exchange}
+                showExchange={showExchange}
+              />
             </>
           )}
 
