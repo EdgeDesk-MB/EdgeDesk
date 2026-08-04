@@ -53,7 +53,7 @@ function StackRow({
   amountClass?: string;
 }) {
   return (
-    <span className="flex items-baseline justify-end gap-0.5 leading-none">
+    <span className="flex items-baseline justify-end gap-1 leading-none">
       <span className="text-topbar-muted">{label}</span>
       <MoneyFlow
         value={value}
