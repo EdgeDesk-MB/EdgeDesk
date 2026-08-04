@@ -713,7 +713,7 @@
   animation: bet-row-highlight-fade 2s ease-out forwards;
 }
 
-/* Page-primary CTA - monochrome button with hover shine (Adjust balance, Add offer, etc.) */
+/* Page-primary CTA - brand yellow button with hover shine (Adjust balance, Add offer, etc.) */
 @keyframes btn-page-primary-shine {
   from {
     transform: translateX(-120%) skewX(-18deg);

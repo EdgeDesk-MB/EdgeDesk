@@ -29,13 +29,14 @@ is the interim mark. Final assets still wanted from Sam:
 
 Decisions for Sam:
 
-1. **Brand colour — DECIDED 2026-08-04.** Yellow `#FFC71E` (`oklch(0.856 0.17 87.3)`)
-   is `--primary` in **dark mode only**; light mode uses ink `#111111`
-   (`oklch(0.178 0 0)`) with white text (Sam's call after reviewing screenshots).
-   `--primary-hover` added per theme (lifted ink light, deepened yellow dark); the
-   `pagePrimary` page-CTA variant is now token-driven (was hardcoded #111/white), so
-   every button follows the brand. Focus rings: ink in light mode, yellow in dark.
-   Product name casing: **Edgeways** (title case) in UI text, tab title and manifest.
+1. **Brand colour — DECIDED 2026-08-04 (revised same day).** Yellow `#FFC71E`
+   (`oklch(0.856 0.17 87.3)`) is `--primary` in **both** themes with bold ink
+   `#111111` text. `--highlight` is the same yellow for line-tab underlines;
+   `--chip` / `--chip-foreground` are ink plate + yellow type for active pills,
+   segmented tabs, and primary badges/counters. `--primary-hover` deepens the
+   yellow; `pagePrimary` is token-driven at `size="default"` (h-8) to match
+   outline siblings. Focus rings follow yellow. Top bar is yellow with the dark
+   lockup. Product name casing: **Edgeways** (title case).
 2. **Edge violet stays reserved.** `--edge` (`oklch(0.5 0.2 295)`) is the Offer Edge /
    pro-tier signature (D5). The yellow brand does not collide with it.
 3. **Dark/light variants** of the mark if it isn't single-colour — the pulse mark is
@@ -50,7 +51,7 @@ Decisions for Sam:
 | PWA manifest | `src/app/manifest.ts` | 192/512 PNG entries, `purpose: "any"` + `"maskable"` |
 | Push notifications | `public/sw.js` | `icon: /icon-192.png`, `badge: /badge-192.png` (white pulse silhouette); push titles carry a leading ⚡ (see `sendPush`) |
 | Boilerplate | `public/` | Deleted (`file/globe/next/vercel/window.svg`, `chart-line.svg`, `icon-180.png`, `edgeways-bolt.svg`, `icon.svg`) |
-| Theme colour | `manifest.ts` | `#111111` mirrors brand ink / light-theme `--topbar` |
+| Theme colour | `manifest.ts` | `#FFC71E` mirrors yellow `--topbar` |
 
 ## 3. Colour tokens (current, for design reference)
 
@@ -63,7 +64,7 @@ Decisions for Sam:
 | `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |
 | `--negative` | `oklch(0.577 0.245 27)` | `oklch(0.78 0.15 22)` | Losses, destructive |
-| `--topbar` | `oklch(0.178 0 0)` (#111111) | `oklch(0.1 0 0)` | Brand ink app bar |
+| `--topbar` | `oklch(0.856 0.17 87.3)` (#FFC71E) | same | Brand yellow app bar |
 
 P&L green is deliberately **not** `--success`: money movement uses
 `moneyPositiveClass` (emerald family) via `MoneyFlow`, per design-system.md.

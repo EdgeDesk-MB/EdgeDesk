@@ -1,6 +1,6 @@
 # Edgeways design system
 
-Flashscore-inspired desk chrome for a sports-app feel: neutral greys, compact density, restrained accent colour.
+Flashscore-inspired desk chrome for a sports-app feel: neutral greys, compact density, with brand yellow `#FFC71E` as the primary CTA and highlight accent.
 
 ## Colour tokens
 
@@ -9,6 +9,7 @@ Defined in `src/app/globals.css`:
 | Token | Use |
 |-------|-----|
 | `--primary` | Brand yellow `#FFC71E` — primary buttons (bold ink text) in both themes |
+| `--primary-hover` | Deepened yellow for primary / pagePrimary hover |
 | `--highlight` | Brand yellow `#FFC71E` — line-tab underlines and accent marks |
 | `--chip` / `--chip-foreground` | Ink `#111` plate + yellow type — active filter pills, segmented tabs, primary badges/counters |
 | `--selection-subtle` / `--selection-subdued` | Hover and selected list rows, header bands |
@@ -55,6 +56,8 @@ From `src/lib/ui/surface-styles.ts`:
   (e.g. Tracker queues, history filters). Inactive pills use muted fill
   (`bg-muted/60` / `dark:bg-input/30`); active is brand chip (`bg-chip text-chip-foreground`).
   Prefer line tabs for page-level section switching.
+- **Page CTAs** - `pagePrimaryButtonProps` (`variant="pagePrimary"`, `size="default"` / h-8,
+  bold) next to outline siblings via `pageSecondaryButtonProps` at the same height.
 - **`listPillState(active)`** - time/selection pills on racecards
 - **`listRowSelected(active)`** - grey selection for sidebar lists
 - **`sectionBar` / `sectionMeta`** - panel section headers
@@ -74,7 +77,7 @@ From `src/lib/ui/surface-styles.ts`:
     title="Page title"
     description="One-line context"
     helpId="dashboard"
-    action={<Button size="sm">Action</Button>}
+    action={<Button {...pagePrimaryButtonProps}>Action</Button>}
   />
   <Card>
     <CardHeader className="pb-0">
