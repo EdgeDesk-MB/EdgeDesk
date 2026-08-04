@@ -4,13 +4,13 @@ Working list for the brand pass, split into **what Sam provides** (design assets
 decisions) and **what gets wired in code** once assets land. Current state verified
 2026-08-04 against `src/app/layout.tsx`, `src/app/manifest.ts`, `public/`, `globals.css`.
 
-> **2026-08-04: the app is now Edgeways** (lowercase "edgeways" wordmark). A placeholder
-> **chamfered bolt** mark is wired end to end: `src/components/edgeways-logo-icon.tsx`
-> (in-app), `public/edgeways-bolt.svg` (master), `src/app/icon.svg` (favicon),
-> `src/app/apple-icon.png`, maskable `icon-192/512.png`, monochrome `badge-192.png`
-> (push badge). Regenerate all PNGs from one path via
-> `node scripts/generate-brand-assets.cjs`. The final mark replaces the bolt path in
-> those two SVG sources + one re-run of the script.
+> **2026-08-04: the app is now Edgeways** (lowercase "edgeways" wordmark). First real
+> brand drop landed: **yellow `#FFC71E` + ink `#111111`**, pulse-line mark derived from
+> `brand/edgeways-lockup.png`. `--primary`/`--ring`/`--topbar` re-tokenised, icon set
+> (`src/app/icon.png`, `apple-icon.png`, maskable `icon-192/512.png`, `badge-192.png`,
+> `public/brand/mark.png`) regenerated via `node scripts/generate-brand-assets.mjs`.
+> The interim bolt is deleted. INTERIM QUALITY: the lockup source is ~105px tall and
+> its export dropped the dark wordmark layer — master artwork still needed (§1).
 
 ## 1. Logo & brand mark (Sam provides)
 
@@ -19,45 +19,48 @@ is the interim mark. Final assets still wanted from Sam:
 
 | Asset | Spec | Used for | Placeholder status |
 | --- | --- | --- | --- |
-| Logo mark, master SVG | Square viewBox, reads at 16px, single-colour variant included | Favicon, in-app brand mark | ✅ bolt placeholder wired |
-| `favicon.svg` + `icon.png` 32×32 fallback | From the master | Browser tab | ✅ `src/app/icon.svg` |
+| Logo mark, master SVG | Square viewBox, reads at 16px, single-colour variant included | Favicon, in-app brand mark | ⬜ **needed** — icons currently derived from a ~105px-tall PNG crop |
+| Complete lockup export | The 2026-08-04 PNG dropped the dark wordmark layer (only yellow shapes + transparent pulse knock-out survived) | Marketing, docs | ⬜ re-export needed |
+| `favicon.svg` + `icon.png` 32×32 fallback | From the master | Browser tab | ✅ `src/app/icon.png` (derived) |
 | `apple-icon.png` | 180×180, **solid background, no alpha** (iOS requirement) | iOS home screen / PWA | ✅ generated |
 | `icon-192.png` / `icon-512.png` | Maskable safe zone (glyph within central 80%) | Android PWA, manifest | ✅ generated, `purpose: maskable` |
-| Push badge | 192×192 monochrome white-on-transparent | Android notification shade | ✅ `badge-192.png` |
+| Push badge | 192×192 monochrome white-on-transparent | Android notification shade | ✅ `badge-192.png` (pulse silhouette) |
 | `og-image.png` (optional for now) | 1200×630 | Link previews once the marketing site exists (F4) | ⬜ still needed |
 | Wordmark (optional) | SVG, dark + light variants | Top bar, marketing site | Text wordmark ("edgeways", lowercase) in the top bar |
 
 Decisions for Sam:
 
-1. **Brand colour.** `--primary` is currently a quiet steel-navy (`oklch(0.42 0.06 250)`
-   light / `oklch(0.58 0.08 250)` dark). Keep navy as the brand base, or does the real
-   brand bring its own hue? If the latter, `--primary` re-tokens and the app follows
-   automatically — that is the point of the token system.
+1. **Brand colour — DECIDED 2026-08-04.** Yellow `#FFC71E` (`oklch(0.856 0.17 87.3)`)
+   is `--primary` in both themes; ink `#111111` (`oklch(0.178 0 0)`) is
+   `--primary-foreground` and the light-theme `--topbar`. Focus rings: ink in light
+   mode, yellow in dark. Light-mode yellow primaries are **on trial** — Sam reviews
+   (screenshots 2026-08-04) and can soften to ink-primary-in-light if it reads loud.
 2. **Edge violet stays reserved.** `--edge` (`oklch(0.5 0.2 295)`) is the Offer Edge /
-   pro-tier signature (D5). The logo should not lean on violet, or modelled-recommendation
-   chrome loses its distinctiveness.
-3. **Dark/light variants** of the mark if it isn't single-colour.
+   pro-tier signature (D5). The yellow brand does not collide with it.
+3. **Dark/light variants** of the mark if it isn't single-colour — the pulse mark is
+   background-agnostic by design (knock-out takes the surface colour), so likely
+   unneeded; confirm when the master SVG lands.
 
-## 2. Icon wiring map (code) — ✅ DONE 2026-08-04 with the placeholder bolt
+## 2. Icon wiring map (code) — ✅ DONE 2026-08-04, real mark 2026-08-04
 
 | Consumer | File | State |
 | --- | --- | --- |
-| Favicon + apple | app-directory conventions | `src/app/icon.svg` + `src/app/apple-icon.png`; manual `metadata.icons` block removed |
-| PWA manifest | `src/app/manifest.ts` | SVG + 192/512 PNG entries with `purpose: "maskable"` |
-| Push notifications | `public/sw.js` | `icon: /icon-192.png`, `badge: /badge-192.png` (monochrome bolt); push titles carry a leading ⚡ (see `sendPush`) |
-| Boilerplate | `public/` | Deleted (`file/globe/next/vercel/window.svg`, `chart-line.svg`, `icon-180.png`) |
-| Theme colour | `manifest.ts` | `#0d0d0f` mirrors `--topbar` — re-check against final brand |
+| Favicon + apple | app-directory conventions | `src/app/icon.png` + `src/app/apple-icon.png`; manual `metadata.icons` block removed |
+| PWA manifest | `src/app/manifest.ts` | 192/512 PNG entries, `purpose: "any"` + `"maskable"` |
+| Push notifications | `public/sw.js` | `icon: /icon-192.png`, `badge: /badge-192.png` (white pulse silhouette); push titles carry a leading ⚡ (see `sendPush`) |
+| Boilerplate | `public/` | Deleted (`file/globe/next/vercel/window.svg`, `chart-line.svg`, `icon-180.png`, `edgeways-bolt.svg`, `icon.svg`) |
+| Theme colour | `manifest.ts` | `#111111` mirrors brand ink / light-theme `--topbar` |
 
 ## 3. Colour tokens (current, for design reference)
 
 | Token | Light | Dark | Meaning |
 | --- | --- | --- | --- |
-| `--primary` | `oklch(0.42 0.06 250)` | `oklch(0.58 0.08 250)` | Brand / primary actions |
+| `--primary` | `oklch(0.856 0.17 87.3)` (#FFC71E) | same | Brand yellow / primary actions |
 | `--success` | `oklch(0.45 0.12 150)` | `oklch(0.62 0.14 150)` | Qualifying / completed / affirmative |
 | `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |
 | `--negative` | `oklch(0.577 0.245 27)` | `oklch(0.78 0.15 22)` | Losses, destructive |
-| `--topbar` | `oklch(0.14 0 0)` | `oklch(0.1 0 0)` | Near-black app bar |
+| `--topbar` | `oklch(0.178 0 0)` (#111111) | `oklch(0.1 0 0)` | Brand ink app bar |
 
 P&L green is deliberately **not** `--success`: money movement uses
 `moneyPositiveClass` (emerald family) via `MoneyFlow`, per design-system.md.

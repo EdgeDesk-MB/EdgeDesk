@@ -9,7 +9,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        default: "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_8%)]",
         pagePrimary:
           "relative isolate overflow-hidden bg-[#111] text-white shadow-sm hover:bg-[#1a1a1a] active:bg-[#0a0a0a] dark:bg-white dark:text-[#111] dark:hover:bg-neutral-100 dark:active:bg-neutral-200",
         outline:
