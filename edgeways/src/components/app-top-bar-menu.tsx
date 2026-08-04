@@ -113,11 +113,11 @@ function BurgerButton(props: React.ComponentProps<"button">) {
   return (
     <button
       type="button"
-      className="relative z-[45] flex size-8 shrink-0 items-center justify-center overflow-visible rounded-md bg-[#111111] text-white shadow-sm transition-colors hover:bg-[#111111]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/40"
+      className="relative z-[45] flex size-9 shrink-0 items-center justify-center overflow-visible rounded-md bg-[#111111] text-white shadow-sm transition-colors hover:bg-[#111111]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/40"
       aria-label="Open menu"
       {...props}
     >
-      <Menu className="size-4 shrink-0" strokeWidth={2.25} />
+      <Menu className="size-[18px] shrink-0" strokeWidth={2.25} />
     </button>
   );
 }

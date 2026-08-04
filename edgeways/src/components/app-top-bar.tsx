@@ -41,7 +41,7 @@ function profitToneClass(value: number): string {
 }
 
 const stackShell =
-  "flex min-h-8 flex-col justify-center gap-0.5 rounded-lg px-1.5 py-0.5 text-[11px] transition-colors hover:bg-topbar-accent";
+  "flex min-h-8 flex-col items-end justify-center gap-0 rounded-lg px-1 py-0.5 text-[11px] transition-colors hover:bg-topbar-accent";
 
 function StackRow({
   label,
@@ -53,7 +53,7 @@ function StackRow({
   amountClass?: string;
 }) {
   return (
-    <span className="flex items-baseline gap-1 leading-none">
+    <span className="flex items-baseline justify-end gap-0.5 leading-none">
       <span className="text-topbar-muted">{label}</span>
       <MoneyFlow
         value={value}
@@ -88,7 +88,7 @@ function TopBarProfitStack({
         <button
           type="button"
           onClick={onFreeBets}
-          className="rounded-sm text-left leading-none transition-opacity hover:opacity-80"
+          className="rounded-sm text-right leading-none transition-opacity hover:opacity-80"
           aria-label={`Free bets ${freeBets.toFixed(2)}`}
         >
           <StackRow label="Free bets" value={freeBets} amountClass="text-violet-700" />
@@ -267,10 +267,10 @@ export function AppTopBar() {
 
           <button
             type="button"
-            className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[#111111] px-2.5 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#111111]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/40"
+            className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[#111111] px-2.5 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#111111]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/40"
             aria-label="Sign in - coming soon"
           >
-            <UserCircle className="size-3.5 shrink-0" strokeWidth={2} />
+            <UserCircle className="size-4 shrink-0" strokeWidth={2} />
             <span className="hidden sm:inline">Login</span>
           </button>
 
