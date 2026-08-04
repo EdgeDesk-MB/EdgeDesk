@@ -155,7 +155,7 @@
   --topbar-foreground: oklch(0.178 0 0); /* #111111 */
   --topbar-muted: oklch(0.178 0 0 / 55%);
   --topbar-border: oklch(0.178 0 0 / 12%);
-  --topbar-accent: oklch(0.178 0 0 / 8%);
+  --topbar-accent: oklch(1 0 0 / 45%); /* light chips on yellow */
   /* Layout spacing - page shell, cards, section bands */
   --layout-page-x: 1.25rem;
   --layout-shell-gap: 0.25rem;
@@ -245,7 +245,7 @@
   --topbar-foreground: oklch(0.178 0 0); /* #111111 */
   --topbar-muted: oklch(0.178 0 0 / 55%);
   --topbar-border: oklch(0.178 0 0 / 12%);
-  --topbar-accent: oklch(0.178 0 0 / 8%);
+  --topbar-accent: oklch(1 0 0 / 45%); /* light chips on yellow */
   --offer-card-details-fade: color-mix(in oklch, var(--muted) 28%, var(--card));
   --offer-card-details: color-mix(in oklch, var(--muted) 48%, var(--card));
   --offer-card-footer-soft: color-mix(in oklch, var(--muted) 20%, var(--card));
