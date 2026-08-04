@@ -76,7 +76,7 @@ function TopBarProfitStack({
   onFreeBets: () => void;
 }) {
   return (
-    <div className={cn(stackShell, "hidden sm:flex")}>
+    <div className={stackShell}>
       <Link
         href="/tracker?tab=pnl"
         className="rounded-sm leading-none transition-opacity hover:opacity-80"
@@ -116,7 +116,7 @@ function TopBarBankrollStack({
   const chip = (
     <Link
       href="/accounts"
-      className={cn(stackShell, "hidden sm:flex")}
+      className={stackShell}
       aria-label={
         showExchange
           ? showInBets
@@ -168,7 +168,7 @@ function MobileStatStacks({
   showExchange: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1 sm:hidden">
+    <div className="flex items-center gap-2 sm:hidden">
       <div className={stackShell}>
         <Link href="/tracker?tab=pnl" aria-label={`Profit ${profit.toFixed(2)}`}>
           <StackRow label="Profit" value={profit} amountClass={profitToneClass(profit)} />
@@ -240,19 +240,21 @@ export function AppTopBar() {
                   Demo data
                 </span>
               ) : null}
-              <TopBarProfitStack
-                profit={profit}
-                freeBets={freeBetsTotal}
-                showFreeBets={showFreeBets}
-                onFreeBets={openFreeBets}
-              />
-              <TopBarBankrollStack
-                exchange={exchange}
-                inBets={inBets}
-                total={bankroll}
-                showExchange={showExchange}
-                ownerLines={ownerBalances}
-              />
+              <div className="hidden items-center gap-2 sm:flex">
+                <TopBarProfitStack
+                  profit={profit}
+                  freeBets={freeBetsTotal}
+                  showFreeBets={showFreeBets}
+                  onFreeBets={openFreeBets}
+                />
+                <TopBarBankrollStack
+                  exchange={exchange}
+                  inBets={inBets}
+                  total={bankroll}
+                  showExchange={showExchange}
+                  ownerLines={ownerBalances}
+                />
+              </div>
               <MobileStatStacks
                 profit={profit}
                 freeBets={freeBetsTotal}
