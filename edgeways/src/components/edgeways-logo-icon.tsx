@@ -23,9 +23,8 @@ export function EdgewaysLogoIcon({ className }: { className?: string }) {
 }
 
 /**
- * Full Edgeways lockup — yellow bolt + "edgeways" wordmark.
- * Used as the sole brand mark in the app top bar.
- * Source: brand/masters/logo.png (Sam supplies as edgeways_logo.svg / PNG).
+ * Full Edgeways lockup — ink bolt + "edgeways" wordmark.
+ * Used on the yellow top bar. Source: brand/masters/logo-dark.png.
  */
 export function EdgewaysLogo({ className }: { className?: string }) {
   return (

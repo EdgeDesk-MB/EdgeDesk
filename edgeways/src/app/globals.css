@@ -150,11 +150,12 @@
   --selection-subdued: oklch(0.935 0.003 250);
   --selection-subtle-border: oklch(0.91 0 0);
   --selection-subdued-border: oklch(0.875 0 0);
-  --topbar: oklch(0.178 0 0);
-  --topbar-foreground: oklch(0.98 0 0);
-  --topbar-muted: oklch(0.98 0 0 / 55%);
-  --topbar-border: oklch(1 0 0 / 10%);
-  --topbar-accent: oklch(1 0 0 / 8%);
+  /* Brand yellow bar; ink lockup + ink chrome sit on it */
+  --topbar: oklch(0.856 0.17 87.3); /* #FFC71E */
+  --topbar-foreground: oklch(0.178 0 0); /* #111111 */
+  --topbar-muted: oklch(0.178 0 0 / 55%);
+  --topbar-border: oklch(0.178 0 0 / 12%);
+  --topbar-accent: oklch(0.178 0 0 / 8%);
   /* Layout spacing - page shell, cards, section bands */
   --layout-page-x: 1.25rem;
   --layout-shell-gap: 0.25rem;
@@ -239,11 +240,12 @@
   --selection-subdued: oklch(0.28 0 0);
   --selection-subtle-border: oklch(1 0 0 / 12%);
   --selection-subdued-border: oklch(1 0 0 / 18%);
-  --topbar: oklch(0.1 0 0);
-  --topbar-foreground: oklch(0.98 0 0);
-  --topbar-muted: oklch(0.98 0 0 / 55%);
-  --topbar-border: oklch(1 0 0 / 10%);
-  --topbar-accent: oklch(1 0 0 / 8%);
+  /* Same yellow bar in dark mode - brand chrome stays consistent */
+  --topbar: oklch(0.856 0.17 87.3); /* #FFC71E */
+  --topbar-foreground: oklch(0.178 0 0); /* #111111 */
+  --topbar-muted: oklch(0.178 0 0 / 55%);
+  --topbar-border: oklch(0.178 0 0 / 12%);
+  --topbar-accent: oklch(0.178 0 0 / 8%);
   --offer-card-details-fade: color-mix(in oklch, var(--muted) 28%, var(--card));
   --offer-card-details: color-mix(in oklch, var(--muted) 48%, var(--card));
   --offer-card-footer-soft: color-mix(in oklch, var(--muted) 20%, var(--card));

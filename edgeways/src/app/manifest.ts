@@ -8,9 +8,9 @@ export default function manifest(): MetadataRoute.Manifest {
       "Calculators, live events and real-time profit tracking for matched betting",
     start_url: "/",
     display: "standalone",
-    // Mirrors --topbar (#111111 brand ink) - manifests cannot reference CSS vars.
+    // Mirrors --topbar (#FFC71E brand yellow) - manifests cannot reference CSS vars.
     background_color: "#111111",
-    theme_color: "#111111",
+    theme_color: "#FFC71E",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },

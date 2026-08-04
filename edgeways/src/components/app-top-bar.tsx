@@ -35,9 +35,9 @@ function BrandLink({ className }: { className?: string }) {
   );
 }
 
-/** Profit on the dark top bar: green when ≥ 0, red when negative. */
+/** Profit on the yellow top bar: green when ≥ 0, red when negative. */
 function profitToneClass(value: number): string {
-  return value < -0.004 ? "text-red-400" : "text-emerald-400";
+  return value < -0.004 ? "text-red-700" : "text-emerald-700";
 }
 
 function TopBarStat({
@@ -60,7 +60,7 @@ function TopBarStat({
   const amountClass = cn(
     "font-bold tabular-nums",
     freeBetTone
-      ? "text-violet-400"
+      ? "text-violet-700"
       : profitTone
         ? profitToneClass(value)
         : "text-topbar-foreground"
@@ -227,7 +227,7 @@ export function AppTopBar() {
                 >
                   <MoneyFlow
                     value={freeBetsTotal}
-                    className="text-sm font-bold tabular-nums text-violet-400"
+                    className="text-sm font-bold tabular-nums text-violet-700"
                   />
                 </button>
               ) : null}

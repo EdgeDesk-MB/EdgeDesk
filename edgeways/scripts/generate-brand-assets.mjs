@@ -6,7 +6,8 @@
  * Masters (Sam-supplied):
  *   brand/masters/favicon.png       – ink bolt on yellow, for browser tab
  *   brand/masters/square.png        – ink bolt on yellow squircle, for PWA / Apple
- *   brand/masters/logo.png          – yellow bolt + "edgeways" wordmark (top bar)
+ *   brand/masters/logo-dark.png     – ink bolt + wordmark (top bar on yellow)
+ *   brand/masters/logo-yellow.png   – yellow bolt + wordmark (on dark surfaces)
  *   brand/masters/notification.png  – white bolt on black (badge silhouette source)
  */
 import sharp from "sharp";
@@ -43,7 +44,8 @@ async function badgeFromNotification(size) {
 (async () => {
   const favicon = path.join(masters, "favicon.png");
   const square = path.join(masters, "square.png");
-  const logo = path.join(masters, "logo.png");
+  const logo = path.join(masters, "logo-dark.png");
+  const logoYellow = path.join(masters, "logo-yellow.png");
 
   await write(
     path.join("src", "app", "icon.png"),
@@ -72,9 +74,13 @@ async function badgeFromNotification(size) {
     await sharp(favicon).resize(64, 64).flatten({ background: YELLOW }).png().toBuffer()
   );
 
-  // Top-bar lockup (transparent bg — sits on the dark top bar).
+  // Top-bar lockup (ink on transparent — sits on the yellow top bar).
   await write(
     path.join("public", "brand", "logo.png"),
     await sharp(logo).png().toBuffer()
+  );
+  await write(
+    path.join("public", "brand", "logo-yellow.png"),
+    await sharp(logoYellow).png().toBuffer()
   );
 })();
