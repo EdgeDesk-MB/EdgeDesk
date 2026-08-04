@@ -83,17 +83,31 @@ export function navLinkState(active: boolean) {
   return cn(
     navLink,
     active
-      ? "font-semibold text-foreground"
+      ? "font-semibold text-[#111111] dark:text-[#FFC71E]"
       : "text-muted-foreground hover:text-foreground"
   );
 }
 
 /**
  * Brand secondary accent — ink plate (#111) + yellow type (#FFC71E).
- * Active filter pills, segmented tabs, primary chips/counters.
+ * Active filter pills, segmented tabs, primary chips.
  */
 export const brandChipActive =
-  "bg-chip font-bold text-chip-foreground shadow-sm";
+  "bg-[#111111] font-bold text-[#FFC71E] shadow-sm";
+
+/**
+ * Nested / standalone counters — inverse of the chip plate
+ * (yellow plate + ink type). Used when the surrounding chip is already ink+yellow.
+ */
+export const brandChipCount =
+  "inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FFC71E] px-1 text-[10px] font-bold tabular-nums text-[#111111]";
+
+/**
+ * Standalone / nested counters — ink plate + yellow type
+ * (reversed from yellow-plate brandChipCount). Ring keeps it legible on ink chips.
+ */
+export const brandChipCountInverse =
+  "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#111111] px-1.5 text-[10px] font-bold tabular-nums text-[#FFC71E] shadow-sm ring-1 ring-[#FFC71E]/45";
 
 /** @deprecated Prefer brandChipActive — kept for any stray imports */
 export const monoAccentActive = brandChipActive;

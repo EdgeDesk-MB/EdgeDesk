@@ -10,9 +10,9 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-chip font-bold text-chip-foreground [a]:hover:bg-chip/90",
+          "bg-[#111111] font-bold text-[#FFC71E] [a]:hover:bg-[#111111]/90",
         active:
-          "border-transparent bg-chip font-bold text-chip-foreground shadow-sm [a]:hover:bg-chip/90",
+          "border-transparent bg-[#111111] font-bold text-[#FFC71E] shadow-sm [a]:hover:bg-[#111111]/90",
         success:
           "border-success/25 bg-success/10 text-success dark:border-success/30 dark:bg-success/15 dark:text-success [a]:hover:bg-success/15",
         warning:

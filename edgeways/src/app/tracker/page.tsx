@@ -38,7 +38,7 @@ import {
   groupBetsByCampaign,
   type BetDeskQueue,
 } from "@/lib/bets/desk-queues";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { brandChipCountInverse, filterPillState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2, Download, NotebookPen } from "lucide-react";
 
@@ -333,16 +333,25 @@ function TrackerContent() {
                   if (q.id === "quick_logged" && count === 0 && deskQueue !== "quick_logged") {
                     return null;
                   }
+                  const active = deskQueue === q.id;
                   return (
                     <button
                       key={q.id}
                       type="button"
                       onClick={() => setDeskQueue(q.id)}
-                      className={cn(filterPillState(deskQueue === q.id))}
+                      className={cn(filterPillState(active))}
                     >
                       {q.label}
                       {q.id !== "all" ? (
-                        <span className="ml-1 tabular-nums opacity-70">{count}</span>
+                        <span
+                          className={cn(
+                            active
+                              ? brandChipCountInverse
+                              : "ml-0.5 tabular-nums opacity-70"
+                          )}
+                        >
+                          {count}
+                        </span>
                       ) : null}
                     </button>
                   );

@@ -8,7 +8,7 @@ import {
   type ComponentType,
   type MouseEvent,
 } from "react";
-import { captionHeading, monoAccentActive, navLinkState } from "@/lib/ui/surface-styles";
+import { brandChipCountInverse, captionHeading, navLinkState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -237,12 +237,7 @@ export function isLinkActive(pathname: string, href: string): boolean {
 export function ActionBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span
-      className={cn(
-        "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums",
-        monoAccentActive
-      )}
-    >
+    <span className={brandChipCountInverse}>
       {count > 9 ? "9+" : count}
     </span>
   );
