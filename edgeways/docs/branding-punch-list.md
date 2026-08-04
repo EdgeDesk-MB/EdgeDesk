@@ -18,8 +18,8 @@ is the interim mark. Final assets still wanted from Sam:
 
 | Asset | Spec | Used for | Placeholder status |
 | --- | --- | --- | --- |
-| Logo mark, master SVG | Square viewBox, reads at 16px, single-colour variant included | Favicon, in-app brand mark | ⬜ **needed** — icons currently derived from a ~105px-tall PNG crop |
-| Complete lockup export | The 2026-08-04 PNG dropped the dark wordmark layer (only yellow shapes + transparent pulse knock-out survived) | Marketing, docs | ⬜ re-export needed |
+| Logo mark, master SVG | Square viewBox, reads at 16px, single-colour variant included | Favicon, in-app brand mark | ✅ `public/brand/mark.svg` (vector bolt on yellow plate) |
+| Lockup as SVG (optional) | Bolt + "edgeways" wordmark as vector, so it stays sharp at any size | Marketing, docs, og-image | ⬜ optional — top bar uses `logo.png` (crisp at current size); only needed if the lockup is used larger |
 | `favicon.svg` + `icon.png` 32×32 fallback | From the master | Browser tab | ✅ `src/app/icon.png` (derived) |
 | `apple-icon.png` | 180×180, **solid background, no alpha** (iOS requirement) | iOS home screen / PWA | ✅ generated |
 | `icon-192.png` / `icon-512.png` | Maskable safe zone (glyph within central 80%) | Android PWA, manifest | ✅ generated, `purpose: maskable` |
@@ -142,7 +142,7 @@ or nominate replacements before F4.
 
 ## Suggested order
 
-1. Sam: brand colour decision + logo mark (§1) — everything else keys off this. ✅ colour decided; master SVG still wanted.
+1. Sam: brand colour decision + logo mark (§1) — everything else keys off this. ✅ colour decided; vector bolt in place; lockup SVG optional.
 2. Me: icon wiring + boilerplate cleanup (§2), token re-map if the hue changes (§3). ✅ done.
 3. Me: colour consolidation sweep (§4) + dialog gaps (§6).
 4. Together: page-by-page QA pass (spacing, fonts, contrast) — the harness running,
