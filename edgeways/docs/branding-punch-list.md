@@ -25,18 +25,20 @@ is the interim mark. Final assets still wanted from Sam:
 | `icon-192.png` / `icon-512.png` | Maskable safe zone (glyph within central 80%) | Android PWA, manifest | ✅ generated, `purpose: maskable` |
 | Push badge | 192×192 monochrome white-on-transparent | Android notification shade | ✅ `badge-192.png` (pulse silhouette) |
 | `og-image.png` (optional for now) | 1200×630 | Link previews once the marketing site exists (F4) | ⬜ still needed |
-| Wordmark (optional) | SVG, dark + light variants | Top bar, marketing site | Text wordmark ("Edgeways", title case) in the top bar |
+| Wordmark (optional) | SVG, dark + light variants | Top bar, marketing site | PNG lockup in top bar (`/brand/logo.png`) |
 
 Decisions for Sam:
 
 1. **Brand colour — DECIDED 2026-08-04 (revised same day).** Yellow `#FFC71E`
-   (`oklch(0.856 0.17 87.3)`) is `--primary` in **both** themes with bold ink
-   `#111111` text. `--highlight` is the same yellow for line-tab underlines;
+   (`oklch(0.856 0.17 87.3)`) is the brand bar + dark-mode primary fill. **Light
+   mode primary is flipped**: ink `#111` plate + yellow type (yellow fails
+   contrast on white). `--highlight` is yellow for line-tab underlines;
    `--chip` / `--chip-foreground` are ink plate + yellow type for active pills,
-   segmented tabs, and primary badges/counters. `--primary-hover` deepens the
-   yellow; `pagePrimary` is token-driven at `size="default"` (h-8) to match
-   outline siblings. Focus rings follow yellow. Top bar is yellow with the dark
-   lockup. Product name casing: **Edgeways** (title case).
+   segmented tabs, and primary badges/counters. `--primary-hover` **lightens**
+   (ink → lighter plate in light; yellow → brighter in dark). `pagePrimary` is
+   token-driven at `size="default"` (h-8) to match outline siblings. Focus rings
+   follow yellow. Top bar is yellow with the dark lockup. Product name casing:
+   **Edgeways** (title case).
 2. **Edge violet stays reserved.** `--edge` (`oklch(0.5 0.2 295)`) is the Offer Edge /
    pro-tier signature (D5). The yellow brand does not collide with it.
 3. **Dark/light variants** of the mark if it isn't single-colour — the pulse mark is
@@ -57,7 +59,9 @@ Decisions for Sam:
 
 | Token | Light | Dark | Meaning |
 | --- | --- | --- | --- |
-| `--primary` | `oklch(0.856 0.17 87.3)` (#FFC71E) | same | Brand yellow **button fills** both themes |
+| `--primary` | `#111111` | `#FFC71E` | Primary **button fills** (flipped in light for contrast) |
+| `--primary-foreground` | `#FFC71E` | `#111111` | Text/icons on primary fills |
+| `--primary-hover` | lighter ink | brighter yellow | Hover **lightens** the plate |
 | `--primary-text` | `#111111` | `#FFC71E` | Inline accent on surfaces (`text-primary-text`) — never yellow on white |
 | `--highlight` | `#FFC71E` | same | Line-tab underlines |
 | `--chip` / `--chip-foreground` | `#111` / `#FFC71E` | same | Active pills, segmented tabs, primary badges |
@@ -65,10 +69,32 @@ Decisions for Sam:
 | `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |
 | `--negative` | `oklch(0.577 0.245 27)` | `oklch(0.78 0.15 22)` | Losses, destructive |
-| `--topbar` | `oklch(0.856 0.17 87.3)` (#FFC71E) | same | Brand yellow app bar |
+| `--topbar` | `#FFC71E` | same | Brand yellow app bar (header + meta-nav share it) |
 
 P&L green is deliberately **not** `--success`: money movement uses
 `moneyPositiveClass` (emerald family) via `MoneyFlow`, per design-system.md.
+
+## 3b. Chrome decisions (2026-08-04, landed)
+
+- **Raised controls (skeuo)** — Untitled UI–style inset 3D lip, **no drop shadow**
+  (`--shadow-skeuo` = inset only). `.skeuo` / `.skeuo-solid` on Button
+  `default` / `pagePrimary` / `secondary` / `outline`, brand chips, badges,
+  segmented active tabs. Ghost/link stay flat.
+- **Button radius** — 2px tighter than the global ladder via `--radius-button`
+  (10→8) and `--radius-button-sm` (8→6). Cards/inputs unchanged.
+- **Secondary / outline buttons** — off-white `#fafafa` fill in light mode,
+  same inset 3D, no thick border.
+- **Top bar (desktop)** — two rows on `--topbar` yellow: `AppTopBarHeader`
+  (logo / stats / Login) + `AppTopBarMetaNav` (Betfair-style site tabs). Active
+  tab = sliding canvas pill on the shared light spring (`SPRING_EASE`,
+  `lib/ui/motion.ts`); line-tab underlines use the same spring. No hover fill
+  on meta tabs. `#111` @ 10% bottom rule behind the meta row. Burger is
+  mobile-only.
+- **Appearance** — Light/Dark only (`ThemeSelect`) at the bottom of the side
+  nav on default surface colours. System/OS sync removed to avoid overflow.
+- **Filter pills** — `filterPillState(active, { hasCount })`; counters use the
+  fixed-size `filterPillCountState` chip so selection doesn’t jump; `hasCount`
+  trims right padding by 4px (`pr-2`).
 
 ## 4. Ad-hoc colour consolidation (code sweep, F1)
 
@@ -76,17 +102,17 @@ Files with the most hardcoded palette classes (`emerald-/amber-/violet-/rose-/sk
 
 | File | Hits | Verdict |
 | --- | --- | --- |
-| `app/calculators/ep-desk/page.tsx` | 28 | Consolidate — biggest offender, plus its dialog lacks a description (§6) |
-| `app/accounts/page.tsx` | 18 | Review — likely bank/health status colours, map to tokens where semantic |
-| `components/racing/flashscore-racecard.tsx` | 16 | Review — some deliberate (bookmaker brand chips stay bespoke) |
-| `components/add-bet-dialog.tsx` | 14 | Review — free-bet violet stays until the D5 tidy |
+| `app/calculators/ep-desk/page.tsx` | 28 | ✅ swept — money/EV positives now `moneyPositiveClass`; remaining amber/violet/blue are market-column + model-check semantics (deliberate) |
+| `app/accounts/page.tsx` | 18 | Reviewed — amber/sky/violet are account-status + free-bet semantics; free-bet violet stays until the D5 tidy |
+| `components/racing/flashscore-racecard.tsx` | 16 | Reviewed — bookmaker brand chips stay bespoke (deliberate) |
+| `components/add-bet-dialog.tsx` | 14 | Reviewed — free-bet violet stays until the D5 tidy |
 | `components/offers/offer-pipeline-strip.tsx` | 12 | **Deliberate** — pipeline stage palette, leave |
-| `components/offers/offer-day-calendar.tsx` | 10 | Review |
-| rest (19 files, ≤9 each) | — | Sweep during F1 QA |
+| `components/offers/offer-day-calendar.tsx` | 10 | ✅ swept — Est. EV greens now `moneyPositiveClass`; rose/amber/sky bars are offer-category palette (deliberate) |
+| rest (19 files, ≤9 each) | — | Spot-checked during F1 QA |
 
 Rule for the sweep: if the colour *means* something the token system already says
 (positive, caution, edge, danger), it moves to the token; bookmaker/exchange brand
-colours and the pipeline palette stay.
+colours, offer-category palettes, and the pipeline palette stay.
 
 ## 5. Typography
 
@@ -96,16 +122,19 @@ or nominate replacements before F4.
 
 ## 6. Dialog & copy consistency
 
-- 42 of 43 dialog files have `DialogTitle`. Two gaps: the EP Desk "Scouting Playbook"
-  dialog has no `DialogDescription`, and the command palette (`ui/command.tsx`) has an
-  sr-only title only. Both get descriptions during F1.
+- ✅ All dialog files now have `DialogTitle` + `DialogDescription`. The EP Desk
+  "Scouting Playbook" dialog and the command palette (`ui/command.tsx`, sr-only)
+  both gained descriptions 2026-08-04.
 - Title language: sentence case, no em dashes in user-facing copy (hard rule), British
   English. One sweep across titles/descriptions during F1 QA.
 
 ## 7. Deferred but scheduled
 
-- **Contrast audit** (deferred from Phase 8 / G4) — runs as part of F1 once final brand
-  colours land, so it only happens once.
+- **Contrast audit** — ✅ ran 2026-08-04 against the final brand tokens. All key
+  combos pass WCAG AA: muted-foreground 6.5:1 (light) / 6.2:1 (dark), warning
+  4.9:1 / 6.3:1, edge 6.6:1 / 6.1:1, ink-on-yellow topbar 12.1:1, topbar-muted
+  3.7:1 (large/meta text), yellow-on-ink chip 12.1:1, yellow `primary-text` on
+  dark canvas 12.0:1. Re-run only if a token value changes.
 - **Spacing/padding sweep** — layout tokens (`appShellGap`, `appShellPadding`,
   `--layout-stack-gap`) exist; F1 QA walks each page against them.
 - **Free-bet violet tidy** (D5) — promo `violet-*` chrome migrates to a token in a later
@@ -113,8 +142,8 @@ or nominate replacements before F4.
 
 ## Suggested order
 
-1. Sam: brand colour decision + logo mark (§1) — everything else keys off this.
-2. Me: icon wiring + boilerplate cleanup (§2), token re-map if the hue changes (§3).
+1. Sam: brand colour decision + logo mark (§1) — everything else keys off this. ✅ colour decided; master SVG still wanted.
+2. Me: icon wiring + boilerplate cleanup (§2), token re-map if the hue changes (§3). ✅ done.
 3. Me: colour consolidation sweep (§4) + dialog gaps (§6).
 4. Together: page-by-page QA pass (spacing, fonts, contrast) — the harness running,
    light and dark, mobile width included.

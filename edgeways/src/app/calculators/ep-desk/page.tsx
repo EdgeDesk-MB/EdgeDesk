@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,6 +29,7 @@ import { PageShell } from "@/components/page-shell";
 import { DeskPageHeader } from "@/components/layout/desk-page-header";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { moneyPositiveClass } from "@/components/money-flow";
 import { useBookieAccounts } from "@/hooks/use-bookie-accounts";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
@@ -693,7 +695,7 @@ function VerdictBanner({
             <div
               className={cn(
                 "mt-1 text-xl font-semibold tracking-tight",
-                anyFire ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+                anyFire ? moneyPositiveClass : "text-foreground"
               )}
             >
               {top ? (
@@ -703,7 +705,7 @@ function VerdictBanner({
                   <span
                     className={cn(
                       "font-mono text-base",
-                      top.ev >= 0 ? "text-emerald-600" : "text-negative"
+                      top.ev >= 0 ? moneyPositiveClass : "text-negative"
                     )}
                   >
                     {gbp(top.ev)} EV
@@ -789,7 +791,7 @@ function VerdictBanner({
                     <td
                       className={cn(
                         "px-3 py-1.5 text-right font-mono font-semibold",
-                        c.ev >= 0 ? "text-emerald-600" : "text-negative"
+                        c.ev >= 0 ? moneyPositiveClass : "text-negative"
                       )}
                     >
                       {gbp(c.ev)}
@@ -831,7 +833,7 @@ function Stat({ label, value, sign }: { label: string; value: string; sign?: num
       <div
         className={cn(
           "font-mono text-sm font-semibold",
-          sign != null && (sign > 0 ? "text-emerald-600" : sign < 0 ? "text-negative" : "")
+          sign != null && (sign > 0 ? moneyPositiveClass : sign < 0 ? "text-negative" : "")
         )}
       >
         {value}
@@ -1121,10 +1123,10 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
                     </td>
                     <td className="py-2.5 text-right font-mono">{f3(o.odds)}</td>
                     <td className="py-2.5 text-right font-mono">{f3(o.decomp.fair)}</td>
-                    <td className={cn("py-2.5 text-right font-mono", o.decomp.total >= 0 ? "text-emerald-600" : "text-negative")}>
+                    <td className={cn("py-2.5 text-right font-mono", o.decomp.total >= 0 ? moneyPositiveClass : "text-negative")}>
                       {pct(o.decomp.total)}
                     </td>
-                    <td className={cn("py-2.5 text-right font-mono", o.layHedged >= 0 ? "text-emerald-600" : "text-negative")}>
+                    <td className={cn("py-2.5 text-right font-mono", o.layHedged >= 0 ? moneyPositiveClass : "text-negative")}>
                       {Number.isFinite(o.layHedged) ? pct(o.layHedged) : "-"}
                     </td>
                     <td className="py-2.5 text-right">
@@ -1170,8 +1172,8 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
                   <td className="py-2 text-right">{pct(o.tW)}</td>
                   <td className="py-2 text-right">{pct(o.pEP)}</td>
                   <td className="py-2 text-right text-negative">{pct(o.decomp.straight)}</td>
-                  <td className="py-2 text-right text-emerald-600">+{pct(o.decomp.bonus)}</td>
-                  <td className={cn("py-2 text-right font-semibold", o.decomp.total >= 0 ? "text-emerald-600" : "text-negative")}>
+                  <td className={cn("py-2 text-right", moneyPositiveClass)}>+{pct(o.decomp.bonus)}</td>
+                  <td className={cn("py-2 text-right font-semibold", o.decomp.total >= 0 ? moneyPositiveClass : "text-negative")}>
                     {pct(o.decomp.total)}
                   </td>
                   <td className="py-2 text-right">{pct(o.decomp.G)}</td>
@@ -1305,7 +1307,7 @@ function DutchTab({
                   <div
                     className={cn(
                       "font-mono text-sm font-semibold",
-                      d.dist.EV >= 0 ? "text-emerald-600" : "text-negative"
+                      d.dist.EV >= 0 ? moneyPositiveClass : "text-negative"
                     )}
                   >
                     EV {gbp(d.dist.EV)}
@@ -1334,7 +1336,7 @@ function DutchTab({
                       <div
                         className={cn(
                           "w-14 text-right font-mono text-[11px]",
-                          leg.edge >= 0 ? "text-emerald-600" : "text-negative"
+                          leg.edge >= 0 ? moneyPositiveClass : "text-negative"
                         )}
                       >
                         {pct(leg.edge)}
@@ -1368,7 +1370,7 @@ function DutchTab({
                         <span
                           className={cn(
                             "w-16 text-right font-mono font-medium",
-                            rung.pl >= 0 ? "text-emerald-600" : "text-negative"
+                            rung.pl >= 0 ? moneyPositiveClass : "text-negative"
                           )}
                         >
                           {gbp(rung.pl)}
@@ -1408,7 +1410,7 @@ function LayTab({ R, s, exchangeName }: { R: Computed; s: DeskState; exchangeNam
             <CardContent className="flex flex-col gap-2 pt-5">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">{side.label}</div>
-                <div className={cn("font-mono text-sm font-semibold", side.lay.EV >= 0 ? "text-emerald-600" : "text-negative")}>
+                <div className={cn("font-mono text-sm font-semibold", side.lay.EV >= 0 ? moneyPositiveClass : "text-negative")}>
                   EV {gbp(side.lay.EV)} ({pct(side.lay.evPer1)}/£)
                 </div>
               </div>
@@ -1430,7 +1432,7 @@ function LayTab({ R, s, exchangeName }: { R: Computed; s: DeskState; exchangeNam
                 ).map(([label, pl, p]) => (
                   <div key={label} className={cn("rounded-md border p-2", pl > 0 && "border-emerald-300 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/30")}>
                     <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-                    <div className={cn("font-mono text-sm font-semibold", pl >= 0 ? "text-emerald-600" : "text-negative")}>{gbp(pl)}</div>
+                    <div className={cn("font-mono text-sm font-semibold", pl >= 0 ? moneyPositiveClass : "text-negative")}>{gbp(pl)}</div>
                     <div className="font-mono text-[10px] text-muted-foreground">{pct(p)}</div>
                   </div>
                 ))}
@@ -1446,7 +1448,7 @@ function LayTab({ R, s, exchangeName }: { R: Computed; s: DeskState; exchangeNam
             Combined both-sides 2UP EV (exact by linearity - home &amp; away lays can&apos;t both lose, so max
             liability is the larger single one)
           </span>
-          <span className={cn("font-mono text-lg font-semibold", combined2 >= 0 ? "text-emerald-600" : "text-negative")}>
+          <span className={cn("font-mono text-lg font-semibold", combined2 >= 0 ? moneyPositiveClass : "text-negative")}>
             {gbp(combined2)}
           </span>
         </CardContent>
@@ -1714,7 +1716,7 @@ function LiveTab({
               <div
                 className={cn(
                   "pt-1 font-mono text-xl font-bold",
-                  row.model >= 0 ? "text-emerald-600" : "text-negative"
+                  row.model >= 0 ? moneyPositiveClass : "text-negative"
                 )}
               >
                 {gbp(row.model)}
@@ -1725,7 +1727,7 @@ function LiveTab({
                 <span
                   className={cn(
                     "font-mono font-semibold tabular-nums",
-                    row.snapshot >= 0 ? "text-emerald-600/80" : "text-negative/80"
+                    row.snapshot >= 0 ? `${moneyPositiveClass} opacity-80` : "text-negative/80"
                   )}
                 >
                   {gbp(row.snapshot)}
@@ -1751,7 +1753,7 @@ function LiveTab({
               <div
                 className={cn(
                   "pt-1 font-mono text-xl font-bold",
-                  pl >= 0 ? "text-emerald-600" : "text-negative"
+                  pl >= 0 ? moneyPositiveClass : "text-negative"
                 )}
               >
                 {gbp(pl)}
@@ -1800,6 +1802,10 @@ function PlaybookOverlay({ open, onClose }: { open: boolean; onClose: () => void
               {done}/{allItems.length}
             </span>
           </DialogTitle>
+          <DialogDescription>
+            Pre-match checklist for early-payout setups. Tick items off as you scout;
+            reset to reuse on the next fixture.
+          </DialogDescription>
         </DialogHeader>
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed">
           <span className="font-semibold text-primary-text">The one rule:</span> the edge is in the{" "}

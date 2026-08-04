@@ -9,7 +9,7 @@
 import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
@@ -27,9 +27,10 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 
 function CommandDialog({
   title = "Command palette",
+  description = "Jump to a page or run a quick action",
   children,
   ...props
-}: React.ComponentProps<typeof Dialog> & { title?: string }) {
+}: React.ComponentProps<typeof Dialog> & { title?: string; description?: string }) {
   return (
     <Dialog {...props}>
       <DialogContent
@@ -37,6 +38,7 @@ function CommandDialog({
         className="overflow-hidden p-0 sm:max-w-lg"
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
+        <DialogDescription className="sr-only">{description}</DialogDescription>
         <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground">
           {children}
         </Command>

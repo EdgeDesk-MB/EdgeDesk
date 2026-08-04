@@ -22,7 +22,13 @@ import {
   offerCategoryFromSport,
   offerCategoryLabel,
 } from "@/lib/offers/offer-categories";
-import { filterPillGroup, filterPillState, offerCalendarCardShell } from "@/lib/ui/surface-styles";
+import {
+  filterPillCountState,
+  filterPillGroup,
+  filterPillState,
+  offerCalendarCardShell,
+} from "@/lib/ui/surface-styles";
+import { moneyPositiveClass } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
 import { CalendarDays, Columns3, List } from "lucide-react";
 
@@ -149,10 +155,7 @@ function PriorityFilterBar({
       <button
         type="button"
         onClick={toggleAll}
-        className={cn(
-          filterPillState(showAll),
-          "inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
-        )}
+        className={cn(filterPillState(showAll), "text-[11px]")}
       >
         All
       </button>
@@ -160,21 +163,19 @@ function PriorityFilterBar({
         const active = !showAll && selected!.has(priority);
         const p = priorityStyles(priority);
         const count = counts[priority];
+        const hasCount = count > 0;
         return (
           <button
             key={priority}
             type="button"
             onClick={() => togglePriority(priority)}
-            className={cn(
-              filterPillState(active),
-              "inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
-            )}
+            className={cn(filterPillState(active, { hasCount }), "text-[11px]")}
             title={`${p.label} priority`}
           >
             <span className={cn("size-1.5 shrink-0 rounded-full", p.dot)} aria-hidden />
             {PRIORITY_LABELS[priority]}
-            {count > 0 ? (
-              <span className="tabular-nums opacity-70">{count}</span>
+            {hasCount ? (
+              <span className={filterPillCountState(active)}>{count}</span>
             ) : null}
           </button>
         );
@@ -203,7 +204,8 @@ function RemainingEvBadge({
       </p>
       <p
         className={cn(
-          "font-bold tabular-nums text-emerald-600 dark:text-emerald-400",
+          "font-bold tabular-nums",
+          moneyPositiveClass,
           variant === "board" ? "text-base" : "text-2xl"
         )}
       >
@@ -222,7 +224,7 @@ function DayEstPill({ amount }: { amount: number }) {
       title="Sum of estimated remaining EV for offers on this day"
     >
       <span className="font-medium text-muted-foreground">Est.</span>
-      <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+      <span className={cn("font-bold tabular-nums", moneyPositiveClass)}>
         £{formatted}
       </span>
     </span>
