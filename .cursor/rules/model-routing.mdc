@@ -25,7 +25,7 @@ right lane. Do not nag on every turn. Full matrix: `docs/Local-vs-Cloud-Model-St
 - Stakeholder-facing prose → Claude.
 - Long-horizon agent jobs with many tool calls → K3 minimum; prefer Claude Code for the longest loops.
 
-## EdgeDesk-specific
+## Edgeways-specific
 
 - Calc/offers money paths: never treat local-only as sufficient for landing changes.
 - UI work: Composer/Grok or local coder is fine; finish with design-review on frontier if non-trivial.

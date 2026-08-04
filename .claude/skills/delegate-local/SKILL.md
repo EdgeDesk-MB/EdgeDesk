@@ -33,7 +33,7 @@ node, reviews the result like a PR from a junior.
    ```
 
    Use a generous Bash timeout (300000ms or more); the 70B model is slow.
-3. Review before applying anything: run `npx vitest run` from `edgedesk/`, and
+3. Review before applying anything: run `npx vitest run` from `edgeways/`, and
    never apply calc or settlement changes without the /calc-change workflow.
 4. Two bad results on the same task means stop delegating, do it in-session,
    and tell Sam which task type failed so the routing matrix can be updated.

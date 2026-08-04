@@ -1,0 +1,32 @@
+---
+description: How agents must treat the Edgeways local Next.js server
+alwaysApply: true
+---
+
+# Dev server (Edgeways)
+
+Sam needs continual localhost uptime. Treat the running Next server as sacred.
+
+## Do
+
+- If nothing listens on `:3000`, start with `npm run dev:detached` from `edgeways/`
+  (supervised, survives agent-shell cleanup). Confirm with a quick curl.
+- Prefer reading `edgeways/data/dev-keep.pid` / `dev-keep.log` over restarting.
+- Leave a healthy server alone while you edit code (HMR handles it).
+
+## Do not
+
+- Do **not** `pkill -f "next"` / `pkill -f "next dev"` / kill listeners on 3000
+  unless Sam explicitly asked you to restart the server.
+- Do **not** `rm -rf edgeways/.next` while a server is running (causes ENOENT
+  storms and dead pages).
+- Do **not** start a second `npm run dev` that steals another port (3001…).
+- Do **not** rely on an agent background shell as the long-lived server; use
+  `dev:detached` or tell Sam to run `npm run dev` in their own terminal.
+
+## Why the site dies after ~15 minutes
+
+Next.js 16 exits the worker when heap crosses ~80% (`Server is approaching the
+used memory threshold, restarting…`). That is normal. Downtime happens when the
+**parent process tree** is gone (agent shell abort, blanket pkill). The keep
+supervisor in `edgeways/scripts/dev-keep.mjs` exists to bring it back.

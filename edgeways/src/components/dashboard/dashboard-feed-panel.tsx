@@ -1,0 +1,142 @@
+"use client";
+
+/**
+ * Home Feed panel - goals, results and settlements in real time.
+ * Shared by the desktop dashboard grid and the mobile swipe deck; it must not
+ * know which container it is in.
+ *
+ * "All" / "Bets" use the polled state.history slice (latest ~40). "Casino"
+ * fetches a dedicated filtered history so older casino settlements are not
+ * dropped just because denser match commentary filled the All window.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
+import { HistoryFeed } from "@/components/history/history-feed";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { apiGet, useAppState } from "@/hooks/use-app-state";
+import type { AppState } from "@/lib/services/state.types";
+import { buildHistoryContext } from "@/lib/history-display";
+import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
+import { dashboardPanelBody, dashboardSection } from "@/lib/ui/dashboard-layout";
+import { cardInsetX } from "@/lib/ui/layout-spacing";
+import { filterPillState } from "@/lib/ui/surface-styles";
+import { cn } from "@/lib/utils";
+
+type FeedFilter = "all" | "bets" | "casino";
+
+const FEED_FILTERS: { id: FeedFilter; label: string }[] = [
+  { id: "bets", label: "Bets" },
+  { id: "casino", label: "Casino" },
+  { id: "all", label: "All" },
+];
+
+interface CasinoHistoryPayload {
+  entries: HistoryRow[];
+  events: EventRow[];
+  bets: BetRow[];
+  promoAwards: Record<number, { amount: number; reason: string }>;
+  offerTitles?: Array<{ id: number; title: string }>;
+}
+
+export function DashboardFeedPanel({
+  state,
+  className,
+}: {
+  state: AppState | null;
+  className?: string;
+}) {
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
+  const [casinoFeed, setCasinoFeed] = useState<CasinoHistoryPayload | null>(null);
+  const { refresh } = useAppState(10_000);
+
+  useEffect(() => {
+    if (feedFilter !== "casino") {
+      setCasinoFeed(null);
+      return;
+    }
+    let live = true;
+    // Dedicated fetch: state.history is capped at ~40 across ALL kinds, so an
+    // older casino row can fall out of the Home All window while History still
+    // shows it under the Casino filter.
+    apiGet<CasinoHistoryPayload>("/api/history?filter=casino&limit=40")
+      .then((res) => {
+        if (live) setCasinoFeed(res);
+      })
+      .catch(() => {
+        if (live) setCasinoFeed(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [feedFilter, state?.history]);
+
+  const historyContext = useMemo(() => {
+    if (feedFilter === "casino" && casinoFeed) {
+      return buildHistoryContext(
+        casinoFeed.events,
+        casinoFeed.bets,
+        casinoFeed.promoAwards,
+        casinoFeed.offerTitles ?? []
+      );
+    }
+    return state
+      ? buildHistoryContext(
+          state.events,
+          state.bets,
+          state.promoAwards,
+          (state.offers ?? []).map((o) => ({ id: o.id, title: o.title }))
+        )
+      : buildHistoryContext([], [], {});
+  }, [feedFilter, casinoFeed, state]);
+
+  const feedEntries = useMemo(() => {
+    if (feedFilter === "casino") return casinoFeed?.entries ?? [];
+    const rows = state?.history ?? [];
+    if (feedFilter === "bets") return rows.filter((e) => e.kind === "settlement");
+    return rows;
+  }, [feedFilter, casinoFeed?.entries, state?.history]);
+
+  return (
+    <section className={cn(dashboardSection, "min-h-0 flex-1", className)}>
+      <DashboardSectionHeader
+        prominent
+        className="bg-page"
+        titleHref="/history"
+        title="History feed"
+        description="Goals, results, bet and casino settlements in real time."
+      />
+      <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
+        <div className="flex justify-end gap-1 py-2">
+          {FEED_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={cn(
+                filterPillState(feedFilter === f.id),
+                "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
+              )}
+              onClick={() => setFeedFilter(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ScrollFadeEdges
+        scrollClassName={cn(
+          dashboardPanelBody,
+          "app-scroll-overlay px-[var(--layout-card-x)] pb-3 pt-0"
+        )}
+      >
+        <HistoryFeed
+          entries={feedEntries}
+          ctx={historyContext}
+          compact
+          onFreeBetAwarded={() => void refresh()}
+          onNoteSaved={() => void refresh()}
+        />
+      </ScrollFadeEdges>
+    </section>
+  );
+}

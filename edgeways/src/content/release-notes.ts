@@ -1,0 +1,388 @@
+/**
+ * Curated release notes - user-facing highlights, newest first. Sourced from
+ * the git history but written for the person using the app, not the diff.
+ * Add a group per release day (or milestone) as work ships.
+ */
+
+export type ReleaseNoteKind = "feature" | "improvement" | "fix";
+
+export interface ReleaseNoteEntry {
+  kind: ReleaseNoteKind;
+  /** Short area tag, e.g. "Home", "Mobile", "Racing Desk" */
+  area: string;
+  /** In-app route for the upgraded experience - the area tag links here */
+  href?: string;
+  text: string;
+}
+
+export interface ReleaseNoteGroup {
+  /** YYYY-MM-DD */
+  date: string;
+  title: string;
+  summary: string;
+  entries: ReleaseNoteEntry[];
+}
+
+export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
+  feature: "New",
+  improvement: "Improved",
+  fix: "Fixed",
+};
+
+export const RELEASE_NOTES: ReleaseNoteGroup[] = [
+  {
+    date: "2026-08-04",
+    title: "EdgeDesk is now edgeways",
+    summary:
+      "New name, same desk: everything you tracked carries over untouched, and the bolt now marks the app wherever it reaches you.",
+    entries: [
+      {
+        kind: "improvement",
+        area: "Everywhere",
+        text: "The app is now called edgeways - the British way to slip an edge through a narrow gap. Your database, offers, bets, balances and settings migrate automatically; there is nothing to redo.",
+      },
+      {
+        kind: "improvement",
+        area: "Alerts",
+        href: "/alerts",
+        text: "A chamfered bolt is the new mark (placeholder pending the final logo): it fronts the app icon, favicon and Android notification badge, and background push titles now lead with ⚡ so an Edgeways alert reads at a glance on the lock screen.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
+    title: "Momentum begins: monthly targets and demo mode",
+    summary:
+      "A target to pace the month against, and a safe parallel universe for showing Edgeways off.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Home",
+        href: "/",
+        text: "Monthly target: set one in Settings and the Monthly P&L chip shows factual pace - \"£162 of £250 · on pace\" or the £/day needed over the days left. No streaks, no confetti; a bad-variance week is not behind plan if the edge was captured.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Demo mode: a separate, seeded, clearly-watermarked database for screenshots and walkthroughs - six accounts, a month of settled campaigns, an open qualifier and a tagged leak, so every page looks lived-in. Your real data never mixes with it: the two live in different files, and switching applies on the next server start.",
+      },
+      {
+        kind: "improvement",
+        area: "Settings",
+        href: "/settings",
+        text: "Demo data can be wiped in one tap - the next demo run reseeds fresh. The wipe can only ever touch the demo file.",
+      },
+      {
+        kind: "feature",
+        area: "Edge Report",
+        href: "/report",
+        text: "Season summary: a Year tab on the Edge Report - profit, expected vs realised and capture month by month, commission drag, retention, and your best and worst bookmakers of the year. Months before your first EV lock show settled profit only, with the coverage window stated plainly rather than implying a capture rate that was never measured.",
+      },
+      {
+        kind: "improvement",
+        area: "Accessibility",
+        href: "/help?guide=keyboard",
+        text: "Every switch and icon button now carries a screen-reader name, the OS \"reduce motion\" preference stills pulsing indicators and dialog animations, and a new Keyboard & accessibility guide in Help documents the palette and everyday keys.",
+      },
+      {
+        kind: "fix",
+        area: "Mobile",
+        href: "/help?guide=mobile",
+        text: "Opening Edgeways from a phone on the same network no longer loads a dead page (empty data, unresponsive menu) - the dev server now allows its own assets across LAN origins. A new \"On your phone\" guide in Help covers reaching the app from your phone and enabling push notifications on Android, step by step.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Set up your desk: the welcome tour now hands off to a four-step wizard - bank and bankroll, your bookies with balances, bet defaults, and notifications. A fresh install reaches a working desk in under a minute; re-run it any time from Settings → Help & about.",
+      },
+      {
+        kind: "fix",
+        area: "Alerts",
+        text: "In-app notifications on Android no longer error (\"Illegal constructor\") - they now show through the service worker, with the same tap-to-open deep links as push.",
+      },
+      {
+        kind: "improvement",
+        area: "Navigation",
+        text: "Navigation, tidied: the sidebar groups into Betting, Live desks and Insight; on the phone the burger is now a full-height drawer that slides in with the whole sectioned navigation; and the old dark-mode switch is a proper Light / Dark / System appearance control with icons.",
+      },
+      {
+        kind: "feature",
+        area: "Help",
+        href: "/help?guide=site-map",
+        text: "Site map: every page and where it lives, rendered live from the navigation structure - including sub-navigation groups, quick actions and the pages that sit outside the main nav.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
+    title: "The workbench: Match Checker, alerts inbox, push and the palette",
+    summary:
+      "Found a price? Get a verdict in seconds. Missed a notification? It's waiting for you, or on your phone. And everything is two keystrokes away.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Match Checker",
+        href: "/match-checker",
+        text: "New Match Checker page: enter the back and lay odds and get a good/ok/poor verdict with the qualifying cost or locked-in free-bet profit, the lay stake and liability, and both outcomes side by side. Commission prefills from your default exchange, and one tap opens the full calculator with everything carried over. It checks the match you found - it never lists markets.",
+      },
+      {
+        kind: "improvement",
+        area: "Match Checker",
+        href: "/match-checker",
+        text: "Risk-free offers deliberately live in the full calculator instead - their verdict depends on refund amount and retention, and a silent assumption here would mislead.",
+      },
+      {
+        kind: "feature",
+        area: "Alerts",
+        href: "/alerts",
+        text: "Alerts inbox: every alert Edgeways raises is kept, with an unread badge in the navigation. Notifications and toasts deliver in the moment; the inbox is the record - tap an alert to mark it read and jump to the right desk, or clear the lot with one tap.",
+      },
+      {
+        kind: "improvement",
+        area: "Alerts",
+        href: "/alerts",
+        text: "A condition that fires again updates its inbox entry rather than stacking duplicates, and an alert you have already read stays read.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Background push: flip \"Push to this device\" in Settings → Alerts and sentinel alerts reach your phone with every Edgeways tab closed. Works anywhere your phone has signal, as long as the Edgeways server is running at home.",
+      },
+      {
+        kind: "improvement",
+        area: "Settings",
+        href: "/settings",
+        text: "\"Send test push\" proves the whole pipe from Settings, and devices that stop existing are pruned automatically - push is a delivery channel on top of the inbox, so nothing is ever lost to a flaky connection.",
+      },
+      {
+        kind: "feature",
+        area: "Navigation",
+        text: "Command palette: Cmd/Ctrl+K anywhere jumps to any page, open offer or bookie wallet, and runs the quick actions - add a bet, start an offer, open the calculator, adjust a balance. It searches live app state only, so there is no index to go stale.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
+    title: "Your rules: tuning, Home layout and data custody",
+    summary:
+      "Edgeways bends to how you operate - every behaviour-defining threshold is yours to set, Home shows the widgets you choose, and your data has a proper backup, restore and import story.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "New Tuning card: unhedged-back grace windows, the offer-drought nudge, the retention prior and its weight, the mistake-tag prompt threshold, the Edge Report minimum, and per-action effort minutes behind the £/hr sort. Defaults match how Edgeways has always behaved, each row shows its default and resets in one tap.",
+      },
+      {
+        kind: "feature",
+        area: "Home",
+        href: "/",
+        text: "Home layout is yours: show or hide any widget per mode and reorder the mobile deck. Desktop keeps its two-column design and adapts - hide the chart and the plan takes the full width. Hidden widgets stay reachable from their own pages.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Data custody: one-tap backup of your entire database (.db or JSON bundle), and a validated restore flow - the upload is checked, you confirm against its row counts, and a safety copy of your current data is always saved first. A failed restore leaves everything untouched.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "CSV import wizard: bring bet history in from a spreadsheet - map your columns, preview, import. UK dates, £ signs and quoted fields all handled; unreadable rows are reported, never silently dropped.",
+      },
+      {
+        kind: "improvement",
+        area: "Settings",
+        href: "/settings",
+        text: "Imported history is provenance-marked: it shows in your P&L and bookmaker stats, but it never changes balances, never links itself to campaigns, and never counts towards EV capture - the Edge Report stays honest.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
+    title: "The Coach",
+    summary:
+      "Edgeways now tells you whether you actually captured your edge - and where the leaks are: a monthly Edge Report, one-tap mistake tags and a bookmaker league table with manual health.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Edge Report",
+        href: "/report",
+        text: "New Edge Report page: cumulative expected edge (stepped at lock time) vs realised P&L (stepped at settle time), with capture rate, commission drag and free-bet retention for the month. Months with fewer than five settled campaigns show a not-enough-data state instead of noisy lines.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Mistake ledger: when a settled campaign captures under 90% of its locked EV, the post-mortem line offers one-tap tags (laid late, wrong market, odds moved, bookie voided, other). The Edge Report totals the £ lost per tag - \"Where the leak is\".",
+      },
+      {
+        kind: "feature",
+        area: "Accounts",
+        href: "/accounts",
+        text: "Bookmaker league table: realised profit, ROI, free-bet retention, offer count and days since the last offer per bookie. Health is yours to set - mark a bookie as cooling, and a 40-day offer drought earns a gentle \"mark as cooling?\" nudge.",
+      },
+      {
+        kind: "improvement",
+        area: "Home",
+        href: "/",
+        text: "Gubbed bookies' offers sink to the bottom of Do next (and wear a Gubbed chip) but are never hidden - closed accounts drop out entirely.",
+      },
+      {
+        kind: "fix",
+        area: "Under the hood",
+        text: "The production build is green again - three long-standing type errors cleared - and the test suite now sits at 571 checks across every calculation and settlement path.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-14",
+    title: "Guardian sentinels",
+    summary:
+      "Edgeways now watches your positions: unhedged backs and triggered 2UP payouts raise alerts the moment they matter.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Alerts",
+        href: "/",
+        text: "Naked-exposure sentinel: an open qualifying or risk-free back with no lay raises an amber Home banner and an alert after 10 minutes (3 minutes near the off). One tap marks it intentional.",
+      },
+      {
+        kind: "feature",
+        area: "Alerts",
+        href: "/calculators/ep-desk",
+        text: "Live 2UP sentinel: when your team goes two up, the alert includes an exact lock-in suggestion - the equalising in-play back, stake and guaranteed profit, priced from the live model.",
+      },
+      {
+        kind: "improvement",
+        area: "Settings",
+        href: "/settings",
+        text: "Both sentinels have their own alert toggles alongside the existing three.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-13",
+    title: "The mobile experience",
+    summary:
+      "A dedicated phone experience: swipeable Home, full-page layouts, bottom sheets, three-tap bet capture and an installable app.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Mobile",
+        href: "/",
+        text: "Home is a swipeable deck on the phone - Overview, Today's plan, Chart, Feed and Do next as full-screen cards with pagination dots, remembered position and a context-aware start card (pin it in Settings).",
+      },
+      {
+        kind: "feature",
+        area: "Mobile",
+        href: "/tracker",
+        text: "Quick-log: a floating + on every mobile screen captures a bet in three taps - paste a slip, tap a plan slot, or log bookie/stake/odds. Captured bets are flagged for desktop review in the tracker.",
+      },
+      {
+        kind: "feature",
+        area: "Mobile",
+        href: "/settings",
+        text: "Edgeways installs to your Home Screen as an app, with local notifications for expiring offers, race off-times and settled results (toggleable per type).",
+      },
+      {
+        kind: "improvement",
+        area: "Mobile",
+        text: "Full-page layouts with no desktop gutters; dialogs open as bottom sheets (small confirms stay centred); tracker and accounts tables become card lists; the Racing Desk leads with the offer workflow and tucks the runner grid behind a tap.",
+      },
+      {
+        kind: "improvement",
+        area: "Navigation",
+        text: "The full main navigation now lives in the burger menu on mobile.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-13",
+    title: "The Daily Plan and honest P&L",
+    summary:
+      "One time-ordered run-sheet for the day, and a chart that can show exactly what commission costs.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Home",
+        href: "/",
+        text: "Today's plan: offer deadlines, race off-times and kick-offs in one timeline, each slot with its expected £. Completed slots collapse but never reorder.",
+      },
+      {
+        kind: "feature",
+        area: "Chart",
+        href: "/",
+        text: "Retained | Gross toggle - gross adds back exchange commission so the cost of commission is visible rather than silently netted.",
+      },
+      {
+        kind: "improvement",
+        area: "Chart",
+        href: "/",
+        text: "Markers are directional triangles (green up = profit in, red down = loss out), sit exactly on the plotted line, and balance corrections get their own markers at the foot of their step.",
+      },
+      {
+        kind: "fix",
+        area: "Chart",
+        href: "/",
+        text: "Markers no longer drift off the line after a P&L-affecting balance adjustment.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-13",
+    title: "EV truth completed",
+    summary:
+      "Every expected-value figure is now locked at the moment it becomes real, so expected vs realised is finally an honest comparison.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "EV lock + capture rate: expected profit snapshots when a campaign starts and is never silently changed - edits create visible re-locks. Settled campaigns show \"Expected → Realised · % captured\".",
+      },
+      {
+        kind: "improvement",
+        area: "Offers",
+        href: "/offers",
+        text: "Expired campaigns record their realised-to-date honestly - lost EV is real signal.",
+      },
+    ],
+  },
+  {
+    date: "2026-07-12",
+    title: "Offer command centre foundations",
+    summary:
+      "The groundwork sprint: measured retention, provenance badges, edge on Home, smarter ranking and paste-to-log.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Free-bet retention is measured from your own conversions (Bayesian-blended for small samples) instead of a hardcoded 80%.",
+      },
+      {
+        kind: "feature",
+        area: "Home",
+        href: "/",
+        text: "Every £-EV on screen carries a provenance badge - live, estimated or heuristic - and Home leads with the edge on the table.",
+      },
+      {
+        kind: "feature",
+        area: "Do next",
+        href: "/",
+        text: "£/hr rate sort, bankroll-aware ranking with funding shortfall chips, and paste-to-log that turns bookie confirmation text into a prefilled bet.",
+      },
+      {
+        kind: "feature",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "No-vig fair odds per runner, straight from the well-tested calc engine.",
+      },
+    ],
+  },
+];

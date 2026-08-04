@@ -1,19 +1,19 @@
-# Cursor setup checklist (EdgeDesk)
+# Cursor setup checklist (Edgeways)
 
 **Updated:** 2 August 2026  
 
 One-off in-app configuration so Cursor picks up the repo rules, the Ultra
 model set, and the local backbone. Repo-side files already in place: `AGENTS.md`
-(root and `edgedesk/`), `edgedesk/.cursor/rules/*.mdc`,
+(root and `edgeways/`), `edgeways/.cursor/rules/*.mdc`,
 `.cursor/rules/model-routing.mdc`, `.cursorignore`.
 
 Routing why/when: `docs/Local-vs-Cloud-Model-Strategy.md`. Day-to-day habits:
 `docs/ai-playbook.md`.
 
 ## 1. Workspace
-Open `MB app build/` (the git root) as the workspace, not `edgedesk/`.
-The root `AGENTS.md`, `edgedesk/AGENTS.md`, root `.cursor/rules/`, and nested
-`edgedesk/.cursor/rules/` are all discovered from there.
+Open `MB app build/` (the git root) as the workspace, not `edgeways/`.
+The root `AGENTS.md`, `edgeways/AGENTS.md`, root `.cursor/rules/`, and nested
+`edgeways/.cursor/rules/` are all discovered from there.
 
 ## 2. Plan
 Confirm **Cursor Ultra** (or Pro+ with on-demand if you defer Ultra).  
@@ -87,9 +87,9 @@ Plan & Usage: optionally set a modest on-demand monthly limit so Other Models
 does not hard-stop mid-session if you spike on K3/Opus.
 
 ## Verification
-1. Open `edgedesk/src/lib/calc/matched.ts`, ask chat a question about it, and
+1. Open `edgeways/src/lib/calc/matched.ts`, ask chat a question about it, and
    confirm the `calc-guardrails` rule shows in the context pills.
-2. Repeat with a file under `edgedesk/src/components/` for `design-system`.
+2. Repeat with a file under `edgeways/src/components/` for `design-system`.
 3. Confirm `model-routing` is attached (always-apply).
 4. Enable Kimi K3, select it, send one prompt; confirm it runs (Other Models
    quota permitting).

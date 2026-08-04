@@ -85,7 +85,7 @@ Local parallel ladder: `qwen3-coder-ctx` → `bb-deepseek-70b` → escalate clou
 - `.cursorignore` keeps `eng.traineddata` and `package-lock.json` out of context.
 
 ### Rules
-`edgedesk/.cursor/rules/*.mdc` auto-attach on matching files. Root
+`edgeways/.cursor/rules/*.mdc` auto-attach on matching files. Root
 `.cursor/rules/model-routing.mdc` always applies. `AGENTS.md` is read at
 workspace root.
 
@@ -150,7 +150,7 @@ Anything AGENTS.md-aware works. For aider, add `read: AGENTS.md` to
    `[strong]`: K3 or Opus in Cursor / Claude Code.  
    `[design-first]`: stop, mock first.
 3. Review: `calc-auditor` and/or `design-reviewer`, then `/code-review`.
-4. `npx vitest run` from `edgedesk/`, then commit.
+4. `npx vitest run` from `edgeways/`, then commit.
 
 ### 2. Calc or settlement change (any size)
 `/calc-change`, test first, `calc-auditor` before commit. Never land

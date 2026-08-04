@@ -4,7 +4,7 @@
  *
  * Selector maps are versioned and expected to break when Betdaq ships a new
  * DOM: every lookup fails LOUD via an on-page banner, and the stake is
- * already on the user's clipboard (EdgeDesk copies before emitting).
+ * already on the user's clipboard (Edgeways copies before emitting).
  */
 const SELECTOR_MAP_VERSION = "betdaq-2026-07";
 const SELECTORS = {
@@ -63,12 +63,12 @@ chrome.runtime.onMessage.addListener((message) => {
     setNativeValue(stakeInput, stake.toFixed(2));
     stakeInput.focus();
     banner(
-      `EdgeDesk filled ${side === "back" ? "back" : "lay"} stake £${stake.toFixed(2)} - check odds and place it yourself.`,
+      `Edgeways filled ${side === "back" ? "back" : "lay"} stake £${stake.toFixed(2)} - check odds and place it yourself.`,
       true
     );
   } else {
     banner(
-      `EdgeDesk couldn't find the betslip (map ${SELECTOR_MAP_VERSION}) - the stake is on your clipboard.`,
+      `Edgeways couldn't find the betslip (map ${SELECTOR_MAP_VERSION}) - the stake is on your clipboard.`,
       false
     );
   }
