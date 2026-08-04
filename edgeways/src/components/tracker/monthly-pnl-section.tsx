@@ -76,15 +76,16 @@ export function MonthlyPnlSection({
     );
   }
 
+  const tableShell = "overflow-hidden rounded-lg border border-border/80";
+  const headerRow = cn("hover:bg-transparent", plain && selectionSubtle);
+
   const monthTable = (
-    <div>
-      <div className={cn("rounded-t-md px-3 py-2", plain ? selectionSubtle : undefined)}>
-        <h3 className={sectionTitle}>By month</h3>
-      </div>
-      <div className="overflow-x-auto rounded-b-lg border border-border/80 border-t-0">
+    <div className="flex flex-col gap-2">
+      <h3 className={sectionTitle}>By month</h3>
+      <div className={tableShell}>
         <Table>
           <TableHeader>
-            <TableRow className={cn("hover:bg-transparent", plain && selectionSubtle)}>
+            <TableRow className={headerRow}>
               <TableHead className={tableHeaderCell}>Month</TableHead>
               <TableHead className={tableHeaderCell}>Bets</TableHead>
               <TableHead className={cn(tableHeaderCell, "text-right")}>Profit</TableHead>
@@ -111,14 +112,12 @@ export function MonthlyPnlSection({
   );
 
   const accountTable = (
-    <div>
-      <div className={cn("rounded-t-md px-3 py-2", plain ? selectionSubtle : undefined)}>
-        <h3 className={sectionTitle}>By account</h3>
-      </div>
-      <div className="overflow-x-auto rounded-b-lg border border-border/80 border-t-0">
+    <div className="flex flex-col gap-2">
+      <h3 className={sectionTitle}>By account</h3>
+      <div className={tableShell}>
         <Table>
           <TableHeader>
-            <TableRow className={cn("hover:bg-transparent", plain && selectionSubtle)}>
+            <TableRow className={headerRow}>
               <TableHead className={tableHeaderCell}>Account</TableHead>
               <TableHead className={tableHeaderCell}>Bets</TableHead>
               <TableHead className={cn(tableHeaderCell, "text-right")}>Profit</TableHead>
@@ -149,14 +148,12 @@ export function MonthlyPnlSection({
 
   const methodTable =
     methods.length > 0 ? (
-      <div>
-        <div className={cn("rounded-t-md px-3 py-2", plain ? selectionSubtle : undefined)}>
-          <h3 className={sectionTitle}>By method</h3>
-        </div>
-        <div className="overflow-x-auto rounded-b-lg border border-border/80 border-t-0">
+      <div className="flex flex-col gap-2">
+        <h3 className={sectionTitle}>By method</h3>
+        <div className={tableShell}>
           <Table>
             <TableHeader>
-              <TableRow className={cn("hover:bg-transparent", plain && selectionSubtle)}>
+              <TableRow className={headerRow}>
                 <TableHead className={tableHeaderCell}>Method</TableHead>
                 <TableHead className={tableHeaderCell}>Bets</TableHead>
                 <TableHead className={cn(tableHeaderCell, "text-right")}>Profit</TableHead>
