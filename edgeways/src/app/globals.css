@@ -78,6 +78,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -112,9 +113,10 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  /* Brand yellow #FFC71E with ink text #111111 */
-  --primary: oklch(0.856 0.17 87.3);
-  --primary-foreground: oklch(0.178 0 0);
+  /* Light mode: ink primary #111111; brand yellow #FFC71E is reserved for dark mode */
+  --primary: oklch(0.178 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --primary-hover: oklch(0.21 0 0);
   --secondary: oklch(0.965 0.002 250);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.935 0.003 250);
@@ -138,8 +140,8 @@
   --radius: 0.625rem;
   --sidebar: var(--canvas);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.856 0.17 87.3);
-  --sidebar-primary-foreground: oklch(0.178 0 0);
+  --sidebar-primary: oklch(0.178 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.965 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.88 0 0);
@@ -201,8 +203,10 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
+  /* Dark mode: brand yellow #FFC71E with ink text #111111 */
   --primary: oklch(0.856 0.17 87.3);
   --primary-foreground: oklch(0.178 0 0);
+  --primary-hover: oklch(0.79 0.158 87.3);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -732,7 +736,7 @@
     105deg,
     transparent 0%,
     transparent 40%,
-    rgb(0 0 0 / 0.07) 50%,
+    rgb(255 255 255 / 0.18) 50%,
     transparent 60%,
     transparent 100%
   );

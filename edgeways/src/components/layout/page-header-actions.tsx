@@ -33,7 +33,7 @@ export function PageHeaderStat({
   );
 }
 
-/** Primary page CTA - larger than default toolbar buttons; monochrome with shine */
+/** Primary page CTA - larger than default toolbar buttons; brand primary with shine */
 export const pagePrimaryButtonProps = {
   size: "lg" as const,
   variant: "pagePrimary" as const,

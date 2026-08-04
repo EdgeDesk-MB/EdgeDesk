@@ -38,7 +38,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "edgeways - Matched Betting Command Centre",
+  title: "Edgeways - Matched Betting Command Centre",
   description: "Calculators, live events and real-time profit tracking for matched betting",
   // Icons come from the app-directory file conventions:
   // src/app/icon.svg (favicon) and src/app/apple-icon.png (iOS home screen).

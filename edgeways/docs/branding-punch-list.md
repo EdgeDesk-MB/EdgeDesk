@@ -26,15 +26,17 @@ is the interim mark. Final assets still wanted from Sam:
 | `icon-192.png` / `icon-512.png` | Maskable safe zone (glyph within central 80%) | Android PWA, manifest | ✅ generated, `purpose: maskable` |
 | Push badge | 192×192 monochrome white-on-transparent | Android notification shade | ✅ `badge-192.png` (pulse silhouette) |
 | `og-image.png` (optional for now) | 1200×630 | Link previews once the marketing site exists (F4) | ⬜ still needed |
-| Wordmark (optional) | SVG, dark + light variants | Top bar, marketing site | Text wordmark ("edgeways", lowercase) in the top bar |
+| Wordmark (optional) | SVG, dark + light variants | Top bar, marketing site | Text wordmark ("Edgeways", title case) in the top bar |
 
 Decisions for Sam:
 
 1. **Brand colour — DECIDED 2026-08-04.** Yellow `#FFC71E` (`oklch(0.856 0.17 87.3)`)
-   is `--primary` in both themes; ink `#111111` (`oklch(0.178 0 0)`) is
-   `--primary-foreground` and the light-theme `--topbar`. Focus rings: ink in light
-   mode, yellow in dark. Light-mode yellow primaries are **on trial** — Sam reviews
-   (screenshots 2026-08-04) and can soften to ink-primary-in-light if it reads loud.
+   is `--primary` in **dark mode only**; light mode uses ink `#111111`
+   (`oklch(0.178 0 0)`) with white text (Sam's call after reviewing screenshots).
+   `--primary-hover` added per theme (lifted ink light, deepened yellow dark); the
+   `pagePrimary` page-CTA variant is now token-driven (was hardcoded #111/white), so
+   every button follows the brand. Focus rings: ink in light mode, yellow in dark.
+   Product name casing: **Edgeways** (title case) in UI text, tab title and manifest.
 2. **Edge violet stays reserved.** `--edge` (`oklch(0.5 0.2 295)`) is the Offer Edge /
    pro-tier signature (D5). The yellow brand does not collide with it.
 3. **Dark/light variants** of the mark if it isn't single-colour — the pulse mark is
@@ -55,7 +57,7 @@ Decisions for Sam:
 
 | Token | Light | Dark | Meaning |
 | --- | --- | --- | --- |
-| `--primary` | `oklch(0.856 0.17 87.3)` (#FFC71E) | same | Brand yellow / primary actions |
+| `--primary` | `oklch(0.178 0 0)` (#111111) | `oklch(0.856 0.17 87.3)` (#FFC71E) | Ink in light, brand yellow in dark |
 | `--success` | `oklch(0.45 0.12 150)` | `oklch(0.62 0.14 150)` | Qualifying / completed / affirmative |
 | `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |

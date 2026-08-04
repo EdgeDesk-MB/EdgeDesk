@@ -30,7 +30,7 @@ function BrandLink({ className }: { className?: string }) {
       )}
     >
       <EdgewaysLogoIcon />
-      <span className="truncate text-base font-extrabold tracking-tight">edgeways</span>
+      <span className="truncate text-base font-extrabold tracking-tight">Edgeways</span>
     </Link>
   );
 }

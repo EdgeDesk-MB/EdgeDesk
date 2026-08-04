@@ -39,7 +39,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "improvement",
         area: "Everywhere",
-        text: "The app is now called edgeways - the British way to slip an edge through a narrow gap. Your database, offers, bets, balances and settings migrate automatically; there is nothing to redo.",
+        text: "The app is now called Edgeways - the British way to slip an edge through a narrow gap. Your database, offers, bets, balances and settings migrate automatically; there is nothing to redo.",
       },
       {
         kind: "improvement",

@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "edgeways - Matched Betting Command Centre",
-    short_name: "edgeways",
+    name: "Edgeways - Matched Betting Command Centre",
+    short_name: "Edgeways",
     description:
       "Calculators, live events and real-time profit tracking for matched betting",
     start_url: "/",
