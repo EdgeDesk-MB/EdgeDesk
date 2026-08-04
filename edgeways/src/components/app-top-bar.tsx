@@ -41,7 +41,7 @@ function profitToneClass(value: number): string {
 }
 
 const stackShell =
-  "flex min-h-8 flex-col items-end justify-center gap-0 rounded-lg px-1 py-0.5 text-[11px] transition-colors hover:bg-topbar-accent";
+  "flex min-h-8 flex-col items-end justify-center gap-0 border-b border-transparent px-1 py-0.5 text-[11px] transition-colors hover:border-b-[#111111]";
 
 function StackRow({
   label,
