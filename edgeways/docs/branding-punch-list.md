@@ -4,12 +4,12 @@ Working list for the brand pass, split into **what Sam provides** (design assets
 decisions) and **what gets wired in code** once assets land. Current state verified
 2026-08-04 against `src/app/layout.tsx`, `src/app/manifest.ts`, `public/`, `globals.css`.
 
-> **2026-08-04: Edgeways brand mark landed.** Yellow bolt on ink is the sole top-bar
-> logo (text wordmark removed). Masters in `brand/masters/`: `favicon.png`,
-> `square.png`, `notification.png`. Icons regenerated via
-> `node scripts/generate-brand-assets.mjs`. In-app mark is a 7-point SVG path traced
-> from the notification silhouette (`edgeways-logo-icon.tsx` /
-> `public/brand/mark.svg`). Optional: supply a design-tool SVG to replace the trace.
+> **2026-08-04: Edgeways brand assets (rev 2).** Top bar uses the full yellow
+> lockup (`brand/masters/logo.png` → `/brand/logo.png`) — bolt + "edgeways"
+> wordmark, not the icon alone. Favicon/square are ink-bolt-on-yellow.
+> Masters: `favicon.png`, `square.png`, `logo.png`, `notification.png`.
+> Compact mark (menu/PWA) remains the yellow-plate SVG bolt. Optional: supply
+> a true `edgeways_logo.svg` to replace the PNG lockup.
 
 ## 1. Logo & brand mark (Sam provides)
 

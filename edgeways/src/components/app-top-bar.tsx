@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { UserCircle } from "lucide-react";
-import { EdgewaysLogoIcon } from "@/components/edgeways-logo-icon";
+import { EdgewaysLogo } from "@/components/edgeways-logo-icon";
 import { AppTopBarMenu, TopBarButton } from "@/components/app-top-bar-menu";
 import { MoneyFlow } from "@/components/money-flow";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
@@ -30,7 +30,7 @@ function BrandLink({ className }: { className?: string }) {
         className
       )}
     >
-      <EdgewaysLogoIcon />
+      <EdgewaysLogo />
     </Link>
   );
 }
