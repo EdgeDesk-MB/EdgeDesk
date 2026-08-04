@@ -193,9 +193,10 @@
 }
 
 .dark {
-  --canvas: oklch(0.128 0.003 250);
-  --page: oklch(0.158 0.004 250);
-  --surface: oklch(0.21 0.003 250);
+  /* Subtle lift vs previous 0.128 / 0.158 - keeps dark character, less cave-like */
+  --canvas: oklch(0.155 0.003 250);
+  --page: oklch(0.185 0.004 250);
+  --surface: oklch(0.23 0.003 250);
   --surface-shadow: none;
   --page-shadow: none;
   --background: var(--canvas);

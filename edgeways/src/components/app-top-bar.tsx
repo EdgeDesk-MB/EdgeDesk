@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { UserCircle } from "lucide-react";
 import { EdgewaysLogo } from "@/components/edgeways-logo-icon";
-import { AppTopBarMenu, TopBarButton } from "@/components/app-top-bar-menu";
+import { AppTopBarMenu } from "@/components/app-top-bar-menu";
 import { MoneyFlow } from "@/components/money-flow";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
 import { useMemo } from "react";
@@ -66,7 +66,7 @@ function TopBarStat({
         : "text-topbar-foreground"
   );
   const shell = cn(
-    "hidden h-8 items-center gap-2 rounded-lg bg-topbar-accent px-2.5 text-sm transition-colors hover:bg-topbar-accent/80 sm:flex",
+    "hidden h-8 items-center gap-1.5 rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:flex",
     className
   );
 
@@ -109,7 +109,7 @@ function TopBarBankroll({
   const chip = (
     <Link
       href="/accounts"
-      className="hidden h-8 items-center rounded-lg bg-topbar-accent px-2.5 text-sm transition-colors hover:bg-topbar-accent/80 sm:flex"
+      className="hidden h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:flex"
       aria-label={
         showInBets
           ? `Bankroll: exchange ${exchange.toFixed(2)}, in-bets ${inBets.toFixed(2)}, total ${total.toFixed(2)}`
@@ -120,11 +120,11 @@ function TopBarBankroll({
         <span key={part.label} className="flex items-center">
           {i > 0 ? (
             <span
-              className="mx-2 h-[1em] w-px shrink-0 self-center bg-topbar-muted/50"
+              className="mx-1.5 h-[1em] w-px shrink-0 self-center bg-topbar-muted/50"
               aria-hidden
             />
           ) : null}
-          <span className="flex items-center gap-1.5 leading-none">
+          <span className="flex items-center gap-1 leading-none">
             <span className="text-topbar-muted">{part.label}</span>
             <MoneyFlow
               value={part.value}
@@ -194,11 +194,11 @@ export function AppTopBar() {
           <BrandLink />
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5">
           {state == null ? null : (
             <>
               {state.demoMode ? (
-                <span className="shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warning">
+                <span className="shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
                   Demo data
                 </span>
               ) : null}
@@ -222,42 +222,43 @@ export function AppTopBar() {
                 <button
                   type="button"
                   onClick={openFreeBets}
-                  className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
+                  className="flex h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:hidden"
                   aria-label={`Free bets ${freeBetsTotal.toFixed(2)}`}
                 >
                   <MoneyFlow
                     value={freeBetsTotal}
-                    className="text-sm font-bold tabular-nums text-violet-700"
+                    className="font-bold tabular-nums text-violet-700"
                   />
                 </button>
               ) : null}
               <Link
                 href="/tracker?tab=pnl"
-                className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
+                className="flex h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:hidden"
                 aria-label="View profit"
               >
                 <MoneyFlow
                   value={profit}
-                  className={cn("text-sm font-bold tabular-nums", profitToneClass(profit))}
+                  className={cn("font-bold tabular-nums", profitToneClass(profit))}
                 />
               </Link>
               <Link
                 href="/accounts"
-                className="flex h-8 items-center rounded-lg bg-topbar-accent px-2 transition-colors hover:bg-topbar-accent/80 sm:hidden"
+                className="flex h-8 items-center rounded-lg px-1.5 text-[13px] transition-colors hover:bg-topbar-accent sm:hidden"
                 aria-label={`Bankroll total ${bankroll.toFixed(2)}`}
               >
-                <MoneyFlow value={bankroll} className="text-sm font-bold tabular-nums" />
+                <MoneyFlow value={bankroll} className="font-bold tabular-nums" />
               </Link>
             </>
           )}
 
-          <TopBarButton
-            className="gap-2 px-2.5 text-xs font-extrabold uppercase tracking-wide"
+          <button
+            type="button"
+            className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[#111111] px-2.5 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#111111]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/40"
             aria-label="Sign in - coming soon"
           >
-            <UserCircle className="size-4 shrink-0" strokeWidth={2} />
+            <UserCircle className="size-3.5 shrink-0" strokeWidth={2} />
             <span className="hidden sm:inline">Login</span>
-          </TopBarButton>
+          </button>
 
           <AppTopBarMenu />
         </div>
