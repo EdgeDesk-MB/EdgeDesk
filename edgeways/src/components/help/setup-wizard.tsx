@@ -163,7 +163,7 @@ function SetupWizardForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
     <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary-text">
               <Icon className="size-5" />
             </div>
             <div>

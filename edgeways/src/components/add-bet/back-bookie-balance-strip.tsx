@@ -183,7 +183,7 @@ export function BackBookieBalanceStrip({
     return (
       <p className={cn("text-[11px] leading-snug text-black/55 dark:text-white/55", className)}>
         No balance tracked for {bookmaker}. Saving a bet will create the account.{" "}
-        <Link href="/accounts" className="font-semibold text-primary underline-offset-2 hover:underline">
+        <Link href="/accounts" className="font-semibold text-primary-text underline-offset-2 hover:underline">
           Open Accounts
         </Link>
       </p>

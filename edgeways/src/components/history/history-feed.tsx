@@ -543,7 +543,7 @@ export function HistoryEntryCard({
               <div className="mt-3 flex justify-end">
                 <Link
                   href={`/tracker?highlight=${bet.id}`}
-                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
                 >
                   View in tracker →
                 </Link>

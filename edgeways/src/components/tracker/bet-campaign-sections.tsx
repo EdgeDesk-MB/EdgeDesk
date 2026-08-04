@@ -54,7 +54,7 @@ export function BetCampaignSections({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 {group.offerId != null ? (
-                  <Gift className="size-3.5 shrink-0 text-primary" aria-hidden />
+                  <Gift className="size-3.5 shrink-0 text-primary-text" aria-hidden />
                 ) : (
                   <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 )}
@@ -62,7 +62,7 @@ export function BetCampaignSections({
                 {group.offerId != null ? (
                   <Link
                     href={`/offers?highlight=${group.offerId}`}
-                    className="truncate text-sm font-bold text-foreground hover:text-primary hover:underline"
+                    className="truncate text-sm font-bold text-foreground hover:text-primary-text hover:underline"
                   >
                     {group.title}
                   </Link>

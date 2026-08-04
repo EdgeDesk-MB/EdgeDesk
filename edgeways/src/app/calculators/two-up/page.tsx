@@ -68,7 +68,7 @@ export default function TwoUpCalculatorPage() {
             Back at a bookie that pays out at 2 goals ahead, lay at the exchange. Small qualifying
             loss, big windfall when the payout triggers and the result flips. For the full
             model-driven desk, see the{" "}
-            <Link href="/calculators/ep-desk" className="text-primary underline-offset-2 hover:underline">
+            <Link href="/calculators/ep-desk" className="text-primary-text underline-offset-2 hover:underline">
               2UP Desk
             </Link>
             .
@@ -185,7 +185,7 @@ export default function TwoUpCalculatorPage() {
 
       <Card className="border-primary/20 bg-primary/[0.03]">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary-text">
             <Sparkles className="size-4" /> Expected value of this position
           </CardTitle>
           <CardDescription>

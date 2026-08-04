@@ -233,7 +233,7 @@ function RunCard({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-default font-semibold text-primary underline decoration-dotted underline-offset-2">
+                    <span className="cursor-default font-semibold text-primary-text underline decoration-dotted underline-offset-2">
                       {combinedOdds.toFixed(2)}
                     </span>
                   </TooltipTrigger>
@@ -857,7 +857,7 @@ function KickOffField({ value, onChange }: { value: string; onChange: (v: string
           <label
             className={cn(
               "relative flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border text-muted-foreground transition-colors hover:text-foreground",
-              set && "border-primary/40 bg-primary/10 text-primary"
+              set && "border-primary/40 bg-primary/10 text-primary-text"
             )}
           >
             {set ? <CalendarCheck className="size-4" /> : <CalendarClock className="size-4" />}

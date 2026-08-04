@@ -72,7 +72,7 @@ export function BalanceCorrectionNoteButton({
         size="icon"
         className={cn(
           "size-5 shrink-0 text-muted-foreground hover:text-foreground",
-          hasNote && "text-primary hover:text-primary",
+          hasNote && "text-primary-text hover:text-primary-text",
           className
         )}
         aria-label={hasNote ? "Edit correction note" : "Add correction note"}

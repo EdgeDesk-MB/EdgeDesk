@@ -970,7 +970,7 @@ function Field({ label, children, accent }: { label: string; children: React.Rea
       <span
         className={cn(
           "text-[10px] font-semibold uppercase tracking-[0.12em]",
-          accent ? "text-primary" : "text-muted-foreground"
+          accent ? "text-primary-text" : "text-muted-foreground"
         )}
       >
         {label}
@@ -1142,7 +1142,7 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
 
       <Card className="border-primary/20">
         <CardContent className="pt-5">
-          <div className="pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+          <div className="pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-text">
             Why the early payout {R.best && R.best.decomp.total > 0 ? "works here" : "doesn't (quite) rescue it"}
           </div>
           <p className="pb-3 text-xs leading-relaxed text-muted-foreground">
@@ -1794,7 +1794,7 @@ function PlaybookOverlay({ open, onClose }: { open: boolean; onClose: () => void
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between pr-6">
             <span className="flex items-center gap-2">
-              <Flag className="size-4 text-primary" /> Scouting Playbook
+              <Flag className="size-4 text-primary-text" /> Scouting Playbook
             </span>
             <span className="font-mono text-xs text-muted-foreground">
               {done}/{allItems.length}
@@ -1802,7 +1802,7 @@ function PlaybookOverlay({ open, onClose }: { open: boolean; onClose: () => void
           </DialogTitle>
         </DialogHeader>
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed">
-          <span className="font-semibold text-primary">The one rule:</span> the edge is in the{" "}
+          <span className="font-semibold text-primary-text">The one rule:</span> the edge is in the{" "}
           <em>offer</em>, not the match. A good setup = an early-payout <strong>promo on near-fair odds</strong>.
           If the EP price is shorter than the straight win price, value&apos;s gone → pass.
           <div className="pt-2 font-mono text-[10px] text-muted-foreground">

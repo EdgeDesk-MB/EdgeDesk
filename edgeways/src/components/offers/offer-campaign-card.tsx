@@ -254,7 +254,7 @@ export function OfferCampaignCard({
               {offer.title}
             </CardTitle>
             {nextActionDetail ? (
-              <p className="mt-1 text-xs text-primary/90">{nextActionDetail}</p>
+              <p className="mt-1 text-xs text-primary-text/90">{nextActionDetail}</p>
             ) : null}
           </div>
           <div className="shrink-0 text-right">

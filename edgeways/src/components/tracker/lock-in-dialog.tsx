@@ -253,7 +253,7 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
                         (frac === 0.5 &&
                           !fullLock &&
                           Math.abs(chosenStake - advice.executableStake * 0.5) < 0.01)) &&
-                        "border-primary/40 bg-primary/10 text-primary"
+                        "border-primary/40 bg-primary/10 text-primary-text"
                     )}
                     onClick={() =>
                       setStakeOverride(frac === 1 ? null : roundPence(advice.executableStake * frac))

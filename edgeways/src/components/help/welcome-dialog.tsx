@@ -84,7 +84,7 @@ function WelcomeBody({
     <>
       <DialogHeader>
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary-text">
             <Icon className="size-5" />
           </div>
           <div>
@@ -159,11 +159,11 @@ function WelcomeBody({
       </DialogFooter>
       {isLast && (
         <div className="flex flex-wrap gap-2 border-t pt-3 text-xs text-muted-foreground">
-          <Link href="/help" className="inline-flex items-center gap-1 text-primary hover:underline">
+          <Link href="/help" className="inline-flex items-center gap-1 text-primary-text hover:underline">
             <Calculator className="size-3" /> Help guides
           </Link>
           <span>·</span>
-          <Link href="/offers" className="inline-flex items-center gap-1 text-primary hover:underline">
+          <Link href="/offers" className="inline-flex items-center gap-1 text-primary-text hover:underline">
             <Gift className="size-3" /> Add an offer
           </Link>
         </div>

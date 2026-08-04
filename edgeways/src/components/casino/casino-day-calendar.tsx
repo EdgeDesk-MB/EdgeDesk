@@ -111,7 +111,7 @@ export function CasinoDayCalendar({
               <h3
                 className={cn(
                   "flex-1 text-xs font-bold uppercase tracking-wide",
-                  day.isToday ? "text-primary" : "text-foreground"
+                  day.isToday ? "text-primary-text" : "text-foreground"
                 )}
               >
                 {day.label}

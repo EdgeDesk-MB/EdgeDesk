@@ -297,7 +297,7 @@ export function FixtureBrowserContent({
               Already tracking?{" "}
               <Link
                 href="/tracked-events"
-                className="text-primary underline-offset-2 hover:underline"
+                className="text-primary-text underline-offset-2 hover:underline"
               >
                 Tracked Events
               </Link>
@@ -305,7 +305,7 @@ export function FixtureBrowserContent({
           ) : (
             <>
               {" "}
-              <Link href="/fixtures" className="text-primary underline-offset-2 hover:underline">
+              <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
                 Open Fixtures page
               </Link>
             </>

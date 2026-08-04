@@ -269,7 +269,7 @@ export default function BoostsPage() {
                         className={cn(
                           "text-[10px] uppercase tracking-wide",
                           placed
-                            ? "border-primary/25 bg-primary/10 text-primary"
+                            ? "border-primary/25 bg-primary/10 text-primary-text"
                             : "text-muted-foreground"
                         )}
                       >

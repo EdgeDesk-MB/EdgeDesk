@@ -37,18 +37,18 @@ export function HistoryEntryIcon({
 
   if (entry.kind === "bet_placed") {
     if (isBoostHistoryEntry(entry, ctx)) {
-      return <Zap className={cn("size-3.5 text-primary", className)} />;
+      return <Zap className={cn("size-3.5 text-primary-text", className)} />;
     }
     if (freeBetPlaced) {
       return <PlusCircle className={cn("size-3.5", freeBetIconClass, className)} />;
     }
-    return <PlusCircle className={cn("size-3.5 text-primary", className)} />;
+    return <PlusCircle className={cn("size-3.5 text-primary-text", className)} />;
   }
   if (entry.kind === "goal") {
     return <Goal className={cn("size-3.5 text-emerald-600 dark:text-emerald-400", className)} />;
   }
   if (entry.kind === "kickoff") {
-    return <Play className={cn("size-3.5 text-primary", className)} />;
+    return <Play className={cn("size-3.5 text-primary-text", className)} />;
   }
   if (entry.kind === "full_time") {
     return <Flag className={cn("size-3.5 text-sky-600 dark:text-sky-400", className)} />;

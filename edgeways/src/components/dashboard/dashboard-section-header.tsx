@@ -140,7 +140,7 @@ export function DashboardSectionHeader({
                 className={cn(
                   "shrink-0",
                   prominent ? "size-5" : "size-4",
-                  iconClassName ?? "text-primary"
+                  iconClassName ?? "text-primary-text"
                 )}
                 aria-hidden
               />

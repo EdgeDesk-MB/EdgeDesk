@@ -27,7 +27,7 @@ function actionTone(kind: OfferNextAction["kind"]): string {
       return "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300";
     case "place_qualifying":
     case "start_planned":
-      return "border-primary/30 bg-primary/10 text-primary";
+      return "border-primary/30 bg-primary/10 text-primary-text";
     default:
       return "border-border/60 bg-selection-subtle text-muted-foreground";
   }
@@ -71,7 +71,7 @@ export function DashboardNextActions({
         action={
           <Link
             href="/offers"
-            className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline"
+            className="shrink-0 text-xs font-medium text-primary-text underline-offset-2 hover:underline"
           >
             All offers →
           </Link>

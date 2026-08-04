@@ -57,16 +57,16 @@ export function DashboardBestAdvantage({
         href={href}
         className="group flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-3 transition-colors hover:border-primary/40 hover:bg-primary/10"
       >
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary-text">
           <Sparkles className="size-4" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             {best.bookmaker ? <VenueBadge name={best.bookmaker} /> : null}
-            <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-primary-text">
               Best next
             </span>
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
+            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary-text">
               {actionLabel}
             </span>
           </span>

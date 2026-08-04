@@ -426,7 +426,7 @@ function AgendaView({
               <h3
                 className={cn(
                   "flex-1 text-xs font-bold uppercase tracking-wide",
-                  day.isToday ? "text-primary" : "text-foreground"
+                  day.isToday ? "text-primary-text" : "text-foreground"
                 )}
               >
                 {day.label}
@@ -597,7 +597,7 @@ export function OfferDayCalendar({
         <div className="flex flex-col gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-primary" aria-hidden />
+              <CalendarDays className="size-4 text-primary-text" aria-hidden />
               <CardTitle section>Offer calendar</CardTitle>
             </div>
             <CardDescription>

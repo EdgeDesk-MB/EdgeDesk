@@ -175,7 +175,7 @@ export function BetLogTable({
                     {offer && (
                       <>
                         {" · "}
-                        <Link href="/offers" className="text-primary hover:underline">
+                        <Link href="/offers" className="text-primary-text hover:underline">
                           {offer.title.length > 28 ? `${offer.title.slice(0, 25)}…` : offer.title}
                         </Link>
                       </>
@@ -369,7 +369,7 @@ export function BetLogTable({
                   {offer && (
                     <>
                       {" · "}
-                      <Link href="/offers" className="text-primary hover:underline">
+                      <Link href="/offers" className="text-primary-text hover:underline">
                         {offer.title.length > 28 ? `${offer.title.slice(0, 25)}…` : offer.title}
                       </Link>
                     </>
@@ -586,7 +586,7 @@ function LinkOfferSelect({
   return (
     <Select onValueChange={(v) => onLink(Number(v))}>
       <SelectTrigger size="sm" className="h-7 w-full max-w-[11rem] text-[11px]">
-        <span className="flex items-center gap-1 text-primary">
+        <span className="flex items-center gap-1 text-primary-text">
           <Link2 className="size-3 shrink-0" /> Link to offer
         </span>
       </SelectTrigger>

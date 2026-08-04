@@ -23,7 +23,7 @@ export function EdgePanel({ backOdds, layOdds, stake }: EdgePanelProps) {
   return (
     <Card className="border-primary/20 bg-primary/[0.03]">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary-text">
           <Sparkles className="size-4" /> Your Edge
         </CardTitle>
       </CardHeader>

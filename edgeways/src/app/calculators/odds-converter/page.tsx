@@ -88,7 +88,7 @@ export default function OddsConverterPage() {
       <Card className="border-primary/20 bg-primary/[0.03]">
         <CardContent className="flex items-center justify-between pt-6">
           <div>
-            <div className="text-sm font-medium text-primary">Implied probability</div>
+            <div className="text-sm font-medium text-primary-text">Implied probability</div>
             <div className="text-xs text-muted-foreground">
               The chance the price says this outcome has - including the margin.
             </div>

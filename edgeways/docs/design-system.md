@@ -8,8 +8,10 @@ Defined in `src/app/globals.css`:
 
 | Token | Use |
 |-------|-----|
-| `--primary` | Brand yellow `#FFC71E` — primary buttons (bold ink text) in both themes |
+| `--primary` | Brand yellow `#FFC71E` — **button fills only** (`bg-primary`) in both themes |
+| `--primary-foreground` | Ink `#111` — text/icons on yellow button fills |
 | `--primary-hover` | Deepened yellow for primary / pagePrimary hover |
+| `--primary-text` | **Inline accent** on surfaces: ink `#111` in light, yellow in dark. Use `text-primary-text` for links, icons, offer titles — never yellow body text on white |
 | `--highlight` | Brand yellow `#FFC71E` — line-tab underlines and accent marks |
 | `--chip` / `--chip-foreground` | Ink `#111` plate + yellow type — active filter pills, segmented tabs, primary badges/counters |
 | `--selection-subtle` / `--selection-subdued` | Hover and selected list rows, header bands |
@@ -20,6 +22,8 @@ Defined in `src/app/globals.css`:
 | `--edge` | **Offer Edge / modelled EV / pro-tier signature** (violet). Race picks, recommended markers, Best plays. Never use for free-bet lots or pipeline stages |
 
 Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrome only.
+
+**Yellow on light surfaces.** Brand yellow fails contrast on white/page backgrounds. Rule: `bg-primary` for filled controls; `text-primary-text` for non-button accent text (links, icons, sublines). Do not use `text-primary` for body copy in light mode.
 
 **Edge vs free-bet violet.** Free-bet UI historically used ad-hoc `violet-*` Tailwind. New Edge chrome must use the `--edge` token (`text-edge`, `bg-edge/15`, …). Do not recolour free-bet Gift rows onto `--edge` — that colour means “modelled recommendation / Edge tier”, not “promo balance”.
 

@@ -85,7 +85,7 @@ function PageRow({
       ) : null}
       <Link
         href={href}
-        className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline"
+        className="inline-flex items-center gap-1 text-sm font-medium text-primary-text underline-offset-2 hover:underline"
       >
         {label}
         <ExternalLink className="size-3 shrink-0" aria-hidden />

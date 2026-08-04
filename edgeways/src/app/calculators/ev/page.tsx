@@ -130,7 +130,7 @@ export default function EvCalculatorPage() {
             <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-primary">Expected value</div>
+                  <div className="text-sm font-medium text-primary-text">Expected value</div>
                   <div className="text-xs text-muted-foreground">
                     Edge:{" "}
                     <span className="font-medium text-foreground">

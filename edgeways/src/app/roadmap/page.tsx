@@ -98,7 +98,7 @@ export default function RoadmapPage() {
           Roadmap data lives in{" "}
           <code className="rounded bg-muted px-1 text-xs">src/content/roadmap.ts</code> - update on
           each release. Full product vision in{" "}
-          <Link href="/help?guide=getting-started" className="text-primary hover:underline">
+          <Link href="/help?guide=getting-started" className="text-primary-text hover:underline">
             Help → Getting started
           </Link>{" "}
           and <code className="rounded bg-muted px-1 text-xs">PLAN.md</code>.

@@ -110,7 +110,7 @@ function FixtureActions({
         <>
           <Link
             href="/tracked-events"
-            className="mr-1 text-xs font-medium text-muted-foreground hover:text-primary"
+            className="mr-1 text-xs font-medium text-muted-foreground hover:text-primary-text"
           >
             Tracked
           </Link>

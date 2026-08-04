@@ -147,7 +147,7 @@ export default function TrackedEventsPage() {
           <>
             Matches and races you&apos;re following - live scores refresh automatically (~once a
             minute). Add more from the{" "}
-            <Link href="/fixtures" className="text-primary underline-offset-2 hover:underline">
+            <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
               Fixtures
             </Link>{" "}
             browser.

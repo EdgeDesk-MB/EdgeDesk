@@ -360,7 +360,7 @@ function TrackerContent() {
               {offerFilterId != null && Number.isFinite(offerFilterId) ? (
                 <button
                   type="button"
-                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
                   onClick={() => {
                     const params = new URLSearchParams(searchParams.toString());
                     params.delete("offer");

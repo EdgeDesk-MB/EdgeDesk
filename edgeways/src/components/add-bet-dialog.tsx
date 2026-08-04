@@ -1738,7 +1738,7 @@ export function AddBetDialog({
                     <SelectValue>
                       <span className="flex items-center gap-1.5">
                         {isBoost ? (
-                          <Zap className="size-3.5 shrink-0 text-primary" aria-hidden />
+                          <Zap className="size-3.5 shrink-0 text-primary-text" aria-hidden />
                         ) : isFreeBetBetType(calcBetType) || bookieFbAvailable > 0.001 ? (
                           <Gift
                             className={cn(
@@ -1759,7 +1759,7 @@ export function AddBetDialog({
                       <SelectItem key={m} value={m}>
                         <span className="flex items-center gap-1.5">
                           {m === "boost" ? (
-                            <Zap className="size-3.5 shrink-0 text-primary" aria-hidden />
+                            <Zap className="size-3.5 shrink-0 text-primary-text" aria-hidden />
                           ) : null}
                           {(m === "free_snr" || m === "free_sr") &&
                           bookieFbAvailable > 0.001 ? (

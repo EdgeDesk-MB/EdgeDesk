@@ -73,7 +73,7 @@ export default function ReleaseNotesPage() {
                       {entry.href ? (
                         <Link
                           href={entry.href}
-                          className="inline-flex items-center gap-0.5 align-baseline font-medium text-primary underline-offset-2 hover:underline"
+                          className="inline-flex items-center gap-0.5 align-baseline font-medium text-primary-text underline-offset-2 hover:underline"
                           aria-label={`Open ${entry.area}`}
                         >
                           {entry.area}

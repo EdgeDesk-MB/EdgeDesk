@@ -143,7 +143,7 @@ export default function AlertsPage() {
                     voided
                       ? "text-muted-foreground"
                       : isUnread
-                        ? "text-primary"
+                        ? "text-primary-text"
                         : "text-muted-foreground"
                   )}
                 />
@@ -175,7 +175,7 @@ export default function AlertsPage() {
                         e.stopPropagation();
                         void markOneRead(alert);
                       }}
-                      className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary-text"
                     >
                       <Check className="size-3.5" />
                       <span className="sr-only">Mark as read</span>

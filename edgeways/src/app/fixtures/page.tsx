@@ -15,7 +15,7 @@ export default function FixturesPage() {
           <>
             Browse today&apos;s live and upcoming football fixtures and horse racing racecards.
             Hit + to track - finished matches stay on{" "}
-            <Link href="/tracked-events" className="text-primary underline-offset-2 hover:underline">
+            <Link href="/tracked-events" className="text-primary-text underline-offset-2 hover:underline">
               Tracked Events
             </Link>
             .

@@ -103,7 +103,7 @@ export function PwaInstallPrompt() {
           ) : (
             <>
               Installing needs a secure address - one-time setup in{" "}
-              <Link href="/help?guide=mobile" className="font-medium text-primary underline-offset-2 hover:underline">
+              <Link href="/help?guide=mobile" className="font-medium text-primary-text underline-offset-2 hover:underline">
                 Help → On your phone
               </Link>
               .

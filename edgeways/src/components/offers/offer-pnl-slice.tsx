@@ -259,7 +259,7 @@ export function OfferPnlSlice({
         <div className="flex items-start justify-between gap-2">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Tag className="size-4 text-primary" />
+              <Tag className="size-4 text-primary-text" />
               Offer P&amp;L
             </CardTitle>
             <CardDescription compact>
@@ -268,7 +268,7 @@ export function OfferPnlSlice({
           </div>
           <Link
             href="/offers"
-            className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline"
+            className="shrink-0 text-xs font-medium text-primary-text underline-offset-2 hover:underline"
           >
             All offers →
           </Link>

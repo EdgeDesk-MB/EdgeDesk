@@ -58,7 +58,7 @@ export function MonthlyPnlSection({
     const emptyBody = (
       <div className="py-6 text-center text-sm text-muted-foreground">
         No settled bets yet.{" "}
-        <Link href="/tracker" className="font-medium text-primary underline-offset-2 hover:underline">
+        <Link href="/tracker" className="font-medium text-primary-text underline-offset-2 hover:underline">
           Log your first bet
         </Link>
         .
@@ -198,7 +198,7 @@ export function MonthlyPnlSection({
             </div>
             <Link
               href="/tracker?tab=pnl"
-              className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline"
+              className="shrink-0 text-xs font-medium text-primary-text underline-offset-2 hover:underline"
             >
               Details →
             </Link>

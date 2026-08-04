@@ -261,7 +261,7 @@ export const LivePnlChart = memo(function LivePnlChart({
                   mini ? "text-xs" : "text-sm"
                 )}
               >
-                <TrendingUp className="size-4 text-primary" />
+                <TrendingUp className="size-4 text-primary-text" />
                 Running profit
               </CardTitle>
               {!mini && (

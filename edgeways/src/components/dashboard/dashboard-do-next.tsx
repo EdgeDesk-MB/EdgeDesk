@@ -162,7 +162,7 @@ function DoNextCard({
                 Convert
               </Button>
             ) : onOpen && item.offerId != null ? (
-              <span className="text-[11px] font-medium text-primary opacity-70 transition-opacity group-hover:opacity-100">
+              <span className="text-[11px] font-medium text-primary-text opacity-70 transition-opacity group-hover:opacity-100">
                 Open →
               </span>
             ) : null}
