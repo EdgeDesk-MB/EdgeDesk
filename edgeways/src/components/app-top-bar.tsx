@@ -23,14 +23,14 @@ function BrandLink({ className }: { className?: string }) {
   return (
     <Link
       href="/"
+      aria-label="Edgeways home"
       className={cn(
-        "flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90",
+        "flex shrink-0 items-center transition-opacity hover:opacity-90",
         appNavInset,
         className
       )}
     >
       <EdgewaysLogoIcon />
-      <span className="truncate text-base font-extrabold tracking-tight">Edgeways</span>
     </Link>
   );
 }

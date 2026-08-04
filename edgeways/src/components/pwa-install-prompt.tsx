@@ -89,9 +89,7 @@ export function PwaInstallPrompt() {
       role="status"
       className="fixed inset-x-3 bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+4.5rem)] z-30 flex items-center gap-3 rounded-lg border border-border/80 bg-popover p-3 text-sm text-popover-foreground shadow-lg"
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-topbar">
-        <EdgewaysLogoIcon className="size-5 text-topbar-foreground" />
-      </span>
+      <EdgewaysLogoIcon className="size-9 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="font-medium">Add Edgeways to your Home Screen</p>
         <p className="mt-0.5 text-xs leading-snug text-muted-foreground">

@@ -151,10 +151,8 @@ function MobileNavDrawer() {
           aria-describedby={undefined}
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-3">
-            <span className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-md bg-topbar">
-                <EdgewaysLogoIcon className="size-4 text-topbar-foreground" />
-              </span>
+            <span className="flex items-center gap-2.5">
+              <EdgewaysLogoIcon className="size-7" />
               <DialogPrimitive.Title className="text-sm font-bold">
                 Edgeways
               </DialogPrimitive.Title>

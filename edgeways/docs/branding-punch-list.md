@@ -4,13 +4,12 @@ Working list for the brand pass, split into **what Sam provides** (design assets
 decisions) and **what gets wired in code** once assets land. Current state verified
 2026-08-04 against `src/app/layout.tsx`, `src/app/manifest.ts`, `public/`, `globals.css`.
 
-> **2026-08-04: the app is now Edgeways** (lowercase "edgeways" wordmark). First real
-> brand drop landed: **yellow `#FFC71E` + ink `#111111`**, pulse-line mark derived from
-> `brand/edgeways-lockup.png`. `--primary`/`--ring`/`--topbar` re-tokenised, icon set
-> (`src/app/icon.png`, `apple-icon.png`, maskable `icon-192/512.png`, `badge-192.png`,
-> `public/brand/mark.png`) regenerated via `node scripts/generate-brand-assets.mjs`.
-> The interim bolt is deleted. INTERIM QUALITY: the lockup source is ~105px tall and
-> its export dropped the dark wordmark layer — master artwork still needed (§1).
+> **2026-08-04: Edgeways brand mark landed.** Yellow bolt on ink is the sole top-bar
+> logo (text wordmark removed). Masters in `brand/masters/`: `favicon.png`,
+> `square.png`, `notification.png`. Icons regenerated via
+> `node scripts/generate-brand-assets.mjs`. In-app mark is a 7-point SVG path traced
+> from the notification silhouette (`edgeways-logo-icon.tsx` /
+> `public/brand/mark.svg`). Optional: supply a design-tool SVG to replace the trace.
 
 ## 1. Logo & brand mark (Sam provides)
 
