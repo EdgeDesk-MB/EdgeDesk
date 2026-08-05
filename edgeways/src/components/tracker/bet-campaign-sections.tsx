@@ -13,7 +13,6 @@ import { formatOfferStatusDisplay } from "@/lib/offers/offer-expiry";
 import { isOfferExpired, offerInactiveFigureClass } from "@/lib/offers/offer-inactive-ui";
 import { campaignHeaderBand } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Gift, Tag } from "lucide-react";
 
 export function BetCampaignSections({
   groups,
@@ -53,11 +52,6 @@ export function BetCampaignSections({
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                {group.offerId != null ? (
-                  <Gift className="size-3.5 shrink-0 text-primary-text" aria-hidden />
-                ) : (
-                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                )}
                 {group.offer?.bookmaker ? <VenueBadge name={group.offer.bookmaker} /> : null}
                 {group.offerId != null ? (
                   <Link

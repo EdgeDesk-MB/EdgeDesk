@@ -26,7 +26,7 @@ import {
   type ChartCasinoSettlement,
   type PnlAdjustment,
 } from "@/lib/pnl/chart-bet-markers";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
 
 export interface LivePnlPoint {
   time: number;
@@ -210,16 +210,14 @@ export const LivePnlChart = memo(function LivePnlChart({
                   {PNL_BASES.map((b) => (
                     <Tooltip key={b.key}>
                       <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className={cn(
-                            filterPillState(pnlBasis === b.key),
-                            "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
-                          )}
+                        <FilterPill
+                          compact
+                          active={pnlBasis === b.key}
                           onClick={() => setPnlBasis(b.key)}
+                          className="shrink-0 whitespace-nowrap"
                         >
                           {b.label}
-                        </button>
+                        </FilterPill>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
                         {b.key === "gross"
@@ -232,20 +230,18 @@ export const LivePnlChart = memo(function LivePnlChart({
               </TooltipProvider>
               <div className="flex justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {CHART_WINDOWS.map((w) => (
-                  <button
+                  <FilterPill
                     key={w.label}
-                    type="button"
+                    compact
+                    active={w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs}
+                    onClick={() => setChartWindowSecs(w.secs)}
                     className={cn(
-                      filterPillState(
-                        w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs
-                      ),
-                      "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none",
+                      "shrink-0 whitespace-nowrap",
                       w.desktopOnly && "hidden sm:inline-flex"
                     )}
-                    onClick={() => setChartWindowSecs(w.secs)}
                   >
                     {w.label}
-                  </button>
+                  </FilterPill>
                 ))}
               </div>
             </div>

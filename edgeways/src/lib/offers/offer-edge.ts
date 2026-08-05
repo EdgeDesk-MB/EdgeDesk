@@ -278,7 +278,7 @@ function buildWarnings(input: {
   }
 
   // Same fallback `raceConfidence` uses. Reading only the runner would let a
-  // "prices are estimates" warning sit next to a green "Live odds" chip.
+  // "prices are estimates" warning sit next to a green "Live back & lay" chip.
   if ((runner.detail.exchangeSource ?? race.exchangeSource) !== "live") {
     warnings.push("Prices are estimates, no live exchange match for this race");
   } else if (triggerBasis === "heuristic") {
@@ -373,6 +373,8 @@ export function buildOfferEdgePlays(
         retention: ev.retention,
         retentionSampleSize: opts.retentionSampleSize ?? 0,
         confidence: raceConfidence(race, runner.detail, bookIsSharp),
+        oddsSource: runner.detail.oddsSource ?? race.oddsSource,
+        exchangeSource: runner.detail.exchangeSource ?? race.exchangeSource,
         reasons: buildReasons({
           race,
           rules,

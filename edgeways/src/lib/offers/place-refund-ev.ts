@@ -41,11 +41,13 @@ export function resolveOfferConfidence(
   oddsSource?: OddsSource,
   exchangeSource?: ExchangeOddsSource
 ): OfferConfidence {
-  if (oddsSource === "proxy") return "estimate";
-  if (oddsSource === "manual" && exchangeSource === "live") return "mixed";
+  // Manual prices are never fully live, even when the other side is.
   if (oddsSource === "manual") return "mixed";
-  if (exchangeSource === "live" && oddsSource === "live") return "live";
-  if (exchangeSource === "live" || oddsSource === "live") return "mixed";
+  const backLive = oddsSource === "live";
+  const layLive = exchangeSource === "live";
+  if (backLive && layLive) return "live";
+  // One live side (including live lay with proxy/snapshot back) is "mixed".
+  if (backLive || layLive) return "mixed";
   return "estimate";
 }
 
@@ -119,15 +121,39 @@ export function placeRefundRunnerEv(input: PlaceRefundEvInput): PlaceRefundEvRes
   };
 }
 
+/** Filter-chip wording for the three confidence tiers. */
 export function formatConfidenceLabel(c: OfferConfidence): string {
   switch (c) {
     case "live":
-      return "Live odds";
+      return "Live back & lay";
     case "mixed":
-      return "Partial live";
+      return "One side live";
     case "estimate":
-      return "Proxy estimate";
+      return "Estimated";
   }
+}
+
+/**
+ * What the user can trust about the prices on a play.
+ *
+ * Prefers per-side provenance when present; falls back to the tier label when
+ * only a confidence bucket is known (e.g. filter chips, demoted races).
+ */
+export function formatPriceTrustLabel(
+  oddsSource?: OddsSource,
+  exchangeSource?: ExchangeOddsSource,
+  confidence?: OfferConfidence
+): string {
+  if (oddsSource === "manual") return "Your prices";
+
+  const backLive = oddsSource === "live";
+  const layLive = exchangeSource === "live";
+  if (backLive && layLive) return "Live back & lay";
+  if (layLive) return "Live lay only";
+  if (backLive) return "Live back only";
+
+  if (confidence) return formatConfidenceLabel(confidence);
+  return "Estimated";
 }
 
 export function formatOddsSourceLabel(

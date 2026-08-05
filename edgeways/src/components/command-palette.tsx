@@ -81,7 +81,7 @@ export function CommandPalette() {
           <CommandItem onSelect={() => run(() => openMatchedCalculator())}>
             <Plus /> Matched calculator
           </CommandItem>
-          <CommandItem onSelect={() => run(openAddBalance)}>
+          <CommandItem onSelect={() => run(() => openAddBalance())}>
             <Wallet /> Adjust balance
           </CommandItem>
           <CommandItem onSelect={() => run(openCasinoLog)}>

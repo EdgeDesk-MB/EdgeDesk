@@ -12,9 +12,9 @@ import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatDecimalOdds } from "@/lib/racing/odds";
 import { formatClockTime } from "@/lib/time-format";
 import { RegionFlag } from "@/components/region-flag";
-import { captionHeading, edgePanel, listRowInteractive } from "@/lib/ui/surface-styles";
+import { captionHeading, edgeNavTag, edgePanel, listRowInteractive } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
+import { AlertTriangle, ChevronRight, Zap } from "lucide-react";
 
 const MAX_PLAYS = 3;
 
@@ -34,7 +34,12 @@ function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeD
               <RegionFlag code={play.region} />
               {play.course}
             </span>
-            <OfferConfidenceBadge confidence={play.confidence} dataSource={dataSource} />
+            <OfferConfidenceBadge
+              confidence={play.confidence}
+              oddsSource={play.oddsSource}
+              exchangeSource={play.exchangeSource}
+              dataSource={dataSource}
+            />
             <span className="ml-auto inline-flex items-baseline gap-1 text-xs">
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">EV</span>
               <MoneyFlow value={play.totalEv} signColor signDisplay className="font-semibold" />
@@ -49,9 +54,13 @@ function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeD
           </p>
 
           {play.reasons.length > 0 && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {play.reasons.join(" · ")}
-            </p>
+            <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+              {play.reasons.map((reason) => (
+                <li key={reason} className="max-w-full">
+                  {reason}
+                </li>
+              ))}
+            </ul>
           )}
 
           {play.warnings.map((warning) => (
@@ -108,8 +117,9 @@ export function OfferEdgePanel({
   return (
     <div className={cn(edgePanel, "overflow-hidden")}>
       <div className="flex items-center gap-1.5 border-b border-border/50 px-2.5 py-1.5">
-        <Sparkles className="size-3.5 text-edge" aria-hidden />
-        <span className={cn(captionHeading, "text-edge")}>Best plays today</span>
+        <Zap className="size-3.5 text-edge" aria-hidden />
+        <span className={edgeNavTag}>Edge</span>
+        <span className={cn(captionHeading, "text-edge")}>Today</span>
       </div>
       <ul>
         {plays.map((play) => (

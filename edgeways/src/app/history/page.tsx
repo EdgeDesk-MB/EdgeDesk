@@ -15,7 +15,7 @@ import {
   type HistoryFilter,
 } from "@/lib/history-display";
 import { cn } from "@/lib/utils";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SportIcon } from "@/components/sport-icon";
 import { Dices, History as HistoryIcon, LayoutList, Rows3, Zap } from "lucide-react";
@@ -166,15 +166,10 @@ export default function HistoryPage() {
         toolbar={
           <>
             {HISTORY_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => changeFilter(f.id)}
-                className={filterPillState(filter === f.id)}
-              >
+              <FilterPill key={f.id} active={filter === f.id} onClick={() => changeFilter(f.id)}>
                 {historyFilterIcon(f.id)}
                 {f.label}
-              </button>
+              </FilterPill>
             ))}
           </>
         }

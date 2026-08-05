@@ -61,6 +61,18 @@ export async function PATCH(req: Request) {
   if (typeof body.monthlyProfitTarget === "number" || body.monthlyProfitTarget === null) {
     patch.monthlyProfitTarget = body.monthlyProfitTarget;
   }
+  if (typeof body.brandAccentPreset === "string") {
+    patch.brandAccentPreset = body.brandAccentPreset;
+  }
+  if (typeof body.brandAccentHex === "string") {
+    patch.brandAccentHex = body.brandAccentHex;
+  }
+  if (typeof body.uiFont === "string") {
+    patch.uiFont = body.uiFont;
+  }
+  if (typeof body.headerPattern === "string") {
+    patch.headerPattern = body.headerPattern;
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

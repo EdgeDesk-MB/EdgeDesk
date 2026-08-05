@@ -1,7 +1,11 @@
 /**
  * Client-safe casino offer campaign types (K1, no SQLite / server services).
  */
-import type { CasinoOfferComponentRow, CasinoOfferRow } from "@/lib/db/schema";
+import type {
+  CasinoOfferComponentRow,
+  CasinoOfferRow,
+  UserReminderRow,
+} from "@/lib/db/schema";
 import type { EvBasis } from "@/lib/offers/advantage";
 import type { OfferRecurrenceMeta } from "@/lib/services/offers.types";
 
@@ -13,4 +17,6 @@ export interface CasinoOfferSummary extends CasinoOfferRow {
   evBasis: EvBasis;
   /** K3: recurring series meta when this row is a materialised instance */
   recurrence?: OfferRecurrenceMeta | null;
+  /** Pending user reminders linked to this campaign (not yet fired/cancelled) */
+  reminders?: UserReminderRow[];
 }

@@ -20,7 +20,7 @@ import { buildHistoryContext } from "@/lib/history-display";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import { dashboardPanelBody, dashboardSection } from "@/lib/ui/dashboard-layout";
 import { cardInsetX } from "@/lib/ui/layout-spacing";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { cn } from "@/lib/utils";
 
 type FeedFilter = "all" | "bets" | "casino";
@@ -109,17 +109,15 @@ export function DashboardFeedPanel({
       <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
         <div className="flex justify-end gap-1 py-2">
           {FEED_FILTERS.map((f) => (
-            <button
+            <FilterPill
               key={f.id}
-              type="button"
-              className={cn(
-                filterPillState(feedFilter === f.id),
-                "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
-              )}
+              compact
+              active={feedFilter === f.id}
               onClick={() => setFeedFilter(f.id)}
+              className="shrink-0 whitespace-nowrap"
             >
               {f.label}
-            </button>
+            </FilterPill>
           ))}
         </div>
       </div>

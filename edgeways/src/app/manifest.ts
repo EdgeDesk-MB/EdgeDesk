@@ -8,9 +8,10 @@ export default function manifest(): MetadataRoute.Manifest {
       "Calculators, live events and real-time profit tracking for matched betting",
     start_url: "/",
     display: "standalone",
-    // Mirrors --topbar (#FFC71E brand yellow) - manifests cannot reference CSS vars.
+    // Ink chrome — matches viewport themeColor / topbar stripe so Arc & PWAs
+    // don’t tint from the yellow dark-mode header plate.
     background_color: "#111111",
-    theme_color: "#FFC71E",
+    theme_color: "#111111",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },

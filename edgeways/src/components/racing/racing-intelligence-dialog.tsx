@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,9 +30,22 @@ import { formatDecimalOdds } from "@/lib/racing/odds";
 import { formatClockTime } from "@/lib/time-format";
 import type { SuggestedRace, SuggestedRunner } from "@/lib/racing-desk/types";
 import { RegionFlag } from "@/components/region-flag";
-import { filterPillState, listRowInteractive } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
+import {
+  edgeNavTag,
+  filterPillCountState,
+  listRowInteractive,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Gift, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Gift,
+  Settings2,
+  Zap,
+} from "lucide-react";
 
 export interface RacingIntelligenceDialogProps {
   open: boolean;
@@ -138,6 +150,7 @@ function SuggestionRow({
                 <OfferConfidenceBadge
                   confidence={suggestion.confidence}
                   oddsSource={suggestion.oddsSource}
+                  exchangeSource={suggestion.exchangeSource}
                   dataSource={dataSource}
                 />
                 {suggestion.topEv != null && (
@@ -251,6 +264,7 @@ function SuggestionRow({
                   <OfferConfidenceBadge
                     confidence={runner.confidence}
                     oddsSource={runner.oddsSource}
+                    exchangeSource={runner.exchangeSource}
                     dataSource={dataSource}
                   />
                 </span>
@@ -284,8 +298,8 @@ function SuggestionRow({
   );
 }
 
-// Labels come from the same helper the chips use, so a filter can never name a
-// tier differently from the badge it filters on.
+// Filter pills name the confidence bucket; row badges name the specific
+// provenance (e.g. "One side live" filters "Live lay only" / "Live back only").
 const CONFIDENCE_FILTERS: Array<{ id: ConfidenceFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "live", label: formatConfidenceLabel("live") },
@@ -431,13 +445,13 @@ export function RacingIntelligenceDialog({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
-                <Sparkles className="size-4 text-edge" />
+                <Zap className="size-4 text-edge" />
                 Race picks
               </DialogTitle>
               <DialogDescription className="mt-1 text-[11px]">
-                Best race and horse for this offer on {dateLabel}
+                Edge race and horse for this offer on {dateLabel}
                 {dataSource === "demo" && (
-                  <span className="ml-1 text-edge">· demo data</span>
+                  <span className="ml-1 text-edge"> (demo data)</span>
                 )}
               </DialogDescription>
             </div>
@@ -477,27 +491,28 @@ export function RacingIntelligenceDialog({
                 </Select>
               ) : (
                 <div className="flex flex-wrap gap-1">
-                  {offerOptions.map((offer) => (
-                    <button
-                      key={offer.id}
-                      type="button"
-                      onClick={() => selectOffer(offer.id)}
-                      className={cn(
-                        filterPillState(activeOfferId === offer.id),
-                        "max-w-[260px] text-[10px]"
-                      )}
-                      title={offer.title}
-                    >
-                      <span className="truncate">
-                        {offer.bookmaker
-                          ? `${offer.bookmaker}: ${offer.title}`
-                          : offer.title}
-                        <span className="ml-1 tabular-nums text-muted-foreground">
-                          ({offer.pickCount})
+                  {offerOptions.map((offer) => {
+                    const active = activeOfferId === offer.id;
+                    return (
+                      <FilterPill
+                        key={offer.id}
+                        active={active}
+                        onClick={() => selectOffer(offer.id)}
+                        hasCount
+                        className="max-w-[260px] text-[10px]"
+                        title={offer.title}
+                      >
+                        <span className="truncate">
+                          {offer.bookmaker
+                            ? `${offer.bookmaker}: ${offer.title}`
+                            : offer.title}
                         </span>
-                      </span>
-                    </button>
-                  ))}
+                        <span className={filterPillCountState(active)}>
+                          {offer.pickCount}
+                        </span>
+                      </FilterPill>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -533,16 +548,18 @@ export function RacingIntelligenceDialog({
               {CONFIDENCE_FILTERS.map((f) => {
                 const count = tierCounts[f.id];
                 if (f.id !== "all" && count === 0) return null;
+                const active = confidenceFilter === f.id;
                 return (
-                  <button
+                  <FilterPill
                     key={f.id}
-                    type="button"
+                    active={active}
                     onClick={() => setConfidenceFilter(f.id)}
-                    className={cn(filterPillState(confidenceFilter === f.id), "text-[10px]")}
+                    hasCount
+                    className="text-[10px]"
                   >
                     {f.label}
-                    <span className="tabular-nums text-muted-foreground">({count})</span>
-                  </button>
+                    <span className={filterPillCountState(active)}>{count}</span>
+                  </FilterPill>
                 );
               })}
             </div>
@@ -552,7 +569,7 @@ export function RacingIntelligenceDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
           {sorted.length === 0 ? (
             <div className="px-2 py-12 text-center text-sm text-muted-foreground">
-              <Sparkles className="mx-auto mb-2 size-8 text-edge/40" />
+              <Zap className="mx-auto mb-2 size-8 text-edge/40" />
               <p className="font-medium text-foreground">
                 {suggestions.length === 0 ? "No picks yet" : "No picks in this tier"}
               </p>
@@ -594,36 +611,31 @@ export function RacingIntelligenceDialog({
 export function RacingIntelligenceTrigger({
   count,
   topEv,
-  topEvConfidence,
-  dataSource,
   onClick,
 }: {
   count: number;
   /** Best expected value across the picks, in pounds. */
   topEv?: number;
-  /** How much that best figure is worth trusting. */
-  topEvConfidence?: OfferConfidence;
-  dataSource?: RacingIntelligenceDialogProps["dataSource"];
   onClick: () => void;
 }) {
   const showEv = count > 0 && topEv != null && topEv > 0;
   return (
-    <Button type="button" variant="outline" {...pageSecondaryButtonProps} className="gap-1.5" onClick={onClick}>
-      <Sparkles className="size-4 text-edge" />
+    <Button
+      type="button"
+      variant="outline"
+      {...pageSecondaryButtonProps}
+      size="lg"
+      className="gap-2"
+      onClick={onClick}
+    >
+      <Zap className="size-4 text-edge" />
       Race picks
-      {count > 0 && (
-        <Badge variant="secondary" className="h-5 min-w-5 px-1.5 tabular-nums">
-          {count}
-        </Badge>
-      )}
       {showEv && (
-        <span className="hidden items-center gap-1 text-xs sm:inline-flex">
-          <span className={`tabular-nums ${moneyPositiveClass}`}>
-            · best +£{topEv.toFixed(2)}
+        <span className="hidden items-center gap-1.5 sm:inline-flex">
+          <span className={edgeNavTag}>Edge</span>
+          <span className={cn("text-xs font-semibold tabular-nums", moneyPositiveClass)}>
+            +£{topEv.toFixed(2)}
           </span>
-          {(topEvConfidence || dataSource === "demo") && (
-            <OfferConfidenceBadge confidence={topEvConfidence} dataSource={dataSource} />
-          )}
         </span>
       )}
     </Button>
@@ -635,57 +647,45 @@ export type DeskRaceFilter = "all" | "qualifying" | "recommended";
 export function DeskFilterPills({
   filter,
   onFilterChange,
-  advancedMode,
-  onAdvancedModeChange,
+  onSettingsClick,
 }: {
   filter: DeskRaceFilter;
   onFilterChange: (v: DeskRaceFilter) => void;
-  advancedMode: boolean;
-  onAdvancedModeChange: (v: boolean) => void;
+  onSettingsClick: () => void;
 }) {
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 ring-1 ring-border/45">
       <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onFilterChange("all")}
-          className={filterPillState(filter === "all")}
-        >
+        <FilterPill active={filter === "all"} onClick={() => onFilterChange("all")}>
           All races
-        </button>
-        <button
-          type="button"
+        </FilterPill>
+        <FilterPill
+          active={filter === "qualifying"}
           onClick={() => onFilterChange("qualifying")}
-          className={filterPillState(filter === "qualifying")}
         >
           Qualifying
-        </button>
-        <button
-          type="button"
+        </FilterPill>
+        <FilterPill
+          active={filter === "recommended"}
           onClick={() => onFilterChange("recommended")}
-          className={cn(
-            filterPillState(filter === "recommended"),
-            filter === "recommended" && "ring-1 ring-edge/40"
-          )}
         >
-          <Sparkles
+          <Zap
             className={cn("size-3", filter !== "recommended" && "text-edge")}
             aria-hidden
           />
-          Recommended
-        </button>
+          Edge
+        </FilterPill>
       </div>
-      <div className="flex items-center gap-2">
-        <Label htmlFor="desk-advanced-mode" className="text-xs font-medium text-muted-foreground">
-          Advanced mode
-        </Label>
-        <Switch
-          id="desk-advanced-mode"
-          size="sm"
-          checked={advancedMode}
-          onCheckedChange={onAdvancedModeChange}
-        />
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5"
+        onClick={onSettingsClick}
+      >
+        <Settings2 className="size-3.5" />
+        Settings
+      </Button>
     </div>
   );
 }

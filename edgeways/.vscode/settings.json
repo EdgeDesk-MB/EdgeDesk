@@ -1,0 +1,8 @@
+{
+    "roo-cline.ripgrepPath": "/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules.asar.unpacked/@vscode/ripgrep/bin/rg",
+    "todo-tree.ripgrep": "/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules.asar.unpacked/@vscode/ripgrep/bin/rg",
+    "roo-cline.requestTimeout": 300000,
+    "roo-cline.openAiCustomModelId": "bb-qwen-14b:latest",
+    "roo-cline.openAiBaseUrl": "http://192.168.50.54:11434/v1",
+    "todo-tree.ripgrep.ripgrep": "/Applications/Visual Studio Code.app/Contents/Resources/app/node_modules.asar.unpacked/@vscode/ripgrep/bin/rg"
+}

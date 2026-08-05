@@ -32,6 +32,12 @@ import { Plus, Trash2 } from "lucide-react";
 
 type FundKind = "cash" | "free_bet";
 
+export type AddBalanceOpenOpts = {
+  accountId?: number;
+  accountName?: string;
+  amount?: number;
+};
+
 interface TopUpRow {
   accountId: number;
   amount: number;
@@ -39,34 +45,72 @@ interface TopUpRow {
   fundKind: FundKind;
 }
 
+function resolveSeedAccount(
+  accounts: AccountBalance[],
+  initial?: AddBalanceOpenOpts | null
+): AccountBalance | undefined {
+  if (initial?.accountId != null) {
+    const byId = accounts.find((a) => a.id === initial.accountId);
+    if (byId) return byId;
+    // Prefer name match over a wrong fallback while accounts catch up after ensure.
+    const q = initial.accountName?.trim().toLowerCase();
+    if (q) {
+      return accounts.find((a) => a.name.toLowerCase() === q);
+    }
+    return undefined;
+  }
+  const q = initial?.accountName?.trim().toLowerCase();
+  if (q) {
+    return accounts.find((a) => a.name.toLowerCase() === q);
+  }
+  return accounts[0];
+}
+
 export function AddBalanceDialog({
   open,
   onOpenChange,
   accounts,
   onSaved,
+  initial,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: AccountBalance[];
   onSaved: () => void;
+  initial?: AddBalanceOpenOpts | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Gate on open: the form renders DialogContent itself, so it must be
           unmounted explicitly for state to reset between opens. */}
       {open ? (
-        <AddBalanceForm accounts={accounts} onOpenChange={onOpenChange} onSaved={onSaved} />
+        <AddBalanceForm
+          accounts={accounts}
+          onOpenChange={onOpenChange}
+          onSaved={onSaved}
+          initial={initial}
+        />
       ) : null}
     </Dialog>
   );
 }
 
-function seedRow(account: AccountBalance | undefined, mode: string): TopUpRow[] {
+function seedRow(
+  account: AccountBalance | undefined,
+  mode: string,
+  amount?: number
+): TopUpRow[] {
   if (!account) return [];
+  const seededAmount =
+    mode === "adjustment"
+      ? roundMoney(account.balance)
+      : amount != null && amount > 0
+        ? roundMoney(amount)
+        : 0;
   return [
     {
       accountId: account.id,
-      amount: mode === "adjustment" ? roundMoney(account.balance) : 0,
+      amount: seededAmount,
       note: "",
       fundKind: "cash",
     },
@@ -82,25 +126,34 @@ function AddBalanceForm({
   accounts,
   onOpenChange,
   onSaved,
+  initial,
 }: {
   accounts: AccountBalance[];
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  initial?: AddBalanceOpenOpts | null;
 }) {
   const { exchanges } = useExchanges();
+  const seedAccount = resolveSeedAccount(accounts, initial);
   const [mode, setMode] = useState<"top_up" | "withdrawal" | "adjustment">("top_up");
-  const [rows, setRows] = useState<TopUpRow[]>(() => seedRow(accounts[0], "top_up"));
+  const [rows, setRows] = useState<TopUpRow[]>(() =>
+    seedRow(seedAccount, "top_up", initial?.amount)
+  );
   const [affectPnl, setAffectPnl] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [showAddAccount, setShowAddAccount] = useState(
+    () => !seedAccount && Boolean(initial?.accountName?.trim())
+  );
   const [newType, setNewType] = useState<"bookie" | "exchange" | "bank">("bookie");
-  const [newName, setNewName] = useState("");
+  const [newName, setNewName] = useState(() => initial?.accountName?.trim() ?? "");
   const [newExchangeId, setNewExchangeId] = useState<string>("");
   const [exchangeCustom, setExchangeCustom] = useState(false);
-  const [openingBalance, setOpeningBalance] = useState(0);
+  const [openingBalance, setOpeningBalance] = useState(() =>
+    initial?.amount != null && initial.amount > 0 ? roundMoney(initial.amount) : 0
+  );
 
-  const effectiveRows = rows.length > 0 ? rows : seedRow(accounts[0], mode);
+  const effectiveRows = rows.length > 0 ? rows : seedRow(seedAccount, mode, initial?.amount);
 
   /** Mode change reshapes every row - amounts reset (or mirror balances). */
   function changeMode(next: typeof mode) {

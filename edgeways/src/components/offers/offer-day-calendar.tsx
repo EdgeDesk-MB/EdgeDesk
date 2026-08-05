@@ -22,11 +22,12 @@ import {
   offerCategoryFromSport,
   offerCategoryLabel,
 } from "@/lib/offers/offer-categories";
+import { FilterPill } from "@/components/ui/filter-pill";
 import {
   filterPillCountState,
   filterPillGroup,
-  filterPillState,
   offerCalendarCardShell,
+  offerCampaignCardShell,
 } from "@/lib/ui/surface-styles";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
@@ -152,24 +153,21 @@ function PriorityFilterBar({
       role="group"
       aria-label="Filter by priority"
     >
-      <button
-        type="button"
-        onClick={toggleAll}
-        className={cn(filterPillState(showAll), "text-[11px]")}
-      >
+      <FilterPill active={showAll} onClick={toggleAll} className="text-[11px]">
         All
-      </button>
+      </FilterPill>
       {ALL_PRIORITIES.map((priority) => {
         const active = !showAll && selected!.has(priority);
         const p = priorityStyles(priority);
         const count = counts[priority];
         const hasCount = count > 0;
         return (
-          <button
+          <FilterPill
             key={priority}
-            type="button"
+            active={active}
             onClick={() => togglePriority(priority)}
-            className={cn(filterPillState(active, { hasCount }), "text-[11px]")}
+            hasCount={hasCount}
+            className="text-[11px]"
             title={`${p.label} priority`}
           >
             <span className={cn("size-1.5 shrink-0 rounded-full", p.dot)} aria-hidden />
@@ -177,7 +175,7 @@ function PriorityFilterBar({
             {hasCount ? (
               <span className={filterPillCountState(active)}>{count}</span>
             ) : null}
-          </button>
+          </FilterPill>
         );
       })}
     </div>
@@ -243,26 +241,39 @@ function calendarHeaderTint(offer: OfferSummary, remainingEv: number): string | 
 function CalendarItemCard({
   item,
   variant = "board",
+  /** Priority bar + EV header tint: today column, or Ends tomorrow. */
+  priorityChrome = false,
   onOfferClick,
 }: {
   item: OfferCalendarItem;
   variant?: "board" | "agenda";
+  priorityChrome?: boolean;
   onOfferClick?: (offer: OfferSummary) => void;
 }) {
   const p = priorityStyles(item.priority);
   const expiry = formatOfferDaysLeftLabel(item.daysLeft);
-  const headerTint = calendarHeaderTint(item.offer, item.remainingEv);
+  const headerTint = priorityChrome
+    ? calendarHeaderTint(item.offer, item.remainingEv)
+    : null;
   const categoryId = offerCategoryFromSport(item.offer.sport);
   const categoryLabel = offerCategoryLabel(item.offer.sport);
+  // Bar-offset inset ring only when the priority bar is present.
+  const shell = priorityChrome ? offerCalendarCardShell : offerCampaignCardShell;
 
   return (
     <button
       type="button"
       onClick={() => onOfferClick?.(item.offer)}
-      className={cn(offerCalendarCardShell, "w-full")}
-      aria-label={`View campaign: ${item.offer.title} (${p.label} priority)`}
+      className={cn(shell, "w-full")}
+      aria-label={
+        priorityChrome
+          ? `View campaign: ${item.offer.title} (${p.label} priority)`
+          : `View campaign: ${item.offer.title}`
+      }
     >
-      <span className={cn("z-10 w-1 shrink-0 self-stretch", p.bar)} aria-hidden />
+      {priorityChrome ? (
+        <span className={cn("z-10 w-1 shrink-0 self-stretch", p.bar)} aria-hidden />
+      ) : null}
       <div
         className={cn(
           "relative z-[2] min-w-0 flex-1",
@@ -373,7 +384,15 @@ function BoardView({
             ) : (
               col.items.map((item) => (
                 <li key={`${col.id}-${item.offerId}-${item.kind}`}>
-                  <CalendarItemCard item={item} variant="board" onOfferClick={onOfferClick} />
+                  <CalendarItemCard
+                    item={item}
+                    variant="board"
+                    priorityChrome={
+                      col.id === "today" ||
+                      (item.daysLeft != null && item.daysLeft < 2)
+                    }
+                    onOfferClick={onOfferClick}
+                  />
                 </li>
               ))
             )}
@@ -459,6 +478,7 @@ function AgendaView({
                     <CalendarItemCard
                       item={item}
                       variant="agenda"
+                      priorityChrome={day.isToday || day.isTomorrow}
                       onOfferClick={onOfferClick}
                     />
                   </li>
@@ -534,28 +554,22 @@ export function OfferDayCalendar({
         onChange={changePriorityFilter}
       />
       <div className={filterPillGroup}>
-        <button
-          type="button"
+        <FilterPill
+          active={view === "board"}
           onClick={() => changeView("board")}
-          className={cn(
-            filterPillState(view === "board"),
-            "inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
-          )}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
         >
           <Columns3 className="size-3" />
           Board
-        </button>
-        <button
-          type="button"
+        </FilterPill>
+        <FilterPill
+          active={view === "agenda"}
           onClick={() => changeView("agenda")}
-          className={cn(
-            filterPillState(view === "agenda"),
-            "inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
-          )}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
         >
           <List className="size-3" />
           Agenda
-        </button>
+        </FilterPill>
       </div>
     </div>
   );

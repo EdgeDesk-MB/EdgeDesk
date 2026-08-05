@@ -4,6 +4,8 @@
  */
 
 import type { OfferConfidence, TriggerBasis } from "@/lib/offers/place-refund-ev";
+import type { OddsSource } from "@/lib/racing/odds";
+import type { ExchangeOddsSource } from "@/lib/services/exchange/types";
 
 export interface OfferEdgeRunner {
   horseId: string;
@@ -44,6 +46,10 @@ export interface OfferEdgePlay {
    */
   retentionSampleSize: number;
   confidence: OfferConfidence;
+  /** Bookie/back price provenance for the trust badge. */
+  oddsSource?: OddsSource;
+  /** Exchange/lay price provenance for the trust badge. */
+  exchangeSource?: ExchangeOddsSource;
   /** Why this play is good, in plain English. */
   reasons: string[];
   /** Execution traps the user should see before placing. */

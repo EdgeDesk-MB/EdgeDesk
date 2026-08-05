@@ -10,9 +10,9 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-08-03 (J2b Boosts money path briefed — Phase 15. Paper-trading EV settle
-parked in product-roadmap §9. Phase 14 Offer Edge in progress; N0 entitlement scaffolding
-⏸ gated.)
+Last updated: 2026-08-05 (L4 Offer qualifier shape → Acca Desk routing briefed. Phase 14 Offer
+Edge in progress; N0 entitlement scaffolding ⏸ gated — L4 ships a thin `acca_desk` can() stub
+that folds into N0 later.)
 
 ---
 
@@ -2278,6 +2278,7 @@ and optionally preview the locked UX. Auth + Stripe wait for the business gate (
 | Demo Racing Desk / demo data | ✓ | ✓ | ✓ |
 | Offers pipeline, tracker, free-bet lots | | ✓ | ✓ |
 | Do Next / Daily Plan / Edge Report / EV analytics | | ✓ | ✓ |
+| Acca Desk + offer → Acca qualifier routing (L4) | | ✓ | ✓ |
 | Offer Edge model + Race picks + recommended desk chrome | | | ✓ |
 | Live/delayed Racing Desk feeds (when keys present) | | | ✓ |
 | 2UP sentinel + web push | | | ✓ |
@@ -2309,6 +2310,175 @@ vaults, oddsmatcher. Those are post-gate (§7.2–7.6).
 5. `npx vitest run` green; no auth dependency.
 
 **Sizing note.** Full Stripe path is a later brief (N1+) after D1. Do not merge N0 and billing.
+
+---
+
+# PHASE — ACCA OFFER BRIDGE
+
+## L4. Offer qualifier shape → Acca Desk routing `[strong]` (Sam 2026-08-05)
+
+**Objective.** Persist whether a campaign’s qualifying stake must be placed as a **single**,
+**acca**, or (later) **bet builder**, and when the user hits Place qualifying bet on an
+acca-shaped offer, open Acca Desk’s **New run** as a global dialog (same pattern as Add bet),
+prefilled from the offer. Non-entitled users fall back to the standard Add bet modal.
+
+**Why.** Today “Bet £20 ACCA get £10 free bet” only encodes ACCA in the title string.
+`deriveTrackBetAction` always returns an `AddBetPrefill`, so Do Next / Offer view assume a
+single matched-bet workflow. Acca Desk already exists (`/acca`, `accaRuns.offerId` nullable
+FK, create API accepts `offerId`) but nothing opens it from an offer. Paste intelligence
+already detects `multisOnly` / `minSelections` and folds them into free-text notes only.
+
+**Product decisions (locked 2026-08-05).**
+1. Structured **Qualifier shape** on the offer (`single` | `acca` | `bet_builder`) in Important
+   terms + editor; paste-intelligence pre-suggests `acca` when it detects ACCA / multis /
+   min selections.
+2. Pro path opens Acca **New run** as a **global dialog** from wherever the user is (like Add
+   bet), linked to the offer, no forced navigation to `/acca`.
+
+**Verified shapes (2026-08-05).**
+- `PromoTermsRules` / Important terms: `minOdds`, `minStake`, `maxStake`, `importantNotes` in
+  `src/lib/offers/offer-terms.ts` — no bet-shape field yet.
+- Routing: `deriveTrackBetAction` → `TrackBetAction { prefill: AddBetPrefill | null }` in
+  `src/lib/offers/offer-track-bet.ts`; callers `offer-view-dialog.tsx` (and any other Place
+  qualifying CTAs) call `openAddBet(trackBet.prefill)`.
+- Acca create: `CreateRunDialog` / `CreateRunForm` local to `src/app/acca/page.tsx`; POST
+  `/api/acca` already accepts `offerId` but the form never sends it.
+- Pro gating: cosmetic `pro: true` on nav Live desks only (`app-nav.tsx`). No `can()` yet;
+  N0 is gated. Acca Desk is fully reachable today for everyone.
+
+### Data model (no new DB columns)
+
+Extend Important / promo rules JSON (same `offers.rules` blob; racing merge keeps working):
+
+```ts
+export type QualifierShape = "single" | "acca" | "bet_builder";
+
+// on OfferImportantTerms + PromoTermsRules (+ racing merge keys):
+qualifierShape?: QualifierShape; // default "single" when absent
+minSelections?: number | null;   // persist what paste already extracts
+```
+
+Defaults: missing / legacy offers → `single` (current behaviour). Read/write via
+`readImportantTerms` / `buildPromoTermsRules` / `mergeImportantIntoRacingRules` /
+`emptyImportantTerms`. Offer create/update APIs already pass `rules` through; no schema
+migration beyond existing JSON.
+
+### Capture UI
+
+In `src/components/offers/offer-editor-form.tsx` Important section (amber “don’t forget”):
+- Segmented or select control: **Single** | **Acca** | **Bet builder**.
+- When Acca or Bet builder: show **Min selections** number input (optional; prefill from paste).
+- Existing min odds / min–max stake stay; they become guidance on the Acca create dialog.
+
+Paste path (`enrichImportantTerms` / `applyPasteDraft`):
+- If `signals.multisOnly` OR `signals.minSelections != null` OR title/text matches
+  `/\bacca\b|\baccumulator\b/i` (extend signals if needed): set `qualifierShape: "acca"`.
+- Copy `signals.minSelections` onto `important.minSelections`.
+- User can still override in the editor before save.
+- Do **not** auto-set from archetype `acca_insurance` alone (that is refund structure, not
+  always “must be an acca qualifier” for bet&get shapes) unless multis/acca text also matches.
+
+### Routing
+
+Widen `TrackBetAction` to a discriminated destination:
+
+```ts
+type TrackBetDestination =
+  | { kind: "add_bet"; prefill: AddBetPrefill }
+  | { kind: "acca_desk"; prefill: AccaRunPrefill }
+  | { kind: "none" };
+
+// AccaRunPrefill: offerId, label, stake, bookmaker, minOdds?, minSelections?,
+// importantNotes?, suggestedMethod? ("sequential" default)
+```
+
+Rules inside `deriveTrackBetAction` (keep enable/disable pipeline logic unchanged):
+1. If step is **convert free bet** (`free_snr`) → always `add_bet` (conversion stays Add bet).
+2. If step is **place qualifying** (or start_planned / review_expiry with no bets) AND
+   `qualifierShape === "acca"` AND `canUseAccaDesk(settings)` → `acca_desk`.
+3. If `qualifierShape === "bet_builder"` → `add_bet` for v1 (no Bet Builder desk yet); CTA
+   label can stay “Place qualifying bet”; optional one-line reason later, not blocking.
+4. Otherwise → `add_bet` as today.
+5. If shape is `acca` but `!canUseAccaDesk` → `add_bet` fallback (Sam: non-pro uses Add bet).
+
+Call sites that must branch on `destination.kind`:
+- `src/components/offers/offer-view-dialog.tsx` (primary).
+- Any Do Next / campaign card path that currently opens Add bet for qualifying (audit
+  `dashboard-do-next.tsx` — today it often opens the offer view first; if any path calls
+  `openAddBet` with offer qualifying prefill directly, route there too).
+
+CTA copy when destination is Acca: prefer **“Open Acca Desk”** or keep “Place qualifying bet”
+with Acca secondary hint — use **“Build acca”** when enabled Acca path (clearer). Disabled
+reasons unchanged.
+
+### Global Acca create provider (2B)
+
+Mirror `AddBetProvider`:
+- NEW `src/components/acca-run-provider.tsx` + extract `CreateRunForm` (and shared types) from
+  `src/app/acca/page.tsx` into e.g. `src/components/acca/create-run-dialog.tsx` so `/acca`
+  “New run” and the global opener share one form.
+- `openAccaRun(prefill?: AccaRunPrefill)` mounts the dialog app-wide; register provider next to
+  `AddBetProvider` in `src/app/layout.tsx`.
+- Prefill behaviour:
+  - `label` ← offer title (or “Qualify · {bookie}”).
+  - `stake` ← same stake resolution as track-bet (`offerBetPrefs` / minStake / default).
+  - `bookmaker` ← offer bookmaker / prefs.
+  - `offerId` ← offer.id (POST must send it — wire into `CreateRunForm` save payload).
+  - Legs: seed `max(minSelections ?? 3, 2)` empty leg rows (user fills odds/labels).
+  - Show a compact **Offer requirements** strip above the form: min odds, min/max stake,
+    min selections, truncated important notes (read-only guidance, not hard validation v1).
+- On success: toast as today; `refresh()` app state; dialog closes. User can continue on Acca
+  Desk via nav if they want lays; no forced redirect.
+
+### Thin entitlement stub (before full N0)
+
+Do **not** unblock full N0. Ship the smallest hook so routing is real:
+
+- NEW `src/lib/entitlements/acca-desk.ts` (or under a tiny `features.ts`):
+  `canUseAccaDesk(settings): boolean`.
+- Default: **true** when `planPreview` is absent / `"unlocked"` (preserves today’s open Acca
+  Desk). False only when a future/settings preview is `"free"` (or whatever N0 matrix says
+  Acca is Core+).
+- Optional Settings “Preview as Free” can wait for N0; if adding a flag now, keep it off by
+  default and document that Acca offer routing uses the same switch.
+- When N0 lands: fold `acca_desk` into the matrix; delete the one-off helper or re-export
+  `can(plan, "acca_desk")`.
+
+Update N0 matrix draft row when convenient: Acca Desk = Core+ (Live desks “Pro” tag).
+
+### Tests
+
+- `offer-terms` / rules round-trip: `qualifierShape`, `minSelections`.
+- `deriveTrackBetAction`: single → add_bet; acca + can → acca_desk; acca + !can → add_bet;
+  free_snr on acca offer → add_bet; bet_builder → add_bet.
+- Paste/intelligence: sample “Bet £20 ACCA get £10 free bet” + min 3 selections → suggests
+  `acca` + `minSelections: 3`.
+- Acca create payload includes `offerId` when prefilled (service or form unit where easy).
+
+### Out of scope
+
+- Bet Builder desk / routing (enum + editor only).
+- Hard-enforcing min odds / stake / selection count on save.
+- Auto-creating legs from fixtures.
+- Full N0 / Stripe / paywall chrome beyond the thin `canUseAccaDesk` stub.
+- Changing Acca calc / settlement (`/calc-change` not required).
+
+### Acceptance
+
+1. New/edited offer can set Qualifier shape Acca; value persists in `rules` and reloads in editor.
+2. Paste of an ACCA bet&get offer suggests Acca + min selections when text supports it.
+3. Place qualifying / Build acca on an Acca-shaped offer (entitled) opens global New run dialog
+   with stake, bookie, offerId, requirements strip; creating the run links `accaRuns.offerId`
+   and logs the back bet as today.
+4. Same CTA when not entitled opens Add bet with existing qualifying prefill.
+5. Free-bet convert on that offer still opens Add bet.
+6. Bet builder shape saves but still opens Add bet.
+7. `/acca` New run still works (shared form); standalone create without offerId unchanged.
+8. `npx vitest run` green; design-reviewer on Important section + Acca create prefill strip.
+
+**Sizing.** `[strong]` — rules shape, track-bet API change, provider extract, multi-surface
+CTA. Grok/Composer fine; no calc audit. Depends on J7 (Acca Desk exists). Soft-depends on N0
+for real paywall; ships with unlocked default.
 
 ---
 

@@ -1,11 +1,14 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
-import { AddBalanceDialog } from "@/components/add-balance-dialog";
+import {
+  AddBalanceDialog,
+  type AddBalanceOpenOpts,
+} from "@/components/add-balance-dialog";
 import { useAppState } from "@/hooks/use-app-state";
 
 type AddBalanceContextValue = {
-  openAddBalance: () => void;
+  openAddBalance: (opts?: AddBalanceOpenOpts) => void;
 };
 
 const AddBalanceContext = createContext<AddBalanceContextValue | null>(null);
@@ -20,19 +23,27 @@ export function useAddBalance() {
 
 export function AddBalanceProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [initial, setInitial] = useState<AddBalanceOpenOpts | null>(null);
   const { state, refresh } = useAppState(5000);
   const accounts = state?.balances?.accounts ?? [];
 
-  const openAddBalance = useCallback(() => setOpen(true), []);
+  const openAddBalance = useCallback((opts?: AddBalanceOpenOpts) => {
+    setInitial(opts ?? null);
+    setOpen(true);
+  }, []);
 
   return (
     <AddBalanceContext.Provider value={{ openAddBalance }}>
       {children}
       <AddBalanceDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setInitial(null);
+        }}
         accounts={accounts}
         onSaved={refresh}
+        initial={initial}
       />
     </AddBalanceContext.Provider>
   );

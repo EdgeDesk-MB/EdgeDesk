@@ -41,12 +41,23 @@ import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
+import { ThemeSelect } from "@/components/theme-select";
+import { BrandAccentSelect } from "@/components/brand-accent-select";
+import { useBrandAccent } from "@/components/brand-accent-provider";
+import { UiFontSelect } from "@/components/ui-font-select";
+import { useUiFont } from "@/components/ui-font-provider";
+import { HeaderPatternSelect } from "@/components/header-pattern-select";
+import { useHeaderPattern } from "@/components/header-pattern-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
-import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, SlidersHorizontal, BookOpen, Map, RotateCcw, Target, Globe } from "lucide-react";
+import type { BrandAccentPresetId } from "@/lib/brand-accent";
+import type { UiFontId } from "@/lib/ui-font";
+import type { HeaderPatternId } from "@/lib/header-pattern";
+import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, Palette, SlidersHorizontal, BookOpen, Map, RotateCcw, Target, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 
 type SettingsTab =
+  | "appearance"
   | "bet-defaults"
   | "automation"
   | "alerts"
@@ -60,8 +71,26 @@ export default function SettingsPage() {
   const { resetAndOpenWelcome, openSetup } = useOnboarding();
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
+  const { syncFromSettings } = useBrandAccent();
+  const { syncFromSettings: syncFontFromSettings } = useUiFont();
+  const { syncFromSettings: syncPatternFromSettings } = useHeaderPattern();
   const settings = state?.settings;
-  const [tab, setTab] = useState<SettingsTab>("bet-defaults");
+  const [tab, setTab] = useState<SettingsTab>("appearance");
+
+  useEffect(() => {
+    if (!settings) return;
+    syncFromSettings(settings.brandAccentPreset, settings.brandAccentHex);
+  }, [settings?.brandAccentPreset, settings?.brandAccentHex, settings, syncFromSettings]);
+
+  useEffect(() => {
+    if (!settings) return;
+    syncFontFromSettings(settings.uiFont);
+  }, [settings?.uiFont, settings, syncFontFromSettings]);
+
+  useEffect(() => {
+    if (!settings) return;
+    syncPatternFromSettings(settings.headerPattern);
+  }, [settings?.headerPattern, settings, syncPatternFromSettings]);
 
   async function setDefaultExchange(id: number) {
     const name = exchanges.find((e) => e.id === id)?.name ?? "Exchange";
@@ -137,6 +166,7 @@ export default function SettingsPage() {
           <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)} className="gap-0">
             <TabsLineBar bleed="card">
               <TabsList variant="line" className="justify-start">
+                <TabsTrigger value="appearance">Appearance</TabsTrigger>
                 <TabsTrigger value="bet-defaults">Bet defaults</TabsTrigger>
                 <TabsTrigger value="automation">Automation</TabsTrigger>
                 <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -150,6 +180,53 @@ export default function SettingsPage() {
           </Tabs>
         </CardHeader>
         <CardContent className="pt-4">
+          {tab === "appearance" && (
+            <AppearanceCard
+              onPersistFont={async (fontId) => {
+                try {
+                  await api("/api/settings", {
+                    method: "PATCH",
+                    json: { uiFont: fontId },
+                  });
+                  await refresh();
+                } catch (e) {
+                  toast.error("Could not save font", {
+                    description: String(e),
+                  });
+                }
+              }}
+              onPersistPattern={async (patternId) => {
+                try {
+                  await api("/api/settings", {
+                    method: "PATCH",
+                    json: { headerPattern: patternId },
+                  });
+                  await refresh();
+                } catch (e) {
+                  toast.error("Could not save header pattern", {
+                    description: String(e),
+                  });
+                }
+              }}
+              onPersistAccent={async (presetId, hex) => {
+                try {
+                  await api("/api/settings", {
+                    method: "PATCH",
+                    json: {
+                      brandAccentPreset: presetId,
+                      brandAccentHex: hex,
+                    },
+                  });
+                  await refresh();
+                } catch (e) {
+                  toast.error("Could not save brand colour", {
+                    description: String(e),
+                  });
+                }
+              }}
+            />
+          )}
+
           {tab === "bet-defaults" && settings && (
             <BetDefaultsCard
               settings={settings}
@@ -199,6 +276,41 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+function AppearanceCard({
+  onPersistFont,
+  onPersistPattern,
+  onPersistAccent,
+}: {
+  onPersistFont: (fontId: UiFontId) => void;
+  onPersistPattern: (patternId: HeaderPatternId) => void;
+  onPersistAccent: (presetId: BrandAccentPresetId, hex: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Palette className="size-4 text-muted-foreground" aria-hidden />
+          <Label className="text-sm font-semibold">Theme</Label>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Light or dark.</p>
+        <ThemeSelect className="max-w-xs" />
+      </div>
+
+      <div className="h-px bg-border" />
+
+      <UiFontSelect onPersist={onPersistFont} />
+
+      <div className="h-px bg-border" />
+
+      <BrandAccentSelect onPersist={onPersistAccent} />
+
+      <div className="h-px bg-border" />
+
+      <HeaderPatternSelect onPersist={onPersistPattern} />
+    </div>
   );
 }
 
@@ -762,7 +874,7 @@ function AutomationCard({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="auto">Auto (context-aware)</SelectItem>
-              <SelectItem value="hero">Overview</SelectItem>
+              <SelectItem value="hero">Summary</SelectItem>
               <SelectItem value="plan">Today&apos;s plan</SelectItem>
               <SelectItem value="chart">Chart</SelectItem>
               <SelectItem value="feed">Feed</SelectItem>
@@ -828,7 +940,7 @@ function AlertsCard({
           <div>
             <p className="text-sm font-medium">Result settled</p>
             <p className="text-xs text-muted-foreground">
-              &ldquo;🟢 +£4.10 settled&rdquo; with Qualifying · selection in the body
+              &ldquo;🟢 +£4.10 settled&rdquo; with Qualifying · offer title (bookie) in the body
             </p>
           </div>
           <Switch

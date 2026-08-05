@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyFlow } from "@/components/money-flow";
 import { DashboardPnlSummaries } from "@/components/dashboard/dashboard-pnl-summaries";
+import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { BetRow } from "@/lib/db/schema";
 import {
@@ -141,7 +142,14 @@ export function DashboardOverviewBar({
 
   return (
     // min-h-full + flex column lets the mobile deck card stretch this to the viewport.
-    <div className="flex min-h-0 shrink-0 flex-col overflow-hidden border-b border-border/60 sm:block sm:min-h-0">
+    // No overflow-hidden here - it would break the sticky Summary header on mobile.
+    <div className="flex min-h-0 shrink-0 flex-col border-b border-border/60 sm:block sm:min-h-0">
+      <DashboardSectionHeader
+        prominent
+        className="bg-page"
+        title="Summary"
+        description="Profit, pace and campaign totals at a glance."
+      />
       <div
         className={cn(
           "flex flex-none flex-col justify-start gap-[var(--layout-section-y)] sm:flex-none sm:justify-start lg:flex-row lg:items-stretch lg:justify-between",

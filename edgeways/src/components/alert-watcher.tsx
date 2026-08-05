@@ -24,6 +24,7 @@ import {
 } from "@/lib/alerts/seen";
 import { detectNakedExposure } from "@/lib/bets/naked-exposure";
 import { suggestTwoUpLock } from "@/lib/calc/two-up-lock";
+import { parseRaceDisplayMeta, parseRacecardRunners } from "@/lib/racing";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 
 export function AlertWatcher() {
@@ -48,16 +49,20 @@ export function AlertWatcher() {
     );
     const previous = settledStatusRef.current;
     settledStatusRef.current = new Map(settledNow.map((b) => [b.id, b.status]));
+    const offersById = new Map((state.offers ?? []).map((o) => [o.id, o]));
     const settledSinceLastPoll: SettledBetNotice[] = [];
     if (previous != null) {
       for (const b of settledNow) {
         const prev = previous.get(b.id);
+        const offer = b.offerId != null ? offersById.get(b.offerId) : undefined;
         const notice: SettledBetNotice = {
           betId: b.id,
           label: b.label,
           profit: b.status === "void" || b.status === "push" ? 0 : (b.actualProfit ?? 0),
           status: b.status,
           betType: b.betType,
+          offerTitle: offer?.title ?? null,
+          bookmaker: b.bookmaker ?? offer?.bookmaker ?? null,
         };
         if (prev == null) {
           // First settle: skip pure void/push (no toast); won/lost etc. announce.
@@ -79,12 +84,16 @@ export function AlertWatcher() {
     const nakedExposed = detectNakedExposure(state.bets ?? [], eventStarts, now, {
       thresholdMs: state.settings.tuning.nakedExposureMinutes * 60_000,
       imminentThresholdMs: state.settings.tuning.nakedImminentMinutes * 60_000,
-    }).map((b) => ({
-      betId: b.id,
-      label: b.label,
-      bookmaker: b.bookmaker,
-      betType: b.betType,
-    }));
+    }).map((b) => {
+      const offer = b.offerId != null ? offersById.get(b.offerId) : undefined;
+      return {
+        betId: b.id,
+        label: b.label,
+        bookmaker: b.bookmaker ?? offer?.bookmaker ?? null,
+        betType: b.betType,
+        offerTitle: offer?.title ?? null,
+      };
+    });
 
     // B6: open 2UP positions whose selection just went two goals up.
     const twoUpTriggered: TwoUpLockNotice[] = [];
@@ -157,11 +166,23 @@ export function AlertWatcher() {
         scopeRaceId: o.scopeRaceId,
         scopeRaceLabel: o.scopeRaceLabel,
         expiresAt: o.expiresAt,
+        status: o.status,
+        offerType: o.offerType,
+        rules: o.rules,
       })),
-      races: (state.planRaces ?? []).map((r) => ({
-        ...r,
-        hasOpenBet: r.hasOpenBet ?? false,
-      })),
+      races: (state.planRaces ?? []).map((r) => {
+        const event = (state.events ?? []).find((e) => e.id === r.eventId);
+        const meta = parseRaceDisplayMeta(event?.goals);
+        const runners = parseRacecardRunners(event?.goals);
+        const fieldSize = meta.fieldSize || runners.length || 0;
+        return {
+          ...r,
+          hasOpenBet: r.hasOpenBet ?? false,
+          externalId: event?.externalId ?? null,
+          fieldSize: fieldSize > 0 ? fieldSize : null,
+          region: null as string | null,
+        };
+      }),
       settledSinceLastPoll,
       nakedExposed,
       twoUpTriggered,

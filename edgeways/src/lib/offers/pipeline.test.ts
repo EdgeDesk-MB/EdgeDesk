@@ -60,28 +60,26 @@ function offer(
 
 describe("deriveOfferPipelineStage", () => {
   it("maps awarded free bet stage", () => {
-    expect(
-      deriveOfferPipelineStage(
-        offer({
-          id: 1,
-          title: "FB",
-          profit: {
-            qualifyingProfit: -1,
-            qualifyingSettledCount: 1,
-            qualifyingOpenCount: 0,
-            freeBetAwarded: true,
-            freeBetAwardAmount: 50,
-            freeBetAwardReason: null,
-            freeBetStage: "awarded",
-            freeBetProfit: 0,
-            freeBetOpenCount: 0,
-            freeBetSettledCount: 0,
-            openExpectedProfit: 0,
-            totalProfit: -1,
-          },
-        })
-      )
-    ).toBe("awarded");
+    const awarded = offer({
+      id: 1,
+      title: "FB",
+      profit: {
+        qualifyingProfit: -1,
+        qualifyingSettledCount: 1,
+        qualifyingOpenCount: 0,
+        freeBetAwarded: true,
+        freeBetAwardAmount: 50,
+        freeBetAwardReason: null,
+        freeBetStage: "awarded",
+        freeBetProfit: 0,
+        freeBetOpenCount: 0,
+        freeBetSettledCount: 0,
+        openExpectedProfit: 0,
+        totalProfit: -1,
+      },
+    });
+    expect(deriveOfferPipelineStage(awarded)).toBe("awarded");
+    expect(formatOfferPipelineStageLabel(awarded)).toBe("Free bet due");
   });
 
   it("maps planned with no bets", () => {

@@ -8,7 +8,7 @@
  * just pass a different `existing` prop.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,6 +34,7 @@ import {
 import { bestGame, matchGamesInText, type CasinoGame } from "@/lib/casino/game-library";
 import type { CasinoOfferComponentRow } from "@/lib/db/schema";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
+import { cn } from "@/lib/utils";
 
 const COMPONENT_LABELS: Record<CasinoComponentType, string> = {
   qualifying_wager: "Qualifying wager",
@@ -64,7 +65,7 @@ export function CasinoComponentForm({
   casinoOfferId: number;
   /** Present = edit mode; absent = add mode */
   existing?: CasinoOfferComponentRow;
-  /** Add-mode only - preselects the type dropdown (defaults to "bonus") */
+  /** Add-mode only - preselects the type dropdown (defaults to qualifying wager) */
   initialComponentType?: CasinoComponentType;
   /** Add-mode only - promo text to match eligible games against the library */
   sourceText?: string;
@@ -87,8 +88,9 @@ export function CasinoComponentForm({
   /** Add-mode primary button label (e.g. "Next step" in the log wizard). */
   submitLabel?: string;
 }) {
+  const stepTypeId = useId();
   const [componentType, setComponentType] = useState<CasinoComponentType>(
-    existing?.componentType ?? initialComponentType ?? "bonus"
+    existing?.componentType ?? initialComponentType ?? "qualifying_wager"
   );
   const [amount, setAmount] = useState(existing?.amount ?? initialValues?.amount ?? 20);
   const [wageringMultiplier, setWageringMultiplier] = useState(
@@ -275,15 +277,22 @@ export function CasinoComponentForm({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">Step type</Label>
+        <Label htmlFor={stepTypeId} className="text-xs font-normal text-muted-foreground">
+          Step type
+        </Label>
         <Select
           value={componentType}
           onValueChange={(v) => setComponentType(v as CasinoComponentType)}
         >
-          <SelectTrigger className="w-full">
-            <SelectValue />
+          <SelectTrigger
+            id={stepTypeId}
+            className={cn(
+              "h-8 w-full min-w-0 justify-between px-2.5 text-left text-sm font-normal text-foreground"
+            )}
+          >
+            <SelectValue placeholder="Choose step type" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent position="popper" className="z-[200]">
             {COMPONENT_TYPES.map((t) => (
               <SelectItem key={t} value={t}>
                 {COMPONENT_LABELS[t]}
@@ -292,9 +301,10 @@ export function CasinoComponentForm({
           </SelectContent>
         </Select>
         {componentType === "qualifying_wager" ? (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] leading-snug text-muted-foreground">
             A cost, not a reward - the deposit staked to unlock whatever else this campaign
-            carries. Its EV is always £0 or below.
+            carries. Its EV is always £0 or below. Add another qualifying wager for the next
+            stake tier on a ladder offer.
           </p>
         ) : null}
       </div>

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   estimatePlaceRefundTriggerProb,
+  formatConfidenceLabel,
+  formatPriceTrustLabel,
   placeRefundRunnerEv,
   resolveOfferConfidence,
   triggerProbFromModel,
@@ -24,12 +26,48 @@ describe("placeRefundRunnerEv", () => {
 });
 
 describe("resolveOfferConfidence", () => {
-  it("marks proxy odds as estimate", () => {
+  it("marks proxy odds with no live lay as estimate", () => {
     expect(resolveOfferConfidence("proxy", "estimated")).toBe("estimate");
+  });
+
+  it("marks live lay with proxy back as mixed (one side live)", () => {
+    expect(resolveOfferConfidence("proxy", "live")).toBe("mixed");
   });
 
   it("marks live both as live", () => {
     expect(resolveOfferConfidence("live", "live")).toBe("live");
+  });
+
+  it("marks live back only as mixed", () => {
+    expect(resolveOfferConfidence("live", "estimated")).toBe("mixed");
+  });
+});
+
+describe("formatPriceTrustLabel", () => {
+  it("names both sides when both are live", () => {
+    expect(formatPriceTrustLabel("live", "live")).toBe("Live back & lay");
+  });
+
+  it("says only when just the lay is live", () => {
+    expect(formatPriceTrustLabel("proxy", "live")).toBe("Live lay only");
+    expect(formatPriceTrustLabel("snapshot", "live")).toBe("Live lay only");
+  });
+
+  it("says only when just the back is live", () => {
+    expect(formatPriceTrustLabel("live", "estimated")).toBe("Live back only");
+  });
+
+  it("labels manual overrides as your prices", () => {
+    expect(formatPriceTrustLabel("manual", "live")).toBe("Your prices");
+  });
+
+  it("says estimated when neither side is live", () => {
+    expect(formatPriceTrustLabel("proxy", "estimated")).toBe("Estimated");
+  });
+
+  it("falls back to the tier label when sources are missing", () => {
+    expect(formatPriceTrustLabel(undefined, undefined, "mixed")).toBe("One side live");
+    expect(formatConfidenceLabel("estimate")).toBe("Estimated");
   });
 });
 

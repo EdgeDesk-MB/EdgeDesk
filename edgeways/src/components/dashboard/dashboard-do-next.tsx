@@ -18,8 +18,6 @@ import {
 } from "@/lib/offers/do-next";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
-import { formatDecimalOdds } from "@/lib/racing/odds";
-import { formatClockTime } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
 import { ListOrdered, Sparkles, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
@@ -66,18 +64,24 @@ function DoNextCard({
   onConvert,
   onOpen,
   offer,
+  layout = "carousel",
 }: {
   item: DoNextItem;
   isBest: boolean;
   onConvert: (item: DoNextItem) => void;
   onOpen?: (item: DoNextItem) => void;
   offer?: OfferSummary;
+  /** `stack` = mobile full-width vertical list; `carousel` = desktop horizontal strip */
+  layout?: "carousel" | "stack";
 }) {
   const headerTint = doNextHeaderTint(item, offer);
 
   const cardClass = cn(
     offerCampaignCardShell,
-    "w-[min(100%,300px)] shrink-0 snap-start min-h-[148px] rounded-[20px]"
+    "min-h-[148px] rounded-[20px]",
+    layout === "stack"
+      ? "w-full"
+      : "w-[min(100%,300px)] shrink-0 snap-start"
   );
 
   const body = (
@@ -127,23 +131,7 @@ function DoNextCard({
               £{item.funding.short.toFixed(2)} short at {item.bookmaker}
             </p>
           ) : null}
-          {item.edge ? (
-            <p className="mt-1 line-clamp-2 text-xs text-edge">
-              <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide">
-                <Sparkles className="size-3 shrink-0" aria-hidden />
-                Edge
-              </span>
-              <span className="mx-1.5 text-muted-foreground">·</span>
-              <span className="font-mono tabular-nums text-foreground">
-                {formatClockTime(item.edge.startTime)}
-              </span>{" "}
-              <span className="text-foreground">
-                {item.edge.course}, back{" "}
-                <span className="font-semibold">{item.edge.runnerName}</span> at{" "}
-                <span className="tabular-nums">{formatDecimalOdds(item.edge.backDecimal)}</span>
-              </span>
-            </p>
-          ) : item.kind !== "place_qualifying" ? (
+          {!item.edge && item.kind !== "place_qualifying" ? (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.detail}</p>
           ) : null}
 
@@ -195,7 +183,9 @@ function DoNextCard({
 }
 
 /**
- * Home "Do next" strip - calendar-style cards, best first, Priority / Edge sort.
+ * Home "Do next" - calendar-style cards, best first, Priority / Edge / Rate sort.
+ * Mobile: full-width vertical stack (tabs reorder that list).
+ * Desktop: horizontal snap strip.
  */
 export function DashboardDoNext({ className }: { className?: string }) {
   const { items: allItems, state } = useDoNextItems(5000);
@@ -231,6 +221,24 @@ export function DashboardDoNext({ className }: { className?: string }) {
     if (!offer) return;
     beginEffort(item.offerId, item.kind);
     viewOffer(offer);
+  }
+
+  function renderCards(layout: "carousel" | "stack") {
+    return items.map((item, i) => (
+      <DoNextCard
+        key={item.id}
+        item={item}
+        isBest={i === 0}
+        layout={layout}
+        onConvert={onConvert}
+        onOpen={onOpenCard}
+        offer={
+          item.offerId != null
+            ? offers.find((o) => o.id === item.offerId)
+            : undefined
+        }
+      />
+    ));
   }
 
   if (allItems.length === 0) return null;
@@ -278,7 +286,13 @@ export function DashboardDoNext({ className }: { className?: string }) {
         </p>
       ) : null}
 
-      <div className="py-[calc(0.75rem+12px)]">
+      {/* Mobile: vertical full-width cards; sort tabs reorder this stack */}
+      <div className="flex flex-col gap-3 px-[var(--layout-card-x)] py-[calc(0.75rem+12px)] sm:hidden">
+        {renderCards("stack")}
+      </div>
+
+      {/* Desktop: horizontal snap strip */}
+      <div className="hidden py-[calc(0.75rem+12px)] sm:block">
         <ScrollFadeEdges
           orientation="horizontal"
           dragToScroll
@@ -286,29 +300,15 @@ export function DashboardDoNext({ className }: { className?: string }) {
           scrollClassName={cn(
             "app-scroll-overlay overflow-x-auto overflow-y-visible",
             "snap-x snap-mandatory",
-            // Match Chart / History feed titles at card-x. Padding + matching
-            // scroll-padding so snap-start does not pull the first card
-            // flush to the panel edge.
-            "pl-[var(--layout-card-x)] scroll-pl-[var(--layout-card-x)]",
-            "pr-[var(--layout-card-x)] scroll-pr-[var(--layout-card-x)]",
+            // scroll-padding keeps snap-start aligned with card-x; actual
+            // inset lives on the flex row so end padding is not clipped
+            // (padding-right on overflow-x scrollports often collapses).
+            "scroll-pl-[var(--layout-card-x)] scroll-pr-[var(--layout-card-x)]",
             "py-px"
           )}
         >
-          <div className="flex gap-3">
-            {items.map((item, i) => (
-              <DoNextCard
-                key={item.id}
-                item={item}
-                isBest={i === 0}
-                onConvert={onConvert}
-                onOpen={onOpenCard}
-                offer={
-                  item.offerId != null
-                    ? offers.find((o) => o.id === item.offerId)
-                    : undefined
-                }
-              />
-            ))}
+          <div className="flex w-max gap-3 px-[var(--layout-card-x)]">
+            {renderCards("carousel")}
           </div>
         </ScrollFadeEdges>
       </div>

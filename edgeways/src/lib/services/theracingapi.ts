@@ -33,6 +33,11 @@ export interface RacingRacecard {
   distance?: string;
   going?: string;
   raceClass?: string;
+  pattern?: string;
+  ratingBand?: string;
+  ageBand?: string;
+  surface?: string;
+  sexRestriction?: string;
   type?: string;
   prize?: string;
   region?: string;
@@ -125,6 +130,18 @@ function mapRunner(r: any, index: number): RacingRunnerDetail {
       ? String(headgearRaw).trim()
       : undefined;
   const silkUrl = r.silk_url ?? r.silk ?? r.silks_url;
+  const lastRunRaw = r.last_run ?? r.lastRun;
+  const lastRunNum = parseInt(String(lastRunRaw ?? ""), 10);
+  const lastRunDays =
+    Number.isFinite(lastRunNum) && lastRunNum >= 0 ? lastRunNum : undefined;
+  const sexRaw = r.sex_code ?? r.sex;
+  const sex =
+    sexRaw != null && String(sexRaw).trim() !== "" ? String(sexRaw).trim() : undefined;
+  const ofrRaw = r.ofr ?? r.or;
+  const ofr =
+    ofrRaw != null && String(ofrRaw).trim() !== "" && String(ofrRaw).trim() !== "-"
+      ? String(ofrRaw).trim()
+      : undefined;
   return {
     horseId: String(r.horse_id ?? r.horse ?? `runner-${index}`),
     name: String(r.horse ?? "").trim(),
@@ -137,9 +154,11 @@ function mapRunner(r: any, index: number): RacingRunnerDetail {
     weight: lbs != null ? `${lbs}lbs` : r.weight != null ? String(r.weight) : undefined,
     weightLbs: lbs,
     horseColour: r.colour != null ? String(r.colour) : undefined,
+    sex,
     headgear,
     silkUrl: typeof silkUrl === "string" && silkUrl.trim() ? silkUrl.trim() : undefined,
-    ofr: r.ofr != null ? String(r.ofr) : undefined,
+    ofr,
+    lastRunDays,
     form: r.form ? String(r.form) : undefined,
     spDecimal,
     spFraction: spRaw != null ? String(spRaw) : undefined,
@@ -160,6 +179,14 @@ function mapRacecard(item: any, now: number): RacingRacecard {
   if (startTime <= now - 90 * 60 * 1000) status = "finished";
   else if (startTime <= now) status = "live";
 
+  const distanceF = item.distance_f ?? item.distance_fur;
+  const distance =
+    item.distance != null && String(item.distance).trim() !== ""
+      ? String(item.distance)
+      : distanceF != null && String(distanceF).trim() !== ""
+        ? `${String(distanceF).replace(/f$/i, "")}f`
+        : undefined;
+
   return {
     externalId: String(item.race_id ?? `${item.course}-${item.off_time}-${item.race_name}`),
     sport: "horse_racing",
@@ -171,9 +198,14 @@ function mapRacecard(item: any, now: number): RacingRacecard {
     fieldSize,
     offTime: String(item.off_time ?? ""),
     runners,
-    distance: item.distance ? String(item.distance) : undefined,
+    distance,
     going: item.going ? String(item.going) : undefined,
     raceClass: item.race_class ? String(item.race_class) : undefined,
+    pattern: item.pattern ? String(item.pattern) : undefined,
+    ratingBand: item.rating_band ? String(item.rating_band) : undefined,
+    ageBand: item.age_band ? String(item.age_band) : undefined,
+    surface: item.surface ? String(item.surface) : undefined,
+    sexRestriction: item.sex_restriction ? String(item.sex_restriction) : undefined,
     type: item.type ? String(item.type) : undefined,
     prize: item.prize ? String(item.prize) : undefined,
     region: item.region ? String(item.region) : undefined,

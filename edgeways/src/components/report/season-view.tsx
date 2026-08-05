@@ -29,8 +29,7 @@ import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { api } from "@/hooks/use-app-state";
 import type { SeasonReport } from "@/lib/report/season-report";
 import { formatGbp } from "@/lib/format-money";
-import { filterPillState } from "@/lib/ui/surface-styles";
-import { cn } from "@/lib/utils";
+import { FilterPill } from "@/components/ui/filter-pill";
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -86,14 +85,9 @@ export function SeasonView({ owner }: { owner?: string | null } = {}) {
       {years.length > 1 ? (
         <div className="flex flex-wrap gap-1.5">
           {years.map((y) => (
-            <button
-              key={y}
-              type="button"
-              className={cn(filterPillState(y === season.year))}
-              onClick={() => setYear(y)}
-            >
+            <FilterPill key={y} active={y === season.year} onClick={() => setYear(y)}>
               {y}
-            </button>
+            </FilterPill>
           ))}
         </div>
       ) : null}

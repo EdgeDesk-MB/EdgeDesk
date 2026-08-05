@@ -32,6 +32,10 @@ import { CasinoCampaignSimDialog } from "@/components/casino/casino-campaign-sim
 import { CasinoComponentDialog } from "@/components/casino/casino-component-dialog";
 import { CasinoGameLibraryDialog } from "@/components/casino/casino-game-library-dialog";
 import { CasinoOfferEditDialog } from "@/components/casino/casino-offer-edit-dialog";
+import {
+  CasinoPendingReminders,
+  CasinoSetReminderDialog,
+} from "@/components/casino/casino-set-reminder-dialog";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import {
   BASIS_COPY,
@@ -41,11 +45,19 @@ import {
   campaignVarianceTier,
   componentSummaryLine,
 } from "@/components/casino/casino-ui";
+import {
+  groupCampaignTiers,
+  shouldShowCampaignTiers,
+  tierExpectedEv,
+} from "@/lib/casino/campaign-tiers";
 import { EmptyState } from "@/components/help/empty-state";
 import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
 import { PageHeader } from "@/components/help/page-header";
 import {
+  PageHeaderActions,
+  PageHeaderButtonGroup,
   PageHeaderStat,
+  PageHeaderStatGroup,
   outlineButtonGroup,
   pagePrimaryButtonProps,
   pageSecondaryButtonProps,
@@ -72,7 +84,7 @@ import {
 import { formatRecurrenceLabel } from "@/lib/offers/offer-recurrence-shared";
 import { formatGbp, roundMoney } from "@/lib/format-money";
 import { formatPillLabel, offerStatusBadgeVariant } from "@/lib/ui/status-badges";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { cn } from "@/lib/utils";
 import type { CasinoOfferComponentRow, CasinoOfferRow } from "@/lib/db/schema";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
@@ -383,6 +395,59 @@ function ComponentRow({
   );
 }
 
+/** Flat steps, or Tier 1…N when the campaign is a stake ladder (UI-only grouping). */
+function CampaignStepList({
+  offer,
+  onChanged,
+}: {
+  offer: CasinoOfferSummary;
+  onChanged: (offer: CasinoOfferSummary) => void;
+}) {
+  const tiers = groupCampaignTiers(offer.components);
+  const showTiers = shouldShowCampaignTiers(tiers);
+
+  if (!showTiers) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {offer.components.map((c) => (
+          <ComponentRow key={c.id} offer={offer} component={c} onChanged={onChanged} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {tiers.map((tier) => {
+        const tierEv = tierExpectedEv(tier.components);
+        return (
+          <div
+            key={`tier-${tier.index}-${tier.components[0]?.id ?? tier.index}`}
+            className="rounded-md border border-border/60 bg-muted/20 p-2"
+          >
+            <div className="mb-1.5 flex items-baseline justify-between gap-2 px-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Tier {tier.index}
+              </p>
+              <MoneyFlow
+                value={tierEv}
+                signColor
+                signDisplay
+                className="text-[11px] font-semibold tabular-nums"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {tier.components.map((c) => (
+                <ComponentRow key={c.id} offer={offer} component={c} onChanged={onChanged} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function CampaignCard({
   offer,
   onChanged,
@@ -459,11 +524,7 @@ function CampaignCard({
 
       <CardContent className="border-t border-border/50 py-2.5">
         {offer.components.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            {offer.components.map((c) => (
-              <ComponentRow key={c.id} offer={offer} component={c} onChanged={onChanged} />
-            ))}
-          </div>
+          <CampaignStepList offer={offer} onChanged={onChanged} />
         ) : (
           <p className="rounded border border-dashed border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
             Nothing logged yet - add a step to get an EV verdict.
@@ -472,6 +533,7 @@ function CampaignCard({
         <div className="mt-2">
           <CasinoComponentDialog casinoOfferId={offer.id} onSaved={onChanged} />
         </div>
+        <CasinoPendingReminders offer={offer} onChanged={onChanged} />
       </CardContent>
 
       {offer.recurrence?.enabled ? (
@@ -498,7 +560,7 @@ function CampaignCard({
         </CardContent>
       ) : null}
 
-      <CardContent className="offer-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
+      <CardContent className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
         <span className="text-xs text-muted-foreground">
           {offer.components.length} step{offer.components.length === 1 ? "" : "s"}
           {expiryLabel && expiryUrgency === "today" ? (
@@ -519,6 +581,9 @@ function CampaignCard({
           <DeleteCampaignDialog offer={offer} onRemoved={onRemoved} />
           <div className={outlineButtonGroup}>
             <CasinoOfferEditDialog offer={offer} onSaved={onChanged} />
+            {offer.status === "planned" || offer.status === "active" ? (
+              <CasinoSetReminderDialog offer={offer} onChanged={onChanged} />
+            ) : null}
             {offer.components.length > 0 ? (
               <CasinoCampaignSimDialog
                 title={offer.title}
@@ -618,32 +683,31 @@ export default function CasinoPage() {
         helpId="casino"
         icon={Dices}
         action={
-          <>
-            <PageHeaderStat label="Active">{totals.active}</PageHeaderStat>
-            <PageHeaderStat label="Actions">{totals.needsAction}</PageHeaderStat>
-            <CasinoGameLibraryDialog
-              triggerProps={{ variant: "outline", ...pageSecondaryButtonProps }}
-            />
-            <Button {...pagePrimaryButtonProps} onClick={openCasinoLog}>
-              <Plus className="size-4" /> Log offer
-            </Button>
-          </>
+          <PageHeaderActions className="gap-6">
+            <PageHeaderStatGroup>
+              <PageHeaderStat label="Active">{totals.active}</PageHeaderStat>
+              <PageHeaderStat label="Actions">{totals.needsAction}</PageHeaderStat>
+            </PageHeaderStatGroup>
+            <PageHeaderButtonGroup>
+              <CasinoGameLibraryDialog
+                triggerProps={{ variant: "outline", ...pageSecondaryButtonProps }}
+              />
+              <Button {...pagePrimaryButtonProps} onClick={openCasinoLog}>
+                <Plus className="size-4" /> Log offer
+              </Button>
+            </PageHeaderButtonGroup>
+          </PageHeaderActions>
         }
         toolbar={
           <>
             {(["all", "needs_action", "active", "completed", "expired"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={cn(filterPillState(filter === f))}
-              >
+              <FilterPill key={f} active={filter === f} onClick={() => setFilter(f)}>
                 {f === "needs_action"
                   ? `Needs action${totals.needsAction ? ` (${totals.needsAction})` : ""}`
                   : f === "expired"
                     ? `Expired${totals.expired ? ` (${totals.expired})` : ""}`
                     : formatPillLabel(f)}
-              </button>
+              </FilterPill>
             ))}
           </>
         }

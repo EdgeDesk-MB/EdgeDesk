@@ -23,7 +23,7 @@ is the interim mark. Final assets still wanted from Sam:
 | `favicon.svg` + `icon.png` 32×32 fallback | From the master | Browser tab | ✅ `src/app/icon.png` (derived) |
 | `apple-icon.png` | 180×180, **solid background, no alpha** (iOS requirement) | iOS home screen / PWA | ✅ generated |
 | `icon-192.png` / `icon-512.png` | Maskable safe zone (glyph within central 80%) | Android PWA, manifest | ✅ generated, `purpose: maskable` |
-| Push badge | 192×192 monochrome white-on-transparent | Android notification shade | ✅ `badge-192.png` (pulse silhouette) |
+| Push badge | 192×192 monochrome white-on-transparent | Android notification shade | ✅ `badge-192.png` (white bolt silhouette from `mark.svg`) |
 | `og-image.png` (optional for now) | 1200×630 | Link previews once the marketing site exists (F4) | ⬜ still needed |
 | Wordmark (optional) | SVG, dark + light variants | Top bar, marketing site | PNG lockup in top bar (`/brand/logo.png`) |
 
@@ -51,9 +51,9 @@ Decisions for Sam:
 | --- | --- | --- |
 | Favicon + apple | app-directory conventions | `src/app/icon.png` + `src/app/apple-icon.png`; manual `metadata.icons` block removed |
 | PWA manifest | `src/app/manifest.ts` | 192/512 PNG entries, `purpose: "any"` + `"maskable"` |
-| Push notifications | `public/sw.js` | `icon: /icon-192.png`, `badge: /badge-192.png` (white pulse silhouette); push titles carry a leading ⚡ (see `sendPush`) |
+| Push notifications | `public/sw.js` | Android shade always has two slots: `badge` (mono white bolt from `mark.svg` — omit → default bell) + `icon` (yellow plate + `#111` bolt from `mark.svg`). Regenerated via `scripts/generate-brand-assets.mjs`. Single yellow-only is not available to web push; titles carry a leading ⚡ |
 | Boilerplate | `public/` | Deleted (`file/globe/next/vercel/window.svg`, `chart-line.svg`, `icon-180.png`, `edgeways-bolt.svg`, `icon.svg`) |
-| Theme colour | `manifest.ts` | `#FFC71E` mirrors yellow `--topbar` |
+| Theme colour | `manifest.ts` + `viewport.themeColor` + `<header>` bg | `#111111` (ink). Dia samples the top element’s `background-color` for tab tint — outer `<header>` stays ink; yellow plate is an inner shell. |
 
 ## 3. Colour tokens (current, for design reference)
 
@@ -69,7 +69,10 @@ Decisions for Sam:
 | `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |
 | `--negative` | `oklch(0.577 0.245 27)` | `oklch(0.78 0.15 22)` | Losses, destructive |
-| `--topbar` | `#FFC71E` | same | Brand yellow app bar (header + meta-nav share it) |
+| `--topbar` | `#111` | `#FFC71E` | Header + meta-nav plate |
+| `--topbar-stripe` | `--canvas` (`md+`; yellow on mobile) | `#111` | 4px stripe above the plate |
+| `--topbar-accent` | `#FFC71E` | `#111` | Login / burger fill |
+| `--topbar-accent-foreground` | `#111` | white | Login / burger icon + label |
 
 P&L green is deliberately **not** `--success`: money movement uses
 `moneyPositiveClass` (emerald family) via `MoneyFlow`, per design-system.md.
@@ -80,16 +83,16 @@ P&L green is deliberately **not** `--success`: money movement uses
   (`--shadow-skeuo` = inset only). `.skeuo` / `.skeuo-solid` on Button
   `default` / `pagePrimary` / `secondary` / `outline`, brand chips, badges,
   segmented active tabs. Ghost/link stay flat.
-- **Button radius** — 2px tighter than the global ladder via `--radius-button`
-  (10→8) and `--radius-button-sm` (8→6). Cards/inputs unchanged.
+- **Control radius** — 2px tighter than the global ladder via `--radius-button`
+  (10→8) on buttons, fields, and selects. Sm/xs share the same radius.
+  Cards/popovers keep `rounded-lg`.
 - **Secondary / outline buttons** — off-white `#fafafa` fill in light mode,
   same inset 3D, no thick border.
-- **Top bar (desktop)** — two rows on `--topbar` yellow: `AppTopBarHeader`
-  (logo / stats / Login) + `AppTopBarMetaNav` (Betfair-style site tabs). Active
-  tab = sliding canvas pill on the shared light spring (`SPRING_EASE`,
-  `lib/ui/motion.ts`); line-tab underlines use the same spring. No hover fill
-  on meta tabs. `#111` @ 10% bottom rule behind the meta row. Burger is
-  mobile-only.
+- **Top bar (desktop)** — two rows on `--topbar` (ink light / yellow dark),
+  topped by a 4px `--topbar-stripe` (canvas light / ink dark):
+  `AppTopBarHeader` + `AppTopBarMetaNav`. Active tab = sliding canvas pill +
+  page foreground (`SPRING_EASE`). Login/burger use `--topbar-accent`. Burger
+  is mobile-only.
 - **Appearance** — Light/Dark only (`ThemeSelect`) at the bottom of the side
   nav on default surface colours. System/OS sync removed to avoid overflow.
 - **Filter pills** — `filterPillState(active, { hasCount })`; counters use the

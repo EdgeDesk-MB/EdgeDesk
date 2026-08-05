@@ -206,6 +206,59 @@ describe("deriveOfferNextAction", () => {
     ).toBeNull();
   });
 
+  it("ignores past-deadline offers even when status is still active", () => {
+    expect(
+      deriveOfferNextAction(
+        offer({
+          id: 5,
+          title: "Late convert",
+          status: "active",
+          expiresAt: now - 60_000,
+          profit: {
+            qualifyingProfit: -1,
+            qualifyingSettledCount: 1,
+            qualifyingOpenCount: 0,
+            freeBetAwarded: true,
+            freeBetAwardAmount: 5,
+            freeBetAwardReason: null,
+            freeBetStage: "awarded",
+            freeBetProfit: 0,
+            freeBetOpenCount: 0,
+            freeBetSettledCount: 0,
+            openExpectedProfit: 0,
+            totalProfit: -1,
+          },
+        }),
+        now
+      )
+    ).toBeNull();
+  });
+
+  it("keeps free-bet ready copy short", () => {
+    const action = deriveOfferNextAction(
+      offer({
+        id: 6,
+        title: "Bet £5 get £5",
+        profit: {
+          qualifyingProfit: -0.5,
+          qualifyingSettledCount: 1,
+          qualifyingOpenCount: 0,
+          freeBetAwarded: true,
+          freeBetAwardAmount: 5,
+          freeBetAwardReason: null,
+          freeBetStage: "awarded",
+          freeBetProfit: 0,
+          freeBetOpenCount: 0,
+          freeBetSettledCount: 0,
+          openExpectedProfit: 0,
+          totalProfit: -0.5,
+        },
+      }),
+      now
+    );
+    expect(action?.detail).toBe("£5.00 free bet ready.");
+  });
+
   it("ranks convert ahead of place qualifying and hides waiting conversions", () => {
     const actions = listOfferNextActions(
       [

@@ -131,6 +131,7 @@ export function DailyPlan({ className }: { className?: string }) {
     >
       <DashboardSectionHeader
         prominent
+        className="bg-page"
         title="Today's plan"
         description="Deadlines, races and kick-offs in time order."
       />

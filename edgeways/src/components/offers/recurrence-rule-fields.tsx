@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
 import type { OfferRecurrenceFreq, OfferRecurrenceRule } from "@/lib/services/offers.types";
 
 export const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -115,9 +115,9 @@ export function RecurrenceRuleFields({
             {WEEKDAY_LABELS.map((label, day) => {
               const active = value.weekdays.includes(day);
               return (
-                <button
+                <FilterPill
                   key={day}
-                  type="button"
+                  active={active}
                   onClick={() => {
                     if (active) {
                       const next = value.weekdays.filter((d) => d !== day);
@@ -132,10 +132,9 @@ export function RecurrenceRuleFields({
                       });
                     }
                   }}
-                  className={filterPillState(active)}
                 >
                   {label}
-                </button>
+                </FilterPill>
               );
             })}
           </div>

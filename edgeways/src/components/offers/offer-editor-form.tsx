@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/date-picker";
+import { EventTimeInput } from "@/components/event-time-input";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,7 +25,7 @@ import { OfferPasteDialog } from "@/components/offers/offer-paste-dialog";
 import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import { RegionFlag } from "@/components/region-flag";
 import { VenueSelect, inferVenueKind } from "@/components/venue-select";
-import { api } from "@/hooks/use-app-state";
+import { api, useAppState } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
 import { useVenueAccounts } from "@/hooks/use-venue-accounts";
 import type { OfferRecurrenceRule, OfferSummary } from "@/lib/services/offers.types";
@@ -54,7 +62,8 @@ import { missedOfferLabelForCategory } from "@/lib/offers/offer-expiry";
 import { formatRecurrenceLabel, localYmd, parseYmd } from "@/lib/offers/offer-recurrence-shared";
 import type { ParsedOfferDraft } from "@/lib/offers/parse-offer-text";
 import { formatApiError } from "@/lib/api-errors";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ChevronDown, Pencil, Plus } from "lucide-react";
 
@@ -90,6 +99,20 @@ function formImportantFromState(input: {
 function raceLabel(card: Pick<RacingRacecard, "offTime" | "raceName">): string {
   const name = card.raceName?.trim();
   return name ? `${card.offTime} · ${name}` : card.offTime;
+}
+
+/** Split datetime-local `YYYY-MM-DDTHH:mm` into upgraded DatePicker + TimePicker values. */
+function splitDatetimeLocal(value: string): { date: string; time: string } {
+  if (!value.trim()) return { date: "", time: "" };
+  const [date = "", time = ""] = value.split("T");
+  return { date, time: time.slice(0, 5) };
+}
+
+/** Combine upgraded date/time pickers into epoch ms (date-only → 23:59). */
+function expiresAtFromParts(date: string, time: string): number | null {
+  if (!date.trim()) return null;
+  const hhmm = time.trim() || "23:59";
+  return fromDatetimeLocalValue(`${date.trim()}T${hhmm}`);
 }
 
 function normalizeOffTime(raw: string): string {
@@ -177,12 +200,16 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     const courseScoped =
       racing && !raceScoped && offer.scopeCourse && !isRegionalScope(offer.scopeCourse);
     const scopeMode: ScopeMode = raceScoped ? "race" : courseScoped ? "course" : "uk_ire";
+    const expiryParts = splitDatetimeLocal(
+      offer.expiresAt ? toDatetimeLocalValue(offer.expiresAt) : ""
+    );
     return {
       editingId: offer.id as number | null,
       title: offer.title,
       bookmaker: offer.bookmaker ?? "",
       expected: offer.expectedProfit != null ? String(offer.expectedProfit) : "",
-      expires: offer.expiresAt ? toDatetimeLocalValue(offer.expiresAt) : "",
+      expiresDate: expiryParts.date,
+      expiresTime: expiryParts.time,
       offerStatus: offer.status as OfferStatus,
       category: offerCategoryFromSport(offer.sport),
       betStake: rules ? String(rules.betStake) : "50",
@@ -221,7 +248,8 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     title: "",
     bookmaker: "",
     expected: "",
-    expires: "",
+    expiresDate: "",
+    expiresTime: "",
     offerStatus: "active" as OfferStatus,
     category: (prefill?.category ?? "general") as OfferCategoryId,
     betStake: "50",
@@ -229,7 +257,7 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     minRunners: "8",
     qualifyingPlaces: [] as number[],
     winnerMustBeSpFavourite: false,
-    /** Off = straight bet&get; on = place/trigger refund (Best plays). */
+    /** Off = straight bet&get; on = place/trigger refund (drives Offer Edge). */
     resultConditional: false,
     scopeMode: "uk_ire" as ScopeMode,
     scopeCourse: "",
@@ -259,16 +287,21 @@ export function OfferEditorForm({
   prefill,
   open = true,
   onSaved,
+  onBlockingOverlayChange,
 }: {
   prefill?: OfferEditorPrefill;
   open?: boolean;
   onSaved: () => void;
+  /** True while a nested confirm is open or a save is in flight (block parent dismiss). */
+  onBlockingOverlayChange?: (blocking: boolean) => void;
 }) {
   const boot = initialFromPrefill(prefill);
+  const { state } = useAppState();
   const [title, setTitle] = useState(boot.title);
   const [bookmaker, setBookmaker] = useState(boot.bookmaker);
   const [expected, setExpected] = useState(boot.expected);
-  const [expires, setExpires] = useState(boot.expires);
+  const [expiresDate, setExpiresDate] = useState(boot.expiresDate);
+  const [expiresTime, setExpiresTime] = useState(boot.expiresTime);
   const [offerStatus, setOfferStatus] = useState<OfferStatus>(boot.offerStatus);
   const [category, setCategory] = useState<OfferCategoryId>(boot.category);
   const [betStake, setBetStake] = useState(boot.betStake);
@@ -299,7 +332,14 @@ export function OfferEditorForm({
   const [stopRecurrence, setStopRecurrence] = useState(boot.stopRecurrence);
   const [seriesRecurrence, setSeriesRecurrence] = useState(boot.seriesRecurrence);
   const [saving, setSaving] = useState(false);
+  const [seriesConfirmOpen, setSeriesConfirmOpen] = useState(false);
+  const [seriesUpdateScope, setSeriesUpdateScope] = useState<"instance" | "series">("series");
   const [editingId, setEditingId] = useState<number | null>(boot.editingId);
+
+  useEffect(() => {
+    onBlockingOverlayChange?.(seriesConfirmOpen);
+    return () => onBlockingOverlayChange?.(false);
+  }, [seriesConfirmOpen, onBlockingOverlayChange]);
   const [racecards, setRacecards] = useState<RacingRacecard[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [sectionRacing, setSectionRacing] = useState(true);
@@ -316,7 +356,7 @@ export function OfferEditorForm({
   const now = useNow(60_000);
   // A pasted promo often carries yesterday's deadline. Saving it works, but the
   // server files it straight under Expired, which reads as "nothing saved".
-  const expiryMs = fromDatetimeLocalValue(expires);
+  const expiryMs = expiresAtFromParts(expiresDate, expiresTime);
   const expiryAlreadyPassed = expiryMs != null && now > 0 && expiryMs < now;
 
   const { bookieWallets, exchangeWallets, exchangeDirectory, ensureVenue } = useVenueAccounts();
@@ -343,7 +383,8 @@ export function OfferEditorForm({
     setTitle(next.title);
     setBookmaker(next.bookmaker);
     setExpected(next.expected);
-    setExpires(next.expires);
+    setExpiresDate(next.expiresDate);
+    setExpiresTime(next.expiresTime);
     setOfferStatus(next.offerStatus);
     setCategory(next.category);
     setBetStake(next.betStake);
@@ -575,7 +616,7 @@ export function OfferEditorForm({
     // the FIRST occurrence - e.g. starts Wed, expires next Tue → every future
     // occurrence also runs for that same span from its own start date.
     const expiryOffsetDays = (() => {
-      const expiresMs = fromDatetimeLocalValue(expires);
+      const expiresMs = expiresAtFromParts(expiresDate, expiresTime);
       if (expiresMs == null) return undefined;
       const anchor = startsOnTrimmed || localYmd(new Date());
       const expiresYmd = localYmd(new Date(expiresMs));
@@ -604,7 +645,7 @@ export function OfferEditorForm({
       bookmaker: bookmaker.trim() || undefined,
       expectedProfit: expected.trim() ? parseFloat(expected) : undefined,
       status: offerStatus,
-      expiresAt: fromDatetimeLocalValue(expires),
+      expiresAt: expiresAtFromParts(expiresDate, expiresTime),
       startsOn: startsOnTrimmed || null,
       sport: cat.sport,
       description: description ?? "",
@@ -670,7 +711,7 @@ export function OfferEditorForm({
         return "Pick a specific race.";
       }
     }
-    if (expires.trim() && fromDatetimeLocalValue(expires) == null) {
+    if (expiresDate.trim() && expiresAtFromParts(expiresDate, expiresTime) == null) {
       setSectionDetails(true);
       return "Expiry date looks invalid - clear it or pick a valid date.";
     }
@@ -711,7 +752,13 @@ export function OfferEditorForm({
     setTitle(draft.title);
     setBookmaker(draft.bookmaker ?? "");
     setExpected(draft.expectedProfit != null ? String(draft.expectedProfit) : "");
-    setExpires(draft.expiresAt != null ? toDatetimeLocalValue(draft.expiresAt) : "");
+    {
+      const parts = splitDatetimeLocal(
+        draft.expiresAt != null ? toDatetimeLocalValue(draft.expiresAt) : ""
+      );
+      setExpiresDate(parts.date);
+      setExpiresTime(parts.time);
+    }
     setOfferStatus("active");
     setImportantFromTerms(draft.important);
     setSectionDetails(true);
@@ -749,22 +796,31 @@ export function OfferEditorForm({
     });
   }
 
-  async function saveOffer(e: React.FormEvent) {
-    e.preventDefault();
-    const validationError = validateBeforeSave();
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
+  const repeatingEdit =
+    editingId != null && Boolean(seriesRecurrence?.enabled) && !stopRecurrence;
+  const otherOccurrenceCount =
+    seriesRecurrence?.seriesId != null
+      ? (state?.offers ?? []).filter(
+          (o) => o.seriesId === seriesRecurrence.seriesId && o.id !== editingId
+        ).length
+      : 0;
+
+  async function persistOffer(updateSeries: boolean) {
     setSaving(true);
     try {
-      const payload = buildOfferPayload();
+      const payload = {
+        ...buildOfferPayload(),
+        ...(updateSeries ? { updateSeries: true } : {}),
+      };
       const expiredOnArrival = expiryAlreadyPassed
         ? { description: "The expiry has already passed, so it's under the Expired filter." }
         : undefined;
       if (editingId != null) {
         await api(`/api/offers/${editingId}`, { method: "PATCH", json: payload });
-        toast.success("Offer updated", expiredOnArrival);
+        toast.success(
+          updateSeries ? "Offer and repeat occurrences updated" : "Offer updated",
+          expiredOnArrival
+        );
       } else {
         await api("/api/offers", { method: "POST", json: payload });
         toast.success("Offer added", expiredOnArrival);
@@ -785,6 +841,7 @@ export function OfferEditorForm({
           });
         }
       }
+      setSeriesConfirmOpen(false);
       onSaved();
     } catch (err) {
       toast.error(editingId != null ? "Could not update offer" : "Could not create offer", {
@@ -793,6 +850,23 @@ export function OfferEditorForm({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveOffer(e: React.FormEvent) {
+    e.preventDefault();
+    const validationError = validateBeforeSave();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    if (repeatingEdit && otherOccurrenceCount > 0) {
+      setSeriesUpdateScope("series");
+      setSeriesConfirmOpen(true);
+      return;
+    }
+    // Series with no siblings materialised yet: still refresh the template so
+    // future occurrences pick up the edited terms (no confirm needed).
+    await persistOffer(repeatingEdit);
   }
 
   const scopeSummary =
@@ -929,7 +1003,7 @@ export function OfferEditorForm({
               </span>
               <span className="mt-0.5 block text-muted-foreground">
                 On for place refunds and similar. Off for straight bet & get, where the free bet
-                lands after the qualifying bet regardless of result. Best plays only appears when
+                lands after the qualifying bet regardless of result. Offer Edge only appears when
                 this is on.
               </span>
             </span>
@@ -942,19 +1016,18 @@ export function OfferEditorForm({
                   {([2, 3, 4, 5, 6] as const).map((place) => {
                     const on = qualifyingPlaces.includes(place);
                     return (
-                      <button
+                      <FilterPill
                         key={place}
-                        type="button"
-                        aria-pressed={on}
+                        active={on}
                         onClick={() => {
                           setQualifyingPlaces((prev) =>
                             on ? prev.filter((p) => p !== place) : [...prev, place].sort((a, b) => a - b)
                           );
                         }}
-                        className={cn(filterPillState(on), "tabular-nums")}
+                        className="tabular-nums"
                       >
                         {place === 2 ? "2nd" : place === 3 ? "3rd" : `${place}th`}
-                      </button>
+                      </FilterPill>
                     );
                   })}
                 </div>
@@ -1037,9 +1110,9 @@ export function OfferEditorForm({
                 ).map(({ id, label }) => {
                   const active = scopeRegions.includes(id);
                   return (
-                    <button
+                    <FilterPill
                       key={id}
-                      type="button"
+                      active={active}
                       onClick={() => {
                         setScopeRegions((prev) => {
                           if (active) {
@@ -1049,13 +1122,12 @@ export function OfferEditorForm({
                           return [...prev, id];
                         });
                       }}
-                      className={filterPillState(active)}
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <RegionFlag code={id} />
                         {label}
                       </span>
-                    </button>
+                    </FilterPill>
                   );
                 })}
               </div>
@@ -1072,18 +1144,16 @@ export function OfferEditorForm({
                       (name) => normalizeCourseName(name) === normalizeCourseName(c.name)
                     );
                     return (
-                      <button
+                      <FilterPill
                         key={c.name}
-                        type="button"
+                        active={active}
                         onClick={() => toggleScopeCourse(c.name)}
-                        className={filterPillState(active)}
-                        aria-pressed={active}
                       >
                         <span className="inline-flex items-center gap-1.5">
                           <RegionFlag code={c.region} />
                           {c.name}
                         </span>
-                      </button>
+                      </FilterPill>
                     );
                   })}
                 </div>
@@ -1204,7 +1274,7 @@ export function OfferEditorForm({
         summary={[
           bookmaker || null,
           expected ? `EV £${expected}` : null,
-          expires ? formatOfferExpiry(fromDatetimeLocalValue(expires) ?? 0) : null,
+          expiryMs != null ? formatOfferExpiry(expiryMs) : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -1273,27 +1343,42 @@ export function OfferEditorForm({
             />
           </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="offer-expires" className="text-[11px] text-muted-foreground">
-            Expires
-          </Label>
-          <Input
-            id="offer-expires"
-            type="datetime-local"
-            value={expires}
-            onChange={(e) => setExpires(e.target.value)}
-          />
-          {expiryAlreadyPassed ? (
-            <p className="text-[11px] font-medium text-warning">
-              This deadline has already passed, so the offer is filed under Expired as soon as
-              you save it. Clear or update the date to keep it in the main feed.
-            </p>
-          ) : startsOn.trim() && startsOn.trim() > localYmd(new Date()) ? (
-            <p className="text-[11px] text-muted-foreground">
-              Stays &ldquo;Planned&rdquo; until {startsOn}, then goes live automatically.
-            </p>
-          ) : null}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="offer-expires-date" className="text-[11px] text-muted-foreground">
+              Expires
+            </Label>
+            <DatePicker
+              id="offer-expires-date"
+              value={expiresDate}
+              onChange={setExpiresDate}
+              placeholder="Pick a date"
+              shortcuts="ending"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="offer-expires-time" className="text-[11px] text-muted-foreground">
+              Time
+            </Label>
+            <EventTimeInput
+              id="offer-expires-time"
+              value={expiresTime}
+              onChange={setExpiresTime}
+              placeholder="Pick a time"
+              shortcuts="ending"
+            />
+          </div>
         </div>
+        {expiryAlreadyPassed ? (
+          <p className="text-[11px] font-medium text-warning">
+            This deadline has already passed, so the offer is filed under Expired as soon as
+            you save it. Clear or update the date to keep it in the main feed.
+          </p>
+        ) : startsOn.trim() && startsOn.trim() > localYmd(new Date()) ? (
+          <p className="text-[11px] text-muted-foreground">
+            Stays &ldquo;Planned&rdquo; until {startsOn}, then goes live automatically.
+          </p>
+        ) : null}
         {editingId == null ? (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
             <input
@@ -1357,9 +1442,9 @@ export function OfferEditorForm({
                   {WEEKDAY_LABELS.map((label, day) => {
                     const active = repeatWeekdays.includes(day);
                     return (
-                      <button
+                      <FilterPill
                         key={day}
-                        type="button"
+                        active={active}
                         onClick={() =>
                           setRepeatWeekdays((prev) => {
                             if (active) {
@@ -1369,10 +1454,9 @@ export function OfferEditorForm({
                             return [...prev, day].sort();
                           })
                         }
-                        className={filterPillState(active)}
                       >
                         {label}
-                      </button>
+                      </FilterPill>
                     );
                   })}
                 </div>
@@ -1484,7 +1568,10 @@ export function OfferEditorForm({
             placeholder="SNR · new customers only · min 3 selections…"
             value={importantNotes}
             onChange={(e) => setImportantNotes(e.target.value)}
-            className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none ring-primary/40 focus:ring-2"
+            className={cn(
+              fieldControl,
+              "min-h-[3.5rem] w-full resize-y px-3 py-2 text-sm outline-none"
+            )}
           />
         </div>
       </FormSection>
@@ -1507,6 +1594,89 @@ export function OfferEditorForm({
           )}
         </Button>
       </div>
+
+      <Dialog
+        open={seriesConfirmOpen}
+        onOpenChange={(next) => {
+          if (!next && saving) return;
+          setSeriesConfirmOpen(next);
+        }}
+      >
+        <DialogContent
+          mobile="center"
+          className="max-w-sm"
+          showCloseButton={!saving}
+          onEscapeKeyDown={(e) => {
+            if (saving) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (saving) e.preventDefault();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Update repeat occurrences?</DialogTitle>
+            <DialogDescription>
+              This offer repeats
+              {seriesRecurrence?.rule
+                ? ` (${formatRecurrenceLabel(seriesRecurrence.rule).toLowerCase()})`
+                : ""}
+              . There {otherOccurrenceCount === 1 ? "is" : "are"} {otherOccurrenceCount} other
+              occurrence{otherOccurrenceCount === 1 ? "" : "s"}. Choose what to update.
+            </DialogDescription>
+          </DialogHeader>
+          <fieldset className="space-y-2 text-sm">
+            <legend className="sr-only">Update scope</legend>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="radio"
+                name="offer-series-update-scope"
+                className="mt-1"
+                checked={seriesUpdateScope === "instance"}
+                onChange={() => setSeriesUpdateScope("instance")}
+              />
+              <span>
+                <span className="font-medium text-foreground">This occurrence only</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Later repeats keep the previous terms.
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="radio"
+                name="offer-series-update-scope"
+                className="mt-1"
+                checked={seriesUpdateScope === "series"}
+                onChange={() => setSeriesUpdateScope("series")}
+              />
+              <span>
+                <span className="font-medium text-foreground">This and other occurrences</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Updates the series template and untouched repeats. Occurrences with bets stay as
+                  they are.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSeriesConfirmOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={saving}
+              onClick={() => void persistOffer(seriesUpdateScope === "series")}
+            >
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

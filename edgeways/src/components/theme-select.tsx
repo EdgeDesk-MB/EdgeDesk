@@ -1,40 +1,59 @@
 "use client";
 
 /**
- * Appearance control - Light / Dark / System as a segmented control with
- * icons, replacing the old two-state dark-mode switch. `system` follows the
- * OS and is the honest default for a PWA that lives on a phone too.
+ * Appearance control — Light / Dark segmented toggle.
+ * System/OS sync was dropped so the control fits the side-nav column
+ * without truncating labels; explicit choice is clearer for a desk tool.
  */
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+import { Moon, Sun, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: Array<{ value: string; label: string; icon: LucideIcon }> = [
+const OPTIONS: Array<{ value: "light" | "dark"; label: string; icon: LucideIcon }> = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
 ];
 
-export function ThemeSelect({ className }: { className?: string }) {
-  const { theme, setTheme } = useTheme();
+export function ThemeSelect({
+  className,
+  tone = "default",
+  size = "default",
+}: {
+  className?: string;
+  /** `topbar` = ink controls on the yellow app bar */
+  tone?: "default" | "topbar";
+  /** `compact` = icons only */
+  size?: "default" | "compact";
+}) {
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
   }, []);
 
-  const active = mounted ? (theme ?? "system") : "system";
+  // Collapse legacy "system" (or unset) onto the resolved light/dark face.
+  const active: "light" | "dark" = !mounted
+    ? "light"
+    : theme === "dark" || theme === "light"
+      ? theme
+      : resolvedTheme === "dark"
+        ? "dark"
+        : "light";
+  const compact = size === "compact";
+  const topbar = tone === "topbar";
 
   return (
-    // Toggle-button group (aria-pressed), not fake radios - each button is a
-    // plain tab stop, so no roving-tabindex machinery is owed.
     <div
       role="group"
       aria-label="Appearance"
       className={cn(
-        "flex items-center gap-0.5 rounded-md border bg-muted/60 p-0.5",
+        "flex w-full min-w-0 items-center gap-0.5 rounded-md border p-0.5",
+        topbar
+          ? "border-[#111111]/15 bg-[#111111]/10"
+          : "border-border bg-muted/60",
         className
       )}
     >
@@ -49,16 +68,21 @@ export function ThemeSelect({ className }: { className?: string }) {
             aria-label={`${option.label} appearance`}
             disabled={!mounted}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-1.5 text-xs font-medium transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+              "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[5px] text-xs font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              compact ? "size-7 flex-none px-0" : "px-2 py-1.5",
               selected
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? topbar
+                  ? "bg-[#111111] text-white"
+                  : "bg-background text-foreground"
+                : topbar
+                  ? "text-[#111111]/70 hover:bg-[#111111]/10 hover:text-[#111111]"
+                  : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setTheme(option.value)}
           >
             <Icon className="size-3.5 shrink-0" aria-hidden />
-            {option.label}
+            {compact ? null : <span className="truncate">{option.label}</span>}
           </button>
         );
       })}

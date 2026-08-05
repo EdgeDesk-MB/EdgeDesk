@@ -15,7 +15,7 @@ import {
   type CasinoCalendarItem,
 } from "@/lib/offers/casino-offer-calendar";
 import { formatOfferDaysLeftLabel } from "@/lib/offers/offer-expiry";
-import { offerCalendarCardShell } from "@/lib/ui/surface-styles";
+import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 
@@ -33,7 +33,9 @@ function CasinoCalendarItemCard({
   onOfferClick?: (offer: CasinoOfferSummary) => void;
 }) {
   const { offer } = item;
-  const tint = headerTint(offer);
+  // EV tint + urgency colour only for today / tomorrow expiries.
+  const nearTerm = item.urgency === "today" || item.urgency === "tomorrow";
+  const tint = nearTerm ? headerTint(offer) : null;
   const urgencyClass =
     item.urgency === "today"
       ? "text-rose-700 dark:text-rose-300"
@@ -45,7 +47,7 @@ function CasinoCalendarItemCard({
     <button
       type="button"
       onClick={() => onOfferClick?.(offer)}
-      className={cn(offerCalendarCardShell, "w-full")}
+      className={cn(offerCampaignCardShell, "w-full")}
       aria-label={`View campaign: ${offer.title}`}
     >
       <div className={cn("relative z-[2] min-w-0 flex-1 px-3 pt-[10px] pb-2.5", tint ?? "bg-card")}>

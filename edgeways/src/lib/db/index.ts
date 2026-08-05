@@ -281,6 +281,20 @@ CREATE TABLE IF NOT EXISTS alerts_inbox (
   updated_at INTEGER NOT NULL,
   read_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS user_reminders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  note TEXT NOT NULL,
+  remind_at INTEGER NOT NULL,
+  casino_offer_id INTEGER,
+  offer_id INTEGER,
+  context_title TEXT,
+  context_venue TEXT,
+  created_at INTEGER NOT NULL,
+  fired_at INTEGER,
+  cancelled_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_user_reminders_due
+  ON user_reminders(remind_at) WHERE fired_at IS NULL AND cancelled_at IS NULL;
 CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,
@@ -412,6 +426,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("casino_offers", "expires_at INTEGER");
   addColumn("casino_offers", "series_id INTEGER");
   addColumn("casino_offers", "instance_date TEXT");
+  addColumn("user_reminders", "context_venue TEXT");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS casino_offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

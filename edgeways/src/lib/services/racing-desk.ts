@@ -359,10 +359,15 @@ function buildSuggestedRaces(
         bookmaker: tag.bookmaker ?? edge?.bookmaker ?? null,
         score: tag.score ?? 0,
         summary: edge?.reasons.join(" · ") || tag.summary || "",
-        oddsSource: race.oddsSource,
+        oddsSource: edge?.oddsSource ?? topTarget?.oddsSource ?? race.oddsSource,
+        exchangeSource:
+          edge?.exchangeSource ?? topTarget?.exchangeSource ?? race.exchangeSource,
         suggestedRunners: tag.suggestedRunners,
         topTarget,
-        confidence: edge?.confidence ?? topTarget?.confidence ?? resolveOfferConfidence(race.oddsSource),
+        confidence:
+          edge?.confidence ??
+          topTarget?.confidence ??
+          resolveOfferConfidence(race.oddsSource, race.exchangeSource),
         topEv: edge?.totalEv ?? topTarget?.totalEv,
         edge,
       });
@@ -518,6 +523,11 @@ export async function getRacingDesk(
       distance: card.distance,
       going: card.going,
       raceClass: card.raceClass,
+      pattern: card.pattern,
+      ratingBand: card.ratingBand,
+      ageBand: card.ageBand,
+      surface: card.surface,
+      sexRestriction: card.sexRestriction,
       type: card.type,
       prize: card.prize,
       region: card.region,

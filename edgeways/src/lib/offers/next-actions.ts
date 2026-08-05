@@ -1,5 +1,6 @@
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+import { isOfferEffectivelyExpired } from "@/lib/offers/offer-list-groups";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatAwaitingResultLabel } from "@/lib/offers/pipeline";
 import { formatDecimalOdds } from "@/lib/racing/odds";
@@ -83,7 +84,9 @@ export function deriveOfferNextAction(
   now = Date.now(),
   opts?: OfferNextActionOptions
 ): OfferNextAction | null {
-  if (offer.status === "completed" || offer.status === "expired") return null;
+  if (offer.status === "completed") return null;
+  // Past deadline (or status expired) - nothing left to do in Do next.
+  if (isOfferEffectivelyExpired(offer, now)) return null;
 
   const edgePlay = opts?.edgePlays?.get(offer.id);
   const edge = edgePlay ? toActionEdge(edgePlay) : undefined;
@@ -147,8 +150,8 @@ export function deriveOfferNextAction(
       title: "Convert free bet",
       detail:
         profit.freeBetAwardAmount != null
-          ? `£${profit.freeBetAwardAmount.toFixed(2)} free bet ready - place SNR/SR conversion.`
-          : "Free bet awarded - place the conversion bet.",
+          ? `£${profit.freeBetAwardAmount.toFixed(2)} free bet ready.`
+          : "Free bet due - place the conversion bet.",
       href: `/tracker?offer=${offer.id}&queue=offers&action=convert`,
     };
   }

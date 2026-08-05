@@ -99,6 +99,19 @@ function daysUntilExpiry(expiresAt: number | null, now: number): number | null {
   return (expiresAt - now) / (24 * 60 * 60 * 1000);
 }
 
+/**
+ * Priority chrome (bars, elevated tiers) only for today/tomorrow work:
+ * do-now actions, planned starts, and expiries within two days.
+ * Further-out cards stay neutral so the board does not read as all-High.
+ */
+export function isCalendarPriorityWindow(input: {
+  kind: OfferCalendarKind;
+  daysLeft: number | null;
+}): boolean {
+  if (input.kind === "action" || input.kind === "planned") return true;
+  return input.daysLeft != null && input.daysLeft < 2;
+}
+
 export function priorityFromSignals(input: {
   kind: OfferCalendarKind;
   daysLeft: number | null;
@@ -106,6 +119,7 @@ export function priorityFromSignals(input: {
   actionPriority?: number;
 }): OfferCalendarPriority {
   const { kind, daysLeft, advantageScore, actionPriority } = input;
+  if (!isCalendarPriorityWindow({ kind, daysLeft })) return "low";
   if (kind === "action" && (actionPriority ?? 99) <= 12) return "critical";
   if (daysLeft != null && daysLeft <= 1) return "critical";
   if (daysLeft != null && daysLeft <= 3) return "high";

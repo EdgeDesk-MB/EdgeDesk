@@ -24,7 +24,6 @@ import {
   suppressAlertKeys,
 } from "@/lib/alerts/seen";
 import { DEFAULT_TUNING } from "@/lib/services/settings-shared";
-import { filterPillState } from "@/lib/ui/surface-styles";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
 import {
   canManuallyCompleteOffer,
@@ -68,7 +67,7 @@ import {
   offerHasFreeBetReward,
 } from "@/lib/offers/offer-ui";
 import { outlineButtonGroup } from "@/components/layout/page-header-actions";
-import { Check, ChevronDown, Eye, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Eye, Pencil, Trash2, Zap } from "lucide-react";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -236,16 +235,16 @@ export function OfferCampaignCard({
                   {issueStatusLabel}
                 </Badge>
               ) : null}
-              <Badge variant="outline" className="gap-1 font-normal">
+              <Badge variant="outline" className="font-normal">
                 <OfferCategoryIcon category={categoryId} size={12} className="opacity-80" />
                 {categoryLabel}
               </Badge>
               {hasFreeBet ? (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                  className="border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-300"
                 >
-                  <Sparkles className="size-3" />
+                  <Zap className="size-3" />
                   {freeBetAmt != null ? `${formatGbp(freeBetAmt)} FB` : "Free bet"}
                 </Badge>
               ) : null}
@@ -418,7 +417,7 @@ export function OfferCampaignCard({
       ) : null}
 
       <CardContent
-        className="offer-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]"
+        className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]"
         onClick={stopCardActivate}
         onKeyDown={stopCardActivate}
       >
@@ -752,15 +751,16 @@ function MistakeTagRow({
         What went wrong?
       </span>
       {MISTAKE_TAG_OPTIONS.map((o) => (
-        <button
+        <Button
           key={o.tag}
           type="button"
+          size="xs"
+          variant={evLock.mistakeTag === o.tag ? "secondary" : "outline"}
           disabled={saving}
-          className={cn(filterPillState(evLock.mistakeTag === o.tag), "px-2 py-0.5 text-[10px] leading-none")}
           onClick={() => void setTag(o.tag)}
         >
           {o.label}
-        </button>
+        </Button>
       ))}
       <button
         type="button"

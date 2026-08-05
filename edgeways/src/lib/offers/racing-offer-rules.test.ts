@@ -9,6 +9,7 @@ import {
   parseOfferRules,
   parseScopeCourses,
   placeRefundTriggerText,
+  countOfferQualifyingRaces,
   raceQualifiesForOffer,
   scorePlaceRefundRunners,
   scorePlaceRefundStrategy,
@@ -209,6 +210,35 @@ describe("raceQualifiesForOffer", () => {
     const result = raceQualifiesForOffer(baseOffer, { ...race, fieldSize: 6 }, "2026-07-08");
     expect(result.qualifies).toBe(false);
     expect(result.reasons[0]).toContain("6 runners");
+  });
+});
+
+describe("countOfferQualifyingRaces", () => {
+  it("counts desk-style qualifying races and skips unknown field sizes", () => {
+    const scoped = { ...baseOffer, scopeCourse: "Galway" };
+    const n = countOfferQualifyingRaces(
+      scoped,
+      [
+        { course: "Galway", fieldSize: 12 },
+        { course: "Galway", fieldSize: 6 },
+        { course: "Galway", fieldSize: 10 },
+        { course: "Galway", fieldSize: null },
+        { course: "Ascot", fieldSize: 14 },
+      ],
+      "2026-07-08"
+    );
+    // 12 and 10 qualify; 6 fails min runners; null skipped; Ascot out of scope
+    expect(n).toBe(2);
+  });
+
+  it("returns null when the offer has no structured rules", () => {
+    expect(
+      countOfferQualifyingRaces(
+        { ...baseOffer, offerType: "general", rules: null },
+        [{ course: "Galway", fieldSize: 12 }],
+        "2026-07-08"
+      )
+    ).toBeNull();
   });
 });
 

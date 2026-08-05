@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./header-patterns.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -39,9 +40,55 @@
   initial-value: #3f3f46;
 }
 
+/*
+ * Brand accent — registered so --brand (and derived logo / on-plate ink)
+ * can interpolate when Appearance presets change.
+ */
+@property --brand {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffc71e;
+}
+@property --brand-logo {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffc71e;
+}
+@property --brand-logo-foreground {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111111;
+}
+@property --brand-on-topbar {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111111;
+}
+@property --topbar-muted-on-brand {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111111;
+}
+@property --brand-text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffc71e;
+}
+@property --brand-highlight {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c99700;
+}
+@property --brand-foreground {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111111;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* Pass-through to next/font (`--font-sans` = Noto). Figtree overrides below. */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
@@ -66,6 +113,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-edge: var(--edge);
+  --color-edge-foreground: var(--edge-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -82,6 +130,11 @@
   /* Body/link/icon accent on surfaces - NOT for button fills (use bg-primary) */
   --color-primary-text: var(--primary-text);
   --color-highlight: var(--highlight);
+  --color-brand: var(--brand);
+  --color-brand-logo: var(--brand-logo);
+  --color-brand-text: var(--brand-text);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-on-topbar: var(--brand-on-topbar);
   --color-chip: var(--chip);
   --color-chip-foreground: var(--chip-foreground);
   --color-popover-foreground: var(--popover-foreground);
@@ -96,6 +149,8 @@
   --color-topbar-muted: var(--topbar-muted);
   --color-topbar-border: var(--topbar-border);
   --color-topbar-accent: var(--topbar-accent);
+  --color-topbar-accent-foreground: var(--topbar-accent-foreground);
+  --color-topbar-stripe: var(--topbar-stripe);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -112,22 +167,60 @@
   --surface: oklch(1 0 0);
   --surface-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
   --page-shadow: 0 0 14px rgb(0 0 0 / 0.11), 0 0 3px rgb(0 0 0 / 0.06);
+  /* Raised controls — Shopify/Polaris shadow-button recipe (shared by
+   * PressButton faces, flat outline triggers, fields, selects).
+   * No outer drop. Top shine lives in the shadow so native <input>/
+   * <textarea> get the same bevel without ::before/::after. */
+  --ew-btn-shadow: inset 0 -1px 0 0 rgb(0 0 0 / 0.14),
+    inset 0 0 0 1px rgb(0 0 0 / 0.1),
+    inset 0 0.5px 0 1.5px rgb(255 255 255 / 0.85);
+  --ew-btn-shadow-pressed: inset 0 1px 0.5px 0 rgb(0 0 0 / 0.12),
+    inset 0.5px 0 0.5px 0 rgb(0 0 0 / 0.06),
+    inset -0.5px 0 0.5px 0 rgb(0 0 0 / 0.06);
+  /* Ink chips / segmented active — soft light rims only. Full button
+   * recipe (hot top shine + dark lip) reads as a heavy bezel on #111. */
+  --ew-chip-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 0 rgb(255 255 255 / 0.07),
+    inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  /* Login / burger face — brand apply overrides to chip when plate is dark */
+  --topbar-accent-face-shadow: var(--ew-btn-shadow);
+  --shadow-skeuo-inset: var(--ew-btn-shadow);
+  --shadow-skeuo: var(--shadow-skeuo-inset);
+  --skeuo-bevel: rgb(255 255 255 / 0.55);
+  --skeuo-bevel-bottom: rgb(255 255 255 / 0.2);
   --background: var(--canvas);
   --foreground: oklch(0.145 0 0);
   --card: var(--surface);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  /* Brand yellow #FFC71E primary buttons (both themes); ink text on fill */
-  --primary: oklch(0.856 0.17 87.3);
-  --primary-foreground: oklch(0.178 0 0);
-  --primary-hover: oklch(0.79 0.158 87.3);
-  /* Inline accent on light surfaces - ink (yellow fails contrast on white) */
+  /* User-replaceable brand accent (default Amber #FFC71E). Appearance presets
+   * set this on <html>; Light/Dark only flip which roles consume it. */
+  --brand: #ffc71e;
+  /* Light-mode topbar lockup — boosted brand on the ink plate. */
+  --brand-logo: #ffc71e;
+  /* Type on the boosted logo plate (Login / burger in light). */
+  --brand-logo-foreground: #111111;
+  /* Accent type on ink / dark plates — lifted when raw brand is dark. */
+  --brand-text: #ffc71e;
+  /* Thin accents on light surfaces — darkened when raw brand is too bright. */
+  --brand-highlight: #c99700;
+  /* Type sitting ON brand fills — #111 or white by luminance. */
+  --brand-foreground: #111111;
+  /* Marks on the brand plate (dark topbar / logo icon bolt). */
+  --brand-on-topbar: #111111;
+  /* Inactive meta tabs on brand plate — #111 / white (same as --brand-on-topbar). */
+  --topbar-muted-on-brand: #111111;
+  /* Light primary: ink plate #111 + brand type; hover lightens plate */
+  --primary: oklch(0.178 0 0);
+  --primary-foreground: var(--brand-text);
+  --primary-hover: oklch(0.28 0 0);
+  /* Inline accent on light surfaces - ink (brand fails contrast on white) */
   --primary-text: oklch(0.178 0 0); /* #111111 */
-  /* Highlight = brand yellow (underlines); chip = ink plate + yellow type */
-  --highlight: oklch(0.856 0.17 87.3); /* #FFC71E */
+  /* Highlight = capped brand (underlines / light strokes); chip = ink + type */
+  --highlight: var(--brand-highlight);
   --chip: oklch(0.178 0 0); /* #111111 */
-  --chip-foreground: oklch(0.856 0.17 87.3); /* #FFC71E */
+  --chip-foreground: var(--brand-text);
   --secondary: oklch(0.965 0.002 250);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.935 0.003 250);
@@ -140,19 +233,25 @@
   --warning: oklch(0.55 0.14 75);
   /* Offer Edge / Race picks / pro-tier signature (violet family, not caution amber) */
   --edge: oklch(0.5 0.2 295);
+  /* Type on solid `bg-edge` plates (`edgeNavTag`) — white on mid-dark edge */
+  --edge-foreground: oklch(1 0 0);
   --border: oklch(0.885 0.003 250);
   --input: oklch(0.885 0.003 250);
-  --ring: oklch(0.856 0.17 87.3);
-  --chart-1: oklch(0.856 0.17 87.3);
+  --ring: var(--brand);
+  --chart-1: var(--brand);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --radius: 0.625rem;
+  /* Controls (buttons, fields, selects) — 2px tighter than cards (10→8).
+   * Sm/xs share the same radius so compact outline buttons don’t look sharp. */
+  --radius-button: max(0px, calc(var(--radius) - 2px));
+  --radius-button-sm: var(--radius-button);
   --sidebar: var(--canvas);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.856 0.17 87.3);
-  --sidebar-primary-foreground: oklch(0.178 0 0);
+  --sidebar-primary: var(--brand-text);
+  --sidebar-primary-foreground: var(--brand-foreground);
   --sidebar-accent: oklch(0.965 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.88 0 0);
@@ -161,12 +260,16 @@
   --selection-subdued: oklch(0.935 0.003 250);
   --selection-subtle-border: oklch(0.91 0 0);
   --selection-subdued-border: oklch(0.875 0 0);
-  /* Brand yellow bar; ink lockup + ink chrome sit on it */
-  --topbar: oklch(0.856 0.17 87.3); /* #FFC71E */
-  --topbar-foreground: oklch(0.178 0 0); /* #111111 */
-  --topbar-muted: oklch(0.178 0 0 / 55%);
-  --topbar-border: oklch(0.178 0 0 / 12%);
-  --topbar-accent: oklch(1 0 0 / 45%); /* light chips on yellow */
+  /* Header + meta-nav: ink plate + yellow stripe / yellow Login */
+  --topbar: oklch(0.178 0 0); /* #111111 */
+  --topbar-foreground: oklch(1 0 0); /* white */
+  /* White on ink plate — full contrast for inactive meta icons/labels */
+  --topbar-muted: #ffffff;
+  --topbar-border: oklch(1 0 0 / 10%);
+  /* Login / burger — same boosted plate as light-mode lockup */
+  --topbar-accent: var(--brand-logo);
+  --topbar-accent-foreground: var(--brand-logo-foreground);
+  --topbar-stripe: var(--canvas); /* matches balance / meta Chrome tabs */
   /* Layout spacing - page shell, cards, section bands */
   --layout-page-x: 1.25rem;
   --layout-shell-gap: 0.25rem;
@@ -175,18 +278,26 @@
   --layout-stack-gap-compact: 0.75rem;
   --layout-card-x: 1rem;
   --layout-section-y: 0.75rem;
-  /* Viewport content area below sticky header + shell padding */
-  --layout-header-h: 3rem;
+  /* Viewport content area below sticky header + shell padding.
+   * Header row (~4rem) + meta-nav strip (~2.25rem) at all breakpoints. */
+  --layout-header-h: 6.25rem;
   --layout-page-min-h: calc(
     100dvh - var(--layout-header-h) - 2 * var(--layout-page-x) - 0.5rem
   );
+  /* Chrome-style top-bar tabs — rise (meta) keeps a tighter radius; hang
+   * (balance) uses a larger ear so connectors read into the topbar plate.
+   * Hang bottom corners are tighter than the top ear scoops. */
+  --chrome-tab-r: 12px;
+  --chrome-tab-r-hang: 24px;
+  --chrome-tab-r-hang-bottom: 12px;
+  /* Top accent stripe above the header */
+  --topbar-stripe-h: 4px;
   /* Segmented control - 2px vertical / 1px horizontal track inset, 32px segments */
   --segmented-track-pad: 2px;
   --segmented-track-pad-x: 1px;
   --segmented-radius: 9999px;
   --offer-card-details-fade: color-mix(in oklch, var(--muted) 6%, var(--card));
   --offer-card-details: color-mix(in oklch, var(--muted) 22%, var(--card));
-  --offer-card-footer-soft: color-mix(in oklch, var(--muted) 16%, var(--card));
 }
 
 @media (min-width: 1024px) {
@@ -210,21 +321,37 @@
   --surface: oklch(0.25 0.003 250);
   --surface-shadow: none;
   --page-shadow: none;
+  /* Dark plates: lighten edges (top + bottom shine), kept soft so faces
+   * match PressButton / fields without a hot white rim. */
+  --ew-btn-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 0 rgb(255 255 255 / 0.1),
+    inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  --ew-btn-shadow-pressed: inset 0 1px 1px 0 rgb(0 0 0 / 0.35),
+    inset 0 -0.5px 0 0 rgb(255 255 255 / 0.06),
+    inset 0.5px 0 0.5px 0 rgb(0 0 0 / 0.16),
+    inset -0.5px 0 0.5px 0 rgb(0 0 0 / 0.16);
+  --ew-chip-shadow: var(--ew-btn-shadow);
+  /* Dark-mode Login is ink #111 — keep soft lighten face */
+  --topbar-accent-face-shadow: var(--ew-chip-shadow);
+  --shadow-skeuo-inset: var(--ew-btn-shadow);
+  --shadow-skeuo: var(--shadow-skeuo-inset);
+  --skeuo-bevel: rgb(255 255 255 / 0.22);
+  --skeuo-bevel-bottom: rgb(255 255 255 / 0.14);
   --background: var(--canvas);
   --foreground: oklch(0.985 0 0);
   --card: var(--surface);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  /* Brand yellow #FFC71E primary buttons; ink text on fill */
-  --primary: oklch(0.856 0.17 87.3);
-  --primary-foreground: oklch(0.178 0 0);
-  --primary-hover: oklch(0.79 0.158 87.3);
-  /* Inline accent on dark surfaces - brand yellow reads well */
-  --primary-text: oklch(0.856 0.17 87.3); /* #FFC71E */
-  --highlight: oklch(0.856 0.17 87.3); /* #FFC71E */
+  /* Dark primary: raw brand fill + contrast type; hover lightens brand */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --primary-hover: color-mix(in oklch, var(--brand) 85%, white);
+  /* Inline accent on dark surfaces — lifted when brand is dark */
+  --primary-text: var(--brand-text);
+  --highlight: var(--brand-text);
   --chip: oklch(0.178 0 0); /* #111111 */
-  --chip-foreground: oklch(0.856 0.17 87.3); /* #FFC71E */
+  --chip-foreground: var(--brand-text);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -237,9 +364,11 @@
   --success: oklch(0.62 0.14 150);
   --warning: oklch(0.72 0.13 75);
   --edge: oklch(0.72 0.16 295);
+  /* Ink on lifted dark-theme edge plate */
+  --edge-foreground: oklch(0.178 0 0);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.856 0.17 87.3);
+  --ring: var(--brand-text);
   --chart-1: oklch(0.58 0.08 250);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -247,8 +376,8 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: var(--canvas);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.856 0.17 87.3);
-  --sidebar-primary-foreground: oklch(0.178 0 0);
+  --sidebar-primary: var(--brand-text);
+  --sidebar-primary-foreground: var(--brand-foreground);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -257,19 +386,40 @@
   --selection-subdued: oklch(0.28 0 0);
   --selection-subtle-border: oklch(1 0 0 / 12%);
   --selection-subdued-border: oklch(1 0 0 / 18%);
-  /* Same yellow bar in dark mode - brand chrome stays consistent */
-  --topbar: oklch(0.856 0.17 87.3); /* #FFC71E */
-  --topbar-foreground: oklch(0.178 0 0); /* #111111 */
-  --topbar-muted: oklch(0.178 0 0 / 55%);
-  --topbar-border: oklch(0.178 0 0 / 12%);
-  --topbar-accent: oklch(1 0 0 / 45%); /* light chips on yellow */
+  /* Brand plate + contrast ink/white (from --brand-on-topbar); ink Login */
+  --topbar: var(--brand);
+  --topbar-foreground: var(--brand-on-topbar);
+  /* #111 / white — flips with brand luminance via --topbar-muted-on-brand */
+  --topbar-muted: var(--topbar-muted-on-brand);
+  --topbar-border: color-mix(in oklch, var(--brand-on-topbar) 12%, transparent);
+  --topbar-accent: oklch(0.178 0 0); /* #111111 — Login / burger */
+  --topbar-accent-foreground: oklch(1 0 0); /* white — Login icon + label */
+  --topbar-stripe: oklch(0.178 0 0); /* #111111 */
   --offer-card-details-fade: color-mix(in oklch, var(--muted) 28%, var(--card));
   --offer-card-details: color-mix(in oklch, var(--muted) 48%, var(--card));
-  --offer-card-footer-soft: color-mix(in oklch, var(--muted) 20%, var(--card));
-  --offer-card-footer-end: color-mix(in oklch, var(--canvas) 30%, var(--card));
 }
 
 @layer base {
+  /*
+   * Fade brand tokens when Appearance changes — only after first paint
+   * (`brand-accent-ready`) so the FOUC/cookie accent does not animate from Amber.
+   */
+  html.brand-accent-ready {
+    transition:
+      --brand 220ms ease,
+      --brand-logo 220ms ease,
+      --brand-logo-foreground 220ms ease,
+      --brand-text 220ms ease,
+      --brand-highlight 220ms ease,
+      --brand-foreground 220ms ease,
+      --brand-on-topbar 220ms ease,
+      --topbar-muted-on-brand 220ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html.brand-accent-ready {
+      transition: none;
+    }
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -301,6 +451,16 @@
   h1, h2, h3 {
     @apply font-bold tracking-tight;
   }
+}
+
+/*
+ * Unlayered on purpose: next/font’s `--font-sans` variable class is also
+ * unlayered, and unlayered beats `@layer base` even with higher specificity.
+ * `html[data-font]` (0,1,1) then wins over the next/font class (0,1,0).
+ */
+html[data-font="figtree"] {
+  --font-sans: var(--font-figtree);
+  --font-heading: var(--font-figtree);
 }
 
 @layer utilities {
@@ -404,6 +564,15 @@
     background-color: var(--page);
     box-shadow: var(--page-shadow);
     border-radius: var(--layout-page-radius);
+    /* Clip section headers (e.g. Home Summary) so they follow the panel radius */
+    overflow: hidden;
+  }
+  /* Full-bleed shell below sm — no panel radius (wins over utility rounded-*) */
+  @media (max-width: 639px) {
+    .page-panel {
+      border-radius: 0;
+      box-shadow: none;
+    }
   }
   .dark .page-panel {
     box-shadow: none;
@@ -674,23 +843,6 @@
     );
   }
 
-  .offer-card-footer {
-    background: linear-gradient(
-      to bottom,
-      var(--offer-card-footer-soft) 0%,
-      var(--offer-card-footer-soft) 35%,
-      var(--card) 100%
-    );
-  }
-
-  .dark .offer-card-footer {
-    background: linear-gradient(
-      to bottom,
-      var(--offer-card-footer-end) 0%,
-      var(--offer-card-footer-end) 28%,
-      var(--card) 100%
-    );
-  }
 }
 
 @keyframes bet-row-highlight-fade {
@@ -719,7 +871,208 @@
   animation: bet-row-highlight-fade 2s ease-out forwards;
 }
 
-/* Page-primary CTA - brand yellow button with hover shine (Adjust balance, Add offer, etc.) */
+/*
+ * Raised interaction surfaces (inset 3D only — no outer drop).
+ * .skeuo — inset lip (chips, light fills).
+ * .skeuo-solid — inset lip + top highlight bevel (primary / secondary / outline).
+ * Layered so Tailwind position utilities (`fixed`, `absolute`) can override
+ * the default `relative` (unlayered rules were winning and broke the FAB).
+ */
+@layer components {
+  .skeuo {
+    box-shadow: var(--shadow-skeuo);
+  }
+
+  .skeuo-solid {
+    position: relative;
+    box-shadow: var(--shadow-skeuo);
+  }
+
+  /* Compact / ink chips — softer face than grey outline buttons */
+  .skeuo-solid.skeuo-sm {
+    --shadow-skeuo-inset: var(--ew-chip-shadow);
+    --shadow-skeuo: var(--ew-chip-shadow);
+    --skeuo-bevel: transparent;
+    --skeuo-bevel-bottom: transparent;
+  }
+
+  .skeuo-solid.skeuo-sm::before,
+  .skeuo-solid.skeuo-sm::after {
+    content: none;
+    display: none;
+  }
+
+  .skeuo-solid > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /*
+   * Field chrome (Input, SelectTrigger, VenueSelect, textarea.field-control).
+   * Dropdowns rest raised (--ew-btn-shadow); press / open → pressed.
+   * Text inputs rest recessed (button pressed face) — a well to type in.
+   */
+  .skeuo-solid.field-control {
+    transition:
+      box-shadow 0.12s ease-out,
+      transform 0.12s ease-out,
+      background-color 0.15s ease;
+  }
+
+  .skeuo-solid.field-control:is(input, textarea) {
+    box-shadow: var(--ew-btn-shadow-pressed);
+  }
+
+  .skeuo-solid.field-control:is(
+      [data-slot="select-trigger"],
+      button
+    ):is(:active, [data-state="open"], [aria-expanded="true"]):not(:disabled):not(
+      [aria-disabled="true"]
+    ) {
+    box-shadow: var(--ew-btn-shadow-pressed);
+    transform: translate3d(0, 0.25px, 0);
+  }
+
+  .skeuo-solid.field-control:focus-visible {
+    outline: none;
+    box-shadow:
+      var(--ew-btn-shadow-pressed),
+      0 0 0 2px var(--page),
+      0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+  }
+
+  .skeuo-solid.field-control:is(
+      [data-state="open"],
+      [aria-expanded="true"]
+    ):focus-visible {
+    box-shadow:
+      var(--ew-btn-shadow-pressed),
+      0 0 0 2px var(--page),
+      0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+  }
+
+  .skeuo-solid.field-control[aria-invalid="true"]:focus-visible {
+    box-shadow:
+      var(--ew-btn-shadow-pressed),
+      0 0 0 2px var(--page),
+      0 0 0 4px color-mix(in oklch, var(--destructive) 55%, transparent);
+  }
+
+  /*
+   * Chrome tabs — Shopify face (same language as buttons / chips).
+   * Rise (meta): top shine. Hang (balance): bottom shine.
+   * Soft 1px rims — no chunky 3px dark lip.
+   */
+  .chrome-tab-plate {
+    --chrome-tab-bevel: rgb(255 255 255 / 0.45);
+    --chrome-tab-bevel-bottom: rgb(255 255 255 / 0.22);
+  }
+
+  .dark .chrome-tab-plate {
+    --chrome-tab-bevel: rgb(255 255 255 / 0.2);
+    --chrome-tab-bevel-bottom: rgb(255 255 255 / 0.14);
+  }
+
+  /* Light plate (light-mode rise) — soft top shine + thin lip */
+  [data-chrome-tab="rise"] > .chrome-tab-plate {
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.65),
+      inset 0 -1px 0 0 rgb(0 0 0 / 0.08),
+      inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  }
+
+  [data-chrome-tab="rise"] > .chrome-tab-plate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 1px 0 0 var(--chrome-tab-bevel);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 28%, transparent 70%);
+    pointer-events: none;
+  }
+
+  [data-chrome-tab="hang"] > .chrome-tab-plate {
+    box-shadow:
+      inset 0 -1px 0 0 rgb(255 255 255 / 0.4),
+      inset 0 1px 0 0 rgb(0 0 0 / 0.06),
+      inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  }
+
+  [data-chrome-tab="hang"] > .chrome-tab-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 -1px 0 0 var(--chrome-tab-bevel-bottom);
+    mask-image: linear-gradient(to top, #000 0%, #000 28%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Dark plate (dark-mode / brand topbar) — lighten edges like --ew-chip-shadow */
+  .dark [data-chrome-tab="rise"] > .chrome-tab-plate {
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.18),
+      inset 0 -1px 0 0 rgb(255 255 255 / 0.08),
+      inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  }
+
+  .dark [data-chrome-tab="hang"] > .chrome-tab-plate {
+    box-shadow:
+      inset 0 -1px 0 0 rgb(255 255 255 / 0.16),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.08),
+      inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  }
+
+  /* Meta-nav press — same 0.25px shunt as PressButton */
+  a[data-meta-nav] {
+    transition:
+      transform 0.12s ease-out,
+      color 0.1s linear;
+  }
+
+  a[data-meta-nav]:active {
+    transform: translate3d(0, 0.25px, 0);
+  }
+
+  /* Soften status / release-note pills — full button face is too hot at h-5 */
+  [data-slot="badge"].skeuo-solid,
+  [data-slot="badge"].skeuo {
+    --shadow-skeuo-inset: var(--ew-chip-shadow);
+    --shadow-skeuo: var(--ew-chip-shadow);
+    box-shadow: var(--ew-chip-shadow);
+  }
+
+  /*
+   * Login / burger — luminance-aware face (see --topbar-accent-face-shadow).
+   * Light brand → raised button face; dark brand → soft chip rims.
+   */
+  .topbar-accent-face.skeuo-solid {
+    box-shadow: var(--topbar-accent-face-shadow);
+  }
+
+  .topbar-accent-face.skeuo-solid:active,
+  .topbar-accent-face-ink.skeuo-solid:active {
+    box-shadow: var(--ew-btn-shadow-pressed);
+  }
+
+  /* Mobile drawer Login on ink — always soft chip (not brand-luminance token) */
+  .topbar-accent-face-ink.skeuo-solid {
+    box-shadow: var(--ew-chip-shadow);
+  }
+
+  .dark .topbar-accent-face-ink.skeuo-solid {
+    box-shadow: var(--ew-btn-shadow);
+  }
+
+}
+
+/* Segmented active pills use --ew-chip-shadow from tabs.tsx (same soft
+ * light rims as FilterPill). No extra ::before bevel — that read hotter
+ * than Retained/Gross chips while size/radius stay on the trigger. */
+
+/* Page-primary CTA hover shine — flat/skeuo path only (3D pack owns press). */
 @keyframes btn-page-primary-shine {
   from {
     transform: translateX(-120%) skewX(-18deg);
@@ -729,11 +1082,12 @@
   }
 }
 
-[data-variant="pagePrimary"]::after {
+[data-variant="pagePrimary"]:not(.edgeways-btn-3d)::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
+  border-radius: inherit;
   background: linear-gradient(
     105deg,
     transparent 0%,
@@ -746,11 +1100,11 @@
   pointer-events: none;
 }
 
-[data-variant="pagePrimary"]:hover::after {
+[data-variant="pagePrimary"]:not(.edgeways-btn-3d):hover::after {
   animation: btn-page-primary-shine 0.75s ease;
 }
 
-.dark [data-variant="pagePrimary"]::after {
+.dark [data-variant="pagePrimary"]:not(.edgeways-btn-3d)::after {
   background: linear-gradient(
     105deg,
     transparent 0%,
@@ -761,7 +1115,7 @@
   );
 }
 
-[data-variant="pagePrimary"] > * {
+[data-variant="pagePrimary"]:not(.edgeways-btn-3d) > * {
   position: relative;
   z-index: 1;
 }
@@ -815,4 +1169,518 @@
   * {
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * react-3d-button — Edgeways / Shopify-style theme.
+ * No chunky extruded colour slab. Depth is shadow-drawn (Polaris shadow-button
+ * recipe): 1px bottom inset lip + top shine. Press → inset shadow + 0.5px
+ * content shunt. Raise geometry is zeroed so the pack can’t paint a thick base.
+ * Density via data-size (h-6 / h-7 / h-8).
+ */
+.aws-btn.edgeways-btn-3d,
+.aws-btn.edgeways-btn-3d.aws-btn--xs,
+.aws-btn.edgeways-btn-3d.aws-btn--sm,
+.aws-btn.edgeways-btn-3d.aws-btn--md,
+.aws-btn.edgeways-btn-3d.aws-btn--lg {
+  --button-raise-level: 0px;
+  --button-pressed-level: 0px;
+}
+
+.aws-btn.edgeways-btn-3d {
+  --button-hover-pressure: 0.5;
+  --button-default-border-radius: var(--radius-button);
+  --button-shadow-color: transparent;
+  --button-font-family: inherit;
+  --button-font-weight: 600;
+  --button-letter-spacing: 0;
+  /* Face shadows come from :root / .dark --ew-btn-shadow* */
+
+  --button-primary-color: var(--primary);
+  /* Match face so pack active state doesn’t flash a dark slab */
+  --button-primary-color-dark: var(--primary);
+  --button-primary-color-light: var(--primary-foreground);
+  --button-primary-color-hover: var(--primary-hover);
+  --button-primary-border: none;
+
+  --button-secondary-color: #eeeeee;
+  --button-secondary-color-dark: #eeeeee;
+  --button-secondary-color-light: var(--secondary-foreground);
+  --button-secondary-color-hover: var(--muted);
+  --button-secondary-border: none;
+
+  --button-tertiary-color: #eeeeee;
+  --button-tertiary-color-dark: #eeeeee;
+  --button-tertiary-color-light: var(--foreground);
+  --button-tertiary-color-hover: var(--muted);
+  --button-tertiary-border: none;
+
+  --button-danger-color: color-mix(in oklch, var(--destructive), white 88%);
+  --button-danger-color-dark: color-mix(in oklch, var(--destructive), white 88%);
+  --button-danger-color-light: var(--destructive);
+  --button-danger-color-hover: color-mix(in oklch, var(--destructive), white 80%);
+  --button-danger-border: none;
+
+  --button-success-color: color-mix(in oklch, var(--success), white 86%);
+  --button-success-color-dark: color-mix(in oklch, var(--success), white 86%);
+  --button-success-color-light: var(--success);
+  --button-success-color-hover: color-mix(in oklch, var(--success), white 78%);
+  --button-success-border: none;
+}
+
+/* Kill pack extrusion slab + outer blob shadow */
+.aws-btn.edgeways-btn-3d::before {
+  opacity: 0;
+}
+
+.aws-btn.edgeways-btn-3d .aws-btn__wrapper::before {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/*
+ * Tiny hover pivot (~0.5px) — no extrusion to animate underneath.
+ */
+.aws-btn.edgeways-btn-3d.aws-btn--left:not(.aws-btn--active) .aws-btn__content {
+  transform: skewY(-0.25deg);
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--right:not(.aws-btn--active) .aws-btn__content {
+  transform: skewY(0.25deg);
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--middle:not(.aws-btn--active) .aws-btn__content {
+  transform: translate3d(0, 0.5px, 0);
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--left:not(.aws-btn--active)::before,
+.aws-btn.edgeways-btn-3d.aws-btn--right:not(.aws-btn--active)::before,
+.aws-btn.edgeways-btn-3d.aws-btn--middle:not(.aws-btn--active)::before {
+  transform: none;
+}
+
+.dark .aws-btn.edgeways-btn-3d {
+  --button-secondary-color: var(--secondary);
+  --button-secondary-color-dark: var(--secondary);
+  --button-secondary-color-light: var(--secondary-foreground);
+  --button-secondary-color-hover: color-mix(
+    in oklch,
+    var(--secondary),
+    var(--foreground) 5%
+  );
+
+  /* Match fieldControl / flat outline: dark:bg-input/30 */
+  --button-tertiary-color: color-mix(in oklch, var(--input) 30%, transparent);
+  --button-tertiary-color-dark: color-mix(in oklch, var(--input) 30%, transparent);
+  --button-tertiary-color-light: var(--foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--input) 50%, transparent);
+
+  --button-danger-color: color-mix(in oklch, var(--destructive), black 55%);
+  --button-danger-color-dark: color-mix(in oklch, var(--destructive), black 55%);
+  --button-danger-color-light: color-mix(in oklch, var(--destructive), white 35%);
+  --button-danger-color-hover: color-mix(in oklch, var(--destructive), black 45%);
+
+  --button-success-color: color-mix(in oklch, var(--success), black 45%);
+  --button-success-color-dark: color-mix(in oklch, var(--success), black 45%);
+  --button-success-color-light: color-mix(in oklch, var(--success), white 40%);
+  --button-success-color-hover: color-mix(in oklch, var(--success), black 35%);
+}
+
+/* Primary (ink / brand) — stronger bottom lip like Polaris primary */
+.aws-btn.edgeways-btn-3d.aws-btn--primary {
+  --ew-btn-shadow: inset 0 -1px 0 0 rgb(0 0 0 / 0.55),
+    inset 0 0 0 1px rgb(0 0 0 / 0.35),
+    inset 0 0.5px 0 1.5px rgb(255 255 255 / 0.22);
+  --ew-btn-shadow-pressed: inset 0 1px 0 0 rgb(0 0 0 / 0.45);
+}
+
+.dark .aws-btn.edgeways-btn-3d.aws-btn--primary {
+  /* Brand fill is brighter — soft light rim, not a hot white band */
+  --ew-btn-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 0 rgb(255 255 255 / 0.12),
+    inset 0 0 0 1px rgb(0 0 0 / 0.18);
+  --ew-btn-shadow-pressed: inset 0 1px 1px 0 rgb(0 0 0 / 0.3),
+    inset 0 -0.5px 0 0 rgb(255 255 255 / 0.08);
+}
+
+/* Desk density — override pack size ladder */
+.aws-btn.edgeways-btn-3d[data-size="default"],
+.aws-btn.edgeways-btn-3d[data-size="icon"],
+.aws-btn.edgeways-btn-3d.h-8,
+.aws-btn.edgeways-btn-3d.size-8 {
+  --button-default-height: 2rem;
+  --button-default-font-size: 0.875rem;
+  --button-default-line-height: 1.25rem;
+  --button-horizontal-padding: 0.625rem;
+  --button-raise-level: 0px;
+  height: 2rem !important;
+  max-height: 2rem !important;
+}
+
+.aws-btn.edgeways-btn-3d.size-8,
+.aws-btn.edgeways-btn-3d[data-size="icon"] {
+  width: 2rem !important;
+  min-width: 2rem !important;
+  --button-horizontal-padding: 0;
+}
+
+.aws-btn.edgeways-btn-3d[data-size="sm"],
+.aws-btn.edgeways-btn-3d[data-size="icon-sm"],
+.aws-btn.edgeways-btn-3d.h-7,
+.aws-btn.edgeways-btn-3d.size-7 {
+  --button-default-height: 1.75rem;
+  --button-default-font-size: 0.8rem;
+  --button-default-line-height: 1.1rem;
+  --button-horizontal-padding: 0.625rem;
+  --button-raise-level: 0px;
+  height: 1.75rem !important;
+  max-height: 1.75rem !important;
+}
+
+.aws-btn.edgeways-btn-3d.size-7,
+.aws-btn.edgeways-btn-3d[data-size="icon-sm"] {
+  width: 1.75rem !important;
+  min-width: 1.75rem !important;
+  --button-horizontal-padding: 0;
+}
+
+.aws-btn.edgeways-btn-3d[data-size="xs"],
+.aws-btn.edgeways-btn-3d[data-size="icon-xs"],
+.aws-btn.edgeways-btn-3d.h-6,
+.aws-btn.edgeways-btn-3d.size-6 {
+  --button-default-height: 1.5rem;
+  --button-default-font-size: 0.75rem;
+  --button-default-line-height: 1rem;
+  --button-horizontal-padding: 0.5rem;
+  --button-raise-level: 0px;
+  height: 1.5rem !important;
+  max-height: 1.5rem !important;
+}
+
+.aws-btn.edgeways-btn-3d.size-6,
+.aws-btn.edgeways-btn-3d[data-size="icon-xs"] {
+  width: 1.5rem !important;
+  min-width: 1.5rem !important;
+  --button-horizontal-padding: 0;
+}
+
+.aws-btn.edgeways-btn-3d[data-size="lg"],
+.aws-btn.edgeways-btn-3d[data-size="icon-lg"],
+.aws-btn.edgeways-btn-3d.aws-btn--md[data-size="lg"],
+.aws-btn.edgeways-btn-3d.aws-btn--md[data-size="icon-lg"],
+.aws-btn.edgeways-btn-3d.h-9,
+.aws-btn.edgeways-btn-3d.size-9 {
+  --button-default-height: 2.25rem;
+  --button-default-font-size: 0.875rem;
+  --button-default-line-height: 1.25rem;
+  --button-horizontal-padding: 0.75rem;
+  --button-raise-level: 0px;
+  /* Pack .aws-btn--md is 40px; lock to flat Button lg / icon-lg (h-9 / size-9). */
+  height: 2.25rem !important;
+  max-height: 2.25rem !important;
+}
+
+.aws-btn.edgeways-btn-3d.h-9:not(.size-9):not([data-size^="icon"]) {
+  width: auto;
+}
+
+.aws-btn.edgeways-btn-3d.size-9,
+.aws-btn.edgeways-btn-3d[data-size="icon-lg"] {
+  width: 2.25rem !important;
+  min-width: 2.25rem !important;
+  padding-left: 0;
+  padding-right: 0;
+  --button-horizontal-padding: 0;
+}
+
+.aws-btn.edgeways-btn-3d[data-size^="icon"] {
+  --button-horizontal-padding: 0;
+}
+
+/* Face — Shopify shadow-button depth (no solid slab) */
+.aws-btn.edgeways-btn-3d .aws-btn__content {
+  gap: 0.375rem;
+  box-shadow: var(--ew-btn-shadow);
+  transition:
+    transform var(--transform-speed, 0.185s) ease-out,
+    box-shadow var(--transform-speed, 0.185s) ease-out,
+    background var(--transform-speed, 0.185s) ease-out;
+}
+
+/*
+ * Pack wraps Button children in a single span. Content-level gap only spaces
+ * before/after slots — icon + label need gap on that inner flex row (6px).
+ */
+.aws-btn.edgeways-btn-3d .aws-btn__content > span:nth-child(1) {
+  gap: 0.375rem;
+}
+
+.aws-btn.edgeways-btn-3d .aws-btn__content > * {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.12s ease-out;
+}
+
+/*
+ * Press — lighter inset + 0.25px content shunt (half the prior depth).
+ * Override pack’s raise-based active translate.
+ */
+.aws-btn.edgeways-btn-3d.aws-btn--active::before {
+  transform: none !important;
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--active .aws-btn__content {
+  box-shadow: var(--ew-btn-shadow-pressed);
+  transform: translate3d(0, 0.25px, 0) !important;
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--active .aws-btn__content > * {
+  transform: translate3d(0, 0.25px, 0);
+}
+
+.aws-btn.edgeways-btn-3d .aws-btn__content svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.aws-btn.edgeways-btn-3d[data-size="xs"] .aws-btn__content svg,
+.aws-btn.edgeways-btn-3d[data-size="icon-xs"] .aws-btn__content svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.aws-btn.edgeways-btn-3d[data-size="sm"] .aws-btn__content svg,
+.aws-btn.edgeways-btn-3d[data-size="icon-sm"] .aws-btn__content svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Common Tailwind size overrides that must win over pack height vars */
+.aws-btn.edgeways-btn-3d.max-sm\:h-9 {
+  --button-default-height: 2.25rem;
+  height: 2.25rem !important;
+  max-height: 2.25rem !important;
+}
+
+@media (max-width: 639px) {
+  .aws-btn.edgeways-btn-3d.max-sm\:h-9 {
+    --button-default-height: 2.25rem;
+    height: 2.25rem !important;
+    max-height: 2.25rem !important;
+  }
+}
+
+.aws-btn.edgeways-btn-3d.h-11 {
+  --button-default-height: 2.75rem;
+  --button-raise-level: 0px;
+}
+
+.aws-btn.edgeways-btn-3d.size-5 {
+  --button-default-height: 1.25rem;
+  --button-raise-level: 0px;
+}
+
+.aws-btn.edgeways-btn-3d.justify-start .aws-btn__content {
+  justify-content: flex-start;
+}
+
+.aws-btn.edgeways-btn-3d.font-normal {
+  --button-font-weight: 400;
+}
+
+.aws-btn.edgeways-btn-3d.w-full {
+  width: 100% !important;
+  display: block;
+}
+
+/* Let root text-* / muted utilities tint the face */
+.aws-btn.edgeways-btn-3d.text-muted-foreground .aws-btn__content,
+.aws-btn.edgeways-btn-3d.text-destructive .aws-btn__content,
+.aws-btn.edgeways-btn-3d.text-success .aws-btn__content,
+.aws-btn.edgeways-btn-3d[data-empty="true"] .aws-btn__content {
+  color: inherit;
+}
+
+.aws-btn.edgeways-btn-3d.bg-success\/15 .aws-btn__content,
+.aws-btn.edgeways-btn-3d.bg-success\/10 .aws-btn__content {
+  background: color-mix(in oklch, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.aws-btn.edgeways-btn-3d.bg-destructive\/15 .aws-btn__content,
+.aws-btn.edgeways-btn-3d.bg-destructive\/10 .aws-btn__content {
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+
+/*
+ * Pack radius overrides — beat `.aws-btn.edgeways-btn-3d` default so
+ * `rounded="none"|"full"` (and filter pills) actually win the cascade.
+ */
+.aws-btn.edgeways-btn-3d.aws-btn--rounded-none {
+  --button-default-border-radius: 0px;
+}
+
+/*
+ * Connected split button — two filled segments (M3 layout, Edgeways radius).
+ * Gap is owned by `[data-slot=split-button]` (2px). Outer corners use
+ * --radius-button; inner facing corners are 2px so the seam reads as a
+ * divider. Shape must win on every pack layer (!important) because the
+ * radius CSS var is only a single value.
+ */
+[data-slot="split-button"] {
+  gap: 2px;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-split-leading,
+.aws-btn.edgeways-btn-3d.edgeways-split-leading .aws-btn__wrapper,
+.aws-btn.edgeways-btn-3d.edgeways-split-leading .aws-btn__wrapper::before,
+.aws-btn.edgeways-btn-3d.edgeways-split-leading .aws-btn__wrapper::after,
+.aws-btn.edgeways-btn-3d.edgeways-split-leading .aws-btn__content {
+  --button-default-border-radius: var(--radius-button);
+  border-radius: var(--radius-button) 2px 2px var(--radius-button) !important;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-split-trailing,
+.aws-btn.edgeways-btn-3d.edgeways-split-trailing .aws-btn__wrapper,
+.aws-btn.edgeways-btn-3d.edgeways-split-trailing .aws-btn__wrapper::before,
+.aws-btn.edgeways-btn-3d.edgeways-split-trailing .aws-btn__wrapper::after,
+.aws-btn.edgeways-btn-3d.edgeways-split-trailing .aws-btn__content {
+  --button-default-border-radius: var(--radius-button);
+  border-radius: 2px var(--radius-button) var(--radius-button) 2px !important;
+}
+
+/*
+ * Filter pills — circular PressButton chips (FilterPill).
+ * Active ink plate + brand type; face uses the same --ew-btn-shadow as outline.
+ */
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill,
+.aws-btn.edgeways-btn-3d.aws-btn--rounded-full {
+  --button-default-border-radius: 9999px;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill {
+  --button-default-height: 2rem;
+  --button-default-font-size: 0.75rem;
+  --button-default-line-height: 1rem;
+  --button-horizontal-padding: 0.75rem;
+  --button-font-weight: 600;
+  height: 2rem !important;
+  max-height: 2rem !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--count {
+  --button-horizontal-padding: 0.75rem;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--count .aws-btn__content {
+  padding-right: 0.5rem;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill .aws-btn__content {
+  gap: 0.375rem;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill .aws-btn__content svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* Active: ink + brand type — same soft face shadow as sibling buttons */
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active {
+  --button-tertiary-color: #111111;
+  --button-tertiary-color-dark: #111111;
+  --button-tertiary-color-light: var(--brand-text);
+  --button-tertiary-color-hover: #1a1a1a;
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active {
+  --button-tertiary-color: #111111;
+  --button-tertiary-color-dark: #111111;
+  --button-tertiary-color-light: var(--brand-text);
+  --button-tertiary-color-hover: #1a1a1a;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active:hover .aws-btn__content {
+  color: var(--brand-text);
+  box-shadow: var(--ew-chip-shadow);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active:focus-visible .aws-btn__content {
+  color: var(--brand-text);
+  box-shadow:
+    var(--ew-chip-shadow),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.aws-btn--active:hover .aws-btn__content {
+  box-shadow: var(--ew-btn-shadow-pressed);
+  color: var(--brand-text);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.aws-btn--active:focus-visible .aws-btn__content {
+  color: var(--brand-text);
+  box-shadow:
+    var(--ew-btn-shadow-pressed),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+}
+
+/*
+ * Focus ring on the rounded face (not the outer aws-btn — that paints a
+ * square). Brand accent, with a page-gap so it sits outside the control.
+ */
+.aws-btn.edgeways-btn-3d:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.aws-btn.edgeways-btn-3d:focus-visible .aws-btn__content {
+  box-shadow:
+    var(--ew-btn-shadow),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--active:focus-visible .aws-btn__content {
+  box-shadow:
+    var(--ew-btn-shadow-pressed),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+}
+
+/* Disabled — replace pack’s hardcoded greys */
+.aws-btn.edgeways-btn-3d.aws-btn--disabled,
+.aws-btn.edgeways-btn-3d.aws-btn--disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__wrapper::before {
+  background: color-mix(in oklch, var(--muted), black 12%) !important;
+}
+
+.aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__content,
+.aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__wrapper:hover .aws-btn__content {
+  background: var(--muted) !important;
+  color: var(--muted-foreground) !important;
+}
+
+.dark .aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__wrapper::before {
+  background: color-mix(in oklch, var(--secondary), black 30%) !important;
+}
+
+.dark .aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__content,
+.dark
+  .aws-btn.edgeways-btn-3d.aws-btn--disabled
+  .aws-btn__wrapper:hover
+  .aws-btn__content {
+  background: var(--secondary) !important;
+  color: var(--muted-foreground) !important;
 }

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SplitButton } from "@/components/ui/split-button";
 import { useAddBet } from "@/components/add-bet-provider";
 import { OfferCampaignCard } from "@/components/offers/offer-campaign-card";
 import { api, useAppState } from "@/hooks/use-app-state";
@@ -130,21 +131,16 @@ export function OfferViewDialog({
               Open in Campaigns
             </Link>
           </Button>
-          <span
-            title={trackBet.reason ?? undefined}
-            className="inline-flex overflow-hidden rounded-lg"
-          >
-            <Button
+          <SplitButton title={trackBet.reason ?? undefined}>
+            <SplitButton.Leading
               size="lg"
-              className="rounded-r-none"
               onClick={handleTrackBet}
               disabled={!trackBet.enabled || !trackBet.prefill}
             >
               {trackBet.label}
-            </Button>
-            <Button
+            </SplitButton.Leading>
+            <SplitButton.Trailing
               size="icon-lg"
-              className="rounded-l-none border-l border-l-primary-foreground/20"
               onClick={() => void handleMarkPlaced()}
               disabled={!trackBet.enabled || !trackBet.prefill || marking}
               aria-label="Mark qualifying bet as placed"
@@ -155,8 +151,8 @@ export function OfferViewDialog({
               ) : (
                 <Check className="size-4" />
               )}
-            </Button>
-          </span>
+            </SplitButton.Trailing>
+          </SplitButton>
         </div>
       </DialogContent>
     </Dialog>

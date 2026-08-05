@@ -83,7 +83,9 @@ export function formatOfferScopeLabel(
   return courseLabel ?? scopeCourse!.trim();
 }
 
-export function parseOfferRules(offer: OfferRow): BetGetFreePlaceRules | null {
+export function parseOfferRules(
+  offer: Pick<OfferRow, "offerType" | "rules">
+): BetGetFreePlaceRules | null {
   if (offer.offerType !== "bet_get_free_place" || !offer.rules) return null;
   try {
     const parsed = JSON.parse(offer.rules) as BetGetFreePlaceRules;
@@ -153,8 +155,13 @@ export function placeRefundTriggerText(rules: BetGetFreePlaceRules): string {
   return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB if ${places}`;
 }
 
+export type OfferQualifyFields = Pick<
+  OfferRow,
+  "eventDate" | "scopeCourse" | "scopeRaceId" | "scopeRaceLabel" | "offerType" | "rules"
+>;
+
 export function raceQualifiesForOffer(
-  offer: OfferRow,
+  offer: OfferQualifyFields,
   race: Pick<RacingDeskRace, "course" | "fieldSize" | "region" | "externalId" | "offTime">,
   date: string
 ): { qualifies: boolean; reasons: string[] } {
@@ -192,6 +199,44 @@ export function raceQualifiesForOffer(
   }
 
   return { qualifies: reasons.length === 0, reasons };
+}
+
+/**
+ * How many races pass the same qualify checks as Racing desk.
+ * Returns null when the offer has no structured place-refund rules, or when
+ * no race has a known field size to evaluate (caller can fall back to scope counts).
+ */
+export function countOfferQualifyingRaces(
+  offer: OfferQualifyFields,
+  races: Array<{
+    course: string;
+    fieldSize?: number | null;
+    region?: string | null;
+    externalId?: string | null;
+  }>,
+  date: string
+): number | null {
+  if (!parseOfferRules(offer)) return null;
+  let evaluated = 0;
+  let qualifying = 0;
+  for (const race of races) {
+    const fieldSize = race.fieldSize ?? 0;
+    if (!(fieldSize > 0)) continue;
+    evaluated += 1;
+    const { qualifies } = raceQualifiesForOffer(
+      offer,
+      {
+        course: race.course,
+        fieldSize,
+        region: race.region ?? "GB",
+        externalId: race.externalId ?? "",
+        offTime: "",
+      },
+      date
+    );
+    if (qualifies) qualifying += 1;
+  }
+  return evaluated > 0 ? qualifying : null;
 }
 
 /**

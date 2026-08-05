@@ -31,28 +31,14 @@ import {
   type BoostDiaryEntry,
   type BoostDiaryQueue,
 } from "@/lib/services/boosts-client";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { filterPillCountState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 function gbp(value: number): string {
   return value < 0 ? `-£${Math.abs(value).toFixed(2)}` : `+£${value.toFixed(2)}`;
 }
 
-/** Match Tracker ManualSettleDialog Won / Lost hover treatment. */
-function settleOutcomeButtonClass(kind: "won" | "lost"): string {
-  if (kind === "won") {
-    return cn(
-      "h-7 px-2 text-xs focus-visible:border-success/50 focus-visible:ring-success/30",
-      "border-border bg-background text-muted-foreground",
-      "hover:border-success/40 hover:bg-success/10 hover:text-success"
-    );
-  }
-  return cn(
-    "h-7 px-2 text-xs focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
-    "border-border bg-background text-muted-foreground",
-    "hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-  );
-}
 
 export default function BoostsPage() {
   const { openAddBet } = useAddBet();
@@ -200,18 +186,20 @@ export default function BoostsPage() {
                 q.id === "all"
                   ? (entries?.length ?? 0)
                   : filterBoostDiaryByQueue(entries ?? [], q.id).length;
+              const active = queue === q.id;
+              const hasCount = q.id !== "all";
               return (
-                <button
+                <FilterPill
                   key={q.id}
-                  type="button"
+                  active={active}
                   onClick={() => setQueue(q.id)}
-                  className={cn(filterPillState(queue === q.id))}
+                  hasCount={hasCount}
                 >
                   {q.label}
-                  {q.id !== "all" ? (
-                    <span className="ml-1 tabular-nums opacity-70">{count}</span>
+                  {hasCount ? (
+                    <span className={filterPillCountState(active)}>{count}</span>
                   ) : null}
-                </button>
+                </FilterPill>
               );
             })}
           </div>
@@ -322,17 +310,15 @@ export default function BoostsPage() {
                       {openBet ? (
                         <>
                           <Button
-                            variant="outline"
+                            variant="success"
                             size="sm"
-                            className={settleOutcomeButtonClass("won")}
                             onClick={() => void settleQuick(entry, "won")}
                           >
                             Won
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
-                            className={settleOutcomeButtonClass("lost")}
                             onClick={() => void settleQuick(entry, "lost")}
                           >
                             Lost

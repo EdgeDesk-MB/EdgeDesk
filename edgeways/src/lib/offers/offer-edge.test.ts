@@ -267,6 +267,8 @@ describe("buildOfferEdgePlays", () => {
     const [play] = buildOfferEdgePlays(offer, [race(TIGHT_BOOK)], opts);
 
     expect(play.confidence).toBe("live");
+    expect(play.oddsSource).toBe("live");
+    expect(play.exchangeSource).toBe("live");
     expect(play.warnings.join(" ")).not.toContain("patchy");
   });
 

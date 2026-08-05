@@ -1,6 +1,11 @@
 import { cn } from "@/lib/utils";
 
-/** Stats + buttons in a page header - 8px gap, vertically centred */
+/**
+ * Stats + buttons in a page header - vertically centred.
+ * Default gap is 8px between loose children. When pairing
+ * `PageHeaderStatGroup` with `PageHeaderButtonGroup`, pass `className="gap-6"`
+ * for the 24px gap between supporting text and the button cluster.
+ */
 export function PageHeaderActions({
   children,
   className,
@@ -30,6 +35,34 @@ export function PageHeaderStat({
       <span className="text-muted-foreground">{label}</span>
       <span className="font-semibold tabular-nums">{children}</span>
     </span>
+  );
+}
+
+/** Cluster of `PageHeaderStat` values - 8px between stats */
+export function PageHeaderStatGroup({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-2", className)}>{children}</div>
+  );
+}
+
+/** Contained page-header button cluster - keeps CTAs together at 8px */
+export function PageHeaderButtonGroup({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex shrink-0 flex-wrap items-center gap-2", className)}>
+      {children}
+    </div>
   );
 }
 

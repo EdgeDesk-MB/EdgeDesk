@@ -7,6 +7,10 @@
  */
 
 import { toast } from "sonner";
+import {
+  NOTIFICATION_BADGE,
+  NOTIFICATION_ICON,
+} from "@/lib/alerts/notification-icons";
 import type { AlertChannel } from "./types";
 
 export function createLocalAlertChannel(): AlertChannel {
@@ -31,7 +35,8 @@ export function createLocalAlertChannel(): AlertChannel {
         try {
           const n = new Notification(alert.title, {
             body: alert.body,
-            icon: "/icon-192.png",
+            icon: NOTIFICATION_ICON,
+            badge: NOTIFICATION_BADGE,
             tag: alert.key,
           });
           n.onclick = () => {
@@ -53,7 +58,8 @@ export function createLocalAlertChannel(): AlertChannel {
               if (!reg) throw new Error("no service worker registration");
               return reg.showNotification(alert.title, {
                 body: alert.body,
-                icon: "/icon-192.png",
+                icon: NOTIFICATION_ICON,
+                badge: NOTIFICATION_BADGE,
                 tag: alert.key,
                 data: { href: alert.href },
               });

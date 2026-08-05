@@ -107,7 +107,7 @@ export default function DashboardPage() {
   // user's order and hidden set (E2).
   const deckCards = applyDeckLayout(
     [
-      { id: "hero", label: "Overview", node: overviewBar },
+      { id: "hero", label: "Summary", node: overviewBar },
       ...(planSignals > 0 ? [{ id: "plan", label: "Today's plan", node: <DailyPlan /> }] : []),
       { id: "chart", label: "Chart", node: pnlChart },
       { id: "feed", label: "History feed", node: <DashboardFeedPanel state={state} /> },

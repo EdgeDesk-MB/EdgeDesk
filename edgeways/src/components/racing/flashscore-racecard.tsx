@@ -4,10 +4,19 @@ import { useNow } from "@/hooks/use-now";
 import { useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PressButton } from "@/components/ui/button-3d";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { formatDecimalOdds, formatWeightStones } from "@/lib/racing/odds";
 import { raceFairOdds, type RunnerFairOdds } from "@/lib/racing/fair-odds";
-import { formatHeadgear } from "@/lib/racing/runner-display";
+import {
+  formatHeadgear,
+  formatHorseColour,
+  formatLastRun,
+  formatRaceClassLabel,
+  formatSex,
+} from "@/lib/racing/runner-display";
 import { formatClockTime } from "@/lib/time-format";
 import type { RacingDeskRace, RacingRunnerDetail } from "@/lib/racing-desk/types";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
@@ -23,8 +32,8 @@ import {
   NotebookPen,
   Pin,
   RotateCcw,
-  Sparkles,
   TrendingDown,
+  Zap,
 } from "lucide-react";
 import { formatExchangeMatchError } from "@/lib/services/exchange/format-exchange-error";
 import { cn } from "@/lib/utils";
@@ -36,6 +45,7 @@ import {
 } from "@/lib/racing/offer-tags";
 import {
   edgeMarkerPill,
+  edgeNavTag,
   listPillState,
   listRow,
   sectionBar,
@@ -69,6 +79,7 @@ export interface FlashscoreRacecardProps {
   layColor?: string;
   /** Show movement, spread %, expanded offer intel */
   advancedMode?: boolean;
+  onAdvancedModeChange?: (v: boolean) => void;
   /** Guided place-refund workflow on qualifying races */
   showOfferGuide?: boolean;
   /** Soft-refresh status shown on the card (avoids page-level layout jump) */
@@ -301,6 +312,10 @@ function RunnerRow({
   const exchMove = runner.exchangeMovement;
   const exchSteamer = exchMove?.change != null && exchMove.change < -0.05;
   const exchDrifter = exchMove?.change != null && exchMove.change > 0.05;
+  const headgearLabel = formatHeadgear(runner.headgear);
+  const colourLabel = advancedMode ? formatHorseColour(runner.horseColour) : undefined;
+  const sexLabel = advancedMode ? formatSex(runner.sex) : undefined;
+  const lastRunLabel = formatLastRun(runner.lastRunDays);
 
   return (
     <tr
@@ -311,18 +326,22 @@ function RunnerRow({
         !isRecommended && isOfferTarget && "bg-muted/40"
       )}
     >
-      <td className="w-12 px-2 py-2.5">
+      <td className="w-14 px-2 py-2.5">
         <div className="flex items-center gap-1.5">
           <RunnerCloth number={runner.number} silkUrl={runner.silkUrl} size="sm" />
           {runner.draw && runner.draw !== "0" && (
-            <span className="text-[10px] tabular-nums text-muted-foreground" title="Draw">
-              ({runner.draw})
+            <span
+              className="text-[10px] tabular-nums text-muted-foreground"
+              title={`Draw ${runner.draw}`}
+            >
+              <span className="text-muted-foreground/70">Dr </span>
+              {runner.draw}
             </span>
           )}
         </div>
       </td>
       <td className="min-w-[10rem] px-2 py-2.5">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <RegionFlag code={race.region} className="opacity-90" />
           <span className="font-semibold leading-tight">{runner.name}</span>
           {isSteamer && (
@@ -335,20 +354,25 @@ function RunnerRow({
               drifter
             </Badge>
           )}
-          {formatHeadgear(runner.headgear) && (
+          {headgearLabel && (
             <Badge variant="outline" className="text-[9px]">
-              {formatHeadgear(runner.headgear)}
+              {headgearLabel}
+            </Badge>
+          )}
+          {sexLabel && (
+            <Badge variant="outline" className="text-[9px]" title="Sex">
+              {sexLabel}
+            </Badge>
+          )}
+          {colourLabel && (
+            <Badge variant="outline" className="text-[9px]" title="Colour">
+              {colourLabel}
             </Badge>
           )}
           {isRecommended && (
-            <Badge
-              variant="outline"
-              className="border-edge/50 text-[9px] text-edge"
-              title="Offer Edge recommended play"
-            >
-              <Sparkles className="mr-0.5 size-2.5" aria-hidden />
-              recommended
-            </Badge>
+            <span className={edgeNavTag} title="Offer Edge recommended play">
+              Edge
+            </span>
           )}
           {isOfferTarget && (
             <Badge
@@ -360,7 +384,14 @@ function RunnerRow({
             </Badge>
           )}
         </div>
-        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{runner.form ?? "-"}</p>
+        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+          {runner.form ?? "-"}
+          {lastRunLabel ? (
+            <span className="ml-1.5 font-sans text-muted-foreground/80" title="Days since last run">
+              · {lastRunLabel}
+            </span>
+          ) : null}
+        </p>
       </td>
       <td className="hidden px-2 py-2.5 text-sm text-muted-foreground md:table-cell">
         <span className="block truncate">{runner.jockey}</span>
@@ -373,6 +404,12 @@ function RunnerRow({
       </td>
       <td className="hidden w-10 px-2 py-2.5 text-center tabular-nums sm:table-cell">
         {runner.age ?? "-"}
+      </td>
+      <td
+        className="hidden w-10 px-2 py-2.5 text-center tabular-nums sm:table-cell"
+        title={runner.ofr ? `Official rating ${runner.ofr}` : "Official rating"}
+      >
+        {runner.ofr ?? "-"}
       </td>
       <td className="hidden w-12 px-2 py-2.5 text-center tabular-nums sm:table-cell">
         {runner.weightLbs ? formatWeightStones(runner.weightLbs) : runner.weight ?? "-"}
@@ -485,6 +522,7 @@ export function FlashscoreRacecard({
   backColor,
   layColor,
   advancedMode = false,
+  onAdvancedModeChange,
   showOfferGuide = true,
   refreshLabel,
   refreshing = false,
@@ -529,7 +567,7 @@ export function FlashscoreRacecard({
 
   if (!selected) {
     return (
-      <div className="rounded-lg border border-dashed py-16 text-center text-sm text-muted-foreground">
+      <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
         Select a race to view the full racecard.
       </div>
     );
@@ -541,9 +579,11 @@ export function FlashscoreRacecard({
     day: "2-digit",
     month: "2-digit",
   })}, ${formatClockTime(startDate)}`;
+  const raceTracked = selected.trackedEventId != null;
+  const classLabel = formatRaceClassLabel(selected.raceClass, selected.ratingBand);
 
   return (
-    <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none">
+    <div className="overflow-hidden rounded-xl bg-card text-card-foreground ring-1 ring-border/50">
       <div className={cn(sectionBar, "text-foreground")}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className={cn(sectionTitle, "flex items-center gap-1.5")}>
@@ -568,28 +608,26 @@ export function FlashscoreRacecard({
                 ) : null}
               </p>
             )}
-            {selected.trackedEventId != null ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="group h-7 border-success/40 bg-success/10 text-success hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:hover:text-destructive"
-                onClick={() => onUntrack(selected)}
-                title="Stop tracking this race"
-              >
-                <Check className="size-3.5 group-hover:hidden" />
-                <span className="group-hover:hidden">Tracked</span>
-                <span className="hidden group-hover:inline">Untrack race</span>
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 border-border bg-card text-foreground hover:bg-selection-subtle"
-                onClick={() => onTrack(selected)}
-              >
-                Track race
-              </Button>
-            )}
+            <PressButton
+              size="sm"
+              variant={raceTracked ? "success" : "outline"}
+              toggle
+              active={raceTracked}
+              onChange={(next) => {
+                if (next) onTrack(selected);
+                else onUntrack(selected);
+              }}
+              title={raceTracked ? "Stop tracking this race" : "Track this race"}
+            >
+              {raceTracked ? (
+                <>
+                  <Check className="size-3.5" />
+                  Tracked
+                </>
+              ) : (
+                "Track race"
+              )}
+            </PressButton>
             {exchangeControl}
           </div>
         </div>
@@ -632,7 +670,7 @@ export function FlashscoreRacecard({
                     className={cn(edgeMarkerPill, "ml-1 translate-y-[-1px]")}
                     title={`${recommendedCount} recommended play${recommendedCount === 1 ? "" : "s"} (Offer Edge)`}
                   >
-                    <Sparkles className="size-2" aria-hidden />
+                    <Zap className="size-2" aria-hidden />
                     {recommendedCount}
                   </span>
                 )}
@@ -668,9 +706,13 @@ export function FlashscoreRacecard({
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
               {selected.type && <span>{selected.type}</span>}
               {selected.distance && <span>{selected.distance}</span>}
-              {selected.raceClass && <span>{selected.raceClass}</span>}
+              {selected.pattern && <span>{selected.pattern}</span>}
+              {classLabel && <span>{classLabel}</span>}
+              {selected.ageBand && <span>{selected.ageBand}</span>}
+              {selected.sexRestriction && <span>{selected.sexRestriction}</span>}
               {selected.prize && <span>Prize {selected.prize}</span>}
               {selected.going && <span>Going: {selected.going}</span>}
+              {selected.surface && <span>{selected.surface}</span>}
               <span>
                 {selected.fieldSize} runners · {selected.standardPlaces} places
               </span>
@@ -708,30 +750,22 @@ export function FlashscoreRacecard({
             onTrack={() => onTrack(selected)}
           />
         )}
-        {hasPlaceOffer &&
-          advancedMode &&
-          edgePlays.filter((p) => p.raceExternalId === selected.externalId).length > 0 && (
-            <div className="mt-2 rounded border border-edge/20 bg-edge/5 px-2 py-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-edge">
-                Recommended plays
-              </p>
-              {edgePlays
-                .filter((p) => p.raceExternalId === selected.externalId)
-                .slice()
-                .sort((a, b) => b.totalEv - a.totalEv)
-                .slice(0, 3)
-                .map((p) => (
-                  <p key={`${p.offerId}-${p.runner.horseId}`} className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{p.runner.name}</span>
-                    <span className="tabular-nums">
-                      {" "}
-                      · EV £{p.totalEv.toFixed(2)}
-                    </span>
-                    {p.reasons[0] ? ` · ${p.reasons[0]}` : ""}
-                  </p>
-                ))}
-            </div>
-          )}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 border-t border-border/60 px-3 py-2">
+        <Label
+          htmlFor="desk-advanced-view"
+          className="text-xs font-medium text-muted-foreground"
+        >
+          Advanced view
+        </Label>
+        <Switch
+          id="desk-advanced-view"
+          size="sm"
+          checked={advancedMode}
+          onCheckedChange={onAdvancedModeChange}
+          disabled={!onAdvancedModeChange}
+        />
       </div>
 
       <button
@@ -755,13 +789,16 @@ export function FlashscoreRacecard({
         id="racecard-runner-grid"
         className={cn("overflow-x-auto", !runnersOpen && "hidden sm:block")}
       >
-        <table className="w-full min-w-[640px] border-collapse text-sm">
+        <table className="w-full min-w-[700px] border-collapse text-sm">
           <thead>
             <tr className="border-b bg-selection-subtle/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <th className="px-2 py-2 text-left">Cloth</th>
               <th className="px-2 py-2 text-left">Horse</th>
               <th className="hidden px-2 py-2 text-left md:table-cell">Jockey / Trainer</th>
               <th className="hidden px-2 py-2 text-center sm:table-cell">Age</th>
+              <th className="hidden px-2 py-2 text-center sm:table-cell" title="Official rating">
+                OR
+              </th>
               <th className="hidden px-2 py-2 text-center sm:table-cell">Wt</th>
               <th className="px-2 py-2 text-right">Bookie</th>
               <th className="hidden px-2 py-2 text-right sm:table-cell">Exchange</th>

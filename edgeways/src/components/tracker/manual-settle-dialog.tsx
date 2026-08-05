@@ -28,22 +28,13 @@ function profitEntryClass(value: number): string {
   return "text-negative";
 }
 
-/** Acca / bet-status chip style for Won / Lost selectors (green/red hover + focus). */
-export function settleOutcomeButtonClass(kind: "won" | "lost", active: boolean): string {
-  if (kind === "won") {
-    return cn(
-      "focus-visible:border-success/50 focus-visible:ring-success/30",
-      active
-        ? "border-success/40 bg-success/15 text-success hover:bg-success/25 hover:text-success"
-        : "border-border bg-background text-muted-foreground hover:border-success/40 hover:bg-success/10 hover:text-success"
-    );
-  }
-  return cn(
-    "focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
-    active
-      ? "border-destructive/40 bg-destructive/15 text-destructive hover:bg-destructive/25 hover:text-destructive"
-      : "border-border bg-background text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-  );
+/** Variant for Won / Lost settle selectors (pressable 3D success / danger faces). */
+export function settleOutcomeButtonVariant(
+  kind: "won" | "lost",
+  active: boolean
+): "success" | "destructive" | "outline" {
+  if (!active) return "outline";
+  return kind === "won" ? "success" : "destructive";
 }
 
 /**
@@ -145,15 +136,13 @@ export function ManualSettleDialog({
         </DialogHeader>
         <div className="flex flex-wrap gap-2">
           <Button
-            variant="outline"
-            className={settleOutcomeButtonClass("won", fullResult === "won")}
+            variant={settleOutcomeButtonVariant("won", fullResult === "won")}
             onClick={() => selectFull("won")}
           >
             Won
           </Button>
           <Button
-            variant="outline"
-            className={settleOutcomeButtonClass("lost", fullResult === "lost")}
+            variant={settleOutcomeButtonVariant("lost", fullResult === "lost")}
             onClick={() => selectFull("lost")}
           >
             Lost

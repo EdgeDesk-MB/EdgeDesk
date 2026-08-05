@@ -16,8 +16,17 @@ import {
   type OfferBetPref,
   type TuningSettings,
 } from "./settings-shared";
+import {
+  DEFAULT_BRAND_ACCENT_HEX,
+  DEFAULT_BRAND_ACCENT_PRESET,
+  hexForPreset,
+  isBrandAccentPresetId,
+  normalizeHex,
+} from "@/lib/brand-accent";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
 import { normalizeTimeFormat, setDisplayTimeFormat } from "@/lib/time-format";
+import { normalizeUiFont } from "@/lib/ui-font";
+import { normalizeHeaderPattern } from "@/lib/header-pattern";
 
 export type { AppSettings, OfferBetPref };
 export {
@@ -127,6 +136,22 @@ export function getAppSettings(): AppSettings {
     tuning: parseTuning(readRaw("tuning")),
     homeLayout: parseHomeLayout(readRaw("homeLayout")),
     monthlyProfitTarget: parseMonthlyTarget(readRaw("monthlyProfitTarget")),
+    ...(() => {
+      const rawPreset = readRaw("brandAccentPreset");
+      const presetId = isBrandAccentPresetId(rawPreset)
+        ? rawPreset
+        : DEFAULT_BRAND_ACCENT_PRESET;
+      const hex =
+        normalizeHex(readRaw("brandAccentHex")) ??
+        hexForPreset(presetId) ??
+        DEFAULT_BRAND_ACCENT_HEX;
+      return {
+        brandAccentPreset: presetId,
+        brandAccentHex: hexForPreset(presetId, hex),
+      };
+    })(),
+    uiFont: normalizeUiFont(readRaw("uiFont")),
+    headerPattern: normalizeHeaderPattern(readRaw("headerPattern")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -249,6 +274,22 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.monthlyProfitTarget !== undefined) {
     writeRaw("monthlyProfitTarget", String(patch.monthlyProfitTarget ?? "null"));
+  }
+  if (patch.brandAccentPreset != null) {
+    const id = isBrandAccentPresetId(patch.brandAccentPreset)
+      ? patch.brandAccentPreset
+      : DEFAULT_BRAND_ACCENT_PRESET;
+    writeRaw("brandAccentPreset", id);
+  }
+  if (patch.brandAccentHex != null) {
+    const hex = normalizeHex(patch.brandAccentHex) ?? DEFAULT_BRAND_ACCENT_HEX;
+    writeRaw("brandAccentHex", hex);
+  }
+  if (patch.uiFont != null) {
+    writeRaw("uiFont", normalizeUiFont(patch.uiFont));
+  }
+  if (patch.headerPattern != null) {
+    writeRaw("headerPattern", normalizeHeaderPattern(patch.headerPattern));
   }
   return getAppSettings();
 }

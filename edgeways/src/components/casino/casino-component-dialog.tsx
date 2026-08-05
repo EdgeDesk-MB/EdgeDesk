@@ -50,12 +50,15 @@ export function CasinoComponentDialog({
         <DialogHeader>
           <DialogTitle>{existing ? "Edit step" : "Add a step"}</DialogTitle>
           <DialogDescription>
-            A campaign can carry any combination - a qualifying wager, plus one or more rewards.
+            {existing
+              ? "Edit this cost or reward. Campaign EV is the sum of every step."
+              : "Add another qualifying wager to start the next stake tier, or a reward that pairs with the latest one."}
           </DialogDescription>
         </DialogHeader>
         <CasinoComponentForm
           casinoOfferId={casinoOfferId}
           existing={existing}
+          initialComponentType={existing ? undefined : "qualifying_wager"}
           onSaved={(offer) => {
             setOpen(false);
             onSaved(offer);

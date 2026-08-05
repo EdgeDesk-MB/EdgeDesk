@@ -7,7 +7,9 @@ import { enGB as dayPickerEnGB } from "react-day-picker/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { filterPillGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 /** Parse YYYY-MM-DD as a local calendar day (no UTC shift). */
@@ -26,9 +28,18 @@ export function formatYmdLocal(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Local calendar day offset from today (midnight-based, no UTC shift). */
+export function ymdDaysFromToday(days: number, now = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+  return formatYmdLocal(d);
+}
+
 /**
  * Shared date field: shadcn Popover + react-day-picker Calendar.
  * Value is always YYYY-MM-DD (or empty), matching previous native `type="date"` inputs.
+ *
+ * Uses PopoverAnchor (not Trigger) so the control stays on the PressButton path
+ * and matches sibling outline buttons for height / face / press.
  */
 export function DatePicker({
   value,
@@ -37,9 +48,12 @@ export function DatePicker({
   className,
   id,
   disabled,
+  size = "default",
   captionLayout = "dropdown",
   fromYear,
   toYear,
+  /** Ending/expiry fields: Tomorrow + 7 days chips under the calendar. */
+  shortcuts,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -47,34 +61,53 @@ export function DatePicker({
   className?: string;
   id?: string;
   disabled?: boolean;
+  /** Matches Button size tokens — use `lg` (h-9) beside page header actions. */
+  size?: "default" | "sm" | "lg";
   captionLayout?: "label" | "dropdown" | "dropdown-months" | "dropdown-years";
   fromYear?: number;
   toYear?: number;
+  shortcuts?: "ending";
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseYmdLocal(value);
   const now = new Date();
   const startYear = fromYear ?? now.getFullYear() - 5;
   const endYear = toYear ?? now.getFullYear() + 2;
+  const tomorrowYmd = ymdDaysFromToday(1, now);
+  const inSevenYmd = ymdDaysFromToday(7, now);
+
+  function pickShortcut(ymd: string) {
+    onChange(ymd);
+    setOpen(false);
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          id={id}
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          data-empty={!selected}
-          className={cn(
-            "w-full justify-start px-2.5 text-left font-normal tabular-nums data-[empty=true]:text-muted-foreground",
-            className
-          )}
-        >
-          <CalendarIcon className="size-3.5 shrink-0 text-muted-foreground" />
-          {selected ? format(selected, "d MMM yyyy", { locale: enGB }) : placeholder}
-        </Button>
-      </PopoverTrigger>
+      <PopoverAnchor asChild>
+        <span className={cn("inline-flex", className)}>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            size={size}
+            disabled={disabled}
+            data-empty={!selected}
+            className={cn(
+              "w-full justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
+              size === "lg" ? "px-3" : "px-2.5"
+            )}
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            <CalendarIcon
+              className={cn(
+                "shrink-0 text-muted-foreground",
+                size === "lg" ? "size-4" : "size-3.5"
+              )}
+            />
+            {selected ? format(selected, "d MMM yyyy", { locale: enGB }) : placeholder}
+          </Button>
+        </span>
+      </PopoverAnchor>
       <PopoverContent align="start" className="w-auto p-0">
         <Calendar
           mode="single"
@@ -93,6 +126,24 @@ export function DatePicker({
             setOpen(false);
           }}
         />
+        {shortcuts === "ending" ? (
+          <div className={cn(filterPillGroup, "border-t px-2 py-2")}>
+            <FilterPill
+              compact
+              active={value === tomorrowYmd}
+              onClick={() => pickShortcut(tomorrowYmd)}
+            >
+              Tomorrow
+            </FilterPill>
+            <FilterPill
+              compact
+              active={value === inSevenYmd}
+              onClick={() => pickShortcut(inSevenYmd)}
+            >
+              7 days
+            </FilterPill>
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

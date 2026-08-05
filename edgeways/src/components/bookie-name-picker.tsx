@@ -34,12 +34,17 @@ export function ExchangeNamePicker({
   label,
   className,
   allowCustom = true,
+  compact = false,
+  size = "default",
 }: {
   value: string;
   onChange: (name: string) => void;
   label?: string;
   className?: string;
   allowCustom?: boolean;
+  compact?: boolean;
+  /** `sm` = Settings-styled trigger at ThemeSelect height */
+  size?: "default" | "sm";
 }) {
   return (
     <VenueSelect
@@ -50,6 +55,8 @@ export function ExchangeNamePicker({
       placeholder="Select exchange"
       kinds={["exchange"]}
       allowCustom={allowCustom}
+      compact={compact}
+      size={size}
     />
   );
 }

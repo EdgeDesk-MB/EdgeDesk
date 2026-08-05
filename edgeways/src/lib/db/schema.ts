@@ -255,6 +255,27 @@ export const alertsInbox = sqliteTable("alerts_inbox", {
   readAt: integer("read_at"),
 });
 
+/**
+ * User-set reminders (e.g. free spins credited tomorrow). Fired into the
+ * alerts inbox + push when remindAt is due; not the same as expiry nudges.
+ */
+export const userReminders = sqliteTable("user_reminders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  note: text("note").notNull(),
+  remindAt: integer("remind_at").notNull(),
+  /** Optional link to a casino campaign */
+  casinoOfferId: integer("casino_offer_id"),
+  /** Optional link to a sports offer campaign */
+  offerId: integer("offer_id"),
+  /** Snapshot title for the alert when the linked row is gone */
+  contextTitle: text("context_title"),
+  /** Snapshot bookie/casino name for the alert when the linked row is gone */
+  contextVenue: text("context_venue"),
+  createdAt: integer("created_at").notNull(),
+  firedAt: integer("fired_at"),
+  cancelledAt: integer("cancelled_at"),
+});
+
 /** Bookie, exchange, or bank wallet for bankroll tracking */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -588,6 +609,7 @@ export type AccountRow = typeof accounts.$inferSelect;
 export type NewAccountRow = typeof accounts.$inferInsert;
 export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type UserReminderRow = typeof userReminders.$inferSelect;
 export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;

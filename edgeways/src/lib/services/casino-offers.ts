@@ -12,6 +12,11 @@ import type { EvBasis } from "@/lib/offers/advantage";
 import { getCasinoOfferRecurrenceMeta } from "@/lib/offers/casino-offer-recurrence";
 import { backfillMissingCasinoOfferBalances } from "@/lib/services/balances";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
+import {
+  listPendingRemindersByCasinoOfferIds,
+  listPendingRemindersForCasino,
+} from "@/lib/services/user-reminders";
+import type { UserReminderRow } from "@/lib/db";
 
 /** "heuristic" if any component defaulted its RTP; otherwise "estimated". */
 function campaignEvBasis(components: CasinoOfferComponentRow[]): EvBasis {
@@ -21,7 +26,8 @@ function campaignEvBasis(components: CasinoOfferComponentRow[]): EvBasis {
 function summariseCasinoOffer(
   offer: typeof casinoOffers.$inferSelect,
   components: CasinoOfferComponentRow[],
-  seriesById: Map<number, typeof casinoOfferSeries.$inferSelect>
+  seriesById: Map<number, typeof casinoOfferSeries.$inferSelect>,
+  reminders: UserReminderRow[] = []
 ): CasinoOfferSummary {
   const sorted = [...components].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
   const series = offer.seriesId != null ? seriesById.get(offer.seriesId) ?? null : null;
@@ -31,6 +37,7 @@ function summariseCasinoOffer(
     expectedEv: sumCampaignEv(sorted),
     evBasis: campaignEvBasis(sorted),
     recurrence: getCasinoOfferRecurrenceMeta(offer, series),
+    reminders,
   };
 }
 
@@ -47,10 +54,16 @@ export function getCasinoOfferSummaries(): CasinoOfferSummary[] {
     list.push(c);
     componentsByOffer.set(c.casinoOfferId, list);
   }
+  const remindersByOffer = listPendingRemindersByCasinoOfferIds(allOffers.map((o) => o.id));
 
   return allOffers
     .map((offer) =>
-      summariseCasinoOffer(offer, componentsByOffer.get(offer.id) ?? [], seriesById)
+      summariseCasinoOffer(
+        offer,
+        componentsByOffer.get(offer.id) ?? [],
+        seriesById,
+        remindersByOffer.get(offer.id) ?? []
+      )
     )
     .sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -68,5 +81,10 @@ export function getCasinoOfferSummary(id: number): CasinoOfferSummary | null {
       ? db.select().from(casinoOfferSeries).where(eq(casinoOfferSeries.id, offer.seriesId)).get()
       : null;
   const seriesById = new Map(series ? [[series.id, series] as const] : []);
-  return summariseCasinoOffer(offer, components, seriesById);
+  return summariseCasinoOffer(
+    offer,
+    components,
+    seriesById,
+    listPendingRemindersForCasino(id)
+  );
 }

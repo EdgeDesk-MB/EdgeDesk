@@ -1,0 +1,91 @@
+"use client";
+
+import {
+  useCallback,
+  useLayoutEffect,
+  useState,
+  type RefObject,
+} from "react";
+
+export type SlidingIndicatorBox = {
+  left: number;
+  width: number;
+  ready: boolean;
+};
+
+/**
+ * Tracks an active child inside `containerRef` and returns left/width for a
+ * sliding underline or pill. Re-measures on resize, scroll, and attribute
+ * changes (e.g. data-state / aria-current).
+ */
+export function useSlidingIndicator(
+  containerRef: RefObject<HTMLElement | null>,
+  activeSelector: string,
+  deps: readonly unknown[] = []
+): SlidingIndicatorBox {
+  const [box, setBox] = useState<SlidingIndicatorBox>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
+
+  const measure = useCallback(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const active = root.querySelector(activeSelector) as HTMLElement | null;
+    if (!active) {
+      setBox((prev) => (prev.ready ? { ...prev, ready: false } : prev));
+      return;
+    }
+    const rootRect = root.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    // Round — subpixel churn from font/layout was restarting CSS transitions.
+    const next = {
+      left: Math.round(activeRect.left - rootRect.left + root.scrollLeft),
+      width: Math.round(activeRect.width),
+      ready: activeRect.width > 0,
+    };
+    setBox((prev) =>
+      prev.left === next.left &&
+      prev.width === next.width &&
+      prev.ready === next.ready
+        ? prev
+        : next
+    );
+  }, [activeSelector, containerRef]);
+
+  useLayoutEffect(() => {
+    measure();
+    const root = containerRef.current;
+    if (!root) return;
+
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(root);
+    for (const child of root.children) {
+      if (child instanceof HTMLElement) ro.observe(child);
+    }
+
+    const mo = new MutationObserver(() => measure());
+    mo.observe(root, {
+      attributes: true,
+      subtree: true,
+      // Don’t watch `class` — colour fades on the meta-nav were remeasuring
+      // every frame of the fade and fighting the pill transition.
+      attributeFilter: ["data-state", "data-active", "aria-current"],
+      childList: true,
+    });
+
+    root.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      root.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps forwarded by caller
+  }, [measure, ...deps]);
+
+  return box;
+}

@@ -84,6 +84,7 @@ import { maybePollEmailIntake } from "@/lib/services/email-intake";
 import { autoResultLinkedLegs, legDueState, listAccaRuns, maybeAccaLayDueAlerts } from "@/lib/services/acca-desk";
 import { recordAlerts } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
+import { fireDueUserReminders } from "@/lib/services/user-reminders";
 import {
   LIVE_POLL_WINDOW_MS,
   needsResultBackfill,
@@ -726,6 +727,8 @@ export async function getAppState(): Promise<AppState> {
   maybePollEmailIntake();
   autoResultLinkedLegs();
   maybeAccaLayDueAlerts();
+  // User-set "check free spins tomorrow" style reminders → inbox + push.
+  fireDueUserReminders(now);
 
   const allEvents = db.select().from(events).all();
   const allBets = db.select().from(bets).all();

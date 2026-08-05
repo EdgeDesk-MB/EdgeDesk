@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, bets, offers } from "@/lib/db";
-import { deleteOfferWithScope, stopRecurrenceForOffer } from "@/lib/offers/offer-recurrence";
+import {
+  deleteOfferWithScope,
+  stopRecurrenceForOffer,
+  syncOfferSeriesTemplateFromOffer,
+} from "@/lib/offers/offer-recurrence";
 import { summariseOffer } from "@/lib/services/offers";
 import { quietOfferAlerts } from "@/lib/services/quiet-alerts";
 import { MISTAKE_TAGS, setMistakeTag, writeEvLock, type MistakeTag } from "@/lib/services/ev-snapshot";
@@ -27,6 +31,8 @@ const patchSchema = z.object({
   scopeRaceLabel: z.string().nullable().optional(),
   rules: z.string().nullable().optional(),
   stopRecurrence: z.boolean().optional(),
+  /** When true, push campaign fields onto the series template and untouched repeats */
+  updateSeries: z.boolean().optional(),
   /** B7: tag the latest settled EV snapshot (null clears) */
   mistakeTag: z.enum(MISTAKE_TAGS).nullable().optional(),
 });
@@ -98,6 +104,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         writeEvLock(summary, { onlyIfUnlocked: true });
       }
     }
+  }
+
+  // Recurring campaigns: optionally restamp the series template + untouched siblings
+  // after this instance has been written (so the edited row is the source of truth).
+  if (p.updateSeries && !p.stopRecurrence) {
+    syncOfferSeriesTemplateFromOffer(offerId);
   }
 
   // Campaign finished or missed: pull down any £unclaimed push still on devices.

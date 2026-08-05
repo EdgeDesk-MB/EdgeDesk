@@ -7,7 +7,7 @@
  * the copy is "operated by", never anything stronger.
  */
 
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { listOwners, type OwnedAccountLike } from "@/lib/accounts/owners";
 import { cn } from "@/lib/utils";
 
@@ -29,14 +29,13 @@ export function OwnerFilter({
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)} role="group" aria-label="Filter by account owner">
       {[ALL_OWNERS, ...owners].map((owner) => (
-        <button
+        <FilterPill
           key={owner}
-          type="button"
-          className={filterPillState(value === owner)}
+          active={value === owner}
           onClick={() => onChange(owner)}
         >
           {owner === ALL_OWNERS ? "All owners" : owner === "me" ? "Me" : owner}
-        </button>
+        </FilterPill>
       ))}
     </div>
   );

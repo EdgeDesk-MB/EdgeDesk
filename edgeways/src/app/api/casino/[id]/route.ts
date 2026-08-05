@@ -11,6 +11,7 @@ import {
   syncCasinoOfferBalance,
 } from "@/lib/services/balances";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
+import { cancelPendingRemindersForCasino } from "@/lib/services/user-reminders";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     syncCasinoOfferBalance(updated);
   }
 
+  // Campaign finished or missed: drop any pending "spins credited" style nudges.
+  if (
+    (p.status === "completed" || p.status === "expired") &&
+    existing.status !== p.status
+  ) {
+    cancelPendingRemindersForCasino(offerId);
+  }
+
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
 }
 
@@ -84,6 +93,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   }
 
   clearCasinoOfferBalance(offerId);
+  cancelPendingRemindersForCasino(offerId);
   deleteCasinoOfferWithScope(existing, scopeParsed.data);
   return NextResponse.json({ ok: true });
 }

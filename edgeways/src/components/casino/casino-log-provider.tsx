@@ -236,6 +236,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                       value={expiresDate}
                       onChange={setExpiresDate}
                       placeholder="Pick a date"
+                      shortcuts="ending"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -247,6 +248,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                       value={expiresTime}
                       onChange={setExpiresTime}
                       placeholder="Pick a time"
+                      shortcuts="ending"
                     />
                   </div>
                 </div>
@@ -318,7 +320,9 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                 <CasinoComponentForm
                   key="reward"
                   casinoOfferId={createdOfferId}
-                  initialComponentType={rewardStepType(draft)}
+                  initialComponentType={
+                    twoStep ? rewardStepType(draft) : "qualifying_wager"
+                  }
                   sourceText={draft?.sourceText}
                   initialGameName={carriedStep?.game}
                   initialValues={

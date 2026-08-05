@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTrackBetAction } from "./offer-track-bet";
+import { deriveTrackBetAction, qualifyingOfferTriggerText } from "./offer-track-bet";
 import type { OfferSummary } from "@/lib/services/offers.types";
 
 function offer(
@@ -78,6 +78,30 @@ describe("deriveTrackBetAction", () => {
     expect(action.prefill?.bookmaker).toBe("Betfair Sportsbook");
     expect(action.prefill?.offerId).toBe(1);
     expect(action.prefill?.triggerText).toMatch(/Bet £50/);
+  });
+
+  it("prefills Offer trigger from title for General bet&get campaigns", () => {
+    const general = offer({
+      id: 10,
+      title: "Bet £10 get £10 free bet",
+      bookmaker: "Ivybet",
+      sport: "general",
+      offerType: "promo_terms",
+      rules: JSON.stringify({
+        type: "promo_terms",
+        minOdds: 2,
+        importantNotes: "SNR (stake not returned) · SNR free bet",
+      }),
+      betCount: 0,
+      scopeCourse: null,
+    });
+    expect(qualifyingOfferTriggerText(general)).toBe("Bet £10 get £10 free bet");
+    const action = deriveTrackBetAction(general);
+    expect(action.enabled).toBe(true);
+    expect(action.prefill?.betType).toBe("qualifying");
+    expect(action.prefill?.offerId).toBe(10);
+    expect(action.prefill?.bookmaker).toBe("Ivybet");
+    expect(action.prefill?.triggerText).toBe("Bet £10 get £10 free bet");
   });
 
   it("prefills free bet conversion when awarded", () => {

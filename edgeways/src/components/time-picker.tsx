@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { filterPillGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
+/** Canonical end-of-day clock time used when expiry time is left blank. */
+export const END_OF_DAY_HM = "23:59";
 
 const ITEM_H = 36;
 const VISIBLE = 5;
@@ -205,6 +210,8 @@ export function TimePicker({
   className,
   id,
   disabled,
+  /** Ending/expiry fields: End of day (23:59) chip under the wheels. */
+  shortcuts,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -212,11 +219,13 @@ export function TimePicker({
   className?: string;
   id?: string;
   disabled?: boolean;
+  shortcuts?: "ending";
 }) {
   const [open, setOpen] = useState(false);
   const parsed = useMemo(() => parseHm(value), [value]);
   const [hour, setHour] = useState(parsed?.hour ?? "12");
   const [minute, setMinute] = useState(parsed?.minute ?? "00");
+  const endOfDayActive = value.trim() === END_OF_DAY_HM || (hour === "23" && minute === "59");
 
   useEffect(() => {
     if (!open) return;
@@ -287,6 +296,20 @@ export function TimePicker({
             </div>
           </div>
         </div>
+        {shortcuts === "ending" ? (
+          <div className={cn(filterPillGroup, "justify-center border-t px-2 py-2")}>
+            <FilterPill
+              compact
+              active={endOfDayActive}
+              onClick={() => {
+                commit("23", "59");
+                setOpen(false);
+              }}
+            >
+              End of day
+            </FilterPill>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5">
           <Button
             type="button"

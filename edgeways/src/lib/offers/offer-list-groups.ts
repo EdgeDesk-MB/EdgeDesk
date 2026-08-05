@@ -3,6 +3,7 @@
  */
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+import { offerPipelineHasStarted } from "@/lib/offers/pipeline";
 
 export function startOfLocalDay(ms: number): number {
   const d = new Date(ms);
@@ -108,6 +109,16 @@ export function isOfferInMainFeed(offer: OfferSummary, now = Date.now()): boolea
   if (offer.profit.freeBetStage === "settled") return false;
   if (isOfferEffectivelyExpired(offer, now)) return false;
   return offerListFeedGroupDayMs(offer, now) >= startOfLocalDay(now);
+}
+
+/**
+ * Active tab: in-progress campaigns only.
+ * Status `active` with no bets yet is still planned work (All / Needs action).
+ */
+export function isOfferActiveInList(offer: OfferSummary, now = Date.now()): boolean {
+  if (offer.status !== "active") return false;
+  if (!isOfferInMainFeed(offer, now)) return false;
+  return offerPipelineHasStarted(offer);
 }
 
 export function isOfferInExpiredFeed(offer: OfferSummary, now = Date.now()): boolean {

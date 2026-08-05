@@ -124,6 +124,8 @@ export function DashboardSectionHeader({
           ? cn("border-b border-border/60 py-[var(--layout-section-y)]", pageInsetX)
           : sectionBar,
         "shrink-0 py-3",
+        // Mobile deck / page scroll: keep the section title pinned while the body moves.
+        "max-sm:sticky max-sm:top-0 max-sm:z-20 max-sm:bg-page",
         className
       )}
     >

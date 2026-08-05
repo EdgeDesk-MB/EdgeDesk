@@ -3,6 +3,8 @@ import {
   buildOfferCalendarBoard,
   buildOfferCalendarDays,
   filterCalendarBoardByPriority,
+  isCalendarPriorityWindow,
+  priorityFromSignals,
 } from "@/lib/offers/offer-calendar";
 import type { OfferSummary } from "@/lib/services/offers.types";
 
@@ -94,6 +96,40 @@ describe("buildOfferCalendarDays", () => {
     );
     const item = days.flatMap((d) => d.items).find((i) => i.offerId === 3);
     expect(item?.priority).toBe("critical");
+  });
+
+  it("keeps far-out expiries at low priority even with high advantage signals", () => {
+    const expires = new Date(2026, 6, 20, 12, 0, 0).getTime(); // ~12 days out
+    const days = buildOfferCalendarDays(
+      [
+        offer({
+          id: 30,
+          title: "Later promo",
+          status: "active",
+          betCount: 1,
+          expiresAt: expires,
+          expectedProfit: 50,
+          profit: { qualifyingOpenCount: 1 },
+        }),
+      ],
+      { now, horizonDays: 14 }
+    );
+    const item = days.flatMap((d) => d.items).find((i) => i.offerId === 30);
+    expect(item?.kind).toBe("expires");
+    expect(item?.priority).toBe("low");
+    expect(isCalendarPriorityWindow(item!)).toBe(false);
+  });
+
+  it("elevates tomorrow expiries into the priority window", () => {
+    expect(
+      priorityFromSignals({
+        kind: "expires",
+        daysLeft: 1.5,
+        advantageScore: 0,
+      })
+    ).toBe("high");
+    expect(isCalendarPriorityWindow({ kind: "expires", daysLeft: 1.5 })).toBe(true);
+    expect(isCalendarPriorityWindow({ kind: "expires", daysLeft: 3 })).toBe(false);
   });
 
   it("dedupes to one card per offer per day (action beats expires)", () => {

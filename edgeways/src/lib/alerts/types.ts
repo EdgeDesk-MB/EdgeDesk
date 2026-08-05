@@ -9,7 +9,8 @@ export type EdgeAlertKind =
   | "race_off_soon"
   | "result_settled"
   | "naked_exposure"
-  | "two_up_lock";
+  | "two_up_lock"
+  | "user_reminder";
 
 export interface EdgeAlert {
   /** Stable dedupe key - a given alert fires once per key per session. */

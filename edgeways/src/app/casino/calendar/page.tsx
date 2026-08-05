@@ -14,8 +14,8 @@ import {
   availableBookieNames,
   offerMatchesAvailableBookies,
 } from "@/lib/accounts/available-bookies";
-import { filterPillState } from "@/lib/ui/surface-styles";
-import { cn } from "@/lib/utils";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { filterPillCountState } from "@/lib/ui/surface-styles";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 
 export default function CasinoCalendarPage() {
@@ -59,10 +59,10 @@ export default function CasinoCalendarPage() {
           </Button>
         }
         toolbar={
-          <button
-            type="button"
+          <FilterPill
+            active={availableOnly}
             onClick={() => setAvailableOnly((v) => !v)}
-            className={cn(filterPillState(availableOnly))}
+            hasCount={availableNames.size > 0}
             title={
               availableNames.size === 0
                 ? "Mark bookies Available in Settings to enable this filter"
@@ -70,10 +70,12 @@ export default function CasinoCalendarPage() {
             }
           >
             Available bookies
-            {availableOnly && availableNames.size > 0 ? (
-              <span className="ml-1 tabular-nums opacity-70">{availableNames.size}</span>
+            {availableNames.size > 0 ? (
+              <span className={filterPillCountState(availableOnly)}>
+                {availableNames.size}
+              </span>
             ) : null}
-          </button>
+          </FilterPill>
         }
       />
 

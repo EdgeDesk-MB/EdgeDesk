@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,14 +28,30 @@ export function OfferDialog({
   onSaved: () => void;
 }) {
   const editing = prefill?.editOffer != null;
+  const [blockDismiss, setBlockDismiss] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && blockDismiss) return;
+        onOpenChange(next);
+      }}
+    >
       <DialogContent
         className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[520px]"
         onFocusOutside={preventDialogDismissOnPortaledContent}
-        onPointerDownOutside={preventDialogDismissOnPortaledContent}
-        onInteractOutside={preventDialogDismissOnPortaledContent}
+        onPointerDownOutside={(e) => {
+          preventDialogDismissOnPortaledContent(e);
+          if (blockDismiss) e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          preventDialogDismissOnPortaledContent(e);
+          if (blockDismiss) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (blockDismiss) e.preventDefault();
+        }}
       >
         <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-7">
           <DialogTitle className="text-[25px] font-extrabold tracking-tight">
@@ -48,6 +65,7 @@ export function OfferDialog({
           key={`offer-form-${formKey}`}
           open={open}
           prefill={prefill}
+          onBlockingOverlayChange={setBlockDismiss}
           onSaved={() => {
             onSaved();
             onOpenChange(false);

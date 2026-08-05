@@ -21,7 +21,11 @@ export function casinoSettlementDedupe(casinoOfferId: number): string {
   return `casino:${casinoOfferId}`;
 }
 import { ensureVenueAccount } from "@/lib/accounts/ensure-venue";
-import { sumFreeBetLotBalance } from "@/lib/accounts/free-bet-lot-balance";
+import {
+  freeBetUsageNote,
+  selectFreeBetLotForUsage,
+  sumFreeBetLotBalance,
+} from "@/lib/accounts/free-bet-lot-balance";
 import { applyWageringRequirement } from "@/lib/accounts/wagering";
 import { roundPence } from "@/lib/calc/money";
 import type { DutchLegRecord } from "@/lib/calc/settlement";
@@ -29,6 +33,53 @@ import {
   EARLY_FREE_BET_AWARD_REASON,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
+
+/** Bet ids whose promo free-bet credits belong to the same offer as `bet`. */
+function preferBetIdsForFreeBetUsage(bet: Pick<BetRow, "id" | "offerId">): number[] {
+  if (bet.offerId == null) return [bet.id];
+  const ids = db
+    .select({ id: bets.id })
+    .from(bets)
+    .where(eq(bets.offerId, bet.offerId))
+    .all()
+    .map((r) => r.id);
+  return ids.length > 0 ? ids : [bet.id];
+}
+
+/** Debit a venue free-bet balance, targeting the best matching open lot. */
+function ledgerFreeBetUsageDebit(
+  accountId: number,
+  stake: number,
+  label: string,
+  bet: Pick<BetRow, "id" | "offerId">
+): void {
+  const lot = selectFreeBetLotForUsage(accountId, {
+    preferBetIds: preferBetIdsForFreeBetUsage(bet),
+    stake,
+  });
+  // Only tag [[lot:N]] when one lot covers the full stake; otherwise FIFO
+  // (untagged) can span multiple lots without silently dropping remainder.
+  insertTx(accountId, -stake, "free_bet", freeBetUsageNote(label, lot?.id), bet.id);
+}
+
+/**
+ * Void/push of a free bet: restore the lot by deleting the placement usage
+ * debit instead of inserting a new "Void - stake returned" credit (those
+ * orphaned as Do-next convert cards and were later spent by FIFO ahead of
+ * fresh promo awards).
+ */
+function restoreFreeBetUsageOnVoid(bet: BetRow): boolean {
+  const usage = db
+    .select()
+    .from(balanceTransactions)
+    .where(and(eq(balanceTransactions.betId, bet.id), eq(balanceTransactions.category, "free_bet")))
+    .all()
+    .filter((t) => t.amount < 0)
+    .sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)[0];
+  if (!usage) return false;
+  db.delete(balanceTransactions).where(eq(balanceTransactions.id, usage.id)).run();
+  return true;
+}
 
 export type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
 import type { AccountBalance, BalanceSummary } from "@/lib/services/balances.types";
@@ -592,7 +643,12 @@ function ledgerDutchFreeLegs(bet: BetRow): boolean {
     if (!leg.freeBet || !leg.bookmaker?.trim() || !(leg.stake > 0)) continue;
     const account =
       findVenueAccountByName(leg.bookmaker) ?? ensureVenueAccount(leg.bookmaker, "bookie").account;
-    insertTx(account.id, -leg.stake, "free_bet", `Free bet used - ${bet.label} (${leg.label})`, bet.id);
+    ledgerFreeBetUsageDebit(
+      account.id,
+      leg.stake,
+      `${bet.label} (${leg.label})`,
+      bet
+    );
     ledgered = true;
   }
   db.update(bets).set({ balanceLedgered: 1 }).where(eq(bets.id, bet.id)).run();
@@ -669,13 +725,7 @@ export function ledgerBetPlacement(
   const applyWagering = opts?.applyWagering !== false;
 
   if (bookie && bet.backStake > 0 && isFree) {
-    insertTx(
-      bookie.id,
-      -bet.backStake,
-      "free_bet",
-      `Free bet used - ${bet.label}`,
-      bet.id
-    );
+    ledgerFreeBetUsageDebit(bookie.id, bet.backStake, bet.label, bet);
   }
   if (bookie && bet.backStake > 0 && !isFree) {
     insertTx(
@@ -721,13 +771,21 @@ export function ledgerBetSettlement(bet: BetRow): boolean {
 
   if (bet.status === "void" || bet.status === "push") {
     if (bookie && bet.backStake > 0) {
-      insertTx(
-        bookie.id,
-        bet.backStake,
-        isFree ? "free_bet" : "bet_settlement",
-        `${bet.status === "push" ? "Push" : "Void"} - stake returned - ${bet.label}`,
-        bet.id
-      );
+      if (isFree) {
+        // Restore by deleting the usage debit. If none remains (already
+        // restored, or never debited), do not insert a free_bet credit —
+        // that created orphan "Void - stake returned" lots and could
+        // double-credit on reopen → re-void.
+        restoreFreeBetUsageOnVoid(bet);
+      } else {
+        insertTx(
+          bookie.id,
+          bet.backStake,
+          "bet_settlement",
+          `${bet.status === "push" ? "Push" : "Void"} - stake returned - ${bet.label}`,
+          bet.id
+        );
+      }
     }
     if (exchange && liability > 0) {
       insertTx(

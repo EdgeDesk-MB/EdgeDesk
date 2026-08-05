@@ -1,5 +1,6 @@
 import type { AddBetPrefill } from "@/components/add-bet-dialog";
 import type { BetMode } from "@/lib/calc";
+import { offerTriggerDetectedInLabel } from "@/lib/calc/ai-triggers";
 import { deriveOfferNextAction } from "@/lib/offers/next-actions";
 import {
   isRegionalScope,
@@ -29,6 +30,21 @@ function ctaLabelForAction(
   return "Place qualifying bet";
 }
 
+/**
+ * Offer-trigger text for a qualifying leg: structured place-refund rules when
+ * present, otherwise a title that already parses as a bet&get / free-bet promo
+ * (e.g. "Bet £10 get £10 free bet" on a General campaign).
+ */
+export function qualifyingOfferTriggerText(
+  offer: Pick<OfferSummary, "title" | "offerType" | "rules">
+): string | null {
+  const rules = parseOfferRules(offer);
+  if (rules) return placeRefundTriggerText(rules);
+  const title = offer.title.trim();
+  if (title && offerTriggerDetectedInLabel(title)) return title;
+  return null;
+}
+
 export interface TrackBetAction {
   enabled: boolean;
   label: string;
@@ -43,7 +59,7 @@ export function deriveTrackBetAction(
 ): TrackBetAction {
   const prefs = settings?.offerBetPrefs ?? {};
   const defaultStake = settings?.defaultBackStake ?? 10;
-  const rules = offer.sport === "horse_racing" ? parseOfferRules(offer) : null;
+  const rules = parseOfferRules(offer);
   const action = deriveOfferNextAction(offer);
   const profit = offer.profit;
 
@@ -119,8 +135,9 @@ export function deriveTrackBetAction(
         : `Qualify · ${bookmaker ?? offer.title}`,
   };
 
-  if (rules && betType === "qualifying") {
-    prefill.triggerText = placeRefundTriggerText(rules);
+  if (betType === "qualifying") {
+    const trigger = qualifyingOfferTriggerText(offer);
+    if (trigger) prefill.triggerText = trigger;
   }
 
   if (offer.sport === "horse_racing") {

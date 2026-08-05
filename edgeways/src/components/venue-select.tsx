@@ -11,6 +11,7 @@ import {
 } from "@/lib/accounts/access";
 import { filterBookmakers } from "@/lib/bookmakers";
 import { bookieBrandColor } from "@/lib/brands/bookies";
+import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
@@ -50,6 +51,8 @@ export function VenueSelect({
   preferAvailable = true,
   /** Compact chip style (2UP / Add bet panels) */
   compact = false,
+  /** Settings-style bordered trigger; `sm` matches ThemeSelect height (~32px) */
+  size = "default",
   placeholder = "Select…",
   /** Which sections to show - default both */
   kinds = ["bookie", "exchange"],
@@ -64,6 +67,7 @@ export function VenueSelect({
   className?: string;
   preferAvailable?: boolean;
   compact?: boolean;
+  size?: "default" | "sm";
   placeholder?: string;
   kinds?: Array<"bookie" | "exchange">;
   allowCustom?: boolean;
@@ -79,9 +83,11 @@ export function VenueSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [menuStyle, setMenuStyle] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     width: number;
+    maxHeight: number;
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -235,14 +241,37 @@ export function VenueSelect({
   function updatePosition() {
     const trigger = triggerRef.current;
     if (!trigger) return;
+    const PAD = 8;
+    const GAP = 4;
     const triggerRect = trigger.getBoundingClientRect();
     const menuWidth = compact
       ? 224
       : Math.max(triggerRect.width, 260);
 
     let left = compact ? triggerRect.right - menuWidth : triggerRect.left;
-    left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
-    setMenuStyle({ top: triggerRect.bottom + 4, left, width: menuWidth });
+    left = Math.max(PAD, Math.min(left, window.innerWidth - menuWidth - PAD));
+
+    const spaceBelow = window.innerHeight - triggerRect.bottom - PAD;
+    const spaceAbove = triggerRect.top - PAD;
+    // Prefer below; flip above when there is clearly more room there.
+    const openBelow = spaceBelow >= 160 || spaceBelow >= spaceAbove;
+    const maxHeight = Math.max(120, openBelow ? spaceBelow - GAP : spaceAbove - GAP);
+
+    if (openBelow) {
+      setMenuStyle({
+        top: triggerRect.bottom + GAP,
+        left,
+        width: menuWidth,
+        maxHeight,
+      });
+    } else {
+      setMenuStyle({
+        bottom: window.innerHeight - triggerRect.top + GAP,
+        left,
+        width: menuWidth,
+        maxHeight,
+      });
+    }
   }
 
   useEffect(() => {
@@ -363,15 +392,17 @@ export function VenueSelect({
       <div
         ref={menuRef}
         data-venue-select-menu
-        className="pointer-events-auto fixed z-[10000] overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
+        className="pointer-events-auto fixed z-[10000] flex flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
         style={{
           top: menuStyle.top,
+          bottom: menuStyle.bottom,
           left: menuStyle.left,
           width: menuStyle.width,
+          maxHeight: menuStyle.maxHeight,
         }}
       >
         {showSearch ? (
-          <div className="border-b p-2">
+          <div className="shrink-0 border-b p-2">
             <input
               ref={searchRef}
               type="text"
@@ -389,7 +420,7 @@ export function VenueSelect({
           </div>
         ) : null}
         <ul
-          className="max-h-64 overflow-y-auto overscroll-contain py-1 text-xs"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 text-xs"
           onWheel={(e) => e.stopPropagation()}
         >
           {showCustom && (
@@ -454,15 +485,24 @@ export function VenueSelect({
     <button
       ref={triggerRef}
       type="button"
+      aria-expanded={open}
+      aria-haspopup="listbox"
       onClick={() => setOpen((o) => !o)}
       className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-md border bg-background px-3 text-sm outline-none ring-primary/40 focus:ring-2",
+        fieldControl,
+        "flex w-full items-center gap-2 outline-none hover:bg-muted dark:hover:bg-input/50",
+        size === "sm"
+          ? "h-8 px-2.5 text-xs"
+          : "h-9 px-3 text-sm",
         !value && "text-muted-foreground"
       )}
     >
       {value ? (
         <span
-          className="inline-block size-2.5 shrink-0 rounded-full"
+          className={cn(
+            "inline-block shrink-0 rounded-full",
+            size === "sm" ? "size-2" : "size-2.5"
+          )}
           style={{ backgroundColor: valueBrandColor ?? undefined }}
         />
       ) : null}
@@ -472,7 +512,12 @@ export function VenueSelect({
           {accessStatusLabel("gubbed")}
         </span>
       )}
-      <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+      <ChevronsUpDown
+        className={cn(
+          "shrink-0 opacity-50",
+          size === "sm" ? "size-3" : "size-3.5"
+        )}
+      />
     </button>
   );
 

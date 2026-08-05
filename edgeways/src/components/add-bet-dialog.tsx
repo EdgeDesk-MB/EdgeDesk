@@ -114,8 +114,8 @@ import {
   isRegionalScope,
   offerMatchesBetContext,
   parseOfferRules,
-  placeRefundTriggerText,
 } from "@/lib/offers/racing-offer-rules";
+import { qualifyingOfferTriggerText } from "@/lib/offers/offer-track-bet";
 import {
   bookmakerFromOfferPrefs,
   stakeFromOfferPrefs,
@@ -127,7 +127,7 @@ import { SportIcon, SportLabel } from "@/components/sport-icon";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { cn } from "@/lib/utils";
 import { BetOfferTriggerField } from "@/components/add-bet/bet-offer-trigger-field";
-import { Gift, Sparkles, Trash2, Zap } from "lucide-react";
+import { Gift, Trash2, Zap } from "lucide-react";
 import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
 import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
@@ -586,8 +586,13 @@ export function AddBetDialog({
           );
           if (stake > 0) setBackStake(stake);
           if (bookie) setBookmaker(bookie);
-          if (rules) {
-            setTriggerText(placeRefundTriggerText(rules));
+        }
+        // Place qualifying bet (and any offerId-only open) must carry the reward
+        // into Offer trigger — not only when stake/bookie were also missing.
+        if (offer && !prefill.triggerText) {
+          const trigger = qualifyingOfferTriggerText(offer);
+          if (trigger) {
+            setTriggerText(trigger);
             setTriggerLinkedFromLabel(false);
           }
         }
@@ -873,17 +878,9 @@ export function AddBetDialog({
     );
     if (stake > 0) setBackStake(stake);
     if (bookie) setBookmaker(bookie);
-    if (rules) {
-      setTriggerText(placeRefundTriggerText(rules));
-      setTriggerLinkedFromLabel(false);
-    } else if (
-      offer.title.trim() &&
-      /\bbet\s+£?\d+/i.test(offer.title) &&
-      /\b(get|gives?)\b/i.test(offer.title)
-    ) {
-      // Unconditional bet&get (and similar) - copy offer title into the AI trigger
-      // so settlement / early-award can see the reward without place-refund rules.
-      setTriggerText(offer.title.trim());
+    const trigger = qualifyingOfferTriggerText(offer);
+    if (trigger) {
+      setTriggerText(trigger);
       setTriggerLinkedFromLabel(false);
     }
     if (betType !== "qualifying" && betType !== "risk_free") {
@@ -1666,7 +1663,7 @@ export function AddBetDialog({
                     title="Offer detected in label — click to apply to Offer trigger"
                     aria-label="Apply offer trigger from label"
                   >
-                    <Sparkles className="size-4" />
+                    <Zap className="size-4" />
                   </button>
                   ) : null}
                 </div>

@@ -28,8 +28,7 @@ import { ALL_OWNERS, OwnerFilter } from "@/components/accounts/owner-filter";
 import type { EdgeReport } from "@/lib/report/edge-report";
 import { mistakeTagLabel } from "@/lib/offers/mistakes";
 import { formatGbp } from "@/lib/format-money";
-import { filterPillState } from "@/lib/ui/surface-styles";
-import { cn } from "@/lib/utils";
+import { FilterPill } from "@/components/ui/filter-pill";
 
 /** Realised follows the P&L chart greens; expected uses the "estimated" sky. */
 const SERIES_COLORS = {
@@ -117,14 +116,13 @@ export default function EdgeReportPage() {
             {view === "month" && months.length > 1 ? (
               <div className="flex flex-wrap gap-1.5">
                 {months.map((m) => (
-                  <button
+                  <FilterPill
                     key={m}
-                    type="button"
-                    className={cn(filterPillState(m === (month ?? report?.month)))}
+                    active={m === (month ?? report?.month)}
                     onClick={() => setMonth(m)}
                   >
                     {formatMonthLabel(m)}
-                  </button>
+                  </FilterPill>
                 ))}
               </div>
             ) : null}

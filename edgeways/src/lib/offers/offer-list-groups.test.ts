@@ -3,6 +3,7 @@ import {
   formatOfferEventDay,
   formatOfferListGroupLabel,
   groupOffersByListDay,
+  isOfferActiveInList,
   isOfferEffectivelyExpired,
   isOfferInExpiredFeed,
   isOfferInMainFeed,
@@ -93,6 +94,34 @@ describe("offer list date groups", () => {
       profit: { freeBetStage: "settled" },
     });
     expect(isOfferInMainFeed(settled, now)).toBe(false);
+  });
+
+  it("Active tab excludes not-started and planned campaigns", () => {
+    const notStarted = offer({
+      id: 8,
+      title: "Ready",
+      eventDate: "2026-07-10",
+      status: "active",
+      betCount: 0,
+    });
+    const planned = offer({
+      id: 9,
+      title: "Scheduled",
+      eventDate: "2026-07-11",
+      status: "planned",
+      betCount: 0,
+    });
+    const inPlay = offer({
+      id: 10,
+      title: "Qualifying",
+      eventDate: "2026-07-10",
+      status: "active",
+      betCount: 1,
+      profit: { qualifyingOpenCount: 1 },
+    });
+    expect(isOfferActiveInList(notStarted, now)).toBe(false);
+    expect(isOfferActiveInList(planned, now)).toBe(false);
+    expect(isOfferActiveInList(inPlay, now)).toBe(true);
   });
 
   it("prefers eventDate for grouping", () => {

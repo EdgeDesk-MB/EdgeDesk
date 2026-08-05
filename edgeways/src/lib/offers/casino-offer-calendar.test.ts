@@ -45,15 +45,21 @@ describe("buildCasinoCalendarDays", () => {
     const now = new Date(2026, 6, 21, 10, 0, 0).getTime(); // 21 July 2026, 10:00 local
     const todayExpiry = new Date(2026, 6, 21, 18, 0, 0).getTime();
     const tomorrowExpiry = new Date(2026, 6, 22, 12, 0, 0).getTime();
+    const laterExpiry = new Date(2026, 6, 28, 12, 0, 0).getTime();
     const offers = [
       offer({ id: 1, title: "Expires today", expiresAt: todayExpiry }),
       offer({ id: 2, title: "Expires tomorrow", expiresAt: tomorrowExpiry }),
+      offer({ id: 3, title: "Expires later", expiresAt: laterExpiry }),
     ];
     const days = buildCasinoCalendarDays(offers, { now });
-    expect(days.map((d) => d.label)).toEqual(["Today", "Tomorrow"]);
+    expect(days.map((d) => d.label).slice(0, 2)).toEqual(["Today", "Tomorrow"]);
+    expect(days).toHaveLength(3);
     expect(days[0].isToday).toBe(true);
     expect(days[1].isTomorrow).toBe(true);
     expect(days[0].items[0].offer.title).toBe("Expires today");
+    expect(days[0].items[0].urgency).toBe("today");
+    expect(days[1].items[0].urgency).toBe("tomorrow");
+    expect(days[2].items[0].urgency).toBe("normal");
   });
 
   it("excludes offers with no expiry, completed, or expired status", () => {

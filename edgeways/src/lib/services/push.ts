@@ -8,6 +8,11 @@
 import "server-only";
 import webpush from "web-push";
 import { eq } from "drizzle-orm";
+import {
+  NOTIFICATION_BADGE,
+  NOTIFICATION_ICON,
+} from "@/lib/alerts/notification-icons";
+import { ensureNotificationTitleEmoji } from "@/lib/alerts/notification-title";
 import { db, appSettings, pushSubscriptions, type PushSubscriptionRow } from "@/lib/db";
 import type { IncomingAlert } from "@/lib/services/alerts-inbox";
 
@@ -69,13 +74,23 @@ export function listSubscriptions(): PushSubscriptionRow[] {
   return db.select().from(pushSubscriptions).all();
 }
 
-async function fanoutPush(payload: string, ttlSeconds: number): Promise<{ sent: number; pruned: number }> {
+export type PushFanoutResult = {
+  sent: number;
+  pruned: number;
+  failed: number;
+  /** Coarse reasons for Settings / test-push diagnostics - never secrets. */
+  failures: { label: string | null; statusCode: number | null; reason: string }[];
+};
+
+async function fanoutPush(payload: string, ttlSeconds: number): Promise<PushFanoutResult> {
   const subs = listSubscriptions();
-  if (subs.length === 0) return { sent: 0, pruned: 0 };
+  if (subs.length === 0) return { sent: 0, pruned: 0, failed: 0, failures: [] };
   configureVapid();
 
   let sent = 0;
   let pruned = 0;
+  let failed = 0;
+  const failures: PushFanoutResult["failures"] = [];
   await Promise.all(
     subs.map(async (sub) => {
       try {
@@ -90,15 +105,28 @@ async function fanoutPush(payload: string, ttlSeconds: number): Promise<{ sent: 
           .where(eq(pushSubscriptions.id, sub.id))
           .run();
       } catch (e) {
-        const status = (e as { statusCode?: number }).statusCode;
+        const status = (e as { statusCode?: number }).statusCode ?? null;
+        const message = e instanceof Error ? e.message : String(e);
         if (status === 404 || status === 410) {
           removeSubscription(sub.endpoint);
           pruned++;
+          failures.push({
+            label: sub.label,
+            statusCode: status,
+            reason: "Subscription expired - re-enable push on that device",
+          });
+        } else {
+          failed++;
+          failures.push({
+            label: sub.label,
+            statusCode: status,
+            reason: message.slice(0, 160),
+          });
         }
       }
     })
   );
-  return { sent, pruned };
+  return { sent, pruned, failed, failures };
 }
 
 /**
@@ -106,17 +134,18 @@ async function fanoutPush(payload: string, ttlSeconds: number): Promise<{ sent: 
  * from the push relay) are pruned. Failures never throw - push is a
  * best-effort channel on top of the inbox record.
  */
-export async function sendPush(alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">): Promise<{
-  sent: number;
-  pruned: number;
-}> {
+export async function sendPush(
+  alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
+): Promise<PushFanoutResult> {
   const payload = JSON.stringify({
-    // The bolt is the brand mark on the lock screen: every Edgeways push
-    // leads with it (paired with the monochrome bolt badge in sw.js).
-    title: `⚡ ${alert.title}`,
+    // Exactly one leading emoji: keep semantic marks from alert rules
+    // (🟢/⚠/🔒/⏰), otherwise brand ⚡. Never stack a second bolt.
+    title: ensureNotificationTitleEmoji(alert.title),
     body: alert.body ?? "",
     href: alert.href ?? "/",
     tag: alert.key,
+    icon: NOTIFICATION_ICON,
+    badge: NOTIFICATION_BADGE,
   });
   return fanoutPush(payload, 60 * 60);
 }
@@ -126,9 +155,9 @@ export async function sendPush(alert: Pick<IncomingAlert, "title" | "body" | "hr
  * Used when the underlying condition is resolved on the web (offer claimed,
  * intentional mute, etc.) so the phone shade does not keep a stale prompt.
  */
-export async function dismissPush(tags: string[]): Promise<{ sent: number; pruned: number }> {
+export async function dismissPush(tags: string[]): Promise<PushFanoutResult> {
   const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))].slice(0, 50);
-  if (clean.length === 0) return { sent: 0, pruned: 0 };
+  if (clean.length === 0) return { sent: 0, pruned: 0, failed: 0, failures: [] };
   const payload = JSON.stringify({ action: "dismiss", tags: clean });
   // Short TTL: a dismiss that arrives hours later is useless.
   return fanoutPush(payload, 5 * 60);

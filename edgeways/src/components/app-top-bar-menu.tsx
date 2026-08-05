@@ -1,98 +1,48 @@
 "use client";
 
 /**
- * The burger menu, two shapes for two worlds:
- * - Desktop (sidebar visible): a compact utilities dropdown - Appearance,
- *   Settings, Release notes, Help.
- * - Mobile: a full-height drawer sliding in from the right, carrying the
- *   whole sectioned navigation plus the same utilities.
- * Both derive navigation from NAV_SECTIONS, so nothing can drift.
+ * Mobile burger drawer — desk section nav + meta links + appearance.
+ * Meta pages also sit in the shared top-bar strip (`AppTopBarMetaNav`).
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { BookOpen, ChevronRight, Menu, ScrollText, Settings, X } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
 import {
   ActionBadge,
   NAV_SECTIONS,
+  NavSectionLabel,
   flattenNavEntries,
   isLinkActive,
 } from "@/components/app-nav";
-import { EdgewaysLogoIcon } from "@/components/edgeways-logo-icon";
 import { ThemeSelect } from "@/components/theme-select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { TopBarLoginButton } from "@/components/top-bar-login-button";
 import { useAppState } from "@/hooks/use-app-state";
 import { isEventPendingSettle } from "@/lib/racing/pending-settle";
+import { META_NAV_ITEMS } from "@/content/meta-nav";
 import { captionHeading } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-
-/**
- * The sidebar hides below `md` (768px), so the drawer must take over at
- * exactly that width - useIsMobile gates at `sm` and would leave a 640-768px
- * band with no main navigation at all (design-review finding).
- */
-function useBelowMd(): boolean | null {
-  const [below, setBelow] = useState<boolean | null>(null);
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767.98px)");
-    const update = () => setBelow(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return below;
-}
 
 const utilityRow =
   "flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60";
 
-const UTILITY_LINKS = [
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/release-notes", label: "Release notes", icon: ScrollText },
-  { href: "/help", label: "Help", icon: BookOpen },
-] as const;
-
-/**
- * Utility rows. In the desktop dropdown they must be DropdownMenuItems so
- * radix keyboard navigation reaches them; the drawer uses plain links.
- */
-function UtilityLinks({
-  asMenuItems = false,
-  onNavigate,
-}: {
-  asMenuItems?: boolean;
-  onNavigate?: () => void;
-}) {
+function UtilityLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
-      {UTILITY_LINKS.map(({ href, label, icon: Icon }) => {
-        const link = (
-          <Link
-            key={href}
-            href={href}
-            className={cn(utilityRow, "border-t border-border/80")}
-            onClick={onNavigate}
-          >
-            <Icon className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
-            <span className="flex-1">{label}</span>
-            <ChevronRight className="size-4 text-muted-foreground" />
-          </Link>
-        );
-        return asMenuItems ? (
-          <DropdownMenuItem key={href} asChild className="rounded-none p-0">
-            {link}
-          </DropdownMenuItem>
-        ) : (
-          link
-        );
-      })}
+      {META_NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className={cn(utilityRow, "border-t border-border/80")}
+          onClick={onNavigate}
+        >
+          <Icon className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="flex-1">{label}</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+      ))}
     </>
   );
 }
@@ -113,7 +63,7 @@ function BurgerButton(props: React.ComponentProps<"button">) {
   return (
     <button
       type="button"
-      className="relative z-[45] flex size-9 shrink-0 items-center justify-center overflow-visible rounded-md bg-[#111111] text-white shadow-sm transition-colors hover:bg-[#111111]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]/40"
+      className="topbar-accent-face skeuo-solid relative z-[45] flex size-9 shrink-0 items-center justify-center overflow-visible rounded-[var(--radius-button)] border border-transparent bg-topbar-accent text-topbar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-topbar-foreground/30"
       aria-label="Open menu"
       {...props}
     >
@@ -151,12 +101,8 @@ function MobileNavDrawer() {
           aria-describedby={undefined}
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-3">
-            <span className="flex items-center gap-2.5">
-              <EdgewaysLogoIcon className="size-7" />
-              <DialogPrimitive.Title className="text-sm font-bold">
-                Edgeways
-              </DialogPrimitive.Title>
-            </span>
+            <DialogPrimitive.Title className="sr-only">Menu</DialogPrimitive.Title>
+            <TopBarLoginButton mobileSwap />
             <DialogPrimitive.Close
               className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Close menu"
@@ -172,7 +118,11 @@ function MobileNavDrawer() {
             {NAV_SECTIONS.map((section) => (
               <div key={section.label ?? "top"}>
                 {section.label ? (
-                  <p className={cn(captionHeading, "px-4 pb-1 pt-4")}>{section.label}</p>
+                  <NavSectionLabel
+                    label={section.label}
+                    pro={section.pro}
+                    className="px-4 pb-1 pt-4"
+                  />
                 ) : (
                   <div className="pt-2" />
                 )}
@@ -221,31 +171,8 @@ function MobileNavDrawer() {
   );
 }
 
-/** Desktop: the sidebar owns navigation, so the burger is utilities only. */
-function DesktopUtilitiesMenu() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <BurgerButton />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        sideOffset={8}
-        className="max-h-[min(38rem,85vh)] w-72 overflow-y-auto overflow-x-hidden rounded-lg border-2 border-border bg-popover p-0 shadow-xl ring-0"
-      >
-        <AppearanceRow />
-        <UtilityLinks asMenuItems />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 export function AppTopBarMenu() {
-  // null on first paint - render the desktop shape until we know (the button
-  // itself is identical, so there is no visual flicker either way). Gated at
-  // md to hand over exactly where the sidebar disappears.
-  const belowMd = useBelowMd();
-  return belowMd === true ? <MobileNavDrawer /> : <DesktopUtilitiesMenu />;
+  return <MobileNavDrawer />;
 }
 
 /** Flashscore-style square icon button on the dark top bar */
@@ -258,7 +185,7 @@ export function TopBarButton({
     <button
       type="button"
       className={cn(
-        "flex h-8 shrink-0 items-center justify-center rounded-lg bg-topbar-accent text-topbar-foreground transition-colors hover:bg-topbar-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "flex h-8 shrink-0 items-center justify-center rounded-lg bg-topbar-accent text-topbar-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-topbar-foreground/30",
         className
       )}
       {...props}

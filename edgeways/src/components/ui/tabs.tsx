@@ -6,6 +6,8 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
+import { useSlidingIndicator } from "@/hooks/use-sliding-indicator"
+import { springTransition } from "@/lib/ui/motion"
 
 function Tabs({
   className,
@@ -45,6 +47,54 @@ const tabsListVariants = cva(
   }
 )
 
+function TabsLineList({
+  className,
+  fadeClassName = "from-card",
+  children,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.List> & { fadeClassName?: string }) {
+  const listRef = React.useRef<HTMLDivElement>(null)
+  const indicator = useSlidingIndicator(
+    listRef,
+    '[data-slot="tabs-trigger"][data-state="active"], [data-slot="tabs-trigger"][data-active]'
+  )
+
+  return (
+    <ScrollFadeEdges
+      orientation="horizontal"
+      dragToScroll
+      className="w-full flex-none"
+      scrollClassName="app-scroll-overlay overflow-x-auto pl-6 pr-6"
+      fadeClassName={fadeClassName}
+    >
+      <TabsPrimitive.List
+        ref={listRef}
+        data-slot="tabs-list"
+        data-variant="line"
+        className={cn(
+          tabsListVariants({ variant: "line" }),
+          "relative w-max",
+          className
+        )}
+        {...props}
+      >
+        {indicator.ready ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-0 z-[1] h-0.5 bg-highlight motion-reduce:transition-none"
+            style={{
+              left: indicator.left,
+              width: indicator.width,
+              transition: `left ${springTransition}, width ${springTransition}`,
+            }}
+          />
+        ) : null}
+        {children}
+      </TabsPrimitive.List>
+    </ScrollFadeEdges>
+  )
+}
+
 function TabsList({
   className,
   variant = "default",
@@ -54,46 +104,36 @@ function TabsList({
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants> & { fadeClassName?: string }) {
-  const list = (
+  // Underline tab strips can outgrow their container (Settings, fixture
+  // filters, ...) - scroll horizontally with a fade cue instead of wrapping
+  // or clipping, and never show a scrollbar (line tabs read as app chrome).
+  if (variant === "line") {
+    return (
+      <TabsLineList className={className} fadeClassName={fadeClassName} {...props}>
+        {children}
+      </TabsLineList>
+    )
+  }
+
+  return (
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(
-        tabsListVariants({ variant }),
-        variant === "line" && "w-max",
-        className
-      )}
+      className={cn(tabsListVariants({ variant }), className)}
       {...props}
     >
       {children}
     </TabsPrimitive.List>
   )
-
-  // Underline tab strips can outgrow their container (Settings, fixture
-  // filters, ...) - scroll horizontally with a fade cue instead of wrapping
-  // or clipping, and never show a scrollbar (line tabs read as app chrome).
-  // The leading/trailing space is padding on the scrollable content itself
-  // (matching gap-6, the same as the inter-tab gap) rather than an outer
-  // margin, so it scrolls away and fades like any other tab.
-  if (variant === "line") {
-    return (
-      <ScrollFadeEdges
-        orientation="horizontal"
-        dragToScroll
-        className="w-full flex-none"
-        scrollClassName="app-scroll-overlay overflow-x-auto pl-6 pr-6"
-        fadeClassName={fadeClassName}
-      >
-        {list}
-      </ScrollFadeEdges>
-    )
-  }
-
-  return list
 }
 
-const segmentedTrigger =
-  "group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-200 group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:data-active:bg-chip group-data-[variant=segmented]/tabs-list:data-active:font-bold group-data-[variant=segmented]/tabs-list:data-active:text-chip-foreground group-data-[variant=segmented]/tabs-list:data-active:shadow-sm group-data-[variant=segmented]/tabs-list:data-active:hover:bg-chip group-data-[variant=segmented]/tabs-list:data-active:active:bg-chip group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5"
+const segmentedTrigger = cn(
+  "group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-200 group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5",
+  /* Active ink + brand type — keep brand text on hover/focus (no dark-on-dark) */
+  "group-data-[variant=segmented]/tabs-list:data-active:bg-chip group-data-[variant=segmented]/tabs-list:data-active:font-semibold group-data-[variant=segmented]/tabs-list:data-active:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:shadow-[var(--ew-chip-shadow)] group-data-[variant=segmented]/tabs-list:data-active:hover:bg-chip group-data-[variant=segmented]/tabs-list:data-active:hover:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:active:bg-chip group-data-[variant=segmented]/tabs-list:data-active:active:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:focus-visible:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:[&_svg]:text-brand-text",
+  /* Brand focus ring that follows the pill radius */
+  "group-data-[variant=segmented]/tabs-list:focus-visible:border-transparent group-data-[variant=segmented]/tabs-list:focus-visible:outline-none group-data-[variant=segmented]/tabs-list:focus-visible:ring-2 group-data-[variant=segmented]/tabs-list:focus-visible:ring-brand/60 group-data-[variant=segmented]/tabs-list:focus-visible:ring-offset-2 group-data-[variant=segmented]/tabs-list:focus-visible:ring-offset-page"
+)
 
 function TabsTrigger({
   className,
@@ -103,10 +143,11 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group/tab-trigger relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
+        "group/tab-trigger relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
         segmentedTrigger,
-        "group-data-[variant=default]/tabs-list:data-active:bg-background group-data-[variant=default]/tabs-list:data-active:text-foreground dark:group-data-[variant=default]/tabs-list:data-active:border-input dark:group-data-[variant=default]/tabs-list:data-active:bg-input/30 dark:group-data-[variant=default]/tabs-list:data-active:text-foreground group-data-[variant=segmented]/tabs-list:data-active:text-chip-foreground",
-        "after:absolute after:bg-highlight after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:h-0.5 group-data-[variant=default]/tabs-list:after:bottom-[-5px] group-data-[variant=line]/tabs-list:after:-bottom-px group-data-[variant=line]/tabs-list:after:z-[1] group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+        "group-data-[variant=default]/tabs-list:data-active:bg-background group-data-[variant=default]/tabs-list:data-active:text-foreground dark:group-data-[variant=default]/tabs-list:data-active:border-input dark:group-data-[variant=default]/tabs-list:data-active:bg-input/30 dark:group-data-[variant=default]/tabs-list:data-active:text-foreground",
+        // Line tabs use a shared sliding spring underline on TabsList — hide per-trigger after.
+        "after:absolute after:bg-highlight after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:h-0.5 group-data-[variant=default]/tabs-list:after:bottom-[-5px] group-data-[variant=line]/tabs-list:after:hidden group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5",
         className
       )}
       {...props}
@@ -145,9 +186,15 @@ export function TabsLineBar({
     <div
       data-slot="tabs-line-bar"
       className={cn(
-        "w-full border-b border-border/60",
-        bleed === "card" && "-mx-(--card-spacing)",
-        bleed === "dialog" && "-mx-6",
+        "border-b border-border/60",
+        // Negative margins alone do not widen a w-full box - the right edge
+        // stays short by 2× the bleed. Expand width explicitly so the hairline
+        // reaches both module edges.
+        bleed === "card"
+          ? "-mx-(--card-spacing) w-[calc(100%+2*var(--card-spacing))]"
+          : bleed === "dialog"
+            ? "-mx-6 w-[calc(100%+3rem)]"
+            : "w-full",
         className
       )}
       {...props}

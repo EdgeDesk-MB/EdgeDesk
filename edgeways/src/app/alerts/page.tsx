@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import {
   AlarmClock,
   Ban,
+  Bell,
   BellRing,
   Check,
   CheckCheck,
@@ -35,6 +36,7 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   result_settled: CircleCheck,
   naked_exposure: ShieldAlert,
   two_up_lock: Flag,
+  user_reminder: Bell,
 };
 
 function dayLabel(ms: number): string {

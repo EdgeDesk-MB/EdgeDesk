@@ -83,7 +83,7 @@ import { betStatusBadgeVariant, formatPillLabel } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
 import { api } from "@/hooks/use-app-state";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
-import { Link2, Pencil, RotateCcw, Sparkles } from "lucide-react";
+import { Link2, Pencil, RotateCcw, Zap } from "lucide-react";
 
 const stickyActionsHead =
   "sticky right-0 z-20 w-14 border-l border-border/60 bg-card px-1 shadow-[-6px_0_10px_-6px_color-mix(in_oklch,var(--border)_50%,transparent)]";
@@ -387,7 +387,7 @@ export function BetLogTable({
                 )}
                 {(bet.triggerText || triggers.length > 0) && (
                   <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                    <Sparkles className="mr-0.5 inline size-3 shrink-0 text-violet-500" />
+                    <Zap className="mr-0.5 inline size-3 shrink-0 text-violet-500" />
                     {bet.triggerText || triggers[0]}
                   </div>
                 )}

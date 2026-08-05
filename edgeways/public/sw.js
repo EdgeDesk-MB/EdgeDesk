@@ -4,7 +4,16 @@
  * sentinels swap the local Notification channel for push without touching
  * alert-rule logic). No offline caching yet: the app is local-first and the
  * dev/local server is the data source.
+ *
+ * Android Chrome always draws TWO icon slots in the shade:
+ *   badge (left / status) → monochrome only; omit it and you get the default bell
+ *   icon  (right / large) → full colour yellow plate + #111 bolt (mark.svg)
+ * A single yellow-only notification is not available to web push on Android.
+ * Bump NOTIF_V when assets change so clients pick up a new SW + fresh PNGs.
  */
+const NOTIF_V = "notif5";
+const NOTIFICATION_ICON = `/icon-192.png?v=${NOTIF_V}`;
+const NOTIFICATION_BADGE = `/badge-192.png?v=${NOTIF_V}`;
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -39,12 +48,25 @@ self.addEventListener("push", (event) => {
         }
         return;
       }
+      const origin = self.location.origin;
+      const icon = data.icon
+        ? data.icon.startsWith("http")
+          ? data.icon
+          : `${origin}${data.icon}`
+        : `${origin}${NOTIFICATION_ICON}`;
+      const badge = data.badge
+        ? data.badge.startsWith("http")
+          ? data.badge
+          : `${origin}${data.badge}`
+        : `${origin}${NOTIFICATION_BADGE}`;
       await self.registration.showNotification(data.title, {
         body: data.body || undefined,
-        icon: "/icon-192.png",
-        badge: "/badge-192.png",
+        icon,
+        badge,
         data: { href: data.href },
         tag: data.tag || undefined,
+        // Same tag replaces the previous shade entry (stops test-push spam).
+        renotify: Boolean(data.tag),
       });
     })()
   );

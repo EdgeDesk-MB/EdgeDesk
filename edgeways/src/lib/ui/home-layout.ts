@@ -9,7 +9,7 @@ export const HOME_WIDGET_IDS = ["hero", "do-next", "plan", "chart", "feed"] as c
 export type HomeWidgetId = (typeof HOME_WIDGET_IDS)[number];
 
 export const HOME_WIDGET_LABELS: Record<HomeWidgetId, string> = {
-  hero: "Overview",
+  hero: "Summary",
   "do-next": "Do next",
   plan: "Today's plan",
   chart: "Chart",

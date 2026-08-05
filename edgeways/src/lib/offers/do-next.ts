@@ -19,6 +19,7 @@ import {
   formatOfferDaysLeftLabel,
   offerExpiryDaysLeft,
 } from "@/lib/offers/offer-expiry";
+import { offerRequiredStake } from "@/lib/offers/offer-required-stake";
 
 export type DoNextSort = "priority" | "edge" | "rate";
 
@@ -85,18 +86,6 @@ export type DoNextItem = {
   /** The race and horse Offer Edge recommends, when it could name one */
   edge?: OfferNextActionEdge;
 };
-
-/** Parse bet stake from offer rules JSON; null when absent. */
-function rulesStake(offer: OfferSummary): number | null {
-  if (!offer.rules) return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parsed: any = JSON.parse(offer.rules);
-    return typeof parsed?.betStake === "number" && parsed.betStake > 0 ? parsed.betStake : null;
-  } catch {
-    return null;
-  }
-}
 
 function normVenue(name: string): string {
   return name.trim().toLowerCase();
@@ -169,7 +158,7 @@ export function buildDoNextItems(
       // Non-racing offers often have no parsed stake in `rules` - without a
       // known required stake we can't judge a shortfall, so skip the check
       // rather than guess (a guessed £10 was showing bogus shortfalls).
-      const needed = rulesStake(offer);
+      const needed = offerRequiredStake(offer);
       if (needed != null) {
         const available = bookieBalances.get(normVenue(action.bookmaker)) ?? -1;
         if (available >= 0 && available < needed) {

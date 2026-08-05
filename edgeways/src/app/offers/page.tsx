@@ -6,18 +6,25 @@ import { useNow } from "@/hooks/use-now";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
-import { PageHeaderStat, pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
+import {
+  PageHeaderActions,
+  PageHeaderButtonGroup,
+  PageHeaderStat,
+  PageHeaderStatGroup,
+  pagePrimaryButtonProps,
+} from "@/components/layout/page-header-actions";
 import { EmptyState } from "@/components/help/empty-state";
 import { useAppState } from "@/hooks/use-app-state";
 import {
   groupOffersByListDay,
+  isOfferActiveInList,
   isOfferEffectivelyExpired,
   isOfferInExpiredFeed,
   isOfferInMainFeed,
   startOfLocalDay,
 } from "@/lib/offers/offer-list-groups";
-import { cn } from "@/lib/utils";
-import { filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { filterPillCountState } from "@/lib/ui/surface-styles";
 import { formatPillLabel } from "@/lib/ui/status-badges";
 import { listOfferNextActions, offerNextActionLabel } from "@/lib/offers/next-actions";
 import {
@@ -116,7 +123,7 @@ function OffersContent() {
       );
     }
     if (filter === "active") {
-      return categoryScoped.filter((o) => o.status === "active" && isOfferInMainFeed(o));
+      return categoryScoped.filter((o) => isOfferActiveInList(o));
     }
     // All — open campaigns from today onward (no expired, completed, or past windows).
     return categoryScoped.filter((o) => isOfferInMainFeed(o));
@@ -141,7 +148,7 @@ function OffersContent() {
 
   const totals = useMemo(() => {
     return {
-      active: categoryScoped.filter((o) => o.status === "active" && isOfferInMainFeed(o)).length,
+      active: categoryScoped.filter((o) => isOfferActiveInList(o)).length,
       expired: categoryScoped.filter((o) => isOfferEffectivelyExpired(o)).length,
     };
   }, [categoryScoped]);
@@ -202,29 +209,28 @@ function OffersContent() {
         title="Campaigns"
         description="Track offer campaigns, next actions, and pipeline stages. Bets auto-link when the label or trigger looks like an offer."
         action={
-          <>
-            <PageHeaderStat label="Active">{totals.active}</PageHeaderStat>
-            <PageHeaderStat label="Actions">{nextActions.length}</PageHeaderStat>
-            <Button {...pagePrimaryButtonProps} onClick={() => openOffer()}>
-              <Plus className="size-4" /> New offer
-            </Button>
-          </>
+          <PageHeaderActions className="gap-6">
+            <PageHeaderStatGroup>
+              <PageHeaderStat label="Active">{totals.active}</PageHeaderStat>
+              <PageHeaderStat label="Actions">{nextActions.length}</PageHeaderStat>
+            </PageHeaderStatGroup>
+            <PageHeaderButtonGroup>
+              <Button {...pagePrimaryButtonProps} onClick={() => openOffer()}>
+                <Plus className="size-4" /> New offer
+              </Button>
+            </PageHeaderButtonGroup>
+          </PageHeaderActions>
         }
         toolbar={
           <>
             {(["all", "needs_action", "active", "completed", "expired"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={cn(filterPillState(filter === f))}
-              >
+              <FilterPill key={f} active={filter === f} onClick={() => setFilter(f)}>
                 {f === "needs_action"
                   ? `Needs action${nextActions.length ? ` (${nextActions.length})` : ""}`
                   : f === "expired"
                     ? `Expired${totals.expired ? ` (${totals.expired})` : ""}`
                     : formatPillLabel(f)}
-              </button>
+              </FilterPill>
             ))}
             {showCategoryFilter ? (
               <Select
@@ -254,10 +260,10 @@ function OffersContent() {
                 </SelectContent>
               </Select>
             ) : null}
-            <button
-              type="button"
+            <FilterPill
+              active={availableOnly}
               onClick={() => setAvailableOnly((v) => !v)}
-              className={cn(filterPillState(availableOnly))}
+              hasCount={availableNames.size > 0}
               title={
                 availableNames.size === 0
                   ? "Mark bookies Available in Settings to enable this filter"
@@ -265,10 +271,12 @@ function OffersContent() {
               }
             >
               Available bookies
-              {availableOnly && availableNames.size > 0 ? (
-                <span className="ml-1 tabular-nums opacity-70">{availableNames.size}</span>
+              {availableNames.size > 0 ? (
+                <span className={filterPillCountState(availableOnly)}>
+                  {availableNames.size}
+                </span>
               ) : null}
-            </button>
+            </FilterPill>
           </>
         }
       />

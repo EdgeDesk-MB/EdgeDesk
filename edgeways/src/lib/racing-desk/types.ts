@@ -33,11 +33,16 @@ export interface RacingRunnerDetail {
   weightLbs?: number;
   /** Horse coat colour code (b, ch, gr, etc.) */
   horseColour?: string;
+  /** Sex / sex_code from Racing API (C, F, G, …) */
+  sex?: string;
   /** Blinkers, visor, etc. */
   headgear?: string;
   /** Jockey silk image URL when API provides it (Standard+ / results) */
   silkUrl?: string;
+  /** Official rating */
   ofr?: string;
+  /** Days since last run (Racing API `last_run`) */
+  lastRunDays?: number;
   form?: string;
   spDecimal?: number;
   spFraction?: string;
@@ -83,6 +88,16 @@ export interface RacingDeskRace {
   distance?: string;
   going?: string;
   raceClass?: string;
+  /** Group / Listed pattern when present */
+  pattern?: string;
+  /** Handicap rating band e.g. "0-85" */
+  ratingBand?: string;
+  /** Age band e.g. "3yo+" */
+  ageBand?: string;
+  /** Turf / AW / Dirt */
+  surface?: string;
+  /** Fillies / Mares / Colts & Geldings, etc. */
+  sexRestriction?: string;
   type?: string;
   prize?: string;
   region?: string;
@@ -167,6 +182,7 @@ export interface SuggestedRace {
   score: number;
   summary: string;
   oddsSource?: OddsSource;
+  exchangeSource?: ExchangeOddsSource;
   suggestedRunners?: SuggestedRunner[];
   /** Best runner by total EV */
   topTarget?: SuggestedRunner;

@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AiTriggerPreview } from "@/lib/calc/ai-triggers";
-import { CircleAlert, CircleCheck, Sparkles } from "lucide-react";
+import { CircleAlert, CircleCheck, Zap } from "lucide-react";
 
 export function BetOfferTriggerField({
   value,
@@ -23,7 +23,7 @@ export function BetOfferTriggerField({
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 p-3">
       <div className="flex items-start gap-2">
-        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-violet-500" aria-hidden />
+        <Zap className="mt-0.5 size-3.5 shrink-0 text-violet-500" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-foreground">Offer trigger</p>
           <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">

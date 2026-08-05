@@ -43,6 +43,14 @@ export interface AppSettings {
   homeLayout: HomeLayoutSettings;
   /** Monthly profit target in £ (G1); null = no target, no pace copy */
   monthlyProfitTarget: number | null;
+  /** Brand accent preset id (amber, viridian, …, custom). */
+  brandAccentPreset: string;
+  /** Brand accent hex (#RRGGBB); used with custom or as resolved colour. */
+  brandAccentHex: string;
+  /** UI typeface id (`default` = Noto Sans, `figtree`, …). */
+  uiFont: string;
+  /** Top bar Hero Pattern id (`diagonal-lines`, …). */
+  headerPattern: string;
 }
 
 /**
@@ -140,6 +148,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tuning: DEFAULT_TUNING,
   homeLayout: DEFAULT_HOME_LAYOUT,
   monthlyProfitTarget: null,
+  brandAccentPreset: "amber",
+  brandAccentHex: "#FFC71E",
+  uiFont: "default",
+  headerPattern: "diagonal-lines",
 };
 
 /** Pure resolve - safe on client with settings from app state. */

@@ -8,7 +8,15 @@ import {
   type ComponentType,
   type MouseEvent,
 } from "react";
-import { brandChipCountInverse, captionHeading, navLinkState } from "@/lib/ui/surface-styles";
+import { toast } from "sonner";
+import { ExchangeNamePicker } from "@/components/bookie-name-picker";
+import { ThemeSelect } from "@/components/theme-select";
+import {
+  brandChipCountInverse,
+  captionHeading,
+  navLinkState,
+  proNavTag,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -38,7 +46,8 @@ import { useTrackFixture } from "@/components/track-fixture-provider";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import { useBoostCheck } from "@/components/boosts/boost-check-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
-import { useAppState } from "@/hooks/use-app-state";
+import { api, useAppState } from "@/hooks/use-app-state";
+import { useExchanges } from "@/hooks/use-exchanges";
 import { effectiveEventStatus } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
 import {
@@ -77,6 +86,8 @@ export interface NavSection {
   /** null = the unlabelled top section */
   label: string | null;
   entries: NavEntry[];
+  /** Tiny brand-yellow Pro mark beside the section label */
+  pro?: boolean;
 }
 
 /**
@@ -147,6 +158,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Live desks",
+    pro: true,
     entries: [
       {
         kind: "link",
@@ -174,7 +186,8 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Insight",
+    label: "Insights",
+    pro: true,
     entries: [
       { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
     ],
@@ -240,6 +253,64 @@ export function ActionBadge({ count }: { count: number }) {
     <span className={brandChipCountInverse}>
       {count > 9 ? "9+" : count}
     </span>
+  );
+}
+
+export function NavSectionLabel({
+  label,
+  pro,
+  className,
+}: {
+  label: string;
+  pro?: boolean;
+  className?: string;
+}) {
+  return (
+    <p className={cn(captionHeading, "flex items-center gap-1.5", className)}>
+      <span>{label}</span>
+      {pro ? <span className={proNavTag}>Pro</span> : null}
+    </p>
+  );
+}
+
+/** Same default-exchange preference as Settings → Bet defaults. */
+function NavDefaultExchange() {
+  const { exchanges, defaultExchange, refresh } = useExchanges();
+
+  async function setDefaultByName(name: string) {
+    const ex = exchanges.find(
+      (e) => e.name.toLowerCase() === name.trim().toLowerCase()
+    );
+    if (!ex || ex.id === defaultExchange?.id) return;
+    try {
+      await api(`/api/exchanges/${ex.id}`, {
+        method: "PATCH",
+        json: { isDefault: true },
+      });
+      toast.success(`${ex.name} is now default`);
+      await refresh();
+    } catch (e) {
+      toast.error("Update failed", { description: String(e) });
+    }
+  }
+
+  return (
+    <div className="mt-6 flex flex-col gap-1.5">
+      <p className={captionHeading}>Default exchange</p>
+      <ExchangeNamePicker
+        label=""
+        allowCustom={false}
+        size="sm"
+        className="w-full"
+        value={defaultExchange?.name ?? ""}
+        onChange={setDefaultByName}
+      />
+      {exchanges.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">
+          Add exchanges on Accounts first.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -501,21 +572,30 @@ export function AppNav() {
         appNavColumn
       )}
     >
-      <nav className="flex flex-1 flex-col px-0.5">
+      <nav className="flex flex-col px-0.5">
         {NAV_SECTIONS.map((section, i) => (
           <div key={section.label ?? "top"} className="flex flex-col gap-0.5">
             {section.label ? (
-              <p className={cn(captionHeading, "px-3 pb-1", i > 0 ? "pt-4" : "pt-1")}>
-                {section.label}
-              </p>
+              <NavSectionLabel
+                label={section.label}
+                pro={section.pro}
+                className={cn("px-3 pb-1", i > 0 ? "pt-4" : "pt-1")}
+              />
             ) : null}
             {section.entries.map((entry) => {
               if (entry.kind === "group") return renderGroup(entry);
               return renderLeaf(entry);
             })}
-            <div className="h-3" />
+            {i < NAV_SECTIONS.length - 1 ? <div className="h-3" /> : null}
           </div>
         ))}
+        <div className="flex flex-col gap-0.5">
+          <p className={cn(captionHeading, "px-3 pb-1 pt-8")}>Settings</p>
+          <div className="flex flex-col gap-2 px-3 pb-0">
+            <ThemeSelect className="w-full" />
+            <NavDefaultExchange />
+          </div>
+        </div>
       </nav>
     </aside>
   );

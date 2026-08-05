@@ -27,8 +27,9 @@ import {
   ListChecks,
   NotebookPen,
   Pin,
-  Sparkles,
+  Zap,
 } from "lucide-react";
+import { edgeNavTag } from "@/lib/ui/surface-styles";
 
 export interface RacingOfferGuideProps {
   race: RacingDeskRace;
@@ -112,12 +113,14 @@ function PlayGuidance({
     return (
       <div className={cn(workflowPanelPad, "rounded-md border border-edge/25")}>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-edge">
-            <Sparkles className="size-3" aria-hidden />
-            Recommended
+          <span className="inline-flex items-center gap-1.5">
+            <Zap className="size-3 text-edge" aria-hidden />
+            <span className={edgeNavTag}>Edge</span>
           </span>
           <OfferConfidenceBadge
             confidence={edge.confidence}
+            oddsSource={edge.oddsSource}
+            exchangeSource={edge.exchangeSource}
             dataSource={dataSource}
           />
           <span className="ml-auto inline-flex items-baseline gap-1 text-sm">
@@ -448,17 +451,16 @@ function CompactOfferCard({
     >
       <div className="flex items-center gap-1">
         {isBest ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-              edge
-                ? "bg-edge/15 text-edge"
-                : "bg-success/15 text-success"
-            )}
-          >
-            <Sparkles className="size-2.5" />
-            Best
-          </span>
+          edge ? (
+            <span className="inline-flex items-center gap-1">
+              <Zap className="size-2.5 text-edge" aria-hidden />
+              <span className={edgeNavTag}>Edge</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-success/15 text-success">
+              Best
+            </span>
+          )
         ) : (
           <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
             Offer

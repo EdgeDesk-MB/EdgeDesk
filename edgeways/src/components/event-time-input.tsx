@@ -10,6 +10,7 @@ export function EventTimeInput({
   placeholder = "12:00",
   id,
   disabled,
+  shortcuts,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -17,6 +18,8 @@ export function EventTimeInput({
   placeholder?: string;
   id?: string;
   disabled?: boolean;
+  /** Ending/expiry fields: End of day chip. */
+  shortcuts?: "ending";
 }) {
   return (
     <TimePicker
@@ -26,6 +29,7 @@ export function EventTimeInput({
       placeholder={placeholder}
       className={className}
       disabled={disabled}
+      shortcuts={shortcuts}
     />
   );
 }

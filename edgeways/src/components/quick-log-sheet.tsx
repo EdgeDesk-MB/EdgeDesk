@@ -24,7 +24,6 @@ import {
   Gift,
   ListTodo,
   PencilLine,
-  Plus,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -196,9 +195,9 @@ export function QuickLogSheet() {
           reset();
           setOpen(true);
         }}
-        className="fixed right-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+        className="skeuo-solid fixed right-[max(1rem,env(safe-area-inset-right,0px))] bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
       >
-        <Plus className="size-7" aria-hidden />
+        <Zap className="size-7" aria-hidden />
       </button>
 
       <Dialog

@@ -13,6 +13,7 @@ import type { DoNextItem } from "@/lib/offers/do-next";
 import type { OfferNextActionKind } from "@/lib/offers/next-actions";
 import type { DailyPlanRaceInput } from "@/lib/plan/daily-plan";
 import {
+  alertCopyAmounts,
   isOfferImpactAlertDue,
   offerExpiringAlertCopy,
   resolveOfferImpact,
@@ -39,8 +40,11 @@ export interface SettledBetNotice {
   profit: number;
   /** When void/push, copy mirrors Profit Tracker (no signed P&L). */
   status?: string;
-  /** Bet workflow type - short label in the body (e.g. Qualifying · Windsor). */
+  /** Bet workflow type - short label in the body (e.g. Qualifying · …). */
   betType?: string | null;
+  /** Linked campaign title when the bet belongs to an offer. */
+  offerTitle?: string | null;
+  bookmaker?: string | null;
 }
 
 export interface NakedExposureNotice {
@@ -48,6 +52,7 @@ export interface NakedExposureNotice {
   label: string;
   bookmaker: string | null;
   betType?: string | null;
+  offerTitle?: string | null;
 }
 
 /** Short push-friendly bet type for alert bodies. */
@@ -71,14 +76,21 @@ export function alertBetTypeLabel(betType: string | null | undefined): string {
   }
 }
 
-function alertIdentityBody(
-  label: string,
-  betType?: string | null,
-  suffix?: string | null
-): string {
-  const type = alertBetTypeLabel(betType);
-  const head = `${type} · ${label}`;
-  return suffix ? `${head}${suffix}` : head;
+/**
+ * Identity line under settlement / exposure titles.
+ * Prefer the offer title when linked: "Qualifying · Bet £10 get £10 (Ivybet)".
+ * Fall back to the bet label when there is no offer.
+ */
+export function formatAlertIdentityBody(input: {
+  label: string;
+  betType?: string | null;
+  offerTitle?: string | null;
+  bookmaker?: string | null;
+}): string {
+  const type = alertBetTypeLabel(input.betType);
+  const subject = input.offerTitle?.trim() || input.label.trim() || "Bet";
+  const bookie = input.bookmaker?.trim() || null;
+  return bookie ? `${type} · ${subject} (${bookie})` : `${type} · ${subject}`;
 }
 
 export interface TwoUpLockNotice {
@@ -95,7 +107,14 @@ export interface AlertRuleInput {
   doNext: DoNextItem[];
   /** Offer rows used to resolve race/course/expiry impact times. */
   offers: OfferImpactOffer[];
-  races: Array<DailyPlanRaceInput & { hasOpenBet: boolean }>;
+  races: Array<
+    DailyPlanRaceInput & {
+      hasOpenBet: boolean;
+      externalId?: string | null;
+      fieldSize?: number | null;
+      region?: string | null;
+    }
+  >;
   settledSinceLastPoll: SettledBetNotice[];
   nakedExposed: NakedExposureNotice[];
   twoUpTriggered: TwoUpLockNotice[];
@@ -131,7 +150,12 @@ export function settledResultAlertCopy(settled: SettledBetNotice): {
   title: string;
   body: string;
 } {
-  const body = alertIdentityBody(settled.label, settled.betType);
+  const body = formatAlertIdentityBody({
+    label: settled.label,
+    betType: settled.betType,
+    offerTitle: settled.offerTitle,
+    bookmaker: settled.bookmaker,
+  });
   if (settled.status === "void") {
     return {
       title: "Void · stakes returned",
@@ -183,11 +207,12 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
         key: nakedExposureAlertKey(exposed.betId),
         kind: "naked_exposure",
         title: "⚠️ Lay missing · full stake exposed",
-        body: alertIdentityBody(
-          exposed.label,
-          exposed.betType,
-          exposed.bookmaker ? ` at ${exposed.bookmaker}` : null
-        ),
+        body: formatAlertIdentityBody({
+          label: exposed.label,
+          betType: exposed.betType,
+          offerTitle: exposed.offerTitle,
+          bookmaker: exposed.bookmaker,
+        }),
         href: `/tracker?highlight=${exposed.betId}`,
       });
     }
@@ -226,19 +251,42 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
               at: now + item.daysLeft * 24 * 60 * 60_000,
               source: "expiry" as const,
               label: null,
+              raceClockHhmm: null,
+              firstOffHhmm: null,
+              scopedRaceCount: null,
+              qualifyingRaceCount: null,
             };
       if (impact == null) continue;
 
-      const hardExpiry = offer != null ? effectiveOfferExpiryMs(offer) : impact.at;
+      const hardExpiry =
+        offer != null
+          ? effectiveOfferExpiryMs({
+              expiresAt: offer.expiresAt,
+              eventDate: offer.eventDate,
+              scopeRaceLabel: offer.scopeRaceLabel,
+              scopeRaceId: offer.scopeRaceId,
+              sport: offer.sport,
+              status: offer.status ?? "active",
+            })
+          : impact.at;
       if (!isOfferImpactAlertDue(impact, now, hardExpiry)) continue;
       // Fully expired with nothing left to do.
       if (item.daysLeft < 0 && (hardExpiry == null || now >= hardExpiry)) continue;
 
+      const amounts = alertCopyAmounts({
+        offer,
+        offerTitle: item.offerTitle ?? item.title,
+        convertLotRemaining: item.convertLot?.remaining ?? null,
+      });
       const copy = offerExpiringAlertCopy({
         remainingEv: item.remainingEv,
         offerTitle: item.offerTitle ?? item.title,
         impact,
         now,
+        bookmaker: item.bookmaker,
+        actionKind: item.kind,
+        stake: amounts.stake,
+        freeBetAmount: amounts.freeBetAmount,
       });
       alerts.push({
         key: `offer_expiring:${item.id}:${dayKey(now)}`,

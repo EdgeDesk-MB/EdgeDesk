@@ -137,7 +137,7 @@ describe("alerts inbox", () => {
     expect(reconcileVoidedSettlementAlerts(T0 + 5000)).toBe(1);
     const row = listInbox().find((r) => r.dedupe === `result_settled:${bet.id}`);
     expect(row?.title).toBe("Void · stakes returned");
-    expect(row?.body).toBe(`Qualifying · ${bet.label}`);
+    expect(row?.body).toBe(`Qualifying · ${bet.label} (Paddy Power)`);
     expect(row?.updatedAt).toBeGreaterThanOrEqual(T0 + 5000);
 
     db.delete(bets).where(eq(bets.id, bet.id)).run();

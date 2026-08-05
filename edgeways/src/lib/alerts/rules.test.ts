@@ -43,6 +43,7 @@ function offer(over: Partial<OfferImpactOffer> = {}): OfferImpactOffer {
     scopeRaceId: null,
     scopeRaceLabel: null,
     expiresAt: NOW + 90 * MIN,
+    rules: JSON.stringify({ betStake: 10, freeBetAmount: 10 }),
     ...over,
   };
 }
@@ -87,7 +88,7 @@ describe("offer_expiring rule", () => {
       href: "/offers?view=5",
     });
     expect(alerts[0]!.title).toMatch(/⚡ £12 edge ends in/i);
-    expect(alerts[0]!.body).toMatch(/expires/i);
+    expect(alerts[0]!.body).toMatch(/place the £10 qualifying bet before/i);
   });
 
   it("stays quiet hours before a course meeting starts", () => {
@@ -128,10 +129,20 @@ describe("offer_expiring rule", () => {
       prefs: { ...base.prefs, raceOffSoon: false },
       offers: [
         offer({
+          title: "Bet £5 get £5 free bet",
           sport: "horse_racing",
           eventDate: "2026-07-13",
           scopeCourse: "Galway",
           expiresAt: NOW + 12 * HOUR,
+          offerType: "bet_get_free_place",
+          rules: JSON.stringify({
+            type: "bet_get_free_place",
+            minRunners: 8,
+            regions: ["GB", "IRE"],
+            qualifyingPlaces: [2, 3, 4],
+            betStake: 5,
+            freeBetAmount: 5,
+          }),
         }),
       ],
       races: [
@@ -142,6 +153,25 @@ describe("offer_expiring rule", () => {
           resultLogged: false,
           openExpected: null,
           hasOpenBet: false,
+          fieldSize: 12,
+        },
+        {
+          eventId: 2,
+          course: "Galway",
+          offTime: firstOff + 30 * MIN,
+          resultLogged: false,
+          openExpected: null,
+          hasOpenBet: false,
+          fieldSize: 6,
+        },
+        {
+          eventId: 3,
+          course: "Galway",
+          offTime: firstOff + 60 * MIN,
+          resultLogged: false,
+          openExpected: null,
+          hasOpenBet: false,
+          fieldSize: 10,
         },
       ],
       doNext: [
@@ -154,8 +184,11 @@ describe("offer_expiring rule", () => {
       ],
     });
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.title).toBe("⚡ £4 edge · Galway in 15 min");
-    expect(alerts[0]!.body).toMatch(/place the qualifying bet/i);
+    expect(alerts[0]!.title).toBe("⚡ £4 edge · Galway starts in 15 min");
+    expect(alerts[0]!.body).toMatch(
+      /^Bet365 · Bet £5 get £5 free bet · place the £5 qualifying bet · first race /
+    );
+    expect(alerts[0]!.body).toMatch(/ · 2 races qualify$/);
   });
 
   it("falls back to the item href when the do-next item has no offer id", () => {
@@ -338,15 +371,19 @@ describe("result_settled rule", () => {
       settledSinceLastPoll: [
         {
           betId: 42,
-          label: "Haydock 13:35",
+          label: "Qualify · Ivybet",
           profit: 4.1,
           betType: "qualifying",
+          offerTitle: "Bet £10 get £10 free bet",
+          bookmaker: "Ivybet",
         },
         {
           betId: 43,
           label: "Kempton EW",
           profit: -1.51,
           betType: "free_snr",
+          offerTitle: "Bet £10 get £10 free bet",
+          bookmaker: "Bet365",
         },
       ],
     });
@@ -356,13 +393,29 @@ describe("result_settled rule", () => {
     ]);
     expect(alerts[0]).toMatchObject({
       title: "🟢 +£4.10 settled",
-      body: "Qualifying · Haydock 13:35",
+      body: "Qualifying · Bet £10 get £10 free bet (Ivybet)",
     });
     expect(alerts[1]).toMatchObject({
       title: "🔴 -£1.51 settled",
-      body: "Free bet · Kempton EW",
+      body: "Free bet · Bet £10 get £10 free bet (Bet365)",
     });
     expect(alerts[0]!.href).toBe("/tracker?highlight=42");
+  });
+
+  it("falls back to the bet label when there is no linked offer", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      settledSinceLastPoll: [
+        {
+          betId: 42,
+          label: "Haydock 13:35",
+          profit: 4.1,
+          betType: "qualifying",
+          bookmaker: "Paddy Power",
+        },
+      ],
+    });
+    expect(alerts[0]!.body).toBe("Qualifying · Haydock 13:35 (Paddy Power)");
   });
 
   it("uses Profit Tracker-style void/push copy with no signed P&L", () => {
@@ -375,6 +428,8 @@ describe("result_settled rule", () => {
           profit: 6.52,
           status: "void",
           betType: "qualifying",
+          offerTitle: "Bet £5 get £5 free bet",
+          bookmaker: "Paddy Power",
         },
         {
           betId: 8,
@@ -388,7 +443,7 @@ describe("result_settled rule", () => {
     expect(alerts[0]).toMatchObject({
       key: "result_settled:7",
       title: "Void · stakes returned",
-      body: "Qualifying · Winner Regal Desire",
+      body: "Qualifying · Bet £5 get £5 free bet (Paddy Power)",
     });
     expect(alerts[0]!.title).not.toContain("£");
     expect(alerts[1]).toMatchObject({
@@ -417,6 +472,7 @@ describe("naked_exposure rule", () => {
         label: "Kempton EW",
         bookmaker: "Bet365",
         betType: "qualifying",
+        offerTitle: "Bet £20 get £10 free bet",
       },
     ];
     const alerts = evaluateAlertRules({ ...base, nakedExposed });
@@ -428,7 +484,7 @@ describe("naked_exposure rule", () => {
     });
     expect(alerts[0]).toMatchObject({
       title: "⚠️ Lay missing · full stake exposed",
-      body: "Qualifying · Kempton EW at Bet365",
+      body: "Qualifying · Bet £20 get £10 free bet (Bet365)",
     });
     expect(
       evaluateAlertRules({

@@ -19,6 +19,9 @@ export async function GET() {
       label: s.label,
       createdAt: s.createdAt,
       lastOkAt: s.lastOkAt,
+      // Last path segment only - enough for the client to spot a desync
+      // without shipping the full FCM endpoint.
+      endpointTail: s.endpoint.slice(-16),
     })),
   });
 }
@@ -39,9 +42,10 @@ export async function POST(req: NextRequest) {
   const body = (await req.json()) as Record<string, unknown>;
 
   // Test-send: prove the pipe end-to-end from Settings.
+  // Stable tag so repeat taps replace one shade entry instead of stacking.
   if (body.test === true) {
     const result = await sendPush({
-      key: `test:${Date.now()}`,
+      key: "edgeways-test-push",
       title: "Edgeways push works",
       body: "This device will get sentinel alerts even with the app closed.",
       href: "/alerts",

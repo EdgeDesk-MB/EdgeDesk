@@ -6,7 +6,7 @@
  */
 import { desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import { settledResultAlertCopy } from "@/lib/alerts/rules";
-import { db, alertsInbox, bets, type AlertsInboxRow } from "@/lib/db";
+import { db, alertsInbox, bets, offers, type AlertsInboxRow } from "@/lib/db";
 
 export interface IncomingAlert {
   key: string;
@@ -58,11 +58,27 @@ export function reconcileVoidedSettlementAlerts(now = Date.now()): number {
       label: bets.label,
       status: bets.status,
       betType: bets.betType,
+      bookmaker: bets.bookmaker,
+      offerId: bets.offerId,
     })
     .from(bets)
     .where(inArray(bets.status, ["void", "push"]))
     .all();
   if (revised.length === 0) return 0;
+
+  const offerIds = [
+    ...new Set(revised.map((b) => b.offerId).filter((id): id is number => id != null)),
+  ];
+  const offerTitleById = new Map<number, string>();
+  if (offerIds.length > 0) {
+    for (const row of db
+      .select({ id: offers.id, title: offers.title })
+      .from(offers)
+      .where(inArray(offers.id, offerIds))
+      .all()) {
+      offerTitleById.set(row.id, row.title);
+    }
+  }
 
   let updated = 0;
   for (const bet of revised) {
@@ -79,6 +95,8 @@ export function reconcileVoidedSettlementAlerts(now = Date.now()): number {
       profit: 0,
       status: bet.status,
       betType: bet.betType,
+      offerTitle: bet.offerId != null ? offerTitleById.get(bet.offerId) ?? null : null,
+      bookmaker: bet.bookmaker,
     });
     if (existing.title === copy.title && (existing.body ?? "") === copy.body) continue;
     db.update(alertsInbox)

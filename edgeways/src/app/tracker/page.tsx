@@ -1,6 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,9 +46,16 @@ import {
   groupBetsByCampaign,
   type BetDeskQueue,
 } from "@/lib/bets/desk-queues";
-import { brandChipCountInverse, filterPillState } from "@/lib/ui/surface-styles";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { filterPillCountState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Download, NotebookPen } from "lucide-react";
+import { Plus, Trash2, Download, NotebookPen, Loader2 } from "lucide-react";
+
+/** First paint budgets for large queues (All / Offer campaigns). */
+const INITIAL_CAMPAIGN_GROUPS = 6;
+const MORE_CAMPAIGN_GROUPS = 6;
+const INITIAL_FLAT_BETS = 50;
+const MORE_FLAT_BETS = 50;
 
 function parseDeskQueue(raw: string | null): BetDeskQueue {
   if (raw && BET_DESK_QUEUES.some((q) => q.id === raw)) return raw as BetDeskQueue;
@@ -61,14 +76,32 @@ function TrackerContent() {
   const { openAddBet } = useAddBet();
   const tabParam = searchParams.get("tab");
   const activeTab = tabParam === "pnl" ? "pnl" : "bets";
-  const deskQueue = parseDeskQueue(searchParams.get("queue"));
+  const urlDeskQueue = parseDeskQueue(searchParams.get("queue"));
+  // Optimistic pill selection so the active queue paints before the heavy list.
+  const [deskQueue, setDeskQueueState] = useState(urlDeskQueue);
+  const [isQueuePending, startQueueTransition] = useTransition();
+  const deferredDeskQueue = useDeferredValue(deskQueue);
+  const listPending = isQueuePending || deferredDeskQueue !== deskQueue;
   const offerFilterParam = searchParams.get("offer");
   const offerFilterId = offerFilterParam != null ? Number(offerFilterParam) : null;
   const highlightParam = searchParams.get("highlight");
   const actionParam = searchParams.get("action");
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [editingBet, setEditingBet] = useState<BetRow | null>(null);
+  const [visibleCampaignGroups, setVisibleCampaignGroups] = useState(INITIAL_CAMPAIGN_GROUPS);
+  const [visibleFlatBets, setVisibleFlatBets] = useState(INITIAL_FLAT_BETS);
+  // Yield one tick on heavy queues so the spinner can paint before tables mount.
+  const [listReady, setListReady] = useState(true);
   const actionApplied = useRef(false);
+
+  useEffect(() => {
+    setDeskQueueState(urlDeskQueue);
+  }, [urlDeskQueue]);
+
+  useEffect(() => {
+    setVisibleCampaignGroups(INITIAL_CAMPAIGN_GROUPS);
+    setVisibleFlatBets(INITIAL_FLAT_BETS);
+  }, [deferredDeskQueue, offerFilterId]);
 
   const { state, refresh } = useAppState(2000);
   const bets = useMemo(() => state?.bets ?? [], [state]);
@@ -88,32 +121,93 @@ function TrackerContent() {
   const provisional = state?.provisionalProfit ?? 0;
   const liveTotal = settled + provisional;
 
+  const queueSourceBets = useMemo(
+    () =>
+      offerFilterId != null && Number.isFinite(offerFilterId)
+        ? bets.filter((b) => b.offerId === offerFilterId)
+        : bets,
+    [bets, offerFilterId]
+  );
+
+  const queueCounts = useMemo(() => {
+    const counts = {} as Record<BetDeskQueue, number>;
+    for (const q of BET_DESK_QUEUES) {
+      counts[q.id] = countDeskQueue(queueSourceBets, q.id, eventById);
+    }
+    return counts;
+  }, [queueSourceBets, eventById]);
+
+  // All / Offer campaigns (and large flat queues) are the slow mounts, paint a spinner first.
+  const heavyListTarget =
+    deskQueue === "all" ||
+    deskQueue === "offers" ||
+    (queueCounts[deskQueue] ?? 0) >= INITIAL_FLAT_BETS;
+
+  useEffect(() => {
+    if (!heavyListTarget) {
+      setListReady(true);
+      return;
+    }
+    if (listPending) {
+      setListReady(false);
+      return;
+    }
+    const t = window.setTimeout(() => setListReady(true), 0);
+    return () => clearTimeout(t);
+  }, [listPending, deferredDeskQueue, heavyListTarget]);
+
+  const showListSpinner =
+    listPending || (heavyListTarget && !listReady);
+
+  // Heavy filter/group work follows the deferred queue so pills stay snappy.
   const scopedBets = useMemo(() => {
     let list = bets;
     if (offerFilterId != null && Number.isFinite(offerFilterId)) {
       list = list.filter((b) => b.offerId === offerFilterId);
     }
-    return filterBetsByDeskQueue(list, deskQueue, eventById);
-  }, [bets, deskQueue, offerFilterId, eventById]);
+    return filterBetsByDeskQueue(list, deferredDeskQueue, eventById);
+  }, [bets, deferredDeskQueue, offerFilterId, eventById]);
 
   const campaignGroups = useMemo(
     () =>
-      deskQueue === "offers" || deskQueue === "all"
+      deferredDeskQueue === "offers" || deferredDeskQueue === "all"
         ? groupBetsByCampaign(scopedBets, offerById, {
-            includeOrphans: deskQueue === "all",
+            includeOrphans: deferredDeskQueue === "all",
           })
         : [],
-    [scopedBets, offerById, deskQueue]
+    [scopedBets, offerById, deferredDeskQueue]
   );
 
   const useCampaignView =
-    (deskQueue === "offers" || deskQueue === "all") &&
+    (deferredDeskQueue === "offers" || deferredDeskQueue === "all") &&
     campaignGroups.some((g) => g.offerId != null);
 
-  const queueSourceBets =
-    offerFilterId != null && Number.isFinite(offerFilterId)
-      ? bets.filter((b) => b.offerId === offerFilterId)
-      : bets;
+  const visibleGroups = useMemo(() => {
+    if (!useCampaignView) return campaignGroups;
+    let limit = visibleCampaignGroups;
+    if (highlightId != null) {
+      const idx = campaignGroups.findIndex((g) => g.bets.some((b) => b.id === highlightId));
+      if (idx >= 0) limit = Math.max(limit, idx + 1);
+    }
+    return campaignGroups.slice(0, limit);
+  }, [campaignGroups, useCampaignView, visibleCampaignGroups, highlightId]);
+
+  const visibleBets = useMemo(() => {
+    if (useCampaignView) return scopedBets;
+    let limit = visibleFlatBets;
+    if (highlightId != null) {
+      const idx = scopedBets.findIndex((b) => b.id === highlightId);
+      if (idx >= 0) limit = Math.max(limit, idx + 1);
+    }
+    return scopedBets.slice(0, limit);
+  }, [scopedBets, useCampaignView, visibleFlatBets, highlightId]);
+
+  const hiddenCampaignCount = useCampaignView
+    ? Math.max(0, campaignGroups.length - visibleGroups.length)
+    : 0;
+  const hiddenFlatCount = !useCampaignView
+    ? Math.max(0, scopedBets.length - visibleBets.length)
+    : 0;
 
   function setActiveTab(tab: "bets" | "pnl") {
     const params = new URLSearchParams(searchParams.toString());
@@ -128,12 +222,16 @@ function TrackerContent() {
   }
 
   function setDeskQueue(queue: BetDeskQueue) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("tab");
-    if (queue === "all") params.delete("queue");
-    else params.set("queue", queue);
-    const qs = params.toString();
-    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+    if (queue === deskQueue && !listPending) return;
+    setDeskQueueState(queue);
+    startQueueTransition(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("tab");
+      if (queue === "all") params.delete("queue");
+      else params.set("queue", queue);
+      const qs = params.toString();
+      router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+    });
   }
 
   useEffect(() => {
@@ -327,33 +425,26 @@ function TrackerContent() {
         <CardContent className="pt-4">
           {activeTab === "bets" ? (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5" aria-label="Bet log queues">
                 {BET_DESK_QUEUES.map((q) => {
-                  const count = countDeskQueue(queueSourceBets, q.id, eventById);
+                  const count = queueCounts[q.id];
                   if (q.id === "quick_logged" && count === 0 && deskQueue !== "quick_logged") {
                     return null;
                   }
                   const active = deskQueue === q.id;
+                  const hasCount = q.id !== "all";
                   return (
-                    <button
+                    <FilterPill
                       key={q.id}
-                      type="button"
+                      active={active}
                       onClick={() => setDeskQueue(q.id)}
-                      className={cn(filterPillState(active))}
+                      hasCount={hasCount}
                     >
                       {q.label}
-                      {q.id !== "all" ? (
-                        <span
-                          className={cn(
-                            active
-                              ? brandChipCountInverse
-                              : "ml-0.5 tabular-nums opacity-70"
-                          )}
-                        >
-                          {count}
-                        </span>
+                      {hasCount ? (
+                        <span className={filterPillCountState(active)}>{count}</span>
                       ) : null}
-                    </button>
+                    </FilterPill>
                   );
                 })}
               </div>
@@ -376,40 +467,86 @@ function TrackerContent() {
           ) : null}
           {activeTab === "pnl" ? (
             <MonthlyPnlSection variant="plain" />
+          ) : showListSpinner ? (
+            <div
+              className="flex min-h-[12rem] flex-col items-center justify-center gap-2 py-10"
+              role="status"
+              aria-live="polite"
+              aria-label="Loading bet log"
+            >
+              <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
+              <p className="text-sm text-muted-foreground">Loading bets…</p>
+            </div>
           ) : scopedBets.length === 0 ? (
             <EmptyState
               icon={NotebookPen}
-              title={deskQueueEmptyCopy(deskQueue).title}
-              description={deskQueueEmptyCopy(deskQueue).description}
+              title={deskQueueEmptyCopy(deferredDeskQueue).title}
+              description={deskQueueEmptyCopy(deferredDeskQueue).description}
               action={{ label: "Open calculators", href: "/calculators" }}
               secondaryAction={{ label: "Offers", href: "/offers" }}
             />
           ) : useCampaignView ? (
-            <BetCampaignSections
-              groups={campaignGroups}
-              events={events}
-              promoAwards={promoAwards}
-              offerById={offerById}
-              eventById={eventById}
-              highlightId={highlightId}
-              onEdit={setEditingBet}
-              onPatch={patchBet}
-              onPatchEvent={patchEvent}
-              onLogged={() => refresh()}
-            />
+            <>
+              <BetCampaignSections
+                groups={visibleGroups}
+                events={events}
+                promoAwards={promoAwards}
+                offerById={offerById}
+                eventById={eventById}
+                highlightId={highlightId}
+                onEdit={setEditingBet}
+                onPatch={patchBet}
+                onPatchEvent={patchEvent}
+                onLogged={() => refresh()}
+              />
+              {hiddenCampaignCount > 0 ? (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    {...pageSecondaryButtonProps}
+                    onClick={() =>
+                      setVisibleCampaignGroups((n) => n + MORE_CAMPAIGN_GROUPS)
+                    }
+                  >
+                    Show more campaigns
+                    <span className="ml-1.5 text-muted-foreground">
+                      ({hiddenCampaignCount} left)
+                    </span>
+                  </Button>
+                </div>
+              ) : null}
+            </>
           ) : (
-            <BetLogTable
-              bets={scopedBets}
-              events={events}
-              promoAwards={promoAwards}
-              offerById={offerById}
-              eventById={eventById}
-              highlightId={highlightId}
-              onEdit={setEditingBet}
-              onPatch={patchBet}
-              onPatchEvent={patchEvent}
-              onLogged={() => refresh()}
-            />
+            <>
+              <BetLogTable
+                bets={visibleBets}
+                events={events}
+                promoAwards={promoAwards}
+                offerById={offerById}
+                eventById={eventById}
+                highlightId={highlightId}
+                onEdit={setEditingBet}
+                onPatch={patchBet}
+                onPatchEvent={patchEvent}
+                onLogged={() => refresh()}
+              />
+              {hiddenFlatCount > 0 ? (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    {...pageSecondaryButtonProps}
+                    onClick={() => setVisibleFlatBets((n) => n + MORE_FLAT_BETS)}
+                  >
+                    Show more bets
+                    <span className="ml-1.5 text-muted-foreground">
+                      ({hiddenFlatCount} left)
+                    </span>
+                  </Button>
+                </div>
+              ) : null}
+            </>
           )}
         </CardContent>
       </Card>

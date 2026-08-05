@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoneyFlow, NumFlow, PercentFlow } from "@/components/money-flow";
 import { expectedValue, trueProbabilityFromExchange } from "@/lib/calc";
-import { Sparkles } from "lucide-react";
+import { Zap } from "lucide-react";
 
 interface EdgePanelProps {
   backOdds: number;
@@ -24,7 +24,7 @@ export function EdgePanel({ backOdds, layOdds, stake }: EdgePanelProps) {
     <Card className="border-primary/20 bg-primary/[0.03]">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary-text">
-          <Sparkles className="size-4" /> Your Edge
+          <Zap className="size-4" /> Your Edge
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm lg:grid-cols-4">

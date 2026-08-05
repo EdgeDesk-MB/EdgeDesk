@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
+import { Figtree, Noto_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { QuickLogSheet } from "@/components/quick-log-sheet";
@@ -16,18 +18,47 @@ import { BoostCheckProvider } from "@/components/boosts/boost-check-provider";
 import { FreeBetsProvider } from "@/components/accounts/free-bets-convert-dialog";
 import { RacingAutopilotListener } from "@/components/racing-autopilot-listener";
 import { OfferReminderListener } from "@/components/offer-reminder-listener";
-import { AppNav } from "@/components/app-nav";
+import { UserReminderListener } from "@/components/user-reminder-listener";
+import { AppShell } from "@/components/app-shell";
 import { AppTopBar } from "@/components/app-top-bar";
 import { OnboardingProvider } from "@/components/help/onboarding-provider";
 import { AppStateProvider } from "@/components/app-state-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { BrandAccentProvider } from "@/components/brand-accent-provider";
+import { UiFontProvider } from "@/components/ui-font-provider";
+import { HeaderPatternProvider } from "@/components/header-pattern-provider";
 import { BrandStorageMigration } from "@/components/brand-storage-migration";
-import { pagePanel } from "@/lib/ui/surface-styles";
-import { appShellGap, appShellMaxWidth, appShellPadding } from "@/lib/ui/app-shell-layout";
-import { cn } from "@/lib/utils";
+import { BRAND_ACCENT_FOUC_SCRIPT } from "@/lib/brand-accent-fouc";
+import {
+  BRAND_ACCENT_COOKIE_KEY,
+  brandAccentStyle,
+  deriveBrandAccent,
+  normalizeHex,
+} from "@/lib/brand-accent";
+import { UI_FONT_FOUC_SCRIPT } from "@/lib/ui-font-fouc";
+import {
+  DEFAULT_UI_FONT,
+  normalizeUiFont,
+  UI_FONT_ATTR,
+  UI_FONT_COOKIE_KEY,
+} from "@/lib/ui-font";
+import { HEADER_PATTERN_FOUC_SCRIPT } from "@/lib/header-pattern-fouc";
+import {
+  DEFAULT_HEADER_PATTERN,
+  HEADER_PATTERN_ATTR,
+  HEADER_PATTERN_COOKIE_KEY,
+  normalizeHeaderPattern,
+} from "@/lib/header-pattern";
 
 const notoSans = Noto_Sans({
+  // Keep the Tailwind v4 pass-through name (`@theme --font-sans: var(--font-sans)`).
   variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
@@ -49,77 +80,100 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Pin browser chrome to ink. Dia samples the top element’s background-color
+  // (see AppTopBar — <header> is always #111; yellow is an inner shell) and
+  // also respects theme-color / manifest theme_color when present.
+  themeColor: "#111111",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jar = await cookies();
+  const cookieHex = normalizeHex(jar.get(BRAND_ACCENT_COOKIE_KEY)?.value);
+  const accentDerived = cookieHex ? deriveBrandAccent(cookieHex) : null;
+  const accentStyle = accentDerived
+    ? (brandAccentStyle(cookieHex!) as CSSProperties)
+    : undefined;
+  const cookieFont = normalizeUiFont(jar.get(UI_FONT_COOKIE_KEY)?.value);
+  const cookiePattern = normalizeHeaderPattern(
+    jar.get(HEADER_PATTERN_COOKIE_KEY)?.value
+  );
+
   return (
     <html
       lang="en"
-      className={`${notoSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
+      className={`${notoSans.variable} ${figtree.variable} ${geistMono.variable} h-full overflow-hidden bg-[#111111] antialiased`}
+      style={accentStyle}
+      {...(accentDerived
+        ? { "data-brand-plate": accentDerived.brandPlateDark ? "dark" : "light" }
+        : {})}
+      {...(cookieFont !== DEFAULT_UI_FONT
+        ? { [UI_FONT_ATTR]: cookieFont }
+        : {})}
+      {...(cookiePattern !== DEFAULT_HEADER_PATTERN
+        ? { [HEADER_PATTERN_ATTR]: cookiePattern }
+        : {})}
       suppressHydrationWarning
     >
+      <head>
+        {/* Blocking — paints stored accent before CSS defaults can flash Amber. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: BRAND_ACCENT_FOUC_SCRIPT }}
+        />
+        {/* Blocking — paints stored UI font before Default (Noto) can flash. */}
+        <script dangerouslySetInnerHTML={{ __html: UI_FONT_FOUC_SCRIPT }} />
+        {/* Blocking — paints stored header pattern before Diagonal lines can flash. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: HEADER_PATTERN_FOUC_SCRIPT }}
+        />
+      </head>
       <body className="h-full overflow-hidden bg-canvas">
         <BrandStorageMigration />
         <ThemeProvider>
-          <AppStateProvider>
-            <OnboardingProvider>
-              <AddBalanceProvider>
-                <AddBetProvider>
-                  <TrackFixtureProvider>
-                    <MatchedCalculatorProvider>
-                      <OfferProvider>
-                        <CasinoLogProvider>
-                        <BoostCheckProvider>
-                        <FreeBetsProvider>
-                          <div className="flex h-dvh flex-col overflow-hidden">
-                            <AppTopBar />
-                            <div className="app-scroll min-h-0 flex-1 overflow-y-auto">
-                              <div
-                                className={cn(
-                                  "flex w-full items-stretch",
-                                  appShellPadding,
-                                  appShellGap,
-                                  appShellMaxWidth
-                                )}
-                              >
-                              <AppNav />
-                              <div className="flex min-w-0 flex-1 flex-col p-0 sm:p-1">
-                                <main
-                                  className={cn(
-                                    pagePanel,
-                                    "flex w-full flex-col dark:shadow-none",
-                                    "max-sm:rounded-none max-sm:shadow-none max-sm:ring-0"
-                                  )}
-                                >
-                                  {children}
-                                </main>
-                              </div>
-                              </div>
-                            </div>
-                          </div>
-                          <Toaster richColors position="top-right" />
-                          <QuickLogSheet />
-                          <PwaInstallPrompt />
-                          <CommandPalette />
-                          <AlertWatcher />
-                          <RacingAutopilotListener />
-                          <OfferReminderListener />
-                        </FreeBetsProvider>
-                        </BoostCheckProvider>
-                      </CasinoLogProvider>
-                      </OfferProvider>
-                    </MatchedCalculatorProvider>
-                  </TrackFixtureProvider>
-                </AddBetProvider>
-              </AddBalanceProvider>
-            </OnboardingProvider>
-          </AppStateProvider>
+          <BrandAccentProvider>
+            <UiFontProvider>
+              <HeaderPatternProvider>
+                <AppStateProvider>
+                  <OnboardingProvider>
+                    <AddBalanceProvider>
+                      <AddBetProvider>
+                        <TrackFixtureProvider>
+                          <MatchedCalculatorProvider>
+                            <OfferProvider>
+                              <CasinoLogProvider>
+                                <BoostCheckProvider>
+                                  <FreeBetsProvider>
+                                    <div className="flex h-dvh flex-col overflow-hidden">
+                                      <AppTopBar />
+                                      <AppShell>{children}</AppShell>
+                                    </div>
+                                    <Toaster richColors position="top-right" />
+                                    <QuickLogSheet />
+                                    <PwaInstallPrompt />
+                                    <CommandPalette />
+                                    <AlertWatcher />
+                                    <RacingAutopilotListener />
+                                    <OfferReminderListener />
+                                    <UserReminderListener />
+                                  </FreeBetsProvider>
+                                </BoostCheckProvider>
+                              </CasinoLogProvider>
+                            </OfferProvider>
+                          </MatchedCalculatorProvider>
+                        </TrackFixtureProvider>
+                      </AddBetProvider>
+                    </AddBalanceProvider>
+                  </OnboardingProvider>
+                </AppStateProvider>
+              </HeaderPatternProvider>
+            </UiFontProvider>
+          </BrandAccentProvider>
         </ThemeProvider>
       </body>
     </html>
   );
 }
+
