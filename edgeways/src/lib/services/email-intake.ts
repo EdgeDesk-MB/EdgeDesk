@@ -18,6 +18,7 @@ import { db, appSettings, offers } from "@/lib/db";
 import { parseEmlToOfferText } from "@/lib/offers/parse-email";
 import { parseOfferFromText } from "@/lib/offers/parse-offer-text";
 import { offerCategoryById } from "@/lib/offers/offer-categories";
+import { rulesJsonFromParsedDraft } from "@/lib/offers/offer-rules-payload";
 import { recordAlerts } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
 
@@ -134,7 +135,9 @@ export function buildEmailDraft(raw: string, now = new Date()): EmailOfferDraft 
     expiresAt: draft.expiresAt,
     eventDate: draft.eventDate,
     sport: offerCategoryById(draft.category).sport,
-    rules: draft.rules ? JSON.stringify(draft.rules) : null,
+    // O1: persist Important facts + playbook for general sports pastes too
+    // (previously only racing draft.rules JSON was saved).
+    rules: rulesJsonFromParsedDraft(draft),
   };
 }
 
@@ -153,6 +156,11 @@ export function createEmailDrafts(drafts: EmailOfferDraft[], nowMs = Date.now())
         sport: d.sport,
         eventDate: d.eventDate,
         rules: d.rules,
+        offerType: d.rules?.includes("bet_get_free_place")
+          ? "bet_get_free_place"
+          : d.rules
+            ? "promo_terms"
+            : null,
         source: "email",
         createdAt: nowMs,
       })

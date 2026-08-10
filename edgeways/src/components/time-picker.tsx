@@ -19,19 +19,6 @@ const VISIBLE = 5;
 const WHEEL_H = ITEM_H * VISIBLE;
 const PAD_COUNT = Math.floor(VISIBLE / 2);
 
-function parseHm(value: string): { hour: string; minute: string } | null {
-  const m = value.trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  const hour = Number(m[1]);
-  const minute = Number(m[2]);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return {
-    hour: String(hour).padStart(2, "0"),
-    minute: String(minute).padStart(2, "0"),
-  };
-}
-
 function indexOfValue(values: string[], value: string): number {
   const i = values.indexOf(value);
   return i >= 0 ? i : 0;
@@ -199,6 +186,68 @@ function WheelColumn({
   );
 }
 
+/** Parse HH:mm into padded hour/minute parts. */
+export function parseHm(value: string): { hour: string; minute: string } | null {
+  const m = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return {
+    hour: String(hour).padStart(2, "0"),
+    minute: String(minute).padStart(2, "0"),
+  };
+}
+
+/**
+ * iOS-style hour/minute wheels (no trigger/footer). Used by TimePicker and
+ * DateTimePicker.
+ */
+export function TimeWheels({
+  hour,
+  minute,
+  onChange,
+  active,
+}: {
+  hour: string;
+  minute: string;
+  onChange: (hour: string, minute: string) => void;
+  /** Remount/reset scroll when the parent popover opens. */
+  active: boolean;
+}) {
+  return (
+    <div className="relative" style={{ height: WHEEL_H }}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-9 -translate-y-1/2 rounded-lg bg-muted"
+      />
+      <div className="relative z-10 flex h-full items-stretch justify-center gap-0.5">
+        <WheelColumn
+          ariaLabel="Hour"
+          values={HOURS}
+          selected={hour}
+          active={active}
+          onSelect={(h) => onChange(h, minute)}
+        />
+        <div
+          aria-hidden
+          className="flex w-2.5 shrink-0 items-center justify-center text-sm font-semibold text-foreground"
+        >
+          :
+        </div>
+        <WheelColumn
+          ariaLabel="Minute"
+          values={MINUTES}
+          selected={minute}
+          active={active}
+          onSelect={(m) => onChange(hour, m)}
+        />
+      </div>
+    </div>
+  );
+}
+
 /**
  * Shared time field: shadcn Popover + iOS-style hour/minute wheels.
  * Value is always HH:mm (24h) or empty.
@@ -266,35 +315,12 @@ export function TimePicker({
         onWheel={(e) => e.stopPropagation()}
       >
         <div className="px-2 py-2">
-          <div className="relative" style={{ height: WHEEL_H }}>
-            {/* Selection lens — spans both columns like iOS */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-9 -translate-y-1/2 rounded-lg bg-muted"
-            />
-            <div className="relative z-10 flex h-full items-stretch justify-center gap-0.5">
-              <WheelColumn
-                ariaLabel="Hour"
-                values={HOURS}
-                selected={hour}
-                active={open}
-                onSelect={(h) => commit(h, minute)}
-              />
-              <div
-                aria-hidden
-                className="flex w-2.5 shrink-0 items-center justify-center text-sm font-semibold text-foreground"
-              >
-                :
-              </div>
-              <WheelColumn
-                ariaLabel="Minute"
-                values={MINUTES}
-                selected={minute}
-                active={open}
-                onSelect={(m) => commit(hour, m)}
-              />
-            </div>
-          </div>
+          <TimeWheels
+            hour={hour}
+            minute={minute}
+            active={open}
+            onChange={commit}
+          />
         </div>
         {shortcuts === "ending" ? (
           <div className={cn(filterPillGroup, "justify-center border-t px-2 py-2")}>

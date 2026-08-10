@@ -37,7 +37,13 @@ import {
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
 import { MonthlyPnlSection } from "@/components/tracker/monthly-pnl-section";
 import { BetLogTable } from "@/components/tracker/bet-log-table";
-import { BetCampaignSections } from "@/components/tracker/bet-campaign-sections";
+import {
+  BetCampaignSections,
+  type AccaRunViewLite,
+  type BetBuilderRunViewLite,
+  type SystemRunViewLite,
+} from "@/components/tracker/bet-campaign-sections";
+import { useNow } from "@/hooks/use-now";
 import {
   BET_DESK_QUEUES,
   countDeskQueue,
@@ -84,15 +90,36 @@ function TrackerContent() {
   const listPending = isQueuePending || deferredDeskQueue !== deskQueue;
   const offerFilterParam = searchParams.get("offer");
   const offerFilterId = offerFilterParam != null ? Number(offerFilterParam) : null;
+  const eventFilterParam = searchParams.get("event");
+  const eventFilterId = eventFilterParam != null ? Number(eventFilterParam) : null;
   const highlightParam = searchParams.get("highlight");
   const actionParam = searchParams.get("action");
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [editingBet, setEditingBet] = useState<BetRow | null>(null);
+  const [trackerAddOpen, setTrackerAddOpen] = useState(false);
   const [visibleCampaignGroups, setVisibleCampaignGroups] = useState(INITIAL_CAMPAIGN_GROUPS);
   const [visibleFlatBets, setVisibleFlatBets] = useState(INITIAL_FLAT_BETS);
+  const [accaRuns, setAccaRuns] = useState<AccaRunViewLite[]>([]);
+  const [betBuilderRuns, setBetBuilderRuns] = useState<BetBuilderRunViewLite[]>([]);
+  const [systemRuns, setSystemRuns] = useState<SystemRunViewLite[]>([]);
+  const now = useNow(30_000);
   // Yield one tick on heavy queues so the spinner can paint before tables mount.
   const [listReady, setListReady] = useState(true);
   const actionApplied = useRef(false);
+
+  const { state, refresh } = useAppState(2000);
+
+  useEffect(() => {
+    api<{ runs: AccaRunViewLite[] }>("/api/acca")
+      .then((r) => setAccaRuns(r.runs))
+      .catch(() => setAccaRuns([]));
+    api<{ runs: BetBuilderRunViewLite[] }>("/api/bet-builder")
+      .then((r) => setBetBuilderRuns(r.runs ?? []))
+      .catch(() => setBetBuilderRuns([]));
+    api<{ runs: SystemRunViewLite[] }>("/api/systems")
+      .then((r) => setSystemRuns(r.runs ?? []))
+      .catch(() => setSystemRuns([]));
+  }, [state?.bets?.length]);
 
   useEffect(() => {
     setDeskQueueState(urlDeskQueue);
@@ -101,9 +128,8 @@ function TrackerContent() {
   useEffect(() => {
     setVisibleCampaignGroups(INITIAL_CAMPAIGN_GROUPS);
     setVisibleFlatBets(INITIAL_FLAT_BETS);
-  }, [deferredDeskQueue, offerFilterId]);
+  }, [deferredDeskQueue, offerFilterId, eventFilterId]);
 
-  const { state, refresh } = useAppState(2000);
   const bets = useMemo(() => state?.bets ?? [], [state]);
   const events = useMemo(() => state?.events ?? [], [state]);
   const promoAwards = useMemo(() => state?.promoAwards ?? {}, [state]);
@@ -121,13 +147,16 @@ function TrackerContent() {
   const provisional = state?.provisionalProfit ?? 0;
   const liveTotal = settled + provisional;
 
-  const queueSourceBets = useMemo(
-    () =>
-      offerFilterId != null && Number.isFinite(offerFilterId)
-        ? bets.filter((b) => b.offerId === offerFilterId)
-        : bets,
-    [bets, offerFilterId]
-  );
+  const queueSourceBets = useMemo(() => {
+    let list = bets;
+    if (offerFilterId != null && Number.isFinite(offerFilterId)) {
+      list = list.filter((b) => b.offerId === offerFilterId);
+    }
+    if (eventFilterId != null && Number.isFinite(eventFilterId)) {
+      list = list.filter((b) => b.eventId === eventFilterId);
+    }
+    return list;
+  }, [bets, offerFilterId, eventFilterId]);
 
   const queueCounts = useMemo(() => {
     const counts = {} as Record<BetDeskQueue, number>;
@@ -165,8 +194,11 @@ function TrackerContent() {
     if (offerFilterId != null && Number.isFinite(offerFilterId)) {
       list = list.filter((b) => b.offerId === offerFilterId);
     }
+    if (eventFilterId != null && Number.isFinite(eventFilterId)) {
+      list = list.filter((b) => b.eventId === eventFilterId);
+    }
     return filterBetsByDeskQueue(list, deferredDeskQueue, eventById);
-  }, [bets, deferredDeskQueue, offerFilterId, eventById]);
+  }, [bets, deferredDeskQueue, offerFilterId, eventFilterId, eventById]);
 
   const campaignGroups = useMemo(
     () =>
@@ -363,34 +395,38 @@ function TrackerContent() {
             {bets.length > 0 && (
               <ClearAllBetsDialog count={bets.length} onConfirm={clearAllBets} />
             )}
-            <AddBetDialog
-              onSaved={() => refresh()}
-              events={events}
-              trigger={
-                <Button {...pagePrimaryButtonProps}>
-                  <Plus className="size-4" /> Add bet
-                </Button>
-              }
-            />
+            <Button {...pagePrimaryButtonProps} onClick={() => setTrackerAddOpen(true)}>
+              <Plus className="size-4" /> Add bet
+            </Button>
           </>
         }
       />
-        <AddBetDialog
-          open={editingBet != null}
-          onOpenChange={(open) => {
-            if (!open) setEditingBet(null);
-          }}
-          editBet={editingBet}
-          events={events}
-          onSaved={() => {
-            refresh();
-            setEditingBet(null);
-          }}
-          onDeleted={() => {
-            refresh();
-            setEditingBet(null);
-          }}
-        />
+        {trackerAddOpen ? (
+          <AddBetDialog
+            open={trackerAddOpen}
+            onOpenChange={setTrackerAddOpen}
+            onSaved={() => refresh()}
+            events={events}
+          />
+        ) : null}
+        {editingBet != null ? (
+          <AddBetDialog
+            open
+            onOpenChange={(next) => {
+              if (!next) setEditingBet(null);
+            }}
+            editBet={editingBet}
+            events={events}
+            onSaved={() => {
+              refresh();
+              setEditingBet(null);
+            }}
+            onDeleted={() => {
+              refresh();
+              setEditingBet(null);
+            }}
+          />
+        ) : null}
 
       {/* Homepage pace strip; breakdown tables stay on the P&L Breakdown tab. */}
       <div className="-mx-[var(--layout-page-x)]">
@@ -448,21 +484,37 @@ function TrackerContent() {
                   );
                 })}
               </div>
-              {offerFilterId != null && Number.isFinite(offerFilterId) ? (
-                <button
-                  type="button"
-                  className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
-                  onClick={() => {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.delete("offer");
-                    params.delete("action");
-                    const qs = params.toString();
-                    router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
-                  }}
-                >
-                  Clear offer filter
-                </button>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {offerFilterId != null && Number.isFinite(offerFilterId) ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete("offer");
+                      params.delete("action");
+                      const qs = params.toString();
+                      router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+                    }}
+                  >
+                    Clear offer filter
+                  </button>
+                ) : null}
+                {eventFilterId != null && Number.isFinite(eventFilterId) ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete("event");
+                      const qs = params.toString();
+                      router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
+                    }}
+                  >
+                    Clear event filter
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
           {activeTab === "pnl" ? (
@@ -494,6 +546,10 @@ function TrackerContent() {
                 offerById={offerById}
                 eventById={eventById}
                 highlightId={highlightId}
+                accaRuns={accaRuns}
+                betBuilderRuns={betBuilderRuns}
+                systemRuns={systemRuns}
+                now={now}
                 onEdit={setEditingBet}
                 onPatch={patchBet}
                 onPatchEvent={patchEvent}

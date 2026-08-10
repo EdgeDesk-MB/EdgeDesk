@@ -2,6 +2,12 @@
  * Heuristic parsing of OCR text from bookie / exchange bet slips.
  * Label-first: Stake, Odds, Matched Stake/Odds, Returns (ignored for odds).
  */
+import {
+  extractBetStructure,
+  extractEachWayFlag,
+  extractSlipLegs,
+  extractUnitStake,
+} from "@/lib/bets/parse-bet-structure";
 import { parseRacingCourseFromEventName } from "@/lib/events";
 import type { BetOcrFields, ScreenshotSource } from "./types";
 
@@ -412,6 +418,10 @@ export function parseBookieScreenshot(raw: string): BetOcrFields {
     isFreeBet
   );
 
+  const structure = extractBetStructure(text) ?? undefined;
+  const unitStake = extractUnitStake(text) ?? undefined;
+  const eachWay = extractEachWayFlag(text) || undefined;
+  const legs = extractSlipLegs(text);
   return {
     selection: parseSelection(text),
     backStake,
@@ -419,6 +429,10 @@ export function parseBookieScreenshot(raw: string): BetOcrFields {
     bookmaker: parseBookmaker(text),
     marketHint: parseMarketHint(text),
     isFreeBet,
+    structure,
+    unitStake,
+    eachWay,
+    legs: legs.length > 0 ? legs : undefined,
     ...buildEventFields(text),
   };
 }
@@ -457,11 +471,15 @@ export function summariseOcrFields(fields: BetOcrFields): string[] {
   if (fields.selection) parts.push(fields.selection);
   if (fields.backStake != null) parts.push(`stake £${fields.backStake}`);
   if (fields.backOdds != null) parts.push(`odds ${fields.backOdds}`);
-  if (fields.layStake != null) parts.push(`lay £${fields.layStake}`);
+  if (fields.layStake != null) parts.push(`lay £${fields.layStake.toFixed(2)}`);
   if (fields.layOdds != null) parts.push(`lay odds ${fields.layOdds}`);
   if (fields.eventName) parts.push(fields.eventName);
   if (fields.eventTime) parts.push(fields.eventTime);
   if (fields.marketHint) parts.push(fields.marketHint);
   if (fields.isFreeBet) parts.push("free bet");
+  if (fields.structure) parts.push(fields.structure.replace(/_/g, " "));
+  if (fields.unitStake != null) parts.push(`unit £${fields.unitStake}`);
+  if (fields.eachWay) parts.push("each-way");
+  if (fields.legs?.length) parts.push(`${fields.legs.length} legs`);
   return parts;
 }

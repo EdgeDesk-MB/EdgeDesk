@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { FocusScope } from "radix-ui/internal";
 import { Label } from "@/components/ui/label";
 import { useVenueAccounts, type VenueOption } from "@/hooks/use-venue-accounts";
 import {
@@ -60,6 +61,10 @@ export function VenueSelect({
   allowCustom = true,
   /** Persist a free-typed name as a wallet immediately on pick. Set false to defer creation to the caller (e.g. save-time, gated by its own checkbox). */
   persistCustom = true,
+  /** Override the trigger brand-colour dot (e.g. live colour picker before save). */
+  brandColor: brandColorOverride = null,
+  /** Hide wallets already on the account - directory + custom only (Add bookie / Add exchange). */
+  omitExistingWallets = false,
 }: {
   value: string;
   onChange: (name: string) => void;
@@ -72,6 +77,8 @@ export function VenueSelect({
   kinds?: Array<"bookie" | "exchange">;
   allowCustom?: boolean;
   persistCustom?: boolean;
+  brandColor?: string | null;
+  omitExistingWallets?: boolean;
 }) {
   const {
     bookieWallets,
@@ -97,14 +104,25 @@ export function VenueSelect({
   const showBookies = kinds.includes("bookie");
   const showExchanges = kinds.includes("exchange");
 
+  const existingWalletKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of bookieWallets) set.add(w.name.toLowerCase());
+    for (const w of exchangeWallets) set.add(w.name.toLowerCase());
+    return set;
+  }, [bookieWallets, exchangeWallets]);
+
   const totalItemCount = useMemo(() => {
     let count = 0;
     if (showBookies) {
       const seenBookies = new Set<string>();
-      for (const w of bookieWallets) {
-        if (preferAvailable && w.accessStatus === "closed") continue;
-        seenBookies.add(w.name.toLowerCase());
-        count++;
+      if (!omitExistingWallets) {
+        for (const w of bookieWallets) {
+          if (preferAvailable && w.accessStatus === "closed") continue;
+          seenBookies.add(w.name.toLowerCase());
+          count++;
+        }
+      } else {
+        for (const key of existingWalletKeys) seenBookies.add(key);
       }
       for (const name of filterBookmakers("")) {
         if (seenBookies.has(name.toLowerCase())) continue;
@@ -113,10 +131,14 @@ export function VenueSelect({
     }
     if (showExchanges) {
       const seenEx = new Set<string>();
-      for (const w of exchangeWallets) {
-        if (preferAvailable && w.accessStatus === "closed") continue;
-        seenEx.add(w.name.toLowerCase());
-        count++;
+      if (!omitExistingWallets) {
+        for (const w of exchangeWallets) {
+          if (preferAvailable && w.accessStatus === "closed") continue;
+          seenEx.add(w.name.toLowerCase());
+          count++;
+        }
+      } else {
+        for (const key of existingWalletKeys) seenEx.add(key);
       }
       for (const e of exchangeDirectory) {
         if (seenEx.has(e.name.toLowerCase())) continue;
@@ -131,6 +153,8 @@ export function VenueSelect({
     preferAvailable,
     showBookies,
     showExchanges,
+    omitExistingWallets,
+    existingWalletKeys,
   ]);
 
   const showSearch = totalItemCount > 10;
@@ -142,17 +166,21 @@ export function VenueSelect({
     if (showBookies) {
       const seenBookies = new Set<string>();
 
-      for (const w of bookieWallets) {
-        if (preferAvailable && w.accessStatus === "closed") continue;
-        if (q && !w.name.toLowerCase().includes(q)) continue;
-        seenBookies.add(w.name.toLowerCase());
-        bookies.push({
-          name: w.name,
-          kind: "bookie",
-          accessStatus: w.accessStatus,
-          brandColor: w.brandColor,
-          section: "bookies",
-        });
+      if (!omitExistingWallets) {
+        for (const w of bookieWallets) {
+          if (preferAvailable && w.accessStatus === "closed") continue;
+          if (q && !w.name.toLowerCase().includes(q)) continue;
+          seenBookies.add(w.name.toLowerCase());
+          bookies.push({
+            name: w.name,
+            kind: "bookie",
+            accessStatus: w.accessStatus,
+            brandColor: w.brandColor,
+            section: "bookies",
+          });
+        }
+      } else {
+        for (const key of existingWalletKeys) seenBookies.add(key);
       }
 
       for (const name of filterBookmakers(search)) {
@@ -171,17 +199,21 @@ export function VenueSelect({
     if (showExchanges) {
       const seenEx = new Set<string>();
 
-      for (const w of exchangeWallets) {
-        if (preferAvailable && w.accessStatus === "closed") continue;
-        if (q && !w.name.toLowerCase().includes(q)) continue;
-        seenEx.add(w.name.toLowerCase());
-        exchanges.push({
-          name: w.name,
-          kind: "exchange",
-          accessStatus: w.accessStatus,
-          brandColor: w.brandColor,
-          section: "exchanges",
-        });
+      if (!omitExistingWallets) {
+        for (const w of exchangeWallets) {
+          if (preferAvailable && w.accessStatus === "closed") continue;
+          if (q && !w.name.toLowerCase().includes(q)) continue;
+          seenEx.add(w.name.toLowerCase());
+          exchanges.push({
+            name: w.name,
+            kind: "exchange",
+            accessStatus: w.accessStatus,
+            brandColor: w.brandColor,
+            section: "exchanges",
+          });
+        }
+      } else {
+        for (const key of existingWalletKeys) seenEx.add(key);
       }
 
       for (const e of exchangeDirectory) {
@@ -207,6 +239,8 @@ export function VenueSelect({
     statusByName,
     showBookies,
     showExchanges,
+    omitExistingWallets,
+    existingWalletKeys,
   ]);
 
   const allNames = useMemo(() => {
@@ -214,8 +248,11 @@ export function VenueSelect({
     for (const r of [...rows.bookies, ...rows.exchanges]) {
       set.add(r.name.toLowerCase());
     }
+    if (omitExistingWallets) {
+      for (const key of existingWalletKeys) set.add(key);
+    }
     return set;
-  }, [rows]);
+  }, [rows, omitExistingWallets, existingWalletKeys]);
 
   const showCustom =
     showSearch &&
@@ -229,6 +266,7 @@ export function VenueSelect({
 
   const valueBrandColor = useMemo(() => {
     if (!value.trim()) return null;
+    if (brandColorOverride?.trim()) return brandColorOverride.trim();
     const key = value.trim().toLowerCase();
     const exWallet = exchangeWallets.find((e) => e.name.toLowerCase() === key);
     if (exWallet?.brandColor) return exWallet.brandColor;
@@ -236,7 +274,7 @@ export function VenueSelect({
     if (exDir?.brandColor) return exDir.brandColor;
     const bookieWallet = bookieWallets.find((b) => b.name.toLowerCase() === key);
     return bookieBrandColor(value, bookieWallet?.brandColor);
-  }, [value, bookieWallets, exchangeWallets, exchangeDirectory]);
+  }, [value, brandColorOverride, bookieWallets, exchangeWallets, exchangeDirectory]);
 
   function updatePosition() {
     const trigger = triggerRef.current;
@@ -244,9 +282,9 @@ export function VenueSelect({
     const PAD = 8;
     const GAP = 4;
     const triggerRect = trigger.getBoundingClientRect();
-    const menuWidth = compact
-      ? 224
-      : Math.max(triggerRect.width, 260);
+    // Match the trigger width (side-nav / Settings fields). Compact chip menus
+    // stay a fixed wider panel anchored to the right edge.
+    const menuWidth = compact ? 224 : triggerRect.width;
 
     let left = compact ? triggerRect.right - menuWidth : triggerRect.left;
     left = Math.max(PAD, Math.min(left, window.innerWidth - menuWidth - PAD));
@@ -359,21 +397,15 @@ export function VenueSelect({
           )}
           onClick={() => void pick(row.name, row.kind, false)}
         >
-          <Check
-            className={cn(
-              "size-3 shrink-0",
-              value === row.name ? "opacity-100" : "opacity-0"
-            )}
-          />
           <span
-            className="inline-block size-2.5 shrink-0 rounded-full"
+            className="inline-block size-3 shrink-0 rounded-full"
             style={{ backgroundColor: color }}
           />
           <span className="min-w-0 flex-1 truncate">{row.name}</span>
           {status && status !== "available" && (
             <span
               className={cn(
-                "shrink-0 text-[10px]",
+                "shrink-0 text-[11px]",
                 status === "gubbed"
                   ? "text-amber-600 dark:text-amber-400"
                   : "text-muted-foreground"
@@ -382,89 +414,116 @@ export function VenueSelect({
               {accessStatusLabel(status)}
             </span>
           )}
+          <Check
+            className={cn(
+              "size-3 shrink-0",
+              value === row.name ? "opacity-100" : "opacity-0"
+            )}
+          />
         </button>
       </li>
     );
   }
 
+  // FocusScope pauses a parent Dialog trap so the portaled search field can
+  // accept typing (menu is on document.body, outside DialogContent).
   const menu =
     open && menuStyle ? (
-      <div
-        ref={menuRef}
-        data-venue-select-menu
-        className="pointer-events-auto fixed z-[10000] flex flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
-        style={{
-          top: menuStyle.top,
-          bottom: menuStyle.bottom,
-          left: menuStyle.left,
-          width: menuStyle.width,
-          maxHeight: menuStyle.maxHeight,
+      <FocusScope.Root
+        asChild
+        trapped
+        onUnmountAutoFocus={(e) => {
+          e.preventDefault();
+          triggerRef.current?.focus();
         }}
       >
-        {showSearch ? (
-          <div className="shrink-0 border-b p-2">
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && showCustom) {
-                  e.preventDefault();
-                  void pickCustom();
-                }
-              }}
-              placeholder="Search or type a name…"
-              className="h-8 w-full rounded-md border-0 bg-muted px-2 text-xs outline-none ring-primary/40 focus:ring-2"
-            />
-          </div>
-        ) : null}
-        <ul
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 text-xs"
-          onWheel={(e) => e.stopPropagation()}
+        <div
+          ref={menuRef}
+          data-venue-select-menu
+          className="pointer-events-auto fixed z-[10000] flex flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
+          style={{
+            top: menuStyle.top,
+            bottom: menuStyle.bottom,
+            left: menuStyle.left,
+            width: menuStyle.width,
+            maxHeight: menuStyle.maxHeight,
+          }}
         >
-          {showCustom && (
-            <li>
-              <button
-                type="button"
-                className="flex w-full px-3 py-1.5 text-left hover:bg-muted"
-                disabled={saving}
-                onClick={() => void pickCustom()}
-              >
-                Add &ldquo;{search.trim()}&rdquo;
-              </button>
-            </li>
-          )}
-          {rows.bookies.length > 0 && (
-            <>
-              <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Bookies
+          {showSearch ? (
+            <div className="shrink-0 border-b p-2">
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && showCustom) {
+                    e.preventDefault();
+                    void pickCustom();
+                  }
+                }}
+                placeholder="Search or type a name…"
+                className="h-8 w-full rounded-md border-0 bg-muted px-2 text-xs outline-none ring-primary/40 focus:ring-2"
+              />
+            </div>
+          ) : null}
+          <ul
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 text-xs"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {showCustom && (
+              <li>
+                <button
+                  type="button"
+                  className="flex w-full px-3 py-1.5 text-left hover:bg-muted"
+                  disabled={saving}
+                  onClick={() => void pickCustom()}
+                >
+                  Add &ldquo;{search.trim()}&rdquo;
+                </button>
               </li>
-              {rows.bookies.map(rowButton)}
-            </>
-          )}
-          {rows.exchanges.length > 0 && (
-            <>
-              <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Exchanges
-              </li>
-              {rows.exchanges.map(rowButton)}
-            </>
-          )}
-          {rows.bookies.length === 0 && rows.exchanges.length === 0 && !showCustom && (
-            <li className="px-3 py-2 text-muted-foreground">No matches</li>
-          )}
-        </ul>
-      </div>
+            )}
+            {rows.bookies.length > 0 && (
+              <>
+                {showBookies && showExchanges ? (
+                  <li className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Bookies
+                  </li>
+                ) : null}
+                {rows.bookies.map(rowButton)}
+              </>
+            )}
+            {rows.exchanges.length > 0 && (
+              <>
+                {showBookies && showExchanges ? (
+                  <li className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Exchanges
+                  </li>
+                ) : null}
+                {rows.exchanges.map(rowButton)}
+              </>
+            )}
+            {rows.bookies.length === 0 && rows.exchanges.length === 0 && !showCustom && (
+              <li className="px-3 py-2 text-muted-foreground">No matches</li>
+            )}
+          </ul>
+        </div>
+      </FocusScope.Root>
     ) : null;
 
   const trigger = compact ? (
     <button
       ref={triggerRef}
       type="button"
+      aria-expanded={open}
+      aria-haspopup="listbox"
       onClick={() => setOpen((o) => !o)}
       className={cn(
-        "flex h-[33px] max-w-[148px] items-center gap-1 rounded-md border-0 bg-[var(--pi)] px-2 text-xs font-bold text-black/85 outline-none ring-primary/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95",
+        // Ghost on the panel tint: quiet hover only; brand ring on keyboard focus, not click
+        "flex h-[33px] max-w-[148px] items-center gap-1 rounded-md border-0 bg-transparent px-2 text-xs font-bold text-black/85 outline-none transition-colors",
+        "hover:bg-black/8 dark:text-white/95 dark:hover:bg-white/10",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        open && "bg-black/8 dark:bg-white/10",
         !value && "text-black/45 dark:text-white/45"
       )}
       title={
@@ -475,7 +534,7 @@ export function VenueSelect({
     >
       <span className="min-w-0 flex-1 truncate text-left">{value || "Bookie"}</span>
       {valueStatus === "gubbed" && (
-        <span className="shrink-0 text-[9px] font-semibold text-amber-700 dark:text-amber-400">
+        <span className="shrink-0 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
           G
         </span>
       )}
@@ -501,14 +560,14 @@ export function VenueSelect({
         <span
           className={cn(
             "inline-block shrink-0 rounded-full",
-            size === "sm" ? "size-2" : "size-2.5"
+            size === "sm" ? "size-2" : "size-3"
           )}
           style={{ backgroundColor: valueBrandColor ?? undefined }}
         />
       ) : null}
       <span className="min-w-0 flex-1 truncate text-left">{value || placeholder}</span>
       {valueStatus === "gubbed" && (
-        <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-400">
+        <span className="shrink-0 text-[11px] text-amber-600 dark:text-amber-400">
           {accessStatusLabel("gubbed")}
         </span>
       )}
@@ -529,7 +588,7 @@ export function VenueSelect({
         ) : null}
         {trigger}
         {valueStatus && valueStatus !== "available" && !compact && (
-          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          <p className="text-xs text-amber-700 dark:text-amber-400">
             Marked {accessStatusLabel(normalizeAccessStatus(valueStatus))} in Settings
           </p>
         )}

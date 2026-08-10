@@ -2,14 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   balanceAdjustmentAccountName,
   buildHistoryContext,
+  formatAccaHistoryDetail,
+  formatAccaPlacedTitle,
+  formatAccaSettlementTitle,
   formatHistoryTimeBadge,
   formatHistoryTimeBadgeParts,
   historyEntrySubtitle,
   historyEntryTitle,
   historyEntryHref,
+  isFreeBetWonHistoryEntry,
   historyKindLabel,
   historyOccurredAt,
   historyUsesMinuteBadge,
+  isDeskCampaignLayHistoryEntry,
   isFreeBetHistoryEntry,
   isFreeBetPlacedHistoryEntry,
   isBoostHistoryEntry,
@@ -33,6 +38,70 @@ function row(partial: Partial<HistoryRow> & Pick<HistoryRow, "kind" | "title">):
   };
 }
 
+describe("isDeskCampaignLayHistoryEntry", () => {
+  const lay: BetRow = {
+    id: 9,
+    eventId: null,
+    label: "Acca lay · Middlesbrough",
+    market: "match_odds",
+    selection: "Middlesbrough",
+    betType: "lay_only",
+    bookmaker: null,
+    exchangeId: 1,
+    backStake: 0,
+    backOdds: 0,
+    layStake: 20,
+    layOdds: 1.81,
+    commission: 0.02,
+    earlyPayout: 0,
+    refundAmount: null,
+    refundRetention: null,
+    legs: null,
+    triggerText: null,
+    triggerRule: null,
+    status: "lost",
+    expectedProfit: null,
+    actualProfit: -16.2,
+    notes: "Acca desk: leg 1 of 3",
+    balanceLedgered: 1,
+    balanceSettled: 1,
+    createdAt: 1,
+    settledAt: 2,
+    offerId: null,
+    source: null,
+    quickLogged: null,
+    sport: null,
+    purpose: null,
+  };
+
+  it("flags Acca desk lay settlements for History exclusion", () => {
+    const ctx = buildHistoryContext([], [lay], {});
+    expect(
+      isDeskCampaignLayHistoryEntry(
+        row({ kind: "settlement", title: "Bet lost", betId: 9, amount: -16.2 }),
+        ctx
+      )
+    ).toBe(true);
+    expect(
+      isDeskCampaignLayHistoryEntry(
+        row({ kind: "bet_placed", title: "Bet placed", betId: 9 }),
+        ctx
+      )
+    ).toBe(true);
+  });
+
+  it("leaves ordinary bet settlements alone", () => {
+    const ordinary: BetRow = { ...lay, id: 10, label: "Arsenal", betType: "qualifying" };
+    const ctx = buildHistoryContext([], [ordinary], {});
+    expect(
+      isDeskCampaignLayHistoryEntry(
+        row({ kind: "settlement", title: "Bet lost", betId: 10, amount: -10 }),
+        ctx
+      )
+    ).toBe(false);
+  });
+});
+
 describe("isFreeBetHistoryEntry", () => {
   const ctx = buildHistoryContext([], [], { 42: { amount: 50, reason: "Finished 2nd" } });
 
@@ -45,10 +114,16 @@ describe("isFreeBetHistoryEntry", () => {
     ).toBe(false);
   });
 
-  it("includes settlement rows with Free bet won in the title", () => {
+  it("includes settlement rows with Free bet won/earned in the title", () => {
     expect(
       isFreeBetHistoryEntry(
         row({ kind: "settlement", title: "Bet lost · Free bet won!" }),
+        ctx
+      )
+    ).toBe(true);
+    expect(
+      isFreeBetHistoryEntry(
+        row({ kind: "settlement", title: "Bet lost · Free bet earned!" }),
         ctx
       )
     ).toBe(true);
@@ -93,6 +168,7 @@ describe("isFreeBetPlacedHistoryEntry", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    sport: null,
     purpose: null,
   };
 
@@ -331,6 +407,7 @@ describe("sortHistoryEntries", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    sport: null,
     purpose: null,
   };
   const ctx = buildHistoryContext([event], [bet], {
@@ -459,6 +536,7 @@ describe("historyEntryHref", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    sport: null,
     purpose: null,
   };
   const ctx = buildHistoryContext([event], [bet]);
@@ -526,6 +604,81 @@ describe("casino history filter", () => {
   });
 });
 
+describe("Acca History copy", () => {
+  it("titles Acca settlements as Acca won/lost (earned vs won free-bet promo)", () => {
+    expect(formatAccaSettlementTitle("lost")).toBe("Acca lost");
+    expect(formatAccaSettlementTitle("won")).toBe("Acca won");
+    expect(
+      formatAccaSettlementTitle("lost", { amount: 10, reason: "Offer unlocked" }, "Free bet earned!")
+    ).toBe("Acca lost · Free bet earned!");
+    expect(
+      formatAccaSettlementTitle("lost", { amount: 50, reason: "Finished 2nd" }, "Free bet won!")
+    ).toBe("Acca lost · Free bet won!");
+    expect(formatAccaPlacedTitle("qualifying")).toBe("Acca placed");
+    expect(formatAccaPlacedTitle("free_snr")).toBe("Acca free bet placed");
+  });
+
+  it("uses fold + run label for the subtitle (not a leg list)", () => {
+    expect(
+      formatAccaHistoryDetail(
+        { label: "Bet £20 (ACCA) get £10 free bet" },
+        [
+          { label: "Middlesbrough", result: "lost" },
+          { label: "Cambridge United", result: "won" },
+          { label: "Stockport County", result: "pending" },
+        ]
+      )
+    ).toBe("Treble · Bet £20 (ACCA) get £10 free bet");
+  });
+
+  it("surfaces Acca detail as the History subtitle (not the bet label)", () => {
+    const accaBet: BetRow = {
+      id: 42,
+      eventId: null,
+      label: "Acca · Bet £20 (ACCA) get £10 free bet",
+      market: "other",
+      selection: "",
+      betType: "qualifying",
+      bookmaker: null,
+      exchangeId: null,
+      backStake: 20,
+      backOdds: 10,
+      layStake: 0,
+      layOdds: 0,
+      commission: 0,
+      earlyPayout: 0,
+      refundAmount: null,
+      refundRetention: null,
+      legs: null,
+      triggerText: null,
+      triggerRule: null,
+      status: "lost",
+      expectedProfit: null,
+      actualProfit: -40.84,
+      notes: "Acca desk run - hedged on the exchange",
+      balanceLedgered: 1,
+      balanceSettled: 1,
+      createdAt: 1,
+      settledAt: 2,
+      offerId: null,
+      quickLogged: null,
+      source: null,
+      sport: null,
+      purpose: null,
+    };
+    const entry = row({
+      kind: "settlement",
+      title: "Acca lost · Free bet earned!",
+      detail: "Treble · Bet £20 (ACCA) get £10 free bet",
+      amount: -40.84,
+    });
+    expect(historyEntrySubtitle(entry, accaBet)).toBe(
+      "Treble · Bet £20 (ACCA) get £10 free bet"
+    );
+    expect(isFreeBetWonHistoryEntry(entry)).toBe(true);
+  });
+});
+
 describe("balance adjustment display", () => {
   it("strips the embedded GBP amount from the account subtitle", () => {
     const entry = row({
@@ -572,6 +725,7 @@ describe("boosts history filter (J2b)", () => {
     offerId: null,
     source: null,
     quickLogged: null,
+    sport: null,
     purpose: null,
   };
   const ctx = buildHistoryContext([], [boostBet], {});

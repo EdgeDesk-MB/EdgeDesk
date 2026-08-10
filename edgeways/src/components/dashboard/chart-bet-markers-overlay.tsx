@@ -19,6 +19,7 @@ import {
   PNL_CHART_WINDOW_TRANSITION_MS,
   projectBetMarkers,
   settlementStatusLabel,
+  type ChartBetMarker,
   type ChartCasinoSettlement,
   type LivePnlPoint,
   type PnlAdjustment,
@@ -35,34 +36,48 @@ function markerStatusLabel(marker: ProjectedBetMarker["marker"]): string {
 function markerHref(marker: ProjectedBetMarker["marker"]): string {
   if (marker.kind === "adjustment") return "/accounts";
   if (marker.kind === "casino") return "/casino";
+  if (marker.label.startsWith("Acca ·") || marker.label.startsWith("Acca FB ·")) {
+    return "/acca?tab=history";
+  }
   return `/tracker?highlight=${marker.id}`;
 }
 
 export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
-  bets,
+  bets = [],
   adjustments = [],
   casinoSettlements = [],
+  markers: markersProp,
   livePoints,
   liveValue,
   windowSecs,
   activeWindowSecs,
   showBadge,
+  referenceValue = 0,
   padding,
 }: {
-  bets: BetRow[];
+  bets?: BetRow[];
   adjustments?: PnlAdjustment[];
   casinoSettlements?: ChartCasinoSettlement[];
+  /** Pre-built markers (e.g. Racing Desk day chart). Skips Home ledger build. */
+  markers?: ChartBetMarker[];
   livePoints: LivePnlPoint[];
   liveValue: number;
   windowSecs: number;
   /** The user-selected timeframe (not the continuously-drifting "All" bound) - drives the hide/fade below. */
   activeWindowSecs: number;
   showBadge: boolean;
+  /** Liveline reference-line value — mirrors the chart floor anchor (0 for All). */
+  referenceValue?: number;
   padding: PnlChartPadding;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [projected, setProjected] = useState<ProjectedBetMarker[]>([]);
+
+  // Frozen {min, max} from the last frame that had 2+ in-window points -
+  // reused when the window goes sparse so markers don't jump to a
+  // mismatched scale relative to Liveline's own (also-frozen) line range.
+  const lastGoodRangeRef = useRef<{ min: number; max: number } | null>(null);
 
   // Hide markers for the duration of Liveline's window-change animation, then
   // fade them back in over half that time so they don't pop in mid-reflow.
@@ -72,6 +87,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   useEffect(() => {
     if (prevActiveWindowRef.current === activeWindowSecs) return;
     prevActiveWindowRef.current = activeWindowSecs;
+    lastGoodRangeRef.current = null;
     setMarkerFade({ opacity: 0, transition: false });
     const timer = window.setTimeout(() => {
       setMarkerFade({ opacity: 1, transition: true });
@@ -80,8 +96,10 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   }, [activeWindowSecs]);
 
   const markers = useMemo(
-    () => buildHomeChartMarkers({ bets, adjustments, casinoSettlements }),
-    [bets, adjustments, casinoSettlements]
+    () =>
+      markersProp ??
+      buildHomeChartMarkers({ bets, adjustments, casinoSettlements }),
+    [markersProp, bets, adjustments, casinoSettlements]
   );
 
   useEffect(() => {
@@ -97,10 +115,9 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
     return () => ro.disconnect();
   }, []);
 
-  // Frozen {min, max} from the last frame that had 2+ in-window points -
-  // reused when the window goes sparse so markers don't jump to a
-  // mismatched scale relative to Liveline's own (also-frozen) line range.
-  const lastGoodRangeRef = useRef<{ min: number; max: number } | null>(null);
+  useEffect(() => {
+    lastGoodRangeRef.current = null;
+  }, [windowSecs, referenceValue]);
 
   useEffect(() => {
     if (!size.width || !size.height || markers.length === 0) {
@@ -121,6 +138,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
         livePoints,
         liveValue,
         fallbackRange: lastGoodRangeRef.current ?? undefined,
+        referenceValue,
       });
       if (layout?.hasSufficientData) {
         lastGoodRangeRef.current = { min: layout.minVal, max: layout.maxVal };
@@ -138,7 +156,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [markers, size, padding, windowSecs, showBadge, livePoints, liveValue]);
+  }, [markers, size, padding, windowSecs, showBadge, livePoints, liveValue, referenceValue]);
 
   if (markers.length === 0) return null;
 

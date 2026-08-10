@@ -31,19 +31,30 @@ export async function POST(req: NextRequest) {
     .all()
     .find((a) => a.type === "bookie" && a.name.toLowerCase() === name.toLowerCase());
   if (dup) {
+    const nextColor = input.brandColor ?? dup.brandColor ?? bookieBrandColor(name);
     if (dup.isActive) {
-      return NextResponse.json({ error: "A bookie with this name already exists" }, { status: 409 });
+      // Idempotent: adopt the submitted brand colour rather than 409.
+      const updated =
+        nextColor !== dup.brandColor
+          ? db
+              .update(accounts)
+              .set({ brandColor: nextColor })
+              .where(eq(accounts.id, dup.id))
+              .returning()
+              .get()
+          : dup;
+      return NextResponse.json({ bookie: updated, created: false });
     }
     const reactivated = db
       .update(accounts)
       .set({
         isActive: 1,
-        brandColor: input.brandColor ?? dup.brandColor ?? bookieBrandColor(name),
+        brandColor: nextColor,
       })
       .where(eq(accounts.id, dup.id))
       .returning()
       .get();
-    return NextResponse.json({ bookie: reactivated });
+    return NextResponse.json({ bookie: reactivated, created: false });
   }
 
   const inserted = db
@@ -62,5 +73,5 @@ export async function POST(req: NextRequest) {
     recordManualTransaction(inserted.id, input.openingBalance, "top_up", "Opening balance");
   }
 
-  return NextResponse.json({ bookie: inserted });
+  return NextResponse.json({ bookie: inserted, created: true });
 }

@@ -107,7 +107,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       { id: "fb-sim", title: "Built-in match simulator (2UP drama)", status: "done" },
       { id: "fb-dashboard", title: "Live dashboard with Liveline P&L chart", status: "done" },
       { id: "fb-triggers", title: "Goalscorer & combo trigger engine", status: "done" },
-      { id: "fb-history", title: "Flashscore-style history feed", status: "done" },
+      { id: "fb-history", title: "Live commentary history feed", status: "done" },
       { id: "fb-model", title: "Live in-play probability model", status: "done" },
       {
         id: "fb-ep-live",
@@ -148,6 +148,13 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         id: "off-templates",
         title: "Offer template import / terms parser",
         description: "Paste from Matched Betting Blog / promo emails",
+        status: "done",
+      },
+      {
+        id: "off-playbook",
+        title: "Offer completion playbook (hybrid wizard)",
+        description:
+          "Deposit codes + step funnel (Mark done / auto from bets, deposits, WR). O1 Phase 1–2 done; bookie T&Cs profiles later.",
         status: "done",
       },
       {

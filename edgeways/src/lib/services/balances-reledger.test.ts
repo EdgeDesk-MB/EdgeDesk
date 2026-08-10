@@ -4,6 +4,7 @@ import { db, accounts, balanceTransactions, bets } from "@/lib/db";
 import {
   getBalanceSummary,
   ledgerBetPlacement,
+  purgeLedgerForDeletedBet,
   reledgerOpenBetPlacement,
 } from "./balances";
 import { sumFreeBetLotBalance } from "@/lib/accounts/free-bet-lot-balance";
@@ -213,5 +214,76 @@ describe("reledgerOpenBetPlacement - cash ↔ free no-lay", () => {
       .filter((t) => t.betId === bet.id && t.category === "free_bet" && t.amount > 0);
     expect(promo).toHaveLength(1);
     expect(promo[0]!.amount).toBe(10);
+  });
+});
+
+describe("purgeLedgerForDeletedBet", () => {
+  beforeEach(() => {
+    for (const b of db.select().from(bets).all()) {
+      if (!b.label.startsWith("PurgeLedger")) continue;
+      db.delete(balanceTransactions).where(eq(balanceTransactions.betId, b.id)).run();
+      db.delete(bets).where(eq(bets.id, b.id)).run();
+    }
+    for (const a of db.select().from(accounts).all()) {
+      if (a.name !== "PurgeLedger Bookie") continue;
+      db.delete(balanceTransactions).where(eq(balanceTransactions.accountId, a.id)).run();
+      db.delete(accounts).where(eq(accounts.id, a.id)).run();
+    }
+  });
+
+  it("removes stake rows so deleting a bet cannot orphan a bookie debit", () => {
+    const account = db
+      .insert(accounts)
+      .values({
+        name: "PurgeLedger Bookie",
+        type: "bookie",
+        isActive: 1,
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+    db.insert(balanceTransactions)
+      .values({
+        accountId: account.id,
+        amount: 50,
+        category: "top_up",
+        note: "Seed",
+        createdAt: Date.now(),
+        pending: 0,
+      })
+      .run();
+
+    const bet = db
+      .insert(bets)
+      .values({
+        label: "PurgeLedger open",
+        market: "win",
+        selection: "Runner",
+        betType: "qualifying",
+        bookmaker: "PurgeLedger Bookie",
+        backStake: 20,
+        backOdds: 3,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        status: "open",
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+
+    ledgerBetPlacement(bet);
+    expect(cashOf(account.id)).toBe(30);
+
+    purgeLedgerForDeletedBet(bet.id);
+    db.delete(bets).where(eq(bets.id, bet.id)).run();
+
+    expect(cashOf(account.id)).toBe(50);
+    const left = db
+      .select()
+      .from(balanceTransactions)
+      .all()
+      .filter((t) => t.betId === bet.id);
+    expect(left).toHaveLength(0);
   });
 });

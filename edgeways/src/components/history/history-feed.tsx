@@ -35,6 +35,7 @@ import {
   showEarlyFreeBetAwardButton,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
+import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Gift } from "lucide-react";
 
@@ -73,25 +74,26 @@ function HistoryEntryTitleDisplay({
   }
 
   if (freeBetWon) {
-    const marker = "Free bet won!";
-    const idx = title.indexOf(marker);
-    /** Inline nowrap unit - same text baseline as "Bet lost ·", gift stays on the line. */
-    const wonBadge = (
-      <span className={cn("whitespace-nowrap", freeBetTextClass)}>
-        {marker}
-        <Gift
-          className={cn("ml-1 inline size-3.5 align-[-0.125em]", freeBetIconClass)}
-          aria-hidden
-        />
-      </span>
-    );
-    if (idx >= 0) {
+    const markers = ["Free bet won!", "Free bet earned!"] as const;
+    for (const marker of markers) {
+      const idx = title.indexOf(marker);
+      if (idx < 0) continue;
+      /** Inline nowrap unit - same text baseline as "Bet lost ·", gift stays on the line. */
+      const awardBadge = (
+        <span className={cn("whitespace-nowrap", freeBetTextClass)}>
+          {marker}
+          <Gift
+            className={cn("ml-1 inline size-3.5 align-[-0.125em]", freeBetIconClass)}
+            aria-hidden
+          />
+        </span>
+      );
       const before = title.slice(0, idx);
       const after = title.slice(idx + marker.length);
       return (
         <span className={cn("min-w-0 max-w-full", className)}>
           {before}
-          {wonBadge}
+          {awardBadge}
           {after}
         </span>
       );
@@ -254,7 +256,7 @@ export function HistoryEntryRow({
           <HistoryTimeBadgeDisplay
             entry={entry}
             ctx={ctx}
-            className="w-[4.75rem] shrink-0 text-left text-[11px] font-semibold text-muted-foreground"
+            className="w-[4.75rem] shrink-0 text-left text-xs font-semibold text-muted-foreground"
           />
           <div className="flex w-4 shrink-0 justify-center">
             <HistoryEntryIcon entry={entry} ctx={ctx} />
@@ -296,7 +298,7 @@ export function HistoryEntryRow({
         <HistoryTimeBadgeDisplay
           entry={entry}
           ctx={ctx}
-          className="w-[4.5rem] shrink-0 text-left text-[11px] font-semibold text-muted-foreground"
+          className="w-[4.5rem] shrink-0 text-left text-xs font-semibold text-muted-foreground"
         />
         <div className="flex w-4 shrink-0 justify-center">
           <HistoryEntryIcon entry={entry} ctx={ctx} />
@@ -318,24 +320,24 @@ export function HistoryEntryRow({
             <span className="block truncate text-xs text-muted-foreground">{entry.detail}</span>
           ) : null}
           {event && eventLine ? (
-            <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/80">
+            <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground/80">
               <SportIcon sport={event.sport} size={11} className="shrink-0 text-muted-foreground/70" />
               <span className="truncate">{eventLine}</span>
             </span>
           ) : null}
           {earlyAwardPrompt}
           {settledNote && (
-            <span className="mt-0.5 block text-[10px] text-muted-foreground">{settledNote}</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">{settledNote}</span>
           )}
           {bet && isBetSettlement && (
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
               {formatBetMeta(bet).map((line) => (
                 <span key={line}>{line}</span>
               ))}
             </div>
           )}
           {bet && entry.kind === "bet_placed" && !showEarlyAward && (
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
               {formatBetMeta(bet).slice(0, 3).map((line) => (
                 <span key={line}>{line}</span>
               ))}
@@ -388,7 +390,7 @@ export function HistoryEntryCard({
     : undefined;
 
   return (
-    <article className="offer-campaign-card overflow-hidden rounded-lg ring-1 ring-border/50 dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100">
+    <article className={cn(offerCampaignCardShell, "flex-col")}>
       <div
         className={cn(
           collapsed ? "flex min-h-[3.75rem] items-center px-3 py-2.5" : "px-4 pt-4 pb-3",
@@ -412,14 +414,14 @@ export function HistoryEntryCard({
             <div className="flex w-full items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {historyKindLabel(entry.kind)}
                   </span>
                   <HistoryTimeBadgeDisplay
                     entry={entry}
                     ctx={ctx}
                     inline
-                    className="text-[11px] text-muted-foreground"
+                    className="text-xs text-muted-foreground"
                   />
                 </div>
                 <h3
@@ -522,7 +524,7 @@ export function HistoryEntryCard({
                   <div>
                     <dt className="text-xs text-muted-foreground">Expected</dt>
                     <dd>
-                      <MoneyFlow value={bet.expectedProfit} signColor signDisplay />
+                      <MoneyFlow value={bet.expectedProfit} signColor signDisplay estimate />
                     </dd>
                   </div>
                 )}

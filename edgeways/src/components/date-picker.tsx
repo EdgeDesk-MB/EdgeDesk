@@ -8,7 +8,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { FilterPill } from "@/components/ui/filter-pill";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { filterPillGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +38,8 @@ export function ymdDaysFromToday(days: number, now = new Date()): string {
  * Shared date field: shadcn Popover + react-day-picker Calendar.
  * Value is always YYYY-MM-DD (or empty), matching previous native `type="date"` inputs.
  *
- * Uses PopoverAnchor (not Trigger) so the control stays on the PressButton path
- * and matches sibling outline buttons for height / face / press.
+ * Uses PopoverTrigger (like TimePicker) so the field stays on the flat Button path.
+ * PressButton/react-3d-button hover translate jitters icon + label in dense forms.
  */
 export function DatePicker({
   value,
@@ -83,31 +83,29 @@ export function DatePicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverAnchor asChild>
-        <span className={cn("inline-flex", className)}>
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            size={size}
-            disabled={disabled}
-            data-empty={!selected}
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          size={size}
+          disabled={disabled}
+          data-empty={!selected}
+          className={cn(
+            "w-full justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
+            size === "lg" ? "px-3" : "px-2.5",
+            className
+          )}
+        >
+          <CalendarIcon
             className={cn(
-              "w-full justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
-              size === "lg" ? "px-3" : "px-2.5"
+              "shrink-0 text-muted-foreground",
+              size === "lg" ? "size-4" : "size-3.5"
             )}
-            onClick={() => setOpen((prev) => !prev)}
-          >
-            <CalendarIcon
-              className={cn(
-                "shrink-0 text-muted-foreground",
-                size === "lg" ? "size-4" : "size-3.5"
-              )}
-            />
-            {selected ? format(selected, "d MMM yyyy", { locale: enGB }) : placeholder}
-          </Button>
-        </span>
-      </PopoverAnchor>
+          />
+          {selected ? format(selected, "d MMM yyyy", { locale: enGB }) : placeholder}
+        </Button>
+      </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
         <Calendar
           mode="single"

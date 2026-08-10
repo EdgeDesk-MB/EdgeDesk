@@ -71,25 +71,37 @@ import {
   linkableEventsForSport,
   MARKET_LABELS,
 } from "@/lib/markets";
-import { formatGbp } from "@/lib/format-money";
+import { formatEvGbp, formatGbp } from "@/lib/format-money";
 import { sportDisplayLabel } from "@/lib/sports";
 import {
   isBetCancelled,
   isOfferExpired,
   offerInactiveFigureClass,
 } from "@/lib/offers/offer-inactive-ui";
-import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
+import {
+  deskTableBodyCell,
+  deskTableHeaderCell,
+  tableEdgeStart,
+} from "@/lib/ui/surface-styles";
 import { betStatusBadgeVariant, formatPillLabel } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
+import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
+import { formatAccaDeskBetDisplayTitle, isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { api } from "@/hooks/use-app-state";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { Link2, Pencil, RotateCcw, Zap } from "lucide-react";
 
-const stickyActionsHead =
-  "sticky right-0 z-20 w-14 border-l border-border/60 bg-card px-1 shadow-[-6px_0_10px_-6px_color-mix(in_oklch,var(--border)_50%,transparent)]";
+function betLogTitle(bet: BetRow): string {
+  if (isAccaDeskBack(bet) || isAccaDeskLay(bet)) return formatAccaDeskBetDisplayTitle(bet);
+  return bet.label;
+}
 
-const stickyActionsCell =
-  "sticky right-0 z-10 w-14 border-l border-border/60 bg-card px-1 shadow-[-6px_0_10px_-6px_color-mix(in_oklch,var(--border)_50%,transparent)]";
+/**
+ * Actions column: right inset matches Campaign P&L (pr-4). Not sticky — a
+ * sticky opaque plate covers the <tr> border-b and stops the row rule short.
+ */
+const actionsHead = "w-14 py-2 pr-4 pl-2 text-right";
+const actionsCell = "w-14 py-2.5 pr-4 pl-2 text-right align-top";
 
 export function BetLogTable({
   bets,
@@ -141,7 +153,12 @@ export function BetLogTable({
           const inactiveFigure = offerInactiveFigureClass(
             isBetCancelled(bet) || (offer != null && isOfferExpired(offer))
           );
-          const sport = inferSportFromBet(bet.market, event?.sport);
+          const sport = inferSportFromBet(
+            bet.market,
+            event?.sport,
+            offer?.sport,
+            bet.sport
+          );
           const canSetRaceResult =
             bet.status === "open" && event?.sport === "horse_racing";
           // Free-bet trigger rules alone must not hide Set result — only hide when
@@ -168,7 +185,7 @@ export function BetLogTable({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">{bet.label}</p>
+                  <p className="line-clamp-2 text-sm font-medium leading-snug">{betLogTitle(bet)}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {bet.betType.replace("_", " ")}
                     {bet.earlyPayout ? " · 2UP" : ""}
@@ -193,7 +210,7 @@ export function BetLogTable({
                   )}
                 </div>
                 <div className="shrink-0 text-right">
-                  <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[10px]">
+                  <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[11px]">
                     {bet.status === "early_payout"
                       ? "2UP paid"
                       : bet.status === "half_win"
@@ -314,12 +331,16 @@ export function BetLogTable({
     <Table className="min-w-[720px] table-fixed">
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className={cn(tableHeaderCell, "w-[26%]")}>Bet</TableHead>
-          <TableHead className={cn(tableHeaderCell, "w-[20%]")}>Event</TableHead>
-          <TableHead className={cn(tableHeaderCell, "w-[14%]")}>Market</TableHead>
-          <TableHead className={cn(tableHeaderCell, "w-[14%] text-right")}>Stakes</TableHead>
-          <TableHead className={cn(tableHeaderCell, "w-[14%]")}>Result</TableHead>
-          <TableHead className={cn(tableHeaderCell, stickyActionsHead, "text-right")}>
+          <TableHead className={cn(deskTableHeaderCell, tableEdgeStart, "w-[26%]")}>
+            Bet
+          </TableHead>
+          <TableHead className={cn(deskTableHeaderCell, "w-[20%]")}>Event</TableHead>
+          <TableHead className={cn(deskTableHeaderCell, "w-[14%]")}>Market</TableHead>
+          <TableHead className={cn(deskTableHeaderCell, "w-[14%] text-right")}>
+            Stakes
+          </TableHead>
+          <TableHead className={cn(deskTableHeaderCell, "w-[14%]")}>Result</TableHead>
+          <TableHead className={cn(deskTableHeaderCell, actionsHead)}>
             <span className="sr-only">Actions</span>
           </TableHead>
         </TableRow>
@@ -336,7 +357,12 @@ export function BetLogTable({
             label: bet.label,
             triggerText: bet.triggerText ?? "",
           }).lines;
-          const sport = inferSportFromBet(bet.market, event?.sport);
+          const sport = inferSportFromBet(
+            bet.market,
+            event?.sport,
+            offer?.sport,
+            bet.sport
+          );
           const canSetRaceResult =
             bet.status === "open" && event?.sport === "horse_racing";
           // Free-bet trigger rules alone must not hide Set result — only hide when
@@ -361,8 +387,14 @@ export function BetLogTable({
                 highlightId === bet.id && "bet-row-highlight"
               )}
             >
-              <TableCell className={cn(tableBodyCell, "whitespace-normal align-top")}>
-                <div className="line-clamp-2 font-medium leading-snug">{bet.label}</div>
+              <TableCell
+                className={cn(
+                  deskTableBodyCell,
+                  tableEdgeStart,
+                  "whitespace-normal align-top"
+                )}
+              >
+                <div className="line-clamp-2 font-medium leading-snug">{betLogTitle(bet)}</div>
                 <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                   {bet.betType.replace("_", " ")}
                   {bet.earlyPayout ? " · 2UP" : ""}
@@ -386,14 +418,14 @@ export function BetLogTable({
                   </div>
                 )}
                 {(bet.triggerText || triggers.length > 0) && (
-                  <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                  <div className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">
                     <Zap className="mr-0.5 inline size-3 shrink-0 text-violet-500" />
                     {bet.triggerText || triggers[0]}
                   </div>
                 )}
               </TableCell>
 
-              <TableCell className={cn(tableBodyCell, "whitespace-normal align-top")}>
+              <TableCell className={cn(deskTableBodyCell, "whitespace-normal align-top")}>
                 {event ? (
                   <SportEventBlock
                     sport={event.sport}
@@ -421,7 +453,12 @@ export function BetLogTable({
                 ) : (
                   <LinkEventSelect
                     events={events}
-                    sport={inferSportFromBet(bet.market, null, offer?.sport)}
+                    sport={inferSportFromBet(
+                      bet.market,
+                      null,
+                      offer?.sport,
+                      bet.sport
+                    )}
                     onLink={(eventId, market, selection) =>
                       onPatch(bet.id, { eventId, market, selection }, "Linked to event")
                     }
@@ -430,7 +467,7 @@ export function BetLogTable({
                 )}
               </TableCell>
 
-              <TableCell className={cn(tableBodyCell, "whitespace-normal align-top text-xs leading-snug")}>
+              <TableCell className={cn(deskTableBodyCell, "whitespace-normal align-top text-xs leading-snug")}>
                 <div className="line-clamp-2">
                   {MARKET_LABELS[bet.market] ?? bet.market}
                   {bet.selection
@@ -446,7 +483,7 @@ export function BetLogTable({
 
               <TableCell
                 className={cn(
-                  tableBodyCell,
+                  deskTableBodyCell,
                   "whitespace-normal align-top text-right text-xs tabular-nums",
                   inactiveFigure
                 )}
@@ -463,8 +500,8 @@ export function BetLogTable({
                 ) : null}
               </TableCell>
 
-              <TableCell className={cn(tableBodyCell, "whitespace-normal align-top")}>
-                <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[10px]">
+              <TableCell className={cn(deskTableBodyCell, "whitespace-normal align-top")}>
+                <Badge variant={betStatusBadgeVariant(bet.status)} className="text-[11px]">
                   {bet.status === "early_payout"
                     ? "2UP paid"
                     : bet.status === "half_win"
@@ -512,7 +549,7 @@ export function BetLogTable({
                           variant="outline"
                           size="sm"
                           className={cn(
-                            "h-7 px-2 text-[10px]",
+                            "h-7 px-2 text-[11px]",
                             resultActionButtonClass
                           )}
                         >
@@ -536,9 +573,8 @@ export function BetLogTable({
 
               <TableCell
                 className={cn(
-                  tableBodyCell,
-                  stickyActionsCell,
-                  "align-top",
+                  deskTableBodyCell,
+                  actionsCell,
                   highlightId === bet.id && "bet-row-highlight"
                 )}
               >
@@ -585,7 +621,7 @@ function LinkOfferSelect({
 }) {
   return (
     <Select onValueChange={(v) => onLink(Number(v))}>
-      <SelectTrigger size="sm" className="h-7 w-full max-w-[11rem] text-[11px]">
+      <SelectTrigger size="sm" className="h-7 w-full max-w-[11rem] text-xs">
         <span className="flex items-center gap-1 text-primary-text">
           <Link2 className="size-3 shrink-0" /> Link to offer
         </span>
@@ -597,7 +633,7 @@ function LinkOfferSelect({
               <span className="truncate font-medium">
                 {o.title.length > 36 ? `${o.title.slice(0, 33)}…` : o.title}
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {o.bookmaker ?? "No bookie"}
                 {o.profit.freeBetStage === "awarded" && o.profit.freeBetAwardAmount != null
                   ? ` · £${o.profit.freeBetAwardAmount.toFixed(0)} FB ready`
@@ -644,6 +680,11 @@ function LinkEventSelect({
   const eventCount = dayBands.reduce((n, b) => n + b.items.length, 0);
   const sportLabel = sportDisplayLabel(sport).toLowerCase();
 
+  function linkToEvent(eventId: number) {
+    suppressRaceOffSoonForBetLink(eventId);
+    onLink(eventId, bet.market, bet.selection);
+  }
+
   if (eventCount === 0 && !isRacing) {
     return (
       <span className="text-xs text-muted-foreground">No {sportLabel} events</span>
@@ -667,7 +708,8 @@ function LinkEventSelect({
         method: "POST",
         json: { course: trimmed, startTime },
       });
-      onLink(res.event.id, bet.market, bet.selection);
+      suppressRaceOffSoonForBetLink(res.event.id);
+      linkToEvent(res.event.id);
       setOpen(false);
       setAddingRace(false);
       setCourse("");
@@ -719,7 +761,7 @@ function LinkEventSelect({
             className={cn(
               "border-t",
               "[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5",
-              "[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold",
+              "[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold",
               "[&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide",
               "[&_[cmdk-group-heading]]:text-muted-foreground"
             )}
@@ -736,7 +778,7 @@ function LinkEventSelect({
                         key={e.id}
                         value={`${label} ${band.label} ${e.homeTeam} ${e.awayTeam} ${e.competition ?? ""}`}
                         onSelect={() => {
-                          onLink(e.id, bet.market, bet.selection);
+                          linkToEvent(e.id);
                           setOpen(false);
                         }}
                       >
@@ -754,7 +796,7 @@ function LinkEventSelect({
           <div className="border-t px-4 py-3">
             {addingRace ? (
               <div className="flex flex-col gap-2.5">
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Free racecards only cover today and tomorrow. Add yesterday&apos;s race by
                   course and off time, then set placings.
                 </p>
@@ -836,7 +878,7 @@ function ExpectedProfitLabel({
   return (
     <span className={cn("text-xs tabular-nums text-muted-foreground", className)}>
       exp.{" "}
-      <span className={cn("font-medium", profitEntryClass(value))}>{formatGbp(value)}</span>
+      <span className={cn("font-medium", profitEntryClass(value))}>{formatEvGbp(value)}</span>
     </span>
   );
 }

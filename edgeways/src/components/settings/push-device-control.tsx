@@ -374,8 +374,8 @@ export function PushDeviceControl() {
             Separate from organic alerts while the app is open. Register on each device once;
             Send test push fans out to every device on the list (from Mac or phone).
           </p>
-          <p className="mt-1 font-mono text-[11px] text-muted-foreground break-all">{origin}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 font-mono text-xs text-muted-foreground break-all">{origin}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Permission: {permission}
             {" · "}
             Local sub: {localSub ? "yes" : "no"}

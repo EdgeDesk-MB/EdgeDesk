@@ -109,7 +109,7 @@ export function CasinoGamePicker({
               <Badge
                 key={g.id}
                 variant={isBest ? "success" : "outline"}
-                className={cn("gap-1 text-[11px]", !isBest && "text-muted-foreground")}
+                className={cn("gap-1 text-xs", !isBest && "text-muted-foreground")}
               >
                 {isBest ? <Star className="size-3" aria-hidden /> : null}
                 <span className="max-w-[10rem] truncate">{g.name}</span>
@@ -128,7 +128,7 @@ export function CasinoGamePicker({
         </div>
       ) : null}
       {best ? (
-        <p className="text-[11px] text-success">
+        <p className="text-xs text-success">
           Play {best.name} - highest RTP of your selection. Verify the RTP in the game info
           before you spin.
         </p>

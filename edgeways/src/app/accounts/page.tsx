@@ -35,6 +35,7 @@ import { useAddBalance } from "@/components/add-balance-provider";
 import { TransferFundsDialog } from "@/components/accounts/transfer-funds-dialog";
 import { ManageVenuesDialog } from "@/components/accounts/venue-admin-panel";
 import { MoneyFlow } from "@/components/money-flow";
+import { isNegativeGbp } from "@/lib/format-money";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { NumField } from "@/components/calc/num-field";
 import { mugDue } from "@/lib/accounts/mug-plan";
@@ -202,7 +203,7 @@ function AccountsContent() {
               >
                 <span className="min-w-0">
                   <span className="font-medium">{tx.accountName}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                     {tx.note || "Transfer"}
                   </span>
                 </span>
@@ -211,7 +212,7 @@ function AccountsContent() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 gap-1 text-[11px]"
+                    className="h-7 gap-1 text-xs"
                     onClick={() => confirmPending(tx.id)}
                   >
                     <Check className="size-3" /> Confirm
@@ -347,7 +348,7 @@ function HealthBadge({ health }: { health: BookmakerLeagueRow["health"] }) {
   if (health === "healthy") return null;
   if (health === "gubbed") {
     return (
-      <Badge variant="warning" className="shrink-0 text-[10px] font-normal">
+      <Badge variant="warning" className="shrink-0 text-[11px] font-normal">
         {bookmakerHealthLabel(health)}
       </Badge>
     );
@@ -355,7 +356,7 @@ function HealthBadge({ health }: { health: BookmakerLeagueRow["health"] }) {
   return (
     <Badge
       variant="outline"
-      className="shrink-0 border-muted-foreground/30 text-[10px] font-normal text-muted-foreground"
+      className="shrink-0 border-muted-foreground/30 text-[11px] font-normal text-muted-foreground"
     >
       {bookmakerHealthLabel(health)}
     </Badge>
@@ -422,7 +423,7 @@ function BookmakerLeagueCard({
           type="button"
           size="sm"
           variant="ghost"
-          className="h-6 px-2 text-[11px] text-muted-foreground"
+          className="h-6 px-2 text-xs text-muted-foreground"
           onClick={(e) => {
             e.stopPropagation();
             setHealth(row.accountId, null);
@@ -438,7 +439,7 @@ function BookmakerLeagueCard({
         size="sm"
         variant={row.droughtNudge ? "outline" : "ghost"}
         className={cn(
-          "h-6 px-2 text-[11px]",
+          "h-6 px-2 text-xs",
           row.droughtNudge ? "border-warning/40 text-warning" : "text-muted-foreground"
         )}
         onClick={(e) => {
@@ -454,7 +455,7 @@ function BookmakerLeagueCard({
   function droughtNote(row: BookmakerLeagueRow) {
     if (!row.droughtNudge) return null;
     return (
-      <span className="text-[11px] font-medium text-warning">
+      <span className="text-xs font-medium text-warning">
         No offers in {row.daysSinceLastOffer}d
       </span>
     );
@@ -480,7 +481,7 @@ function BookmakerLeagueCard({
           <span className="text-muted-foreground">–</span>
         )}
         {due?.due ? (
-          <Badge variant="warning" className="text-[10px]">
+          <Badge variant="warning" className="text-[11px]">
             Due
           </Badge>
         ) : null}
@@ -607,7 +608,7 @@ function MugPlanDialog({
           type="button"
           size="sm"
           variant="ghost"
-          className="h-6 px-2 text-[11px] text-muted-foreground"
+          className="h-6 px-2 text-xs text-muted-foreground"
           onClick={(e) => e.stopPropagation()}
         >
           {plan ? "Plan" : "Plan…"}
@@ -783,7 +784,7 @@ function AccountTable({
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-[10px] font-normal",
+                        "text-[11px] font-normal",
                         a.accessStatus === "gubbed" &&
                           "border-amber-500/40 text-amber-700 dark:text-amber-400",
                         a.accessStatus === "closed" &&
@@ -797,7 +798,7 @@ function AccountTable({
                 <span
                   className={cn(
                     "shrink-0 text-base font-semibold tabular-nums",
-                    a.balance < 0 && "text-negative"
+                    isNegativeGbp(a.balance) && "text-negative"
                   )}
                 >
                   <MoneyFlow value={a.balance} />
@@ -884,21 +885,21 @@ function AccountTable({
                 {inlineTypeBadge ? <AccountTypeBadge type={a.type} /> : null}
               </span>
               {a.fundedByAccountId && bankNameById.get(a.fundedByAccountId) ? (
-                <p className="mt-0.5 text-[11px] font-normal text-muted-foreground">
+                <p className="mt-0.5 text-xs font-normal text-muted-foreground">
                   Funded by {bankNameById.get(a.fundedByAccountId)}
                 </p>
               ) : a.notes?.trim() ? (
-                <p className="mt-0.5 line-clamp-1 text-[11px] font-normal text-muted-foreground">
+                <p className="mt-0.5 line-clamp-1 text-xs font-normal text-muted-foreground">
                   {a.notes}
                 </p>
               ) : null}
               {(a.pendingIn ?? 0) > 0 ? (
-                <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
                   +£{a.pendingIn.toFixed(2)} pending
                 </p>
               ) : null}
               {(a.wrRemaining ?? 0) > 0 ? (
-                <p className="mt-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-400">
+                <p className="mt-0.5 text-xs font-medium text-sky-700 dark:text-sky-400">
                   WR £{a.wrRemaining.toFixed(2)}
                 </p>
               ) : null}
@@ -911,7 +912,7 @@ function AccountTable({
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-[10px] font-normal",
+                    "text-[11px] font-normal",
                     a.accessStatus === "gubbed" &&
                       "border-amber-500/40 text-amber-700 dark:text-amber-400",
                     a.accessStatus === "closed" &&
@@ -931,7 +932,7 @@ function AccountTable({
             <TableCell
               className={cn(
                 "text-right font-semibold tabular-nums",
-                a.balance < 0 && "text-negative"
+                isNegativeGbp(a.balance) && "text-negative"
               )}
             >
               <MoneyFlow value={a.balance} />
@@ -1298,7 +1299,7 @@ function AccountDetailBody({
             <Label className="text-xs text-muted-foreground">Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
             {account.type === "bookie" ? (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Renaming updates bets, offers, and remembered prefs that used this name.
               </p>
             ) : null}
@@ -1345,12 +1346,12 @@ function AccountDetailBody({
 
           {account.type === "bookie" ? (
             <div className="rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300">
                 Wagering requirement
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
-                  <Label className="text-[10px] text-muted-foreground">Remaining (£)</Label>
+                  <Label className="text-[11px] text-muted-foreground">Remaining (£)</Label>
                   <Input
                     type="number"
                     min={0}
@@ -1360,7 +1361,7 @@ function AccountDetailBody({
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label className="text-[10px] text-muted-foreground">Min odds</Label>
+                  <Label className="text-[11px] text-muted-foreground">Min odds</Label>
                   <Input
                     type="number"
                     min={1}
@@ -1372,7 +1373,7 @@ function AccountDetailBody({
                 </div>
               </div>
               <div className="mt-2 flex flex-col gap-1">
-                <Label className="text-[10px] text-muted-foreground">Counts as</Label>
+                <Label className="text-[11px] text-muted-foreground">Counts as</Label>
                 <Select
                   value={wrType}
                   onValueChange={(v) => setWrType(v as typeof wrType)}
@@ -1386,7 +1387,7 @@ function AccountDetailBody({
                   </SelectContent>
                 </Select>
               </div>
-              <p className="mt-1.5 text-[10px] text-muted-foreground">
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
                 Cash qualifying bets auto-reduce WR when odds meet the minimum.
               </p>
             </div>
@@ -1403,7 +1404,7 @@ function AccountDetailBody({
                     key={lot.id}
                     className="flex items-center justify-between gap-2 rounded-md border border-violet-500/20 bg-violet-500/5 px-2.5 py-1.5"
                   >
-                    <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
                       {lot.note
                         ?.replace(/^Free bet promo - /, "")
                         .replace(/\[\[lot:\d+\]\]\s*/g, "")
@@ -1460,7 +1461,7 @@ function AccountDetailBody({
                     className="flex min-w-0 items-start justify-between gap-3 border-b border-border/50 py-1.5 last:border-0"
                   >
                     <span className="min-w-0 flex-1 overflow-hidden">
-                      <span className="block text-[11px] font-medium uppercase text-muted-foreground">
+                      <span className="block text-xs font-medium uppercase text-muted-foreground">
                         {tx.category.replace(/_/g, " ")}
                         {tx.pending ? " · pending" : ""}
                       </span>

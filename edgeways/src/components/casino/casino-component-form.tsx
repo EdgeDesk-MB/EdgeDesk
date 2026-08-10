@@ -301,7 +301,7 @@ export function CasinoComponentForm({
           </SelectContent>
         </Select>
         {componentType === "qualifying_wager" ? (
-          <p className="text-[11px] leading-snug text-muted-foreground">
+          <p className="text-xs leading-snug text-muted-foreground">
             A cost, not a reward - the deposit staked to unlock whatever else this campaign
             carries. Its EV is always £0 or below. Add another qualifying wager for the next
             stake tier on a ladder offer.
@@ -503,6 +503,7 @@ export function CasinoComponentForm({
             value={previewEv}
             signColor
             signDisplay
+            estimate
             className="text-sm font-semibold tabular-nums"
           />
         </p>

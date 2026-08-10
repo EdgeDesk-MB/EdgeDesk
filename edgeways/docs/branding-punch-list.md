@@ -107,7 +107,7 @@ Files with the most hardcoded palette classes (`emerald-/amber-/violet-/rose-/sk
 | --- | --- | --- |
 | `app/calculators/ep-desk/page.tsx` | 28 | ✅ swept — money/EV positives now `moneyPositiveClass`; remaining amber/violet/blue are market-column + model-check semantics (deliberate) |
 | `app/accounts/page.tsx` | 18 | Reviewed — amber/sky/violet are account-status + free-bet semantics; free-bet violet stays until the D5 tidy |
-| `components/racing/flashscore-racecard.tsx` | 16 | Reviewed — bookmaker brand chips stay bespoke (deliberate) |
+| `components/racing/desk-racecard.tsx` | 16 | Reviewed — bookmaker brand chips stay bespoke (deliberate) |
 | `components/add-bet-dialog.tsx` | 14 | Reviewed — free-bet violet stays until the D5 tidy |
 | `components/offers/offer-pipeline-strip.tsx` | 12 | **Deliberate** — pipeline stage palette, leave |
 | `components/offers/offer-day-calendar.tsx` | 10 | ✅ swept — Est. EV greens now `moneyPositiveClass`; rose/amber/sky bars are offer-category palette (deliberate) |

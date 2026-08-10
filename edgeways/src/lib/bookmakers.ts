@@ -25,6 +25,7 @@ export const UK_BOOKMAKERS = [
   "CopyBet",
   "Coral",
   "DAZN Bet",
+  "Dynobet",
   "FanTeam",
   "Grosvenor Sport",
   "Hollywoodbets",
@@ -86,6 +87,7 @@ export function matchBookmakerFromText(text: string): string | null {
     if (/\bsky\s*bet\b/i.test(text)) return "Sky Bet";
     if (/\bpaddy\b/i.test(text)) return "Paddy Power";
     if (/\bwilliam\s*hill\b|\bwh\b/i.test(text)) return "William Hill";
+    if (/\bdynobet\b/i.test(text)) return "Dynobet";
   }
   return best;
 }

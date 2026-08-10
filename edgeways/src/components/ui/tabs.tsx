@@ -35,7 +35,10 @@ const tabsListVariants = cva(
         default: "bg-muted",
         line: "h-auto gap-6 rounded-none border-0 bg-transparent p-0",
         segmented: cn(
-          "box-border h-auto w-fit gap-0.5 rounded-full bg-muted/60 p-0.5",
+          // Override base `group-data-horizontal/tabs:h-8` or py is crushed to 0.
+          "box-border h-auto w-fit gap-0.5 group-data-horizontal/tabs:h-auto bg-muted/60",
+          "rounded-[var(--segmented-radius)]",
+          "px-[var(--segmented-track-pad-x)] py-[var(--segmented-track-pad)]",
           "ring-1 ring-border/35",
           "dark:bg-input/30 dark:ring-border/50"
         ),
@@ -47,38 +50,59 @@ const tabsListVariants = cva(
   }
 )
 
-function TabsLineList({
+/**
+ * Horizontal tab strips scroll with drag-to-pan + edge fades when they
+ * overflow; no scrollbar. When every tab fits, overflow is inert (no fade).
+ */
+function TabsScrollList({
   className,
+  variant = "default",
   fadeClassName = "from-card",
   children,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.List> & { fadeClassName?: string }) {
+}: React.ComponentProps<typeof TabsPrimitive.List> &
+  VariantProps<typeof tabsListVariants> & { fadeClassName?: string }) {
   const listRef = React.useRef<HTMLDivElement>(null)
+  const isLine = variant === "line"
   const indicator = useSlidingIndicator(
     listRef,
     '[data-slot="tabs-trigger"][data-state="active"], [data-slot="tabs-trigger"][data-active]'
   )
 
+  const isSegmented = variant === "segmented"
+
   return (
     <ScrollFadeEdges
       orientation="horizontal"
       dragToScroll
-      className="w-full flex-none"
-      scrollClassName="app-scroll-overlay overflow-x-auto pl-6 pr-6"
+      className={cn(
+        "w-full flex-none",
+        isSegmented && "rounded-[var(--segmented-radius)]"
+      )}
+      scrollClassName={cn(
+        "app-scroll-overlay overflow-x-auto",
+        // Match card content inset when TabsLineBar bleeds; Racing Desk
+        // (no bleed, px-0 CardContent) also lands on --card-spacing.
+        isLine ? "px-(--card-spacing)" : undefined,
+        isSegmented && "rounded-[var(--segmented-radius)]"
+      )}
       fadeClassName={fadeClassName}
     >
       <TabsPrimitive.List
         ref={listRef}
         data-slot="tabs-list"
-        data-variant="line"
+        data-variant={variant ?? "default"}
         className={cn(
-          tabsListVariants({ variant: "line" }),
-          "relative w-max",
+          tabsListVariants({ variant }),
+          // w-max grows with tabs; min-w-full keeps few segmented tabs stretched.
+          "relative w-max min-w-full",
+          // Beat base `rounded-lg` / fixed h-8 from the shared list recipe.
+          isSegmented && "h-auto rounded-full group-data-horizontal/tabs:h-auto",
           className
         )}
         {...props}
       >
-        {indicator.ready ? (
+        {isLine && indicator.ready ? (
           <span
             aria-hidden
             className="pointer-events-none absolute bottom-0 z-[1] h-0.5 bg-highlight motion-reduce:transition-none"
@@ -98,47 +122,72 @@ function TabsLineList({
 function TabsList({
   className,
   variant = "default",
-  /** Scroll-fade gradient source for variant="line" - match the surface the tab strip sits on. */
+  /** Scroll-fade gradient source — match the surface the tab strip sits on. */
   fadeClassName = "from-card",
+  orientation,
   children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
-  VariantProps<typeof tabsListVariants> & { fadeClassName?: string }) {
-  // Underline tab strips can outgrow their container (Settings, fixture
-  // filters, ...) - scroll horizontally with a fade cue instead of wrapping
-  // or clipping, and never show a scrollbar (line tabs read as app chrome).
-  if (variant === "line") {
+  VariantProps<typeof tabsListVariants> & {
+    fadeClassName?: string
+    orientation?: "horizontal" | "vertical"
+  }) {
+  // Vertical lists never overflow horizontally — keep the plain Radix list.
+  if (orientation === "vertical") {
     return (
-      <TabsLineList className={className} fadeClassName={fadeClassName} {...props}>
+      <TabsPrimitive.List
+        data-slot="tabs-list"
+        data-variant={variant ?? "default"}
+        className={cn(tabsListVariants({ variant }), className)}
+        {...props}
+      >
         {children}
-      </TabsLineList>
+      </TabsPrimitive.List>
     )
   }
 
   return (
-    <TabsPrimitive.List
-      data-slot="tabs-list"
-      data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+    <TabsScrollList
+      className={className}
+      variant={variant}
+      fadeClassName={fadeClassName}
       {...props}
     >
       {children}
-    </TabsPrimitive.List>
+    </TabsScrollList>
   )
 }
 
 const segmentedTrigger = cn(
   "group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-200 group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5",
-  /* Active ink + brand type — keep brand text on hover/focus (no dark-on-dark) */
-  "group-data-[variant=segmented]/tabs-list:data-active:bg-chip group-data-[variant=segmented]/tabs-list:data-active:font-semibold group-data-[variant=segmented]/tabs-list:data-active:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:shadow-[var(--ew-chip-shadow)] group-data-[variant=segmented]/tabs-list:data-active:hover:bg-chip group-data-[variant=segmented]/tabs-list:data-active:hover:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:active:bg-chip group-data-[variant=segmented]/tabs-list:data-active:active:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:focus-visible:text-brand-text group-data-[variant=segmented]/tabs-list:data-active:[&_svg]:text-brand-text",
-  /* Brand focus ring that follows the pill radius */
-  "group-data-[variant=segmented]/tabs-list:focus-visible:border-transparent group-data-[variant=segmented]/tabs-list:focus-visible:outline-none group-data-[variant=segmented]/tabs-list:focus-visible:ring-2 group-data-[variant=segmented]/tabs-list:focus-visible:ring-brand/60 group-data-[variant=segmented]/tabs-list:focus-visible:ring-offset-2 group-data-[variant=segmented]/tabs-list:focus-visible:ring-offset-page"
+  /* Active solid brand plate — same filled-accent recipe as FilterPill */
+  "group-data-[variant=segmented]/tabs-list:data-active:bg-brand group-data-[variant=segmented]/tabs-list:data-active:font-semibold group-data-[variant=segmented]/tabs-list:data-active:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:shadow-[var(--ew-chip-shadow)] group-data-[variant=segmented]/tabs-list:data-active:hover:bg-brand group-data-[variant=segmented]/tabs-list:data-active:hover:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:active:bg-brand group-data-[variant=segmented]/tabs-list:data-active:active:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:focus-visible:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:[&_svg]:text-brand-foreground",
+  /* Inset focus ring — offset rings balloon the active pill inside the track */
+  "group-data-[variant=segmented]/tabs-list:focus-visible:border-transparent group-data-[variant=segmented]/tabs-list:focus-visible:outline-none group-data-[variant=segmented]/tabs-list:focus-visible:ring-2 group-data-[variant=segmented]/tabs-list:focus-visible:ring-inset group-data-[variant=segmented]/tabs-list:focus-visible:ring-brand/60 group-data-[variant=segmented]/tabs-list:focus-visible:ring-offset-0"
 )
 
+/** Press longer than this is hold/scroll intent — do not select the tab. */
+const TAB_HOLD_MS = 200
+/** Pointer movement (px) before a press is treated as a drag, not a click. */
+const TAB_DRAG_EPS = 4
+
+/**
+ * Radix selects on mousedown. We defer to a clean click so click-and-hold
+ * (scroll intent) and drag-to-pan never change the active tab. App-wide.
+ */
 function TabsTrigger({
   className,
+  onMouseDown,
+  onClick,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+  const downRef = React.useRef<{ t: number; x: number; y: number } | null>(null)
+  const cancelRef = React.useRef(false)
+  const commitRef = React.useRef(false)
+
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
@@ -151,6 +200,64 @@ function TabsTrigger({
         className
       )}
       {...props}
+      onMouseDown={(e) => {
+        onMouseDown?.(e)
+        // Allow one synthetic mousedown through so Radix can commit a clean click.
+        if (commitRef.current) return
+        // Block Radix select-on-press; hold/drag must not change the tab.
+        if (e.button === 0 && !e.ctrlKey) {
+          e.preventDefault()
+          downRef.current = { t: performance.now(), x: e.clientX, y: e.clientY }
+          cancelRef.current = false
+        }
+      }}
+      onPointerMove={(e) => {
+        onPointerMove?.(e)
+        const down = downRef.current
+        if (!down || cancelRef.current) return
+        if (
+          Math.abs(e.clientX - down.x) > TAB_DRAG_EPS ||
+          Math.abs(e.clientY - down.y) > TAB_DRAG_EPS
+        ) {
+          cancelRef.current = true
+        }
+      }}
+      onPointerUp={(e) => {
+        onPointerUp?.(e)
+        const down = downRef.current
+        if (down && performance.now() - down.t >= TAB_HOLD_MS) {
+          cancelRef.current = true
+        }
+        downRef.current = null
+      }}
+      onPointerCancel={(e) => {
+        onPointerCancel?.(e)
+        cancelRef.current = true
+        downRef.current = null
+      }}
+      onClick={(e) => {
+        onClick?.(e)
+        if (e.defaultPrevented) return
+        if (cancelRef.current) {
+          cancelRef.current = false
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+        // Clean click — re-enter Radix's mousedown selection path.
+        // Do not focus() here: programmatic focus after click makes segmented
+        // pills look oversized (focus ring) and confuses keyboard tab order.
+        commitRef.current = true
+        e.currentTarget.dispatchEvent(
+          new MouseEvent("mousedown", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            view: window,
+          })
+        )
+        commitRef.current = false
+      }}
     />
   )
 }
@@ -173,9 +280,8 @@ export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
 /**
  * Full-width bottom rule for underline tab rows - active indicator sits on
  * this line. Bleeds to the true edge with no re-added inset: the line-variant
- * TabsList owns its own leading/trailing space (see TabsList) so that space
- * lives inside the scrollable region and fades correctly, instead of sitting
- * outside it as a fixed gap.
+ * TabsList owns leading/trailing space via `px-(--card-spacing)` so that
+ * space lives inside the scrollable region and fades correctly.
  */
 export function TabsLineBar({
   className,

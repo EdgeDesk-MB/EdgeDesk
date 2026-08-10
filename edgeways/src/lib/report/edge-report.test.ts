@@ -56,6 +56,7 @@ function bet(over: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     quickLogged: null,
     source: null,
     purpose: null,
+    sport: null,
     ...over,
   };
 }

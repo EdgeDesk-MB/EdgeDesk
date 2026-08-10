@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -15,17 +14,12 @@ import {
   type ReleaseNoteKind,
 } from "@/content/release-notes";
 import { ROADMAP_VERSION } from "@/content/roadmap";
+import { filterPillState } from "@/lib/ui/surface-styles";
 import { ArrowUpRight, ScrollText } from "lucide-react";
 
-function kindBadgeVariant(kind: ReleaseNoteKind): "default" | "secondary" | "outline" {
-  switch (kind) {
-    case "feature":
-      return "default";
-    case "improvement":
-      return "secondary";
-    case "fix":
-      return "outline";
-  }
+/** New = active Retained-style plate; Improved / Fixed = muted chip. */
+function kindPillActive(kind: ReleaseNoteKind): boolean {
+  return kind === "feature";
 }
 
 function formatGroupDate(date: string): string {
@@ -60,20 +54,21 @@ export default function ReleaseNotesPage() {
               <CardDescription>{group.summary}</CardDescription>
             </CardHeader>
             <CardContent>
-              <ul className="flex flex-col gap-2.5">
+              <ul className="flex flex-col gap-3.5">
                 {group.entries.map((entry, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm">
-                    <Badge
-                      variant={kindBadgeVariant(entry.kind)}
-                      className="mt-0.5 shrink-0 text-[10px]"
-                    >
-                      {RELEASE_NOTE_KIND_LABELS[entry.kind]}
-                    </Badge>
-                    <span className="min-w-0 leading-snug">
+                  <li key={i} className="flex flex-col items-start gap-1 text-sm">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={filterPillState(kindPillActive(entry.kind), {
+                          compact: true,
+                        })}
+                      >
+                        {RELEASE_NOTE_KIND_LABELS[entry.kind]}
+                      </span>
                       {entry.href ? (
                         <Link
                           href={entry.href}
-                          className="inline-flex items-center gap-0.5 align-baseline font-medium text-primary-text underline-offset-2 hover:underline"
+                          className="inline-flex items-center gap-0.5 font-medium text-primary-text underline-offset-2 hover:underline"
                           aria-label={`Open ${entry.area}`}
                         >
                           {entry.area}
@@ -82,9 +77,10 @@ export default function ReleaseNotesPage() {
                       ) : (
                         <span className="font-medium">{entry.area}</span>
                       )}
-                      {" · "}
-                      <span className="text-muted-foreground">{entry.text}</span>
-                    </span>
+                    </div>
+                    <p className="min-w-0 leading-snug text-muted-foreground">
+                      {entry.text}
+                    </p>
                   </li>
                 ))}
               </ul>

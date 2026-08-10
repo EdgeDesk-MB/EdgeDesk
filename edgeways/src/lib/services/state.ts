@@ -14,10 +14,13 @@ import {
   isDemoMode,
   mugPlans,
   offerEffortSamples,
+  offers,
   type BetRow,
   type EventRow,
   type HistoryRow,
 } from "@/lib/db";
+import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
+import { isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
 import {
   backfillMissingCasinoOfferBalances,
   ledgerFromSettledBet,
@@ -26,6 +29,14 @@ import {
   ledgerPromoAward,
 } from "@/lib/services/balances";
 import { computePnlBuckets } from "@/lib/pnl/pnl-buckets";
+import {
+  accaCampaignSettledProfit,
+  activeAccaDeskLayBetIds,
+  completedAccaDeskLinkedBetIds,
+  completedAccaSeriesPoints,
+  isDeferredAccaDeskLaySettlement,
+  sumAccaSquareProvisional,
+} from "@/lib/pnl/acca-provisional";
 import { countBoostsNeedingAction } from "@/lib/services/boosts";
 import type { BalanceSummary } from "@/lib/services/balances.types";
 import { simStateAt, type SimGoal } from "./sim";
@@ -49,7 +60,10 @@ import {
 } from "@/lib/services/exchange";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
-import { freeBetEffectsForBet } from "@/lib/offers/early-free-bet-award";
+import {
+  freeBetAwardPhrase,
+  freeBetEffectsForBet,
+} from "@/lib/offers/early-free-bet-award";
 import {
   betWinRuleForBet,
   evaluateFreeBetAward,
@@ -59,6 +73,7 @@ import {
   provisionalProfit,
   settleBet,
   settleFromOutcome,
+  racingMarketReadyToSettle,
   settleRacingBet,
   triggerIfEndedNow,
   type DutchLegRecord,
@@ -69,7 +84,12 @@ import {
   type TriggerRule,
 } from "@/lib/calc";
 import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
-import { parseRaceResults, racingEventStatusDetail, selectionPosition } from "@/lib/racing";
+import {
+  isRaceResultIncomplete,
+  parseRaceResults,
+  racingEventStatusDetail,
+  selectionPosition,
+} from "@/lib/racing";
 import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes";
 import { formatRacingEventTitle } from "@/lib/events";
 import { formatEventTitle, racingVenueLabel } from "@/lib/events";
@@ -79,9 +99,32 @@ import {
   liveModelForEvent,
 } from "@/lib/calc/ep/live-model";
 import { getHistoryFeed, getChartAnnotationHistory } from "@/lib/services/history-feed";
+import { maybeSendDailyTasksDigest } from "@/lib/services/daily-tasks-digest";
 import { maybeSendWeeklyDigest } from "@/lib/services/weekly-digest";
 import { maybePollEmailIntake } from "@/lib/services/email-intake";
-import { autoResultLinkedLegs, legDueState, listAccaRuns, maybeAccaLayDueAlerts } from "@/lib/services/acca-desk";
+import {
+  formatAccaHistoryDetail,
+  formatAccaPlacedTitle,
+  formatAccaSettlementTitle,
+  formatSettlementTitleWithFreeBet,
+} from "@/lib/history-display";
+import {
+  autoResultLinkedLegs,
+  legDueState,
+  listAccaRuns,
+  maybeAccaLayDueAlerts,
+  pendingAccaRacingEventIds,
+} from "@/lib/services/acca-desk";
+import {
+  autoResultBetBuilderSelections,
+  betBuilderLayDue,
+  maybeBetBuilderLayDueAlerts,
+  pendingBetBuilderRacingEventIds,
+} from "@/lib/services/bet-builder-desk";
+import {
+  autoResultLinkedSystemLegs,
+  pendingSystemRacingEventIds,
+} from "@/lib/services/systems-desk";
 import { recordAlerts } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
 import { fireDueUserReminders } from "@/lib/services/user-reminders";
@@ -90,17 +133,20 @@ import {
   needsResultBackfill,
   shouldFetchGoalTimeline,
 } from "@/lib/live-poll-rules";
-import { medianEffortByKind } from "@/lib/offers/effort";
+import { openBetCoversRacingEvent } from "@/lib/alerts/race-open-bet-coverage";
 import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
 import { repairMisparsedPlaceFreeBetTriggers } from "@/lib/offers/repair-place-free-bet-triggers";
 import { repairInventedPlaceRulesOnUnconditionalOffers } from "@/lib/offers/repair-invented-place-rules";
+import { repairMismatchedTitlePlaceRules } from "@/lib/offers/repair-title-place-rules";
 import { syncCasinoOfferSeriesInstances } from "@/lib/offers/casino-offer-recurrence";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { getRealizedRetention } from "@/lib/services/retention";
+import { medianEffortByKind } from "@/lib/offers/effort";
 import { unreadCount } from "@/lib/services/alerts-inbox";
+import { formatLivePositionTriggerNote } from "@/lib/services/live-position-note";
 
 export type {
   AppState,
@@ -329,7 +375,12 @@ async function refreshApiEvents(): Promise<void> {
 
 /** Refresh tracked horse-racing events with results from The Racing API. */
 async function refreshRacingApiEvents(): Promise<{ updated: number; settledLabels: string[] }> {
-  const r1 = await syncRacingResultsForOpenBets();
+  const deskRacingEventIds = [
+    ...pendingAccaRacingEventIds(),
+    ...pendingSystemRacingEventIds(),
+    ...pendingBetBuilderRacingEventIds(),
+  ];
+  const r1 = await syncRacingResultsForOpenBets(deskRacingEventIds);
   const r2 = await syncRecentTrackedRacingResults();
 
   return {
@@ -389,6 +440,8 @@ function autoSettle(): void {
 
   for (const bet of openBets) {
     if (hasBetWinTrigger(bet)) continue; // bet-win triggers settle via the trigger engine
+    // Desk owns Acca / Bet Builder hedges — do not settle them ahead of desk legs.
+    if (isAccaDeskLay(bet) || isBetBuilderDeskLay(bet)) continue;
     const event = bet.eventId ? byId.get(bet.eventId) : undefined;
     if (!event || event.status !== "finished") continue;
 
@@ -396,7 +449,10 @@ function autoSettle(): void {
     if (event.sport === "horse_racing") {
       const race = parseRaceResults(event.goals);
       if (!race) continue;
-      outcome = settleRacingBet(toSettleable(bet), race);
+      const settleable = toSettleable(bet);
+      // Fast result: win markets settle on winner-only; place/EW wait for placings.
+      if (!racingMarketReadyToSettle(settleable.market, race)) continue;
+      outcome = settleRacingBet(settleable, race);
     } else {
       outcome = settleBet(toSettleable(bet), toMatchResult(event));
     }
@@ -461,7 +517,7 @@ function processAiEffects(): void {
       if (!event || event.status !== "finished" || event.sport !== "horse_racing") continue;
 
       const race = parseRaceResults(event.goals);
-      if (!race) continue;
+      if (!race || isRaceResultIncomplete(race)) continue;
 
       const verdict = evaluateFreeBetAward(effect, bet.selection, race);
       if (verdict.met) ledgerPromoAward(bet, effect.amount, verdict.reason);
@@ -470,13 +526,19 @@ function processAiEffects(): void {
 }
 
 /**
- * Live commentary feed (Flashscore-style): kick-offs, goals with scorers, 2UP
+ * Live commentary feed (desk-style): kick-offs, goals with scorers, 2UP
  * triggers, full times, and bet settlements. Entries are written idempotently -
  * every fact has a natural dedupe key - so this can run on every poll.
  */
 function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
   const now = Date.now();
   const eventById = new Map(allEvents.map((e) => [e.id, e]));
+  const betsById = new Map(allBets.map((b) => [b.id, b]));
+  const accaByBackId = new Map(
+    listAccaRuns()
+      .filter((b) => b.run.backBetId != null)
+      .map((b) => [b.run.backBetId!, b])
+  );
   const put = (row: Omit<typeof history.$inferInsert, "createdAt"> & { createdAt?: number }) => {
     db.insert(history)
       .values({ createdAt: now, ...row })
@@ -616,48 +678,88 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
   }
 
   const promoAwards = getPromoAwardsByBetId();
+  const offerTitleById = new Map(
+    db
+      .select({ id: offers.id, title: offers.title })
+      .from(offers)
+      .all()
+      .map((o) => [o.id, o.title])
+  );
 
   for (const bet of allBets) {
+    // Acca / Bet Builder desk lays are campaign hedges. They stay on the desk
+    // (+ Profit Tracker) while the run is live — do not narrate them in History.
+    if (isAccaDeskLay(bet) || isBetBuilderDeskLay(bet)) {
+      db.delete(history).where(eq(history.betId, bet.id)).run();
+      continue;
+    }
+
     const linkedEvent = bet.eventId ? eventById.get(bet.eventId) : undefined;
+    const accaBundle = isAccaDeskBack(bet) ? accaByBackId.get(bet.id) : undefined;
+    const accaDetail = accaBundle
+      ? formatAccaHistoryDetail(accaBundle.run, accaBundle.legs)
+      : null;
     upsert({
       dedupe: `bet-placed:${bet.id}`,
       kind: "bet_placed",
       betId: bet.id,
       eventId: bet.eventId,
-      title:
-        bet.betType === "free_snr" || bet.betType === "free_sr"
+      title: accaBundle
+        ? formatAccaPlacedTitle(bet.betType)
+        : bet.betType === "free_snr" || bet.betType === "free_sr"
           ? "Free bet placed"
           : "Bet placed",
-      detail: bet.label,
+      detail: accaDetail ?? bet.label,
       createdAt: bet.createdAt,
     });
 
     if (bet.status === "open" || !bet.settledAt) continue;
     const promo = promoAwards[bet.id];
-    const title =
-      bet.status === "won"
-        ? "Bet won"
-        : bet.status === "lost"
-          ? promo
-            ? "Bet lost · Free bet won!"
-            : "Bet lost"
-          : bet.status === "early_payout"
-            ? "2UP paid early"
-            : bet.status === "half_win"
-              ? "Bet half won"
-              : bet.status === "half_lose"
-                ? "Bet half lost"
-                : bet.status === "push"
-                  ? "Bet push"
-                  : "Bet void";
-    let detail = bet.label;
-    if (promo) {
+    const offerTitle =
+      (bet.offerId != null ? offerTitleById.get(bet.offerId) : null) ??
+      (accaBundle?.run.offerId != null
+        ? offerTitleById.get(accaBundle.run.offerId)
+        : null) ??
+      accaBundle?.run.label ??
+      null;
+    const freeBetPhrase = promo ? freeBetAwardPhrase(bet, offerTitle) : null;
+    const title = accaBundle
+      ? formatAccaSettlementTitle(bet.status, promo, freeBetPhrase ?? undefined)
+      : promo && freeBetPhrase && (bet.status === "won" || bet.status === "lost")
+        ? formatSettlementTitleWithFreeBet(bet.status, freeBetPhrase)
+        : bet.status === "won"
+          ? "Bet won"
+          : bet.status === "lost"
+            ? "Bet lost"
+            : bet.status === "early_payout"
+              ? "2UP paid early"
+              : bet.status === "half_win"
+                ? "Bet half won"
+                : bet.status === "half_lose"
+                  ? "Bet half lost"
+                  : bet.status === "push"
+                    ? "Bet push"
+                    : "Bet void";
+    // Acca: campaign second-line (promo already surfaces in the title).
+    // Ordinary bets: embed promo in detail when present (subtitle may strip it).
+    let detail = accaDetail ?? bet.label;
+    if (promo && !accaDetail) {
       detail = `${bet.label} · ${formatPromoTooltip(promo.amount, promo.reason)}`;
     }
     const settlementTime =
       linkedEvent?.sport === "horse_racing" && linkedEvent.startTime
         ? linkedEvent.startTime
         : bet.settledAt;
+    // Acca lays are History-silent: the back row carries the consolidated
+    // campaign P&L so History matches the Home chart marker / series step.
+    let amount: number | null =
+      bet.status === "void" || bet.status === "push" ? null : bet.actualProfit;
+    if (
+      amount != null &&
+      accaBundle?.run.status === "completed"
+    ) {
+      amount = accaCampaignSettledProfit(accaBundle, betsById) ?? amount;
+    }
     upsert({
       dedupe: `bet:${bet.id}:${bet.settledAt}`,
       kind: "settlement",
@@ -665,7 +767,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
       eventId: bet.eventId,
       title,
       detail,
-      amount: bet.status === "void" || bet.status === "push" ? null : bet.actualProfit,
+      amount,
       createdAt: settlementTime,
     });
   }
@@ -718,15 +820,22 @@ export async function getAppState(): Promise<AppState> {
   // Clear place targets the editor invented on straight bet & get (stops Best
   // plays / favourite-frame copy on unconditional rewards).
   repairInventedPlaceRulesOnUnconditionalOffers();
+  // Heal title ↔ rules place mismatches: restore subset corruption from the
+  // title, or rewrite a stale OCR title when the user edited places in rules.
+  repairMismatchedTitlePlaceRules();
   processAiEffects();
   syncOfferSeriesInstances();
   syncCasinoOfferSeriesInstances();
   syncOfferStatuses();
   backfillOffersFromBets();
   maybeSendWeeklyDigest();
+  maybeSendDailyTasksDigest();
   maybePollEmailIntake();
   autoResultLinkedLegs();
+  autoResultLinkedSystemLegs();
+  autoResultBetBuilderSelections();
   maybeAccaLayDueAlerts();
+  maybeBetBuilderLayDueAlerts();
   // User-set "check free spins tomorrow" style reminders → inbox + push.
   fireDueUserReminders(now);
 
@@ -744,8 +853,19 @@ export async function getAppState(): Promise<AppState> {
     racingAutopilot.push({ id: noticeId++, message: `Race settled: ${label}` });
   }
 
+  // Acca desk: mid-run lay settlements stay off settled P&L until the run
+  // finishes; when square, campaign worst/locked floor lives in provisional.
+  // Completed runs fold back + lays into one series step (same-ms final settle
+  // otherwise draws a vertical drop/spike on the Home chart).
+  const accaBundles = listAccaRuns();
+  const deferredAccaLayIds = activeAccaDeskLayBetIds(accaBundles);
+  const completedAccaBetIds = completedAccaDeskLinkedBetIds(accaBundles);
+  const betsById = new Map(allBets.map((b) => [b.id, b]));
+
   const settled = allBets
     .filter((b) => b.status !== "open" && b.status !== "void" && b.actualProfit != null)
+    .filter((b) => !isDeferredAccaDeskLaySettlement(b, deferredAccaLayIds))
+    .filter((b) => !completedAccaBetIds.has(b.id))
     .sort((a, b) => (a.settledAt ?? a.createdAt) - (b.settledAt ?? b.createdAt));
 
   const allCasinoOffers = db.select().from(casinoOffers).all();
@@ -767,17 +887,26 @@ export async function getAppState(): Promise<AppState> {
     .all();
 
   const pnlBuckets = computePnlBuckets({
-    bets: allBets,
+    bets: allBets.filter((b) => !isDeferredAccaDeskLaySettlement(b, deferredAccaLayIds)),
     casinoOffers: allCasinoOffers,
     adjustments: balanceAdjustments,
   });
 
   type PnlPoint = { time: number; profit: number; commission: number };
+  const accaSeriesPoints = completedAccaSeriesPoints(accaBundles, betsById, (id) => {
+    const b = betsById.get(id);
+    return b ? commissionPaidOnSettledBet(b) : 0;
+  });
   const allPnlPoints: PnlPoint[] = [
     ...settled.map((b) => ({
       time: b.settledAt ?? b.createdAt,
       profit: b.actualProfit!,
       commission: commissionPaidOnSettledBet(b),
+    })),
+    ...accaSeriesPoints.map((p) => ({
+      time: p.time,
+      profit: p.profit,
+      commission: p.commission,
     })),
     ...casinoSettlements.map((c) => ({
       time: c.time,
@@ -814,6 +943,9 @@ export async function getAppState(): Promise<AppState> {
       .filter((b) => b.eventId === eventId && b.status === "open" && b.expectedProfit != null)
       .reduce((s, b) => s + (b.expectedProfit ?? 0), 0);
 
+  const offerSummaries = listOfferSummaries();
+  const offersById = new Map(offerSummaries.map((o) => [o.id, o]));
+
   const planRaces = allEvents
     .filter(
       (e) =>
@@ -825,7 +957,13 @@ export async function getAppState(): Promise<AppState> {
       offTime: e.startTime,
       resultLogged: e.status === "finished" || parseRaceResults(e.goals) != null,
       openExpected: Math.round(openExpectedFor(e.id) * 100) / 100 || null,
-      hasOpenBet: allBets.some((b) => b.eventId === e.id && b.status === "open"),
+      hasOpenBet: allBets.some((b) =>
+        openBetCoversRacingEvent(
+          b,
+          e,
+          b.offerId != null ? offersById.get(b.offerId) : undefined
+        )
+      ),
     }));
 
   const planFixtures = allEvents
@@ -854,6 +992,10 @@ export async function getAppState(): Promise<AppState> {
   for (const bet of allBets.filter((b) => b.status === "open")) {
     const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
     if (!event || event.status !== "live") continue;
+    // Acca desk hedges/backs: campaign floor via sumAccaSquareProvisional —
+    // never live-value the individual lay (would double-count vs cover ≈ £0).
+    if (isAccaDeskLay(bet) || isAccaDeskBack(bet)) continue;
+
     const rule = parseRule(bet);
     const snapshotProvisional = rule
       ? triggerProvisional(bet, rule, event)
@@ -875,12 +1017,11 @@ export async function getAppState(): Promise<AppState> {
       provisionalTotal += provisional;
       liveValuedBetIds.add(bet.id);
     }
-    const triggerNote =
-      rule && bet.triggerText
-        ? `wins IF ${bet.triggerText} - ${evaluateTrigger(rule, toTriggerContext(event)).reason}`
-        : bet.triggerText
-          ? `wins IF ${bet.triggerText} (manual settle)`
-          : null;
+    const triggerNote = formatLivePositionTriggerNote(
+      bet,
+      rule,
+      toTriggerContext(event)
+    );
     const eventStatusLabel =
       event.sport === "horse_racing"
         ? racingEventStatusDetail(event.goals)
@@ -904,9 +1045,12 @@ export async function getAppState(): Promise<AppState> {
   // Pre-result open bets: count worst-case guaranteed (e.g. free-bet conversion).
   for (const bet of allBets.filter((b) => b.status === "open")) {
     if (liveValuedBetIds.has(bet.id)) continue;
+    // Acca desk backs/lays: campaign provisional is summed below when square.
+    if (isAccaDeskLay(bet) || isAccaDeskBack(bet)) continue;
     const expected = openBetExpectedProfit(bet);
     if (expected != null) provisionalTotal += expected;
   }
+  provisionalTotal += sumAccaSquareProvisional(accaBundles);
   provisionalTotal = Math.round(provisionalTotal * 100) / 100;
 
   const promoAwards = getPromoAwardsByBetId();
@@ -985,6 +1129,7 @@ export async function getAppState(): Promise<AppState> {
     effortMeasured,
     mugPlans: mugPlanRows,
     accaLayDue,
+    betBuilderLayDue: betBuilderLayDue(),
     alertsUnread: unreadCount(),
     boostsOpen: countBoostsNeedingAction(),
     casinoNeedsAction: db
@@ -1011,6 +1156,6 @@ export async function getAppState(): Promise<AppState> {
     racingAutopilot,
     settings,
     balances: getBalanceSummary(),
-    offers: listOfferSummaries(),
+    offers: offerSummaries,
   };
 }

@@ -1,0 +1,14 @@
+---
+description: No sub-11px UI type; XSmall floor for Edgeways
+globs: src/app/**,src/components/**,src/lib/ui/**
+alwaysApply: false
+---
+
+# Micro typography floor
+
+- **Never ship UI copy at 10px or smaller** (`text-[10px]`, `text-[9px]`, `text-[8px]`, or equivalent `font-size`).
+- **Ideal XSmall is 12px** (`text-xs`). Use this for captions, dense meta, uppercase section labels, and campaign card micro labels.
+- **11px (`text-[11px]`) is the absolute minimum** — counters, compact filter pills, tier tags only when 12px truly will not fit.
+- Prefer tokens in `src/lib/ui/surface-styles.ts` (`sectionDescription`, `captionHeading`, `tableHeaderCell`, `brandChipCount`, `proNavTag`, `edgeNavTag`, `filterPillState`) over ad-hoc pixel sizes.
+- Inline icons in lock-ups with XSmall text should track the type (typically `size-3`, not `size-2.5`). Decorative chrome (tooltip arrows, non-text gutters) is exempt.
+- Full note: `docs/design-system.md` → “Type scale floor (micro copy)”.

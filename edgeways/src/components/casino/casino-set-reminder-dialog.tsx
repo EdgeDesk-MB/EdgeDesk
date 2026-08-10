@@ -15,7 +15,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { DatePicker, formatYmdLocal } from "@/components/date-picker";
@@ -109,12 +108,17 @@ export function CasinoSetReminderDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="gap-1.5">
-          <Bell className="size-3.5" aria-hidden />
-          Set reminder
-        </Button>
-      </DialogTrigger>
+      {/* Controlled open (not DialogTrigger) so the Button stays on the Press path
+          and matches sibling outline sm actions for height / face / press. */}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setOpen(true)}
+      >
+        <Bell className="size-3.5" aria-hidden />
+        Set reminder
+      </Button>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Set your reminder</DialogTitle>
@@ -190,16 +194,16 @@ export function CasinoPendingReminders({
   const pending = offer.reminders ?? [];
   if (pending.length === 0) return null;
 
-  async function cancel(id: number) {
+  async function remove(id: number) {
     try {
       await api("/api/reminders", { method: "DELETE", json: { id } });
       onChanged({
         ...offer,
         reminders: (offer.reminders ?? []).filter((r) => r.id !== id),
       });
-      toast.success("Reminder cancelled");
+      toast.success("Reminder removed");
     } catch (e) {
-      toast.error("Could not cancel reminder", { description: String(e) });
+      toast.error("Could not remove reminder", { description: String(e) });
     }
   }
 
@@ -208,9 +212,13 @@ export function CasinoPendingReminders({
       {pending.map((r) => (
         <div
           key={r.id}
-          className="flex items-start justify-between gap-2 rounded-md border border-dashed border-border/70 bg-muted/20 px-2.5 py-1.5 text-[11px]"
+          className="flex items-start gap-2.5 rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-2.5 text-xs"
         >
-          <div className="min-w-0">
+          <Bell
+            className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
             <p className="font-medium text-foreground">
               Reminder · {formatReminderWhen(r.remindAt)}
             </p>
@@ -220,10 +228,10 @@ export function CasinoPendingReminders({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 shrink-0 px-2 text-[11px]"
-            onClick={() => void cancel(r.id)}
+            className="h-7 shrink-0 px-2 text-xs"
+            onClick={() => void remove(r.id)}
           >
-            Cancel
+            Remove
           </Button>
         </div>
       ))}

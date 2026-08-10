@@ -33,6 +33,8 @@ const buttonVariants = cva(
           "skeuo-solid border-transparent bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 active:shadow-[var(--ew-btn-shadow-pressed)] dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         success:
           "skeuo-solid border-transparent bg-success/15 text-success hover:bg-success/25 active:shadow-[var(--ew-btn-shadow-pressed)]",
+        edge:
+          "skeuo-solid border-transparent bg-edge font-semibold text-edge-foreground hover:brightness-95 active:shadow-[var(--ew-btn-shadow-pressed)] dark:hover:brightness-110",
         link: "text-primary-text underline-offset-4 hover:underline",
       },
       size: {
@@ -63,6 +65,7 @@ const PRESSABLE_VARIANTS = new Set<string>([
   "secondary",
   "destructive",
   "success",
+  "edge",
 ])
 
 type ButtonProps = React.ComponentProps<"button"> &

@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { ChevronRight, CircleHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sectionBar } from "@/lib/ui/layout-spacing";
+import { cardInsetX } from "@/lib/ui/layout-spacing";
 import {
   Tooltip,
   TooltipContent,
@@ -15,10 +15,10 @@ const pageInsetX = "px-[var(--layout-page-x)]";
 function TooltipBody({ children }: { children: React.ReactNode }) {
   if (typeof children === "string") {
     return (
-      <span className="block whitespace-pre-line leading-relaxed">{children}</span>
+      <span className="block whitespace-pre-line leading-snug">{children}</span>
     );
   }
-  return <div className="flex w-full flex-col gap-1 leading-relaxed">{children}</div>;
+  return <div className="flex w-full flex-col gap-0.5 leading-snug">{children}</div>;
 }
 
 const titleLinkClass =
@@ -47,7 +47,7 @@ function SectionDescriptionTooltip({
           side="top"
           align="center"
           sideOffset={6}
-          className="max-w-[14rem] py-2 leading-relaxed"
+          className="max-w-[14rem] px-2.5 py-1.5 text-xs leading-snug"
         >
           <TooltipBody>{description}</TooltipBody>
         </TooltipContent>
@@ -120,10 +120,10 @@ export function DashboardSectionHeader({
   return (
     <div
       className={cn(
-        pageAlign
-          ? cn("border-b border-border/60 py-[var(--layout-section-y)]", pageInsetX)
-          : sectionBar,
-        "shrink-0 py-3",
+        "shrink-0 border-b border-border/60 py-3",
+        // Match Do next cards / chart filters (`--layout-card-x`), not Racing Desk
+        // `sectionBar` (`px-4`) — that tighter inset made home titles look flush.
+        pageAlign ? pageInsetX : cardInsetX,
         // Mobile deck / page scroll: keep the section title pinned while the body moves.
         "max-sm:sticky max-sm:top-0 max-sm:z-20 max-sm:bg-page",
         className
@@ -131,11 +131,11 @@ export function DashboardSectionHeader({
     >
       <div
         className={cn(
-          "flex justify-between gap-2",
+          "flex gap-2",
           prominent ? "items-center" : "items-start"
         )}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 shrink-0">
           <div className="flex items-center gap-2">
             {Icon ? (
               <Icon
@@ -151,18 +151,18 @@ export function DashboardSectionHeader({
             {titleBadge ? <div className="ml-4 flex items-center">{titleBadge}</div> : null}
           </div>
           {!prominent ? (
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{description}</p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{description}</p>
           ) : null}
         </div>
         {(action || (prominent && description)) && (
-          <div className="flex shrink-0 items-center gap-4">
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
+            {action}
             {prominent && description ? (
               <SectionDescriptionTooltip
                 description={description}
                 ariaLabel={descriptionAriaLabel}
               />
             ) : null}
-            {action}
           </div>
         )}
       </div>

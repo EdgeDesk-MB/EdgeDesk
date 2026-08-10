@@ -3,17 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
+  type AnimationEvent,
   type ComponentType,
   type MouseEvent,
+  type ReactNode,
+  type TransitionEvent,
 } from "react";
+import { SPRING_DURATION_MS } from "@/lib/ui/motion";
 import { toast } from "sonner";
 import { ExchangeNamePicker } from "@/components/bookie-name-picker";
 import { ThemeSelect } from "@/components/theme-select";
 import {
   brandChipCountInverse,
   captionHeading,
+  edgeMarkerPill,
   navLinkState,
   proNavTag,
 } from "@/lib/ui/surface-styles";
@@ -27,10 +34,12 @@ import {
   CalendarSearch,
   Dices,
   Gift,
+  Grid2x2,
   History,
   Layers,
   NotebookPen,
   Plus,
+  Puzzle,
   Radio,
   Scale,
   Trophy,
@@ -56,6 +65,10 @@ import {
 } from "@/lib/accounts/available-bookies";
 import { countDeskQueue } from "@/lib/bets/desk-queues";
 import { isEventPendingSettle } from "@/lib/racing/pending-settle";
+import {
+  useOfferEdgeRaceCount,
+  useRacingOfferEdgeKey,
+} from "@/hooks/use-offer-edge-race-count";
 
 type NavIcon = ComponentType<{ className?: string }>;
 
@@ -74,11 +87,24 @@ type NavGroup = {
   icon: NavIcon;
   /** Default destination when the parent is clicked (collapsed) */
   href: string;
-  /** Section prefix - leaving it auto-collapses */
+  /** Collapse-state key; also the default path prefix when matchPrefixes is omitted */
   baseHref: string;
+  /**
+   * Path prefixes that keep the group expanded (e.g. Combo Desk spans /acca
+   * and /bet-builder). Defaults to [baseHref].
+   */
+  matchPrefixes?: string[];
   children: Array<{ href: string; label: string; icon: NavIcon }>;
   quickAction?: "newOffer" | "casinoLog";
 };
+
+function groupMatchPrefixes(group: NavGroup): string[] {
+  return group.matchPrefixes ?? [group.baseHref];
+}
+
+function isGroupPath(pathname: string, group: NavGroup): boolean {
+  return groupMatchPrefixes(group).some((prefix) => pathname.startsWith(prefix));
+}
 
 type NavEntry = NavLeaf | NavGroup;
 
@@ -107,6 +133,15 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Accounts",
         icon: Wallet,
         quickAction: "addBalance",
+      },
+      { kind: "link", href: "/fixtures", label: "Fixtures", icon: CalendarSearch },
+      {
+        kind: "link",
+        href: "/tracked-events",
+        label: "Tracked Events",
+        icon: Radio,
+        livePulse: true,
+        quickAction: "trackFixture",
       },
     ],
   },
@@ -162,14 +197,6 @@ export const NAV_SECTIONS: NavSection[] = [
     entries: [
       {
         kind: "link",
-        href: "/tracked-events",
-        label: "Tracked Events",
-        icon: Radio,
-        livePulse: true,
-        quickAction: "trackFixture",
-      },
-      {
-        kind: "link",
         href: "/racing",
         label: "Racing Desk",
         icon: Trophy,
@@ -181,8 +208,19 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "2UP Desk",
         icon: FootballIcon,
       },
-      { kind: "link", href: "/acca", label: "Acca Desk", icon: Layers },
-      { kind: "link", href: "/fixtures", label: "Fixtures", icon: CalendarSearch },
+      {
+        kind: "group",
+        label: "Combo Desk",
+        icon: Layers,
+        href: "/acca",
+        baseHref: "/acca",
+        matchPrefixes: ["/acca", "/bet-builder", "/systems"],
+        children: [
+          { href: "/acca", label: "Accumulator", icon: Layers },
+          { href: "/bet-builder", label: "Bet Builder", icon: Puzzle },
+          { href: "/systems", label: "Systems", icon: Grid2x2 },
+        ],
+      },
     ],
   },
   {
@@ -256,6 +294,49 @@ export function ActionBadge({ count }: { count: number }) {
   );
 }
 
+/** Offer Edge race count beside Racing Desk — Edge-tier chrome (zap + count). */
+export function EdgeRaceNavMark({ count }: { count: number }) {
+  const prevCount = useRef<number | null>(null);
+  const [shining, setShining] = useState(false);
+
+  useEffect(() => {
+    const prev = prevCount.current;
+    prevCount.current = count;
+    // Skip the first observation; shine only when the number actually changes.
+    if (prev === null || prev === count || count <= 0) return;
+    // Retrigger if a sweep is already running (rapid successive changes).
+    setShining(false);
+    const raf = requestAnimationFrame(() => setShining(true));
+    // Fallback if the ::after animationend does not surface on the host.
+    const clear = window.setTimeout(() => setShining(false), 1000);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(clear);
+    };
+  }, [count]);
+
+  function onAnimationEnd(e: AnimationEvent<HTMLSpanElement>) {
+    if (e.animationName !== "sheen-sweep-once") return;
+    setShining(false);
+  }
+
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        edgeMarkerPill,
+        "edge-count-mark overflow-hidden",
+        shining && "is-shining"
+      )}
+      title={`${count} Race pick${count === 1 ? "" : "s"} today`}
+      onAnimationEnd={onAnimationEnd}
+    >
+      <Zap className="size-3" aria-hidden />
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
 export function NavSectionLabel({
   label,
   pro,
@@ -270,6 +351,47 @@ export function NavSectionLabel({
       <span>{label}</span>
       {pro ? <span className={proNavTag}>Pro</span> : null}
     </p>
+  );
+}
+
+/**
+ * Height-animated sub-nav slot. Soft mask while opening/closing so labels
+ * fade at the clip edge; `data-settled` clears the mask once open height lands.
+ */
+function NavSubPanel({
+  expanded,
+  children,
+}: {
+  expanded: boolean;
+  children: ReactNode;
+}) {
+  const [settled, setSettled] = useState(expanded);
+
+  useEffect(() => {
+    if (!expanded) {
+      setSettled(false);
+      return;
+    }
+    // Fallback if transitionend is skipped (reduced motion / already at target).
+    const t = window.setTimeout(() => setSettled(true), SPRING_DURATION_MS + 40);
+    return () => clearTimeout(t);
+  }, [expanded]);
+
+  function onTransitionEnd(e: TransitionEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== "grid-template-rows") return;
+    if (expanded) setSettled(true);
+  }
+
+  return (
+    <div
+      className="nav-sub-panel"
+      data-open={expanded ? "true" : "false"}
+      data-settled={settled ? "true" : "false"}
+      onTransitionEnd={onTransitionEnd}
+    >
+      <div className="nav-sub-panel-inner">{children}</div>
+    </div>
   );
 }
 
@@ -306,7 +428,7 @@ function NavDefaultExchange() {
         onChange={setDefaultByName}
       />
       {exchanges.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Add exchanges on Accounts first.
         </p>
       ) : null}
@@ -354,10 +476,14 @@ export function AppNav() {
   const boostsOpenCount = state?.boostsOpen ?? 0;
   const casinoNeedsActionCount = state?.casinoNeedsAction ?? 0;
   const accaLayDueCount = state?.accaLayDue?.length ?? 0;
+  const betBuilderLayDueCount = state?.betBuilderLayDue?.length ?? 0;
+  const comboLayDueCount = accaLayDueCount + betBuilderLayDueCount;
   const racingPendingSettleCount = useMemo(
     () => (state?.events ?? []).filter((e) => isEventPendingSettle(e)).length,
     [state?.events]
   );
+  const racingOfferKey = useRacingOfferEdgeKey(state?.offers);
+  const edgeRaceCount = useOfferEdgeRaceCount(state?.settings, racingOfferKey);
 
   /** Manual collapse per group (keyed by baseHref) while still on that group's route */
   const [userCollapsed, setUserCollapsed] = useState<Record<string, boolean>>({});
@@ -366,7 +492,7 @@ export function AppNav() {
   // clears its manual collapse so the next visit starts expanded.
   const [wasInSection, setWasInSection] = useState<Record<string, boolean>>({});
   for (const group of navGroups) {
-    const inSection = pathname.startsWith(group.baseHref);
+    const inSection = isGroupPath(pathname, group);
     if (wasInSection[group.baseHref] !== inSection) {
       setWasInSection((prev) => ({ ...prev, [group.baseHref]: inSection }));
       if (!inSection) setUserCollapsed((prev) => ({ ...prev, [group.baseHref]: false }));
@@ -426,11 +552,9 @@ export function AppNav() {
           ? boostsOpenCount
           : item.href === "/alerts"
             ? (state?.alertsUnread ?? 0)
-            : item.href === "/acca"
-              ? accaLayDueCount
-              : item.href === "/racing"
-                ? racingPendingSettleCount
-                : 0;
+            : item.href === "/racing"
+              ? racingPendingSettleCount
+              : 0;
 
     return (
       <div key={item.href} className="relative w-full min-w-0">
@@ -448,6 +572,7 @@ export function AppNav() {
           />
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate">{item.label}</span>
+            {item.href === "/racing" ? <EdgeRaceNavMark count={edgeRaceCount} /> : null}
             <ActionBadge count={leafBadge} />
           </span>
         </Link>
@@ -469,7 +594,7 @@ export function AppNav() {
   }
 
   function renderGroup(entry: NavGroup) {
-    const inSection = pathname.startsWith(entry.baseHref);
+    const inSection = isGroupPath(pathname, entry);
     const collapsed = userCollapsed[entry.baseHref] ?? false;
     const expanded = inSection && !collapsed;
     const GroupIcon = entry.icon;
@@ -480,7 +605,9 @@ export function AppNav() {
         ? offerActionCount
         : entry.baseHref === "/casino"
           ? casinoNeedsActionCount
-          : 0;
+          : entry.matchPrefixes?.includes("/bet-builder")
+            ? comboLayDueCount
+            : 0;
     const quickLabel =
       entry.quickAction === "newOffer"
         ? "New offer"
@@ -515,7 +642,7 @@ export function AppNav() {
             href={firstChildHref}
             prefetch
             onClick={onParentClick}
-            className={cn(navLinkState(parentActive), "pr-10")}
+            className={cn(navLinkState(parentActive), onQuickAction && "pr-10")}
             aria-expanded={expanded}
           >
             <GroupIcon className="size-4 shrink-0" />
@@ -539,28 +666,35 @@ export function AppNav() {
           ) : null}
         </div>
 
-        <div className="nav-sub-panel" data-open={expanded ? "true" : "false"}>
-          <div className="nav-sub-panel-inner">
-            <div className="flex flex-col gap-0.5 pb-0.5">
-              {entry.children.map((child) => {
-                const active = isLinkActive(pathname, child.href);
-                const ChildIcon = child.icon;
-                return (
-                  <Link
-                    key={child.href}
-                    href={child.href}
-                    prefetch
-                    className={cn(navLinkState(active), "py-1.5 pl-9 text-[13px]")}
-                    tabIndex={expanded ? undefined : -1}
-                  >
-                    <ChildIcon className="size-3.5 shrink-0" />
+        <NavSubPanel expanded={expanded}>
+          <div className="flex flex-col gap-0.5 pb-0.5">
+            {entry.children.map((child) => {
+              const active = isLinkActive(pathname, child.href);
+              const ChildIcon = child.icon;
+              const childBadge =
+                child.href === "/acca"
+                  ? accaLayDueCount
+                  : child.href === "/bet-builder"
+                    ? betBuilderLayDueCount
+                    : 0;
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  prefetch
+                  className={cn(navLinkState(active), "py-1.5 pl-9 text-[13px]")}
+                  tabIndex={expanded ? undefined : -1}
+                >
+                  <ChildIcon className="size-3.5 shrink-0" />
+                  <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate">{child.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
+                    <ActionBadge count={childBadge} />
+                  </span>
+                </Link>
+              );
+            })}
           </div>
-        </div>
+        </NavSubPanel>
       </div>
     );
   }

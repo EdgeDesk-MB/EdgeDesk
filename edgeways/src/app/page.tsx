@@ -192,20 +192,36 @@ export default function DashboardPage() {
                       >
                         {showPlanPanel ? (
                           <DailyPlan
-                            className={showFeedPanel ? "border-b border-border/60" : undefined}
+                            className={
+                              showFeedPanel || showLive
+                                ? "border-b border-border/60"
+                                : undefined
+                            }
                           />
                         ) : null}
-                        {showFeedPanel ? <DashboardFeedPanel state={state} /> : null}
+                        {showFeedPanel ? (
+                          <DashboardFeedPanel
+                            state={state}
+                            showLiveDock={showLive}
+                          />
+                        ) : showLive ? (
+                          <DashboardLiveTabs
+                            state={state}
+                            docked
+                            className="min-h-0 flex-1"
+                          />
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
                 ) : null}
 
-                {showLive && (
+                {/* No History / plan column: keep Live on the page foot. */}
+                {showLive && !showFeedPanel && !showPlanPanel ? (
                   <div className="hidden border-t border-border/60 sm:block">
-                    <DashboardLiveTabs state={state} />
+                    <DashboardLiveTabs state={state} docked />
                   </div>
-                )}
+                ) : null}
               </>
             ) : null}
           </>

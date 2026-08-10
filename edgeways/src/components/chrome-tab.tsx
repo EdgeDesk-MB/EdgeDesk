@@ -47,7 +47,7 @@ export function ChromeTab({
       <ChromeTabEar side="left" hang={hang} rVar={rVar} />
       <ChromeTabEar side="right" hang={hang} rVar={rVar} />
       {children ? (
-        <div className="relative z-[1] flex h-full min-h-0 items-center">
+        <div className="relative z-[1] flex h-full min-h-0 w-full items-stretch">
           {children}
         </div>
       ) : null}
@@ -74,12 +74,15 @@ function ChromeTabEar({
     <span
       aria-hidden
       className={cn(
-        "pointer-events-none absolute z-[2] block rounded-full",
+        /* Shine rim on ::after in globals (fade out at free edge). */
+        "chrome-tab-ear pointer-events-none absolute z-[2] block rounded-full",
         // Hang / sm+ rise: canvas. Full-bleed rise: page.
         hang
           ? "shadow-[0_0_0_40px_var(--canvas)]"
           : "shadow-[0_0_0_40px_var(--page)] sm:shadow-[0_0_0_40px_var(--canvas)]",
-        hang ? "top-0" : "bottom-0",
+        // Rise ears sit 1px above the plate bottom so the concave joins the
+        // topbar strip cleanly.
+        hang ? "top-0" : "bottom-[1px]",
         // Quarter toward the tab. Rise = bottom quarters; hang = top quarters.
         !hang && left && "[clip-path:inset(50%_-2px_0_50%)]",
         !hang && !left && "[clip-path:inset(50%_50%_0_-2px)]",

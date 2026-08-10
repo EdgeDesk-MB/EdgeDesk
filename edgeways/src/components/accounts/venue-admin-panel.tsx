@@ -10,7 +10,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -130,6 +129,7 @@ export function ManageVenuesDialog({
           <Tabs
             value={accountsTab}
             onValueChange={(v) => setAccountsTab(v as typeof accountsTab)}
+            activationMode="manual"
           >
             <TabsList variant="segmented">
               <TabsTrigger value="exchanges">Exchanges</TabsTrigger>
@@ -137,68 +137,70 @@ export function ManageVenuesDialog({
             </TabsList>
           </Tabs>
           <div className="mt-4">
-        {accountsTab === "exchanges" ? (
-          <>
-            <div className="mb-3 flex justify-end">
-              <AddExchangeDialog onSaved={refreshExchanges} />
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Exchange</TableHead>
-                  <TableHead className="w-40">Commission %</TableHead>
-                  <TableHead>Colours</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {exchanges.map((exchange) => (
-                  <ExchangeEditRow
-                    key={exchange.id}
-                    exchange={exchange}
-                    onPatch={patchExchange}
-                    onDelete={deleteExchange}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </>
-        ) : (
-          <>
-            <div className="mb-3 flex justify-end">
-              <AddBookieDialog onSaved={loadBookies} />
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bookie</TableHead>
-                  <TableHead className="w-28">Owner</TableHead>
-                  <TableHead className="w-28">Status</TableHead>
-                  <TableHead className="w-28">Colour</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bookies.length === 0 && (
+            {accountsTab === "exchanges" ? (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                      No bookie wallets yet - add one here or via Adjust balance when topping up.
-                    </TableCell>
+                    <TableHead>Exchange</TableHead>
+                    <TableHead className="w-40">Commission %</TableHead>
+                    <TableHead>Colours</TableHead>
+                    <TableHead className="w-12" />
                   </TableRow>
-                )}
-                {bookies.map((bookie) => (
-                  <BookieEditRow
-                    key={bookie.id}
-                    bookie={bookie}
-                    onPatch={patchBookie}
-                    onArchive={archiveBookie}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {exchanges.map((exchange) => (
+                    <ExchangeEditRow
+                      key={exchange.id}
+                      exchange={exchange}
+                      onPatch={patchExchange}
+                      onDelete={deleteExchange}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bookie</TableHead>
+                    <TableHead className="w-28">Owner</TableHead>
+                    <TableHead className="w-28">Status</TableHead>
+                    <TableHead className="w-28">Colour</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bookies.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
+                        No bookie wallets yet - add one here or via Adjust balance when topping up.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {bookies.map((bookie) => (
+                    <BookieEditRow
+                      key={bookie.id}
+                      bookie={bookie}
+                      onPatch={patchBookie}
+                      onArchive={archiveBookie}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </div>
+        <div className="shrink-0 border-t">
+          <div className="flex justify-end gap-2 px-6 py-4">
+            {accountsTab === "exchanges" ? (
+              <AddExchangeDialog onSaved={refreshExchanges} />
+            ) : (
+              <AddBookieDialog onSaved={loadBookies} />
+            )}
           </div>
         </div>
       </DialogContent>
@@ -251,13 +253,13 @@ function ExchangeEditRow({
       <TableCell>
         <div className="flex items-center gap-1.5">
           <span
-            className="rounded px-2 py-0.5 text-[10px] font-medium text-black/70"
+            className="rounded px-2 py-0.5 text-[11px] font-medium text-black/70"
             style={{ backgroundColor: exchange.backColor }}
           >
             back
           </span>
           <span
-            className="rounded px-2 py-0.5 text-[10px] font-medium text-black/70"
+            className="rounded px-2 py-0.5 text-[11px] font-medium text-black/70"
             style={{ backgroundColor: exchange.layColor }}
           >
             lay
@@ -316,7 +318,7 @@ function BookieEditRow({
             />
             {bookie.name}
             {!bookie.isActive && (
-              <Badge variant="outline" className="text-[10px] font-normal">
+              <Badge variant="outline" className="text-[11px] font-normal">
                 archived
               </Badge>
             )}
@@ -410,19 +412,28 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
     if (next.trim()) setBrandColor(bookieBrandColor(next.trim()));
   }
 
+  function resetForm() {
+    setName("");
+    setBrandColor("#3f3f46");
+  }
+
   async function save() {
     if (!name.trim()) {
       toast.error("Enter a bookie name");
       return;
     }
     try {
-      await api("/api/bookies", {
+      const res = await api<{ bookie: { name: string }; created?: boolean }>("/api/bookies", {
         method: "POST",
         json: { name: name.trim(), brandColor },
       });
-      toast.success(`${name.trim()} added`);
+      toast.success(
+        res.created === false
+          ? `${name.trim()} already on your list, brand colour updated`
+          : `${name.trim()} added`
+      );
       setOpen(false);
-      setName("");
+      resetForm();
       onSaved();
     } catch (e) {
       toast.error("Could not add bookie", { description: String(e) });
@@ -430,34 +441,46 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="size-4" /> Add bookie
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Add bookie</DialogTitle>
-          <DialogDescription>
-            Pick from the list or enter a custom name. Brand colour defaults to the known palette.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <BookieNamePicker value={name} onChange={changeName} />
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Brand colour</Label>
-            <input
-              type="color"
-              value={brandColor}
-              onChange={(e) => setBrandColor(e.target.value)}
-              className="h-9 w-full cursor-pointer rounded-md border bg-transparent"
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="size-4" /> Add bookie
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) resetForm();
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add bookie</DialogTitle>
+            <DialogDescription>
+              Pick from the list or enter a custom name. Brand colour defaults to the known palette.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <BookieNamePicker
+              value={name}
+              onChange={changeName}
+              persistCustom={false}
+              brandColor={brandColor}
+              omitExistingWallets
             />
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Brand colour</Label>
+              <input
+                type="color"
+                value={brandColor}
+                onChange={(e) => setBrandColor(e.target.value)}
+                className="h-9 w-full cursor-pointer rounded-md border bg-transparent"
+              />
+            </div>
+            <Button onClick={save}>Add bookie</Button>
           </div>
-          <Button onClick={save}>Add bookie</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -503,74 +526,78 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="size-4" /> Add exchange
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Add exchange</DialogTitle>
-          <DialogDescription>
-            Pick a preset (colours included) and set the commission you actually pay.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Preset</Label>
-            <Select value={preset} onValueChange={applyPreset}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="custom">Custom…</SelectItem>
-                {EXCHANGE_PRESETS.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="size-4" /> Add exchange
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add exchange</DialogTitle>
+            <DialogDescription>
+              Pick a preset (colours included) and set the commission you actually pay.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Preset</Label>
+              <Select value={preset} onValueChange={applyPreset}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom…</SelectItem>
+                  {EXCHANGE_PRESETS.map((p) => (
+                    <SelectItem key={p.name} value={p.name}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Betdaq"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Commission %</Label>
+              <Input
+                type="number"
+                step={0.5}
+                min={0}
+                max={20}
+                className="tabular-nums"
+                value={commission}
+                onChange={(e) => setCommission(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {(
+                [
+                  ["Brand", brandColor, setBrandColor],
+                  ["Back", backColor, setBackColor],
+                  ["Lay", layColor, setLayColor],
+                ] as const
+              ).map(([label, value, set]) => (
+                <div key={label} className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">{label}</Label>
+                  <input
+                    type="color"
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    className="h-9 w-full cursor-pointer rounded-md border bg-transparent"
+                  />
+                </div>
+              ))}
+            </div>
+            <Button onClick={save}>Add exchange</Button>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Betdaq" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Commission %</Label>
-            <Input
-              type="number"
-              step={0.5}
-              min={0}
-              max={20}
-              className="tabular-nums"
-              value={commission}
-              onChange={(e) => setCommission(parseFloat(e.target.value) || 0)}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {(
-              [
-                ["Brand", brandColor, setBrandColor],
-                ["Back", backColor, setBackColor],
-                ["Lay", layColor, setLayColor],
-              ] as const
-            ).map(([label, value, set]) => (
-              <div key={label} className="flex flex-col gap-1.5">
-                <Label className="text-xs text-muted-foreground">{label}</Label>
-                <input
-                  type="color"
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  className="h-9 w-full cursor-pointer rounded-md border bg-transparent"
-                />
-              </div>
-            ))}
-          </div>
-          <Button onClick={save}>Add exchange</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -10,9 +10,8 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-08-05 (L4 Offer qualifier shape → Acca Desk routing briefed. Phase 14 Offer
-Edge in progress; N0 entitlement scaffolding ⏸ gated — L4 ships a thin `acca_desk` can() stub
-that folds into N0 later.)
+Last updated: 2026-08-10 (O1 Offer completion playbook Phase 1–2 done — hybrid wizard,
+deposit/WR auto, Dynobet golden parse, release notes. L7 EW/EP local done. Phase 14 / N0 ⏸ gated.)
 
 ---
 
@@ -245,7 +244,7 @@ in the calculators and Racing Desk runner rows.
 
 **Files.** Calculator pages under `src/app/calculators/` (locate the odds-input components; add a
 "fair odds / overround" line beneath market inputs where a full market's odds are present).
-Racing: `src/components/racing/flashscore-racecard.tsx` runner rows — when a race has
+Racing: `src/components/racing/desk-racecard.tsx` runner rows — when a race has
 `bookieDecimal` for most runners, compute market overround once per race and show each runner's
 "x% over fair" delta. Compute in a pure helper NEW `src/lib/racing/fair-odds.ts`
 (`raceFairOdds(runners): Map<horseId, { fair: number; overPct: number }>`) so it's testable.
@@ -914,7 +913,7 @@ complete → expected-vs-realised line renders); mobile 390×844 pass; suite + b
 
 **Follow-ups shipped same day (Sam's requests, 2026-07-15):**
 - *Paste offer*: `parse-casino-offer-text.ts` (pure, tested — bonus/wagering/RTP/contribution
-  from promo text, fractions out) behind `CasinoPasteDialog`; the shared capture block
+  from promo text, fractions out) via inline paste on Log casino offer; the shared capture block
   (screenshots→OCR + text merge) was extracted from the offers paste dialog into
   `src/components/paste-capture.tsx` and both dialogs now use it (the extraction also
   cleared the two react-compiler lint errors the old dialog carried).
@@ -2224,7 +2223,7 @@ play + EV; markers and a COURSES legend make the colour language explicit.
   prefer Edge EV when plays are supplied.
 - `src/components/racing/racing-offer-guide.tsx` — Recommended / Estimate / Qualifies guidance
   from `edgePlays`; Back/Lay target `edge.runner`; MoneyFlow EV + confidence + reasons/warnings.
-- `src/components/racing/flashscore-racecard.tsx` — pass `edgePlays`; race-tab emerald = qualifies,
+- `src/components/racing/desk-racecard.tsx` — pass `edgePlays`; race-tab emerald = qualifies,
   warning+sparkles = recommended count; runner row "recommended" badge for Edge horses.
 - `src/components/racing/racing-desk-view.tsx` — course pills mirror the same two markers; COURSES
   legend (qualifies / recommended / near-min dots).
@@ -2315,7 +2314,29 @@ vaults, oddsmatcher. Those are post-gate (§7.2–7.6).
 
 # PHASE — ACCA OFFER BRIDGE
 
-## L4. Offer qualifier shape → Acca Desk routing `[strong]` (Sam 2026-08-05)
+## L4. Offer qualifier shape → Acca Desk routing `[strong]` (Sam 2026-08-05) — ✅ DONE 2026-08-05
+
+**Follow-up L4b (same day):** separate `rewardScope` / `rewardMinSelections` for free-bet
+convert (renamed from “shape” → “scope”). Convert Acca opens global Acca New run with
+`backBetType: "free_snr"`, `ledgerBetPlacement` on create, lose P&L £0 for free bets, and
+`ledgerFromSettledBet` on Acca settles. Settings → Appearance → Plan preview stubs Free vs
+Unlocked. Paste only suggests reward Acca from free-bet T&Cs, not from qualifier titles.
+
+**Follow-up L4c (multi-scope):** `qualifierScopes` / `rewardScopes` arrays (any combination of
+Single / Acca / Bet builder). Place/Convert with 2+ paths opens a scope chooser modal.
+
+**Follow-up L5 (Bet Builder Desk) — ✅ DONE 2026-08-06 (local):** Live desks → Combo Desk group
+(Accumulator + Bet Builder sub-nav); methods Combined lay + No lay (optional lay at create);
+whole-ticket settle; free_snr convert; Acca method `combined` (+ no lay). Entitlement mirrors
+Acca. Offer chooser / Do Next / free-bet convert open Bet Builder Desk when entitled. Tracker
+campaign strip links back to the desk.
+
+**Follow-up L6 (Systems Desk) — Phases 1–3 local 2026-08-06:** Combo sibling **Systems** (`/systems`)
+for full-cover organisation (Lucky / Patent / Trixie / Yankee / Canadian–Goliath). No finder
+(complement OM/Outplayed Lucky Finder). Create + Paste slip (structure/unit/EW/legs via OCR),
+Active/History + family pills, per-leg settle with combination returns (void = refund dead
+lines; EW place terms), classification (`ev_play` / `mug_bet`). Guide:
+`docs/betting-methods-guide.md` (repo parent). Acca/BB create dialogs share Paste slip.
 
 **Objective.** Persist whether a campaign’s qualifying stake must be placed as a **single**,
 **acca**, or (later) **bet builder**, and when the user hits Place qualifying bet on an
@@ -2482,6 +2503,299 @@ for real paywall; ships with unlocked default.
 
 ---
 
+## L7. Each-way & Extra-place on Racing Desk `[strong]`
+
+**Status.** Phases 1–4 local 2026-08-06 (dialog handoff, UK place ladder + min-runners,
+Active bets strip + PlaceZoneBar, dual-lay settle tests). Betfair PLACE feed still stretch.
+Multi-dutch later. Unparks §9 “Each-way matcher” as execution cut (not OM discovery EV).
+
+**Product decisions (locked 2026-08-06).**
+1. **Calculator is the place of truth** for EW / Extra place — dual win+place lays, 1/4|1/5,
+   bookie vs exchange place counts, 4-outcome P&L. Do **not** stretch the single-lay Add bet
+   dialog for these markets (today Market=Each way / Extra place still shows one lay only —
+   that is the bug Sam hit).
+2. **Racing Desk opens the EW/EP calculator** (modal/dialog), prefilled like win bets already
+   are: course, off time, runner, win odds, exchange win lay, field size, desk place settings.
+3. **Save lands in Profit Tracker** with `market: each_way | extra_place` and `notes` containing
+   `serializeEwMeta` (`src/lib/bets/ew-meta.ts`). Race result auto-settle already branches on
+   that meta via `settleRacingBet` → `settleDualLayEachWay` (`src/lib/calc/racing-settlement.ts`).
+4. **Active racing positions** — Acca Desk–style “Active” strip of open horse_racing EW/EP/win
+   bets linked to upcoming races. Reuse / improve the “Open positions” stat (rename if needed,
+   e.g. “On desk” / “Active bets”) so it is not a dead count.
+5. **Horizontal place-zone visual** — merge standard exchange places with bookie extra places
+   (e.g. 1–2–3 standard · 4–5 extra) akin to Acca timeline (`acca-legs-timeline.tsx`) but
+   horizontal; show on active cards and in the calculator when Extra place mode.
+6. **Min runners + place terms are first-class** — warn when `fieldSize` is near bookie min
+   runners for the advertised place count; place fraction 1/4 vs 1/5 selectable (never hardcode
+   0.2). Seed a bookie min-runners table from Outplayed-style rules (editable later).
+7. **Exchange place odds on the desk** — Advanced view and/or Settings must surface place-market
+   lays (today Betfair fetch is `marketTypeCodes: ["WIN"]` only; EP hardcodes `layPlaceOdds: 2.8`
+   in `openBetForRunner`). Phase A: manual place-lay entry in the modal with desk-seeded
+   defaults; Phase B: Betfair PLACE catalogue/book when API access allows.
+8. **Multi-dutch racing** — out of scope for L7 (park explicitly).
+
+**Objective.** From a racecard runner, open Each way or Extra place, complete dual lays,
+save to tracker, and have finish position settle win / standard place / extra place / unplaced
+automatically. See open EW/EP (and other racing) positions on the desk with a clear place-zone
+graphic.
+
+**Why.** Calculators are already strong (`/calculators/each-way`). Desk EP shortcut writes
+broken single-lay Add bet prefills. Add bet Market=Each way/Extra place has no place side.
+Users cannot see “races I’m on” the way Acca Desk shows Active runs.
+
+**Verified shapes (2026-08-06).**
+- Calc: `src/lib/calc/eachway.ts`, `extra-place.ts`, `each-way-outcomes.ts` —
+  `eachWayOutcomePnL`, `classifyEachWayFinish`, `impliedExtraPlaceOdds`.
+- Meta: `EachWayBetMeta` in `ew-meta.ts` (stakePerPart, placeFraction, layWin, layPlace,
+  bookiePlaces, exchangePlaces, mode).
+- Desk open path: `racing-desk-view.tsx` → `openBetForRunner(..., "extra_place")` → hardcodes
+  then `openAddBet`. Win path already prefills event/selection.
+- Settlement: `state.ts` `autoSettle` → `settleRacingBet` when event finished + placings.
+- Place ladder today: `placePositions(fieldSize)` in `racing.ts` (≤4→1, ≤7→2, else 3) —
+  **not** handicap-aware (12+ handicaps 1/4 / 4 places). L7 must extend or document.
+- Acca Active pattern: `app/acca/page.tsx` + `acca-legs-timeline.tsx` + campaign card shell.
+
+### Phase 1 — Calculator modal + desk handoff `[strong]`
+
+1. Extract `EachWayCalculatorForm` from `app/calculators/each-way/page.tsx` into
+   `components/calc/each-way-calculator-form.tsx` (page becomes thin shell).
+2. Add `EachWayCalculatorDialog` (global or racing-scoped) with prefill:
+   `mode`, `selection`, `bookmaker?`, `stakePerPart`, `winOdds`, `layWinOdds`, `layPlaceOdds?`,
+   `placeFraction`, `fieldSize`, `bookiePlaces`, `exchangePlaces`, `eventId` / race ids,
+   `commission`, `labelSuggestion`.
+3. Desk runner actions:
+   - **Each way** (new) → dialog `mode: each_way`, exchange places = `placePositions` /
+     handicap ladder, bookie places = same (or settings).
+   - **Extra place** → dialog `mode: extra_place` when bookiePlaces > exchangePlaces;
+     remove silent `openAddBet` EP path with hardcoded 2.8 / 0.2.
+4. Save uses existing Calculator → Add bet bridge pattern (`CalculatorAddBetButton` /
+   `serializeEwMeta`) ensuring `eventId` links for auto-settle.
+5. When Add bet Market is `each_way` or `extra_place`, show a clear CTA “Open each-way
+   calculator” (or auto-redirect) so the broken single-lay UI is not the default path.
+
+### Phase 2 — Place terms, min runners, place odds `[strong]` + `/calc-change` if ladder changes
+
+1. **Standard place terms helper** — extend beyond `placePositions`: race type (handicap vs
+   non-handicap), field size → places + default fraction (1/4 vs 1/5) per UK conventions in
+   Matched Betting Blog / guide tables. Pure function + Vitest vectors.
+2. **Min-runners knowledge** — `src/lib/racing/extra-place-min-runners.ts` seeded from
+   Outplayed-style tables (5p→16+ almost everyone / Bet365 15+; 4p→12+ / Bet365 11+; etc.).
+   Desk + dialog warn when `fieldSize <= minRunners + buffer` (non-runner risk).
+3. **Settings modal** — keep global bookie/exch place defaults; add place-fraction default;
+   document Advanced view place column.
+4. **Place lay column (Advanced)** — show manual or live place lay per runner when available;
+   until Betfair PLACE lands, allow paste/override in dialog only.
+5. **Betfair PLACE (stretch)** — extend `betfair.ts` `marketTypeCodes` to include PLACE when
+   safe; map to runners. Do not block Phases 1/3 on this.
+
+### Phase 3 — Active positions + place-zone visual `[strong]` / light design
+
+1. Rename or promote **Open positions** → filter/tab or expandable strip listing open
+   `horse_racing` bets for today’s/selected date races (label TBD with Sam: “Active bets”
+   preferred over “Open positions”).
+2. Card chrome inspired by Acca Active: bookie, market badge (EW / EP), runner, off time,
+   stake, QL / implied EP odds from stored meta + `extraPlace()` recompute.
+3. **`PlaceZoneBar` component** — horizontal positions 1…N:
+   - exchange standard places (muted / “place lay covers”),
+   - extra bookie-only places (accent / “extra place profit zone”),
+   - beyond (unplaced).
+   Reuse on calculator Extra place tab and active cards.
+4. Click-through → tracker highlight or edit dialog.
+
+### Phase 4 — Settlement hardening `[strong]` + calc-auditor
+
+1. Vitest: dual-lay settle for finish in extra zone, standard place, win, unplaced, void NR.
+2. Ensure `racingMarketReadyToSettle` requires placings for EW/EP (already) and desk-created
+   bets always carry complete `EachWayBetMeta`.
+3. Commission-paid markers already cover dual lays — add EP finish case if missing.
+
+### Out of scope (L7)
+
+- Multi-dutch / dutch the field across bookies (OM dutching EP races) — later brief.
+- OddsMonkey-style EV% model (jockey/course features) — optional later; Phase 3 can show
+  `impliedExtraPlaceOdds` / QL from existing calc only.
+- Full oddsmatcher / scraping bookie EP lists.
+- Systems Desk Lucky EW changes (already shipped).
+- Changing Add bet into a full dual-lay editor (calculator owns that UX).
+
+### Acceptance
+
+1. From Racing Desk, Each way and Extra place open the calculator dialog with race/runner/
+   win odds/field size/place settings prefilled; no hardcoded place lay 2.8 / fraction 0.2
+   as the only path.
+2. Save creates a tracker bet with `edgeways_ew` meta + event link; after race placings sync,
+   auto-settle classifies extra_place vs standard_place correctly.
+3. Active bets strip shows upcoming open racing positions; place-zone bar distinguishes
+   exchange places vs bookie extras.
+4. Min-runners warning fires near threshold; 1/4 and 1/5 both selectable and persisted.
+5. Add bet Market=Each way/Extra place does not silently use single-lay maths as the primary path.
+6. `npx vitest run` green; `/calc-change` + calc-auditor if place-ladder or settle maths change;
+   design-reviewer on place-zone + active strip.
+
+**Sizing.** `[strong]` — cross-cutting desk/calc/tracker; money path already exists but
+settlement tests and place-ladder need frontier + audit. Prefer **Claude Opus / Fable** or
+Claude Code for Phases 1–4; Grok/Composer OK for pure UI extract of the calculator form.
+Depends on existing EW calc (done) and Racing Desk. Soft-depends on Betfair PLACE for live
+place lays (Phase 2 stretch).
+
+---
+
+## O1. Offer completion playbook — Phase 1 `[strong]`
+
+> **Verified against code 2026-08-10.** Sports offers store Important terms in `offers.rules`
+> JSON (`promo_terms` or racing `bet_get_free_place` + extras) via
+> `src/lib/offers/offer-terms.ts`. Pipeline stage is derived (`pipeline.ts`); next action is a
+> single kind (`next-actions.ts`). “How to match” is free text stuffed into `importantNotes`
+> by `offer-intelligence`. Casino has ordered EV *components* (`casino_offer_components`) —
+> UX precedent for a funnel, not the schema to copy. No `promoCode` / `minDeposit` fields
+> exist today. Email intake (`email-intake.ts` `buildEmailDraft`) persists racing `rules` only
+> and drops Important terms for general sports pastes. Dynobet is absent from
+> `UK_BOOKMAKERS` / `matchBookmakerFromText`.
+
+**Objective.** Capture and completion are two layers of one campaign. Parsers produce
+**structured facts** (including deposit promo codes). Starting / working an offer funnels the
+user through a **hybrid step-by-step playbook wizard** (auto-advance from ledger where
+possible; Mark done for soft gates). Deposit codes are first-class and high-visibility on
+Step 1. Financial pipeline strip stays; the playbook is the instruction UI.
+
+**Product locks (Sam 2026-08-10).**
+- Hybrid completion (not checklist-only, not ledger-only).
+- Wizard UX inspired by Casino log funnel, not casino EV component maths.
+- No bookie-site scraping (AGENTS hard rule). Bookie-profile T&Cs = later phase.
+
+### Data shapes (extend in `offers.rules` JSON — no new table in Phase 1)
+
+Extend `OfferImportantTerms` / `PromoTermsRules` / racing merge extras:
+
+```ts
+promoCode: string | null;
+minDeposit: number | null;
+depositRequired: boolean;
+rewardEventLabel: string | null;   // "PSG vs Aston Villa"
+rewardEventDate: string | null;    // YYYY-MM-DD
+winningsWageringX: number | null;  // 1 for Dynobet FB winnings WR
+maxConversion: number | null;
+paymentExclusions: string[];       // ["Skrill","Neteller"]
+```
+
+Playbook (same JSON, key `playbook`):
+
+```ts
+type OfferPlaybookStepKind =
+  | "deposit" | "opt_in" | "qualify" | "await_award"
+  | "convert" | "clear_wagering" | "done";
+
+type OfferPlaybookStep = {
+  id: string;              // stable: "deposit", "qualify", …
+  kind: OfferPlaybookStepKind;
+  title: string;
+  detail: string;
+  sortOrder: number;
+  status: "pending" | "done" | "skipped";
+  completion: "auto" | "manual" | null;
+  completedAt: number | null;
+  evidence?: { kind: "bet" | "transfer" | "manual" | "wr_watch"; id?: number };
+};
+
+type OfferPlaybook = { version: 1; steps: OfferPlaybookStep[] };
+```
+
+NEW pure lib `src/lib/offers/offer-playbook.ts`:
+- `deriveOfferPlaybook(facts, ctx) → OfferPlaybook` (definitions only)
+- `mergePlaybookProgress(prev, next) → OfferPlaybook` (preserve status by `id`)
+- `syncPlaybookFromOfferProfit(playbook, offer) → OfferPlaybook` (auto-advance qualify /
+  await_award / convert / done from `OfferProfitBreakdown`; deposit stays manual/best-effort)
+- `currentPlaybookStep(playbook) → OfferPlaybookStep | null`
+- `markPlaybookStepDone(playbook, stepId, now) → OfferPlaybook`
+
+Derivation order: deposit (if code/minDeposit/depositRequired) → opt_in (only if opt-in
+language and no deposit-code path) → qualify → await_award → convert → clear_wagering (if
+`winningsWageringX > 0`) → done. Classic bet&get with no deposit starts at qualify.
+
+### Parser / intelligence
+
+Files: `parse-offer-text.ts`, `offer-intelligence/*`, `bookmakers.ts`, tests.
+
+1. Extract `promoCode` (`promo code UEFA`, `using (the )?code X`, `code: X`).
+2. Extract `minDeposit` / `depositRequired` (`Deposit £30 or more`).
+3. Fix stake disambiguation: “qualifying bets worth £20” / “bets totaling £20” must not
+   collapse to free-bet face when “Receive a £10 Free Bet” is also present; deposit amounts
+   must not become `betStake`.
+4. Reward event + date; `winningsWageringX` (`1X wagering` / `wagered 1 time` on free-bet
+   winnings); `maxConversion`; Skrill/Neteller exclusions.
+5. Category: UEFA Super Cup / named football match → `football`.
+6. Bookie alias: Dynobet (+ optional ProgressPlay note in Important).
+7. **Golden fixture** in `parse-offer-text.test.ts` (Dynobet UEFA Super Cup email + T&C
+   body): bookmaker Dynobet, betStake 20, freeBet 10, minDeposit 30, promoCode UEFA,
+   minOdds 1.5, playbook step 1 = deposit with code in title, EV still estimated.
+
+On paste apply + offer save: write facts into Important / promo_terms; attach derived
+`playbook` (merged with any existing progress). Email intake `buildEmailDraft` MUST persist
+full rules JSON (important + playbook), not only racing `draft.rules`.
+
+### Next action / Do next
+
+`deriveOfferNextAction` (and thus Home Do next): when a playbook exists and
+`currentPlaybookStep` is not `done`, surface that step’s title/detail. Deposit / opt_in /
+clear_wagering kinds do **not** open Add bet — href stays offer highlight; UI offers Mark
+done (+ Open offer link / Accounts for deposit). Qualify / convert keep existing Track bet
+CTAs via `offer-track-bet.ts`.
+
+### UI (campaign card + view dialog)
+
+NEW `src/components/offers/offer-playbook-panel.tsx` (or equivalent on
+`offer-campaign-card.tsx` / `offer-view-dialog.tsx`):
+- “Step N of M” + current step title/detail
+- Deposit steps: large promo-code chip + copy-to-clipboard
+- Primary: Mark done | Place qualifying | Convert free bet (by kind)
+- Secondary: Important / T&C collapse, Open offer URL
+- Pipeline strip remains below as financial context
+
+Editor: paste apply fills new fact fields; Important section can show promo code / min
+deposit inputs (compact). No full redesign of New offer form beyond that.
+
+### Mark done API
+
+Client PATCHes `offers.rules` with updated playbook (read-modify-write), or small helper on
+`PATCH /api/offers/[id]` accepting `{ playbookStepDone: stepId }`. Prefer the helper to avoid
+races stomping other rules fields. Server merges via `markPlaybookStepDone` +
+`syncPlaybookFromOfferProfit`.
+
+### Out of scope (Phase 1)
+
+- New SQLite `offer_steps` table
+- Bookie-profile scraped/pasted full T&Cs (Phase 3)
+- Cloud LLM parse
+
+### Phase 2 progress (2026-08-10)
+
+- ✅ Best-effort deposit auto-complete from Accounts transfer/top-up
+  (`findDepositEvidence` + `syncOfferPlaybooksFromLedger` in `syncOfferStatuses`)
+- ✅ Convert prefills include `rewardEventLabel` / date lock notes
+- ✅ Clear-wagering WR watch: arm `wr_watch` when bookie `wrRemaining > 0` after convert;
+  auto-complete only when armed WR later burns to £0 (never treats always-£0 as cleared).
+  Panel shows live WR + Accounts link.
+
+### Acceptance
+
+1. Dynobet golden parse test green with stakes/code/deposit/playbook step 1 correct.
+2. Saving a pasted deposit-gated offer persists `promoCode`, `minDeposit`, and `playbook` in
+   `offers.rules`; email intake drafts do too for general sports pastes.
+3. Starting / viewing an active offer with a pending deposit step shows Step 1 with code hero;
+   Mark done advances to qualify; Do next title mentions deposit/code until done.
+4. Classic bet&get without deposit still works; wizard starts at qualify; pipeline strip
+   unchanged in meaning.
+5. Re-saving / re-pasting facts regenerates step titles but preserves done status by step id.
+6. `npx vitest run` green; design-reviewer on playbook panel (British English, tokens, no
+   type below 11px).
+
+**Sizing.** `[strong]` — cross-cutting parser + rules JSON + next-actions + campaign UI.
+Prefer **Claude Opus / Fable** or Kimi K3 for the full slice; Grok/Composer OK for isolated
+parser tests after the model is sketched. Depends on J6 paste/email and Offer Command Centre
+pipeline (done). Soft-depends on Accounts transfers for Phase 2 deposit auto.
+
+---
+
 ```
 A1 ──► A2 ──► A3 ──► B7 ──► B8
  │      │      │
@@ -2490,6 +2804,8 @@ B1 ◄─ offer-calendar (exists)   B2, B3 (independent, after A1 sig change)
 B4 ──► C3                       B10 (independent audit)
 C4 (AlertChannel) ──► B5, B6    C1 ──► C2
 B9 (after A1; feeds advantage scoring)
+L7 (EW/EP desk) ◄─ calc-ew (done), Racing Desk; multi-dutch later
+O1 (offer playbook) ◄─ J6 paste/email, pipeline/next-actions (done)
 ```
 
 ## Standing acceptance bar for every brief

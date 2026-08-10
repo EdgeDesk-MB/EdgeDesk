@@ -5,6 +5,7 @@ import { db, accounts, bets, events, mugPlans } from "@/lib/db";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import {
   ledgerFromSettledBet,
+  purgeLedgerForDeletedBet,
   reledgerDutchFreeLegs,
   reledgerOpenBetPlacement,
 } from "@/lib/services/balances";
@@ -72,15 +73,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const nextLabel = p.label !== undefined ? p.label : existing.label;
+  const effectiveBetType = p.betType ?? existing.betType;
   const shouldReparseTriggers =
     p.triggerText !== undefined ||
     p.label !== undefined ||
+    p.betType !== undefined ||
     (p.eventId !== undefined && (existing.triggerText || existing.triggerRule));
 
   let triggerFields: { triggerText: string | null; triggerRule: string | null } | undefined;
   if (shouldReparseTriggers) {
     const eventId = p.eventId !== undefined ? p.eventId : existing.eventId;
     triggerFields = resolveTriggerFields({
+      betType: effectiveBetType,
       label: nextLabel,
       triggerText: p.triggerText !== undefined ? p.triggerText : existing.triggerText,
       eventId,
@@ -183,6 +187,7 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   const betId = Number(id);
   unlinkBoostDiaryForBet(betId);
   purgeHistoryForBet(betId);
+  purgeLedgerForDeletedBet(betId);
   db.delete(bets).where(eq(bets.id, betId)).run();
   return NextResponse.json({ ok: true });
 }

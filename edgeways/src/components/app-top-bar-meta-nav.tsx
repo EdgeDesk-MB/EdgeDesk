@@ -15,6 +15,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChromeTab } from "@/components/chrome-tab";
+import { TopBarLoginButton } from "@/components/top-bar-login-button";
 import { TOP_SUB_NAV_ITEMS, activeMetaNavId } from "@/content/meta-nav";
 import { META_TAB_DURATION_S, META_TAB_EASE } from "@/lib/ui/motion";
 import { appShellMaxWidth } from "@/lib/ui/app-shell-layout";
@@ -225,7 +226,7 @@ export function AppTopBarMetaNav() {
                   aria-current={active ? "page" : undefined}
                   prefetch
                   className={cn(
-                    "group/meta-tab relative z-[1] flex shrink-0 touch-manipulation items-center gap-1.5 px-2.5 pt-1.5 pb-1.5 text-[13px] font-semibold tracking-tight",
+                    "group/meta-tab relative z-[1] flex shrink-0 touch-manipulation items-center gap-1.5 px-2.5 pt-1.5 pb-2 text-[13px] font-semibold tracking-tight",
                     "outline-none ring-0 motion-reduce:transition-none",
                     "focus-visible:outline-none focus-visible:ring-0",
                     active ? "text-foreground" : "text-topbar-muted"
@@ -249,6 +250,9 @@ export function AppTopBarMetaNav() {
                 </Link>
               );
             })}
+
+            {/* Temporary: Login lives in the submenu until auth ships. */}
+            <TopBarLoginButton variant="meta" className="hidden md:flex" />
           </nav>
         </div>
       </div>

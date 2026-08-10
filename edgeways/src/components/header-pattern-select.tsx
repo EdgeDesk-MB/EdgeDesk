@@ -24,7 +24,7 @@ export function HeaderPatternSelect({
         <Layers className="size-4 text-muted-foreground" aria-hidden />
         <Label className="text-sm font-semibold">Header pattern</Label>
       </div>
-      <p className="text-[11px] text-muted-foreground">Top bar texture.</p>
+      <p className="text-xs text-muted-foreground">Top bar texture.</p>
       <div
         role="listbox"
         aria-label="Header pattern"
@@ -58,7 +58,7 @@ export function HeaderPatternSelect({
                 }
                 aria-hidden
               />
-              <span className="truncate text-[11px] font-medium text-foreground">
+              <span className="truncate text-xs font-medium text-foreground">
                 {opt.label}
               </span>
             </button>

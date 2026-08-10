@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main
             className={cn(
               pagePanel,
-              "flex w-full flex-col dark:shadow-none",
+              "flex w-full flex-col",
               "max-sm:rounded-none max-sm:shadow-none max-sm:ring-0"
             )}
           >

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,15 +19,15 @@ export default function SupportPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">While this page fills out</CardTitle>
           <CardDescription>
-            Guides cover day-to-day how-tos. Contact us is for direct messages.
+            Guides cover day-to-day how-tos. Feedback is for bugs, ideas, and direct notes.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/help">Open guides</Link>
+          <Button asChild {...pagePrimaryButtonProps}>
+            <Link href="/feedback">Send feedback</Link>
           </Button>
-          <Button asChild variant="outline">
-            <Link href="/contact">Contact us</Link>
+          <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+            <Link href="/help">Open guides</Link>
           </Button>
         </CardContent>
       </Card>

@@ -6,9 +6,13 @@ import { Button } from "@/components/ui/button";
 import { VenueBadge } from "@/components/venue-badge";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import { useAddBet } from "@/components/add-bet-provider";
+import { useAccaRun } from "@/components/acca-run-provider";
+import { useBetBuilderRun } from "@/components/bet-builder-run-provider";
+import { useScopePlaceChooser } from "@/components/scope-place-chooser-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
+import { beginEffort } from "@/lib/effort-timer";
 import { isOfferExpired } from "@/lib/offers/offer-inactive-ui";
 import {
   keepFirstRecurringInstance,
@@ -16,24 +20,31 @@ import {
   type DoNextItem,
   type DoNextSort,
 } from "@/lib/offers/do-next";
+import {
+  deriveFreeBetLotConvertAction,
+  resolveTrackBetDestination,
+} from "@/lib/offers/offer-track-bet";
 import type { OfferSummary } from "@/lib/services/offers.types";
-import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
+import {
+  convertFreeBetButtonClass,
+  offerCampaignCardInteractive,
+  offerCampaignCardShell,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { ListOrdered, Sparkles, Timer } from "lucide-react";
+import { ListOrdered, Sparkles, Star, Timer } from "lucide-react";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import type { EvBasis } from "@/lib/offers/advantage";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
-import { beginEffort } from "@/lib/effort-timer";
+import { formatEvGbp } from "@/lib/format-money";
 
 /** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
 function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: EvBasis }) {
   if (remainingEv <= 0.5) return null;
-  const amount = remainingEv >= 10 ? remainingEv.toFixed(0) : remainingEv.toFixed(1);
   return (
     <div className="shrink-0 text-right">
       <EvBasisBadge basis={basis} className="mb-0.5 justify-end" />
       <p className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-        £{amount}
+        {formatEvGbp(remainingEv)}
       </p>
     </div>
   );
@@ -78,7 +89,8 @@ function DoNextCard({
 
   const cardClass = cn(
     offerCampaignCardShell,
-    "min-h-[148px] rounded-[20px]",
+    // Stronger glassy face than campaign default — see .do-next-card in globals.
+    "do-next-card min-h-[148px] rounded-[20px]",
     layout === "stack"
       ? "w-full"
       : "w-[min(100%,300px)] shrink-0 snap-start"
@@ -90,7 +102,7 @@ function DoNextCard({
         className={cn(
           "flex min-h-full min-w-0 flex-1 flex-col",
           headerTint ?? "bg-card",
-          isBest && "bg-primary/[0.03]"
+          isBest && "bg-brand/[0.03]"
         )}
       >
         <div className="flex items-start gap-2 px-4 pt-4">
@@ -98,17 +110,24 @@ function DoNextCard({
             {item.bookmaker ? <VenueBadge name={item.bookmaker} size="sm" /> : null}
             {/* Warning-toned gubbed / muted cooling - matches the Accounts health chips */}
             {item.health === "gubbed" ? (
-              <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
+              <span className="inline-flex items-center rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warning">
                 Gubbed
               </span>
             ) : item.health === "cooling" ? (
-              <span className="inline-flex items-center rounded-full border border-muted-foreground/30 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              <span className="inline-flex items-center rounded-full border border-muted-foreground/30 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                 Cooling
               </span>
             ) : null}
             {isBest ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                <Sparkles className="size-2.5" aria-hidden />
+              <span
+                className={cn(
+                  // Match VenueBadge size="sm" box (incl. 1px border) exactly.
+                  "do-next-best-pill inline-flex items-center gap-1 overflow-hidden rounded-full border border-transparent",
+                  "bg-brand px-2 py-0.5 text-[11px] font-semibold leading-tight text-brand-foreground",
+                  "shadow-[var(--ew-chip-shadow)]"
+                )}
+              >
+                <Star className="size-2.5 shrink-0" aria-hidden />
                 Best
               </span>
             ) : null}
@@ -122,12 +141,12 @@ function DoNextCard({
             <p className="mt-0.5 truncate text-sm font-medium text-foreground">{item.offerTitle}</p>
           ) : null}
           {item.expiryLabel && item.daysLeft != null && item.daysLeft <= 2 ? (
-            <p className="mt-0.5 text-[10px] font-medium tabular-nums text-rose-700 dark:text-rose-300">
+            <p className="mt-0.5 text-[11px] font-medium tabular-nums text-rose-700 dark:text-rose-300">
               {item.expiryLabel}
             </p>
           ) : null}
           {item.funding && item.funding.short > 0 ? (
-            <p className="mt-0.5 text-[10px] font-medium tabular-nums text-orange-700 dark:text-orange-300">
+            <p className="mt-0.5 text-[11px] font-medium tabular-nums text-orange-700 dark:text-orange-300">
               £{item.funding.short.toFixed(2)} short at {item.bookmaker}
             </p>
           ) : null}
@@ -135,22 +154,26 @@ function DoNextCard({
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.detail}</p>
           ) : null}
 
-          <div className="mt-auto flex justify-end pt-2">
+          <div
+            className="mt-auto flex justify-end pt-2"
+            data-do-next-action
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             {item.convertLot ? (
               <Button
                 type="button"
                 size="sm"
-                variant={isBest ? "default" : "outline"}
-                className="h-7 shrink-0 text-[11px]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onConvert(item);
-                }}
+                variant="edge"
+                className={convertFreeBetButtonClass}
+                onClick={() => onConvert(item)}
               >
                 Convert
               </Button>
             ) : onOpen && item.offerId != null ? (
-              <span className="text-[11px] font-medium text-primary-text opacity-70 transition-opacity group-hover:opacity-100">
+              <span className="text-xs font-medium text-primary-text opacity-70 transition-opacity group-hover:opacity-100">
                 Open →
               </span>
             ) : null}
@@ -165,14 +188,17 @@ function DoNextCard({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onOpen(item)}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("[data-do-next-action]")) return;
+          onOpen(item);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onOpen(item);
           }
         }}
-        className={cn(cardClass, "cursor-pointer hover:brightness-[0.98] dark:hover:brightness-110")}
+        className={cn(cardClass, offerCampaignCardInteractive)}
       >
         {body}
       </div>
@@ -190,6 +216,9 @@ function DoNextCard({
 export function DashboardDoNext({ className }: { className?: string }) {
   const { items: allItems, state } = useDoNextItems(5000);
   const { openAddBet } = useAddBet();
+  const { openAccaRun } = useAccaRun();
+  const { openBetBuilderRun } = useBetBuilderRun();
+  const { openScopeChooser } = useScopePlaceChooser();
   const { viewOffer } = useOfferDialog();
   const [sort, setSort] = useState<DoNextSort>("priority");
 
@@ -204,15 +233,41 @@ export function DashboardDoNext({ className }: { className?: string }) {
   function onConvert(item: DoNextItem) {
     const lot = item.convertLot;
     if (!lot) return;
-    openAddBet({
-      betType: "free_snr",
-      bookmaker: lot.accountName,
-      backStake: lot.remaining,
-      labelSuggestion: lot.labelSuggestion,
+    const offer =
+      item.offerId != null ? offers.find((o) => o.id === item.offerId) ?? null : null;
+    const action = deriveFreeBetLotConvertAction(
+      { remaining: lot.remaining, accountName: lot.accountName },
+      offer,
+      state?.settings
+    );
+    const opened = resolveTrackBetDestination(action, {
+      openAddBet: (prefill) =>
+        openAddBet({
+          ...prefill,
+          labelSuggestion: lot.labelSuggestion ?? prefill.labelSuggestion,
+        }),
+      openAccaRun,
+      openBetBuilderRun,
+      openScopeChooser,
     });
-    toast.message("Add bet opened", {
-      description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
-    });
+    if (!opened) return;
+    if (action.destination.kind === "acca_desk") {
+      toast.message("Acca Desk opened", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    } else if (action.destination.kind === "bet_builder_desk") {
+      toast.message("Bet Builder Desk opened", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    } else if (action.destination.kind === "choose") {
+      toast.message("Choose how to convert", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    } else {
+      toast.message("Add bet opened", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    }
   }
 
   function onOpenCard(item: DoNextItem) {
@@ -250,12 +305,14 @@ export function DashboardDoNext({ className }: { className?: string }) {
         className="bg-page"
         titleHref="/offers"
         title="Do next"
-        description={
-          "Best first - same cards, different sort.\n\nPriority: expiring offers and open actions first.\nEdge: highest estimated remaining EV first.\nRate: highest £/hr estimated value first."
-        }
-        descriptionAriaLabel="Best first. Priority sorts by urgency. Edge sorts by estimated remaining EV. Rate sorts by EV per hour of effort."
+        description={"Priority: urgency\nEdge: remaining EV\nRate: £/hr"}
+        descriptionAriaLabel="Sort Do next. Priority by urgency, Edge by remaining EV, Rate by pounds per hour."
         action={
-          <Tabs value={sort} onValueChange={(v) => setSort(v as DoNextSort)}>
+          <Tabs
+            value={sort}
+            onValueChange={(v) => setSort(v as DoNextSort)}
+            activationMode="manual"
+          >
             <TabsList variant="segmented">
               <TabsTrigger value="priority">
                 <ListOrdered className="size-3.5 shrink-0" aria-hidden />
@@ -275,7 +332,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
       />
 
       {sort === "rate" ? (
-        <p className="px-[var(--layout-card-x)] pt-2 text-[11px] text-muted-foreground">
+        <p className="px-[var(--layout-card-x)] pt-2 text-xs text-muted-foreground">
           {(() => {
             const measured = Object.values(state?.effortMeasured ?? {});
             const n = measured.reduce((a, m) => a + m.sampleSize, 0);
@@ -297,6 +354,10 @@ export function DashboardDoNext({ className }: { className?: string }) {
           orientation="horizontal"
           dragToScroll
           springSnap
+          pinScrollStart
+          // Re-pin when the leader changes (lots/edge often prepend a convert
+          // card after first paint) or the queue length settles on load.
+          scrollStartKey={`${sort}:${items[0]?.id ?? ""}:${items.length}`}
           scrollClassName={cn(
             "app-scroll-overlay overflow-x-auto overflow-y-visible",
             "snap-x snap-mandatory",

@@ -32,11 +32,14 @@ describe("brand-accent contrast", () => {
     expect(mutedForegroundOn("#2BB673")).toBe("#FFFFFF");
   });
 
-  it("boosts light-mode logo vibrance vs raw brand", () => {
+  it("lifts dark logos to the ink-topbar floor and leaves light brands unchanged", () => {
     const boosted = boostBrandForLightLogo("#2BB673");
     expect(boosted).toMatch(/^#[0-9A-F]{6}$/);
     expect(boosted).not.toBe("#2BB673");
-    expect(relativeLuminance(boosted)).toBeGreaterThan(relativeLuminance("#2BB673"));
+    expect(relativeLuminance(boosted)).toBeGreaterThanOrEqual(
+      BRAND_TEXT_MIN_LUMINANCE
+    );
+    expect(boostBrandForLightLogo("#FFC71E")).toBe("#FFC71E");
   });
 
   it("keeps light brand-text as the raw colour", () => {
@@ -91,8 +94,11 @@ describe("brand-accent contrast", () => {
     );
     expect(viridian.brandHighlight).toBe("#2BB673");
     expect(viridian.brandLogo).not.toBe("#2BB673");
+    expect(relativeLuminance(viridian.brandLogo)).toBeGreaterThanOrEqual(
+      BRAND_TEXT_MIN_LUMINANCE
+    );
     expect(viridian.brandPlateDark).toBe(true);
-    // Logo boost can cross the plate threshold — Login uses logo contrast/face
+    // Logo lift clears the plate threshold — ink type + raised Login face.
     expect(viridian.brandLogoForeground).toBe("#111111");
     expect(viridian.topbarAccentFaceShadow).toBe("var(--ew-btn-shadow)");
   });

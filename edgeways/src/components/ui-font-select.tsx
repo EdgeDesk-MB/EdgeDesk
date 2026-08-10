@@ -32,7 +32,7 @@ export function UiFontSelect({
           Font
         </Label>
       </div>
-      <p className="text-[11px] text-muted-foreground">Desk typeface.</p>
+      <p className="text-xs text-muted-foreground">Desk typeface.</p>
       <Select
         value={fontId}
         onValueChange={(v) => {

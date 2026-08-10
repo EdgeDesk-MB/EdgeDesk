@@ -122,6 +122,8 @@
   --color-selection-subdued: var(--selection-subdued);
   --color-selection-subtle-border: var(--selection-subtle-border);
   --color-selection-subdued-border: var(--selection-subdued-border);
+  --color-stat-tile-selected: var(--stat-tile-selected);
+  --color-stat-tile-selected-border: var(--stat-tile-selected-border);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
@@ -162,11 +164,12 @@
 
 :root {
   /* Three-layer hierarchy: canvas (app shell) → page (main panel) → card (lifted blocks) */
-  --canvas: oklch(0.975 0.002 250);
-  --page: oklch(0.988 0.002 250);
-  --surface: oklch(1 0 0);
+  --canvas: oklch(0.915 0.002 250);
+  /* Same lightness as before; chroma 0 so it reads white-neutral, not cool grey */
+  --page: oklch(0.942 0 0);
+  --surface: oklch(0.955 0 0);
   --surface-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
-  --page-shadow: 0 0 14px rgb(0 0 0 / 0.11), 0 0 3px rgb(0 0 0 / 0.06);
+  --page-shadow: 0 0 8px rgb(0 0 0 / 0.06), 0 0 2px rgb(0 0 0 / 0.03);
   /* Raised controls — Shopify/Polaris shadow-button recipe (shared by
    * PressButton faces, flat outline triggers, fields, selects).
    * No outer drop. Top shine lives in the shadow so native <input>/
@@ -177,11 +180,31 @@
   --ew-btn-shadow-pressed: inset 0 1px 0.5px 0 rgb(0 0 0 / 0.12),
     inset 0.5px 0 0.5px 0 rgb(0 0 0 / 0.06),
     inset -0.5px 0 0.5px 0 rgb(0 0 0 / 0.06);
-  /* Ink chips / segmented active — soft light rims only. Full button
-   * recipe (hot top shine + dark lip) reads as a heavy bezel on #111. */
-  --ew-chip-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.16),
+  /*
+   * Accent / brand-plate faces (filter pills, segmented active tabs).
+   * Light mode: soft dark inset rims — reverse of dark-mode lighten,
+   * kept lighter than dark’s white rims so yellow plates don’t punch.
+   * Dark mode (below): soft white rims — do not change that recipe.
+   */
+  --ew-chip-shadow: inset 0 1px 0 0 rgb(0 0 0 / 0.08),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.06),
+    inset 0 0 0 1px rgb(0 0 0 / 0.05);
+  /* Ink / #111 plates in light — white lighten rims (Login, dark topbar). */
+  --ew-ink-plate-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.16),
     inset 0 -1px 0 0 rgb(255 255 255 / 0.07),
     inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  /*
+   * Lifted containers (Cards, surface-lift, page-panel, calc panels).
+   * Quieter than chip / Do next — soft top catch, no boxy stroke.
+   */
+  --ew-surface-face: inset 0 1px 0 0 rgb(255 255 255 / 0.5),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.05),
+    inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  --ew-surface-rim: 0 0 0 1px rgb(0 0 0 / 0.04);
+  /* Selected StatTile face — a step above quiet surface-lift (campaign language) */
+  --ew-stat-tile-selected-face: inset 0 1px 0 0 rgb(255 255 255 / 0.72),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.08),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08);
   /* Login / burger face — brand apply overrides to chip when plate is dark */
   --topbar-accent-face-shadow: var(--ew-btn-shadow);
   --shadow-skeuo-inset: var(--ew-btn-shadow);
@@ -228,7 +251,9 @@
   --accent: oklch(0.965 0.002 250);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --negative: oklch(0.577 0.245 27.325);
+  /* Loss / holding status — deeper brick, chroma in line with success/warning
+   * (was 0.245 and read neon on page white, especially large Racing Desk type). */
+  --negative: oklch(0.5 0.14 25);
   --success: oklch(0.45 0.12 150);
   --warning: oklch(0.55 0.14 75);
   /* Offer Edge / Race picks / pro-tier signature (violet family, not caution amber) */
@@ -260,6 +285,11 @@
   --selection-subdued: oklch(0.935 0.003 250);
   --selection-subtle-border: oklch(0.91 0 0);
   --selection-subdued-border: oklch(0.875 0 0);
+  /* Interactive StatTile selected plate — white lift vs --surface */
+  --stat-tile-selected: oklch(1 0 0);
+  --stat-tile-selected-border: oklch(0.86 0 0);
+  --stat-tile-hover-mix: 42%;
+  --stat-tile-press-mix: 70%;
   /* Header + meta-nav: ink plate + yellow stripe / yellow Login */
   --topbar: oklch(0.178 0 0); /* #111111 */
   --topbar-foreground: oklch(1 0 0); /* white */
@@ -274,9 +304,10 @@
   --layout-page-x: 1.25rem;
   --layout-shell-gap: 0.25rem;
   --layout-page-radius: calc(var(--radius) * 2);
-  --layout-stack-gap: 1.25rem;
+  /* Page / section stack — room between graph and breakdown lists, etc. */
+  --layout-stack-gap: 2rem;
   --layout-stack-gap-compact: 0.75rem;
-  --layout-card-x: 1rem;
+  --layout-card-x: 1.25rem;
   --layout-section-y: 0.75rem;
   /* Viewport content area below sticky header + shell padding.
    * Header row (~4rem) + meta-nav strip (~2.25rem) at all breakpoints. */
@@ -292,12 +323,10 @@
   --chrome-tab-r-hang-bottom: 12px;
   /* Top accent stripe above the header */
   --topbar-stripe-h: 4px;
-  /* Segmented control - 2px vertical / 1px horizontal track inset, 32px segments */
+  /* Segmented control — 2px track inset all sides + full pill radius */
   --segmented-track-pad: 2px;
-  --segmented-track-pad-x: 1px;
+  --segmented-track-pad-x: 2px;
   --segmented-radius: 9999px;
-  --offer-card-details-fade: color-mix(in oklch, var(--muted) 6%, var(--card));
-  --offer-card-details: color-mix(in oklch, var(--muted) 22%, var(--card));
 }
 
 @media (min-width: 1024px) {
@@ -316,9 +345,9 @@
 
 .dark {
   /* Subtle lift vs previous 0.128 / 0.158 - keeps dark character, less cave-like */
-  --canvas: oklch(0.18 0.003 250);
-  --page: oklch(0.21 0.004 250);
-  --surface: oklch(0.25 0.003 250);
+  --canvas: oklch(0.15 0.003 250);
+  --page: oklch(0.18 0.004 250);
+  --surface: oklch(0.235 0.003 250);
   --surface-shadow: none;
   --page-shadow: none;
   /* Dark plates: lighten edges (top + bottom shine), kept soft so faces
@@ -330,7 +359,18 @@
     inset 0 -0.5px 0 0 rgb(255 255 255 / 0.06),
     inset 0.5px 0 0.5px 0 rgb(0 0 0 / 0.16),
     inset -0.5px 0 0.5px 0 rgb(0 0 0 / 0.16);
+  /* Nailed: soft white lighten rims on dark/brand plates — never change. */
   --ew-chip-shadow: var(--ew-btn-shadow);
+  --ew-ink-plate-shadow: var(--ew-chip-shadow);
+  /* Container face — a touch under chip so large plates stay quiet */
+  --ew-surface-face: inset 0 1px 0 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 0 rgb(255 255 255 / 0.07),
+    inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  --ew-surface-rim: 0 0 0 1px rgb(255 255 255 / 0.06);
+  /* Selected StatTile face — between chip and do-next strength */
+  --ew-stat-tile-selected-face: inset 0 1px 0 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 0 rgb(255 255 255 / 0.12),
+    inset 0 0 0 1px rgb(255 255 255 / 0.14);
   /* Dark-mode Login is ink #111 — keep soft lighten face */
   --topbar-accent-face-shadow: var(--ew-chip-shadow);
   --shadow-skeuo-inset: var(--ew-btn-shadow);
@@ -386,6 +426,9 @@
   --selection-subdued: oklch(0.28 0 0);
   --selection-subtle-border: oklch(1 0 0 / 12%);
   --selection-subdued-border: oklch(1 0 0 / 18%);
+  /* Interactive StatTile selected plate — lifted grey vs --surface */
+  --stat-tile-selected: oklch(0.36 0 0);
+  --stat-tile-selected-border: oklch(1 0 0 / 24%);
   /* Brand plate + contrast ink/white (from --brand-on-topbar); ink Login */
   --topbar: var(--brand);
   --topbar-foreground: var(--brand-on-topbar);
@@ -395,8 +438,6 @@
   --topbar-accent: oklch(0.178 0 0); /* #111111 — Login / burger */
   --topbar-accent-foreground: oklch(1 0 0); /* white — Login icon + label */
   --topbar-stripe: oklch(0.178 0 0); /* #111111 */
-  --offer-card-details-fade: color-mix(in oklch, var(--muted) 28%, var(--card));
-  --offer-card-details: color-mix(in oklch, var(--muted) 48%, var(--card));
 }
 
 @layer base {
@@ -561,8 +602,9 @@ html[data-font="figtree"] {
 
 @layer utilities {
   .page-panel {
+    position: relative;
     background-color: var(--page);
-    box-shadow: var(--page-shadow);
+    box-shadow: var(--page-shadow), var(--ew-surface-rim);
     border-radius: var(--layout-page-radius);
     /* Clip section headers (e.g. Home Summary) so they follow the panel radius */
     overflow: hidden;
@@ -573,17 +615,87 @@ html[data-font="figtree"] {
       border-radius: 0;
       box-shadow: none;
     }
+    .page-panel::after {
+      content: none;
+    }
   }
   .dark .page-panel {
-    box-shadow: none;
+    box-shadow: var(--ew-surface-rim);
   }
 
   .surface-lift {
+    position: relative;
     background-color: var(--surface);
-    box-shadow: var(--surface-shadow);
+    box-shadow: var(--surface-shadow), var(--ew-surface-rim);
   }
   .dark .surface-lift {
-    box-shadow: none;
+    box-shadow: var(--ew-surface-rim);
+  }
+
+  /**
+   * Interactive StatTile summary tabs — selected fill must beat `.surface-lift`
+   * background (same utilities layer). White (light) / lifted grey (dark) plate
+   * plus a stronger glossy face so the active tab reads at a glance.
+   */
+  .surface-lift[data-stat-tile]:hover:not([aria-pressed="true"]) {
+    background-color: color-mix(
+      in oklab,
+      var(--surface),
+      var(--stat-tile-selected) var(--stat-tile-hover-mix)
+    );
+  }
+  .surface-lift[data-stat-tile]:active:not([aria-pressed="true"]) {
+    background-color: color-mix(
+      in oklab,
+      var(--surface),
+      var(--stat-tile-selected) var(--stat-tile-press-mix)
+    );
+  }
+  /* Rim via box-shadow only (layout border stays transparent; no ring stack). */
+  .surface-lift[data-stat-tile][aria-pressed="true"] {
+    background-color: var(--stat-tile-selected);
+    box-shadow: var(--surface-shadow), 0 0 0 1px var(--stat-tile-selected-border);
+  }
+  .dark .surface-lift[data-stat-tile][aria-pressed="true"] {
+    box-shadow: 0 0 0 1px var(--stat-tile-selected-border);
+  }
+
+  /**
+   * Minimal glassy face for lifted containers (Acca Desk / page-panel language).
+   * Quieter than chips and .do-next-card. Campaign cards keep their own ::after.
+   */
+  .surface-glass,
+  .surface-lift:not(.offer-campaign-card),
+  .page-panel,
+  [data-slot="card"]:not(.offer-campaign-card) {
+    position: relative;
+  }
+
+  .surface-glass::after,
+  .surface-lift:not(.offer-campaign-card)::after,
+  .page-panel::after,
+  [data-slot="card"]:not(.offer-campaign-card)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+    box-shadow: var(--ew-surface-face);
+  }
+
+  /* Selected summary tab — stronger glossy face (must follow quiet surface ::after). */
+  .surface-lift[data-stat-tile][aria-pressed="true"]::after {
+    box-shadow: var(--ew-stat-tile-selected-face);
+  }
+
+  .surface-glass {
+    box-shadow: var(--ew-surface-rim);
+  }
+
+  /* Cards keep a light ring; dark relies on the soft rim + face (no boxy stroke). */
+  .dark [data-slot="card"]:not(.offer-campaign-card) {
+    box-shadow: var(--ew-surface-rim);
   }
 
   /* Liveline renders window controls + chart as fragment siblings - cap total height */
@@ -798,8 +910,9 @@ html[data-font="figtree"] {
   }
 
   /**
-   * Lifted surfaces with a 1px light inset line (offer campaign cards, modals).
-   * Pair with an outer ring-1 ring-border/50 (dark: darkened border mix).
+   * Lifted surfaces — same Shopify / glassy face as buttons, chips and
+   * ChromeTab plates (top shine + soft lip), not a flat 1px white stroke.
+   * Pair with outer ring-1 ring-border/50 in light; dark relies on the face.
    * Do NOT set position on .modal-surface — DialogContent uses `fixed`; a
    * relative override here knocked modals below the viewport.
    * ::after still anchors: `fixed` / other positioned ancestors create the CB.
@@ -814,33 +927,93 @@ html[data-font="figtree"] {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: inset 0 0 0 1px #fff;
+    /* Light plate — match [data-chrome-tab="rise"] > .chrome-tab-plate */
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.65),
+      inset 0 -1px 0 0 rgb(0 0 0 / 0.08),
+      inset 0 0 0 1px rgb(0 0 0 / 0.08);
     pointer-events: none;
     z-index: 1;
   }
 
   .dark .offer-campaign-card::after,
   .dark .modal-surface::after {
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+    /* Soft white lighten rims — same token as filter pills / segmented tabs */
+    box-shadow: var(--ew-chip-shadow);
   }
 
-  /** Calendar cards - white inset skips the priority bar column */
+  /** Calendar cards - face inset skips the priority bar column */
   .offer-calendar-card::after {
     inset: 0 0 0 0.25rem;
   }
 
-  .dark .offer-calendar-card::after {
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  /**
+   * Do next cards — amplify the segmented-tab / ChromeTab glassy face so it
+   * still reads on a large plate (chip rims alone wash out at card scale).
+   * Padding / radius stay on the component; this is border chrome only.
+   */
+  .do-next-card {
+    /* Soft outer edge so the plate separates from --page (dark drops shell ring). */
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.05);
   }
 
-  /** Offer campaign cards - details band: pale grey→mid grey (left half), solid mid grey (right half) */
-  .offer-card-details {
+  .do-next-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    pointer-events: none;
+    /* Convex glass wash + top catch (ChromeTab rise ::before language). */
     background: linear-gradient(
-      to right,
-      var(--offer-card-details-fade) 0,
-      var(--offer-card-details) 50%,
-      var(--offer-card-details) 100%
+      to bottom,
+      rgb(255 255 255 / 0.07) 0%,
+      rgb(255 255 255 / 0.02) 28%,
+      transparent 55%
     );
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.42);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 32%,
+      transparent 72%
+    );
+    mask-image: linear-gradient(to bottom, #000 0%, #000 32%, transparent 72%);
+  }
+
+  .do-next-card::after {
+    /* Light — rise-tab plate, a step above campaign default */
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.58),
+      inset 0 -1px 0 0 rgb(0 0 0 / 0.08),
+      inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  }
+
+  .dark .do-next-card {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+
+  .dark .do-next-card::before {
+    background: linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.05) 0%,
+      rgb(255 255 255 / 0.015) 30%,
+      transparent 55%
+    );
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.2);
+  }
+
+  .dark .do-next-card::after {
+    /* Between --ew-chip-shadow and the stronger draft — Priority geometry, quieter */
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.18),
+      inset 0 -1px 0 0 rgb(255 255 255 / 0.1),
+      inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  }
+
+  /** Campaign Details band — same plate as Racing Desk Courses (`bg-selection-subtle/50`) */
+  .offer-card-details {
+    background-color: color-mix(in oklch, var(--selection-subtle) 50%, transparent);
   }
 
 }
@@ -869,6 +1042,28 @@ html[data-font="figtree"] {
 
 .bet-row-highlight {
   animation: bet-row-highlight-fade 2s ease-out forwards;
+}
+
+/* Place-refund free-bet zone — same violet-500/400 family as Gift / Free bet rail. */
+.free-bet-place-row {
+  background-color: color-mix(in oklab, var(--color-violet-500, #8b5cf6) 4%, transparent);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    color-mix(in oklab, var(--color-violet-500, #8b5cf6) 10%, transparent) 4px,
+    color-mix(in oklab, var(--color-violet-500, #8b5cf6) 10%, transparent) 5px
+  );
+}
+.dark .free-bet-place-row {
+  background-color: color-mix(in oklab, var(--color-violet-500, #8b5cf6) 5%, transparent);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    color-mix(in oklab, var(--color-violet-400, #a78bfa) 12%, transparent) 4px,
+    color-mix(in oklab, var(--color-violet-400, #a78bfa) 12%, transparent) 5px
+  );
 }
 
 /*
@@ -963,14 +1158,58 @@ html[data-font="figtree"] {
    * Rise (meta): top shine. Hang (balance): bottom shine.
    * Soft 1px rims — no chunky 3px dark lip.
    */
-  .chrome-tab-plate {
+  /* Bevel on the tab root so plate + ear siblings share the same tokens. */
+  [data-chrome-tab] {
     --chrome-tab-bevel: rgb(255 255 255 / 0.45);
     --chrome-tab-bevel-bottom: rgb(255 255 255 / 0.22);
   }
 
-  .dark .chrome-tab-plate {
+  .dark [data-chrome-tab] {
     --chrome-tab-bevel: rgb(255 255 255 / 0.2);
     --chrome-tab-bevel-bottom: rgb(255 255 255 / 0.14);
+  }
+
+  /*
+   * Concave ear rim shine — 1px ring on the circle arc, same bevel as the plate.
+   * Rise (submenu): fade to 0 toward the bottom (into the topbar strip).
+   * Hang (balance): fade to 0 toward the top (into the header strip).
+   */
+  .chrome-tab-ear::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px var(--chrome-tab-bevel);
+  }
+
+  [data-chrome-tab="rise"] .chrome-tab-ear::after {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 28%,
+      transparent 85%
+    );
+    mask-image: linear-gradient(to bottom, #000 0%, #000 28%, transparent 85%);
+  }
+
+  [data-chrome-tab="hang"] .chrome-tab-ear::after {
+    box-shadow: 0 0 0 1px var(--chrome-tab-bevel-bottom);
+    -webkit-mask-image: linear-gradient(
+      to top,
+      #000 0%,
+      #000 28%,
+      transparent 85%
+    );
+    mask-image: linear-gradient(to top, #000 0%, #000 28%, transparent 85%);
+  }
+
+  .dark [data-chrome-tab="rise"] .chrome-tab-ear::after {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18);
+  }
+
+  .dark [data-chrome-tab="hang"] .chrome-tab-ear::after {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.16);
   }
 
   /* Light plate (light-mode rise) — soft top shine + thin lip */
@@ -1026,13 +1265,15 @@ html[data-font="figtree"] {
   }
 
   /* Meta-nav press — same 0.25px shunt as PressButton */
-  a[data-meta-nav] {
+  a[data-meta-nav],
+  button[data-meta-nav] {
     transition:
       transform 0.12s ease-out,
       color 0.1s linear;
   }
 
-  a[data-meta-nav]:active {
+  a[data-meta-nav]:active,
+  button[data-meta-nav]:active {
     transform: translate3d(0, 0.25px, 0);
   }
 
@@ -1057,9 +1298,9 @@ html[data-font="figtree"] {
     box-shadow: var(--ew-btn-shadow-pressed);
   }
 
-  /* Mobile drawer Login on ink — always soft chip (not brand-luminance token) */
+  /* Mobile drawer Login on ink — white lighten rims in light, chip in dark */
   .topbar-accent-face-ink.skeuo-solid {
-    box-shadow: var(--ew-chip-shadow);
+    box-shadow: var(--ew-ink-plate-shadow);
   }
 
   .dark .topbar-accent-face-ink.skeuo-solid {
@@ -1080,6 +1321,61 @@ html[data-font="figtree"] {
   to {
     transform: translateX(280%) skewX(-18deg);
   }
+}
+
+/* Soft sheen sweep — Do next "Best" (idle loop) + Race picks nav mark (on change) */
+@keyframes do-next-best-shine {
+  0%,
+  72% {
+    transform: translateX(-130%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-16deg);
+  }
+}
+
+@keyframes sheen-sweep-once {
+  from {
+    transform: translateX(-130%) skewX(-16deg);
+  }
+  to {
+    transform: translateX(220%) skewX(-16deg);
+  }
+}
+
+.do-next-best-pill,
+.edge-count-mark {
+  position: relative;
+  isolation: isolate;
+}
+
+.do-next-best-pill::after,
+.edge-count-mark.is-shining::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 12%,
+    rgb(255 255 255 / 0.06) 28%,
+    rgb(255 255 255 / 0.18) 50%,
+    rgb(255 255 255 / 0.06) 72%,
+    transparent 88%,
+    transparent 100%
+  );
+  transform: translateX(-130%) skewX(-16deg);
+  pointer-events: none;
+}
+
+.do-next-best-pill::after {
+  animation: do-next-best-shine 5.5s ease-in-out infinite;
+}
+
+.edge-count-mark.is-shining::after {
+  animation: sheen-sweep-once 0.9s ease-in-out 1;
 }
 
 [data-variant="pagePrimary"]:not(.edgeways-btn-3d)::after {
@@ -1120,11 +1416,16 @@ html[data-font="figtree"] {
   z-index: 1;
 }
 
-/* Side-nav expandable group - 150ms springy open/close */
+/*
+ * Side-nav expandable group — height collapse (no overshoot; spring curves
+ * glitch on 0fr/1fr) with a soft top/bottom mask so labels fade at the clip
+ * edge instead of hard-cutting over neighbours (same idea as Feed fades).
+ * `data-settled` clears the mask once open height has landed.
+ */
 .nav-sub-panel {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 150ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition: grid-template-rows 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-sub-panel[data-open="true"] {
@@ -1134,10 +1435,31 @@ html[data-font="figtree"] {
 .nav-sub-panel > .nav-sub-panel-inner {
   min-height: 0;
   overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
 }
 
-.nav-sub-panel[data-open="true"] > .nav-sub-panel-inner {
-  overflow: visible;
+.nav-sub-panel[data-open="true"][data-settled="true"] > .nav-sub-panel-inner {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-sub-panel {
+    transition: none;
+  }
 }
 
 /**
@@ -1150,12 +1472,82 @@ html[data-font="figtree"] {
 }
 
 /**
+ * OnEvent / automation alerts — default popover face (not richColors info blue)
+ * with a brand accent rail. Close is forced top-right (Sonner defaults top-left).
+ */
+[data-sonner-toast].edge-alert-toast {
+  --normal-bg: var(--popover);
+  --normal-text: var(--popover-foreground);
+  --normal-border: var(--border);
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-left: 3px solid var(--highlight) !important;
+  box-shadow: var(--page-shadow);
+}
+
+[data-sonner-toast].edge-alert-toast [data-title],
+[data-sonner-toast].edge-alert-toast .edge-alert-toast-title {
+  color: var(--popover-foreground) !important;
+}
+
+/* Lead copy must stay neutral even if a parent picks up polarity colour. */
+[data-sonner-toast].edge-alert-toast .edge-alert-toast-title-lead {
+  color: var(--popover-foreground) !important;
+  font-weight: inherit;
+}
+
+/* Match MoneyFlow signColor (emerald-600 / emerald-400 / --negative) on £ only. */
+[data-sonner-toast].edge-alert-toast .edge-alert-toast-amount-positive {
+  color: #059669 !important; /* emerald-600 */
+}
+.dark [data-sonner-toast].edge-alert-toast .edge-alert-toast-amount-positive {
+  color: #34d399 !important; /* emerald-400 */
+}
+[data-sonner-toast].edge-alert-toast .edge-alert-toast-amount-negative {
+  color: var(--negative) !important;
+}
+
+[data-sonner-toast].edge-alert-toast.edge-alert-toast--positive {
+  border-left-color: #059669 !important;
+}
+.dark [data-sonner-toast].edge-alert-toast.edge-alert-toast--positive {
+  border-left-color: #34d399 !important;
+}
+[data-sonner-toast].edge-alert-toast.edge-alert-toast--negative {
+  border-left-color: var(--negative) !important;
+}
+
+[data-sonner-toast].edge-alert-toast [data-description],
+[data-sonner-toast].edge-alert-toast .edge-alert-toast-description {
+  color: var(--muted-foreground) !important;
+}
+
+[data-sonner-toast].edge-alert-toast [data-close-button],
+[data-sonner-toast].edge-alert-toast .edge-alert-toast-close {
+  left: auto !important;
+  right: 0 !important;
+  transform: translate(35%, -35%) !important;
+  background: var(--secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--muted-foreground) !important;
+}
+
+/* No Open / action button on these alerts. */
+[data-sonner-toast].edge-alert-toast [data-button],
+[data-sonner-toast].edge-alert-toast [data-action] {
+  display: none !important;
+}
+
+/**
  * G4 - respect the OS "reduce motion" preference: still the pulsing live
  * indicators and dialog slide/zoom animations; keep instant state changes.
  */
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
-  .animate-spin {
+  .animate-spin,
+  .do-next-best-pill::after,
+  .edge-count-mark.is-shining::after {
     animation: none !important;
   }
   [data-slot="dialog-content"],
@@ -1228,6 +1620,36 @@ html[data-font="figtree"] {
   --button-success-border: none;
 }
 
+/* Free-bet convert CTAs — solid Offer Edge violet plate */
+.aws-btn.edgeways-btn-3d.edgeways-btn-edge {
+  --button-primary-color: var(--edge);
+  --button-primary-color-dark: var(--edge);
+  --button-primary-color-light: var(--edge-foreground);
+  --button-primary-color-hover: color-mix(in oklch, var(--edge) 88%, black);
+  --button-primary-border: none;
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-btn-edge.aws-btn--primary .aws-btn__wrapper::before {
+  background: color-mix(in oklch, var(--edge) 82%, black);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-btn-edge.aws-btn--primary .aws-btn__content {
+  background: var(--edge);
+  color: var(--edge-foreground);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-btn-edge.aws-btn--primary .aws-btn__wrapper:hover .aws-btn__content {
+  background: color-mix(in oklch, var(--edge) 88%, black);
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-btn-edge {
+  --button-primary-color-hover: color-mix(in oklch, var(--edge) 88%, white);
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-btn-edge.aws-btn--primary .aws-btn__wrapper:hover .aws-btn__content {
+  background: color-mix(in oklch, var(--edge) 88%, white);
+}
+
 /* Kill pack extrusion slab + outer blob shadow */
 .aws-btn.edgeways-btn-3d::before {
   opacity: 0;
@@ -1239,24 +1661,23 @@ html[data-font="figtree"] {
 }
 
 /*
- * Tiny hover pivot (~0.5px) — no extrusion to animate underneath.
+ * Stable hover — 0.5px content shunt only. No left/right skew (moveEvents is
+ * off): zone tracking made icon+label rows jitter as the pointer crossed the face.
  */
-.aws-btn.edgeways-btn-3d.aws-btn--left:not(.aws-btn--active) .aws-btn__content {
-  transform: skewY(-0.25deg);
-}
-
-.aws-btn.edgeways-btn-3d.aws-btn--right:not(.aws-btn--active) .aws-btn__content {
-  transform: skewY(0.25deg);
-}
-
-.aws-btn.edgeways-btn-3d.aws-btn--middle:not(.aws-btn--active) .aws-btn__content {
+.aws-btn.edgeways-btn-3d:hover:not(.aws-btn--active):not(:disabled) .aws-btn__content {
   transform: translate3d(0, 0.5px, 0);
 }
 
-.aws-btn.edgeways-btn-3d.aws-btn--left:not(.aws-btn--active)::before,
-.aws-btn.edgeways-btn-3d.aws-btn--right:not(.aws-btn--active)::before,
-.aws-btn.edgeways-btn-3d.aws-btn--middle:not(.aws-btn--active)::before {
+.aws-btn.edgeways-btn-3d:hover:not(.aws-btn--active):not(:disabled)::before {
   transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aws-btn.edgeways-btn-3d:hover:not(.aws-btn--active):not(:disabled) .aws-btn__content,
+  .aws-btn.edgeways-btn-3d.aws-btn--active .aws-btn__content,
+  .aws-btn.edgeways-btn-3d.aws-btn--active .aws-btn__content > * {
+    transform: none !important;
+  }
 }
 
 .dark .aws-btn.edgeways-btn-3d {
@@ -1494,6 +1915,19 @@ html[data-font="figtree"] {
   display: block;
 }
 
+/* Multi-line choice rows — escape the fixed desk height ladder */
+.aws-btn.edgeways-btn-3d.h-auto {
+  --button-default-height: auto;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.aws-btn.edgeways-btn-3d.h-auto .aws-btn__content {
+  height: auto !important;
+  min-height: 0;
+  white-space: normal;
+}
+
 /* Let root text-* / muted utilities tint the face */
 .aws-btn.edgeways-btn-3d.text-muted-foreground .aws-btn__content,
 .aws-btn.edgeways-btn-3d.text-destructive .aws-btn__content,
@@ -1524,13 +1958,13 @@ html[data-font="figtree"] {
 
 /*
  * Connected split button — two filled segments (M3 layout, Edgeways radius).
- * Gap is owned by `[data-slot=split-button]` (2px). Outer corners use
+ * Gap is owned by `[data-slot=split-button]` (1px). Outer corners use
  * --radius-button; inner facing corners are 2px so the seam reads as a
  * divider. Shape must win on every pack layer (!important) because the
  * radius CSS var is only a single value.
  */
 [data-slot="split-button"] {
-  gap: 2px;
+  gap: 1px;
 }
 
 .aws-btn.edgeways-btn-3d.edgeways-split-leading,
@@ -1553,7 +1987,7 @@ html[data-font="figtree"] {
 
 /*
  * Filter pills — circular PressButton chips (FilterPill).
- * Active ink plate + brand type; face uses the same --ew-btn-shadow as outline.
+ * Active solid brand plate + contrast type (Edge tone overrides below).
  */
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill,
 .aws-btn.edgeways-btn-3d.aws-btn--rounded-full {
@@ -1589,29 +2023,29 @@ html[data-font="figtree"] {
   height: 0.75rem;
 }
 
-/* Active: ink + brand type — same soft face shadow as sibling buttons */
+/* Active: solid brand plate + contrast type — same pattern as Edge violet */
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active {
-  --button-tertiary-color: #111111;
-  --button-tertiary-color-dark: #111111;
-  --button-tertiary-color-light: var(--brand-text);
-  --button-tertiary-color-hover: #1a1a1a;
+  --button-tertiary-color: var(--brand);
+  --button-tertiary-color-dark: var(--brand);
+  --button-tertiary-color-light: var(--brand-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--brand) 88%, black);
 }
 
 .dark .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active {
-  --button-tertiary-color: #111111;
-  --button-tertiary-color-dark: #111111;
-  --button-tertiary-color-light: var(--brand-text);
-  --button-tertiary-color-hover: #1a1a1a;
+  --button-tertiary-color: var(--brand);
+  --button-tertiary-color-dark: var(--brand);
+  --button-tertiary-color-light: var(--brand-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--brand) 88%, white);
 }
 
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active .aws-btn__content,
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active:hover .aws-btn__content {
-  color: var(--brand-text);
+  color: var(--brand-foreground);
   box-shadow: var(--ew-chip-shadow);
 }
 
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active:focus-visible .aws-btn__content {
-  color: var(--brand-text);
+  color: var(--brand-foreground);
   box-shadow:
     var(--ew-chip-shadow),
     0 0 0 2px var(--page),
@@ -1621,15 +2055,58 @@ html[data-font="figtree"] {
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.aws-btn--active .aws-btn__content,
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.aws-btn--active:hover .aws-btn__content {
   box-shadow: var(--ew-btn-shadow-pressed);
-  color: var(--brand-text);
+  color: var(--brand-foreground);
 }
 
 .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.aws-btn--active:focus-visible .aws-btn__content {
-  color: var(--brand-text);
+  color: var(--brand-foreground);
   box-shadow:
     var(--ew-btn-shadow-pressed),
     0 0 0 2px var(--page),
     0 0 0 4px color-mix(in oklch, var(--brand) 65%, transparent);
+}
+
+/* Active Edge tone — Offer Edge violet plate + contrast type */
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge {
+  --button-tertiary-color: var(--edge);
+  --button-tertiary-color-dark: var(--edge);
+  --button-tertiary-color-light: var(--edge-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--edge) 88%, black);
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge {
+  --button-tertiary-color: var(--edge);
+  --button-tertiary-color-dark: var(--edge);
+  --button-tertiary-color-light: var(--edge-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--edge) 88%, white);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge:hover .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge.aws-btn--active:hover .aws-btn__content {
+  color: var(--edge-foreground);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge:focus-visible .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge.aws-btn--active:focus-visible .aws-btn__content {
+  color: var(--edge-foreground);
+  box-shadow:
+    var(--ew-chip-shadow),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--edge) 65%, transparent);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge.aws-btn--active:hover .aws-btn__content {
+  box-shadow: var(--ew-btn-shadow-pressed);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--edge.aws-btn--active:focus-visible .aws-btn__content {
+  box-shadow:
+    var(--ew-btn-shadow-pressed),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--edge) 65%, transparent);
 }
 
 /*

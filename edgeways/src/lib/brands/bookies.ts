@@ -71,7 +71,8 @@ const MAP: Record<string, BookiePaletteEntry> = {
   novibet: { bg: "#00a651", fg: "#ffffff" },
   parimatch: { bg: "#1a1a1a", fg: "#f5c518" },
   planetsportbet: { bg: "#0033a0", fg: "#ffffff" },
-  pricedup: { bg: "#6c2bd9", fg: "#ffffff" },
+  // Black + yellow brand (not violet — that was a bad default)
+  pricedup: { bg: "#f5c518", fg: "#0a0a0a" },
   sportingindex: { bg: "#003366", fg: "#ffffff" },
   starsports: { bg: "#1a1a1a", fg: "#f5c518" },
   thepools: { bg: "#003087", fg: "#ffffff" },

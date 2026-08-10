@@ -48,7 +48,7 @@ export function VarianceChip({
             aria-label={`Variance: ${varianceTierCopy(tier)}`}
           >
             <span className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT[tier])} aria-hidden />
-            <span className={cn("text-[9px] font-semibold uppercase tracking-wide", TIER_TEXT[tier])}>
+            <span className={cn("text-[11px] font-semibold uppercase tracking-wide", TIER_TEXT[tier])}>
               {tier} variance
             </span>
           </span>

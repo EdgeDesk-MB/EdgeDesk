@@ -32,12 +32,9 @@ import {
   type BoostDiaryQueue,
 } from "@/lib/services/boosts-client";
 import { FilterPill } from "@/components/ui/filter-pill";
+import { formatEvGbp } from "@/lib/format-money";
 import { filterPillCountState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-
-function gbp(value: number): string {
-  return value < 0 ? `-£${Math.abs(value).toFixed(2)}` : `+£${value.toFixed(2)}`;
-}
 
 
 export default function BoostsPage() {
@@ -161,7 +158,7 @@ export default function BoostsPage() {
         <section className="flex min-w-0 flex-col gap-2 lg:pt-[calc(2.25rem+0.75rem+0.75rem)]">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="flex items-center gap-1.5 text-sm font-semibold">
-              EV banked <MoneyFlow value={totals.evBanked} signColor className="inline" />
+              EV banked <MoneyFlow value={totals.evBanked} signColor estimate className="inline" />
               {entries && entries.length > 0 ? (
                 <EvBasisBadge
                   basis={totals.basis}
@@ -175,7 +172,7 @@ export default function BoostsPage() {
             </span>
             {totals.settled > 0 ? (
               <span className="text-xs text-muted-foreground">
-                Realised {gbp(totals.realised)} over {totals.settled} settled
+                Realised {formatEvGbp(totals.realised, { signed: true })} over {totals.settled} settled
               </span>
             ) : null}
           </div>
@@ -255,7 +252,7 @@ export default function BoostsPage() {
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[10px] uppercase tracking-wide",
+                          "text-[11px] uppercase tracking-wide",
                           placed
                             ? "border-primary/25 bg-primary/10 text-primary-text"
                             : "text-muted-foreground"
@@ -272,9 +269,9 @@ export default function BoostsPage() {
                     </div>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
                       <span>
-                        EV {gbp(entry.evGbp)}
+                        EV {formatEvGbp(entry.evGbp, { signed: true })}
                         {settledBet
-                          ? ` · ${entry.linkedBet?.status} ${gbp(displayProfit ?? 0)}`
+                          ? ` · ${entry.linkedBet?.status} ${formatEvGbp(displayProfit ?? 0, { signed: true })}`
                           : openBet
                             ? " · open in Tracker · click to settle"
                             : !placed

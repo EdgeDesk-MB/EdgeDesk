@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyFlow } from "@/components/money-flow";
 import { DashboardPnlSummaries } from "@/components/dashboard/dashboard-pnl-summaries";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
@@ -61,7 +61,7 @@ function OverviewMetric({
       >
         {value}
       </div>
-      <p className="mt-[3px] min-h-[1rem] text-xs leading-snug text-muted-foreground sm:text-[11px]">
+      <p className="mt-[3px] min-h-[1rem] text-xs leading-snug text-muted-foreground sm:text-xs">
         {sub}
       </p>
     </>
@@ -130,9 +130,9 @@ export function DashboardOverviewBar({
   const pnlSub =
     Math.abs(provisional) >= 0.005 ? (
       <>
-        Settled <MoneyFlow value={settled} signColor className="inline text-[11px]" />
+        Settled <MoneyFlow value={settled} signColor className="inline text-xs" />
         {" · "}
-        Prov <MoneyFlow value={provisional} signColor signDisplay className="inline text-[11px]" />
+        Prov <MoneyFlow value={provisional} signColor signDisplay className="inline text-xs" />
       </>
     ) : openBets === 0 ? (
       "All settled - no open positions"
@@ -198,20 +198,8 @@ export function DashboardOverviewBar({
           <DialogContent className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
             <div className={cn(sectionBar, "shrink-0 pr-12")}>
               <DialogHeader className="gap-1 text-left">
-                <DialogTitle className="flex items-baseline justify-between gap-3 pr-2 text-base font-bold">
-                  <span>Pace</span>
-                  <span className="text-sm font-semibold tabular-nums">
-                    <MoneyFlow
-                      value={paceTab === "daily" ? pace.dailyAvg : pace.yearlyEst}
-                      signColor
-                      className="inline text-sm"
-                    />
-                    <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {paceTab === "daily" ? "/day" : "/yr"}
-                    </span>
-                  </span>
-                </DialogTitle>
-                <DialogDescription className="text-[11px] leading-snug">
+                <DialogTitle className="text-base font-bold">Pace</DialogTitle>
+                <DialogDescription className="text-xs leading-snug">
                   Settled profit (bets, boosts, casino and P&L adjustments) averaged over every
                   calendar day since your first settlement.
                 </DialogDescription>
@@ -222,6 +210,7 @@ export function DashboardOverviewBar({
               <Tabs
                 value={paceTab}
                 onValueChange={(v) => setPaceTab(v as "daily" | "yearly")}
+                activationMode="manual"
                 className="gap-3"
               >
                 <TabsList variant="segmented" className="w-full">
@@ -230,7 +219,7 @@ export function DashboardOverviewBar({
                     <MoneyFlow
                       value={pace.dailyAvg}
                       signColor
-                      className="ml-1 inline text-[11px] font-semibold"
+                      className="ml-1 inline text-xs font-semibold"
                     />
                   </TabsTrigger>
                   <TabsTrigger value="yearly">
@@ -238,79 +227,96 @@ export function DashboardOverviewBar({
                     <MoneyFlow
                       value={pace.yearlyEst}
                       signColor
-                      className="ml-1 inline text-[11px] font-semibold"
+                      className="ml-1 inline text-xs font-semibold"
                     />
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="daily" className="space-y-3 outline-none">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Daily average
-                    </p>
-                    <div className="mt-1 text-3xl font-bold tabular-nums leading-none tracking-tight">
-                      <MoneyFlow value={pace.dailyAvg} signColor className="inline" />
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                      Total settled ÷ {formatPaceDayCount(pace.dayCount)} since{" "}
-                      {formatActivitySince(pace.activityStartMs)}
-                    </p>
-                  </div>
-                  <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-xs dark:bg-input/20">
+                {/* Stack both panels so height stays at the taller view (no dialog jump). */}
+                <div className="grid">
+                  <div
+                    role="tabpanel"
+                    aria-hidden={paceTab !== "daily"}
+                    className={cn(
+                      "col-start-1 row-start-1 space-y-3 outline-none",
+                      paceTab !== "daily" && "invisible pointer-events-none"
+                    )}
+                  >
                     <div>
-                      <dt className="text-muted-foreground">Settled P&L</dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums">
-                        <MoneyFlow value={pace.totalProfit} signColor className="inline" />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Settlements</dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums">
-                        {pace.settlementCount.toLocaleString("en-GB")}
-                      </dd>
-                    </div>
-                    <div className="col-span-2">
-                      <dt className="text-muted-foreground">Activity window</dt>
-                      <dd className="mt-0.5 font-medium">
-                        {formatActivitySince(pace.activityStartMs)} → today ·{" "}
-                        {formatPaceDayCount(pace.dayCount)}
-                      </dd>
-                    </div>
-                  </dl>
-                </TabsContent>
-
-                <TabsContent value="yearly" className="space-y-3 outline-none">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Yearly estimate
-                    </p>
-                    <div className="mt-1 text-3xl font-bold tabular-nums leading-none tracking-tight">
-                      <MoneyFlow value={pace.yearlyEst} signColor className="inline" />
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                      Daily avg. × 365 - projects current pace over a full year
-                    </p>
-                  </div>
-                  <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-xs dark:bg-input/20">
-                    <div>
-                      <dt className="text-muted-foreground">Daily avg.</dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Daily average
+                      </p>
+                      <div className="mt-1 text-3xl font-bold tabular-nums leading-none tracking-tight">
                         <MoneyFlow value={pace.dailyAvg} signColor className="inline" />
-                      </dd>
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Total settled ÷ {formatPaceDayCount(pace.dayCount)} since{" "}
+                        {formatActivitySince(pace.activityStartMs)}
+                      </p>
                     </div>
+                    <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-xs dark:bg-input/20">
+                      <div>
+                        <dt className="text-muted-foreground">Settled P&L</dt>
+                        <dd className="mt-0.5 font-semibold tabular-nums">
+                          <MoneyFlow value={pace.totalProfit} signColor className="inline" />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Settlements</dt>
+                        <dd className="mt-0.5 font-semibold tabular-nums">
+                          {pace.settlementCount.toLocaleString("en-GB")}
+                        </dd>
+                      </div>
+                      <div className="col-span-2">
+                        <dt className="text-muted-foreground">Activity window</dt>
+                        <dd className="mt-0.5 font-medium">
+                          {formatActivitySince(pace.activityStartMs)} → today ·{" "}
+                          {formatPaceDayCount(pace.dayCount)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div
+                    role="tabpanel"
+                    aria-hidden={paceTab !== "yearly"}
+                    className={cn(
+                      "col-start-1 row-start-1 space-y-3 outline-none",
+                      paceTab !== "yearly" && "invisible pointer-events-none"
+                    )}
+                  >
                     <div>
-                      <dt className="text-muted-foreground">Multiplier</dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums">× 365</dd>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Yearly estimate
+                      </p>
+                      <div className="mt-1 text-3xl font-bold tabular-nums leading-none tracking-tight">
+                        <MoneyFlow value={pace.yearlyEst} signColor className="inline" />
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Daily avg. × 365 - projects current pace over a full year
+                      </p>
                     </div>
-                    <div className="col-span-2 flex items-start gap-2 text-[11px] text-muted-foreground">
-                      <CalendarRange className="mt-0.5 size-3.5 shrink-0" />
-                      <span>
-                        Based on {formatPaceDayCount(pace.dayCount)} of settled activity. Short
-                        windows can swing this estimate a lot.
-                      </span>
-                    </div>
-                  </dl>
-                </TabsContent>
+                    <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-xs dark:bg-input/20">
+                      <div>
+                        <dt className="text-muted-foreground">Daily avg.</dt>
+                        <dd className="mt-0.5 font-semibold tabular-nums">
+                          <MoneyFlow value={pace.dailyAvg} signColor className="inline" />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Multiplier</dt>
+                        <dd className="mt-0.5 font-semibold tabular-nums">× 365</dd>
+                      </div>
+                      <div className="col-span-2 flex items-start gap-2 text-xs text-muted-foreground">
+                        <CalendarRange className="mt-0.5 size-3.5 shrink-0" />
+                        <span>
+                          Based on {formatPaceDayCount(pace.dayCount)} of settled activity. Short
+                          windows can swing this estimate a lot.
+                        </span>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
               </Tabs>
             </div>
 

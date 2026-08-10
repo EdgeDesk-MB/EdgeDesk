@@ -12,6 +12,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { ChevronRight, Menu, X } from "lucide-react";
 import {
   ActionBadge,
+  EdgeRaceNavMark,
   NAV_SECTIONS,
   NavSectionLabel,
   flattenNavEntries,
@@ -20,6 +21,10 @@ import {
 import { ThemeSelect } from "@/components/theme-select";
 import { TopBarLoginButton } from "@/components/top-bar-login-button";
 import { useAppState } from "@/hooks/use-app-state";
+import {
+  useOfferEdgeRaceCount,
+  useRacingOfferEdgeKey,
+} from "@/hooks/use-offer-edge-race-count";
 import { isEventPendingSettle } from "@/lib/racing/pending-settle";
 import { META_NAV_ITEMS } from "@/content/meta-nav";
 import { captionHeading } from "@/lib/ui/surface-styles";
@@ -82,9 +87,12 @@ function MobileNavDrawer() {
   const boostsOpen = state?.boostsOpen ?? 0;
   const casinoNeedsAction = state?.casinoNeedsAction ?? 0;
   const accaLayDue = state?.accaLayDue?.length ?? 0;
+  const betBuilderLayDue = state?.betBuilderLayDue?.length ?? 0;
   const racingPendingSettle = (state?.events ?? []).filter((e) =>
     isEventPendingSettle(e)
   ).length;
+  const racingOfferKey = useRacingOfferEdgeKey(state?.offers);
+  const edgeRaceCount = useOfferEdgeRaceCount(state?.settings, racingOfferKey);
   const close = () => setOpen(false);
 
   return (
@@ -150,8 +158,14 @@ function MobileNavDrawer() {
                           <ActionBadge count={casinoNeedsAction} />
                         ) : null}
                         {item.href === "/acca" ? <ActionBadge count={accaLayDue} /> : null}
+                        {item.href === "/bet-builder" ? (
+                          <ActionBadge count={betBuilderLayDue} />
+                        ) : null}
                         {item.href === "/racing" ? (
-                          <ActionBadge count={racingPendingSettle} />
+                          <>
+                            <EdgeRaceNavMark count={edgeRaceCount} />
+                            <ActionBadge count={racingPendingSettle} />
+                          </>
                         ) : null}
                       </span>
                     </Link>
@@ -175,7 +189,7 @@ export function AppTopBarMenu() {
   return <MobileNavDrawer />;
 }
 
-/** Flashscore-style square icon button on the dark top bar */
+/** Desk-style square icon button on the dark top bar */
 export function TopBarButton({
   children,
   className,

@@ -20,7 +20,13 @@ import {
   computeMethodBreakdown,
   computeMonthlyBreakdown,
 } from "@/lib/pnl/monthly-breakdown";
-import { tableBodyCell, tableHeaderCell, sectionTitle, selectionSubtle } from "@/lib/ui/surface-styles";
+import {
+  tableBodyCell,
+  tableHeaderCell,
+  sectionStack,
+  sectionTitle,
+  selectionSubtle,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Download } from "lucide-react";
 
@@ -68,7 +74,7 @@ export function MonthlyPnlSection({
     return (
       <Card>
         <SectionHeader
-          title="P&L Breakdown"
+          title="P&L breakdown"
           description="Settle bets to see profit by month, account and method."
         />
         <CardContent>{emptyBody}</CardContent>
@@ -80,7 +86,7 @@ export function MonthlyPnlSection({
   const headerRow = cn("hover:bg-transparent", plain && selectionSubtle);
 
   const monthTable = (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <h3 className={sectionTitle}>By month</h3>
       <div className={tableShell}>
         <Table>
@@ -112,7 +118,7 @@ export function MonthlyPnlSection({
   );
 
   const accountTable = (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <h3 className={sectionTitle}>By account</h3>
       <div className={tableShell}>
         <Table>
@@ -128,7 +134,7 @@ export function MonthlyPnlSection({
               <TableRow key={row.name} className="hover:bg-selection-subtle">
                 <TableCell className={tableBodyCell}>
                   <span className="text-sm font-medium">{row.name}</span>
-                  <span className="ml-1.5 text-[10px] uppercase text-muted-foreground">
+                  <span className="ml-1.5 text-[11px] uppercase text-muted-foreground">
                     {row.kind}
                   </span>
                 </TableCell>
@@ -148,7 +154,7 @@ export function MonthlyPnlSection({
 
   const methodTable =
     methods.length > 0 ? (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <h3 className={sectionTitle}>By method</h3>
         <div className={tableShell}>
           <Table>
@@ -180,7 +186,13 @@ export function MonthlyPnlSection({
     ) : null;
 
   const body = (
-    <div className={plain ? "flex flex-col gap-4" : "grid gap-4 lg:grid-cols-2"}>
+    <div
+      className={
+        plain
+          ? sectionStack
+          : "grid gap-[var(--layout-stack-gap)] lg:grid-cols-2"
+      }
+    >
       {monthTable}
       {accountTable}
       {methodTable}
@@ -193,7 +205,7 @@ export function MonthlyPnlSection({
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle section>P&L Breakdown</CardTitle>
+              <CardTitle section>P&L breakdown</CardTitle>
               <CardDescription compact>Settled profit by month, account and method.</CardDescription>
             </div>
             <Link
@@ -216,7 +228,7 @@ export function MonthlyPnlSection({
   return (
     <Card>
       <SectionHeader
-        title="P&L Breakdown"
+        title="P&L breakdown"
         description="Settled profit rolled up by calendar month, bookie, and method."
         action={
           <Button variant="outline" size="sm" className="gap-1.5" asChild>

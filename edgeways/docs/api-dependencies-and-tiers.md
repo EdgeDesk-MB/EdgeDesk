@@ -15,7 +15,7 @@ Provider publish rates vs what Edgeways actually polls (we cache to protect free
 | Source | Provider updates | Edgeways refresh | Notes |
 |--------|------------------|------------------|-------|
 | **Racing API Free** - racecards | Today ~every **3 min**; tomorrow ~every **15 min** (provider) | Cached **15 min** in-app; Racing Desk UI reloads every **60 s** (uses cache) | Non-runners / going changes can lag up to ~15 min in Edgeways |
-| **Racing API Basic** - results | Today results ~every **3 min** (provider) | Cached **90 s**; synced on app poll while open | Free tier: no results - use Set winner |
+| **Racing API Basic** - results | Today results ~every **3 min** (provider) | Idle cache **5 min**; open-bet / incomplete sync uses **90 s** | Free tier: no results - use Set winner. Winner-only payloads settle win markets; place/EW wait for fuller placings |
 | **Betfair delayed key** | Exchange prices **~1–3 min behind** live | Fetched when Racing Desk loads / refreshes | Fine for pre-race matched betting; not for tight in-play |
 | **API-Football Free** - fixtures list | Live scores continuous | Fixtures cached **10 min**; live scores **~60 s** | Budget ~**95 req/day** in-app (headroom under 100) ≈ **1 live match/day** |
 | **App dashboard / Tracked Events** | - | Poll every **3 s** (Settings → Preferences) | Reuses caches above; does not burn a new API call every 3 s |

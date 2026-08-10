@@ -22,7 +22,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
@@ -56,11 +55,16 @@ export function CasinoCampaignSimDialog({
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className={cn("gap-1.5", triggerClassName)}>
-          <ChartColumn className="size-3.5" aria-hidden /> Simulate
-        </Button>
-      </DialogTrigger>
+      {/* Controlled open (not DialogTrigger) so the Button stays on the Press path. */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={triggerClassName}
+        onClick={() => setOpen(true)}
+      >
+        <ChartColumn className="size-3.5" aria-hidden /> Simulate
+      </Button>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         {open ? (
           <CasinoCampaignSimContent
@@ -204,7 +208,7 @@ function CasinoCampaignSimContent({
                 />
               ) : null}
             </div>
-            <div className="relative text-[10px] tabular-nums text-muted-foreground">
+            <div className="relative text-[11px] tabular-nums text-muted-foreground">
               <div className="flex justify-between">
                 <span>£{result.histogram.edges[0].toFixed(0)}</span>
                 <span>£{result.histogram.edges[result.histogram.edges.length - 1].toFixed(0)}+</span>
@@ -222,7 +226,7 @@ function CasinoCampaignSimContent({
 
           <div className="rounded-md border bg-selection-subtle/50 px-3 py-2.5 text-xs text-muted-foreground">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Static vs simulated
               </span>
               <EvBasisBadge
@@ -233,17 +237,17 @@ function CasinoCampaignSimContent({
             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
               <span>
                 Static EV (K1 model){" "}
-                <MoneyFlow value={result.analyticEv} signColor signDisplay className="font-semibold" />
+                <MoneyFlow value={result.analyticEv} signColor signDisplay estimate className="font-semibold" />
               </span>
               <span>
                 Simulated mean{" "}
-                <MoneyFlow value={result.meanEv} signColor signDisplay className="font-semibold" />
+                <MoneyFlow value={result.meanEv} signColor signDisplay estimate className="font-semibold" />
               </span>
             </div>
             <p className="mt-1.5">
               10–90% band:{" "}
-              <MoneyFlow value={result.p10} signColor signDisplay className="inline" /> to{" "}
-              <MoneyFlow value={result.p90} signColor signDisplay className="inline" /> · EV is an
+              <MoneyFlow value={result.p10} signColor signDisplay estimate className="inline" /> to{" "}
+              <MoneyFlow value={result.p90} signColor signDisplay estimate className="inline" /> · EV is an
               expectation across many attempts, never a lock.
             </p>
           </div>
@@ -274,7 +278,7 @@ function StatTile({
 )) {
   return (
     <div className="rounded-md border bg-card px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
       {money != null ? (
@@ -282,6 +286,7 @@ function StatTile({
           value={money}
           signColor
           signDisplay
+          estimate
           className="text-sm font-bold tabular-nums"
         />
       ) : (

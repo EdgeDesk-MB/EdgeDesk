@@ -173,7 +173,7 @@ export function BackBookieBalanceStrip({
 
   if (!bookmaker.trim()) {
     return (
-      <p className={cn("text-[11px] font-medium text-black/45 dark:text-white/45", className)}>
+      <p className={cn("text-xs font-medium text-black/45 dark:text-white/45", className)}>
         Select a bookie to see available balance.
       </p>
     );
@@ -181,7 +181,7 @@ export function BackBookieBalanceStrip({
 
   if (!account && !showAddBalance) {
     return (
-      <p className={cn("text-[11px] leading-snug text-black/55 dark:text-white/55", className)}>
+      <p className={cn("text-xs leading-snug text-black/55 dark:text-white/55", className)}>
         No balance tracked for {bookmaker}. Saving a bet will create the account.{" "}
         <Link href="/accounts" className="font-semibold text-primary-text underline-offset-2 hover:underline">
           Open Accounts
@@ -204,7 +204,7 @@ export function BackBookieBalanceStrip({
       {account ? (
         <div
           className={cn(
-            "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-semibold",
+            "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold",
             usesFreeBet
               ? "bg-violet-600/15 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100"
               : "bg-black/10 text-black/75 dark:bg-white/10 dark:text-white/80"
@@ -225,7 +225,7 @@ export function BackBookieBalanceStrip({
           />
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-black/10 px-2.5 py-1.5 text-[11px] font-semibold text-black/75 dark:bg-white/10 dark:text-white/80">
+        <div className="flex items-center justify-between gap-2 rounded-md bg-black/10 px-2.5 py-1.5 text-xs font-semibold text-black/75 dark:bg-white/10 dark:text-white/80">
           <span>Cash balance</span>
           <span className="tabular-nums text-muted-foreground">No wallet</span>
         </div>
@@ -233,7 +233,7 @@ export function BackBookieBalanceStrip({
 
       {/* Always surface free bets when in cash mode (and vice versa if useful) */}
       {account && !usesFreeBet && freeBets > 0.001 ? (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-violet-600/12 px-2.5 py-1.5 text-[11px] font-semibold text-violet-950 dark:bg-violet-500/15 dark:text-violet-100">
+        <div className="flex items-center justify-between gap-2 rounded-md bg-violet-600/12 px-2.5 py-1.5 text-xs font-semibold text-violet-950 dark:bg-violet-500/15 dark:text-violet-100">
           <span className="flex min-w-0 items-center gap-1.5">
             <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
             Free bet balance
@@ -244,7 +244,7 @@ export function BackBookieBalanceStrip({
               <button
                 type="button"
                 onClick={() => onUseFreeBet(freeBets)}
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800 underline-offset-2 hover:underline dark:text-violet-200"
+                className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-violet-800 underline-offset-2 hover:underline dark:text-violet-200"
               >
                 Use
               </button>
@@ -254,7 +254,7 @@ export function BackBookieBalanceStrip({
       ) : null}
 
       {account && usesFreeBet && (cash !== 0 || onUseCash) ? (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-black/8 px-2.5 py-1 text-[10px] font-medium text-black/60 dark:bg-white/8 dark:text-white/60">
+        <div className="flex items-center justify-between gap-2 rounded-md bg-black/8 px-2.5 py-1 text-[11px] font-medium text-black/60 dark:bg-white/8 dark:text-white/60">
           <span>Cash balance</span>
           <span className="flex shrink-0 items-center gap-2">
             <MoneyFlow value={cash} className="tabular-nums" />
@@ -262,7 +262,7 @@ export function BackBookieBalanceStrip({
               <button
                 type="button"
                 onClick={onUseCash}
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black/70 underline-offset-2 hover:underline dark:text-white/70"
+                className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-black/70 underline-offset-2 hover:underline dark:text-white/70"
               >
                 Use cash
               </button>
@@ -274,7 +274,7 @@ export function BackBookieBalanceStrip({
       {stake > 0 && (account || credit > 0) && (
         <p
           className={cn(
-            "px-0.5 text-[10px] font-medium tabular-nums",
+            "px-0.5 text-[11px] font-medium tabular-nums",
             over
               ? "text-amber-800 dark:text-amber-300"
               : usesFreeBet
@@ -294,7 +294,7 @@ export function BackBookieBalanceStrip({
         </p>
       )}
       {showAddBalance ? (
-        <label className="flex cursor-pointer items-center gap-2 px-0.5 pt-0.5 text-[11px] font-semibold text-black/75 dark:text-white/80">
+        <label className="flex cursor-pointer items-center gap-2 px-0.5 pt-0.5 text-xs font-semibold text-black/75 dark:text-white/80">
           <input
             type="checkbox"
             className="size-3.5 rounded border-border accent-primary"

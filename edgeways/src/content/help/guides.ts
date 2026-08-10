@@ -160,7 +160,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Do next ranks offers using: measured retention + EV basis + bookie health (gubbed sinks, never hides) + funding checks + measured £/hr.",
           "The Daily Plan is Do next re-cut for today, plus timed slots: tracked races, kickoffs, and acca lay-due legs.",
           "The 2UP Desk consumes tracked-event live scores; the Acca Desk consumes event results; the Racing Desk consumes racecards plus your racing offers.",
-          "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, acca lay-due, email-intake drafts, API budget, and the weekly digest.",
+          "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, the morning daily tasks digest, acca lay-due, email-intake drafts, API budget, and the weekly digest.",
         ],
       },
     ],
@@ -222,10 +222,13 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Acca Desk: multi-day accas, leg by leg",
         bullets: [
-          "Create a run: legs in play order, method = Sequential lock, Insurance leg-by-leg, or Insurance whole-acca (refund offers). The acca back is logged as a real tracker bet immediately.",
-          "A leg turns LAY DUE when the previous result is in and kick-off is within 30 minutes - alert + push + a Daily Plan slot. The suggested stake covers your whole exposure (£0 if the leg loses); the FINAL leg equalises instead so the run ends the same either way.",
-          "Insurance runs stay open after a loss until every other leg resolves - the refund only counts when exactly one leg lost.",
-          "Legs linked to tracked events settle from the score; everything else has Won/Lost/Void buttons.",
+          "Create a run with legs in play order. The acca back is logged as a real tracker bet immediately.",
+          "Sequential lock: cover each non-final leg for ~£0 if it loses; the final leg equalises so the run ends the same either way.",
+          "Insurance · leg-by-leg: same cover lays, for refund-if-one-loses offers. Stays open after a loss until every leg resolves; claim the free bet when exactly one lost.",
+          "Insurance · whole acca: one equalising lay at the combined exchange price, then settle legs. Same refund rule.",
+          "The next unlaid leg is ready to lay immediately (leg 1 right after create). Enter live exchange lay odds and stake. Do not reuse the bookie back price.",
+          "Alerts / Daily Plan still fire from 30 minutes before the leg starts; you can lay earlier whenever you like.",
+          "Tracked-event legs auto-result from the football score or race result; everything else uses Won / Lost / Void on the desk.",
         ],
       },
       {
@@ -354,9 +357,9 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
-        heading: "Expiry reminders",
+        heading: "Daily tasks digest",
         paragraphs: [
-          "Toggle in Settings → Preferences. Toasts nudge before expiry (default 7, 3 and 1 days) for active and planned offers. Repeating series only remind the current occurrence, and the same reminder is not replayed on every reload.",
+          "Toggle in Settings → Automation. Once each morning (from 09:00, while the desk is open) Edgeways sends a single inbox + push briefing of Do Next tasks with expiry in the next few days, soonest first. Repeating series only include the current occurrence. Urgent same-day and race-impact prompts still come from Alerts.",
         ],
       },
     ],
@@ -435,7 +438,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "On the phone, open chrome://flags/#unsafely-treat-insecure-origin-as-secure",
           "Enter your Edgeways LAN address (e.g. http://192.168.50.71:3000) in the box, set the flag to Enabled, relaunch Chrome",
           "Open Edgeways, add it to your Home Screen when prompted, then Settings → Alerts → flip \"Push to this device\" and allow notifications",
-          "Tap \"Send test push\" - the notification should land even after you close the app",
+          "Tap \"Send test push\" - the notification should land even after you close the app (lightning badge + yellow bolt icon; open the PWA once after updates so the service worker caches the art)",
         ],
       },
       {

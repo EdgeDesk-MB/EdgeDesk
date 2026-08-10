@@ -18,17 +18,36 @@ export const pageShellCompact = cn(
 /** Card internal horizontal inset - keep in sync with Card --card-spacing */
 export const cardInsetX = "px-[var(--layout-card-x)]";
 
-/** Section band inside a card (headers, tab bars) */
-export const sectionBar = cn(
-  "border-b border-border/60",
-  cardInsetX,
+/**
+ * Racing Desk horizontal inset — +4px vs the old `px-3` so Courses, race
+ * chrome and the table share one right edge with filter pills / Add offer.
+ */
+export const deskInsetX = "px-4";
+
+/**
+ * Uniform band inset — matches Racing Desk “Track race” header padding
+ * (desk horizontal inset, vertical `--layout-section-y`).
+ */
+export const deskBandPad = cn(
+  deskInsetX,
   "py-[var(--layout-section-y)]"
 );
 
-export const sectionMeta = cn(
-  "border-b border-border/60",
-  cardInsetX,
-  "py-2.5"
+/** Footer/legend band — same as deskBandPad but 8px less bottom padding. */
+export const deskBandPadFooter = cn(
+  deskInsetX,
+  "pt-[var(--layout-section-y)] pb-1"
+);
+
+/** Section band inside a card (headers, tab bars) */
+export const sectionBar = cn("border-b border-border/60", deskBandPad);
+
+export const sectionMeta = cn("border-b border-border/60", deskBandPad);
+
+/** Denser card shell for Racing Desk blocks (Courses, day P&L, …). */
+export const deskCardShell = cn(
+  "gap-[var(--layout-section-y)] py-[var(--layout-section-y)]",
+  "[--card-spacing:1rem]"
 );
 
 /** Page-level title band - no extra horizontal inset (page shell already padded) */

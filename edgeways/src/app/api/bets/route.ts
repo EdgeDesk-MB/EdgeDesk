@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
   const input = parsed.data;
 
   const { triggerText, triggerRule } = resolveTriggerFields({
+    betType: input.betType,
     label: input.label,
     triggerText: input.triggerText,
     eventId: input.eventId,

@@ -18,7 +18,9 @@ import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
 import { VenueSelect } from "@/components/venue-select";
+import { OfferUrlField } from "@/components/offers/offer-url-field";
 import { api } from "@/hooks/use-app-state";
+import { isInvalidOfferUrlInput, normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 import { fieldControl } from "@/lib/ui/surface-styles";
@@ -52,13 +54,20 @@ export function CasinoOfferEditDialog({
   const [open, setOpen] = useState(false);
   const [casino, setCasino] = useState(offer.casino ?? "");
   const [title, setTitle] = useState(offer.title);
+  const [offerUrl, setOfferUrl] = useState(offer.offerUrl ?? "");
   const [notes, setNotes] = useState(offer.notes ?? "");
   const [expiresDate, setExpiresDate] = useState(initial.date);
   const [expiresTime, setExpiresTime] = useState(initial.time);
   const [saving, setSaving] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   async function save() {
     if (!title.trim()) return;
+    if (isInvalidOfferUrlInput(offerUrl)) {
+      setUrlError("Enter a valid http(s) link, or clear the field.");
+      return;
+    }
+    setUrlError(null);
     setSaving(true);
     try {
       const res = await api<{ offer: CasinoOfferSummary }>(`/api/casino/${offer.id}`, {
@@ -66,6 +75,7 @@ export function CasinoOfferEditDialog({
         json: {
           casino: casino.trim() || null,
           title: title.trim(),
+          offerUrl: normalizeOfferUrl(offerUrl),
           notes: notes.trim() || null,
           expiresAt: expiresAtFromParts(expiresDate, expiresTime),
         },
@@ -88,9 +98,11 @@ export function CasinoOfferEditDialog({
           const next = bootExpiry(offer);
           setCasino(offer.casino ?? "");
           setTitle(offer.title);
+          setOfferUrl(offer.offerUrl ?? "");
           setNotes(offer.notes ?? "");
           setExpiresDate(next.date);
           setExpiresTime(next.time);
+          setUrlError(null);
         }
       }}
     >
@@ -107,7 +119,9 @@ export function CasinoOfferEditDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Edit campaign</DialogTitle>
-          <DialogDescription>Casino, title and notes - steps are edited on their own row.</DialogDescription>
+          <DialogDescription>
+            Casino, title, link and notes - steps are edited on their own row.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <VenueSelect
@@ -123,6 +137,18 @@ export function CasinoOfferEditDialog({
             </Label>
             <Input id="edit-casino-title" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
+          <OfferUrlField
+            id="edit-casino-url"
+            value={offerUrl}
+            onChange={(next) => {
+              setOfferUrl(next);
+              if (urlError) setUrlError(null);
+            }}
+            labelClassName="text-xs"
+            gapClassName="gap-1.5"
+            aria-invalid={urlError ? true : undefined}
+            error={urlError}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-casino-expires-date" className="text-xs text-muted-foreground">

@@ -1,11 +1,27 @@
 import type { BetRow, HistoryRow } from "@/lib/db/schema";
 import {
+  accaRunLabelFromBack,
+  isAccaDeskBack,
+  isAccaDeskLay,
+  isAccaLayForRun,
+} from "@/lib/bets/acca-desk-bets";
+import { isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
+import { roundPence } from "@/lib/calc/money";
+import {
   historyEntryHref,
   historyEntrySubtitle,
   historyEntryTitle,
   historyOccurredAt,
+  isDeskCampaignLayHistoryEntry,
   type HistoryContext,
 } from "@/lib/history-display";
+
+/** Acca / BB desk campaign legs — keep chart markers aligned with folded series. */
+function isDeskCampaignChartBet(
+  bet: Pick<BetRow, "label" | "notes" | "betType">
+): boolean {
+  return isAccaDeskLay(bet) || isAccaDeskBack(bet) || isBetBuilderDeskLay(bet);
+}
 
 export interface LivePnlPoint {
   time: number;
@@ -40,6 +56,38 @@ export const PNL_CHART_MARKER_FADE_IN_MS = PNL_CHART_WINDOW_TRANSITION_MS / 2;
 
 const WINDOW_BUFFER_BADGE = 0.05;
 const WINDOW_BUFFER_NO_BADGE = 0.015;
+
+/** Left edge of Liveline's visible time window (seconds). */
+export function chartWindowLeftEdge(
+  windowSecs: number,
+  nowSec: number,
+  showBadge: boolean
+): number {
+  const buffer = showBadge ? WINDOW_BUFFER_BADGE : WINDOW_BUFFER_NO_BADGE;
+  const rightEdge = nowSec + windowSecs * buffer;
+  return rightEdge - windowSecs;
+}
+
+/**
+ * Value Liveline should treat as the chart floor reference.
+ * "All" anchors at £0; narrower windows anchor at the P&L at the window's
+ * left edge so the first in-range point sits on the same baseline as £0 in All.
+ */
+export function chartWindowAnchorValue(
+  points: LivePnlPoint[],
+  windowSecs: number,
+  opts?: { nowSec?: number; showBadge?: boolean; anchorAtZero?: boolean }
+): number {
+  if (opts?.anchorAtZero || windowSecs <= 0) return 0;
+  const nowSec = opts?.nowSec ?? Date.now() / 1000;
+  const leftEdge = chartWindowLeftEdge(windowSecs, nowSec, opts?.showBadge ?? false);
+  const atEdge = seriesValueAt(points, leftEdge);
+  if (atEdge != null) return atEdge;
+  for (const p of points) {
+    if (p.time >= leftEdge - 2) return p.value;
+  }
+  return points[0]?.value ?? 0;
+}
 
 export type ChartBetMarkerTone = "win" | "loss" | "neutral";
 
@@ -275,11 +323,52 @@ export function buildPnlChartMarkers(events: LedgerMarkerSource[]): ChartBetMark
   return markers;
 }
 
+/**
+ * One Home-chart marker per completed Acca campaign (net of back + lays),
+ * matching the folded series step in `state.ts`.
+ */
+export function buildAccaCampaignMarkerSources(bets: BetRow[]): LedgerMarkerSource[] {
+  const lays = bets.filter(isAccaDeskLay);
+  const sources: LedgerMarkerSource[] = [];
+
+  for (const back of bets) {
+    if (!isAccaDeskBack(back) || back.status === "open" || back.settledAt == null) continue;
+    const runLabel = accaRunLabelFromBack(back);
+    if (!runLabel) continue;
+
+    const linked = lays.filter((lay) => isAccaLayForRun(lay, runLabel, back.offerId));
+    let profit = 0;
+    let time = back.settledAt;
+    if (back.status !== "void" && back.actualProfit != null) profit += back.actualProfit;
+
+    for (const lay of linked) {
+      if (lay.status === "open" || lay.status === "void" || lay.actualProfit == null) continue;
+      profit += lay.actualProfit;
+      if (lay.settledAt != null && lay.settledAt > time) time = lay.settledAt;
+    }
+
+    const amount = roundPence(profit);
+    sources.push({
+      id: back.id,
+      kind: "bet",
+      time,
+      amount,
+      label: back.label,
+      status:
+        amount > 0.004 ? "won" : amount < -0.004 ? "lost" : back.status === "void" ? "void" : "push",
+      tone: toneFromSignedAmount(amount),
+    });
+  }
+
+  return sources;
+}
+
 /** Settled bets as chart markers (prior-plateau convention). */
 export function buildChartBetMarkers(bets: BetRow[]): ChartBetMarker[] {
-  return buildPnlChartMarkers(
-    bets
+  return buildPnlChartMarkers([
+    ...bets
       .filter((b) => b.status !== "open" && b.settledAt != null)
+      .filter((b) => !isDeskCampaignChartBet(b))
       .map((b) => ({
         id: b.id,
         kind: "bet" as const,
@@ -288,8 +377,9 @@ export function buildChartBetMarkers(bets: BetRow[]): ChartBetMarker[] {
         label: b.label,
         status: b.status,
         tone: markerToneFromBet(b),
-      }))
-  );
+      })),
+    ...buildAccaCampaignMarkerSources(bets),
+  ]);
 }
 
 /**
@@ -386,6 +476,8 @@ export function buildHomeChartMarkers(opts: {
 
   for (const b of opts.bets) {
     if (b.status === "open" || b.settledAt == null) continue;
+    // Acca / BB desk: campaign hedges (+ Acca back) fold into one series step.
+    if (isDeskCampaignChartBet(b)) continue;
     events.push({
       id: b.id,
       kind: "bet",
@@ -396,6 +488,8 @@ export function buildHomeChartMarkers(opts: {
       tone: markerToneFromBet(b),
     });
   }
+
+  events.push(...buildAccaCampaignMarkerSources(opts.bets));
 
   for (const adj of opts.adjustments ?? []) {
     if (adj.amount === 0) continue;
@@ -425,6 +519,25 @@ export function buildHomeChartMarkers(opts: {
   return buildPnlChartMarkers(events);
 }
 
+/**
+ * Liveline only plots from the first in-window series point — not back to
+ * `leftEdge`. Markers timed in the gap before that point sit in empty chart
+ * space (common on 24h / week / month windows).
+ */
+export function firstLinePointTimeInWindow(
+  points: LivePnlPoint[],
+  leftEdge: number,
+  rightEdge: number
+): number | null {
+  let first: number | null = null;
+  for (const p of points) {
+    if (p.time < leftEdge - 2) continue;
+    if (p.time > rightEdge) break;
+    if (first === null || p.time < first) first = p.time;
+  }
+  return first;
+}
+
 export function projectBetMarkers(
   markers: ChartBetMarker[],
   layout: PnlChartLayout,
@@ -432,15 +545,20 @@ export function projectBetMarkers(
 ): ProjectedBetMarker[] {
   const { pad, chartW, chartH, leftEdge, rightEdge, toX, toY } = layout;
   const projected: ProjectedBetMarker[] = [];
+  const firstDrawnTime = linePoints
+    ? firstLinePointTimeInWindow(linePoints, leftEdge, rightEdge)
+    : null;
 
   for (const marker of markers) {
     if (marker.settledAtSec < leftEdge || marker.settledAtSec > rightEdge) continue;
+    if (firstDrawnTime != null && marker.settledAtSec < firstDrawnTime - 1) continue;
     // Markers are already timed at the prior plateau (or £0 origin). Read the
     // line at that time (inclusive) so they sit ON the plotted point, then the
     // next series tip is the movement that follows.
     const lineValue = linePoints
       ? seriesValueAt(linePoints, marker.settledAtSec)
       : null;
+    if (linePoints && lineValue == null) continue;
     const x = toX(marker.settledAtSec);
     const y = toY(lineValue ?? marker.cumulativeValue);
     if (x < pad.left - 6 || x > pad.left + chartW + 6) continue;
@@ -454,6 +572,8 @@ export function projectBetMarkers(
 /** Whether a history row should appear as a chart annotation for this user. */
 export function isChartAnnotationEntry(entry: HistoryRow, ctx: HistoryContext): boolean {
   if (!CHART_ANNOTATION_KINDS.has(entry.kind)) return false;
+  // Desk hedge lays are not History / chart narrative while campaigns run.
+  if (isDeskCampaignLayHistoryEntry(entry, ctx)) return false;
 
   // Casino settlements are campaign-level (no bet/event link).
   if (entry.kind === "casino_settlement") return true;
@@ -594,8 +714,11 @@ export function computePnlChartLayout(opts: {
   }
 
   const hasSufficientData = visible.length >= 2;
+  const fallbackStale =
+    fallbackRange != null &&
+    (fallbackRange.min > referenceValue + 1 || fallbackRange.max < referenceValue - 1);
   const { min: minVal, max: maxVal } =
-    !hasSufficientData && fallbackRange
+    !hasSufficientData && fallbackRange && !fallbackStale
       ? fallbackRange
       : computePnlValueRange(visible, liveValue, referenceValue, false);
   const valRange = maxVal - minVal || 1;

@@ -38,12 +38,12 @@ function PnlRow({
     <div className="flex items-center gap-2">
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </div>
         <div className="flex items-baseline gap-1.5">
           <span className="text-sm font-semibold tabular-nums">{value}</span>
-          {sub && <span className="text-[10px] text-muted-foreground">{sub}</span>}
+          {sub && <span className="text-[11px] text-muted-foreground">{sub}</span>}
         </div>
       </div>
     </div>
@@ -131,14 +131,19 @@ export function DashboardPnlSummaries({
           <div className={cn(sectionBar, "shrink-0 pr-12")}>
             <DialogHeader className="gap-1 text-left">
               <DialogTitle className="text-base font-bold">Profit &amp; Loss breakdown</DialogTitle>
-              <DialogDescription className="text-[11px] leading-snug">
+              <DialogDescription className="text-xs leading-snug">
                 Offer P&amp;L and monthly P&amp;L, side by side.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-[var(--layout-card-x)] py-[var(--layout-card-x)]">
-            <Tabs value={activeTab} onValueChange={(v) => setTab(v as typeof tab)} className="gap-3">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setTab(v as typeof tab)}
+              activationMode="manual"
+              className="gap-3"
+            >
               <TabsList variant="segmented" className="w-full">
                 <TabsTrigger value="offer" disabled={!offerStats}>
                   Offer P&amp;L

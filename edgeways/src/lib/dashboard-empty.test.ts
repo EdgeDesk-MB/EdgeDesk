@@ -16,6 +16,7 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     retention: { rate: 0, sampleSize: 0 },
     effortMeasured: {},
     accaLayDue: [],
+    betBuilderLayDue: [],
     mugPlans: [],
     alertsUnread: 0,
     boostsOpen: 0,

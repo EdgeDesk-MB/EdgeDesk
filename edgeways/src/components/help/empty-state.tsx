@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { Card, CardContent } from "@/components/ui/card";
+import { emptyStateIconWell } from "@/lib/ui/surface-styles";
 
 export function EmptyState({
   icon: Icon,
@@ -31,7 +32,7 @@ export function EmptyState({
         )}
       >
         {Icon && (
-          <div className="flex size-10 items-center justify-center rounded-full bg-selection-subtle text-muted-foreground">
+          <div className={emptyStateIconWell}>
             <Icon className="size-5" />
           </div>
         )}

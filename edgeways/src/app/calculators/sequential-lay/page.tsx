@@ -18,6 +18,8 @@ import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { layBounds, layPlanOutcome, type BetMode, type PartLay } from "@/lib/calc";
 import type { ExchangeRow } from "@/lib/db/schema";
+import { panelSurface } from "@/lib/ui/surface-styles";
+import { cn } from "@/lib/utils";
 
 const modeLabels: Record<BetMode, string> = {
   qualifying: "Qualifying bet",
@@ -99,7 +101,7 @@ export default function SequentialLayCalculatorPage() {
         </p>
       </div>
 
-      <div className="rounded-xl border bg-card p-4">
+      <div className={cn(panelSurface, "p-4")}>
         <div className="mb-2 text-sm font-semibold">Back bet type</div>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(modeLabels) as BetMode[]).map((m) => (
@@ -138,7 +140,7 @@ export default function SequentialLayCalculatorPage() {
         chip={
           exchange && (
             <span
-              className="rounded px-2 py-0.5 text-[10px] font-bold"
+              className="rounded px-2 py-0.5 text-[11px] font-bold"
               style={{
                 backgroundColor: exchange.brandColor,
                 color: contrastText(exchange.brandColor),

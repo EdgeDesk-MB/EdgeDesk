@@ -63,10 +63,10 @@ export function DashboardBestAdvantage({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             {best.bookmaker ? <VenueBadge name={best.bookmaker} /> : null}
-            <span className="text-[10px] font-bold uppercase tracking-wide text-primary-text">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-primary-text">
               Best next
             </span>
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary-text">
+            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-primary-text">
               {actionLabel}
             </span>
           </span>
@@ -84,6 +84,7 @@ export function DashboardBestAdvantage({
               value={best.remainingEv}
               signColor
               signDisplay
+              estimate
               className="text-sm font-bold"
             />
           </span>

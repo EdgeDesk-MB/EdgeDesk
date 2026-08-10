@@ -82,7 +82,7 @@ colours. Exchanges and rates are managed in Settings.
 
 ## Live Dashboard History feed
 
-A Flashscore-style commentary column next to Live positions: kick-offs, every goal (scorer,
+A live commentary column next to Live positions: kick-offs, every goal (scorer,
 minute, running score, 1st-goalscorer and own-goal flags), 2UP triggers, full-time results -
 and when a bet settles and leaves Live positions, its realised P&L lands here highlighted
 green or red.

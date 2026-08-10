@@ -13,8 +13,18 @@ import { useSyncExternalStore } from "react";
 export function useNow(refreshMs = 30_000): number {
   const bucket = useSyncExternalStore(
     (onChange) => {
-      const id = setInterval(onChange, refreshMs);
-      return () => clearInterval(id);
+      // Align the first fire to the next bucket boundary so a 1s countdown
+      // does not wait almost a full interval after mount / window entry.
+      let intervalId: ReturnType<typeof setInterval> | undefined;
+      const delay = refreshMs - (Date.now() % refreshMs);
+      const timeoutId = setTimeout(() => {
+        onChange();
+        intervalId = setInterval(onChange, refreshMs);
+      }, delay);
+      return () => {
+        clearTimeout(timeoutId);
+        if (intervalId !== undefined) clearInterval(intervalId);
+      };
     },
     () => Math.floor(Date.now() / refreshMs),
     // Server snapshot: these surfaces render from client-polled state, so a

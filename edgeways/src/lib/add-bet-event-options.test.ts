@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADD_BET_FOOTBALL_IN_PLAY_MS,
   bandLinkableEventsForPicker,
   bandNotTrackedFixtures,
   bandTrackedEvents,
@@ -11,17 +12,22 @@ import {
   formatKnownFixtureOption,
   formatTrackedEventOption,
   groupByDayBand,
+  groupByHourBandIfDense,
+  isAddBetEventSelectable,
   isFixtureSelectValue,
   isLiveInAddBetEvents,
   isSelectableInAddBetEvents,
   knownFromFootballFixtures,
   knownFromRacingFixtures,
   parseFixtureSelectValue,
+  partsKnownFixtureOption,
+  partsTrackedEventOption,
   resolveRaceRunnerOptions,
   type KnownFixtureOption,
 } from "./add-bet-event-options";
 import { londonWallToUtcMs, localCalendarDate } from "./events";
 import { serializeRacecardRunners } from "./racing";
+import { formatClockString } from "./time-format";
 
 function msOnDay(dayOffset: number, hm: string): number {
   const today = localCalendarDate();
@@ -62,6 +68,32 @@ describe("groupByDayBand", () => {
       now
     );
     expect(bands.map((b) => b.label)).toEqual(["Today", "Tomorrow"]);
+    expect(bands[0]?.items.map((i) => i.id)).toEqual(["a", "b"]);
+    expect(bands[1]?.items.map((i) => i.id)).toEqual(["c"]);
+  });
+});
+
+describe("groupByHourBandIfDense", () => {
+  it("stays flat when every item shares one hour", () => {
+    const bands = groupByHourBandIfDense([
+      { startTime: msOnDay(0, "18:10"), id: "a" },
+      { startTime: msOnDay(0, "18:45"), id: "b" },
+    ]);
+    expect(bands).toHaveLength(1);
+    expect(bands[0]?.label).toBe("");
+    expect(bands[0]?.items.map((i) => i.id)).toEqual(["a", "b"]);
+  });
+
+  it("nests hour labels when items span multiple hours", () => {
+    const bands = groupByHourBandIfDense([
+      { startTime: msOnDay(0, "14:05"), id: "a" },
+      { startTime: msOnDay(0, "14:40"), id: "b" },
+      { startTime: msOnDay(0, "16:10"), id: "c" },
+    ]);
+    expect(bands.map((b) => b.label)).toEqual([
+      formatClockString("14:00"),
+      formatClockString("16:00"),
+    ]);
     expect(bands[0]?.items.map((i) => i.id)).toEqual(["a", "b"]);
     expect(bands[1]?.items.map((i) => i.id)).toEqual(["c"]);
   });
@@ -152,7 +184,7 @@ describe("add bet past grace window", () => {
     ).toEqual([2]);
   });
 
-  it("labels LIVE for races inside the grace window", () => {
+  it("labels Live for races inside the grace window", () => {
     const now = msOnDay(0, "14:00");
     expect(
       formatTrackedEventOption(
@@ -167,7 +199,7 @@ describe("add bet past grace window", () => {
         },
         now
       )
-    ).toContain("LIVE");
+    ).toContain("Live");
     expect(
       formatKnownFixtureOption(
         {
@@ -182,7 +214,80 @@ describe("add bet past grace window", () => {
         },
         now
       )
-    ).toContain("LIVE");
+    ).toContain("Live");
+  });
+
+  it("keeps in-play football selectable with a Live chip", () => {
+    const now = msOnDay(0, "20:48");
+    const kickoff = now - 48 * 60_000;
+    expect(
+      isAddBetEventSelectable(
+        {
+          sport: "football",
+          status: "live",
+          startTime: kickoff,
+        },
+        now
+      )
+    ).toBe(true);
+    expect(
+      isLiveInAddBetEvents(kickoff, "live", now, undefined, "football")
+    ).toBe(true);
+    expect(
+      filterNotTrackedFixtures(
+        [
+          {
+            externalId: "1567409",
+            sport: "football",
+            competition: "League Cup",
+            homeTeam: "Plymouth",
+            awayTeam: "Exeter City",
+            startTime: kickoff,
+            status: "live",
+          },
+          {
+            externalId: "stale-ft",
+            sport: "football",
+            competition: "League Cup",
+            homeTeam: "Old",
+            awayTeam: "News",
+            startTime: now - ADD_BET_FOOTBALL_IN_PLAY_MS - 60_000,
+            status: "live",
+          },
+        ],
+        new Set(),
+        now
+      ).map((f) => f.externalId)
+    ).toEqual(["1567409"]);
+    expect(
+      formatKnownFixtureOption(
+        {
+          externalId: "1567409",
+          sport: "football",
+          competition: "League Cup",
+          homeTeam: "Plymouth",
+          awayTeam: "Exeter City",
+          startTime: kickoff,
+          status: "live",
+        },
+        now
+      )
+    ).toContain("Live");
+    expect(
+      filterTrackedForAddBet(
+        [
+          {
+            id: 9,
+            homeTeam: "Plymouth",
+            awayTeam: "Exeter City",
+            startTime: kickoff,
+            status: "live",
+            sport: "football",
+          },
+        ],
+        now
+      ).map((e) => e.id)
+    ).toEqual([9]);
   });
 });
 
@@ -280,8 +385,20 @@ describe("tracked banding", () => {
 });
 
 describe("formatKnownFixtureOption", () => {
-  it("formats football like tracked options", () => {
+  it("formats football with clock only (day band carries the date)", () => {
     const start = msOnDay(0, "15:00");
+    const parts = partsKnownFixtureOption({
+      externalId: "1",
+      sport: "football",
+      competition: "PL",
+      homeTeam: "Arsenal",
+      awayTeam: "Chelsea",
+      startTime: start,
+      status: "upcoming",
+    });
+    expect(parts.title).toBe("Arsenal v Chelsea");
+    expect(parts.time).toBe(formatClockString("15:00"));
+    expect(parts.time).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     const label = formatKnownFixtureOption({
       externalId: "1",
       sport: "football",
@@ -291,26 +408,44 @@ describe("formatKnownFixtureOption", () => {
       startTime: start,
       status: "upcoming",
     });
-    expect(label).toContain("Arsenal v Chelsea");
-    expect(label).toContain("·");
+    expect(label).toBe(`Arsenal v Chelsea · ${formatClockString("15:00")}`);
   });
 
-  it("formats racing as venue · time", () => {
+  it("formats racing as venue with separate clock", () => {
     const start = msOnDay(0, "14:05");
-    const label = formatKnownFixtureOption(
-      knownFromRacingFixtures([
-        {
-          externalId: "r1",
-          competition: "Redcar",
-          raceName: "Handicap",
-          course: "Redcar",
-          startTime: start,
-          status: "upcoming",
-          offTime: "14:05",
-        },
-      ])[0]!
+    const fixture = knownFromRacingFixtures([
+      {
+        externalId: "r1",
+        competition: "Redcar",
+        raceName: "Handicap",
+        course: "Redcar",
+        startTime: start,
+        status: "upcoming",
+        offTime: "14:05",
+      },
+    ])[0]!;
+    const parts = partsKnownFixtureOption(fixture);
+    expect(parts.title).toBe("Redcar");
+    expect(parts.time).toBe(formatClockString("14:05"));
+    expect(formatKnownFixtureOption(fixture)).toMatch(/Redcar ·/);
+  });
+
+  it("keeps Live out of the title for tracked football", () => {
+    const now = msOnDay(0, "15:02");
+    const parts = partsTrackedEventOption(
+      {
+        id: 1,
+        homeTeam: "Arsenal",
+        awayTeam: "Chelsea",
+        startTime: now - 2 * 60_000,
+        status: "live",
+        sport: "football",
+      },
+      now
     );
-    expect(label).toMatch(/Redcar ·/);
+    expect(parts.title).toBe("Arsenal v Chelsea");
+    expect(parts.status).toBe("Live");
+    expect(parts.time).toBeTruthy();
   });
 });
 
@@ -381,6 +516,15 @@ describe("resolveRaceRunnerOptions", () => {
         currentSelection: "Legacy Pick",
       })
     ).toEqual(["Legacy Pick", "Yazin", "State Man"]);
+  });
+
+  it("keeps the current selection while the runner card is still empty", () => {
+    expect(
+      resolveRaceRunnerOptions({
+        eventLinked: true,
+        currentSelection: "State Man",
+      })
+    ).toEqual(["State Man"]);
   });
 
   it("capitalises lowercase runner names", () => {

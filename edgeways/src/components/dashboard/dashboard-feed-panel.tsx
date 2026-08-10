@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
+import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { HistoryFeed } from "@/components/history/history-feed";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { apiGet, useAppState } from "@/hooks/use-app-state";
@@ -19,7 +20,6 @@ import type { AppState } from "@/lib/services/state.types";
 import { buildHistoryContext } from "@/lib/history-display";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import { dashboardPanelBody, dashboardSection } from "@/lib/ui/dashboard-layout";
-import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { cn } from "@/lib/utils";
 
@@ -42,9 +42,12 @@ interface CasinoHistoryPayload {
 export function DashboardFeedPanel({
   state,
   className,
+  /** When true, docks Live under the feed so growth steals History space, not the chart. */
+  showLiveDock = false,
 }: {
   state: AppState | null;
   className?: string;
+  showLiveDock?: boolean;
 }) {
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
   const [casinoFeed, setCasinoFeed] = useState<CasinoHistoryPayload | null>(null);
@@ -105,23 +108,24 @@ export function DashboardFeedPanel({
         titleHref="/history"
         title="History feed"
         description="Goals, results, bet and casino settlements in real time."
+        action={
+          <div className="flex min-w-0 justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {FEED_FILTERS.map((f) => (
+              <FilterPill
+                key={f.id}
+                compact
+                active={feedFilter === f.id}
+                onClick={() => setFeedFilter(f.id)}
+                className="shrink-0 whitespace-nowrap"
+              >
+                {f.label}
+              </FilterPill>
+            ))}
+          </div>
+        }
       />
-      <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
-        <div className="flex justify-end gap-1 py-2">
-          {FEED_FILTERS.map((f) => (
-            <FilterPill
-              key={f.id}
-              compact
-              active={feedFilter === f.id}
-              onClick={() => setFeedFilter(f.id)}
-              className="shrink-0 whitespace-nowrap"
-            >
-              {f.label}
-            </FilterPill>
-          ))}
-        </div>
-      </div>
       <ScrollFadeEdges
+        className="min-h-0 flex-1"
         scrollClassName={cn(
           dashboardPanelBody,
           "app-scroll-overlay px-[var(--layout-card-x)] pb-3 pt-0"
@@ -135,6 +139,13 @@ export function DashboardFeedPanel({
           onNoteSaved={() => void refresh()}
         />
       </ScrollFadeEdges>
+      {showLiveDock && state ? (
+        <DashboardLiveTabs
+          state={state}
+          docked
+          className="border-t border-border/60"
+        />
+      ) : null}
     </section>
   );
 }

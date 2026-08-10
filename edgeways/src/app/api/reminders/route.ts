@@ -5,6 +5,7 @@ import {
   createUserReminder,
   fireDueUserReminders,
   listPendingRemindersForCasino,
+  listPendingRemindersForOffer,
 } from "@/lib/services/user-reminders";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +26,13 @@ const cancelSchema = z.object({
 export async function GET(req: NextRequest) {
   const fired = fireDueUserReminders();
   const casinoOfferId = Number(req.nextUrl.searchParams.get("casinoOfferId"));
+  const offerId = Number(req.nextUrl.searchParams.get("offerId"));
   const pending =
     Number.isFinite(casinoOfferId) && casinoOfferId > 0
       ? listPendingRemindersForCasino(casinoOfferId)
-      : [];
+      : Number.isFinite(offerId) && offerId > 0
+        ? listPendingRemindersForOffer(offerId)
+        : [];
   return NextResponse.json({ fired, pending });
 }
 

@@ -10,9 +10,9 @@ import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
   LayoutDashboard,
-  Mail,
   Map,
   MessageCircle,
+  MessageSquarePlus,
   ScrollText,
   Settings,
 } from "lucide-react";
@@ -40,7 +40,7 @@ export const DESK_NAV_ITEM: MetaNavItem = {
 
 /**
  * Meta / utility tabs. Order = left-to-right after Desk.
- * Support & Contact are lightweight stubs until content lands.
+ * Support remains a lightweight stub; Feedback is the send channel.
  */
 export const META_NAV_ITEMS: readonly MetaNavItem[] = [
   {
@@ -79,11 +79,11 @@ export const META_NAV_ITEMS: readonly MetaNavItem[] = [
     matchPrefixes: ["/roadmap"],
   },
   {
-    id: "contact",
-    label: "Contact us",
-    href: "/contact",
-    icon: Mail,
-    matchPrefixes: ["/contact"],
+    id: "feedback",
+    label: "Feedback",
+    href: "/feedback",
+    icon: MessageSquarePlus,
+    matchPrefixes: ["/feedback", "/contact"],
   },
 ] as const;
 

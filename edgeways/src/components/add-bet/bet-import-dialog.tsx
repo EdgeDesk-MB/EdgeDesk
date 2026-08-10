@@ -23,7 +23,7 @@ const BetScreenshotImport = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 px-3 py-4 text-center text-[11px] text-muted-foreground">
+      <div className="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 px-3 py-4 text-center text-xs text-muted-foreground">
         Loading screenshot import…
       </div>
     ),

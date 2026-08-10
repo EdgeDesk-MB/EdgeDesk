@@ -48,7 +48,7 @@ export function EvBasisBadge({
           aria-label={`EV basis: ${detail}`}
         >
           <span className={cn("size-1.5 shrink-0 rounded-full", DOT_CLASS[basis])} aria-hidden />
-          <span className={cn("text-[9px] font-semibold uppercase tracking-wide", TEXT_CLASS[basis])}>
+          <span className={cn("text-[11px] font-semibold uppercase tracking-wide", TEXT_CLASS[basis])}>
             {LABELS[basis]}
           </span>
         </span>

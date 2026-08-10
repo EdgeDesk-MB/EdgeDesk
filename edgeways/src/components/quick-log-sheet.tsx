@@ -221,7 +221,7 @@ export function QuickLogSheet() {
             <div className="flex min-w-0 flex-col gap-2">
               {planSlots.length > 0 ? (
                 <div className="mb-1.5">
-                  <p className="flex items-center gap-1.5 px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="flex items-center gap-1.5 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <ListTodo className="size-3.5" aria-hidden />
                     From today&apos;s plan
                   </p>
@@ -250,7 +250,7 @@ export function QuickLogSheet() {
               </div>
 
               <div className="mt-1.5">
-                <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quick actions
                 </p>
                 <div className="grid grid-cols-2 gap-2">

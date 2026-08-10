@@ -28,6 +28,7 @@ import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { PageShell } from "@/components/page-shell";
 import { DeskPageHeader } from "@/components/layout/desk-page-header";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
+import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { useBookieAccounts } from "@/hooks/use-bookie-accounts";
@@ -350,6 +351,7 @@ function EpDeskContent() {
         "/api/events/track",
         { method: "POST", json: { homeTeam: s.homeTeam, awayTeam: s.awayTeam } }
       );
+      suppressRaceOffSoonForBetLink(tracked.event.id);
       const { bet } = await api<{ bet: { id: number } }>("/api/bets", {
         method: "POST",
         json: {
@@ -482,7 +484,7 @@ function EpDeskContent() {
         </Tabs>
       )}
 
-      <p className="pb-4 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="pb-4 text-xs leading-relaxed text-muted-foreground">
         Dixon-Coles model (win market + Over 2.5 + BTTS). Dutch EV is the sum of three edges - when EP
         odds sit near the exchange win price, lay hedges usually win on EV; dutch wins when EP is soft
         or you need the windfall ladder. Mixed 2UP/1UP is ranked automatically. Live tab shows
@@ -680,16 +682,15 @@ function VerdictBanner({
   return (
     <Card
       className={cn(
-        "border",
         anyFire
-          ? "border-emerald-500/40 bg-emerald-500/[0.04]"
-          : "border-border bg-muted/20"
+          ? "bg-emerald-500/[0.04] ring-1 ring-emerald-500/35 dark:ring-emerald-500/30"
+          : "bg-muted/20"
       )}
     >
       <CardContent className="flex flex-col gap-4 pt-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
               Covered play · ranked by EV
             </div>
             <div
@@ -719,13 +720,13 @@ function VerdictBanner({
               {top?.rationale}
             </p>
             {valueNote && (
-              <p className="mt-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-1.5 text-xs leading-snug text-muted-foreground">
                 <span className="font-medium text-foreground">Where the value is: </span>
                 {valueNote}
               </p>
             )}
             {compareNote && (
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 {compareNote}
               </p>
             )}
@@ -768,7 +769,7 @@ function VerdictBanner({
           <div className="overflow-x-auto rounded-lg border bg-background/50">
             <table className="w-full min-w-[520px] text-left text-xs">
               <thead>
-                <tr className="border-b text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                <tr className="border-b text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
                   <th className="px-3 py-2 font-medium">#</th>
                   <th className="px-3 py-2 font-medium">Structure</th>
                   <th className="px-3 py-2 text-right font-medium">EV</th>
@@ -829,7 +830,7 @@ function VerdictBanner({
 function Stat({ label, value, sign }: { label: string; value: string; sign?: number | null }) {
   return (
     <div className="rounded-lg border bg-muted/40 px-3 py-2 text-right">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
       <div
         className={cn(
           "font-mono text-sm font-semibold",
@@ -888,7 +889,7 @@ function InputMatrix({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <tr className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <tr className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="w-24 pb-1 text-left font-medium" />
                 <th className="pb-1 text-left font-semibold text-amber-600 dark:text-amber-400">
                   {s.homeTeam || "Home"}
@@ -901,25 +902,25 @@ function InputMatrix({
             </thead>
             <tbody className="[&_td]:py-1 [&_td]:pr-2">
               <tr>
-                <td className="text-[10px] uppercase tracking-wide text-muted-foreground">Exch back</td>
+                <td className="text-[11px] uppercase tracking-wide text-muted-foreground">Exch back</td>
                 <td><Num value={s.oHomeWin} onChange={(v) => set("oHomeWin", v)} /></td>
                 <td><Num value={s.oDraw} onChange={(v) => set("oDraw", v)} /></td>
                 <td><Num value={s.oAwayWin} onChange={(v) => set("oAwayWin", v)} /></td>
               </tr>
               <tr>
-                <td className="text-[10px] uppercase tracking-wide text-muted-foreground">Exch lay</td>
+                <td className="text-[11px] uppercase tracking-wide text-muted-foreground">Exch lay</td>
                 <td><Num value={s.oLayH} onChange={(v) => set("oLayH", v)} exchangeOddsStepping /></td>
                 <td className="text-center text-muted-foreground">-</td>
                 <td><Num value={s.oLayA} onChange={(v) => set("oLayA", v)} exchangeOddsStepping /></td>
               </tr>
               <tr>
-                <td className="text-[10px] uppercase tracking-wide text-muted-foreground">EP 2UP</td>
+                <td className="text-[11px] uppercase tracking-wide text-muted-foreground">EP 2UP</td>
                 <td><BookOdds book={s.bkH2} odds={s.oH2} onBook={(v) => set("bkH2", v)} onOdds={(v) => set("oH2", v)} /></td>
                 <td className="text-center text-muted-foreground">-</td>
                 <td><BookOdds book={s.bkA2} odds={s.oA2} onBook={(v) => set("bkA2", v)} onOdds={(v) => set("oA2", v)} /></td>
               </tr>
               <tr>
-                <td className="text-[10px] uppercase tracking-wide text-muted-foreground">EP 1UP</td>
+                <td className="text-[11px] uppercase tracking-wide text-muted-foreground">EP 1UP</td>
                 <td><BookOdds book={s.bkH1} odds={s.oH1} onBook={(v) => set("bkH1", v)} onOdds={(v) => set("oH1", v)} /></td>
                 <td className="text-center text-muted-foreground">-</td>
                 <td><BookOdds book={s.bkA1} odds={s.oA1} onBook={(v) => set("bkA1", v)} onOdds={(v) => set("oA1", v)} /></td>
@@ -971,7 +972,7 @@ function Field({ label, children, accent }: { label: string; children: React.Rea
     <label className="flex flex-col gap-1">
       <span
         className={cn(
-          "text-[10px] font-semibold uppercase tracking-[0.12em]",
+          "text-[11px] font-semibold uppercase tracking-[0.12em]",
           accent ? "text-primary-text" : "text-muted-foreground"
         )}
       >
@@ -1052,7 +1053,7 @@ function Tick({ input, model, tol = 0.005 }: { input: number; model: number; tol
 
 function ModelReadout({ R, s }: { R: Computed; s: DeskState }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-muted/30 px-4 py-2 font-mono text-[11px] text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-muted/30 px-4 py-2 font-mono text-xs text-muted-foreground">
       <span>
         xG {f2(R.fit.lh)}–{f2(R.fit.la)}
       </span>
@@ -1094,7 +1095,7 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
         <CardContent className="pt-5">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <tr className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="pb-2 text-left font-medium">Offer</th>
                 <th className="pb-2 text-left font-medium">Book</th>
                 <th className="pb-2 text-right font-medium">Odds</th>
@@ -1113,7 +1114,7 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
                     <td className="py-2.5 font-medium">
                       {o.label}
                       {isBest && (
-                        <Badge variant="secondary" className="ml-2 text-[9px]">
+                        <Badge variant="secondary" className="ml-2 text-[11px]">
                           BEST
                         </Badge>
                       )}
@@ -1144,7 +1145,7 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
 
       <Card className="border-primary/20">
         <CardContent className="pt-5">
-          <div className="pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary-text">
+          <div className="pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-text">
             Why the early payout {R.best && R.best.decomp.total > 0 ? "works here" : "doesn't (quite) rescue it"}
           </div>
           <p className="pb-3 text-xs leading-relaxed text-muted-foreground">
@@ -1155,7 +1156,7 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
           </p>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <tr className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="pb-2 text-left font-medium">Leg</th>
                 <th className="pb-2 text-right font-medium">P(win FT)</th>
                 <th className="pb-2 text-right font-medium">P(EP)</th>
@@ -1181,7 +1182,7 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
               ))}
             </tbody>
           </table>
-          <p className="pt-3 text-[10px] leading-relaxed text-muted-foreground">
+          <p className="pt-3 text-[11px] leading-relaxed text-muted-foreground">
             *Bonus event = P(team leads by the threshold, then fails to win) - the &quot;went ahead then got pegged
             back&quot; scenario. Total xG here is {f2(R.fit.lh + R.fit.la)} ({R.fit.lh + R.fit.la < 2.8 ? "low" : "goal-friendly"}
             -scoring): few goals → few leads surrendered → small bonus for 2UP; 1UP beats 2UP only if sourced near fair
@@ -1299,7 +1300,7 @@ function DutchTab({
                   <div className="text-sm font-semibold">
                     {title}
                     {highlight && (
-                      <Badge variant="secondary" className="ml-2 text-[10px]">
+                      <Badge variant="secondary" className="ml-2 text-[11px]">
                         top dutch
                       </Badge>
                     )}
@@ -1320,13 +1321,13 @@ function DutchTab({
                       key={leg.n}
                       className="flex items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0"
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[10px]">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px]">
                         {leg.n}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{leg.label}</div>
-                        <div className="text-[11px] text-muted-foreground">
-                          <BookieChip name={leg.venue} className="[&>span:last-child]:text-[11px]" />
+                        <div className="text-xs text-muted-foreground">
+                          <BookieChip name={leg.venue} className="[&>span:last-child]:text-xs" />
                         </div>
                       </div>
                       <div className="text-right font-mono text-xs">
@@ -1335,7 +1336,7 @@ function DutchTab({
                       </div>
                       <div
                         className={cn(
-                          "w-14 text-right font-mono text-[11px]",
+                          "w-14 text-right font-mono text-xs",
                           leg.edge >= 0 ? moneyPositiveClass : "text-negative"
                         )}
                       >
@@ -1351,12 +1352,12 @@ function DutchTab({
                 </div>
 
                 <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <div className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Ladder · P(profit) {pct(d.dist.pProfit)} · σ £{f2(d.dist.sd)}
                   </div>
                   <div className="flex flex-col gap-1">
                     {d.dist.ladder.slice(0, 5).map((rung) => (
-                      <div key={rung.label + rung.pl} className="flex items-center gap-2 text-[11px]">
+                      <div key={rung.label + rung.pl} className="flex items-center gap-2 text-xs">
                         <span className="w-32 truncate">{rung.label}</span>
                         <div className="h-1.5 flex-1 overflow-hidden rounded bg-muted">
                           <div
@@ -1431,13 +1432,13 @@ function LayTab({ R, s, exchangeName }: { R: Computed; s: DeskState; exchangeNam
                   ] as const
                 ).map(([label, pl, p]) => (
                   <div key={label} className={cn("rounded-md border p-2", pl > 0 && "border-emerald-300 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/30")}>
-                    <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
                     <div className={cn("font-mono text-sm font-semibold", pl >= 0 ? moneyPositiveClass : "text-negative")}>{gbp(pl)}</div>
-                    <div className="font-mono text-[10px] text-muted-foreground">{pct(p)}</div>
+                    <div className="font-mono text-[11px] text-muted-foreground">{pct(p)}</div>
                   </div>
                 ))}
               </div>
-              <div className="text-[10px] text-muted-foreground">σ £{f2(side.lay.sd)}</div>
+              <div className="text-[11px] text-muted-foreground">σ £{f2(side.lay.sd)}</div>
             </CardContent>
           </Card>
         ))}
@@ -1655,7 +1656,7 @@ function LiveTab({
             </Badge>
             <Badge
               variant="outline"
-              className="font-mono text-[11px] tabular-nums"
+              className="font-mono text-xs tabular-nums"
               title="Dixon-Coles remaining-goals model from desk odds"
             >
               {formatLiveMarkets(markets)}
@@ -1663,7 +1664,7 @@ function LiveTab({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               EP triggers
             </span>
             {toggles.map((t) => (
@@ -1689,7 +1690,7 @@ function LiveTab({
               </button>
             ))}
           </div>
-          <p className="text-center text-[11px] text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             Model EV uses remaining-goals Dixon-Coles from your desk odds + minute. Snapshot is
             &quot;if the match ended now&quot;. Triggers auto-lock when the score forces them.
           </p>
@@ -1704,11 +1705,11 @@ function LiveTab({
           >
             <CardContent className="pt-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   {row.label}
                 </div>
                 {i === 0 && (
-                  <Badge variant="secondary" className="text-[9px]">
+                  <Badge variant="secondary" className="text-[11px]">
                     Best model
                   </Badge>
                 )}
@@ -1721,8 +1722,8 @@ function LiveTab({
               >
                 {gbp(row.model)}
               </div>
-              <div className="text-[10px] text-muted-foreground">model EV</div>
-              <div className="mt-2 flex items-baseline justify-between gap-2 border-t pt-2 text-[11px]">
+              <div className="text-[11px] text-muted-foreground">model EV</div>
+              <div className="mt-2 flex items-baseline justify-between gap-2 border-t pt-2 text-xs">
                 <span className="text-muted-foreground">if ended now</span>
                 <span
                   className={cn(
@@ -1747,7 +1748,7 @@ function LiveTab({
         ).map(([label, pl]) => (
           <Card key={label}>
             <CardContent className="pt-4 text-center">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {label}
               </div>
               <div
@@ -1758,7 +1759,7 @@ function LiveTab({
               >
                 {gbp(pl)}
               </div>
-              <div className="text-[10px] text-muted-foreground">snapshot only</div>
+              <div className="text-[11px] text-muted-foreground">snapshot only</div>
             </CardContent>
           </Card>
         ))}
@@ -1811,13 +1812,13 @@ function PlaybookOverlay({ open, onClose }: { open: boolean; onClose: () => void
           <span className="font-semibold text-primary-text">The one rule:</span> the edge is in the{" "}
           <em>offer</em>, not the match. A good setup = an early-payout <strong>promo on near-fair odds</strong>.
           If the EP price is shorter than the straight win price, value&apos;s gone → pass.
-          <div className="pt-2 font-mono text-[10px] text-muted-foreground">
+          <div className="pt-2 font-mono text-[11px] text-muted-foreground">
             Ideal: fav @ 1.70–2.30 · O2.5 ≤ 1.50 · BTTS ≤ 1.55 · total xG ≥ 3.5 · use 2UP
           </div>
         </div>
         {PLAYBOOK.map((section) => (
           <div key={section.section}>
-            <div className="pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {section.section}
             </div>
             <div className="flex flex-col gap-1">

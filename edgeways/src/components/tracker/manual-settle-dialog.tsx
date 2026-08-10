@@ -118,7 +118,7 @@ export function ManualSettleDialog({
             variant="outline"
             size="sm"
             className={cn(
-              "h-7 px-2 text-[10px] max-sm:h-9 max-sm:px-3 max-sm:text-xs",
+              "h-7 px-2 text-[11px] max-sm:h-9 max-sm:px-3 max-sm:text-xs",
               resultActionButtonClass
             )}
           >

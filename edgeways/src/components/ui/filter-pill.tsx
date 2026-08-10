@@ -15,8 +15,15 @@ export type FilterPillProps = {
   /** Home chart / feed chips — flat, no PressButton. */
   compact?: boolean;
   hasCount?: boolean;
+  /**
+   * Active plate tone. `"edge"` keeps Offer Edge violet (`--edge`) instead of
+   * the default ink + brand-type chip.
+   */
+  tone?: "default" | "edge";
   type?: "button" | "submit" | "reset";
   title?: string;
+  /** Accessible name when visible label is abbreviated or truncated. */
+  "aria-label"?: string;
   id?: string;
 };
 
@@ -35,8 +42,10 @@ export const FilterPill = React.forwardRef<HTMLButtonElement, FilterPillProps>(
       disabled,
       compact = false,
       hasCount = false,
+      tone = "default",
       type = "button",
       title,
+      "aria-label": ariaLabel,
       id,
     },
     ref
@@ -48,9 +57,13 @@ export const FilterPill = React.forwardRef<HTMLButtonElement, FilterPillProps>(
           type={type}
           id={id}
           title={title}
+          aria-label={ariaLabel}
           disabled={disabled}
           onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
-          className={cn(filterPillState(active, { compact, hasCount }), className)}
+          className={cn(
+            filterPillState(active, { compact, hasCount, tone }),
+            className
+          )}
         >
           {children}
         </button>
@@ -71,10 +84,13 @@ export const FilterPill = React.forwardRef<HTMLButtonElement, FilterPillProps>(
           "edgeways-filter-pill",
           hasCount && "edgeways-filter-pill--count",
           active && "edgeways-filter-pill--active",
+          tone === "edge" && "edgeways-filter-pill--edge",
           className
         )}
         containerProps={{
           "data-pill-active": active ? "true" : "false",
+          "data-pill-tone": tone,
+          ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         }}
       >
         {children}

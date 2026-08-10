@@ -10,10 +10,19 @@ import {
   clearCasinoOfferBalance,
   syncCasinoOfferBalance,
 } from "@/lib/services/balances";
+import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { cancelPendingRemindersForCasino } from "@/lib/services/user-reminders";
 
 export const dynamic = "force-dynamic";
+
+const offerUrlField = z
+  .string()
+  .nullable()
+  .optional()
+  .refine((v) => v == null || v.trim() === "" || normalizeOfferUrl(v) != null, {
+    message: "Enter a valid http(s) link",
+  });
 
 /** K1: campaign-level fields only - reward fields live on the components endpoints. */
 const patchSchema = z.object({
@@ -22,6 +31,7 @@ const patchSchema = z.object({
   status: z.enum(["planned", "active", "completed", "expired"]).optional(),
   actualProfit: z.number().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
+  offerUrl: offerUrlField,
   expiresAt: z.number().nullable().optional(),
   /** K3: stop repeating from this occurrence forward */
   stopRecurrence: z.boolean().optional(),
@@ -53,6 +63,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.status !== undefined ? { status: p.status } : {}),
       ...(p.actualProfit !== undefined ? { actualProfit: p.actualProfit } : {}),
       ...(p.notes !== undefined ? { notes: p.notes } : {}),
+      ...(p.offerUrl !== undefined ? { offerUrl: normalizeOfferUrl(p.offerUrl) } : {}),
       ...(p.expiresAt !== undefined ? { expiresAt: p.expiresAt } : {}),
       ...(p.status === "completed" ? { completedAt: Date.now() } : {}),
       ...(p.status !== undefined && p.status !== "completed" ? { completedAt: null } : {}),

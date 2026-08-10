@@ -59,7 +59,7 @@ export function LockInDialog({ bet, onLogged }: { bet: BetRow; onLogged: () => v
         <Button
           variant="outline"
           size="sm"
-          className="h-7 gap-1 px-2 text-[10px] max-sm:h-9 max-sm:px-3 max-sm:text-xs"
+          className="h-7 gap-1 px-2 text-[11px] max-sm:h-9 max-sm:px-3 max-sm:text-xs"
         >
           <Lock className="size-3" aria-hidden /> Lock in
         </Button>
@@ -248,7 +248,7 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
                     key={label}
                     type="button"
                     className={cn(
-                      "rounded-full border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-selection-subtle",
+                      "rounded-full border px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-selection-subtle",
                       ((frac === 1 && fullLock) ||
                         (frac === 0.5 &&
                           !fullLock &&

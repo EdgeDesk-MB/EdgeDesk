@@ -26,7 +26,7 @@ export function BetOfferTriggerField({
         <Zap className="mt-0.5 size-3.5 shrink-0 text-violet-500" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-foreground">Offer trigger</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
             Describe the promo so free bets and place refunds auto-apply at settlement.
           </p>
         </div>
@@ -42,7 +42,7 @@ export function BetOfferTriggerField({
       {hasInput ? (
         <div
           className={cn(
-            "rounded-md border px-2.5 py-2 text-[11px] leading-snug",
+            "rounded-md border px-2.5 py-2 text-xs leading-snug",
             preview.recognised
               ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
               : "border-amber-500/25 bg-amber-500/5 text-amber-900 dark:text-amber-200"
@@ -65,7 +65,7 @@ export function BetOfferTriggerField({
           )}
         </div>
       ) : (
-        <p className="text-[10px] leading-snug text-muted-foreground">
+        <p className="text-[11px] leading-snug text-muted-foreground">
           Straight free bet:{" "}
           <span className="text-foreground/80">Bet £50 get £50</span>
           {" · "}
@@ -75,12 +75,12 @@ export function BetOfferTriggerField({
       )}
 
       {needsEventLink ? (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Link an event and selection so place triggers can run when the result lands.
         </p>
       ) : null}
       {needsTeamNames ? (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Enter team names or link a fixture so match triggers can watch the score.
         </p>
       ) : null}

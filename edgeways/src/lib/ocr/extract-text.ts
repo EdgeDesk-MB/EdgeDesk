@@ -41,11 +41,46 @@ export async function extractTextFromImage(
   }
 }
 
-/** Free client-side OCR for offer / promo screenshots (paragraph layout). */
+/** Prefer OCR dumps that keep stake / free-bet / bookie wording intact. */
+function scoreOfferOcrText(text: string): number {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length < 12) return 0;
+  let score = Math.min(t.length, 1200) / 300;
+  if (/£\s*\d|\bE\s*\d{1,3}\b|\b\d+\s*free\s*bets?\b/i.test(t)) score += 4;
+  if (/\bbet\s+(?:£|E|€)?\s*\d+/i.test(t)) score += 3;
+  if (/\bfree\s*bets?\b|\bfre\s*bet\b/i.test(t)) score += 3;
+  if (/\b(?:opt[- ]?in|min(?:imum)?\s+odds|multiples?|horse\s*racing)\b/i.test(t)) {
+    score += 2;
+  }
+  if (/\b(?:who can take part|terms?\s*(?:&|and)\s*conditions|remaining steps)\b/i.test(t)) {
+    score -= 1;
+  }
+  // Penalise dense garbage with almost no money tokens.
+  const moneyHits = (t.match(/£\s*\d|\bE\d{1,3}\b/g) ?? []).length;
+  if (moneyHits === 0 && t.length > 200) score -= 2;
+  return score;
+}
+
+/**
+ * Free client-side OCR for offer / promo screenshots.
+ * Upscales and tries auto + sparse layouts, keeping the dump that best
+ * preserves stake / free-bet wording (dense T&Cs columns often shred PSM.AUTO).
+ */
 export async function ocrOfferScreenshot(
   file: File
 ): Promise<{ text: string; confidence: number }> {
-  return extractTextFromImage(file, "auto");
+  const upscaled = await upscaleImageForOcr(file, 2);
+  const jobs: Array<Promise<{ text: string; confidence: number }>> = [
+    extractTextFromImage(file, "auto"),
+    extractTextFromImage(file, "sparse"),
+  ];
+  if (upscaled !== file) {
+    jobs.push(extractTextFromImage(upscaled, "auto"));
+    jobs.push(extractTextFromImage(upscaled, "sparse"));
+  }
+  const results = await Promise.all(jobs);
+  results.sort((a, b) => scoreOfferOcrText(b.text) - scoreOfferOcrText(a.text));
+  return results[0] ?? { text: "", confidence: 0 };
 }
 
 /** Prefer OCR dumps that preserve fractional SPs after repair. */
@@ -121,30 +156,13 @@ export async function ocrOfferScreenshots(
   files: File[]
 ): Promise<Array<{ text: string; confidence: number; fileName: string }>> {
   if (files.length === 0) return [];
-  if (files.length === 1) {
-    const one = await ocrOfferScreenshot(files[0]);
-    return [{ ...one, fileName: files[0].name }];
+  // Each file uses the multi-layout picker (worker-per-pass inside extract).
+  const out: Array<{ text: string; confidence: number; fileName: string }> = [];
+  for (const file of files) {
+    const one = await ocrOfferScreenshot(file);
+    out.push({ ...one, fileName: file.name });
   }
-
-  const { createWorker, PSM } = await import("tesseract.js");
-  const worker = await createWorker("eng", 1, { logger: () => {} });
-  try {
-    await worker.setParameters({
-      tessedit_pageseg_mode: PSM.AUTO,
-    });
-    const out: Array<{ text: string; confidence: number; fileName: string }> = [];
-    for (const file of files) {
-      const { data } = await worker.recognize(file);
-      out.push({
-        text: data.text,
-        confidence: data.confidence,
-        fileName: file.name,
-      });
-    }
-    return out;
-  } finally {
-    await worker.terminate();
-  }
+  return out;
 }
 
 export async function ocrBetScreenshot(file: File, source: ScreenshotSource): Promise<OcrResult> {

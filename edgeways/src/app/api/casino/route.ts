@@ -5,6 +5,7 @@ import {
   createCasinoOfferSeriesWithInstance,
   syncCasinoOfferSeriesInstances,
 } from "@/lib/offers/casino-offer-recurrence";
+import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { getCasinoOfferSummaries, getCasinoOfferSummary } from "@/lib/services/casino-offers";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,20 @@ const recurrenceSchema = z.object({
   expiryOffsetDays: z.number().int().min(0).max(365).optional(),
 });
 
+const offerUrlField = z
+  .string()
+  .nullable()
+  .optional()
+  .refine((v) => v == null || v.trim() === "" || normalizeOfferUrl(v) != null, {
+    message: "Enter a valid http(s) link",
+  });
+
 const createSchema = z.object({
   casino: z.string().max(120).optional(),
   title: z.string().min(1).max(200),
   status: z.enum(["planned", "active"]).optional(),
   notes: z.string().max(1000).nullable().optional(),
+  offerUrl: offerUrlField,
   expiresAt: z.number().nullable().optional(),
   recurrence: recurrenceSchema.optional(),
 });
@@ -46,6 +56,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+  const offerUrl = normalizeOfferUrl(input.offerUrl ?? null);
 
   if (input.recurrence) {
     const { offerId } = createCasinoOfferSeriesWithInstance(
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
         casino: input.casino?.trim() || null,
         title: input.title.trim(),
         notes: input.notes ?? null,
+        offerUrl,
         expiresAt: input.expiresAt ?? null,
       },
       input.recurrence
@@ -76,6 +88,7 @@ export async function POST(req: NextRequest) {
       game: null,
       status: input.status ?? "planned",
       notes: input.notes ?? null,
+      offerUrl,
       expiresAt: input.expiresAt ?? null,
       createdAt: Date.now(),
     })

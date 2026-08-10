@@ -15,14 +15,14 @@ type SplitSegmentProps = React.ComponentProps<typeof Button>;
 
 /**
  * Connected split button — leading primary action + trailing related action.
- * M3 layout (2px gap, asymmetric corners) with Edgeways `--radius-button`.
+ * Gap is set in globals.css (`[data-slot=split-button]`); keep class in sync.
  */
 function SplitButtonRoot({ children, className, title }: SplitButtonProps) {
   return (
     <span
       data-slot="split-button"
       title={title}
-      className={cn("inline-flex items-stretch gap-0.5", className)}
+      className={cn("inline-flex items-stretch gap-px", className)}
     >
       {children}
     </span>

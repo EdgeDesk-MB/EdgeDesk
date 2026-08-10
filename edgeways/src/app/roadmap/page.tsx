@@ -58,7 +58,7 @@ export default function RoadmapPage() {
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
         {(["done", "in_progress", "planned", "future"] as const).map((s) => (
           <span key={s} className="inline-flex items-center gap-1.5">
-            <Badge variant={roadmapStatusBadgeVariant(s)} className="text-[10px]">
+            <Badge variant={roadmapStatusBadgeVariant(s)} className="text-[11px]">
               {ROADMAP_STATUS_LABELS[s]}
             </Badge>
           </span>
@@ -83,7 +83,7 @@ export default function RoadmapPage() {
                       <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
                     )}
                   </div>
-                  <Badge variant={roadmapStatusBadgeVariant(item.status)} className="shrink-0 text-[10px]">
+                  <Badge variant={roadmapStatusBadgeVariant(item.status)} className="shrink-0 text-[11px]">
                     {ROADMAP_STATUS_LABELS[item.status]}
                   </Badge>
                 </div>

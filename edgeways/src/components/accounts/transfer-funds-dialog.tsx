@@ -243,7 +243,7 @@ function TransferFundsForm({
             <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
               <span>
                 <span className="font-medium">Pending until statement</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                <span className="mt-0.5 block text-xs text-muted-foreground">
                   Bank credit stays yellow until you confirm it landed
                 </span>
               </span>

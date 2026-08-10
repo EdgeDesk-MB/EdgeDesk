@@ -107,7 +107,11 @@ export default function EdgeReportPage() {
               value={owner}
               onChange={setOwner}
             />
-            <Tabs value={view} onValueChange={(v) => setView(v as "month" | "year")}>
+            <Tabs
+              value={view}
+              onValueChange={(v) => setView(v as "month" | "year")}
+              activationMode="manual"
+            >
               <TabsList variant="segmented">
                 <TabsTrigger value="month">Month</TabsTrigger>
                 <TabsTrigger value="year">Year</TabsTrigger>

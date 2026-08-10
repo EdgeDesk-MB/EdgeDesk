@@ -13,7 +13,8 @@ export type PressButtonVariant =
   | "outline"
   | "secondary"
   | "destructive"
-  | "success";
+  | "success"
+  | "edge";
 
 export type PressButtonSize =
   | "default"
@@ -32,6 +33,7 @@ const VARIANT_TO_TYPE: Record<PressButtonVariant, ButtonType> = {
   secondary: "secondary",
   destructive: "danger",
   success: "success",
+  edge: "primary",
 };
 
 /** Package size class (density is refined via CSS on data-size). */
@@ -115,7 +117,9 @@ export function PressButton({
       size={SIZE_TO_PKG[size]}
       rounded={rounded}
       ripple={false}
-      moveEvents
+      // Left/right hover tracking thrashes icon+label lock-ups as the pointer
+      // crosses the face — use a single stable hover transform in CSS instead.
+      moveEvents={false}
       placeholder={false}
       iconOnly={iconOnly}
       disabled={disabled}
@@ -124,7 +128,12 @@ export function PressButton({
       defaultActive={defaultActive}
       onChange={onChange}
       onPress={(event) => onClick?.(event)}
-      className={cn("edgeways-btn-3d", SIZE_TO_HEIGHT_CLASS[size], className)}
+      className={cn(
+        "edgeways-btn-3d",
+        variant === "edge" && "edgeways-btn-edge",
+        SIZE_TO_HEIGHT_CLASS[size],
+        className
+      )}
       containerProps={
         {
           "data-slot": "button",

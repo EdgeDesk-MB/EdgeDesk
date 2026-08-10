@@ -178,7 +178,9 @@ function accountCashBalance(accountId: number): number {
     .all()
     .filter((t) => t.category !== "free_bet" && !t.pending)
     .reduce((s, t) => s + t.amount, 0);
-  return raw + sharedLiabilityReturn(accountId);
+  // Round to pence so IEEE dust from summing ledger rows never surfaces as
+  // a tiny negative £0.00 (red) or a non-zero compare against exact 0.
+  return roundPence(raw + sharedLiabilityReturn(accountId));
 }
 
 function accountPendingIn(accountId: number): number {
@@ -685,6 +687,16 @@ function clearOpenBetPlacementDebits(betId: number): void {
     if (!placementDebit) continue;
     db.delete(balanceTransactions).where(eq(balanceTransactions.id, t.id)).run();
   }
+}
+
+/**
+ * Remove every ledger row for a bet that is being deleted, so stake /
+ * settlement / free-bet lines cannot orphan on bookie balances.
+ */
+export function purgeLedgerForDeletedBet(betId: number): void {
+  db.delete(balanceTransactions)
+    .where(eq(balanceTransactions.betId, betId))
+    .run();
 }
 
 /**

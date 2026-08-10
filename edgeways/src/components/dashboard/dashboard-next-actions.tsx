@@ -95,7 +95,7 @@ export function DashboardNextActions({
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
                   {action.bookmaker ? <VenueBadge name={action.bookmaker} /> : null}
-                  <Badge variant="outline" className="text-[10px] font-semibold uppercase">
+                  <Badge variant="outline" className="text-[11px] font-semibold uppercase">
                     {offerNextActionLabel(action.kind)}
                   </Badge>
                   <span className="truncate text-[13px] font-medium text-foreground">

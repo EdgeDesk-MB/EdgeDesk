@@ -26,7 +26,7 @@ import { AccountTypeBadge } from "@/components/accounts/account-type-badge";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { BookieNamePicker, EXCHANGE_CUSTOM } from "@/components/bookie-name-picker";
-import { formatGbp, roundMoney } from "@/lib/format-money";
+import { formatGbp, isNegativeGbp, roundMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -294,6 +294,17 @@ function AddBalanceForm({
   const totalCash = effectiveRows
     .filter((r) => mode !== "top_up" || r.fundKind === "cash")
     .reduce((s, r) => s + signedAmount(r.amount), 0);
+
+  /** Top up footer: resulting cash balance when every cash row hits one account. */
+  const topUpCashRows = mode === "top_up" ? effectiveRows.filter((r) => r.fundKind === "cash") : [];
+  const topUpAccountIds = new Set(topUpCashRows.map((r) => r.accountId));
+  const topUpNewBalance =
+    topUpAccountIds.size === 1
+      ? roundMoney(
+          (accounts.find((a) => a.id === topUpCashRows[0]!.accountId)?.balance ?? 0) +
+            topUpCashRows.reduce((s, r) => s + Math.abs(r.amount), 0)
+        )
+      : null;
 
   return (
     <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[780px]">
@@ -606,7 +617,9 @@ function AddBalanceForm({
                 <span
                   className={cn(
                     "font-semibold tabular-nums",
-                    totalCash >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-negative"
+                    isNegativeGbp(totalCash)
+                      ? "text-negative"
+                      : "text-emerald-600 dark:text-emerald-400"
                   )}
                 >
                   {formatGbp(totalCash, { signed: true })}
@@ -617,13 +630,22 @@ function AddBalanceForm({
                   {formatGbp(totalFreeBets, { signed: true })}
                 </span>
               </>
+            ) : mode === "top_up" && topUpNewBalance != null ? (
+              <>
+                New balance:{" "}
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatGbp(topUpNewBalance)}
+                </span>
+              </>
             ) : (
               <>
                 Net change:{" "}
                 <span
                   className={cn(
                     "font-semibold tabular-nums",
-                    totalDelta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-negative"
+                    isNegativeGbp(totalDelta)
+                      ? "text-negative"
+                      : "text-emerald-600 dark:text-emerald-400"
                   )}
                 >
                   {formatGbp(totalDelta, { signed: true })}

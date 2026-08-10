@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Dices, Plus, Trash2 } from "lucide-react";
+import { Dices, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +85,16 @@ import { formatRecurrenceLabel } from "@/lib/offers/offer-recurrence-shared";
 import { formatGbp, roundMoney } from "@/lib/format-money";
 import { formatPillLabel, offerStatusBadgeVariant } from "@/lib/ui/status-badges";
 import { FilterPill } from "@/components/ui/filter-pill";
+import {
+  campaignCardBadge,
+  campaignCardFooterMeta,
+  campaignCardHeader,
+  campaignCardOpenLink,
+  campaignCardPnl,
+  campaignCardPnlLabel,
+  campaignCardTitle,
+  filterPillCountState,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import type { CasinoOfferComponentRow, CasinoOfferRow } from "@/lib/db/schema";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
@@ -226,11 +236,10 @@ function CompleteDialog({ offer, onDone }: { offer: CasinoOfferSummary; onDone: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          Complete
-        </Button>
-      </DialogTrigger>
+      {/* Controlled open (not DialogTrigger) so the Button stays on the Press path. */}
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+        Complete
+      </Button>
       {/* Remount on open so mode / amounts reset cleanly between campaigns. */}
       {open ? (
         <CompleteDialogForm offer={offer} onDone={onDone} onOpenChange={setOpen} />
@@ -382,10 +391,11 @@ function ComponentRow({
             value={component.expectedEv}
             signColor
             signDisplay
+            estimate
             className="font-semibold tabular-nums"
           />
         </p>
-        <p className="truncate text-[11px] text-muted-foreground">
+        <p className="truncate text-xs text-muted-foreground">
           {componentSummaryLine(component)}
         </p>
       </div>
@@ -426,14 +436,15 @@ function CampaignStepList({
             className="rounded-md border border-border/60 bg-muted/20 p-2"
           >
             <div className="mb-1.5 flex items-baseline justify-between gap-2 px-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Tier {tier.index}
               </p>
               <MoneyFlow
                 value={tierEv}
                 signColor
                 signDisplay
-                className="text-[11px] font-semibold tabular-nums"
+                estimate
+                className="text-xs font-semibold tabular-nums"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -475,24 +486,36 @@ function CampaignCard({
 
   return (
     <Card className="gap-0 overflow-hidden py-0">
-      <CardHeader className={cn("space-y-0 pt-(--card-spacing) pb-3", headerTintClass ?? "bg-card")}>
+      <CardHeader className={cn(campaignCardHeader, headerTintClass ?? "bg-card")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               {offer.casino ? <VenueBadge name={offer.casino} kind="bookie" size="md" /> : null}
-              <Badge variant={offerStatusBadgeVariant(offer.status)}>
+              <Badge
+                variant={offerStatusBadgeVariant(offer.status)}
+                className={campaignCardBadge}
+              >
                 {STATUS_LABEL[offer.status]}
               </Badge>
             </div>
-            <CardTitle className="mt-2 text-xl font-bold leading-snug text-foreground">
-              {offer.title}
-            </CardTitle>
+            <CardTitle className={campaignCardTitle}>{offer.title}</CardTitle>
+            {offer.offerUrl ? (
+              <a
+                href={offer.offerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={campaignCardOpenLink}
+              >
+                <ExternalLink className="size-3 shrink-0" />
+                Open offer
+              </a>
+            ) : null}
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className={campaignCardPnlLabel}>
               {settled ? "Realised" : "Total EV"}
             </p>
-            <MoneyFlow value={headerEv} signColor className="text-xl font-bold tabular-nums" />
+            <MoneyFlow value={headerEv} signColor estimate={!settled} className={campaignCardPnl} />
             <div className="mt-0.5 flex items-center justify-end gap-1.5">
               <EvBasisBadge
                 basis={offer.evBasis}
@@ -503,12 +526,13 @@ function CampaignCard({
           </div>
         </div>
         {settled ? (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-muted-foreground">
             Expected{" "}
             <MoneyFlow
               value={offer.expectedEv}
               signColor
               signDisplay
+              estimate
               className="inline font-medium"
             />{" "}
             → Realised{" "}
@@ -526,7 +550,7 @@ function CampaignCard({
         {offer.components.length > 0 ? (
           <CampaignStepList offer={offer} onChanged={onChanged} />
         ) : (
-          <p className="rounded border border-dashed border-border/60 px-2.5 py-2 text-[11px] text-muted-foreground">
+          <p className="rounded border border-dashed border-border/60 px-2.5 py-2 text-xs text-muted-foreground">
             Nothing logged yet - add a step to get an EV verdict.
           </p>
         )}
@@ -560,8 +584,8 @@ function CampaignCard({
         </CardContent>
       ) : null}
 
-      <CardContent className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
-        <span className="text-xs text-muted-foreground">
+      <CardContent className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-3.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
+        <span className={campaignCardFooterMeta}>
           {offer.components.length} step{offer.components.length === 1 ? "" : "s"}
           {expiryLabel && expiryUrgency === "today" ? (
             <>
@@ -700,15 +724,28 @@ export default function CasinoPage() {
         }
         toolbar={
           <>
-            {(["all", "needs_action", "active", "completed", "expired"] as const).map((f) => (
-              <FilterPill key={f} active={filter === f} onClick={() => setFilter(f)}>
-                {f === "needs_action"
-                  ? `Needs action${totals.needsAction ? ` (${totals.needsAction})` : ""}`
+            {(["all", "needs_action", "active", "completed", "expired"] as const).map((f) => {
+              const count =
+                f === "needs_action"
+                  ? totals.needsAction
                   : f === "expired"
-                    ? `Expired${totals.expired ? ` (${totals.expired})` : ""}`
-                    : formatPillLabel(f)}
-              </FilterPill>
-            ))}
+                    ? totals.expired
+                    : 0;
+              const hasCount = count > 0;
+              return (
+                <FilterPill
+                  key={f}
+                  active={filter === f}
+                  onClick={() => setFilter(f)}
+                  hasCount={hasCount}
+                >
+                  {formatPillLabel(f)}
+                  {hasCount ? (
+                    <span className={filterPillCountState(filter === f)}>{count}</span>
+                  ) : null}
+                </FilterPill>
+              );
+            })}
           </>
         }
       />

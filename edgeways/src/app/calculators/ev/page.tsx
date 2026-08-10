@@ -139,7 +139,7 @@ export default function EvCalculatorPage() {
                   </div>
                 </div>
                 <div className="text-3xl font-semibold">
-                  <MoneyFlow value={ev?.evForStake ?? 0} signColor signDisplay />
+                  <MoneyFlow value={ev?.evForStake ?? 0} signColor signDisplay estimate />
                 </div>
               </div>
             </div>

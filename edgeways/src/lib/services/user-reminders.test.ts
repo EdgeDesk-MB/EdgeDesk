@@ -2,11 +2,13 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { db, userReminders, alertsInbox } from "@/lib/db";
 import {
   cancelPendingRemindersForCasino,
+  cancelPendingRemindersForOffer,
   cancelUserReminder,
   createUserReminder,
   fireDueUserReminders,
   formatUserReminderAlert,
   listPendingRemindersForCasino,
+  listPendingRemindersForOffer,
 } from "./user-reminders";
 
 beforeEach(() => {
@@ -108,5 +110,49 @@ describe("user reminders", () => {
     const fired = fireDueUserReminders(now + 5_000);
     expect(fired).toHaveLength(1);
     expect(fired[0]?.body).toBe("Other campaign");
+  });
+
+  it("creates a pending reminder linked to a sports offer", () => {
+    const now = Date.UTC(2026, 7, 4, 12, 0, 0);
+    const remindAt = now + 24 * 60 * 60 * 1000;
+    const row = createUserReminder(
+      {
+        note: "Free bet credited - convert tonight",
+        remindAt,
+        offerId: 21,
+        contextTitle: "Bet £20 get £20 free bet",
+        contextVenue: "Betfair Sportsbook",
+      },
+      now
+    );
+    expect(row.offerId).toBe(21);
+    expect(listPendingRemindersForOffer(21)).toHaveLength(1);
+    expect(listPendingRemindersForOffer(21)[0]?.note).toBe(
+      "Free bet credited - convert tonight"
+    );
+  });
+
+  it("completing a sports offer cancels all its pending reminders", () => {
+    const now = Date.UTC(2026, 7, 4, 12, 0, 0);
+    createUserReminder(
+      { note: "Check free bet", remindAt: now + 1_000, offerId: 8 },
+      now
+    );
+    createUserReminder(
+      { note: "Convert before expiry", remindAt: now + 2_000, offerId: 8 },
+      now
+    );
+    createUserReminder(
+      { note: "Other offer", remindAt: now + 1_000, offerId: 9 },
+      now
+    );
+    expect(cancelPendingRemindersForOffer(8, now)).toBe(2);
+    expect(listPendingRemindersForOffer(8)).toHaveLength(0);
+    expect(listPendingRemindersForOffer(9)).toHaveLength(1);
+
+    const fired = fireDueUserReminders(now + 5_000);
+    expect(fired).toHaveLength(1);
+    expect(fired[0]?.body).toBe("Other offer");
+    expect(fired[0]?.href).toBe("/offers");
   });
 });

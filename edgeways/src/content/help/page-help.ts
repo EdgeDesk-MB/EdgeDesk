@@ -1,3 +1,5 @@
+import { ACCA_DESK_HELP_BULLETS } from "@/content/help/acca-methods";
+
 export type PageHelpId =
   | "dashboard"
   | "fixtures"
@@ -8,6 +10,8 @@ export type PageHelpId =
   | "casino"
   | "boosts"
   | "acca"
+  | "bet-builder"
+  | "systems"
   | "tracked-events"
   | "settings"
   | "history"
@@ -73,14 +77,35 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   acca: {
     title: "Acca Desk",
     summary:
-      "Run acca offers as guided multi-day workflows - the desk says when and how much to lay, leg by leg.",
+      "Run acca offers as guided multi-day workflows. Pick a method, then enter live exchange lay odds and stake whenever a leg is due.",
+    bullets: [...ACCA_DESK_HELP_BULLETS],
+    guideSlug: "desk-how-tos",
+  },
+  "bet-builder": {
+    title: "Bet Builder Desk",
+    summary:
+      "Same-event builders with one kick-off. Match with one combined lay, or choose No lay when the exchange has no clean market.",
     bullets: [
-      "Sequential lock: each leg is laid to cover the stake plus every liability paid so far - £0 if any leg loses; the final leg is equalised so the run ends the same either way.",
-      "Insurance runs (refund if exactly one leg loses): lay leg-by-leg with the same cover rhythm, or lay the whole acca once at the combined price - pick per run.",
-      "A leg turns LAY DUE once the previous result is in and kick-off is within 30 minutes - alert + push (mutable per run), plus a Daily Plan slot.",
-      "Legs linked to a tracked event auto-result from the score; anything else settles with the Won/Lost/Void buttons.",
-      "The acca back and every lay are real Profit Tracker bets - the desk orchestrates, the tracker owns the money.",
+      "Selections share one event — unlike Acca Desk, which spans multiple kick-offs.",
+      "Combined lay: one equalising stake/odds (correct-score collapse, or any single exchange market you found).",
+      "No lay: deliberate back-only — common for free-bet clears and +EV qualifiers that are hard to match.",
+      "Free-bet converts debit the lot as free_snr; a lose settles at £0 P&L.",
+      "The back and lay are real Profit Tracker bets.",
     ],
+    guideSlug: "desk-how-tos",
+  },
+  systems: {
+    title: "Systems Desk",
+    summary:
+      "Full-cover tickets (Lucky 15, Yankee, Trixie…). Log what you placed elsewhere, settle selections, track P&L. Not a Lucky Finder.",
+    bullets: [
+      "Paste a bookie or Lucky Finder slip to pre-fill structure, unit stake, each-way and selections.",
+      "No Acca-style lay workflow: these tickets are for organisation, mug cover, and value-play tracking.",
+      "Mark each selection Won / Lost / Void (Placed on each-way when it finishes in the places but not first).",
+      "Each-way doubles stake; win and place parts settle from stored place terms (1/4 or 1/5).",
+      "Classify as EV play, mug bet, or qualifying so Report can separate edge from camouflage.",
+    ],
+    guideSlug: "desk-how-tos",
   },
   boosts: {
     title: "Boosts",
@@ -118,7 +143,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Got a promo email? Drop the .eml straight into Paste offer (or paste its text) - it parses locally into the same preview, subject line included.",
       "Racing offers drive Intelligence on the Racing Desk - add a place-refund offer first.",
       "Expiry is the earlier of the Expires field or a scoped race/match time - missed windows show as Missed race / Missed match.",
-      "Expiry reminders nudge before the deadline (default 7, 3, 1 days); repeating offers only remind the current occurrence - toggle in Settings → Preferences.",
+      "Daily tasks digest (Settings → Automation) sends one morning briefing of Do Next work due in the next few days; same-day / race interrupts still use Alerts.",
     ],
     guideSlug: "offers",
   },

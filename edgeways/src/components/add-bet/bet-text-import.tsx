@@ -22,6 +22,10 @@ function toOcrFields(parsed: ReturnType<typeof parseBetText>): BetOcrFields {
     selection: parsed.selection?.value,
     isFreeBet: parsed.isFreeBet,
     marketHint: parsed.marketHint?.value,
+    structure: parsed.structure?.value,
+    unitStake: parsed.unitStake?.value,
+    eachWay: parsed.eachWay || undefined,
+    legs: parsed.legs.length > 0 ? parsed.legs : undefined,
   };
 }
 
@@ -55,7 +59,7 @@ export function BetTextImport({ onApply, className }: BetTextImportProps) {
         <ClipboardList className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-foreground">Paste bet text</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
             Paste bookie confirmation text to prefill odds, stake and selection.
             Always review — never auto-submitted.
           </p>
@@ -74,14 +78,14 @@ export function BetTextImport({ onApply, className }: BetTextImportProps) {
       />
 
       {error && (
-        <p className="text-[11px] text-destructive">{error}</p>
+        <p className="text-xs text-destructive">{error}</p>
       )}
 
       <Button
         type="button"
         size="sm"
         variant="outline"
-        className="self-end h-7 text-[11px]"
+        className="self-end h-7 text-xs"
         disabled={!text.trim()}
         onClick={handleParse}
       >

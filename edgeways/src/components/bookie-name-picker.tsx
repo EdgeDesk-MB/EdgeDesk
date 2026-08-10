@@ -8,12 +8,21 @@ export function BookieNamePicker({
   onChange,
   label,
   className,
+  persistCustom = true,
+  brandColor,
+  omitExistingWallets = false,
 }: {
   value: string;
   onChange: (name: string) => void;
   /** Omit or pass empty string to hide the inner label (outer field label handles it). */
   label?: string;
   className?: string;
+  /** Set false when the parent saves the wallet (e.g. Add bookie with a colour). */
+  persistCustom?: boolean;
+  /** Live override for the trigger brand-colour dot. */
+  brandColor?: string | null;
+  /** Directory + custom only - hide wallets already on the account. */
+  omitExistingWallets?: boolean;
 }) {
   return (
     <VenueSelect
@@ -23,6 +32,9 @@ export function BookieNamePicker({
       className={className}
       placeholder="Select bookie"
       kinds={["bookie"]}
+      persistCustom={persistCustom}
+      brandColor={brandColor}
+      omitExistingWallets={omitExistingWallets}
     />
   );
 }

@@ -66,6 +66,12 @@ export interface AppState {
     scheduledAt: number | null;
     suggestedStake: number | null;
   }>;
+  /** Bet Builder Desk: combined runs awaiting a whole lay */
+  betBuilderLayDue: Array<{
+    runId: number;
+    label: string;
+    suggestedStake: number | null;
+  }>;
   /** J5: mug-bet cadence plans joined to account names */
   mugPlans: Array<{
     id: number;

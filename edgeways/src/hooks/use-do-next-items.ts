@@ -46,6 +46,16 @@ export function useDoNextItems(pollMs?: number): {
       .catch(() => setLots([]));
   }, [freeBetTotal]);
 
+  const bets = state?.bets;
+  const lotsWithOffers = useMemo(() => {
+    if (!bets?.length) return lots;
+    return lots.map((lot) => {
+      if (lot.offerId != null || lot.betId == null) return lot;
+      const offerId = bets.find((b) => b.id === lot.betId)?.offerId ?? null;
+      return offerId != null ? { ...lot, offerId } : lot;
+    });
+  }, [lots, bets]);
+
   // Gubbed bookies stay in scope (their offers sink, never hide); only
   // closed/archived wallets drop out.
   const scopedOffers = useMemo(() => {
@@ -132,10 +142,10 @@ export function useDoNextItems(pollMs?: number): {
       edgePlays,
     };
     // buildDoNextItems defaults `now` internally - keeps this memo pure.
-    return buildDoNextItems(scopedOffers, lots, undefined, opts, bookieBalances);
+    return buildDoNextItems(scopedOffers, lotsWithOffers, undefined, opts, bookieBalances);
   }, [
     scopedOffers,
-    lots,
+    lotsWithOffers,
     retention,
     healthMap,
     effortMinutes,
@@ -144,5 +154,5 @@ export function useDoNextItems(pollMs?: number): {
     edgePlays,
   ]);
 
-  return { items, lots, state };
+  return { items, lots: lotsWithOffers, state };
 }

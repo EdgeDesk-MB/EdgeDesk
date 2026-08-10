@@ -32,7 +32,7 @@ import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { NumField } from "@/components/calc/num-field";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { useAddBet } from "@/components/add-bet-provider";
-import { api } from "@/hooks/use-app-state";
+import { formatEvGbp } from "@/lib/format-money";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
   executableLayStake,
@@ -48,6 +48,7 @@ import {
 import { contrastText } from "@/lib/brands/exchanges";
 import type { BoostDiaryRow, ExchangeRow } from "@/lib/db/schema";
 import { boostDiaryToAddBetPrefill } from "@/lib/services/boosts-client";
+import { panelSurface } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 /** Fired after a check is logged so the /boosts diary refreshes if mounted. */
@@ -61,10 +62,6 @@ const VERDICT_CHIP: Record<BoostCall, { label: string; className: string }> = {
   },
   skip: { label: "Skip", className: "border-negative/40 bg-negative/10 text-negative" },
 };
-
-function gbp(value: number): string {
-  return value < 0 ? `-£${Math.abs(value).toFixed(2)}` : `+£${value.toFixed(2)}`;
-}
 
 export function BoostCheckerForm({
   onLogged,
@@ -252,7 +249,7 @@ export function BoostCheckerForm({
             <span className="flex items-center gap-2.5">
               {exchange && (
                 <span
-                  className="rounded px-2 py-0.5 text-[10px] font-bold"
+                  className="rounded px-2 py-0.5 text-[11px] font-bold"
                   style={{
                     backgroundColor: exchange.brandColor,
                     color: contrastText(exchange.brandColor),
@@ -264,6 +261,7 @@ export function BoostCheckerForm({
               <label className="flex items-center gap-1.5 text-xs font-semibold text-black/70 dark:text-white/80">
                 Advanced
                 <Switch
+                  tone="onPanel"
                   className="scale-90"
                   checked={advanced}
                   onCheckedChange={(on) => {
@@ -305,7 +303,7 @@ export function BoostCheckerForm({
               exchangeOddsStepping
             />
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">
+              <span className="text-xs font-semibold text-black/60 dark:text-white/70">
                 Fair odds (no-vig midpoint)
               </span>
               <div className="flex h-11 items-center rounded-md bg-[var(--pi)] px-3 text-lg font-bold tabular-nums text-black/85 dark:bg-[var(--pi-dark)] dark:text-white/95">
@@ -340,7 +338,7 @@ export function BoostCheckerForm({
           ) : null}
         </LayPanel>
       ) : (
-        <div className="flex flex-col gap-2 rounded-xl border bg-card p-4">
+        <div className={cn(panelSurface, "flex flex-col gap-2 p-4")}>
           <Label className="text-xs text-muted-foreground">
             Fair odds per leg (from the exchange or your own read)
           </Label>
@@ -447,7 +445,7 @@ export function BoostCheckerForm({
         {verdict ? (
           <p className="mt-1 text-sm font-semibold tabular-nums">
             {verdict.edgePct >= 0 ? "+" : ""}
-            {verdict.edgePct.toFixed(1)}% edge · EV {gbp(verdict.evGbp)}{" "}
+            {verdict.edgePct.toFixed(1)}% edge · EV {formatEvGbp(verdict.evGbp, { signed: true })}{" "}
             <span className="font-normal text-muted-foreground">
               · fair {verdict.fairOdds.toFixed(2)}
             </span>

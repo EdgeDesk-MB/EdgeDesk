@@ -63,9 +63,9 @@ is read directly off `product-roadmap.md` §6 (phase status) and §9 (parking lo
 | Full oddsmatcher (back/lay across ~90 bookies) | £49.99 tier+ | £49.99 tier+ | ⛔ Not planned | D2: "possibly never" — their core cost and moat; requires continuous multi-bookmaker polling. `AGENTS.md` hard-rules out bookmaker scraping. |
 | Price boost matcher / tracker (finds boosted prices) | £49.99 tier+ | £49.99 tier+ | ⛔ Not planned | Discovery half of the feature — D2 territory. |
 | Bet builder finder | — | £49.99 tier+ | ⛔ Not planned | Same — finding builders across books is discovery. |
-| Extra place / each-way matcher | Ultra (bundled in Advanced) | Elite (bundled) | ⛔ Not planned | Parked in §9: "wait for real demand from daily use." |
+| Extra place / each-way matcher | Ultra (bundled in Advanced) | Elite (bundled) | 🔜 L7 briefed | Not OM discovery EV. Desk → EW/EP calculator modal → tracker + result settle; active bets + place-zone visual. Multi-dutch later. |
 | Acca finder (discovery half of Acca Catcher) | — | Elite | ⛔ Not planned | Only the *tracker* half is on the roadmap (see J7 below) — finding accas across books is D2. |
-| Lucky Finder (value 15/31s across books) | Ultra | Pro/Elite | ⛔ Not planned | Finder = discovery = D2. |
+| Lucky Finder (value 15/31s across books) | Ultra | Pro/Elite | ⛔ Finder not planned · 🔜 Systems Desk | Discovery stays D2. Edgeways **Systems Desk** (`/systems`) organises tickets users place elsewhere (paste slip, settle, P&L) — complementary, not a finder. |
 | Edge Finder | — | Elite | ⛔ Not planned | Same. |
 | Golf Master (golf market finder) | — | Elite | ⛔ Not planned | Same. |
 | Steam Chaser (line-movement finder) | — | Elite | ⛔ Not planned | Same. |

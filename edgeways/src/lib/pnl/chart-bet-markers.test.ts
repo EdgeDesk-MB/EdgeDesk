@@ -9,10 +9,13 @@ import {
   buildHomeChartMarkers,
   buildSettledPnlSeries,
   chartBetMarkerClassName,
+  chartWindowAnchorValue,
   computePnlChartLayout,
+  computePnlValueRange,
   isChartAnnotationEntry,
   markerToneForStatus,
   markerToneFromBet,
+  firstLinePointTimeInWindow,
   projectBetMarkers,
   seriesValueAt,
   spreadOverlappingAnnotations,
@@ -107,6 +110,129 @@ describe("buildChartBetMarkers", () => {
     expect(markers).toHaveLength(1);
     expect(markers[0]?.settledAtSec).toBe(1);
     expect(markers[0]?.cumulativeValue).toBe(0);
+  });
+
+  it("folds Acca desk back + lays into one net campaign marker", () => {
+    const markers = buildChartBetMarkers([
+      bet({
+        id: 1,
+        status: "won",
+        actualProfit: 50,
+        settledAt: 5_000,
+        label: "Acca · Offer",
+        betType: "qualifying",
+        notes: "Acca desk run - hedged on the exchange",
+      }),
+      bet({
+        id: 2,
+        status: "lost",
+        actualProfit: -16.2,
+        settledAt: 3_000,
+        label: "Acca lay · Middlesbrough",
+        betType: "lay_only",
+        notes: 'Acca desk: leg 1 of "Offer"',
+      }),
+      bet({
+        id: 3,
+        status: "won",
+        actualProfit: 4,
+        settledAt: 4_000,
+        label: "Ordinary qualify",
+        betType: "qualifying",
+      }),
+    ]);
+    expect(markers.map((m) => m.id).sort((a, b) => a - b)).toEqual([1, 3]);
+    const acca = markers.find((m) => m.id === 1);
+    expect(acca?.betProfit).toBeCloseTo(33.8, 10);
+    expect(acca?.tone).toBe("win");
+    expect(acca?.label).toBe("Acca · Offer");
+  });
+});
+
+describe("buildHomeChartMarkers Acca campaign marker", () => {
+  it("marks Acca as one net step and keeps BB desk lays off the ledger", () => {
+    const markers = buildHomeChartMarkers({
+      bets: [
+        bet({
+          id: 1,
+          status: "won",
+          actualProfit: 12,
+          settledAt: 2_000,
+          label: "Qualifier",
+          betType: "qualifying",
+        }),
+        bet({
+          id: 2,
+          status: "lost",
+          actualProfit: -16.2,
+          settledAt: 3_000,
+          label: "Acca lay · Middlesbrough",
+          betType: "lay_only",
+          notes: 'Acca desk: leg 1 of "Weekend"',
+        }),
+        bet({
+          id: 3,
+          status: "lost",
+          actualProfit: -8,
+          settledAt: 4_000,
+          label: "BB lay · Combo",
+          betType: "lay_only",
+        }),
+        bet({
+          id: 4,
+          status: "lost",
+          actualProfit: -20,
+          settledAt: 5_000,
+          label: "Acca · Weekend",
+          betType: "qualifying",
+          notes: "Acca desk run - hedged on the exchange",
+        }),
+      ],
+    });
+    expect(markers.map((m) => m.id).sort((a, b) => a - b)).toEqual([1, 4]);
+    const acca = markers.find((m) => m.id === 4);
+    expect(acca?.betProfit).toBeCloseTo(-36.2, 10);
+    expect(acca?.tone).toBe("loss");
+  });
+});
+
+describe("chartWindowAnchorValue", () => {
+  const nowSec = 10_000;
+
+  it("returns 0 for All (anchorAtZero)", () => {
+    const points = [
+      { time: nowSec - 5_000, value: 0 },
+      { time: nowSec - 1_000, value: 400 },
+    ];
+    expect(
+      chartWindowAnchorValue(points, 86_400, { nowSec, showBadge: false, anchorAtZero: true })
+    ).toBe(0);
+  });
+
+  it("returns the P&L at the window left edge for narrow windows", () => {
+    const points = [
+      { time: nowSec - 5_000, value: 0 },
+      { time: nowSec - 3_000, value: 400 },
+      { time: nowSec - 500, value: 460 },
+    ];
+    // ~41 min window so the left edge lands after the £400 step.
+    const anchor = chartWindowAnchorValue(points, 2_500, { nowSec, showBadge: false });
+    expect(anchor).toBe(400);
+  });
+});
+
+describe("computePnlValueRange window anchor", () => {
+  it("includes £0 for All but not when anchored to window start", () => {
+    const visible = [
+      { time: 1, value: 400 },
+      { time: 2, value: 460 },
+    ];
+    const allRange = computePnlValueRange(visible, 460, 0);
+    expect(allRange.min).toBeLessThan(0);
+
+    const windowRange = computePnlValueRange(visible, 460, 400);
+    expect(windowRange.min).toBeGreaterThan(0);
+    expect(windowRange.min).toBeLessThan(400);
   });
 });
 
@@ -538,6 +664,54 @@ describe("seriesValueAt", () => {
   it("returns null before the first point", () => {
     expect(seriesValueAt(points, 699)).toBeNull();
     expect(seriesValueAt([], 800)).toBeNull();
+  });
+});
+
+describe("projectBetMarkers window gap", () => {
+  it("skips markers left of Liveline's first in-window point", () => {
+    const nowSec = 10_000;
+    const windowSecs = 3_600;
+    const buffer = 0.015;
+    const rightEdge = nowSec + windowSecs * buffer;
+    const leftEdge = rightEdge - windowSecs;
+    const firstDrawn = nowSec - 1_800;
+    const linePoints = [
+      { time: nowSec - 5_000, value: 400 },
+      { time: firstDrawn, value: 441 },
+      { time: nowSec - 300, value: 455 },
+    ];
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs,
+      showBadge: false,
+      livePoints: linePoints,
+      liveValue: 455,
+      nowSec,
+      referenceValue: 441,
+    });
+    expect(layout).not.toBeNull();
+
+    const gapMarker = {
+      id: 1,
+      kind: "bet" as const,
+      label: "In gap",
+      status: "lost" as const,
+      settledAtSec: leftEdge + 60,
+      betProfit: -1,
+      cumulativeValue: 441,
+      tone: "loss" as const,
+    };
+    expect(gapMarker.settledAtSec).toBeLessThan(firstDrawn - 1);
+    expect(projectBetMarkers([gapMarker], layout!, linePoints)).toHaveLength(0);
+
+    const onLineMarker = {
+      ...gapMarker,
+      id: 2,
+      settledAtSec: firstDrawn,
+    };
+    expect(projectBetMarkers([onLineMarker], layout!, linePoints)).toHaveLength(1);
   });
 });
 

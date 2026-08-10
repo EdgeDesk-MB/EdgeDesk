@@ -1,17 +1,39 @@
 "use client";
 
+import { useRef } from "react";
 import NumberFlow from "@number-flow/react";
+import { evFractionDigits } from "@/lib/format-money";
 import { OFFER_INACTIVE_FIGURE_CLASS } from "@/lib/offers/offer-inactive-ui";
 import { cn } from "@/lib/utils";
 
 /**
- * Half of NumberFlow's defaults (900/450ms) - snappier live counters.
+ * Snappy discrete updates. Continuous scrubbing (underlay slider) disables
+ * animation via {@link useAnimateMoneyFlow} so spins never stack.
  */
 const timings = {
-  transformTiming: { duration: 450, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
-  spinTiming: { duration: 450, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
-  opacityTiming: { duration: 225, easing: "ease-out" },
+  transformTiming: { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  spinTiming: { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  opacityTiming: { duration: 100, easing: "ease-out" },
 } as const;
+
+/** Updates closer than this are treated as scrubbing — jump, don't spin. */
+const RAPID_UPDATE_MS = 90;
+
+/**
+ * Detect slider/drag-style value floods. Derived during render (no effect lag)
+ * so the first rapid frame already skips NumberFlow animation.
+ */
+function useAnimateMoneyFlow(value: number, enabled: boolean): boolean {
+  const prev = useRef({ value, t: 0 });
+  if (!enabled) return false;
+  const now = performance.now();
+  if (value !== prev.current.value) {
+    const rapid = prev.current.t > 0 && now - prev.current.t < RAPID_UPDATE_MS;
+    prev.current = { value, t: now };
+    return !rapid;
+  }
+  return true;
+}
 
 /**
  * Price-ticker style number: only the digits AFTER the decimal point animate.
@@ -52,6 +74,7 @@ function SplitFlow({
   const intPart = Math.floor(totalUnits / scale);
   const fracPart = totalUnits % scale;
   const fracText = String(fracPart).padStart(digits, "0");
+  const animated = useAnimateMoneyFlow(fracPart, animateFraction && digits > 0);
 
   return (
     <span
@@ -71,6 +94,7 @@ function SplitFlow({
             <NumberFlow
               value={fracPart}
               trend={0}
+              animated={animated}
               {...timings}
               format={{ minimumIntegerDigits: digits, useGrouping: false }}
             />
@@ -94,13 +118,22 @@ interface MoneyFlowProps {
   /** Show an explicit + for positive values */
   signDisplay?: boolean;
   compact?: boolean;
+  /** EV / estimate surfaces: whole pounds without decimals, otherwise two dp */
+  estimate?: boolean;
 }
 
 /**
  * Animated GBP amount - every changing money value in the app goes through this.
- * Pounds swap instantly; only the pence animate.
+ * Pounds swap instantly; only the pence animate (skipped while scrubbing).
  */
-export function MoneyFlow({ value, className, signColor, signDisplay, compact }: MoneyFlowProps) {
+export function MoneyFlow({
+  value,
+  className,
+  signColor,
+  signDisplay,
+  compact,
+  estimate,
+}: MoneyFlowProps) {
   const safe = Number.isFinite(value) ? value : 0;
   if (compact) {
     // Compact notation ("£1.2K") has no stable decimal part to isolate - no animation.
@@ -122,10 +155,11 @@ export function MoneyFlow({ value, className, signColor, signDisplay, compact }:
     );
   }
   const animateFraction = !className?.includes(OFFER_INACTIVE_FIGURE_CLASS);
+  const digits = estimate ? evFractionDigits(safe) : 2;
   return (
     <SplitFlow
       value={safe}
-      digits={2}
+      digits={digits}
       prefix="£"
       className={className}
       signColor={signColor}

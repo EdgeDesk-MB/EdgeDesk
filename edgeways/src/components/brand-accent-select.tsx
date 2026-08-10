@@ -82,7 +82,7 @@ export function BrandAccentSelect({
             <SwatchBook className="size-4 text-muted-foreground" aria-hidden />
             <Label className="text-sm font-semibold">Brand colour</Label>
           </div>
-          <p className="text-[11px] text-muted-foreground">App accent.</p>
+          <p className="text-xs text-muted-foreground">App accent.</p>
         </>
       ) : null}
 
@@ -135,7 +135,7 @@ export function BrandAccentSelect({
                   <Loader2
                     className={cn(
                       "animate-spin text-[oklch(0.178_0_0)] mix-blend-difference",
-                      compact ? "size-3" : "size-2.5"
+                      "size-3"
                     )}
                   />
                 ) : null}
@@ -188,11 +188,11 @@ export function BrandAccentSelect({
               <Loader2
                 className={cn(
                   "animate-spin text-[oklch(0.178_0_0)] mix-blend-difference",
-                  compact ? "size-3" : "size-2.5"
+                  "size-3"
                 )}
               />
             ) : (
-              <Pipette className="size-2.5 text-[oklch(0.178_0_0)] mix-blend-difference" />
+              <Pipette className="size-3 text-[oklch(0.178_0_0)] mix-blend-difference" />
             )}
           </span>
           {compact ? null : <span>Custom</span>}

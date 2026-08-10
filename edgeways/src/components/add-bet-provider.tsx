@@ -3,13 +3,18 @@
 import { createContext, useCallback, useContext, useState } from "react";
 import { AddBetDialog, type AddBetPrefill } from "@/components/add-bet-dialog";
 import { BOOSTS_CHANGED_EVENT } from "@/components/boosts/boost-checker-form";
+import { useEachWayCalculator } from "@/components/each-way-calculator-provider";
 import { useAppState } from "@/hooks/use-app-state";
+import { useDevStickyOpen } from "@/lib/dev/use-dev-sticky-open";
+import type { AppState } from "@/lib/services/state.types";
 
 type AddBetContextValue = {
   openAddBet: (prefill?: AddBetPrefill) => void;
 };
 
 const AddBetContext = createContext<AddBetContextValue | null>(null);
+
+const EMPTY_EVENTS: AppState["events"] = [];
 
 export function useAddBet() {
   const ctx = useContext(AddBetContext);
@@ -20,15 +25,21 @@ export function useAddBet() {
 }
 
 export function AddBetProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useDevStickyOpen("add-bet");
   const [prefill, setPrefill] = useState<AddBetPrefill | undefined>();
   const { state, refresh } = useAppState(5000);
-  const events = state?.events ?? [];
+  // Freeze the event list at open so background polls cannot re-render the modal.
+  const [eventsSnapshot, setEventsSnapshot] = useState(EMPTY_EVENTS);
+  const { openEachWayCalculator } = useEachWayCalculator();
 
-  const openAddBet = useCallback((next?: AddBetPrefill) => {
-    setPrefill(next);
-    setOpen(true);
-  }, []);
+  const openAddBet = useCallback(
+    (next?: AddBetPrefill) => {
+      setPrefill(next);
+      setEventsSnapshot(state?.events ?? EMPTY_EVENTS);
+      setOpen(true);
+    },
+    [state?.events]
+  );
 
   const handleOpenChange = useCallback((next: boolean) => {
     setOpen(next);
@@ -43,16 +54,28 @@ export function AddBetProvider({ children }: { children: React.ReactNode }) {
     }
   }, [prefill?.boostDiaryId, refresh]);
 
+  const handleOpenEachWay = useCallback(
+    (hint?: Parameters<typeof openEachWayCalculator>[0]) => {
+      setOpen(false);
+      setPrefill(undefined);
+      openEachWayCalculator(hint);
+    },
+    [openEachWayCalculator]
+  );
+
   return (
     <AddBetContext.Provider value={{ openAddBet }}>
       {children}
-      <AddBetDialog
-        open={open}
-        onOpenChange={handleOpenChange}
-        events={events}
-        prefill={prefill}
-        onSaved={handleSaved}
-      />
+      {open ? (
+        <AddBetDialog
+          open={open}
+          onOpenChange={handleOpenChange}
+          events={eventsSnapshot}
+          prefill={prefill}
+          onSaved={handleSaved}
+          onOpenEachWayCalculator={handleOpenEachWay}
+        />
+      ) : null}
     </AddBetContext.Provider>
   );
 }

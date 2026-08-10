@@ -8,6 +8,7 @@ export {
   BRAND_ACCENT_SETTLE_MS,
   BRAND_ACCENT_STORAGE_KEY,
   BRAND_HIGHLIGHT_MAX_LUMINANCE,
+  BRAND_LOGO_MIN_LUMINANCE,
   BRAND_LUMINANCE_THRESHOLD,
   BRAND_TEXT_MIN_LUMINANCE,
   DEFAULT_BRAND_ACCENT_HEX,
@@ -19,6 +20,7 @@ import {
   BRAND_ACCENT_SETTLE_MS,
   BRAND_ACCENT_STORAGE_KEY,
   BRAND_HIGHLIGHT_MAX_LUMINANCE,
+  BRAND_LOGO_MIN_LUMINANCE,
   BRAND_LUMINANCE_THRESHOLD,
   BRAND_TEXT_MIN_LUMINANCE,
   DEFAULT_BRAND_ACCENT_HEX,
@@ -59,7 +61,7 @@ export type BrandAccentState = {
 
 export type BrandAccentDerived = {
   brand: string;
-  /** Light-mode topbar logo — brand with extra brightness / vibrance. */
+  /** Light-mode topbar logo — lifted to ink-readable floor when dark (no sat boost). */
   brandLogo: string;
   /**
    * Accent type on dark canvas / ink plates (selected nav, counters, chips).
@@ -202,22 +204,33 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 /**
- * Light-mode topbar logo: brand with a touch more brightness + vibrance
- * so it reads on the ink `#111` plate.
+ * Light-mode topbar logo on the ink `#111` plate (lockup, Beta, Login fill).
+ * Light brands stay as-is; dark brands are lightness-lifted until they clear
+ * {@link BRAND_LOGO_MIN_LUMINANCE} — same floor as brand-text. Saturation is
+ * preserved (no vibrance boost).
  */
 export function boostBrandForLightLogo(hex: string): string {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return DEFAULT_BRAND_ACCENT_HEX;
-  const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  const s2 = Math.min(1, s * 1.14 + 0.05);
-  const l2 = Math.min(0.74, Math.max(0.42, l * 1.1 + 0.05));
-  return hslToHex(h, s2, l2);
+  const brand = normalizeHex(hex) ?? DEFAULT_BRAND_ACCENT_HEX;
+  if (relativeLuminance(brand) >= BRAND_LUMINANCE_THRESHOLD) {
+    return brand;
+  }
+  const rgb = hexToRgb(brand);
+  if (!rgb) return brand;
+  let { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  let lifted = brand;
+  for (let i = 0; i < 14; i++) {
+    // Never clamp below current L — high-L / low-Y hues (orchid) must not darken.
+    l = Math.min(0.84, l + 0.055);
+    lifted = hslToHex(h, s, l);
+    if (relativeLuminance(lifted) >= BRAND_LOGO_MIN_LUMINANCE) break;
+  }
+  return lifted;
 }
 
 /**
  * Accent colour for text/icons on dark canvas, secondary plates, and ink chips.
- * Light brands stay as-is; dark brands are lifted until they clear
- * {@link BRAND_TEXT_MIN_LUMINANCE}.
+ * Light brands stay as-is; dark brands are lightness-lifted until they clear
+ * {@link BRAND_TEXT_MIN_LUMINANCE}. Saturation is preserved (no floor / boost).
  */
 export function ensureBrandTextOnDark(hex: string): string {
   const brand = normalizeHex(hex) ?? DEFAULT_BRAND_ACCENT_HEX;
@@ -227,7 +240,6 @@ export function ensureBrandTextOnDark(hex: string): string {
   const rgb = hexToRgb(brand);
   if (!rgb) return brand;
   let { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  s = Math.min(1, Math.max(0.5, s * 1.08));
   let lifted = brand;
   for (let i = 0; i < 14; i++) {
     l = Math.min(0.84, l + 0.055);
@@ -241,6 +253,7 @@ export function ensureBrandTextOnDark(hex: string): string {
  * Thin accent strokes on light surfaces (underlines, stripes).
  * Dark / mid brands stay as-is; bright brands are darkened until they clear
  * {@link BRAND_HIGHLIGHT_MAX_LUMINANCE} — reverse of {@link ensureBrandTextOnDark}.
+ * Saturation is preserved (achromatic greys stay grey).
  */
 export function ensureBrandOnLight(hex: string): string {
   const brand = normalizeHex(hex) ?? DEFAULT_BRAND_ACCENT_HEX;
@@ -250,8 +263,7 @@ export function ensureBrandOnLight(hex: string): string {
   const rgb = hexToRgb(brand);
   if (!rgb) return brand;
   let { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  const achromatic = s < 0.08;
-  s = achromatic ? 0 : Math.min(1, Math.max(0.5, s * 1.08));
+  if (s < 0.08) s = 0;
   let darkened = brand;
   for (let i = 0; i < 14; i++) {
     l = Math.max(0.12, l - 0.055);
@@ -279,7 +291,7 @@ export function deriveBrandAccent(hex: string): BrandAccentDerived {
     brandPlateDark,
     brandLogoForeground: contrastInkOrWhite(brandLogo),
     topbarAccentFaceShadow: logoPlateDark
-      ? "var(--ew-chip-shadow)"
+      ? "var(--ew-ink-plate-shadow)"
       : "var(--ew-btn-shadow)",
   };
 }
@@ -330,6 +342,10 @@ export function applyBrandAccent(hex: string, options?: ApplyBrandAccentOptions)
   );
   root.dataset.brandPlate = derived.brandPlateDark ? "dark" : "light";
   writeBrandAccentCookie(derived.brand);
+  // Dynamic import avoids a static cycle (bolt-mark → deriveBrandAccent).
+  void import("@/lib/brand/bolt-mark").then((m) => {
+    m.setAccentFavicon(derived.brand);
+  });
 
   const onReady = options?.onReady;
   if (!onReady) return;

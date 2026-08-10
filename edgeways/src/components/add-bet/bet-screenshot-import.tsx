@@ -113,7 +113,7 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
         <ScanLine className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-foreground">Import from screenshot</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
             Paste a slip image to fill odds, stake and event hints. Returns are ignored —
             always check values before saving.
           </p>
@@ -165,7 +165,7 @@ export function BetScreenshotImport({ open, onApply, className }: BetScreenshotI
             ? `Reading ${SOURCE_LABEL[processing!].toLowerCase()}…`
             : `Paste ${SOURCE_LABEL[activeSource].toLowerCase()} (⌘V / Ctrl+V)`}
         </p>
-        <p className="text-[10px] leading-snug text-muted-foreground/80">
+        <p className="text-[11px] leading-snug text-muted-foreground/80">
           Odds · stake · matched stake/odds · win · time · course
         </p>
       </div>

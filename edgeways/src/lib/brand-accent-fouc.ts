@@ -7,6 +7,7 @@ import {
   BRAND_ACCENT_COOKIE_KEY,
   BRAND_ACCENT_STORAGE_KEY,
   BRAND_HIGHLIGHT_MAX_LUMINANCE,
+  BRAND_LOGO_MIN_LUMINANCE,
   BRAND_LUMINANCE_THRESHOLD,
   BRAND_TEXT_MIN_LUMINANCE,
 } from "@/lib/brand-accent-constants";
@@ -105,18 +106,22 @@ export const BRAND_ACCENT_FOUC_SCRIPT = `(function () {
     }
     var n = parseInt(h.slice(1), 16);
     var hsl = rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
-    var logo = hslToHex(
-      hsl.h,
-      Math.min(1, hsl.s * 1.14 + 0.05),
-      Math.min(0.74, Math.max(0.42, hsl.l * 1.1 + 0.05))
-    );
+    var logo = h;
+    if (lum(h) < ${BRAND_LUMINANCE_THRESHOLD}) {
+      var ll = hsl.l;
+      for (var li = 0; li < 14; li++) {
+        ll = Math.min(0.84, ll + 0.055);
+        logo = hslToHex(hsl.h, hsl.s, ll);
+        if (lum(logo) >= ${BRAND_LOGO_MIN_LUMINANCE}) break;
+      }
+    }
     var dark = lum(h) < ${BRAND_LUMINANCE_THRESHOLD};
     var on = dark ? "#FFFFFF" : "#111111";
     var logoDark = lum(logo) < ${BRAND_LUMINANCE_THRESHOLD};
     var onLogo = logoDark ? "#FFFFFF" : "#111111";
     var text = h;
     if (dark) {
-      var ts = Math.min(1, Math.max(0.5, hsl.s * 1.08));
+      var ts = hsl.s;
       var tl = hsl.l;
       for (var j = 0; j < 14; j++) {
         tl = Math.min(0.84, tl + 0.055);
@@ -126,7 +131,7 @@ export const BRAND_ACCENT_FOUC_SCRIPT = `(function () {
     }
     var highlight = h;
     if (lum(h) > ${BRAND_HIGHLIGHT_MAX_LUMINANCE}) {
-      var hs = hsl.s < 0.08 ? 0 : Math.min(1, Math.max(0.5, hsl.s * 1.08));
+      var hs = hsl.s < 0.08 ? 0 : hsl.s;
       var hl = hsl.l;
       for (var k = 0; k < 14; k++) {
         hl = Math.max(0.12, hl - 0.055);
@@ -145,7 +150,7 @@ export const BRAND_ACCENT_FOUC_SCRIPT = `(function () {
     root.style.setProperty("--topbar-muted-on-brand", on);
     root.style.setProperty(
       "--topbar-accent-face-shadow",
-      logoDark ? "var(--ew-chip-shadow)" : "var(--ew-btn-shadow)"
+      logoDark ? "var(--ew-ink-plate-shadow)" : "var(--ew-btn-shadow)"
     );
     root.dataset.brandPlate = dark ? "dark" : "light";
     document.cookie =

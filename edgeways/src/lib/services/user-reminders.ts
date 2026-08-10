@@ -93,6 +93,21 @@ export function cancelPendingRemindersForCasino(
   return pending.length;
 }
 
+/** Cancel every pending reminder for a sports offer campaign. */
+export function cancelPendingRemindersForOffer(
+  offerId: number,
+  now = Date.now()
+): number {
+  const pending = listPendingRemindersForOffer(offerId);
+  for (const row of pending) {
+    db.update(userReminders)
+      .set({ cancelledAt: now })
+      .where(eq(userReminders.id, row.id))
+      .run();
+  }
+  return pending.length;
+}
+
 export function listPendingRemindersForCasino(casinoOfferId: number): UserReminderRow[] {
   return db
     .select()
@@ -100,6 +115,21 @@ export function listPendingRemindersForCasino(casinoOfferId: number): UserRemind
     .where(
       and(
         eq(userReminders.casinoOfferId, casinoOfferId),
+        isNull(userReminders.firedAt),
+        isNull(userReminders.cancelledAt)
+      )
+    )
+    .orderBy(asc(userReminders.remindAt))
+    .all();
+}
+
+export function listPendingRemindersForOffer(offerId: number): UserReminderRow[] {
+  return db
+    .select()
+    .from(userReminders)
+    .where(
+      and(
+        eq(userReminders.offerId, offerId),
         isNull(userReminders.firedAt),
         isNull(userReminders.cancelledAt)
       )
@@ -123,6 +153,26 @@ export function listPendingRemindersByCasinoOfferIds(
   for (const row of rows) {
     if (row.casinoOfferId == null) continue;
     const list = map.get(row.casinoOfferId);
+    if (list) list.push(row);
+  }
+  return map;
+}
+
+export function listPendingRemindersByOfferIds(
+  offerIds: number[]
+): Map<number, UserReminderRow[]> {
+  const map = new Map<number, UserReminderRow[]>();
+  if (offerIds.length === 0) return map;
+  for (const id of offerIds) map.set(id, []);
+  const rows = db
+    .select()
+    .from(userReminders)
+    .where(and(isNull(userReminders.firedAt), isNull(userReminders.cancelledAt)))
+    .orderBy(asc(userReminders.remindAt))
+    .all();
+  for (const row of rows) {
+    if (row.offerId == null) continue;
+    const list = map.get(row.offerId);
     if (list) list.push(row);
   }
   return map;

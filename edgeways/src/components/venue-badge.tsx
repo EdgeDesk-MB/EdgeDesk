@@ -19,9 +19,9 @@ const EXCHANGE_KEYS = new Set(
 
 const venueBadgeSizeClasses = {
   /** Calendar cards and compact rows */
-  sm: "px-2 py-0.5 text-[10px] font-semibold leading-tight",
-  /** Campaign cards — matches standard Badge (h-6, text-xs) */
-  md: "h-6 px-2 text-xs font-medium leading-none",
+  sm: "px-2 py-0.5 text-[11px] font-semibold leading-tight",
+  /** Campaign cards — half-step above compact Badge (text-xs / h-6) */
+  md: "h-6.5 px-2 text-[13px] font-medium leading-none",
 } as const;
 
 /**

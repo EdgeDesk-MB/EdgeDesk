@@ -21,8 +21,16 @@ import {
 import { MoneyFlow } from "@/components/money-flow";
 import { VenueBadge } from "@/components/venue-badge";
 import { useAddBet } from "@/components/add-bet-provider";
+import { useAccaRun } from "@/components/acca-run-provider";
+import { useBetBuilderRun } from "@/components/bet-builder-run-provider";
+import { useScopePlaceChooser } from "@/components/scope-place-chooser-provider";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
+import {
+  deriveFreeBetLotConvertAction,
+  resolveTrackBetDestination,
+} from "@/lib/offers/offer-track-bet";
 import { Gift, Trash2 } from "lucide-react";
+import { convertFreeBetButtonClass } from "@/lib/ui/surface-styles";
 
 type Lot = {
   id: number;
@@ -32,6 +40,7 @@ type Lot = {
   originalAmount: number;
   note: string | null;
   createdAt: number;
+  betId: number | null;
 };
 
 type FreeBetsContextValue = {
@@ -68,22 +77,50 @@ function FreeBetsConvertDialog({
 }) {
   const { state } = useAppState(open ? 5_000 : 0);
   const { openAddBet } = useAddBet();
+  const { openAccaRun } = useAccaRun();
+  const { openBetBuilderRun } = useBetBuilderRun();
+  const { openScopeChooser } = useScopePlaceChooser();
 
   const freeBetTotal = state?.balances?.accounts
     ?.filter((a) => a.type === "bookie")
     .reduce((s, a) => s + (a.freeBets ?? 0), 0);
 
   function convert(lot: Lot) {
-    openAddBet({
-      betType: "free_snr",
-      bookmaker: lot.accountName,
-      backStake: lot.remaining,
-      labelSuggestion: `Convert FB · ${lot.accountName}`,
-    });
+    const offerId =
+      lot.betId != null
+        ? state?.bets?.find((b) => b.id === lot.betId)?.offerId ?? null
+        : null;
+    const offer =
+      offerId != null ? state?.offers?.find((o) => o.id === offerId) ?? null : null;
+    const action = deriveFreeBetLotConvertAction(lot, offer, state?.settings);
     onOpenChange(false);
-    toast.message("Add bet opened", {
-      description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+    const opened = resolveTrackBetDestination(action, {
+      openAddBet,
+      openAccaRun,
+      openBetBuilderRun,
+      openScopeChooser,
     });
+    if (!opened) return;
+    if (action.destination.kind === "acca_desk") {
+      toast.message("Acca Desk opened", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName} · reward Acca`,
+      });
+    } else if (action.destination.kind === "bet_builder_desk") {
+      toast.message("Bet Builder Desk opened", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    } else if (action.destination.kind === "choose") {
+      toast.message("Choose how to convert", {
+        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    } else {
+      toast.message("Add bet opened", {
+        description:
+          offer == null
+            ? `£${lot.remaining.toFixed(2)} at ${lot.accountName} · no linked campaign`
+            : `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
+      });
+    }
   }
 
   return (
@@ -95,7 +132,8 @@ function FreeBetsConvertDialog({
             Free bets to convert
           </DialogTitle>
           <DialogDescription className="text-pretty">
-            Open free-bet balance by bookie. Convert prefills Add bet.
+            Open free-bet balance by bookie. Convert opens Add bet, Acca Desk, or a chooser
+            when the linked reward allows more than one scope.
           </DialogDescription>
         </DialogHeader>
 
@@ -158,7 +196,7 @@ function FreeBetsLots({
                     className="font-semibold text-violet-700 dark:text-violet-300"
                   />
                 </span>
-                <span className="mt-0.5 block text-[11px] leading-snug break-words text-muted-foreground">
+                <span className="mt-0.5 block text-xs leading-snug break-words text-muted-foreground">
                   {note}
                 </span>
               </span>
@@ -166,8 +204,8 @@ function FreeBetsLots({
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
-                  className="h-8"
+                  variant="edge"
+                  className={convertFreeBetButtonClass}
                   onClick={() => onConvert(lot)}
                 >
                   Convert

@@ -4,12 +4,12 @@
  */
 
 import {
-  formatEventDate,
   formatEventTime,
-  formatRacingEventTitle,
   isCurrentOrFutureFixture,
   localCalendarDate,
   londonWallToUtcMs,
+  normalizeEventTimeInput,
+  racingVenueLabel,
   sortFixturesByKickoff,
   sortTrackedEvents,
   type TrackedEventLike,
@@ -33,10 +33,16 @@ export function tomorrowCalendarDate(now = Date.now()): string {
 export const FIXTURE_SELECT_PREFIX = "fixture:";
 
 /**
- * How long after off/kick-off an event stays in the Add bet Events list.
- * Within this window it may still show as LIVE; beyond it, drop the row.
+ * How long after off an event stays in the Add bet Events list (racing).
+ * Football uses {@link ADD_BET_FOOTBALL_IN_PLAY_MS} so in-play bets stay linkable.
  */
 export const ADD_BET_EVENT_PAST_GRACE_MS = 5 * 60_000;
+
+/**
+ * Football stays pickable after kick-off for in-play linking.
+ * Same 4h window as `effectiveEventStatus` for API football.
+ */
+export const ADD_BET_FOOTBALL_IN_PLAY_MS = 4 * 60 * 60_000;
 
 /** True when start is in the future, or at most `graceMs` in the past. */
 export function isSelectableInAddBetEvents(
@@ -48,16 +54,49 @@ export function isSelectableInAddBetEvents(
   return startTime > now - graceMs;
 }
 
-/** LIVE chip for dropdown rows still inside the post-off grace window. */
+/**
+ * Whether a fixture/tracked row belongs in Add bet Events.
+ * Racing: short post-off grace. Football: full in-play window (status live or kick-off within 4h).
+ */
+export function isAddBetEventSelectable(
+  ev: {
+    startTime?: number | null;
+    status?: string | null;
+    sport?: string | null;
+  },
+  now = Date.now()
+): boolean {
+  if (ev.status === "finished") return false;
+  const sport = ev.sport ?? "football";
+  if (sport === "football") {
+    if (ev.startTime == null || !Number.isFinite(ev.startTime)) {
+      return ev.status === "live" || ev.status === "upcoming" || ev.status == null;
+    }
+    if (ev.startTime > now) return true;
+    return ev.startTime > now - ADD_BET_FOOTBALL_IN_PLAY_MS;
+  }
+  return isSelectableInAddBetEvents(ev.startTime, now);
+}
+
+/** LIVE chip: football for the in-play window; racing for the short post-off grace. */
 export function isLiveInAddBetEvents(
   startTime: number | null | undefined,
   status: string | null | undefined,
   now = Date.now(),
-  graceMs = ADD_BET_EVENT_PAST_GRACE_MS
+  graceMs = ADD_BET_EVENT_PAST_GRACE_MS,
+  sport?: string | null
 ): boolean {
   if (status === "finished") return false;
   if (startTime != null && Number.isFinite(startTime)) {
-    return startTime <= now && startTime > now - graceMs;
+    if (startTime > now) return false;
+    // Racing always uses the short grace. Football (or live with no sport) uses in-play.
+    const ms =
+      sport === "horse_racing"
+        ? graceMs
+        : sport === "football" || status === "live"
+          ? ADD_BET_FOOTBALL_IN_PLAY_MS
+          : graceMs;
+    return startTime > now - ms;
   }
   return status === "live";
 }
@@ -83,6 +122,18 @@ export interface EventDayBand<T> {
   key: string;
   label: string;
   items: T[];
+}
+
+/**
+ * Structured Add bet Events row: title left, kick-off right.
+ * Day bands already carry the date, so `time` is clock-only.
+ */
+export interface EventOptionParts {
+  title: string;
+  /** Right-rail clock via formatClockString; empty when unknown. */
+  time: string;
+  /** Short status chip text (Live / Result / FT), empty when none. */
+  status: string;
 }
 
 export function isFixtureSelectValue(value: string): boolean {
@@ -139,6 +190,48 @@ export function groupByDayBand<T extends { startTime?: number }>(
   return bands;
 }
 
+/** Local hour bucket key as canonical 24h `HH:00`. */
+export function eventHourKey(startTime: number): string {
+  const d = new Date(startTime);
+  return `${String(d.getHours()).padStart(2, "0")}:00`;
+}
+
+export function formatEventHourBandLabel(startTime: number): string {
+  return formatClockString(eventHourKey(startTime));
+}
+
+/**
+ * Nest hour bands under a day when fixtures span 2+ hours.
+ * Single-hour days stay flat (one band with an empty label — skip the subheader).
+ */
+export function groupByHourBandIfDense<T extends { startTime?: number }>(
+  items: T[]
+): EventDayBand<T>[] {
+  if (items.length === 0) return [];
+  const distinctHours = new Set(
+    items.map((item) => eventHourKey(item.startTime ?? 0))
+  );
+  if (distinctHours.size < 2) {
+    return [{ key: "all", label: "", items }];
+  }
+  const bands: EventDayBand<T>[] = [];
+  for (const item of items) {
+    const start = item.startTime ?? 0;
+    const key = eventHourKey(start);
+    const last = bands[bands.length - 1];
+    if (last && last.key === key) {
+      last.items.push(item);
+      continue;
+    }
+    bands.push({
+      key,
+      label: formatEventHourBandLabel(start),
+      items: [item],
+    });
+  }
+  return bands;
+}
+
 /**
  * Link-event picker bands: Today / Tomorrow / later (ascending), then past days
  * newest-first so history is reachable without scrolling past months of races.
@@ -168,7 +261,7 @@ export function filterNotTrackedFixtures(
     known.filter(
       (f) =>
         isCurrentOrFutureFixture(f.status) &&
-        isSelectableInAddBetEvents(f.startTime, now) &&
+        isAddBetEventSelectable(f, now) &&
         Boolean(f.externalId) &&
         !trackedExternalIds.has(f.externalId)
     )
@@ -184,7 +277,7 @@ export function filterTrackedForAddBet<T extends TrackedEventLike>(
   return events.filter((e) => {
     if (keepIds?.has(e.id)) return true;
     if (e.status === "finished") return false;
-    return isSelectableInAddBetEvents(e.startTime, now);
+    return isAddBetEventSelectable(e, now);
   });
 }
 
@@ -203,40 +296,92 @@ export function filterByOfferCourseScope<
   });
 }
 
+function racingOptionClock(ev: {
+  startTime?: number | null;
+  awayTeam?: string | null;
+  offTime?: string | null;
+}): string {
+  if (ev.startTime != null && Number.isFinite(ev.startTime)) {
+    return formatClockString(formatEventTime(ev.startTime));
+  }
+  const raw = (ev.offTime ?? ev.awayTeam ?? "").trim();
+  if (!raw) return "";
+  const normalised = normalizeEventTimeInput(raw);
+  return normalised ? formatClockString(normalised) : "";
+}
+
+function joinEventOptionParts(parts: EventOptionParts): string {
+  const when = parts.time ? ` · ${parts.time}` : "";
+  const status = parts.status ? ` · ${parts.status}` : "";
+  return `${parts.title}${when}${status}`;
+}
+
+/** Structured row for the Add bet Events dropdown (title | time). */
+export function partsKnownFixtureOption(
+  f: KnownFixtureOption,
+  now = Date.now()
+): EventOptionParts {
+  const live = isLiveInAddBetEvents(f.startTime, f.status, now, ADD_BET_EVENT_PAST_GRACE_MS, f.sport);
+  if (f.sport === "horse_racing") {
+    return {
+      title: racingVenueLabel(f.course ?? f.competition),
+      time: racingOptionClock({
+        startTime: f.startTime,
+        awayTeam: f.awayTeam,
+        offTime: f.offTime,
+      }),
+      status: live ? "Live" : "",
+    };
+  }
+  return {
+    title: `${f.homeTeam} v ${f.awayTeam}`,
+    time: formatClockString(formatEventTime(f.startTime)),
+    status: live ? "Live" : "",
+  };
+}
+
 export function formatKnownFixtureOption(
   f: KnownFixtureOption,
   now = Date.now()
 ): string {
-  const live = isLiveInAddBetEvents(f.startTime, f.status, now);
-  if (f.sport === "horse_racing") {
-    const status = live ? " · LIVE" : "";
-    return `${formatRacingEventTitle({
-      competition: f.course ?? f.competition,
-      startTime: f.startTime,
-      awayTeam: f.offTime ?? f.awayTeam,
-    })}${status}`;
-  }
-  const status = live ? " · LIVE" : "";
-  const when = ` · ${formatEventDate(f.startTime)} ${formatClockString(formatEventTime(f.startTime))}`;
-  return `${f.homeTeam} v ${f.awayTeam}${when}${status}`;
+  return joinEventOptionParts(partsKnownFixtureOption(f, now));
 }
 
-/** Label for Tracked rows in Add bet Events (LIVE within the grace window). */
+/** Structured row for Tracked events in Add bet Events. */
+export function partsTrackedEventOption(
+  ev: TrackedEventLike,
+  now = Date.now()
+): EventOptionParts {
+  const live = isLiveInAddBetEvents(
+    ev.startTime,
+    ev.status,
+    now,
+    ADD_BET_EVENT_PAST_GRACE_MS,
+    ev.sport
+  );
+  if (ev.sport === "horse_racing") {
+    return {
+      title: racingVenueLabel(ev.competition),
+      time: racingOptionClock(ev),
+      status: live ? "Live" : ev.status === "finished" ? "Result" : "",
+    };
+  }
+  return {
+    title: `${ev.homeTeam} v ${ev.awayTeam}`,
+    time:
+      ev.startTime != null
+        ? formatClockString(formatEventTime(ev.startTime))
+        : "",
+    status: live ? "Live" : ev.status === "finished" ? "FT" : "",
+  };
+}
+
+/** Flat label for Tracked rows (search / legacy string consumers). */
 export function formatTrackedEventOption(
   ev: TrackedEventLike,
   now = Date.now()
 ): string {
-  const live = isLiveInAddBetEvents(ev.startTime, ev.status, now);
-  if (ev.sport === "horse_racing") {
-    const status = live ? " · LIVE" : ev.status === "finished" ? " · Result" : "";
-    return `${formatRacingEventTitle(ev)}${status}`;
-  }
-  const status = live ? " · LIVE" : ev.status === "finished" ? " · FT" : "";
-  const when =
-    ev.startTime != null
-      ? ` · ${formatEventDate(ev.startTime)} ${formatClockString(formatEventTime(ev.startTime))}`
-      : "";
-  return `${ev.homeTeam} v ${ev.awayTeam}${when}${status}`;
+  return joinEventOptionParts(partsTrackedEventOption(ev, now));
 }
 
 /** Tracked section: same sort as today (live first, then ascending kick-off). */
@@ -391,7 +536,10 @@ export function resolveRaceRunnerOptions(input: {
     needsOddsHint = true;
   }
 
-  if (runners.length === 0) return [];
+  const current = formatRunnerOptionName(input.currentSelection ?? "");
+
+  // Keep the desk/edit pick visible while the card is still loading (empty list).
+  if (runners.length === 0) return current ? [current] : [];
 
   if (needsOddsHint && input.oddsOrder?.length) {
     runners = orderRunnersByOddsHint(
@@ -400,7 +548,6 @@ export function resolveRaceRunnerOptions(input: {
     );
   }
 
-  const current = formatRunnerOptionName(input.currentSelection ?? "");
   if (current && !runners.some((r) => r.toLowerCase() === current.toLowerCase())) {
     return [current, ...runners];
   }

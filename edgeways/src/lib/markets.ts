@@ -136,9 +136,12 @@ export function inferSportFromBet(
   market: string,
   eventSport?: string | null,
   /** Campaign sport when the bet has no linked event yet (e.g. cricket offer + match_winner). */
-  offerSport?: string | null
+  offerSport?: string | null,
+  /** Denormalised bets.sport (desk backs, quick-log without event). */
+  betSport?: string | null
 ): string {
   if (eventSport) return eventSport;
+  if (betSport?.trim()) return betSport.trim();
   if (offerSport?.trim()) return offerSport.trim();
   if (HORSE_RACING_MARKETS.has(market)) return "horse_racing";
   if (TENNIS_MARKETS.has(market)) return "tennis";

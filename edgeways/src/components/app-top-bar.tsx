@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { EdgewaysLogo } from "@/components/edgeways-logo-icon";
 import { AppTopBarMenu } from "@/components/app-top-bar-menu";
 import { AppTopBarMetaNav } from "@/components/app-top-bar-meta-nav";
 import { ChromeTab } from "@/components/chrome-tab";
 import { MoneyFlow } from "@/components/money-flow";
-import { TopBarLoginButton } from "@/components/top-bar-login-button";
+import { isNegativeGbp } from "@/lib/format-money";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useState, useMemo, type CSSProperties, type ReactNode } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { accountOwner } from "@/lib/accounts/owners";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,7 +19,24 @@ import {
   appShellGap,
   appShellMaxWidth,
 } from "@/lib/ui/app-shell-layout";
+import { COLLAPSE_EASE, SPRING_DURATION_MS, SPRING_EASE } from "@/lib/ui/motion";
 import { cn } from "@/lib/utils";
+
+const BALANCE_PILL_COLLAPSED_KEY = "edgeways.balancePillCollapsed";
+
+/** Matches header `h-14` content box after `pb-1` — rem↔rem so height can interpolate. */
+const BALANCE_PILL_EXPANDED_H = "3.25rem";
+const BALANCE_PILL_COLLAPSED_H = "1.75rem";
+
+const springStyle = {
+  transitionDuration: `${SPRING_DURATION_MS}ms`,
+  transitionTimingFunction: SPRING_EASE,
+} satisfies CSSProperties;
+
+const collapseStyle = {
+  transitionDuration: `${SPRING_DURATION_MS}ms`,
+  transitionTimingFunction: COLLAPSE_EASE,
+} satisfies CSSProperties;
 
 function BrandLink({ className }: { className?: string }) {
   return (
@@ -26,26 +44,30 @@ function BrandLink({ className }: { className?: string }) {
       href="/"
       aria-label="Edgeways home"
       className={cn(
-        "flex shrink-0 items-center transition-opacity sm:hover:opacity-90",
+        "flex shrink-0 items-center gap-2 transition-opacity sm:hover:opacity-90",
         appNavInset,
         className
       )}
     >
       <EdgewaysLogo topbar />
+      {/* Same geometry as racing-desk “Backed”; plate tracks the lockup colour. */}
+      <span className="inline-flex origin-left translate-y-[2px] scale-[0.625] -mr-[37.5%] items-center rounded-[3px] bg-brand-logo px-1.5 py-0.5 text-xs font-bold uppercase leading-none tracking-wide text-topbar-accent-foreground dark:bg-brand-on-topbar dark:text-brand">
+        Beta
+      </span>
     </Link>
   );
 }
 
-/** Profit on the balance pill: green when ≥ 0, red when negative. */
+/** Profit on the balance pill: green when ≥ 0, red when negative after pence round. */
 function profitToneClass(value: number): string {
-  return value < -0.004
+  return isNegativeGbp(value)
     ? "text-red-600 dark:text-red-400"
     : "text-emerald-600 dark:text-emerald-400";
 }
 
 /** Single metric column inside the canvas balance pill. */
 const stackShell =
-  "flex min-h-0 flex-col items-end justify-center gap-0.5 px-1.5 text-[12px] sm:text-[11px]";
+  "flex min-h-0 flex-col items-end justify-center gap-0.5 px-1.5 text-[12px] sm:text-xs";
 
 function StackRow({
   label,
@@ -67,18 +89,17 @@ function StackRow({
   );
 }
 
-/** Profit above Free bets. Profit alone centres vertically when free bets are hidden. */
+/** Profit above Free bets. Violet amount only when free bets are non-zero. */
 function TopBarProfitStack({
   profit,
   freeBets,
-  showFreeBets,
   onFreeBets,
 }: {
   profit: number;
   freeBets: number;
-  showFreeBets: boolean;
   onFreeBets: () => void;
 }) {
+  const freeBetsActive = freeBets > 0.005;
   return (
     <div className={stackShell}>
       <Link
@@ -88,25 +109,25 @@ function TopBarProfitStack({
       >
         <StackRow label="Profit" value={profit} amountClass={profitToneClass(profit)} />
       </Link>
-      {showFreeBets ? (
-        <button
-          type="button"
-          onClick={onFreeBets}
-          className="rounded-sm text-right leading-none transition-opacity sm:hover:opacity-80"
-          aria-label={`Free bets ${freeBets.toFixed(2)}`}
-        >
-          <StackRow
-            label="Free bets"
-            value={freeBets}
-            amountClass="text-violet-600 dark:text-violet-400"
-          />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        onClick={onFreeBets}
+        className="rounded-sm text-right leading-none transition-opacity sm:hover:opacity-80"
+        aria-label={`Free bets ${freeBets.toFixed(2)}`}
+      >
+        <StackRow
+          label="Free bets"
+          value={freeBets}
+          amountClass={
+            freeBetsActive ? "text-violet-600 dark:text-violet-400" : undefined
+          }
+        />
+      </button>
     </div>
   );
 }
 
-/** Total above Exchange. Total alone centres vertically when exchange is hidden. */
+/** Exchange above Total. Total alone centres vertically when exchange is hidden. */
 function TopBarBankrollStack({
   exchange,
   inBets,
@@ -121,7 +142,7 @@ function TopBarBankrollStack({
   ownerLines: Array<{ owner: string; balance: number }>;
 }) {
   const showInBets = inBets > 0.005;
-  // Exchange and In-bets share the second row — In-bets wins when present.
+  // Exchange and In-bets share the first row — In-bets wins when present.
   const showExchangeRow = showExchange && !showInBets;
   const chip = (
     <Link
@@ -129,15 +150,15 @@ function TopBarBankrollStack({
       className={stackShell}
       aria-label={
         showInBets
-          ? `Bankroll: total ${total.toFixed(2)}, in-bets ${inBets.toFixed(2)}`
+          ? `Bankroll: in-bets ${inBets.toFixed(2)}, total ${total.toFixed(2)}`
           : showExchangeRow
-            ? `Bankroll: total ${total.toFixed(2)}, exchange ${exchange.toFixed(2)}`
+            ? `Bankroll: exchange ${exchange.toFixed(2)}, total ${total.toFixed(2)}`
             : `Bankroll total ${total.toFixed(2)}`
       }
     >
-      <StackRow label="Total" value={total} />
       {showExchangeRow ? <StackRow label="Exchange" value={exchange} /> : null}
       {showInBets ? <StackRow label="In-bets" value={inBets} /> : null}
+      <StackRow label="Total" value={total} />
     </Link>
   );
 
@@ -163,7 +184,6 @@ function TopBarBankrollStack({
 function MobileStatStacks({
   profit,
   freeBets,
-  showFreeBets,
   onFreeBets,
   total,
   exchange,
@@ -171,12 +191,12 @@ function MobileStatStacks({
 }: {
   profit: number;
   freeBets: number;
-  showFreeBets: boolean;
   onFreeBets: () => void;
   total: number;
   exchange: number;
   showExchange: boolean;
 }) {
+  const freeBetsActive = freeBets > 0.005;
   return (
     <>
       <div className={stackShell}>
@@ -187,23 +207,27 @@ function MobileStatStacks({
             amountClass={profitToneClass(profit)}
           />
         </Link>
-        {showFreeBets ? (
-          <button type="button" onClick={onFreeBets} aria-label={`Free bets ${freeBets.toFixed(2)}`}>
-            <StackRow
-              label="Free bets"
-              value={freeBets}
-              amountClass="text-violet-600 dark:text-violet-400"
-            />
-          </button>
-        ) : null}
+        <button type="button" onClick={onFreeBets} aria-label={`Free bets ${freeBets.toFixed(2)}`}>
+          <StackRow
+            label="Free bets"
+            value={freeBets}
+            amountClass={
+              freeBetsActive ? "text-violet-600 dark:text-violet-400" : undefined
+            }
+          />
+        </button>
       </div>
       <Link
         href="/accounts"
         className={stackShell}
-        aria-label={`Bankroll total ${total.toFixed(2)}`}
+        aria-label={
+          showExchange
+            ? `Bankroll: exchange ${exchange.toFixed(2)}, total ${total.toFixed(2)}`
+            : `Bankroll total ${total.toFixed(2)}`
+        }
       >
-        <StackRow label="Total" value={total} />
         {showExchange ? <StackRow label="Exchange" value={exchange} /> : null}
+        <StackRow label="Total" value={total} />
       </Link>
     </>
   );
@@ -211,21 +235,115 @@ function MobileStatStacks({
 
 /**
  * Inverted Chrome tab: canvas plate hanging from the top of the header,
- * bottom radii + top ears blending into the topbar. Desktop: rightmost,
- * after Login. Mobile: flush with the burger.
+ * bottom radii + top ears blending into the topbar. Desktop: rightmost.
+ * Mobile: flush with the burger.
+ *
+ * Bottom 12px strip collapses the metrics up into the topbar; collapsed
+ * state keeps a short “Show balances” reveal with chevron down.
  */
 function BalancePill({ children }: { children: ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
+  /** Skip motion on the first paint after restoring localStorage (avoids expand→collapse flash). */
+  const [motionReady, setMotionReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(BALANCE_PILL_COLLAPSED_KEY) === "1") {
+        setCollapsed(true);
+      }
+    } catch {
+      /* private mode / blocked storage */
+    }
+    const id = requestAnimationFrame(() => setMotionReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(BALANCE_PILL_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
+  const heightMotion = motionReady ? collapseStyle : undefined;
+  const fadeMotion = motionReady ? springStyle : undefined;
+
   return (
     <ChromeTab
       edge="hang"
-      className="flex items-stretch self-stretch overflow-visible px-2.5 text-foreground"
+      className={cn(
+        // Top-aligned: header is fixed h-14, so this never reflows the page.
+        // Height uses rem↔rem (not %↔rem) so the transition can interpolate.
+        "flex self-start text-foreground",
+        motionReady && "transition-[height]"
+      )}
+      style={{
+        ...heightMotion,
+        height: collapsed ? BALANCE_PILL_COLLAPSED_H : BALANCE_PILL_EXPANDED_H,
+      }}
     >
-      <div className="flex items-center gap-1">{children}</div>
+      <div className="flex h-full min-h-0 w-full flex-col">
+        <div
+          className={cn(
+            "grid min-h-0 flex-1",
+            motionReady && "transition-[grid-template-rows]"
+          )}
+          style={{
+            ...heightMotion,
+            gridTemplateRows: collapsed ? "0fr" : "1fr",
+          }}
+        >
+          <div className="min-h-0 overflow-hidden">
+              <div
+                className={cn(
+                  "flex h-full items-center gap-1 px-2.5 pt-2",
+                  motionReady && "transition-[opacity,transform]",
+                  collapsed && "-translate-y-2 opacity-0"
+                )}
+                style={fadeMotion}
+              >
+              {children}
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Show balances" : "Hide balances"}
+          className={cn(
+            "flex w-full shrink-0 items-center justify-center gap-1",
+            "rounded-b-[var(--chrome-tab-r-hang-bottom)]",
+            "text-muted-foreground transition-[color,height]",
+            /* Hover wash only: solid at bottom → 0% at top. */
+            "hover:bg-gradient-to-b hover:from-transparent hover:to-selection-subtle hover:text-foreground",
+            "focus-visible:bg-gradient-to-b focus-visible:from-transparent focus-visible:to-selection-subtle focus-visible:text-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            collapsed ? "h-7 px-2.5" : "h-3"
+          )}
+          style={heightMotion}
+        >
+          {collapsed ? (
+            <>
+              <span className="text-xs font-medium leading-none">Show balances</span>
+              <ChevronDown className="size-3 shrink-0" aria-hidden />
+            </>
+          ) : (
+            <ChevronUp className="size-3 shrink-0" aria-hidden />
+          )}
+        </button>
+      </div>
     </ChromeTab>
   );
 }
 
-/** Logo, bankroll stacks, Login — ink chrome under the yellow top stripe. */
+/** Logo and bankroll stacks — ink chrome under the yellow top stripe. */
 function AppTopBarHeader() {
   const { state } = useAppState(5000);
   const { openFreeBets } = useFreeBets();
@@ -249,14 +367,13 @@ function AppTopBarHeader() {
     balances?.accounts
       ?.filter((a) => a.type === "bookie")
       .reduce((s, a) => s + (a.freeBets ?? 0), 0) ?? 0;
-  const showFreeBets = freeBetsTotal > 0.005;
   const showExchange = exchange > 0.005;
 
   return (
     <div
       className={cn(
-        // Stretch row: balance pill hangs from the top; Login sits on the bottom edge
-        "flex min-h-14 w-full items-stretch overflow-visible",
+        // Fixed height so the balance pill collapse never reflows the page below
+        "flex h-14 w-full items-stretch overflow-visible",
         appShellGap,
         "px-0 pb-1 sm:px-[var(--layout-page-x)]",
         appShellMaxWidth
@@ -269,15 +386,10 @@ function AppTopBarHeader() {
 
       <div className="flex min-w-0 flex-1 items-stretch justify-end gap-1 sm:gap-1.5">
         {state?.demoMode ? (
-          <span className="self-center shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-warning sm:text-[10px]">
+          <span className="self-center shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-warning sm:text-[11px]">
             Demo data
           </span>
         ) : null}
-
-        {/* Desktop: Login left of the balance tab (mobile Login is in the drawer). */}
-        <div className="mr-3 hidden shrink-0 items-end md:flex">
-          <TopBarLoginButton className="mb-0.5" />
-        </div>
 
         {state == null ? null : (
           <>
@@ -286,7 +398,6 @@ function AppTopBarHeader() {
                 <TopBarProfitStack
                   profit={profit}
                   freeBets={freeBetsTotal}
-                  showFreeBets={showFreeBets}
                   onFreeBets={openFreeBets}
                 />
                 <TopBarBankrollStack
@@ -303,7 +414,6 @@ function AppTopBarHeader() {
                 <MobileStatStacks
                   profit={profit}
                   freeBets={freeBetsTotal}
-                  showFreeBets={showFreeBets}
                   onFreeBets={openFreeBets}
                   total={bankroll}
                   exchange={exchange}

@@ -1,7 +1,15 @@
-import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
+import type { AccaLegRow, AccaRunRow, BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
+import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
+import { accaFoldName } from "@/lib/bets/acca-fold-name";
+import { isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
 import { formatGbp } from "@/lib/format-money";
 import { formatPromoTooltip } from "@/lib/bet-outcomes";
 import { formatEventTitle, racingVenueLabel } from "@/lib/events";
+import {
+  FREE_BET_EARNED_PHRASE,
+  FREE_BET_WON_PHRASE,
+  titleHasFreeBetAwardPhrase,
+} from "@/lib/offers/early-free-bet-award";
 import { formatClockTime } from "@/lib/time-format";
 import { MARKET_LABELS } from "@/lib/markets";
 
@@ -209,8 +217,9 @@ export function isRacingHistoryEntry(entry: HistoryRow, ctx: HistoryContext): bo
   return event?.sport === "horse_racing";
 }
 
+/** Settlement rows that credit a free bet (won = place trigger, earned = qualifier). */
 export function isFreeBetWonHistoryEntry(entry: HistoryRow): boolean {
-  return entry.title.includes("Free bet won");
+  return titleHasFreeBetAwardPhrase(entry.title);
 }
 
 export function isFreeBetBetType(betType: BetRow["betType"]): boolean {
@@ -234,6 +243,21 @@ export function isFreeBetPlacedHistoryEntry(entry: HistoryRow, ctx: HistoryConte
   return bet != null && isFreeBetBetType(bet.betType);
 }
 
+/**
+ * Acca / Bet Builder desk hedge lays — belong on the desk while the campaign
+ * is live. History narrates the campaign back (+ match events), not per-leg lays.
+ */
+export function isDeskCampaignLayHistoryEntry(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): boolean {
+  if (entry.betId == null) return false;
+  if (entry.kind !== "settlement" && entry.kind !== "bet_placed") return false;
+  const bet = ctx.betsById.get(entry.betId);
+  if (bet == null) return false;
+  return isAccaDeskLay(bet) || isBetBuilderDeskLay(bet);
+}
+
 /** Display title - upgrades legacy "Bet placed" rows when the bet is a free bet. */
 export function historyEntryTitle(entry: HistoryRow, ctx: HistoryContext): string {
   if (isFreeBetPlacedHistoryEntry(entry, ctx)) return "Free bet placed";
@@ -249,6 +273,7 @@ export function historyEntryHref(entry: HistoryRow, ctx: HistoryContext): string
     entry.kind === "settlement" ||
     entry.kind === "free_bet_promo"
   ) {
+    if (bet && isAccaDeskBack(bet)) return "/acca?tab=history";
     return bet ? `/tracker?highlight=${bet.id}` : "/tracker";
   }
 
@@ -289,7 +314,7 @@ export function historyEntryLinkLabel(entry: HistoryRow, ctx: HistoryContext): s
 
 export function isFreeBetHistoryEntry(entry: HistoryRow, ctx: HistoryContext): boolean {
   if (isFreeBetPlacedHistoryEntry(entry, ctx)) return true;
-  if (entry.title.includes("Free bet won")) return true;
+  if (titleHasFreeBetAwardPhrase(entry.title)) return true;
   if (entry.kind === "free_bet_promo") return true;
   if (entry.kind === "settlement" && entry.betId != null && ctx.promoByBetId[entry.betId]) {
     return true;
@@ -457,6 +482,73 @@ export function formatHistoryEventLine(
     return venue || formatEventTitle(event);
   }
   return formatEventTitle(event);
+}
+
+/** Acca settlement title — campaign outcome, not ordinary single-bet wording. */
+export function formatAccaSettlementTitle(
+  status: BetRow["status"],
+  promo?: { amount: number; reason: string } | null,
+  freeBetPhrase: string = FREE_BET_EARNED_PHRASE
+): string {
+  const base =
+    status === "won"
+      ? "Acca won"
+      : status === "lost"
+        ? "Acca lost"
+        : status === "void"
+          ? "Acca void"
+          : status === "push"
+            ? "Acca push"
+            : "Acca settled";
+  if (promo && (status === "won" || status === "lost")) {
+    return `${base} · ${freeBetPhrase}`;
+  }
+  return base;
+}
+
+/** Ordinary bet settlement title when a free-bet promo credits on settle. */
+export function formatSettlementTitleWithFreeBet(
+  status: BetRow["status"],
+  freeBetPhrase: string
+): string {
+  if (status === "lost") return `Bet lost · ${freeBetPhrase}`;
+  if (status === "won") return `Bet won · ${freeBetPhrase}`;
+  return status === "early_payout"
+    ? "2UP paid early"
+    : status === "half_win"
+      ? "Bet half won"
+      : status === "half_lose"
+        ? "Bet half lost"
+        : status === "push"
+          ? "Bet push"
+          : status === "void"
+            ? "Bet void"
+            : "Bet settled";
+}
+
+export { FREE_BET_EARNED_PHRASE, FREE_BET_WON_PHRASE };
+
+/** Acca placed title. */
+export function formatAccaPlacedTitle(betType: BetRow["betType"] | string | null): string {
+  if (betType === "free_snr" || betType === "free_sr") return "Acca free bet placed";
+  return "Acca placed";
+}
+
+/**
+ * Second-line History copy for Acca desk backs — campaign identity only.
+ * `Treble · Bet £20 (ACCA) get £10 free bet` — not a single fixture or a leg list.
+ */
+export function formatAccaHistoryDetail(
+  run: Pick<AccaRunRow, "label">,
+  legs: Array<Pick<AccaLegRow, "label" | "result">>
+): string {
+  const runLabel = run.label.trim();
+  const fold = accaFoldName(legs.length);
+  if (fold && runLabel) return `${fold} · ${runLabel}`;
+  if (runLabel) return runLabel;
+  if (fold) return fold;
+  const n = legs.length;
+  return `${n} ${n === 1 ? "leg" : "legs"}`;
 }
 
 /**

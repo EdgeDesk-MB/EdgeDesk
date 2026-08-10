@@ -150,6 +150,7 @@ export default function HistoryPage() {
           <Tabs
             value={viewDensity}
             onValueChange={(v) => changeViewDensity(v as HistoryViewDensity)}
+            activationMode="manual"
           >
             <TabsList variant="segmented">
               <TabsTrigger value="expanded">

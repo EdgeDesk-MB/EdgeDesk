@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  noteUserOriginatedSettlesFromRequest,
+  noteUserOriginatedSettlesFromResponse,
+} from "@/lib/alerts/note-user-settle";
 import { cachedGet, clearApiGetCache } from "@/lib/api-get-cache";
 
 export { useAppStateContext as useAppState } from "@/components/app-state-provider";
@@ -10,6 +14,10 @@ export async function api<T = unknown>(
 ): Promise<T> {
   const { json, ...rest } = init ?? {};
   const method = (rest.method ?? (json !== undefined ? "POST" : "GET")).toUpperCase();
+  // Mark before fetch so a concurrent state poll cannot sticky-toast first.
+  if (method !== "GET" && method !== "HEAD") {
+    noteUserOriginatedSettlesFromRequest(path, json);
+  }
   const res = await fetch(path, {
     ...rest,
     headers: { "Content-Type": "application/json", ...rest.headers },
@@ -23,7 +31,11 @@ export async function api<T = unknown>(
   if (method !== "GET" && method !== "HEAD") {
     clearApiGetCache();
   }
-  return res.json();
+  const data = (await res.json()) as T;
+  if (method !== "GET" && method !== "HEAD") {
+    noteUserOriginatedSettlesFromResponse(path, json, data);
+  }
+  return data;
 }
 
 /**

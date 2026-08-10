@@ -43,7 +43,7 @@ export function DeskPageHeader({
               {helpId && <PageHelp pageId={helpId} />}
             </div>
             {description && (
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
                 {description}
               </p>
             )}
@@ -60,7 +60,7 @@ export function DeskPageHeader({
   }
 
   return (
-    <div className={cn("surface-lift overflow-hidden rounded-[var(--layout-page-radius)] ring-1 ring-border/50 dark:shadow-none", className)}>
+    <div className={cn("surface-lift overflow-hidden rounded-[var(--layout-page-radius)] ring-1 ring-border/40 dark:ring-0", className)}>
       {band}
     </div>
   );

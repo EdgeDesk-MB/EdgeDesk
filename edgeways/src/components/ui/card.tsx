@@ -1,5 +1,6 @@
 import * as React from "react"
 
+import { sectionTitle } from "@/lib/ui/surface-styles"
 import { cn } from "@/lib/utils"
 
 function Card({
@@ -12,7 +13,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-border/50 [--card-spacing:var(--layout-card-x)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:var(--layout-card-x)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-border/40 dark:ring-0 [--card-spacing:var(--layout-card-x)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:var(--layout-card-x)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         className
       )}
       {...props}
@@ -42,10 +43,8 @@ function CardTitle({
     <div
       data-slot="card-title"
       className={cn(
-        "font-heading leading-snug font-semibold group-data-[size=sm]/card:text-sm",
-        section
-          ? "text-xs font-bold uppercase tracking-wide text-foreground"
-          : "text-base font-bold",
+        "font-heading group-data-[size=sm]/card:text-sm",
+        section ? sectionTitle : "text-base font-bold leading-snug",
         className
       )}
       {...props}
@@ -58,7 +57,7 @@ function CardDescription({ className, compact, ...props }: React.ComponentProps<
     <div
       data-slot="card-description"
       className={cn(
-        compact ? "text-[11px] text-muted-foreground" : "text-sm text-muted-foreground",
+        compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground",
         className
       )}
       {...props}

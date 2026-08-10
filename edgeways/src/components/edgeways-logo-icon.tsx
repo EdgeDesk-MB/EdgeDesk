@@ -1,8 +1,5 @@
+import { BOLT_PATH } from "@/lib/brand/bolt-mark";
 import { cn } from "@/lib/utils";
-
-/** Bolt path traced from brand/masters/notification.png (7-point geometric mark). */
-const BOLT_PATH =
-  "M12.82 4.32 L12.86 10.3 L18.91 10.3 L11.25 19.61 L11.14 13.7 L5.13 13.67 L12.75 4.39 Z";
 
 /**
  * Compact Edgeways mark — contrast bolt on brand plate.

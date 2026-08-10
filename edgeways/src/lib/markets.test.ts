@@ -10,6 +10,12 @@ describe("inferSportFromBet", () => {
     expect(inferSportFromBet("match_winner", null, "cricket")).toBe("cricket");
   });
 
+  it("prefers denormalised bet sport over offer sport", () => {
+    expect(inferSportFromBet("other", null, "football", "horse_racing")).toBe(
+      "horse_racing"
+    );
+  });
+
   it("falls back to market catalogues", () => {
     expect(inferSportFromBet("win")).toBe("horse_racing");
     expect(inferSportFromBet("match_winner")).toBe("tennis");

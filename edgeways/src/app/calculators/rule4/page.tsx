@@ -47,7 +47,7 @@ export default function Rule4CalculatorPage() {
               type="button"
               onClick={() => setDeductionPence(p.pence)}
               className={cn(
-                "rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                "rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors",
                 deductionPence === p.pence
                   ? "bg-black/80 text-white dark:bg-white/90 dark:text-black"
                   : "bg-black/10 text-black/70 hover:bg-black/15 dark:bg-white/15 dark:text-white/80 dark:hover:bg-white/20"

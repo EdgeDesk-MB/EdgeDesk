@@ -15,7 +15,10 @@ import {
   type CasinoCalendarItem,
 } from "@/lib/offers/casino-offer-calendar";
 import { formatOfferDaysLeftLabel } from "@/lib/offers/offer-expiry";
-import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
+import {
+  offerCampaignCardInteractive,
+  offerCampaignCardShell,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 
@@ -47,7 +50,7 @@ function CasinoCalendarItemCard({
     <button
       type="button"
       onClick={() => onOfferClick?.(offer)}
-      className={cn(offerCampaignCardShell, "w-full")}
+      className={cn(offerCampaignCardShell, offerCampaignCardInteractive, "w-full")}
       aria-label={`View campaign: ${offer.title}`}
     >
       <div className={cn("relative z-[2] min-w-0 flex-1 px-3 pt-[10px] pb-2.5", tint ?? "bg-card")}>
@@ -55,15 +58,15 @@ function CasinoCalendarItemCard({
           <div className="min-w-0 flex-1">
             {offer.casino ? <VenueBadge name={offer.casino} kind="bookie" size="sm" /> : null}
             <p className="mt-1 break-words text-sm font-bold leading-snug">{offer.title}</p>
-            <p className={cn("mt-0.5 text-[10px] font-medium tabular-nums", urgencyClass)}>
+            <p className={cn("mt-0.5 text-[11px] font-medium tabular-nums", urgencyClass)}>
               {formatOfferDaysLeftLabel(item.daysLeft)}
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               EV
             </p>
-            <MoneyFlow value={offer.expectedEv} signColor className="text-sm font-bold tabular-nums" />
+            <MoneyFlow value={offer.expectedEv} signColor estimate className="text-sm font-bold tabular-nums" />
           </div>
         </div>
       </div>
@@ -98,27 +101,13 @@ export function CasinoDayCalendar({
         days.map((day) => (
           <section
             key={day.dateKey}
-            className={cn(
-              "overflow-hidden rounded-lg border border-border/60",
-              day.isToday && "border-primary/30"
-            )}
+            className="overflow-hidden rounded-lg border border-border/60"
           >
-            <div
-              className={cn(
-                "flex items-center gap-2 px-3 py-2",
-                "bg-muted/40 dark:bg-input/25",
-                day.isToday && "bg-primary/10 dark:bg-primary/15"
-              )}
-            >
-              <h3
-                className={cn(
-                  "flex-1 text-xs font-bold uppercase tracking-wide",
-                  day.isToday ? "text-primary-text" : "text-foreground"
-                )}
-              >
+            <div className="flex items-center gap-2 bg-muted/40 px-3 py-2 dark:bg-input/25">
+              <h3 className="flex-1 text-xs font-bold uppercase tracking-wide text-foreground">
                 {day.label}
               </h3>
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {day.items.length}
               </span>
             </div>

@@ -31,6 +31,143 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-08-10",
+    title: "Offer completion playbook: deposit codes to clear wagering",
+    summary:
+      "Paste or forward a sports promo and Edgeways walks the campaign step by step, with code on Step 1, Mark done for soft gates, and auto-advance from bets, deposits and wagering where the ledger can prove it.",
+    entries: [
+      {
+        kind: "improvement",
+        area: "Offers",
+        href: "/offers",
+        text: "Paste offer expands a drop zone on the New offer form (no nested Preview). Fields fill as you paste; green ticks mark paste-filled values until you edit them. Same pattern on Log a casino offer. Sticky Add offer / Continue stays reachable.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Completion playbook on campaign cards: Step N of M with deposit → qualify → await award → convert → clear wagering (when the T&Cs need it). Soft gates use Mark done; qualify and convert keep Place / Convert.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Paste and email intake capture promo codes, min deposit, reward event, winnings wagering, max conversion and payment exclusions. Dynobet-style Bet & Get emails land with the right stakes and Step 1 = deposit + code.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Deposit step shows the promo code for one-tap copy. After Mark done (or a matching Accounts transfer/top-up), Do next and Track move on to the qualifying bet — no more opening Place while deposit is still due.",
+      },
+      {
+        kind: "improvement",
+        area: "Offers",
+        href: "/offers",
+        text: "Convert prefills lock the reward event when the offer names one (e.g. PSG vs Villa). Clear-wagering watches bookie WR after convert: shows pounds left, links to Accounts, and auto-completes only once outstanding WR has burned to £0.",
+      },
+      {
+        kind: "improvement",
+        area: "Home",
+        href: "/",
+        text: "Do next surfaces playbook steps first (deposit / opt-in / clear wagering) so deposit-gated campaigns do not look like ready-to-qualify Track cards.",
+      },
+      {
+        kind: "improvement",
+        area: "Offers",
+        href: "/offers",
+        text: "Paste preview calls out deposit + code before you save. Classic bet&get without a deposit gate still starts at qualify; the financial pipeline strip stays as context under the wizard.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-06",
+    title: "Combo desks: Bet Builder, Systems, and place tools",
+    summary:
+      "Full-cover systems and bet builders sit beside Acca, Racing Desk gains place-aware tools, and Feedback replaces Contact us.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Bet Builder",
+        href: "/bet-builder",
+        text: "Bet Builder Desk joins the Combo group: create a run, track selections, settle the whole ticket, and open it from offers, Do next or free-bet convert when the campaign is bet-builder shaped.",
+      },
+      {
+        kind: "feature",
+        area: "Systems",
+        href: "/systems",
+        text: "Systems Desk for Lucky / Patent / Trixie / Yankee / Canadian (Goliath): paste a slip, organise legs, settle per leg with combination returns (void refunds dead lines), and classify as an EV play or mug bet. Not a finder - it tracks the system you already built.",
+      },
+      {
+        kind: "improvement",
+        area: "Acca Desk",
+        href: "/acca",
+        text: "Acca runs share paste-slip create with Bet Builder, support combined and no-lay methods, and show a clearer leg timeline while a run is live.",
+      },
+      {
+        kind: "feature",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Active bets strip and place-zone bar on the card so each-way and place-refund work stays next to the runners, plus a clearer today P&L view for the desk.",
+      },
+      {
+        kind: "feature",
+        area: "Each Way",
+        href: "/calculators/each-way",
+        text: "Each Way / Extra Place calculator on the desk: place ladder, dual-lay settle paths, and the maths wired through the same settlement tests as the rest of the calc engine.",
+      },
+      {
+        kind: "feature",
+        area: "Feedback",
+        href: "/feedback",
+        text: "Feedback in the top submenu (replacing Contact us): pick Bug, Idea or Other, add a summary and details, then save locally and email or copy a report with diagnostics attached.",
+      },
+      {
+        kind: "improvement",
+        area: "Alerts",
+        href: "/alerts",
+        text: "Quieter toasts for actions you just took, clearer settle-related copy, and bolt notification art kept working when the home server is offline.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-05",
+    title: "Make it yours: appearance, reminders, and Acca from offers",
+    summary:
+      "Personalise the chrome, set casino and offer reminders, and route multi-leg campaigns into the right combo desk.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Appearance: choose a brand accent, header pattern and UI font - the desk keeps your choices across reloads without a flash of the defaults.",
+      },
+      {
+        kind: "feature",
+        area: "Casino",
+        href: "/casino",
+        text: "Set a reminder on a campaign for free spins or bonuses that land later - it fires into the alerts inbox and push when due.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Qualifier and reward scope (Single / Acca / Bet builder): Place and Convert open the matching combo desk when entitled, with a chooser if more than one path applies. Free-bet Acca convert lands as SNR on the Acca run.",
+      },
+      {
+        kind: "improvement",
+        area: "Navigation",
+        text: "Desk and meta tabs use Chrome-style rise tabs across the top submenu (Settings, Support, Guides, Release notes, Roadmap, Feedback), with the side nav reserved for Desk routes.",
+      },
+      {
+        kind: "improvement",
+        area: "Tracker",
+        href: "/tracker",
+        text: "Campaign sections, settle flows and P&L breakdown polish so multi-leg and offer-linked positions are easier to scan on desktop.",
+      },
+    ],
+  },
+  {
     date: "2026-08-04",
     title: "EdgeDesk is now edgeways",
     summary:
@@ -46,6 +183,11 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         area: "Alerts",
         href: "/alerts",
         text: "A chamfered bolt is the new mark (placeholder pending the final logo): it fronts the app icon, favicon and Android notification badge, and background push titles now lead with ⚡ so an Edgeways alert reads at a glance on the lock screen.",
+      },
+      {
+        kind: "improvement",
+        area: "Everywhere",
+        text: "Brand tokens land properly: yellow primaries in both themes, ink-and-yellow chips, clearer top-bar stacks, and page CTAs that share one primary style.",
       },
     ],
   },

@@ -126,7 +126,7 @@ export default function RefundIfCalculatorPage() {
                   type="button"
                   onClick={() => setRefundRetention(p.pct)}
                   className={
-                    "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors " +
+                    "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors " +
                     (refundRetention === p.pct
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:bg-muted/80")
@@ -146,7 +146,7 @@ export default function RefundIfCalculatorPage() {
         chip={
           exchange && (
             <span
-              className="rounded px-2 py-0.5 text-[10px] font-bold"
+              className="rounded px-2 py-0.5 text-[11px] font-bold"
               style={{
                 backgroundColor: exchange.brandColor,
                 color: contrastText(exchange.brandColor),

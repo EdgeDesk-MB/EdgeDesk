@@ -22,6 +22,8 @@ import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { twoUp, twoUpEV } from "@/lib/calc";
 import type { ExchangeRow } from "@/lib/db/schema";
+import { panelSurface } from "@/lib/ui/surface-styles";
+import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
 
 export default function TwoUpCalculatorPage() {
@@ -76,7 +78,7 @@ export default function TwoUpCalculatorPage() {
         }
       />
 
-      <div className="rounded-xl border bg-card p-4">
+      <div className={cn(panelSurface, "p-4")}>
         <div className="mb-1 text-sm font-semibold">Match (optional)</div>
         <p className="mb-3 text-xs text-muted-foreground">
           Name the match and the profit tracker will link it - the windfall settles itself the
@@ -84,15 +86,15 @@ export default function TwoUpCalculatorPage() {
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-muted-foreground">Home team</span>
+            <span className="text-xs font-medium text-muted-foreground">Home team</span>
             <Input value={homeTeam} onChange={(e) => setHomeTeam(e.target.value)} placeholder="e.g. Arsenal" className="h-10" />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-muted-foreground">Away team</span>
+            <span className="text-xs font-medium text-muted-foreground">Away team</span>
             <Input value={awayTeam} onChange={(e) => setAwayTeam(e.target.value)} placeholder="e.g. Liverpool" className="h-10" />
           </label>
           <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
-            <span className="text-[11px] font-medium text-muted-foreground">Team you&apos;re backing</span>
+            <span className="text-xs font-medium text-muted-foreground">Team you&apos;re backing</span>
             <div className="flex h-10 items-center gap-1 rounded-md border p-1">
               {(["home", "away"] as const).map((side) => (
                 <button
@@ -131,7 +133,7 @@ export default function TwoUpCalculatorPage() {
         chip={
           exchange ? (
             <span
-              className="rounded px-2 py-0.5 text-[10px] font-bold"
+              className="rounded px-2 py-0.5 text-[11px] font-bold"
               style={{
                 backgroundColor: exchange.brandColor,
                 color: contrastText(exchange.brandColor),
@@ -204,7 +206,7 @@ export default function TwoUpCalculatorPage() {
           />
           <div className="pb-1 text-right">
             <div className="text-xs text-muted-foreground">EV</div>
-            <MoneyFlow value={ev ?? 0} signColor signDisplay className="text-2xl font-semibold" />
+            <MoneyFlow value={ev ?? 0} signColor signDisplay estimate className="text-2xl font-semibold" />
           </div>
         </CardContent>
       </Card>

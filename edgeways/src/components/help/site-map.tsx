@@ -18,6 +18,8 @@ const OFF_NAV_PAGES: Array<{ href: string; label: string; note: string }> = [
   { href: "/release-notes", label: "Release notes", note: "burger menu" },
   { href: "/help", label: "Help", note: "burger menu" },
   { href: "/roadmap", label: "Roadmap", note: "linked from Help and Settings" },
+  { href: "/feedback", label: "Feedback", note: "meta submenu (bugs, ideas, notes)" },
+  { href: "/contact", label: "Contact", note: "legacy redirect → Feedback" },
   { href: "/balances", label: "Balances", note: "legacy redirect → Accounts" },
   { href: "/events", label: "Events", note: "legacy redirect → Fixtures" },
 ];
@@ -61,7 +63,7 @@ const OBSERVATIONS: Array<{ title: string; detail: string }> = [
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+    <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/30 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
       {children}
     </span>
   );
@@ -90,7 +92,7 @@ function PageRow({
         {label}
         <ExternalLink className="size-3 shrink-0" aria-hidden />
       </Link>
-      <code className="rounded bg-muted px-1 text-[11px] text-muted-foreground">{href}</code>
+      <code className="rounded bg-muted px-1 text-xs text-muted-foreground">{href}</code>
       {chips}
     </div>
   );
@@ -119,12 +121,12 @@ export function SiteMapView() {
                     <>
                       {entry.quickAction ? (
                         <Chip>
-                          <Plus className="size-2.5" aria-hidden /> quick action
+                          <Plus className="size-3" aria-hidden /> quick action
                         </Chip>
                       ) : null}
                       {entry.livePulse ? (
                         <Chip>
-                          <Radio className="size-2.5" aria-hidden /> live pulse
+                          <Radio className="size-3" aria-hidden /> live pulse
                         </Chip>
                       ) : null}
                     </>

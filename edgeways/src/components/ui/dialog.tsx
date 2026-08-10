@@ -72,8 +72,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // Light grey fill + outer ring + 1px white inset (.modal-surface) — same recipe as offer campaign cards.
-          "modal-surface fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-hidden rounded-xl bg-page p-4 text-sm text-foreground ring-1 ring-border/50 duration-100 outline-none sm:max-w-sm dark:bg-card dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Light grey fill + outer ring + glassy Shopify face (.modal-surface) — same recipe as offer campaign cards.
+          "modal-surface fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-hidden rounded-xl bg-page p-4 text-sm text-foreground ring-1 ring-border/50 duration-100 outline-none sm:max-w-sm dark:bg-card dark:ring-0 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           mobile === "sheet" &&
             "max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[92dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] max-sm:data-open:slide-in-from-bottom-1/2 max-sm:data-open:zoom-in-100 max-sm:data-closed:slide-out-to-bottom-1/2 max-sm:data-closed:zoom-out-100",
           className

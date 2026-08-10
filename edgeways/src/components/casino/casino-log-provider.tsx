@@ -17,6 +17,8 @@
  */
 
 import { createContext, useCallback, useContext, useState } from "react";
+import { useDevStickyOpen } from "@/lib/dev/use-dev-sticky-open";
+import { computeCasinoFormReadiness } from "@/lib/offers/offer-form-readiness";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,24 +32,39 @@ import { Label } from "@/components/ui/label";
 import { DatePicker, formatYmdLocal } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
 import { CasinoComponentForm } from "@/components/casino/casino-component-form";
-import { CasinoPasteDialog } from "@/components/casino/casino-paste-dialog";
 import { CASINO_CHANGED_EVENT } from "@/components/casino/casino-ui";
+import { InlinePasteStrip } from "@/components/offers/inline-paste-strip";
+import {
+  PasteFieldLabel,
+  pasteDescribedBy,
+  pasteFieldClass,
+} from "@/components/offers/paste-field-chrome";
 import {
   DEFAULT_RECURRENCE_FIELDS,
   RecurrenceRuleFields,
   buildRecurrenceRule,
   type RecurrenceRuleFieldsValue,
 } from "@/components/offers/recurrence-rule-fields";
+import { OfferUrlField } from "@/components/offers/offer-url-field";
 import { VenueSelect } from "@/components/venue-select";
 import { api } from "@/hooks/use-app-state";
 import type { CasinoComponentType } from "@/lib/calc/casino-reward-ev";
+import {
+  countPasteFields,
+  markCasinoFieldUser,
+  mergeCasinoPasteDraft,
+  type CasinoPasteProvenance,
+} from "@/lib/offers/merge-paste-draft";
 import { fromDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import { localYmd, parseYmd } from "@/lib/offers/offer-recurrence-shared";
+import { isInvalidOfferUrlInput, normalizeOfferUrl } from "@/lib/offers/offer-url";
 import {
   draftNeedsQualifyThenReward,
+  parseCasinoOfferText,
   type ParsedCasinoOfferDraft,
 } from "@/lib/offers/parse-casino-offer-text";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
+import { cn } from "@/lib/utils";
 
 /** Combine upgraded date/time pickers into epoch ms (date-only → 23:59). */
 function expiresAtFromParts(date: string, time: string): number | null {
@@ -87,12 +104,14 @@ function rewardStepType(draft: ParsedCasinoOfferDraft | null): CasinoComponentTy
 }
 
 export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useDevStickyOpen("casino-log");
   const [casino, setCasino] = useState("");
   const [title, setTitle] = useState("");
+  const [offerUrl, setOfferUrl] = useState("");
   const [expiresDate, setExpiresDate] = useState(defaultExpiresDate);
   const [expiresTime, setExpiresTime] = useState(DEFAULT_EXPIRES_TIME);
   const [saving, setSaving] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [createdOfferId, setCreatedOfferId] = useState<number | null>(null);
   const [draft, setDraft] = useState<ParsedCasinoOfferDraft | null>(null);
   const [stepPhase, setStepPhase] = useState<StepPhase>("reward");
@@ -100,6 +119,11 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
   const [repeatsEnabled, setRepeatsEnabled] = useState(false);
   const [repeatFields, setRepeatFields] =
     useState<RecurrenceRuleFieldsValue>(DEFAULT_RECURRENCE_FIELDS);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteProvenance, setPasteProvenance] = useState<CasinoPasteProvenance>({});
+  const [pasteConfidence, setPasteConfidence] = useState<
+    "high" | "medium" | "low" | null
+  >(null);
 
   const openCasinoLog = useCallback(() => {
     setExpiresDate(defaultExpiresDate());
@@ -110,6 +134,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
   function resetForm() {
     setCasino("");
     setTitle("");
+    setOfferUrl("");
     setExpiresDate(defaultExpiresDate());
     setExpiresTime(DEFAULT_EXPIRES_TIME);
     setCreatedOfferId(null);
@@ -118,7 +143,36 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
     setCarriedStep(null);
     setRepeatsEnabled(false);
     setRepeatFields(DEFAULT_RECURRENCE_FIELDS);
+    setUrlError(null);
+    setPasteText("");
+    setPasteProvenance({});
+    setPasteConfidence(null);
   }
+
+  function handlePasteTextChange(next: string) {
+    setPasteText(next);
+    if (!next.trim()) {
+      setPasteConfidence(null);
+      return;
+    }
+    const parsed = parseCasinoOfferText(next);
+    const { form, provenance } = mergeCasinoPasteDraft(
+      { casino, title, draft },
+      parsed,
+      pasteProvenance
+    );
+    setCasino(form.casino);
+    setTitle(form.title);
+    setDraft(form.draft);
+    setPasteProvenance(provenance);
+    setPasteConfidence(parsed.confidence);
+  }
+
+  const formReadiness = computeCasinoFormReadiness({
+    casino,
+    title,
+    hasDraft: draft != null,
+  });
 
   function advanceFromQualify(offer: CasinoOfferSummary) {
     const qw =
@@ -133,6 +187,11 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
 
   async function createCampaign() {
     if (!title.trim()) return;
+    if (isInvalidOfferUrlInput(offerUrl)) {
+      setUrlError("Enter a valid http(s) link, or clear the field.");
+      return;
+    }
+    setUrlError(null);
     setSaving(true);
     try {
       const expiresAt = expiresAtFromParts(expiresDate, expiresTime);
@@ -151,6 +210,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
         json: {
           casino: casino.trim() || undefined,
           title: title.trim(),
+          offerUrl: normalizeOfferUrl(offerUrl),
           status: "active",
           expiresAt,
           ...(repeatsEnabled
@@ -186,10 +246,10 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
           if (!v) resetForm();
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="flex max-h-[92vh] max-w-md flex-col overflow-hidden">
           {createdOfferId == null ? (
             <>
-              <DialogHeader>
+              <DialogHeader className="shrink-0">
                 <DialogTitle>Log a casino offer</DialogTitle>
                 <DialogDescription>
                   Name the campaign, then add its steps - a qualifying wager first when
@@ -197,35 +257,70 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                   cashback.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex justify-start">
-                <CasinoPasteDialog
-                  onApply={(d) => {
-                    if (d.casino) setCasino(d.casino);
-                    if (d.title) setTitle(d.title);
-                    setDraft(d);
-                  }}
-                />
-              </div>
-              <div className="flex flex-col gap-3">
-                <VenueSelect
-                  value={casino}
-                  onChange={setCasino}
-                  label="Casino"
-                  placeholder="Select bookie"
-                  kinds={["bookie"]}
-                  className="w-full"
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+                <InlinePasteStrip
+                  text={pasteText}
+                  onTextChange={handlePasteTextChange}
+                  filledCount={countPasteFields(pasteProvenance)}
+                  confidence={pasteConfidence}
+                  readyCompleted={formReadiness.completed}
+                  readyTotal={formReadiness.total}
+                  buttonLabel="Paste promo"
+                  textLabel="Promo text"
+                  placeholder={`Sky Vegas
+Stake £10 get a £20 casino bonus
+35x wagering · Selected slots only · RTP 96.5%`}
                 />
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="casino-title" className="text-xs text-muted-foreground">
+                  <PasteFieldLabel provenance={pasteProvenance.casino} describedById="casino-venue-paste">
+                    Casino
+                  </PasteFieldLabel>
+                  <VenueSelect
+                    value={casino}
+                    onChange={(v) => {
+                      setCasino(v);
+                      setPasteProvenance((p) => markCasinoFieldUser(p, "casino"));
+                    }}
+                    label=""
+                    placeholder="Select bookie"
+                    kinds={["bookie"]}
+                    className={cn("w-full", pasteFieldClass(pasteProvenance.casino))}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <PasteFieldLabel
+                    htmlFor="casino-title"
+                    provenance={pasteProvenance.title}
+                    required
+                  >
                     Offer
-                  </Label>
+                  </PasteFieldLabel>
                   <Input
                     id="casino-title"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      setPasteProvenance((p) => markCasinoFieldUser(p, "title"));
+                    }}
                     placeholder="e.g. Wager £10 get £1 bonus"
+                    aria-describedby={pasteDescribedBy(pasteProvenance.title, "casino-title")}
+                    className={pasteFieldClass(pasteProvenance.title, {
+                      requiredEmpty: Boolean(pasteText.trim()) && !title.trim(),
+                    })}
                   />
                 </div>
+                <OfferUrlField
+                  id="casino-url"
+                  value={offerUrl}
+                  onChange={(next) => {
+                    setOfferUrl(next);
+                    if (urlError) setUrlError(null);
+                  }}
+                  labelClassName="text-xs"
+                  gapClassName="gap-1.5"
+                  aria-invalid={urlError ? true : undefined}
+                  error={urlError}
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="casino-expires-date" className="text-xs text-muted-foreground">
@@ -275,7 +370,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
                   />
                 ) : null}
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex shrink-0 justify-end gap-2 border-t pt-3">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>

@@ -17,6 +17,7 @@ import {
   CheckCheck,
   CircleCheck,
   Flag,
+  ListChecks,
   ShieldAlert,
   Timer,
   type LucideIcon,
@@ -37,6 +38,8 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   naked_exposure: ShieldAlert,
   two_up_lock: Flag,
   user_reminder: Bell,
+  daily_tasks: ListChecks,
+  weekly_digest: Bell,
 };
 
 function dayLabel(ms: number): string {

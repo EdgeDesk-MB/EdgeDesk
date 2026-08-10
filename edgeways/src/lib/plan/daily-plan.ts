@@ -10,6 +10,7 @@
 
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { DoNextItem } from "@/lib/offers/do-next";
+import { sortDoNextItems } from "@/lib/offers/do-next";
 import type { EvBasis } from "@/lib/offers/advantage";
 import {
   priorityFromSignals,
@@ -96,7 +97,8 @@ function sortSlots(slots: DailyPlanSlot[]): DailyPlanSlot[] {
 }
 
 export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
-  const { offers, doNext, races, fixtures } = input;
+  const { offers, doNext: rawDoNext, races, fixtures } = input;
+  const doNext = sortDoNextItems(rawDoNext, "priority");
   const now = input.now ?? Date.now();
   const { start, end } = todayWindow(now);
 

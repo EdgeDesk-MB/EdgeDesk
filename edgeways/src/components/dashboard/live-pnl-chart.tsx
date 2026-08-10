@@ -1,26 +1,20 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
 import { Radio, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { MoneyFlow } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
 import { dashboardSection } from "@/lib/ui/dashboard-layout";
-import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { ChartBetMarkersOverlay } from "@/components/dashboard/chart-bet-markers-overlay";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import type { BetRow } from "@/lib/db/schema";
 import { formatClockTime } from "@/lib/time-format";
 import {
   anchorSeriesAtZero,
+  chartWindowAnchorValue,
   PNL_CHART_PADDING_DEFAULT,
   PNL_CHART_PADDING_PANEL,
   type ChartCasinoSettlement,
@@ -32,14 +26,6 @@ export interface LivePnlPoint {
   time: number;
   value: number;
 }
-
-/** Retained = net of exchange commission (real money); gross adds commission back. */
-type PnlBasis = "retained" | "gross";
-
-const PNL_BASES = [
-  { key: "retained", label: "Retained" },
-  { key: "gross", label: "Gross" },
-] as const;
 
 const ALL_WINDOW_SECS = 0;
 
@@ -136,41 +122,30 @@ export const LivePnlChart = memo(function LivePnlChart({
   const [mounted, setMounted] = useState(false);
   const [livePoints, setLivePoints] = useState<LivePnlPoint[]>([]);
   const [chartWindowSecs, setChartWindowSecs] = useState<number>(DEFAULT_CHART_WINDOW);
-  const [pnlBasis, setPnlBasis] = useState<PnlBasis>("retained");
-  const lastBasisRef = useRef<PnlBasis>("retained");
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
   }, []);
 
-  // Gross = retained + cumulative commission paid. Open positions carry the
-  // last settled cumulative figure (their commission is not yet known).
-  const grossOffset =
-    pnlBasis === "gross" ? (historicSeries.at(-1)?.commissionPaid ?? 0) : 0;
-  const displayTotal = liveTotal + grossOffset;
-
+  // Chart always shows retained P&L (net of exchange commission).
   useEffect(() => {
     const nowSec = Date.now() / 1000;
-    const gross = pnlBasis === "gross";
-    // commissionPaid arrives already cumulative from the series build - add, never re-sum.
     const historic = historicSeries.map((p) => ({
       time: p.time / 1000,
-      value: gross ? p.value + (p.commissionPaid ?? 0) : p.value,
+      value: p.value,
     }));
-    const basisChanged = lastBasisRef.current !== pnlBasis;
-    lastBasisRef.current = pnlBasis;
     setLivePoints((prev) => {
       const lastHistTime = historic.at(-1)?.time ?? 0;
-      const liveTail = basisChanged ? [] : prev.filter((p) => p.time > lastHistTime + 0.5);
-      const tail = [...liveTail, { time: nowSec, value: displayTotal }].slice(-3600);
+      const liveTail = prev.filter((p) => p.time > lastHistTime + 0.5);
+      const tail = [...liveTail, { time: nowSec, value: liveTotal }].slice(-3600);
       return anchorSeriesAtZero([...historic, ...tail], nowSec);
     });
-  }, [historicSeries, liveTotal, pnlBasis, displayTotal]);
+  }, [historicSeries, liveTotal]);
 
   const isDark = resolvedTheme === "dark";
   const chartColor = useMemo(
-    () => pnlChartColor(displayTotal, isDark),
-    [displayTotal, isDark]
+    () => pnlChartColor(liveTotal, isDark),
+    [liveTotal, isDark]
   );
 
   const effectiveWindowSecs = useMemo(() => {
@@ -188,65 +163,51 @@ export const LivePnlChart = memo(function LivePnlChart({
 
   const isAllSelected = chartWindowSecs === ALL_WINDOW_SECS;
   const markerPadding = panel ? PNL_CHART_PADDING_PANEL : PNL_CHART_PADDING_DEFAULT;
+  const showBadge = !panel;
+  const chartReferenceValue = useMemo(
+    () =>
+      chartWindowAnchorValue(livePoints, effectiveWindowSecs, {
+        showBadge,
+        anchorAtZero: isAllSelected,
+      }),
+    [livePoints, effectiveWindowSecs, showBadge, isAllSelected]
+  );
+
+  const windowPills = (
+    <div className="flex min-w-0 justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {CHART_WINDOWS.map((w) => (
+        <FilterPill
+          key={w.label}
+          compact
+          active={w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs}
+          onClick={() => setChartWindowSecs(w.secs)}
+          className={cn(
+            "shrink-0 whitespace-nowrap",
+            w.desktopOnly && "hidden sm:inline-flex"
+          )}
+        >
+          {w.label}
+        </FilterPill>
+      ))}
+    </div>
+  );
 
   const body = (
     <>
       {panel ? (
-        <>
-          <DashboardSectionHeader
-            prominent
-            className="bg-page"
-            icon={hasLiveEvent ? Radio : undefined}
-            iconClassName={
-              hasLiveEvent ? "animate-pulse text-emerald-600" : undefined
-            }
-            title={hasLiveEvent ? "Live Chart" : "Chart"}
-            description="P&L streams while tracked events are in play."
-          />
-          <div className={cn("shrink-0 border-b border-border/60", cardInsetX)}>
-            <div className="flex items-center justify-between gap-2 py-2">
-              <TooltipProvider delayDuration={200}>
-                <div className="flex shrink-0 gap-1">
-                  {PNL_BASES.map((b) => (
-                    <Tooltip key={b.key}>
-                      <TooltipTrigger asChild>
-                        <FilterPill
-                          compact
-                          active={pnlBasis === b.key}
-                          onClick={() => setPnlBasis(b.key)}
-                          className="shrink-0 whitespace-nowrap"
-                        >
-                          {b.label}
-                        </FilterPill>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                        {b.key === "gross"
-                          ? "Before exchange commission - shows what commission costs you"
-                          : "Net of exchange commission - real money"}
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
-              </TooltipProvider>
-              <div className="flex justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {CHART_WINDOWS.map((w) => (
-                  <FilterPill
-                    key={w.label}
-                    compact
-                    active={w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs}
-                    onClick={() => setChartWindowSecs(w.secs)}
-                    className={cn(
-                      "shrink-0 whitespace-nowrap",
-                      w.desktopOnly && "hidden sm:inline-flex"
-                    )}
-                  >
-                    {w.label}
-                  </FilterPill>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
+        <DashboardSectionHeader
+          prominent
+          className="bg-page"
+          icon={hasLiveEvent ? Radio : undefined}
+          iconClassName={
+            hasLiveEvent
+              ? "animate-pulse text-emerald-600 motion-reduce:animate-none"
+              : undefined
+          }
+          title={hasLiveEvent ? "Live chart" : "Chart"}
+          description="P&L after exchange commission. Streams while tracked events are in play."
+          action={windowPills}
+        />
       ) : (
         <CardHeader className={cn("shrink-0 pb-2", (compact || mini) && "py-3", mini && "py-2")}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -267,7 +228,7 @@ export const LivePnlChart = memo(function LivePnlChart({
               )}
             </div>
             <div className="shrink-0 text-right">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Live P&L
               </div>
               <MoneyFlow
@@ -299,9 +260,9 @@ export const LivePnlChart = memo(function LivePnlChart({
           <div className={cn("relative isolate min-h-0 flex-1", !panel && "h-full")}>
             {mounted ? (
               <Liveline
-                key={`${resolvedTheme}-${pnlBasis}`}
+                key={resolvedTheme}
                 data={livePoints}
-                value={displayTotal}
+                value={liveTotal}
                 theme={isDark ? "dark" : "light"}
                 color={chartColor}
                 momentum={liveInPlay}
@@ -321,7 +282,7 @@ export const LivePnlChart = memo(function LivePnlChart({
                   },
                   windowStyle: "rounded" as const,
                 })}
-                referenceLine={{ value: 0 }}
+                referenceLine={{ value: chartReferenceValue }}
                 emptyText="Profit updates appear here as bets settle and events go live."
                 formatValue={(v) => `£${v.toFixed(2)}`}
                 formatTime={(t) => formatChartTime(effectiveWindowSecs, t)}
@@ -338,10 +299,11 @@ export const LivePnlChart = memo(function LivePnlChart({
                 adjustments={adjustments}
                 casinoSettlements={casinoSettlements}
                 livePoints={livePoints}
-                liveValue={displayTotal}
+                liveValue={liveTotal}
                 windowSecs={effectiveWindowSecs}
                 activeWindowSecs={chartWindowSecs}
-                showBadge={!panel}
+                showBadge={showBadge}
+                referenceValue={chartReferenceValue}
                 padding={markerPadding}
               />
             ) : null}

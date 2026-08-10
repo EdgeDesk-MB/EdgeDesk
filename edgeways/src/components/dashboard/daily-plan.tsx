@@ -18,6 +18,7 @@ import {
   mergePlanWithSeen,
   type DailyPlanSlot,
 } from "@/lib/plan/daily-plan";
+import { formatEvGbp } from "@/lib/format-money";
 import { formatClockTime } from "@/lib/time-format";
 import { dashboardSection } from "@/lib/ui/dashboard-layout";
 import { cardInsetX } from "@/lib/ui/layout-spacing";
@@ -37,7 +38,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
     <>
       <span
         className={cn(
-          "w-14 shrink-0 text-right text-sm font-semibold tabular-nums sm:w-12 sm:text-[11px]",
+          "w-14 shrink-0 text-right text-sm font-semibold tabular-nums sm:w-12 sm:text-xs",
           urgent ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground",
           slot.done && "line-through opacity-70"
         )}
@@ -58,7 +59,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
           {slot.title}
         </span>
         {slot.detail ? (
-          <span className="block truncate text-xs text-muted-foreground sm:text-[11px]">
+          <span className="block truncate text-xs text-muted-foreground sm:text-xs">
             {slot.detail}
           </span>
         ) : null}
@@ -67,7 +68,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
         <span className="flex shrink-0 items-center gap-1.5">
           {slot.basis ? <EvBasisBadge basis={slot.basis} /> : null}
           <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xs">
-            £{slot.ev >= 10 ? slot.ev.toFixed(0) : slot.ev.toFixed(1)}
+            {formatEvGbp(slot.ev)}
           </span>
         </span>
       ) : null}
@@ -156,7 +157,7 @@ export function DailyPlan({ className }: { className?: string }) {
               role="heading"
               aria-level={3}
               className={cn(
-                "px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                "px-2 pb-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
                 timed.length > 0 && "mt-1.5 border-t border-border/60 pt-2"
               )}
             >
@@ -172,7 +173,7 @@ export function DailyPlan({ className }: { className?: string }) {
           </>
         ) : null}
         {doneCount > 0 ? (
-          <p className="px-2 pb-1 pt-1.5 text-[10px] text-muted-foreground">
+          <p className="px-2 pb-1 pt-1.5 text-[11px] text-muted-foreground">
             {doneCount} of {slots.length} done
           </p>
         ) : null}

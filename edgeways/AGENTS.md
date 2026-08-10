@@ -56,14 +56,16 @@ the app derives every market and auto-settles linked bets.
 - Product vision: `PLAN.md`, `docs/roadmap/`
 - Design system: `docs/design-system.md`
 
-## Skills, subagents and delegation (Claude Code)
-Project skills and subagents live in `../.claude/` at the git root.
+## Skills, subagents and delegation
+Harness at the git root: Cursor reads `../.cursor/` (skills, agents, commands);
+Claude Code reads `../.claude/` (same content, mirrored). Map: `../docs/cursor-kit.md`.
 - `/calc-change`: guarded workflow for any change to calc/settlement maths.
 - `/brief`: turn a roadmap item into an implementation brief in the
   `docs/roadmap/implementation-briefs.md` format, sized [local]/[strong]/[design-first].
 - `/delegate-local`: hand bounded, mechanical tasks to the local Ollama backbone.
-- Subagents: `calc-auditor` (audits money-maths diffs before commit) and
-  `design-reviewer` (checks UI diffs against the design system).
+- Subagents: `calc-auditor`, `design-reviewer`, `consistency-checker`, `ux-qa-auditor`.
+- UI skills (auto-triggered): `design-system-consistency`, `design-taste`,
+  `ux-heuristics`, `visual-qa-loop`.
 - Model routing: `../docs/Local-vs-Cloud-Model-Strategy.md`, playbook
   `../docs/ai-playbook.md`, always-on rule `../.cursor/rules/model-routing.mdc`.
 
