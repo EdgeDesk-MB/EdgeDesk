@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
@@ -21,7 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { OfferPasteDialog } from "@/components/offers/offer-paste-dialog";
+import {
+  InlinePasteStrip,
+  InlinePasteTrigger,
+} from "@/components/offers/inline-paste-strip";
+import {
+  PasteFieldLabel,
+  pasteDescribedBy,
+  pasteFieldClass,
+} from "@/components/offers/paste-field-chrome";
+import { OfferUrlField } from "@/components/offers/offer-url-field";
 import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import { RegionFlag } from "@/components/region-flag";
 import { VenueSelect, inferVenueKind } from "@/components/venue-select";
@@ -39,6 +48,7 @@ import {
   parseOfferRules,
   parseScopeCourses,
 } from "@/lib/offers/racing-offer-rules";
+import { syncBetGetTitleWithPlaces } from "@/lib/offers/bet-get-title-places";
 import {
   OFFER_CATEGORIES,
   normalizeOfferCategoryId,
@@ -47,25 +57,39 @@ import {
   type OfferCategoryId,
 } from "@/lib/offers/offer-categories";
 import {
-  buildPromoTermsRules,
   emptyImportantTerms,
   formatImportantTermsSummary,
   formatOfferExpiry,
   fromDatetimeLocalValue,
-  mergeImportantIntoRacingRules,
+  betScopeLabel,
   readImportantTerms,
+  scopesNeedMinSelections,
   toDatetimeLocalValue,
+  toggleScope,
   type OfferImportantTerms,
+  type BetScope,
+  BET_SCOPES,
 } from "@/lib/offers/offer-terms";
+import { buildRulesJsonWithPlaybook } from "@/lib/offers/offer-rules-payload";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
 import { missedOfferLabelForCategory } from "@/lib/offers/offer-expiry";
 import { formatRecurrenceLabel, localYmd, parseYmd } from "@/lib/offers/offer-recurrence-shared";
-import type { ParsedOfferDraft } from "@/lib/offers/parse-offer-text";
+import { isInvalidOfferUrlInput, normalizeOfferUrl } from "@/lib/offers/offer-url";
+import {
+  countPasteFields,
+  markOfferFieldUser,
+  mergeOfferPasteDraft,
+  type OfferPasteFieldKey,
+  type OfferPasteFormSlice,
+  type OfferPasteProvenance,
+} from "@/lib/offers/merge-paste-draft";
+import { computeOfferFormReadiness } from "@/lib/offers/offer-form-readiness";
+import { parseOfferFromText } from "@/lib/offers/parse-offer-text";
 import { formatApiError } from "@/lib/api-errors";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronDown, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, ChevronDown, Plus, Save } from "lucide-react";
 
 export type OfferEditorPrefill = {
   category?: OfferCategoryId;
@@ -79,20 +103,60 @@ type RepeatFreq = "daily" | "weekly" | "monthly";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+function parseSelectionsField(raw: string, scopes: BetScope[]): number | null {
+  if (!scopesNeedMinSelections(scopes)) return null;
+  const n = raw.trim() ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n >= 2 && n <= 12 ? n : null;
+}
+
 function formImportantFromState(input: {
   minOdds: string;
   minStake: string;
   maxStake: string;
   importantNotes: string;
+  qualifierScopes: BetScope[];
+  rewardScopes: BetScope[];
+  minSelections: string;
+  rewardMinSelections: string;
+  promoCode: string;
+  minDeposit: string;
+  depositRequired: boolean;
+  rewardEventLabel: string;
+  rewardEventDate: string;
+  winningsWageringX: string;
+  maxConversion: string;
+  paymentExclusions: string[];
 }): OfferImportantTerms {
   const odds = input.minOdds.trim() ? parseFloat(input.minOdds) : NaN;
   const minS = input.minStake.trim() ? parseFloat(input.minStake) : NaN;
   const maxS = input.maxStake.trim() ? parseFloat(input.maxStake) : NaN;
+  const minDep = input.minDeposit.trim() ? parseFloat(input.minDeposit) : NaN;
+  const wr = input.winningsWageringX.trim() ? parseFloat(input.winningsWageringX) : NaN;
+  const maxConv = input.maxConversion.trim() ? parseFloat(input.maxConversion) : NaN;
+  const code = input.promoCode.trim().toUpperCase();
   return {
     minOdds: Number.isFinite(odds) && odds > 1 ? odds : null,
     minStake: Number.isFinite(minS) && minS > 0 ? minS : null,
     maxStake: Number.isFinite(maxS) && maxS > 0 ? maxS : null,
     importantNotes: input.importantNotes.trim(),
+    qualifierScopes: input.qualifierScopes,
+    rewardScopes: input.rewardScopes,
+    minSelections: parseSelectionsField(input.minSelections, input.qualifierScopes),
+    rewardMinSelections: parseSelectionsField(
+      input.rewardMinSelections,
+      input.rewardScopes
+    ),
+    promoCode: code || null,
+    minDeposit: Number.isFinite(minDep) && minDep > 0 ? minDep : null,
+    depositRequired:
+      input.depositRequired ||
+      Boolean(code) ||
+      (Number.isFinite(minDep) && minDep > 0),
+    rewardEventLabel: input.rewardEventLabel.trim() || null,
+    rewardEventDate: input.rewardEventDate.trim() || null,
+    winningsWageringX: Number.isFinite(wr) && wr > 0 ? wr : null,
+    maxConversion: Number.isFinite(maxConv) && maxConv > 0 ? maxConv : null,
+    paymentExclusions: input.paymentExclusions,
   };
 }
 
@@ -170,7 +234,7 @@ function FormSection({
           )}
         </span>
         {!open && summary ? (
-          <span className="max-w-[55%] truncate text-[11px] text-muted-foreground">
+          <span className="max-w-[55%] truncate text-xs text-muted-foreground">
             {summary}
           </span>
         ) : null}
@@ -207,6 +271,7 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
       editingId: offer.id as number | null,
       title: offer.title,
       bookmaker: offer.bookmaker ?? "",
+      offerUrl: offer.offerUrl ?? "",
       expected: offer.expectedProfit != null ? String(offer.expectedProfit) : "",
       expiresDate: expiryParts.date,
       expiresTime: expiryParts.time,
@@ -217,6 +282,10 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
       minRunners: rules ? String(rules.minRunners) : "8",
       qualifyingPlaces: (rules?.qualifyingPlaces ?? []) as number[],
       winnerMustBeSpFavourite: rules?.winnerMustBeSpFavourite === true,
+      minFavouriteSpOdds:
+        rules?.minFavouriteSpOdds != null && rules.minFavouriteSpOdds > 1
+          ? String(rules.minFavouriteSpOdds)
+          : "",
       resultConditional:
         (rules?.qualifyingPlaces?.length ?? 0) > 0 ||
         rules?.winnerMustBeSpFavourite === true,
@@ -231,6 +300,24 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
       minStake: important.minStake != null ? String(important.minStake) : "",
       maxStake: important.maxStake != null ? String(important.maxStake) : "",
       importantNotes: important.importantNotes,
+      qualifierScopes: important.qualifierScopes,
+      rewardScopes: important.rewardScopes,
+      minSelections:
+        important.minSelections != null ? String(important.minSelections) : "",
+      rewardMinSelections:
+        important.rewardMinSelections != null
+          ? String(important.rewardMinSelections)
+          : "",
+      promoCode: important.promoCode ?? "",
+      minDeposit: important.minDeposit != null ? String(important.minDeposit) : "",
+      depositRequired: important.depositRequired,
+      rewardEventLabel: important.rewardEventLabel ?? "",
+      rewardEventDate: important.rewardEventDate ?? "",
+      winningsWageringX:
+        important.winningsWageringX != null ? String(important.winningsWageringX) : "",
+      maxConversion:
+        important.maxConversion != null ? String(important.maxConversion) : "",
+      paymentExclusions: [...important.paymentExclusions],
       startsOn: offer.startsOn ?? "",
       repeatsEnabled: false,
       repeatFreq: "daily" as RepeatFreq,
@@ -247,6 +334,7 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     editingId: null as number | null,
     title: "",
     bookmaker: "",
+    offerUrl: "",
     expected: "",
     expiresDate: "",
     expiresTime: "",
@@ -257,6 +345,7 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     minRunners: "8",
     qualifyingPlaces: [] as number[],
     winnerMustBeSpFavourite: false,
+    minFavouriteSpOdds: "",
     /** Off = straight bet&get; on = place/trigger refund (drives Offer Edge). */
     resultConditional: false,
     scopeMode: "uk_ire" as ScopeMode,
@@ -270,6 +359,18 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     minStake: empty.minStake != null ? String(empty.minStake) : "",
     maxStake: empty.maxStake != null ? String(empty.maxStake) : "",
     importantNotes: empty.importantNotes,
+    qualifierScopes: [...empty.qualifierScopes] as BetScope[],
+    rewardScopes: [...empty.rewardScopes] as BetScope[],
+    minSelections: "",
+    rewardMinSelections: "",
+    promoCode: "",
+    minDeposit: "",
+    depositRequired: false,
+    rewardEventLabel: "",
+    rewardEventDate: "",
+    winningsWageringX: "",
+    maxConversion: "",
+    paymentExclusions: [] as string[],
     startsOn: "",
     repeatsEnabled: false,
     repeatFreq: "daily" as RepeatFreq,
@@ -299,6 +400,7 @@ export function OfferEditorForm({
   const { state } = useAppState();
   const [title, setTitle] = useState(boot.title);
   const [bookmaker, setBookmaker] = useState(boot.bookmaker);
+  const [offerUrl, setOfferUrl] = useState(boot.offerUrl);
   const [expected, setExpected] = useState(boot.expected);
   const [expiresDate, setExpiresDate] = useState(boot.expiresDate);
   const [expiresTime, setExpiresTime] = useState(boot.expiresTime);
@@ -311,6 +413,7 @@ export function OfferEditorForm({
   const [winnerMustBeSpFavourite, setWinnerMustBeSpFavourite] = useState(
     boot.winnerMustBeSpFavourite
   );
+  const [minFavouriteSpOdds, setMinFavouriteSpOdds] = useState(boot.minFavouriteSpOdds);
   const [resultConditional, setResultConditional] = useState(boot.resultConditional);
   const [scopeMode, setScopeMode] = useState<ScopeMode>(boot.scopeMode);
   const [scopeCourse, setScopeCourse] = useState(boot.scopeCourse);
@@ -323,6 +426,20 @@ export function OfferEditorForm({
   const [minStake, setMinStake] = useState(boot.minStake);
   const [maxStake, setMaxStake] = useState(boot.maxStake);
   const [importantNotes, setImportantNotes] = useState(boot.importantNotes);
+  const [qualifierScopes, setQualifierScopes] = useState<BetScope[]>(boot.qualifierScopes);
+  const [rewardScopes, setRewardScopes] = useState<BetScope[]>(boot.rewardScopes);
+  const [minSelections, setMinSelections] = useState(boot.minSelections);
+  const [rewardMinSelections, setRewardMinSelections] = useState(boot.rewardMinSelections);
+  const [promoCode, setPromoCode] = useState(boot.promoCode);
+  const [minDeposit, setMinDeposit] = useState(boot.minDeposit);
+  const [depositRequired, setDepositRequired] = useState(boot.depositRequired);
+  const [rewardEventLabel, setRewardEventLabel] = useState(boot.rewardEventLabel);
+  const [rewardEventDate, setRewardEventDate] = useState(boot.rewardEventDate);
+  const [winningsWageringX, setWinningsWageringX] = useState(boot.winningsWageringX);
+  const [maxConversion, setMaxConversion] = useState(boot.maxConversion);
+  const [paymentExclusions, setPaymentExclusions] = useState<string[]>(
+    boot.paymentExclusions
+  );
   const [startsOn, setStartsOn] = useState(boot.startsOn);
   const [repeatsEnabled, setRepeatsEnabled] = useState(boot.repeatsEnabled);
   const [repeatFreq, setRepeatFreq] = useState<RepeatFreq>(boot.repeatFreq);
@@ -352,6 +469,14 @@ export function OfferEditorForm({
   // different new venue is picked, while still respecting an explicit
   // uncheck for the venue currently shown.
   const [autoAddAccountFor, setAutoAddAccountFor] = useState(bookmaker.trim());
+  const [pasteText, setPasteText] = useState("");
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const pastePanelId = useId();
+  const [pasteProvenance, setPasteProvenance] = useState<OfferPasteProvenance>({});
+  const [pasteConfidence, setPasteConfidence] = useState<
+    "high" | "medium" | "low" | null
+  >(null);
+  const [pastePlaybookHint, setPastePlaybookHint] = useState<string | null>(null);
 
   const now = useNow(60_000);
   // A pasted promo often carries yesterday's deadline. Saving it works, but the
@@ -382,6 +507,7 @@ export function OfferEditorForm({
   function applyBoot(next: Boot) {
     setTitle(next.title);
     setBookmaker(next.bookmaker);
+    setOfferUrl(next.offerUrl);
     setExpected(next.expected);
     setExpiresDate(next.expiresDate);
     setExpiresTime(next.expiresTime);
@@ -392,6 +518,7 @@ export function OfferEditorForm({
     setMinRunners(next.minRunners);
     setQualifyingPlaces(next.qualifyingPlaces);
     setWinnerMustBeSpFavourite(next.winnerMustBeSpFavourite);
+    setMinFavouriteSpOdds(next.minFavouriteSpOdds);
     setResultConditional(next.resultConditional);
     setScopeMode(next.scopeMode);
     setScopeCourse(next.scopeCourse);
@@ -404,6 +531,18 @@ export function OfferEditorForm({
     setMinStake(next.minStake);
     setMaxStake(next.maxStake);
     setImportantNotes(next.importantNotes);
+    setQualifierScopes(next.qualifierScopes);
+    setRewardScopes(next.rewardScopes);
+    setMinSelections(next.minSelections);
+    setRewardMinSelections(next.rewardMinSelections);
+    setPromoCode(next.promoCode);
+    setMinDeposit(next.minDeposit);
+    setDepositRequired(next.depositRequired);
+    setRewardEventLabel(next.rewardEventLabel);
+    setRewardEventDate(next.rewardEventDate);
+    setWinningsWageringX(next.winningsWageringX);
+    setMaxConversion(next.maxConversion);
+    setPaymentExclusions(next.paymentExclusions);
     setStartsOn(next.startsOn);
     setRepeatsEnabled(next.repeatsEnabled);
     setRepeatFreq(next.repeatFreq);
@@ -427,10 +566,25 @@ export function OfferEditorForm({
 
   const isRacingCategory = offerCategoryById(category).isRacing;
   const titleRequired = !isRacingCategory;
+  const formReadiness = computeOfferFormReadiness({
+    isRacing: isRacingCategory,
+    title,
+    bookmaker,
+    expiresAtMs: expiryMs,
+    minOdds,
+    minStake,
+    betStake,
+    freeBetAmount,
+  });
+  /** Meeting/race pin — not used for straight bet&get (desk follows Starts→Expires). */
+  const needsRacingDay = resultConditional || scopeMode === "race";
+  const cardsDate = needsRacingDay
+    ? eventDate.trim()
+    : startsOn.trim() || localYmd(new Date());
 
-  // Load Racing Desk racecards for the chosen day (courses + races)
+  // Load Racing Desk racecards for course / race pickers
   useEffect(() => {
-    if (!open || !isRacingCategory || !eventDate) {
+    if (!open || !isRacingCategory || !cardsDate) {
       queueMicrotask(() => setRacecards([]));
       return;
     }
@@ -438,7 +592,7 @@ export function OfferEditorForm({
     queueMicrotask(() => {
       if (!cancelled) setCardsLoading(true);
     });
-    api<{ racecards: RacingRacecard[] }>(`/api/racing/racecards?date=${encodeURIComponent(eventDate)}`)
+    api<{ racecards: RacingRacecard[] }>(`/api/racing/racecards?date=${encodeURIComponent(cardsDate)}`)
       .then((res) => {
         if (!cancelled) setRacecards(res.racecards ?? []);
       })
@@ -451,7 +605,7 @@ export function OfferEditorForm({
     return () => {
       cancelled = true;
     };
-  }, [open, isRacingCategory, eventDate]);
+  }, [open, isRacingCategory, cardsDate]);
 
   const selectedCourses = useMemo(() => parseScopeCourses(scopeCourse), [scopeCourse]);
   /** Race mode needs a single course for the race-time picker. */
@@ -506,6 +660,43 @@ export function OfferEditorForm({
     setMinStake(terms.minStake != null ? String(terms.minStake) : "");
     setMaxStake(terms.maxStake != null ? String(terms.maxStake) : "");
     setImportantNotes(terms.importantNotes);
+    setQualifierScopes(terms.qualifierScopes);
+    setRewardScopes(terms.rewardScopes);
+    setMinSelections(terms.minSelections != null ? String(terms.minSelections) : "");
+    setRewardMinSelections(
+      terms.rewardMinSelections != null ? String(terms.rewardMinSelections) : ""
+    );
+    setPromoCode(terms.promoCode ?? "");
+    setMinDeposit(terms.minDeposit != null ? String(terms.minDeposit) : "");
+    setDepositRequired(terms.depositRequired);
+    setRewardEventLabel(terms.rewardEventLabel ?? "");
+    setRewardEventDate(terms.rewardEventDate ?? "");
+    setWinningsWageringX(
+      terms.winningsWageringX != null ? String(terms.winningsWageringX) : ""
+    );
+    setMaxConversion(terms.maxConversion != null ? String(terms.maxConversion) : "");
+    setPaymentExclusions([...terms.paymentExclusions]);
+  }
+
+  function importantFromForm(): OfferImportantTerms {
+    return formImportantFromState({
+      minOdds,
+      minStake,
+      maxStake,
+      importantNotes,
+      qualifierScopes,
+      rewardScopes,
+      minSelections,
+      rewardMinSelections,
+      promoCode,
+      minDeposit,
+      depositRequired,
+      rewardEventLabel,
+      rewardEventDate,
+      winningsWageringX,
+      maxConversion,
+      paymentExclusions,
+    });
   }
 
   function changeScopeMode(next: ScopeMode) {
@@ -524,6 +715,7 @@ export function OfferEditorForm({
       const first = parseScopeCourses(scopeCourse)[0];
       if (first) setScopeCourse(first);
       else setScopeCourse("");
+      if (!eventDate.trim()) setEventDate(startsOn.trim() || localYmd(new Date()));
     }
   }
 
@@ -543,7 +735,7 @@ export function OfferEditorForm({
   function buildOfferPayload() {
     const isRacing = isRacingCategory;
     const cat = offerCategoryById(category);
-    const important = formImportantFromState({ minOdds, minStake, maxStake, importantNotes });
+    const important = importantFromForm();
     const normalizedImportant = {
       ...important,
       importantNotes: normalizeOfferDetailsText(important.importantNotes),
@@ -557,19 +749,6 @@ export function OfferEditorForm({
           ? ([2] as number[])
           : ([] as number[])
       : ([] as number[]);
-    const placeLabel =
-      places.length === 2 && places[0] === 2 && places[1] === 3
-        ? "2nd & 3rd"
-        : places.length === 3 && places[0] === 2 && places[2] === 4
-          ? "2nd–4th place"
-          : places.length > 0
-            ? `places ${places.join(", ")}`
-            : null;
-    const racingTitle =
-      title.trim() ||
-      (placeLabel
-        ? `Bet £${stake} get £${free} free bet (${placeLabel})`
-        : `Bet £${stake} get £${free} free bet`);
     const regions =
       scopeMode === "uk_ire"
         ? scopeRegions.length > 0
@@ -577,6 +756,7 @@ export function OfferEditorForm({
           : (["GB", "IRE"] as ("GB" | "IRE")[])
         : (["GB", "IRE"] as ("GB" | "IRE")[]);
 
+    const minFavSp = parseFloat(minFavouriteSpOdds);
     const racingRules = isRacing
       ? {
           type: "bet_get_free_place" as const,
@@ -588,15 +768,41 @@ export function OfferEditorForm({
           ...(resultConditional && winnerMustBeSpFavourite
             ? { winnerMustBeSpFavourite: true as const }
             : {}),
+          ...(resultConditional &&
+          winnerMustBeSpFavourite &&
+          Number.isFinite(minFavSp) &&
+          minFavSp > 1
+            ? { minFavouriteSpOdds: minFavSp }
+            : {}),
         }
       : null;
 
-    const rulesPayload = isRacing
-      ? JSON.stringify(mergeImportantIntoRacingRules(racingRules!, normalizedImportant))
-      : (() => {
-          const promo = buildPromoTermsRules(normalizedImportant);
-          return promo ? JSON.stringify(promo) : null;
-        })();
+    // Keep the title place clause in sync with the form. Leaving an OCR/paste
+    // title like "(4th, 6th)" while saving places=[2] lets background repair
+    // (and the racing desk) treat the stale title as truth.
+    const racingTitle = isRacing
+      ? syncBetGetTitleWithPlaces(
+          title.trim() || `Bet £${stake} get £${free} free bet`,
+          places,
+          {
+            winnerMustBeSpFavourite:
+              resultConditional && winnerMustBeSpFavourite === true,
+          }
+        )
+      : title.trim();
+
+    const previousRulesJson =
+      editingId != null
+        ? (state?.offers ?? []).find((o) => o.id === editingId)?.rules ?? null
+        : null;
+    const rulesPayload = buildRulesJsonWithPlaybook({
+      important: normalizedImportant,
+      racingRules,
+      betStake: isRacing ? stake : normalizedImportant.minStake,
+      freeBetAmount: isRacing ? free : null,
+      bookmaker: bookmaker.trim() || null,
+      previousRulesJson,
+    });
 
     const importantSummary = formatImportantTermsSummary(normalizedImportant);
     const description = normalizeOfferDetailsText(
@@ -641,8 +847,9 @@ export function OfferEditorForm({
         : null;
 
     return {
-      title: isRacing ? racingTitle : title.trim(),
+      title: racingTitle,
       bookmaker: bookmaker.trim() || undefined,
+      offerUrl: normalizeOfferUrl(offerUrl),
       expectedProfit: expected.trim() ? parseFloat(expected) : undefined,
       status: offerStatus,
       expiresAt: expiresAtFromParts(expiresDate, expiresTime),
@@ -657,7 +864,12 @@ export function OfferEditorForm({
         ? {
             offerType: "bet_get_free_place",
             scopeCourse: courseValue,
-            eventDate,
+            // Place-refund / race-scoped pin a meeting day. Straight bet&get
+            // stays on the desk from Starts on through Expires instead.
+            eventDate:
+              (resultConditional || scopeMode === "race") && eventDate.trim()
+                ? eventDate.trim()
+                : null,
             scopeRaceId: scopeMode === "race" && scopeRaceId.trim() ? scopeRaceId.trim() : null,
             scopeRaceLabel:
               scopeMode === "race" && scopeRaceLabel.trim() ? scopeRaceLabel.trim() : null,
@@ -678,6 +890,10 @@ export function OfferEditorForm({
     if (!isRacingCategory && !title.trim() && editingId == null) {
       return "Add a title for this offer.";
     }
+    if (isInvalidOfferUrlInput(offerUrl)) {
+      setSectionDetails(true);
+      return "Enter a valid http(s) link, or clear Link to offer.";
+    }
     if (isRacingCategory) {
       const stake = parseFloat(betStake);
       const free = parseFloat(freeBetAmount);
@@ -693,7 +909,14 @@ export function OfferEditorForm({
         setSectionRacing(true);
         return "Pick at least one qualifying place, or turn off result-dependent reward.";
       }
-      if (!eventDate.trim()) {
+      if (resultConditional && winnerMustBeSpFavourite && minFavouriteSpOdds.trim()) {
+        const n = parseFloat(minFavouriteSpOdds);
+        if (!Number.isFinite(n) || n <= 1) {
+          setSectionRacing(true);
+          return "Min favourite SP must be greater than 1, or leave it blank.";
+        }
+      }
+      if ((resultConditional || scopeMode === "race") && !eventDate.trim()) {
         setSectionScope(true);
         return "Pick a racing day.";
       }
@@ -746,54 +969,122 @@ export function OfferEditorForm({
     return null;
   }
 
-  function applyPasteDraft(draft: ParsedOfferDraft) {
+  function touchPasteUser(key: OfferPasteFieldKey) {
+    setPasteProvenance((prev) => markOfferFieldUser(prev, key));
+  }
+
+  function currentPasteSlice(): OfferPasteFormSlice {
+    return {
+      category,
+      title,
+      bookmaker,
+      expected,
+      expiresAtMs: expiresAtFromParts(expiresDate, expiresTime),
+      startsOn,
+      minOdds,
+      minStake,
+      maxStake,
+      importantNotes,
+      promoCode,
+      minDeposit,
+      depositRequired,
+      rewardEventLabel,
+      rewardEventDate,
+      winningsWageringX,
+      maxConversion,
+      paymentExclusions,
+      qualifierScopes,
+      rewardScopes,
+      minSelections,
+      rewardMinSelections,
+      betStake,
+      freeBetAmount,
+      minRunners,
+      qualifyingPlaces,
+      winnerMustBeSpFavourite,
+      minFavouriteSpOdds,
+      resultConditional,
+      scopeMode,
+      scopeCourse,
+      preferredOffTime,
+      scopeRegions,
+      eventDate,
+    };
+  }
+
+  function applyMergedPasteForm(merged: OfferPasteFormSlice) {
     setEditingId(null);
-    setCategory(draft.category);
-    setTitle(draft.title);
-    setBookmaker(draft.bookmaker ?? "");
-    setExpected(draft.expectedProfit != null ? String(draft.expectedProfit) : "");
-    {
-      const parts = splitDatetimeLocal(
-        draft.expiresAt != null ? toDatetimeLocalValue(draft.expiresAt) : ""
-      );
+    setCategory(merged.category);
+    setTitle(merged.title);
+    setBookmaker(merged.bookmaker);
+    setExpected(merged.expected);
+    if (merged.expiresAtMs != null) {
+      const parts = splitDatetimeLocal(toDatetimeLocalValue(merged.expiresAtMs));
       setExpiresDate(parts.date);
       setExpiresTime(parts.time);
     }
-    setOfferStatus("active");
-    setImportantFromTerms(draft.important);
+    setOfferStatus((s) => (s === "completed" || s === "expired" ? s : "active"));
+    setStartsOn(merged.startsOn);
+    setMinOdds(merged.minOdds);
+    setMinStake(merged.minStake);
+    setMaxStake(merged.maxStake);
+    setImportantNotes(merged.importantNotes);
+    setPromoCode(merged.promoCode);
+    setMinDeposit(merged.minDeposit);
+    setDepositRequired(merged.depositRequired);
+    setRewardEventLabel(merged.rewardEventLabel);
+    setRewardEventDate(merged.rewardEventDate);
+    setWinningsWageringX(merged.winningsWageringX);
+    setMaxConversion(merged.maxConversion);
+    setPaymentExclusions(merged.paymentExclusions);
+    setQualifierScopes(merged.qualifierScopes);
+    setRewardScopes(merged.rewardScopes);
+    setMinSelections(merged.minSelections);
+    setRewardMinSelections(merged.rewardMinSelections);
     setSectionDetails(true);
     setSectionImportant(true);
-    if (offerCategoryById(draft.category).isRacing) {
-      setBetStake(draft.betStake != null ? String(draft.betStake) : "");
-      setFreeBetAmount(draft.freeBetAmount != null ? String(draft.freeBetAmount) : "");
-      setMinRunners(draft.minRunners != null ? String(draft.minRunners) : "8");
-      const pastedPlaces = draft.qualifyingPlaces;
-      const pastedSpFav = draft.rules?.winnerMustBeSpFavourite === true;
-      setQualifyingPlaces(
-        pastedPlaces.length > 0 ? pastedPlaces : pastedSpFav ? [2] : []
-      );
-      setWinnerMustBeSpFavourite(pastedSpFav);
-      setResultConditional(pastedPlaces.length > 0 || pastedSpFav);
-      setScopeMode(draft.scopeMode);
-      setScopeCourse(draft.scopeCourse);
+    if (offerCategoryById(merged.category).isRacing) {
+      setBetStake(merged.betStake);
+      setFreeBetAmount(merged.freeBetAmount);
+      setMinRunners(merged.minRunners || "8");
+      setQualifyingPlaces(merged.qualifyingPlaces);
+      setWinnerMustBeSpFavourite(merged.winnerMustBeSpFavourite);
+      setMinFavouriteSpOdds(merged.minFavouriteSpOdds);
+      setResultConditional(merged.resultConditional);
+      setScopeMode(merged.scopeMode);
+      setScopeCourse(merged.scopeCourse);
       setScopeRaceId("");
       setScopeRaceLabel(
-        draft.preferredOffTime ? `${draft.preferredOffTime} · resolving…` : ""
+        merged.preferredOffTime ? `${merged.preferredOffTime} · resolving…` : ""
       );
-      setPreferredOffTime(draft.preferredOffTime);
-      setScopeRegions(draft.scopeRegions.length > 0 ? draft.scopeRegions : ["GB", "IRE"]);
-      setEventDate(draft.eventDate ?? new Date().toISOString().slice(0, 10));
+      setPreferredOffTime(merged.preferredOffTime);
+      setScopeRegions(merged.scopeRegions);
+      setEventDate(merged.eventDate || localYmd(new Date()));
       setSectionRacing(true);
-      // Expand scope when paste pinned a course/race so the user can confirm
-      setSectionScope(draft.scopeMode !== "uk_ire");
+      setSectionScope(merged.scopeMode !== "uk_ire");
     }
-    const expiryHint =
-      draft.expiresAt != null
-        ? `Expires ${formatOfferExpiry(draft.expiresAt)}`
-        : "Check expiry";
-    toast.success("Offer form filled from paste", {
-      description: `${expiryHint} · review bookie and stakes, then save.`,
-    });
+  }
+
+  function handlePasteTextChange(next: string) {
+    setPasteText(next);
+    if (!next.trim()) {
+      setPasteConfidence(null);
+      setPastePlaybookHint(null);
+      return;
+    }
+    const draft = parseOfferFromText(next);
+    const { form, provenance } = mergeOfferPasteDraft(
+      currentPasteSlice(),
+      draft,
+      pasteProvenance
+    );
+    applyMergedPasteForm(form);
+    setPasteProvenance(provenance);
+    setPasteConfidence(draft.confidence);
+    const step0 = draft.playbook?.steps[0];
+    setPastePlaybookHint(
+      step0?.kind === "deposit" ? step0.title : step0?.kind === "qualify" ? step0.title : null
+    );
   }
 
   const repeatingEdit =
@@ -869,20 +1160,25 @@ export function OfferEditorForm({
     await persistOffer(repeatingEdit);
   }
 
+  const scopeWindowLabel = needsRacingDay
+    ? eventDate || "pick day"
+    : expiresDate.trim()
+      ? `until ${expiresDate}`
+      : "until Expires";
   const scopeSummary =
     scopeMode === "uk_ire"
-      ? `UK & IRE · ${eventDate}`
+      ? `UK & IRE · ${scopeWindowLabel}`
       : scopeMode === "race"
-        ? `${primaryCourse || "Course"} · ${scopeRaceLabel || "pick race"} · ${eventDate}`
-        : `${formatOfferScopeLabel(scopeCourse) || "Courses"} · ${eventDate}`;
+        ? `${primaryCourse || "Course"} · ${scopeRaceLabel || "pick race"} · ${eventDate || "pick day"}`
+        : `${formatOfferScopeLabel(scopeCourse) || "Courses"} · ${scopeWindowLabel}`;
 
   return (
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={saveOffer}>
       <div className="flex-1 space-y-2.5 overflow-y-auto px-6 py-5">
       <div className="flex items-end gap-2">
-        <div className="grid flex-1 grid-cols-2 gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <Label className="text-[11px] text-muted-foreground">Category</Label>
+            <Label className="text-xs text-muted-foreground">Category</Label>
             <Select value={category} onValueChange={(v) => setCategory(normalizeOfferCategoryId(v))}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Category" />
@@ -904,7 +1200,7 @@ export function OfferEditorForm({
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-[11px] text-muted-foreground">Status</Label>
+            <Label className="text-xs text-muted-foreground">Status</Label>
             <Select
               value={offerStatus}
               onValueChange={(v) => setOfferStatus(v as OfferStatus)}
@@ -925,27 +1221,59 @@ export function OfferEditorForm({
             </Select>
           </div>
         </div>
-        {editingId == null ? <OfferPasteDialog onApply={applyPasteDraft} /> : null}
+        {editingId == null ? (
+          <InlinePasteTrigger
+            open={pasteOpen}
+            onOpenChange={setPasteOpen}
+            filledCount={countPasteFields(pasteProvenance)}
+            panelId={pastePanelId}
+          />
+        ) : null}
       </div>
+
+      {editingId == null ? (
+        <InlinePasteStrip
+          text={pasteText}
+          onTextChange={handlePasteTextChange}
+          filledCount={countPasteFields(pasteProvenance)}
+          confidence={pasteConfidence}
+          playbookHint={pastePlaybookHint}
+          readyCompleted={formReadiness.completed}
+          readyTotal={formReadiness.total}
+          open={pasteOpen}
+          onOpenChange={setPasteOpen}
+          panelId={pastePanelId}
+          hideTrigger
+          placeholder={`Dynobet
+UEFA Super Cup Bet & Get
+Deposit £30 with code UEFA · bet £20 · get £10 free bet
+Expires 12 Aug 2026, 23:59`}
+        />
+      ) : null}
 
       {isRacingCategory && (
         <FormSection
           title="Racing terms"
           open={sectionRacing}
           onOpenChange={setSectionRacing}
-          summary={`£${betStake || "-"} → £${freeBetAmount || "-"} · min ${minRunners || "-"}${
+          summary={`£${betStake || "-"} → £${freeBetAmount || "-"}${
             resultConditional
-              ? winnerMustBeSpFavourite
-                ? " · result trigger · 2nd to SP fav"
-                : qualifyingPlaces.length > 0
-                  ? ` · result trigger · ${qualifyingPlaces.join(",")}`
-                  : " · result trigger"
+              ? ` · min ${minRunners || "-"}${
+                  winnerMustBeSpFavourite
+                    ? minFavouriteSpOdds.trim()
+                      ? ` · SP favourite · min fav SP ${minFavouriteSpOdds.trim()}`
+                      : " · SP favourite"
+                    : qualifyingPlaces.length > 0
+                      ? ` · places ${qualifyingPlaces.join(",")}`
+                      : " · result trigger"
+                }`
               : " · straight reward"
           }`}
         >
-          <div className="grid grid-cols-3 gap-2">
+          {/* Money first — stake/free always; min runners only for desk place-refunds. */}
+          <div className={resultConditional ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="offer-stake" className="text-[11px] text-muted-foreground">
+              <Label htmlFor="offer-stake" className="text-xs text-muted-foreground">
                 Bet stake (£)
               </Label>
               <Input
@@ -957,7 +1285,7 @@ export function OfferEditorForm({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="offer-free" className="text-[11px] text-muted-foreground">
+              <Label htmlFor="offer-free" className="text-xs text-muted-foreground">
                 Free bet (£)
               </Label>
               <Input
@@ -968,19 +1296,23 @@ export function OfferEditorForm({
                 onChange={(e) => setFreeBetAmount(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="offer-min-runners" className="text-[11px] text-muted-foreground">
-                Min runners
-              </Label>
-              <Input
-                id="offer-min-runners"
-                type="number"
-                min={1}
-                value={minRunners}
-                onChange={(e) => setMinRunners(e.target.value)}
-              />
-            </div>
+            {resultConditional ? (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="offer-min-runners" className="text-xs text-muted-foreground">
+                  Min runners
+                </Label>
+                <Input
+                  id="offer-min-runners"
+                  type="number"
+                  min={1}
+                  value={minRunners}
+                  onChange={(e) => setMinRunners(e.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
+
+          {/* When it pays — one toggle, then places / favourite nest underneath. */}
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
             <input
               type="checkbox"
@@ -991,27 +1323,27 @@ export function OfferEditorForm({
                 setResultConditional(on);
                 if (on) {
                   if (qualifyingPlaces.length === 0) setQualifyingPlaces([2, 3, 4]);
+                  if (!eventDate.trim()) setEventDate(localYmd(new Date()));
+                  setSectionScope(true);
                 } else {
                   setQualifyingPlaces([]);
                   setWinnerMustBeSpFavourite(false);
+                  setMinFavouriteSpOdds("");
                 }
               }}
             />
             <span>
-              <span className="font-medium text-foreground">
-                Reward depends on result (trigger / conditional)
-              </span>
+              <span className="font-medium text-foreground">Reward depends on result</span>
               <span className="mt-0.5 block text-muted-foreground">
-                On for place refunds and similar. Off for straight bet & get, where the free bet
-                lands after the qualifying bet regardless of result. Offer Edge only appears when
-                this is on.
+                Place refunds and similar. Off = straight bet & get (once per campaign).
               </span>
             </span>
           </label>
+
           {resultConditional ? (
-            <>
+            <div className="flex flex-col gap-3 border-l-2 border-border/70 pl-3">
               <div className="flex flex-col gap-1.5">
-                <Label className="text-[11px] text-muted-foreground">Qualifying places</Label>
+                <Label className="text-xs text-muted-foreground">Qualifying places</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {([2, 3, 4, 5, 6] as const).map((place) => {
                     const on = qualifyingPlaces.includes(place);
@@ -1021,7 +1353,9 @@ export function OfferEditorForm({
                         active={on}
                         onClick={() => {
                           setQualifyingPlaces((prev) =>
-                            on ? prev.filter((p) => p !== place) : [...prev, place].sort((a, b) => a - b)
+                            on
+                              ? prev.filter((p) => p !== place)
+                              : [...prev, place].sort((a, b) => a - b)
                           );
                         }}
                         className="tabular-nums"
@@ -1032,30 +1366,59 @@ export function OfferEditorForm({
                   })}
                 </div>
               </div>
-              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={winnerMustBeSpFavourite}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setWinnerMustBeSpFavourite(on);
-                    if (on && qualifyingPlaces.length !== 1) setQualifyingPlaces([2]);
-                  }}
-                />
-                <span>
-                  <span className="font-medium text-foreground">2nd to SP favourite</span>
-                  <span className="mt-0.5 block text-muted-foreground">
-                    Free bet only if the selection finishes in the qualifying places and the winner
-                    was the Starting Price favourite (QuinnBet-style).
+
+              <div className="flex flex-col gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2.5">
+                <label className="flex cursor-pointer items-start gap-2.5 text-xs">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={winnerMustBeSpFavourite}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setWinnerMustBeSpFavourite(on);
+                      if (on && qualifyingPlaces.length !== 1) setQualifyingPlaces([2]);
+                      if (!on) setMinFavouriteSpOdds("");
+                    }}
+                  />
+                  <span>
+                    <span className="font-medium text-foreground">
+                      Winner must be SP favourite
+                    </span>
+                    <span className="mt-0.5 block text-muted-foreground">
+                      QuinnBet-style: place only pays behind the Starting Price favourite.
+                    </span>
                   </span>
-                </span>
-              </label>
-            </>
+                </label>
+                {winnerMustBeSpFavourite ? (
+                  <div className="flex flex-wrap items-end gap-2 border-t border-border/40 pt-2 pl-6">
+                    <div className="flex min-w-[7.5rem] flex-col gap-1">
+                      <Label
+                        htmlFor="offer-min-fav-sp"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Min favourite SP
+                      </Label>
+                      <Input
+                        id="offer-min-fav-sp"
+                        type="number"
+                        step="0.01"
+                        min={1.01}
+                        placeholder="e.g. 2.5"
+                        value={minFavouriteSpOdds}
+                        onChange={(e) => setMinFavouriteSpOdds(e.target.value)}
+                        className="max-w-[8rem]"
+                      />
+                    </div>
+                    <p className="pb-1.5 text-xs text-muted-foreground">
+                      Optional. Leave blank if the offer has no floor.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground">
-              Qualifying tip: match back and lay as closely as you can. Free bet tip: extract at
-              reasonably high odds with a tight lay.
+            <p className="text-xs text-muted-foreground">
+              Match the qualifier tightly; extract the free bet at higher odds with a tight lay.
             </p>
           )}
         </FormSection>
@@ -1068,23 +1431,25 @@ export function OfferEditorForm({
           onOpenChange={setSectionScope}
           summary={scopeSummary}
         >
-          <div className="grid grid-cols-2 gap-2">
+          <div className={needsRacingDay ? "grid grid-cols-2 gap-2" : undefined}>
+            {needsRacingDay ? (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="offer-event-date" className="text-xs text-muted-foreground">
+                  Racing day
+                </Label>
+                <DatePicker
+                  id="offer-event-date"
+                  value={eventDate}
+                  onChange={(date) => {
+                    setEventDate(date);
+                    setScopeRaceId("");
+                    setScopeRaceLabel("");
+                  }}
+                />
+              </div>
+            ) : null}
             <div className="flex flex-col gap-1">
-              <Label htmlFor="offer-event-date" className="text-[11px] text-muted-foreground">
-                Racing day
-              </Label>
-              <DatePicker
-                id="offer-event-date"
-                value={eventDate}
-                onChange={(date) => {
-                  setEventDate(date);
-                  setScopeRaceId("");
-                  setScopeRaceLabel("");
-                }}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-[11px] text-muted-foreground">Scope</Label>
+              <Label className="text-xs text-muted-foreground">Scope</Label>
               <Select value={scopeMode} onValueChange={(v) => changeScopeMode(v as ScopeMode)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -1100,7 +1465,7 @@ export function OfferEditorForm({
 
           {scopeMode === "uk_ire" && (
             <div className="flex flex-col gap-1">
-              <Label className="text-[11px] text-muted-foreground">Regions</Label>
+              <Label className="text-xs text-muted-foreground">Regions</Label>
               <div className="flex gap-2">
                 {(
                   [
@@ -1136,7 +1501,7 @@ export function OfferEditorForm({
 
           {scopeMode === "course" && (
             <div className="flex flex-col gap-1">
-              <Label className="text-[11px] text-muted-foreground">Courses</Label>
+              <Label className="text-xs text-muted-foreground">Courses</Label>
               {courses.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {courses.map((c) => {
@@ -1169,12 +1534,12 @@ export function OfferEditorForm({
                 />
               )}
               {selectedCourses.length > 1 ? (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {selectedCourses.length} courses selected · {formatOfferScopeLabel(scopeCourse)}
                 </p>
               ) : null}
               {!cardsLoading && courses.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Racecards available for today/tomorrow when Racing API is connected.
                 </p>
               ) : null}
@@ -1183,7 +1548,7 @@ export function OfferEditorForm({
 
           {scopeMode === "race" && (
             <div className="flex flex-col gap-1">
-              <Label className="text-[11px] text-muted-foreground">Course</Label>
+              <Label className="text-xs text-muted-foreground">Course</Label>
               {courses.length > 0 ? (
                 <Select
                   value={
@@ -1224,7 +1589,7 @@ export function OfferEditorForm({
 
           {scopeMode === "race" && (
             <div className="flex flex-col gap-1">
-              <Label className="text-[11px] text-muted-foreground">Race</Label>
+              <Label className="text-xs text-muted-foreground">Race</Label>
               {racesAtCourse.length > 0 ? (
                 <Select
                   value={scopeRaceId || undefined}
@@ -1254,7 +1619,7 @@ export function OfferEditorForm({
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="rounded-md border border-dashed px-3 py-2 text-[11px] text-muted-foreground">
+                <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
                   {primaryCourse
                     ? cardsLoading
                       ? "Loading races…"
@@ -1263,6 +1628,22 @@ export function OfferEditorForm({
                 </p>
               )}
             </div>
+          )}
+
+          {scopeMode === "race" ? (
+            <p className="text-xs text-muted-foreground">
+              One race only. Completing it does not create another campaign for later races.
+            </p>
+          ) : resultConditional ? (
+            <p className="text-xs text-muted-foreground">
+              Place-refund offers stay available all day: after you log a qualifier, a fresh copy
+              appears so you can go again on the next race in this scope.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Shows on the Racing Desk from Starts on through Expires. One qualifier; leaves the
+              desk once logged.
+            </p>
           )}
         </FormSection>
       )}
@@ -1280,25 +1661,52 @@ export function OfferEditorForm({
           .join(" · ")}
       >
         <div className="flex flex-col gap-1">
-          <Label htmlFor="offer-title" className="text-[11px] text-muted-foreground">
+          <PasteFieldLabel
+            htmlFor="offer-title"
+            provenance={pasteProvenance.title}
+            required={titleRequired && editingId == null}
+          >
             {isRacingCategory ? "Title (optional)" : "Title"}
-          </Label>
+          </PasteFieldLabel>
           <Input
             id="offer-title"
             placeholder={
-              isRacingCategory ? "Auto-generated from stake amounts" : "Bet £50 get £50 free bet"
+              isRacingCategory
+                ? "Auto-generated from stake amounts"
+                : "Bet £20 get £10 free bet (Football)"
             }
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              touchPasteUser("title");
+            }}
+            aria-describedby={pasteDescribedBy(pasteProvenance.title, "offer-title")}
+            className={pasteFieldClass(pasteProvenance.title, {
+              requiredEmpty:
+                titleRequired &&
+                editingId == null &&
+                !title.trim() &&
+                Boolean(pasteText.trim()),
+            })}
           />
         </div>
-        <VenueSelect
-          value={bookmaker}
-          onChange={setBookmaker}
-          label="Bookie / Exchange"
-          placeholder="Select bookie or exchange"
-          persistCustom={false}
-        />
+        <div className="flex flex-col gap-1">
+          <PasteFieldLabel provenance={pasteProvenance.bookmaker} describedById="offer-bookie-paste">
+            Bookie / Exchange
+          </PasteFieldLabel>
+          <VenueSelect
+            value={bookmaker}
+            onChange={(v) => {
+              setBookmaker(v);
+              touchPasteUser("bookmaker");
+            }}
+            label=""
+            placeholder="Select bookie or exchange"
+            persistCustom={false}
+            className={pasteFieldClass(pasteProvenance.bookmaker)}
+          />
+        </div>
+        <OfferUrlField id="offer-url" value={offerUrl} onChange={setOfferUrl} />
         {showAutoAddAccount ? (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
             <input
@@ -1319,63 +1727,86 @@ export function OfferEditorForm({
         ) : null}
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-exp" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel htmlFor="offer-exp" provenance={pasteProvenance.expected}>
               Expected profit (£)
-            </Label>
+            </PasteFieldLabel>
             <Input
               id="offer-exp"
               type="number"
               step="0.01"
               placeholder="45"
               value={expected}
-              onChange={(e) => setExpected(e.target.value)}
+              onChange={(e) => {
+                setExpected(e.target.value);
+                touchPasteUser("expected");
+              }}
+              aria-describedby={pasteDescribedBy(pasteProvenance.expected, "offer-exp")}
+              className={pasteFieldClass(pasteProvenance.expected)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-starts-on" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel htmlFor="offer-starts-on" provenance={pasteProvenance.startsOn}>
               Starts on
-            </Label>
+            </PasteFieldLabel>
             <DatePicker
               id="offer-starts-on"
               placeholder="Today"
               value={startsOn}
-              onChange={setStartsOn}
+              onChange={(v) => {
+                setStartsOn(v);
+                touchPasteUser("startsOn");
+              }}
+              className={pasteFieldClass(pasteProvenance.startsOn)}
             />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-expires-date" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel
+              htmlFor="offer-expires-date"
+              provenance={pasteProvenance.expiresAtMs}
+            >
               Expires
-            </Label>
+            </PasteFieldLabel>
             <DatePicker
               id="offer-expires-date"
               value={expiresDate}
-              onChange={setExpiresDate}
+              onChange={(v) => {
+                setExpiresDate(v);
+                touchPasteUser("expiresAtMs");
+              }}
               placeholder="Pick a date"
               shortcuts="ending"
+              className={pasteFieldClass(pasteProvenance.expiresAtMs)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-expires-time" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel
+              htmlFor="offer-expires-time"
+              provenance={pasteProvenance.expiresAtMs}
+            >
               Time
-            </Label>
+            </PasteFieldLabel>
             <EventTimeInput
               id="offer-expires-time"
               value={expiresTime}
-              onChange={setExpiresTime}
+              onChange={(v) => {
+                setExpiresTime(v);
+                touchPasteUser("expiresAtMs");
+              }}
               placeholder="Pick a time"
               shortcuts="ending"
+              className={pasteFieldClass(pasteProvenance.expiresAtMs)}
             />
           </div>
         </div>
         {expiryAlreadyPassed ? (
-          <p className="text-[11px] font-medium text-warning">
+          <p className="text-xs font-medium text-warning">
             This deadline has already passed, so the offer is filed under Expired as soon as
             you save it. Clear or update the date to keep it in the main feed.
           </p>
         ) : startsOn.trim() && startsOn.trim() > localYmd(new Date()) ? (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Stays &ldquo;Planned&rdquo; until {startsOn}, then goes live automatically.
           </p>
         ) : null}
@@ -1400,7 +1831,7 @@ export function OfferEditorForm({
           <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-2.5">
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-muted-foreground">Frequency</Label>
+                <Label className="text-xs text-muted-foreground">Frequency</Label>
                 <Select
                   value={repeatFreq}
                   onValueChange={(v) => setRepeatFreq(v as RepeatFreq)}
@@ -1416,7 +1847,7 @@ export function OfferEditorForm({
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="offer-repeat-interval" className="text-[11px] text-muted-foreground">
+                <Label htmlFor="offer-repeat-interval" className="text-xs text-muted-foreground">
                   Every
                 </Label>
                 <div className="flex items-center gap-1.5">
@@ -1437,7 +1868,7 @@ export function OfferEditorForm({
 
             {repeatFreq === "weekly" ? (
               <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-muted-foreground">On</Label>
+                <Label className="text-xs text-muted-foreground">On</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {WEEKDAY_LABELS.map((label, day) => {
                     const active = repeatWeekdays.includes(day);
@@ -1465,7 +1896,7 @@ export function OfferEditorForm({
 
             {repeatFreq === "monthly" ? (
               <div className="flex flex-col gap-1">
-                <Label htmlFor="offer-repeat-monthday" className="text-[11px] text-muted-foreground">
+                <Label htmlFor="offer-repeat-monthday" className="text-xs text-muted-foreground">
                   Day of month
                 </Label>
                 <Input
@@ -1480,7 +1911,7 @@ export function OfferEditorForm({
               </div>
             ) : null}
 
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Each occurrence stays live for the same span as &ldquo;Starts on&rdquo; → &ldquo;Expires&rdquo;
               above (leave &ldquo;Starts on&rdquo; blank to anchor from today).
             </p>
@@ -1507,18 +1938,170 @@ export function OfferEditorForm({
         title="Important - don't forget"
         open={sectionImportant}
         onOpenChange={setSectionImportant}
-        summary={
-          formatImportantTermsSummary(
-            formImportantFromState({ minOdds, minStake, maxStake, importantNotes })
-          ) || undefined
-        }
+        summary={formatImportantTermsSummary(importantFromForm()) || undefined}
         accent
       >
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <PasteFieldLabel htmlFor="offer-promo-code" provenance={pasteProvenance.promoCode}>
+              Promo / deposit code
+            </PasteFieldLabel>
+            <Input
+              id="offer-promo-code"
+              placeholder="e.g. UEFA"
+              value={promoCode}
+              onChange={(e) => {
+                setPromoCode(e.target.value.toUpperCase());
+                touchPasteUser("promoCode");
+                if (e.target.value.trim()) setDepositRequired(true);
+              }}
+              className={cn(
+                "font-semibold tracking-wide",
+                pasteFieldClass(pasteProvenance.promoCode)
+              )}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <PasteFieldLabel htmlFor="offer-min-deposit" provenance={pasteProvenance.minDeposit}>
+              Min deposit
+            </PasteFieldLabel>
+            <Input
+              id="offer-min-deposit"
+              type="number"
+              step="0.01"
+              min={0}
+              placeholder="£30"
+              value={minDeposit}
+              onChange={(e) => {
+                setMinDeposit(e.target.value);
+                touchPasteUser("minDeposit");
+                if (e.target.value.trim()) setDepositRequired(true);
+              }}
+              className={pasteFieldClass(pasteProvenance.minDeposit)}
+            />
+          </div>
+        </div>
+        {(promoCode.trim() || minDeposit.trim()) && (
+          <p className="text-xs text-warning">
+            Step 1 when you start this offer: deposit
+            {minDeposit.trim() ? ` £${minDeposit.trim()}+` : ""}
+            {promoCode.trim() ? ` with code ${promoCode.trim()}` : ""}.
+          </p>
+        )}
+        <div className="flex flex-col gap-1.5">
+          <PasteFieldLabel provenance={pasteProvenance.qualifierScopes}>
+            Qualifier scope
+          </PasteFieldLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {BET_SCOPES.map((scope) => (
+              <FilterPill
+                key={`q-${scope}`}
+                type="button"
+                active={qualifierScopes.includes(scope)}
+                onClick={() => {
+                  setQualifierScopes((prev) => toggleScope(prev, scope));
+                  touchPasteUser("qualifierScopes");
+                }}
+              >
+                {betScopeLabel(scope)}
+              </FilterPill>
+            ))}
+          </div>
+          {scopesNeedMinSelections(qualifierScopes) ? (
+            <div className="flex flex-col gap-1">
+              <PasteFieldLabel
+                htmlFor="offer-min-selections"
+                provenance={pasteProvenance.minSelections}
+              >
+                Qualifier min selections
+              </PasteFieldLabel>
+              <Input
+                id="offer-min-selections"
+                type="number"
+                step="1"
+                min={2}
+                max={12}
+                placeholder="e.g. 3"
+                value={minSelections}
+                onChange={(e) => {
+                  setMinSelections(e.target.value);
+                  touchPasteUser("minSelections");
+                }}
+                aria-describedby={pasteDescribedBy(
+                  pasteProvenance.minSelections,
+                  "offer-min-selections"
+                )}
+                className={cn("max-w-[8rem]", pasteFieldClass(pasteProvenance.minSelections))}
+              />
+            </div>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Tick every allowed type. Acca / Bet builder open Combo Desk when entitled; otherwise
+            Place uses Add bet.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <PasteFieldLabel provenance={pasteProvenance.rewardScopes}>
+            Reward scope
+          </PasteFieldLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {BET_SCOPES.map((scope) => (
+              <FilterPill
+                key={`r-${scope}`}
+                type="button"
+                active={rewardScopes.includes(scope)}
+                onClick={() => {
+                  setRewardScopes((prev) => toggleScope(prev, scope));
+                  touchPasteUser("rewardScopes");
+                }}
+              >
+                {betScopeLabel(scope)}
+              </FilterPill>
+            ))}
+          </div>
+          {scopesNeedMinSelections(rewardScopes) ? (
+            <div className="flex flex-col gap-1">
+              <PasteFieldLabel
+                htmlFor="offer-reward-min-selections"
+                provenance={pasteProvenance.rewardMinSelections}
+              >
+                Reward min selections
+              </PasteFieldLabel>
+              <Input
+                id="offer-reward-min-selections"
+                type="number"
+                step="1"
+                min={2}
+                max={12}
+                placeholder="e.g. 3"
+                value={rewardMinSelections}
+                onChange={(e) => {
+                  setRewardMinSelections(e.target.value);
+                  touchPasteUser("rewardMinSelections");
+                }}
+                aria-describedby={pasteDescribedBy(
+                  pasteProvenance.rewardMinSelections,
+                  "offer-reward-min-selections"
+                )}
+                className={cn(
+                  "max-w-[8rem]",
+                  pasteFieldClass(pasteProvenance.rewardMinSelections)
+                )}
+              />
+            </div>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Tick every type the free bet can use. Acca / Bet builder open Combo Desk when entitled;
+            otherwise Convert uses Add bet.
+          </p>
+        </div>
+
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-min-odds" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel htmlFor="offer-min-odds" provenance={pasteProvenance.minOdds}>
               Min odds
-            </Label>
+            </PasteFieldLabel>
             <Input
               id="offer-min-odds"
               type="number"
@@ -1526,13 +2109,18 @@ export function OfferEditorForm({
               min={1.01}
               placeholder="2.0"
               value={minOdds}
-              onChange={(e) => setMinOdds(e.target.value)}
+              onChange={(e) => {
+                setMinOdds(e.target.value);
+                touchPasteUser("minOdds");
+              }}
+              aria-describedby={pasteDescribedBy(pasteProvenance.minOdds, "offer-min-odds")}
+              className={pasteFieldClass(pasteProvenance.minOdds)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-min-stake" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel htmlFor="offer-min-stake" provenance={pasteProvenance.minStake}>
               Min stake
-            </Label>
+            </PasteFieldLabel>
             <Input
               id="offer-min-stake"
               type="number"
@@ -1540,13 +2128,18 @@ export function OfferEditorForm({
               min={0}
               placeholder="£"
               value={minStake}
-              onChange={(e) => setMinStake(e.target.value)}
+              onChange={(e) => {
+                setMinStake(e.target.value);
+                touchPasteUser("minStake");
+              }}
+              aria-describedby={pasteDescribedBy(pasteProvenance.minStake, "offer-min-stake")}
+              className={pasteFieldClass(pasteProvenance.minStake)}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="offer-max-stake" className="text-[11px] text-muted-foreground">
+            <PasteFieldLabel htmlFor="offer-max-stake" provenance={pasteProvenance.maxStake}>
               Max stake
-            </Label>
+            </PasteFieldLabel>
             <Input
               id="offer-max-stake"
               type="number"
@@ -1554,23 +2147,32 @@ export function OfferEditorForm({
               min={0}
               placeholder="£"
               value={maxStake}
-              onChange={(e) => setMaxStake(e.target.value)}
+              onChange={(e) => {
+                setMaxStake(e.target.value);
+                touchPasteUser("maxStake");
+              }}
+              aria-describedby={pasteDescribedBy(pasteProvenance.maxStake, "offer-max-stake")}
+              className={pasteFieldClass(pasteProvenance.maxStake)}
             />
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="offer-important" className="text-[11px] text-muted-foreground">
+          <PasteFieldLabel htmlFor="offer-important" provenance={pasteProvenance.importantNotes}>
             Other must-not-miss
-          </Label>
+          </PasteFieldLabel>
           <textarea
             id="offer-important"
-            rows={2}
-            placeholder="SNR · new customers only · min 3 selections…"
+            rows={4}
+            placeholder="Opt-in · SNR · sportsbook only…"
             value={importantNotes}
-            onChange={(e) => setImportantNotes(e.target.value)}
+            onChange={(e) => {
+              setImportantNotes(e.target.value);
+              touchPasteUser("importantNotes");
+            }}
             className={cn(
               fieldControl,
-              "min-h-[3.5rem] w-full resize-y px-3 py-2 text-sm outline-none"
+              "min-h-[5.5rem] w-full resize-y px-2.5 py-2 text-sm leading-relaxed outline-none",
+              pasteFieldClass(pasteProvenance.importantNotes)
             )}
           />
         </div>
@@ -1585,7 +2187,7 @@ export function OfferEditorForm({
         >
           {editingId != null ? (
             <>
-              <Pencil className="size-4" /> Save changes
+              <Save className="size-4" /> Save changes
             </>
           ) : (
             <>

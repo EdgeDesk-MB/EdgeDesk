@@ -223,15 +223,28 @@ function OffersContent() {
         }
         toolbar={
           <>
-            {(["all", "needs_action", "active", "completed", "expired"] as const).map((f) => (
-              <FilterPill key={f} active={filter === f} onClick={() => setFilter(f)}>
-                {f === "needs_action"
-                  ? `Needs action${nextActions.length ? ` (${nextActions.length})` : ""}`
+            {(["all", "needs_action", "active", "completed", "expired"] as const).map((f) => {
+              const count =
+                f === "needs_action"
+                  ? nextActions.length
                   : f === "expired"
-                    ? `Expired${totals.expired ? ` (${totals.expired})` : ""}`
-                    : formatPillLabel(f)}
-              </FilterPill>
-            ))}
+                    ? totals.expired
+                    : 0;
+              const hasCount = count > 0;
+              return (
+                <FilterPill
+                  key={f}
+                  active={filter === f}
+                  onClick={() => setFilter(f)}
+                  hasCount={hasCount}
+                >
+                  {formatPillLabel(f)}
+                  {hasCount ? (
+                    <span className={filterPillCountState(filter === f)}>{count}</span>
+                  ) : null}
+                </FilterPill>
+              );
+            })}
             {showCategoryFilter ? (
               <Select
                 value={effectiveCategory}

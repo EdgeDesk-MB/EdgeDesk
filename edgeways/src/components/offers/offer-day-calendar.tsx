@@ -27,9 +27,11 @@ import {
   filterPillCountState,
   filterPillGroup,
   offerCalendarCardShell,
+  offerCampaignCardInteractive,
   offerCampaignCardShell,
 } from "@/lib/ui/surface-styles";
 import { moneyPositiveClass } from "@/components/money-flow";
+import { formatEvGbp } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { CalendarDays, Columns3, List } from "lucide-react";
 
@@ -153,7 +155,7 @@ function PriorityFilterBar({
       role="group"
       aria-label="Filter by priority"
     >
-      <FilterPill active={showAll} onClick={toggleAll} className="text-[11px]">
+      <FilterPill active={showAll} onClick={toggleAll} className="text-xs">
         All
       </FilterPill>
       {ALL_PRIORITIES.map((priority) => {
@@ -167,7 +169,7 @@ function PriorityFilterBar({
             active={active}
             onClick={() => togglePriority(priority)}
             hasCount={hasCount}
-            className="text-[11px]"
+            className="text-xs"
             title={`${p.label} priority`}
           >
             <span className={cn("size-1.5 shrink-0 rounded-full", p.dot)} aria-hidden />
@@ -191,13 +193,12 @@ function RemainingEvBadge({
   variant: "board" | "agenda";
 }) {
   if (remainingEv <= 0.5) return null;
-  const amount = remainingEv >= 10 ? remainingEv.toFixed(0) : remainingEv.toFixed(1);
   return (
     <div
       className="shrink-0 text-right"
       title="Estimated remaining expected value on this offer"
     >
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Est.
       </p>
       <p
@@ -207,7 +208,7 @@ function RemainingEvBadge({
           variant === "board" ? "text-base" : "text-2xl"
         )}
       >
-        £{amount}
+        {formatEvGbp(remainingEv)}
       </p>
     </div>
   );
@@ -215,15 +216,14 @@ function RemainingEvBadge({
 
 /** Agenda day total — white pill, grey Est. label, bright green amount. */
 function DayEstPill({ amount }: { amount: number }) {
-  const formatted = amount >= 10 ? amount.toFixed(0) : amount.toFixed(1);
   return (
     <span
-      className="inline-flex items-baseline gap-0.5 rounded-full bg-white px-2 py-0.5 text-[10px] ring-1 ring-border/50 dark:bg-card"
+      className="inline-flex items-baseline gap-0.5 rounded-full bg-white px-2 py-0.5 text-[11px] ring-1 ring-border/50 dark:bg-card"
       title="Sum of estimated remaining EV for offers on this day"
     >
       <span className="font-medium text-muted-foreground">Est.</span>
       <span className={cn("font-bold tabular-nums", moneyPositiveClass)}>
-        £{formatted}
+        {formatEvGbp(amount)}
       </span>
     </span>
   );
@@ -264,7 +264,7 @@ function CalendarItemCard({
     <button
       type="button"
       onClick={() => onOfferClick?.(item.offer)}
-      className={cn(shell, "w-full")}
+      className={cn(shell, offerCampaignCardInteractive, "w-full")}
       aria-label={
         priorityChrome
           ? `View campaign: ${item.offer.title} (${p.label} priority)`
@@ -292,7 +292,7 @@ function CalendarItemCard({
                 ) : null}
                 <Badge
                   variant="outline"
-                  className="h-auto gap-1 px-2 py-0.5 text-[10px] font-medium leading-tight"
+                  className="h-auto gap-1 px-2 py-0.5 text-[11px] font-medium leading-tight"
                 >
                   <OfferCategoryIcon category={categoryId} size={10} className="opacity-80" />
                   {categoryLabel}
@@ -318,7 +318,7 @@ function CalendarItemCard({
           {expiry ? (
             <p
               className={cn(
-                "text-[10px] font-medium tabular-nums",
+                "text-[11px] font-medium tabular-nums",
                 item.daysLeft != null && item.daysLeft < 1
                   ? "text-rose-700 dark:text-rose-300"
                   : item.daysLeft != null && item.daysLeft < 2
@@ -367,18 +367,18 @@ function BoardView({
               <h3 className="text-xs font-bold uppercase tracking-wide text-foreground">
                 {col.title}
               </h3>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{col.description}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{col.description}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {columnEv > 0.5 ? <DayEstPill amount={columnEv} /> : null}
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
                 {col.items.length}
               </span>
             </div>
           </header>
           <ul className="flex flex-1 flex-col gap-2 p-2">
             {col.items.length === 0 ? (
-              <li className="px-2 py-6 text-center text-[11px] text-muted-foreground">
+              <li className="px-2 py-6 text-center text-xs text-muted-foreground">
                 Nothing here
               </li>
             ) : (
@@ -428,10 +428,7 @@ function AgendaView({
         return (
           <section
             key={day.dateKey}
-            className={cn(
-              "overflow-hidden rounded-lg border border-border/60",
-              day.isToday && "border-primary/30"
-            )}
+            className="overflow-hidden rounded-lg border border-border/60"
           >
             <button
               type="button"
@@ -440,25 +437,19 @@ function AgendaView({
               }
               className={cn(
                 "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
-                "bg-muted/40 hover:bg-muted/60 dark:bg-input/25 dark:hover:bg-input/40",
-                day.isToday && "bg-primary/10 hover:bg-primary/15 dark:bg-primary/15"
+                "bg-muted/40 hover:bg-muted/60 dark:bg-input/25 dark:hover:bg-input/40"
               )}
             >
-              <h3
-                className={cn(
-                  "flex-1 text-xs font-bold uppercase tracking-wide",
-                  day.isToday ? "text-primary-text" : "text-foreground"
-                )}
-              >
+              <h3 className="flex-1 text-xs font-bold uppercase tracking-wide text-foreground">
                 {day.label}
               </h3>
               {dayEv > 0.5 ? <DayEstPill amount={dayEv} /> : null}
               {criticalCount > 0 ? (
-                <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:text-rose-300">
+                <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:text-rose-300">
                   {criticalCount} critical
                 </span>
               ) : null}
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {day.items.length}
               </span>
               <span
@@ -557,7 +548,7 @@ export function OfferDayCalendar({
         <FilterPill
           active={view === "board"}
           onClick={() => changeView("board")}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs"
         >
           <Columns3 className="size-3" />
           Board
@@ -565,7 +556,7 @@ export function OfferDayCalendar({
         <FilterPill
           active={view === "agenda"}
           onClick={() => changeView("agenda")}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px]"
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs"
         >
           <List className="size-3" />
           Agenda

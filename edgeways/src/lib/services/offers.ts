@@ -1,6 +1,15 @@
 import { eq } from "drizzle-orm";
 import "server-only";
-import { db, bets, offers, offerSeries, type BetRow, type OfferRow } from "@/lib/db";
+import {
+  db,
+  accounts,
+  balanceTransactions,
+  bets,
+  offers,
+  offerSeries,
+  type BetRow,
+  type OfferRow,
+} from "@/lib/db";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
 import {
   writeEvLock,
@@ -15,8 +24,23 @@ import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
 import { getOfferRecurrenceMeta, syncOfferSeriesInstances } from "@/lib/offers/offer-recurrence";
 import { localYmd } from "@/lib/offers/offer-recurrence-shared";
-import { ensureCourseOfferSiblings } from "@/lib/offers/course-offer-sync";
+import {
+  ensureSameDayOfferSiblings,
+  reconcileSameDayOfferSiblings,
+  retireUnusedSameDayOfferSiblings,
+} from "@/lib/offers/course-offer-sync";
+import {
+  applyDepositEvidenceToPlaybook,
+  findDepositEvidence,
+  playbooksEqual,
+  readPlaybookFromRulesJson,
+  syncClearWageringFromBookieWr,
+  syncPlaybookFromOfferProfit,
+  withPlaybookOnRules,
+} from "@/lib/offers/offer-playbook";
+import { readImportantTerms } from "@/lib/offers/offer-terms";
 import { quietOfferAlerts } from "@/lib/services/quiet-alerts";
+import { listPendingRemindersByOfferIds } from "@/lib/services/user-reminders";
 
 export type {
   FreeBetStage,
@@ -73,6 +97,43 @@ function betHasUnconditionalFreeBet(bet: BetRow): boolean {
   );
 }
 
+function betTimeKey(bet: Pick<BetRow, "id" | "createdAt">): number {
+  return bet.createdAt > 0 ? bet.createdAt : bet.id;
+}
+
+/**
+ * Promo awards on qualifying bets that have no free-bet usage at/after them.
+ * An earlier convert must not hide a later unused award (Betfair Acca re-qualify).
+ */
+function firstUnconvertedPromoAward(
+  qualifying: BetRow[],
+  freeBetBets: BetRow[],
+  promoAwards: Record<number, { amount: number; reason: string }>
+): { betId: number; amount: number; reason: string } | null {
+  const awards = qualifying
+    .filter((b) => promoAwards[b.id])
+    .sort((a, b) => betTimeKey(a) - betTimeKey(b) || a.id - b.id);
+  if (awards.length === 0) return null;
+
+  const usages = [...freeBetBets].sort(
+    (a, b) => betTimeKey(a) - betTimeKey(b) || a.id - b.id
+  );
+  const used = new Set<number>();
+
+  for (const awardBet of awards) {
+    const awardKey = betTimeKey(awardBet);
+    const usage = usages.find(
+      (u) => !used.has(u.id) && (betTimeKey(u) > awardKey || (betTimeKey(u) === awardKey && u.id > awardBet.id))
+    );
+    if (!usage) {
+      const promo = promoAwards[awardBet.id]!;
+      return { betId: awardBet.id, amount: promo.amount, reason: promo.reason };
+    }
+    used.add(usage.id);
+  }
+  return null;
+}
+
 export function computeOfferProfitBreakdown(
   linkedInput: BetRow[],
   promoAwards: Record<number, { amount: number; reason: string }> = getPromoAwardsByBetId()
@@ -95,13 +156,20 @@ export function computeOfferProfitBreakdown(
   let freeBetAwardAmount: number | null = null;
   let freeBetAwardReason: string | null = null;
 
-  for (const bet of qualifying) {
-    const promo = promoAwards[bet.id];
-    if (!promo) continue;
+  const unconverted = firstUnconvertedPromoAward(qualifying, freeBetBets, promoAwards);
+  if (unconverted) {
     freeBetAwarded = true;
-    freeBetAwardAmount = promo.amount;
-    freeBetAwardReason = promo.reason;
-    break;
+    freeBetAwardAmount = unconverted.amount;
+    freeBetAwardReason = unconverted.reason;
+  } else {
+    for (const bet of qualifying) {
+      const promo = promoAwards[bet.id];
+      if (!promo) continue;
+      freeBetAwarded = true;
+      freeBetAwardAmount = promo.amount;
+      freeBetAwardReason = promo.reason;
+      break;
+    }
   }
 
   // Unconditional "Bet £X get £Y FB" - treat as awarded once qualifying settles,
@@ -122,10 +190,13 @@ export function computeOfferProfitBreakdown(
   const hasPlaceTrigger = qualifying.some(betHasPlaceFreeBetTrigger);
   const hasAnyFreeBetTrigger = qualifying.some((b) => expectedFreeBetAmountFromBet(b) != null);
 
-  if (freeBetSettled.length > 0) {
-    freeBetStage = "settled";
-  } else if (freeBetOpen.length > 0) {
+  if (freeBetOpen.length > 0) {
     freeBetStage = "in_use";
+  } else if (unconverted) {
+    // Later unused promo wins over an earlier settled convert on the same campaign.
+    freeBetStage = "awarded";
+  } else if (freeBetSettled.length > 0) {
+    freeBetStage = "settled";
   } else if (freeBetAwarded) {
     freeBetStage = "awarded";
   } else if (hasPlaceTrigger && qualifyingOpen.length > 0) {
@@ -303,8 +374,11 @@ export function resolveOfferForBet(input: {
 
 /**
  * Link SNR/SR conversion bets to an offer that already awarded a free bet.
- * Bookmaker match is preferred but not required - missing bookie on the free bet
- * (common) still links to the best awarded campaign, optionally filtered by stake.
+ *
+ * Default: only honour an **explicit** `offerId` (Convert CTA, Acca desk,
+ * Add bet offer picker). Inferring from bookie+stake alone used to pull
+ * unrelated free bets (e.g. a cricket selection) onto whatever campaign was
+ * sitting in "awarded" — pass `allowInfer: true` only for backfill/repair.
  */
 export function resolveOfferForFreeBetUsage(input: {
   offerId?: number | null;
@@ -312,9 +386,12 @@ export function resolveOfferForFreeBetUsage(input: {
   bookmaker?: string | null;
   /** Free-bet stake - prefer campaigns whose award amount matches */
   backStake?: number | null;
+  /** Infer a campaign when no offerId was chosen (backfill only). */
+  allowInfer?: boolean;
 }): number | null {
   if (input.offerId != null && input.offerId > 0) return input.offerId;
   if (input.betType !== "free_snr" && input.betType !== "free_sr") return null;
+  if (!input.allowInfer) return null;
 
   const bookie = input.bookmaker?.trim().toLowerCase() || null;
   const stake = input.backStake != null && input.backStake > 0 ? input.backStake : null;
@@ -337,34 +414,24 @@ export function resolveOfferForFreeBetUsage(input: {
     const breakdown = computeOfferProfitBreakdown(linked, promoAwards);
     if (!(breakdown.freeBetAwarded && breakdown.freeBetStage === "awarded")) continue;
 
-    let score = 10;
     const offerBookie = offer.bookmaker?.trim().toLowerCase() || null;
 
-    // Never attach a free-bet conversion to a different bookie's campaign
-    // (e.g. test pollution "InBet Bookie" must not land on Betfair Sportsbook).
-    if (bookie && offerBookie && bookie !== offerBookie) continue;
-
-    if (bookie && offerBookie) {
-      score += 50;
-    } else if (bookie && !offerBookie) {
-      // Free bet has bookie, offer doesn't - mild preference if stake matches
-      score += 5;
-    } else if (!bookie && offerBookie) {
-      score += 5;
-    } else {
-      // Neither has bookie - still linkable
-      score += 8;
+    // Infer path: require bookie + exact award stake so a £10 cricket FB
+    // cannot land on a £50 racing campaign (or any other mismatch).
+    if (!bookie || !offerBookie || bookie !== offerBookie) continue;
+    if (
+      stake == null ||
+      breakdown.freeBetAwardAmount == null ||
+      Math.abs(breakdown.freeBetAwardAmount - stake) >= 0.02
+    ) {
+      continue;
     }
 
-    if (stake != null && breakdown.freeBetAwardAmount != null) {
-      const delta = Math.abs(breakdown.freeBetAwardAmount - stake);
-      if (delta < 0.02) score += 40;
-      else if (delta <= 1) score += 15;
-      else score -= 10;
-    }
-
-    // Prefer newer campaigns when scores tie
-    scored.push({ offerId: offer.id, score, createdAt: offer.createdAt });
+    scored.push({
+      offerId: offer.id,
+      score: 100,
+      createdAt: offer.createdAt,
+    });
   }
 
   scored.sort((a, b) => b.score - a.score || b.createdAt - a.createdAt);
@@ -410,6 +477,8 @@ export function listOfferSummaries(): OfferSummary[] {
     snapsByOffer.set(s.offerId, list);
   }
 
+  const remindersByOffer = listPendingRemindersByOfferIds(allOffers.map((o) => o.id));
+
   return allOffers
     .map((o) => {
       const linked = allBets.filter((b) => b.offerId === o.id);
@@ -453,7 +522,12 @@ export function listOfferSummaries(): OfferSummary[] {
       }
 
       const evLock = captureSummary(snaps);
-      return { ...summary, recurrence, evLock };
+      return {
+        ...summary,
+        recurrence,
+        evLock,
+        reminders: remindersByOffer.get(o.id) ?? [],
+      };
     })
     .sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -568,6 +642,7 @@ export function syncOfferStatuses(): void {
           .where(eq(offers.id, offer.id))
           .run();
         quietOfferAlerts(offer.id, now);
+        retireUnusedSameDayOfferSiblings(offer.id);
       }
       continue;
     }
@@ -620,6 +695,7 @@ export function syncOfferStatuses(): void {
           .where(eq(offers.id, offer.id))
           .run();
         quietOfferAlerts(offer.id, now);
+        retireUnusedSameDayOfferSiblings(offer.id);
         continue;
       }
     }
@@ -632,19 +708,112 @@ export function syncOfferStatuses(): void {
         .where(eq(offers.id, offer.id))
         .run();
       quietOfferAlerts(offer.id, now);
+      retireUnusedSameDayOfferSiblings(offer.id);
     }
   }
 
+  // Drop unused same-day twins once a recurring day's play is underway / done,
+  // and after used non-series cards have already been completed.
+  reconcileSameDayOfferSiblings();
+
+  syncOfferPlaybooksFromLedger(now);
 }
 
 /**
- * Spawn a fresh course-day campaign when every live sibling in the group already
- * has a linked bet. Call only after bet create/link, not on every status sync,
- * otherwise deleting an unused fresh card immediately respawns an identical one.
+ * O1 Phase 2: keep offer playbooks in sync with ledger evidence —
+ * deposit credits, bet-linked profit stages, and clear-wagering WR watch.
  */
-export function spawnCourseOfferSiblingsIfNeeded(): void {
+export function syncOfferPlaybooksFromLedger(now = Date.now()): number {
+  const allAccounts = db.select().from(accounts).all();
+  const allTx = db.select().from(balanceTransactions).all();
   const allBets = db.select().from(bets).all();
-  ensureCourseOfferSiblings(db.select().from(offers).all(), allBets);
+  const promoAwards = getPromoAwardsByBetId();
+  const wrAccounts = allAccounts.map((a) => ({
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    wrRemaining: a.wrRemaining ?? 0,
+  }));
+  let updated = 0;
+
+  for (const offer of db.select().from(offers).all()) {
+    if (offer.status !== "active" && offer.status !== "planned") continue;
+    const playbook = readPlaybookFromRulesJson(offer.rules);
+    if (!playbook) continue;
+
+    let next = playbook;
+    const important = readImportantTerms(offer);
+
+    const deposit = next.steps.find((s) => s.kind === "deposit");
+    if (deposit && deposit.status !== "done") {
+      const evidence = findDepositEvidence({
+        bookmaker: offer.bookmaker,
+        minDeposit: important.minDeposit,
+        notBeforeMs: offer.createdAt,
+        accounts: allAccounts.map((a) => ({ id: a.id, name: a.name, type: a.type })),
+        transactions: allTx.map((t) => ({
+          id: t.id,
+          accountId: t.accountId,
+          amount: t.amount,
+          category: t.category,
+          createdAt: t.createdAt,
+        })),
+      });
+      if (evidence) {
+        next = applyDepositEvidenceToPlaybook(next, evidence, now);
+      }
+    }
+
+    const linked = allBets.filter((b) => b.offerId === offer.id);
+    const profit = computeOfferProfitBreakdown(linked, promoAwards);
+    next = syncPlaybookFromOfferProfit(next, profit, now);
+
+    const convertDone = next.steps.find((s) => s.kind === "convert")?.status === "done";
+    const convertComplete =
+      convertDone ||
+      profit.freeBetStage === "in_use" ||
+      profit.freeBetStage === "settled";
+
+    next = syncClearWageringFromBookieWr(
+      next,
+      {
+        bookmaker: offer.bookmaker,
+        accounts: wrAccounts,
+        convertComplete,
+      },
+      now
+    );
+
+    if (playbooksEqual(playbook, next)) continue;
+
+    try {
+      const parsed = offer.rules
+        ? (JSON.parse(offer.rules) as Record<string, unknown>)
+        : { type: "promo_terms" };
+      const rules = JSON.stringify(withPlaybookOnRules(parsed, next));
+      db.update(offers).set({ rules }).where(eq(offers.id, offer.id)).run();
+      updated += 1;
+    } catch {
+      // leave rules untouched
+    }
+  }
+  return updated;
+}
+
+/**
+ * Spawn a fresh same-day campaign (course or UK & Ireland) when every live
+ * sibling in the group already has a linked bet. Call only after bet create/link,
+ * not on every status sync, otherwise deleting an unused fresh card immediately
+ * respawns an identical one.
+ */
+export function spawnSameDayOfferSiblingsIfNeeded(): void {
+  const allBets = db.select().from(bets).all();
+  ensureSameDayOfferSiblings(db.select().from(offers).all(), allBets);
+}
+
+/** @deprecated Prefer spawnSameDayOfferSiblingsIfNeeded. */
+export function spawnCourseOfferSiblingsIfNeeded(): void {
+  spawnSameDayOfferSiblingsIfNeeded();
 }
 
 /** Backfill offers for existing bets that look like promos but have no offer_id. */
@@ -670,12 +839,14 @@ export function backfillOffersFromBets(): number {
   }
 
   // Pass 2: attach SNR/SR conversions to awarded campaigns (bookie optional).
+  // Infer is intentional here — repair orphan free bets; live Add bet does not.
   for (const bet of db.select().from(bets).all().filter((b) => b.offerId == null)) {
     if (bet.source === "import") continue;
     const offerId = resolveOfferForFreeBetUsage({
       betType: bet.betType,
       bookmaker: bet.bookmaker,
       backStake: bet.backStake,
+      allowInfer: true,
     });
     if (offerId != null) {
       db.update(bets).set({ offerId }).where(eq(bets.id, bet.id)).run();

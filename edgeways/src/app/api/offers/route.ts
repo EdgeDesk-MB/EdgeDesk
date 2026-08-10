@@ -7,6 +7,7 @@ import {
   localYmd,
   type OfferRecurrenceRule,
 } from "@/lib/offers/offer-recurrence";
+import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import {
   backfillOffersFromBets,
   listOfferSummaries,
@@ -24,6 +25,14 @@ const recurrenceSchema = z.object({
   expiryOffsetDays: z.number().int().min(0).max(365).optional(),
 });
 
+const offerUrlField = z
+  .string()
+  .nullable()
+  .optional()
+  .refine((v) => v == null || v.trim() === "" || normalizeOfferUrl(v) != null, {
+    message: "Enter a valid http(s) link",
+  });
+
 const createSchema = z.object({
   bookmaker: z.string().optional(),
   title: z.string().min(1),
@@ -40,6 +49,7 @@ const createSchema = z.object({
   scopeRaceId: z.string().nullable().optional(),
   scopeRaceLabel: z.string().nullable().optional(),
   rules: z.string().nullable().optional(),
+  offerUrl: offerUrlField,
   recurrence: recurrenceSchema.optional(),
 });
 
@@ -56,6 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+  const offerUrl = normalizeOfferUrl(input.offerUrl ?? null);
 
   if (input.recurrence) {
     const rule: OfferRecurrenceRule = {
@@ -77,6 +88,7 @@ export async function POST(req: NextRequest) {
         scopeRaceId: input.scopeRaceId ?? null,
         scopeRaceLabel: input.scopeRaceLabel ?? null,
         rules: input.rules ?? null,
+        offerUrl,
         expiresAt: input.expiresAt ?? null,
       },
       rule,
@@ -107,6 +119,7 @@ export async function POST(req: NextRequest) {
       scopeRaceId: input.scopeRaceId ?? null,
       scopeRaceLabel: input.scopeRaceLabel ?? null,
       rules: input.rules ?? null,
+      offerUrl,
       createdAt: Date.now(),
     })
     .returning()

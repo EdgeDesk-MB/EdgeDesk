@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ocrOfferScreenshots } from "@/lib/ocr/extract-text";
 import { parseEmlToOfferText } from "@/lib/offers/parse-email";
+import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ImageIcon, Loader2, ScanLine, X } from "lucide-react";
 
@@ -65,16 +66,20 @@ export function PasteCapture({
   onTextChange,
   textLabel = "Offer text",
   placeholder,
+  /** Compact strip for inline form paste — smaller drop zone, source text collapsed. */
+  dense = false,
 }: {
   text: string;
   onTextChange: (text: string) => void;
   textLabel?: string;
   placeholder?: string;
+  dense?: boolean;
 }) {
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrProgress, setOcrProgress] = useState<string | null>(null);
   const [shots, setShots] = useState<Shot[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [sourceOpen, setSourceOpen] = useState(!dense);
   const fileRef = useRef<HTMLInputElement>(null);
   const shotsRef = useRef<Shot[]>([]);
 
@@ -180,7 +185,7 @@ export function PasteCapture({
             description: [
               `~${Math.round(avg)}% accurate`,
               weak > 0 ? `${weak} skipped (too little text)` : null,
-              "Check the merged text before applying.",
+              dense ? "Fields update as text is merged." : "Check the merged text.",
             ]
               .filter(Boolean)
               .join(" · "),
@@ -195,7 +200,7 @@ export function PasteCapture({
         setOcrProgress(null);
       }
     },
-    [onTextChange, applyShots]
+    [onTextChange, applyShots, dense]
   );
 
   useEffect(() => {
@@ -239,11 +244,13 @@ export function PasteCapture({
       if (added > 0) {
         onTextChange(combined);
         toast.success(added === 1 ? "Email added" : `${added} emails added`, {
-          description: "Parsed locally - check the preview below.",
+          description: dense
+            ? "Parsed locally - form fields update from the text."
+            : "Parsed locally - check the text below.",
         });
       }
     },
-    [onTextChange, text]
+    [onTextChange, text, dense]
   );
 
   const canAddMore = shots.length < MAX_SCREENSHOTS;
@@ -252,7 +259,8 @@ export function PasteCapture({
     <>
       <div
         className={cn(
-          "relative flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-4 text-center transition-colors",
+          "relative flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-center transition-colors",
+          dense ? "px-3 py-2.5" : "px-3 py-4",
           dragOver
             ? "border-primary/50 bg-primary/5"
             : "border-muted-foreground/25 bg-muted/20",
@@ -279,7 +287,9 @@ export function PasteCapture({
         <p className="text-xs text-muted-foreground">
           {ocrProgress ??
             (canAddMore
-              ? "Drop screenshots or a promo email (.eml), paste (⌘V / Ctrl+V), or choose files"
+              ? dense
+                ? "Drop or paste screenshots, .eml or text; fields fill below"
+                : "Drop screenshots or a promo email (.eml), paste (⌘V / Ctrl+V), or choose files"
               : `Maximum ${MAX_SCREENSHOTS} screenshots - remove one to add more`)}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -323,7 +333,7 @@ export function PasteCapture({
                   alt={`Screenshot ${i + 1}`}
                   className="h-16 w-full object-cover"
                 />
-                <div className="flex items-center justify-between gap-1 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <div className="flex items-center justify-between gap-1 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                   <span className="truncate">#{i + 1}</span>
                   <span className="tabular-nums">
                     {Math.round(shot.confidence)}%
@@ -345,20 +355,40 @@ export function PasteCapture({
 
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs text-muted-foreground">{textLabel}</Label>
+          {dense ? (
+            <button
+              type="button"
+              className="rounded-sm text-xs font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => setSourceOpen((v) => !v)}
+              aria-expanded={sourceOpen}
+              aria-controls="paste-capture-source"
+            >
+              {sourceOpen ? "Hide source text" : "Show source text"}
+              {text.trim() ? ` · ${text.trim().length.toLocaleString()} chars` : ""}
+            </button>
+          ) : (
+            <Label className="text-xs text-muted-foreground">{textLabel}</Label>
+          )}
           {shots.length > 1 && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Merged from {shots.length} screenshots
             </span>
           )}
         </div>
-        <textarea
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          rows={8}
-          placeholder={placeholder}
-          className="min-h-[10rem] w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none ring-primary/40 focus:ring-2"
-        />
+        {sourceOpen ? (
+          <textarea
+            id="paste-capture-source"
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
+            rows={dense ? 4 : 8}
+            placeholder={placeholder}
+            className={cn(
+              fieldControl,
+              "w-full resize-y px-3 py-2 text-sm outline-none",
+              dense ? "min-h-[5rem]" : "min-h-[10rem]"
+            )}
+          />
+        ) : null}
       </div>
     </>
   );

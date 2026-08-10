@@ -30,7 +30,7 @@ function RetentionStat({
   return (
     <span
       className={cn(
-        "font-medium text-violet-700 dark:text-violet-300 tabular-nums",
+        "font-medium tabular-nums text-edge",
         offerInactiveFigureClass(inactive)
       )}
     >
@@ -62,7 +62,7 @@ function OfferPnlRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="truncate font-medium">{offer.title}</p>
           {isRacing && (
-            <Badge variant="outline" className="h-4 px-1 text-[9px]">
+            <Badge variant="outline" className="h-5 px-1.5 text-[11px]">
               Racing
             </Badge>
           )}
@@ -74,7 +74,7 @@ function OfferPnlRow({
             {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
           </span>
         </p>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
           {(profit.qualifyingSettledCount > 0 || profit.qualifyingOpenCount > 0) && (
             <span>
               <span className="text-muted-foreground">Qual loss </span>
@@ -211,7 +211,7 @@ export function OfferPnlSlice({
   const awaitingNote = withActivity.some((o) => o.profit.freeBetStage === "awaiting_result") && (
     <p
       className={cn(
-        "flex items-center gap-1.5 text-[11px] text-muted-foreground",
+        "flex items-center gap-1.5 text-xs text-muted-foreground",
         variant === "plain" && cn("rounded-md px-3 py-2", selectionSubtle)
       )}
     >
@@ -279,7 +279,7 @@ export function OfferPnlSlice({
 
         {bookieRows.length > 1 && (
           <div>
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               By bookie
             </p>
             <div className="space-y-1">

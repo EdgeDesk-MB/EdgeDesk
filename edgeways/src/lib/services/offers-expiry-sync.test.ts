@@ -48,6 +48,9 @@ beforeEach(() => {
 describe("syncOfferStatuses - race-scoped deadlines", () => {
   it("keeps an offer live when its race is later today", () => {
     const later = new Date(Date.now() + 3 * 3_600_000);
+    // Only meaningful while the off-time is still ahead of us today; near
+    // midnight now+3h rolls into tomorrow and the off-time would be past.
+    if (localYmd(later) !== localYmd(new Date())) return;
     const hh = Number(
       new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/London",
@@ -55,8 +58,6 @@ describe("syncOfferStatuses - race-scoped deadlines", () => {
         hour12: false,
       }).format(later)
     );
-    // Only meaningful while the off-time is still ahead of us today.
-    if (hh > 23) return;
 
     const offer = insertOffer({
       status: "active",

@@ -11,7 +11,7 @@ import {
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { Check } from "lucide-react";
 
-/** Progress fill colour by current stage - free-bet stages use violet. */
+/** Progress fill — free-bet stages use `--edge` (same plate as FB badge / Convert). */
 function stageProgressClass(stage: OfferPipelineStage): string {
   switch (stage) {
     case "qualifying":
@@ -19,9 +19,8 @@ function stageProgressClass(stage: OfferPipelineStage): string {
     case "awaiting":
       return "bg-amber-500";
     case "awarded":
-      return "bg-violet-500";
     case "converting":
-      return "bg-violet-600";
+      return "bg-edge";
     case "completed":
       return "bg-emerald-500/70";
     case "settled":
@@ -37,7 +36,7 @@ function stageLabelClass(stage: OfferPipelineStage): string {
   switch (stage) {
     case "awarded":
     case "converting":
-      return "text-violet-700 dark:text-violet-300";
+      return "text-edge";
     case "completed":
     case "settled":
       return "text-emerald-700 dark:text-emerald-400";
@@ -74,7 +73,7 @@ function TerminalPipelineStatus({
               : "bg-emerald-500/10 ring-emerald-500/25"
           )}
         >
-          <Check className="size-2.5" strokeWidth={3} aria-hidden />
+          <Check className="size-3" strokeWidth={3} aria-hidden />
         </span>
         {label}
       </p>
@@ -100,7 +99,7 @@ export function OfferPipelineStrip({
   if (stage === "expired") {
     return (
       <div className={className}>
-        <p className="text-[11px] font-medium text-muted-foreground">Expired</p>
+        <p className="text-xs font-medium text-muted-foreground">Expired</p>
       </div>
     );
   }
@@ -122,7 +121,7 @@ export function OfferPipelineStrip({
         <p className={cn("text-xs font-semibold", stageLabelClass(stage))}>
           {currentLabel}
         </p>
-        <p className="text-[10px] tabular-nums text-muted-foreground">
+        <p className="text-[11px] tabular-nums text-muted-foreground">
           {activeIdx + 1}/{total}
           {next ? ` · next ${next.label}` : ""}
         </p>

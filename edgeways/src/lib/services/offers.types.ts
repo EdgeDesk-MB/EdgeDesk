@@ -1,7 +1,7 @@
 /**
  * Client-safe offer types (no SQLite / server services).
  */
-import type { OfferRow } from "@/lib/db/schema";
+import type { OfferRow, UserReminderRow } from "@/lib/db/schema";
 import type { EvBasis } from "@/lib/offers/advantage";
 
 export type FreeBetStage =
@@ -69,4 +69,6 @@ export interface OfferSummary extends OfferRow {
   recurrence?: OfferRecurrenceMeta | null;
   /** Immutable EV baseline; populated once the campaign goes active. */
   evLock?: EvLockSummary | null;
+  /** Pending user reminders linked to this campaign (not yet fired/cancelled) */
+  reminders?: UserReminderRow[];
 }

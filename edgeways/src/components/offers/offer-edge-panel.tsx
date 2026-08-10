@@ -12,18 +12,22 @@ import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatDecimalOdds } from "@/lib/racing/odds";
 import { formatClockTime } from "@/lib/time-format";
 import { RegionFlag } from "@/components/region-flag";
-import { captionHeading, edgeNavTag, edgePanel, listRowInteractive } from "@/lib/ui/surface-styles";
+import { proNavTag, sectionDescription } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ChevronRight, Zap } from "lucide-react";
 
 const MAX_PLAYS = 3;
 
+/** Quiet nest inside a campaign card — Edge tint only, no wash (card-in-card). */
+const racePicksNest =
+  "overflow-hidden rounded-md border border-edge/20 bg-edge/5";
+
 function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeDataSource }) {
   return (
-    <li className="border-b border-border/60 last:border-0">
+    <li className="border-b border-border/50 last:border-0">
       <Link
         href={`/racing?race=${encodeURIComponent(play.raceExternalId)}`}
-        className={cn("group flex items-start gap-1 px-2.5 py-2", listRowInteractive)}
+        className="group flex items-start gap-2 px-3 py-2.5 transition-colors hover:bg-selection-subtle focus-visible:bg-selection-subtle focus-visible:outline-none"
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -40,13 +44,13 @@ function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeD
               exchangeSource={play.exchangeSource}
               dataSource={dataSource}
             />
-            <span className="ml-auto inline-flex items-baseline gap-1 text-xs">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">EV</span>
-              <MoneyFlow value={play.totalEv} signColor signDisplay className="font-semibold" />
+            <span className="ml-auto inline-flex items-baseline gap-1 text-xs font-semibold">
+              <span className="uppercase tracking-wide text-muted-foreground">EV</span>
+              <MoneyFlow value={play.totalEv} signColor signDisplay estimate />
             </span>
           </div>
 
-          <p className="mt-0.5 text-sm">
+          <p className="mt-1 text-sm">
             Back <span className="font-semibold">{play.runner.name}</span>{" "}
             <span className="text-muted-foreground">
               at {formatDecimalOdds(play.runner.backDecimal)}
@@ -54,7 +58,7 @@ function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeD
           </p>
 
           {play.reasons.length > 0 && (
-            <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            <ul className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
               {play.reasons.map((reason) => (
                 <li key={reason} className="max-w-full">
                   {reason}
@@ -64,14 +68,14 @@ function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeD
           )}
 
           {play.warnings.map((warning) => (
-            <p key={warning} className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
+            <p key={warning} className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
               <AlertTriangle className="mt-px size-3 shrink-0 text-muted-foreground" aria-hidden />
               {warning}
             </p>
           ))}
         </div>
         <ChevronRight
-          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           aria-hidden
         />
       </Link>
@@ -80,10 +84,11 @@ function PlayRow({ play, dataSource }: { play: OfferEdgePlay; dataSource?: EdgeD
 }
 
 /**
- * Offer Edge for one racing offer: which races today, and which horse in each.
+ * Race picks for one racing offer: which races on the offer's race day, and
+ * which horse in each.
  *
  * Renders nothing until there is something worth showing, so an offer with no
- * qualifying races today leaves no empty shell on the card.
+ * modelled plays leaves no empty shell on the card.
  */
 export function OfferEdgePanel({
   offerId,
@@ -115,11 +120,13 @@ export function OfferEdgePanel({
   const assumedRetention = Math.round(plays[0].retention * 100);
 
   return (
-    <div className={cn(edgePanel, "overflow-hidden")}>
-      <div className="flex items-center gap-1.5 border-b border-border/50 px-2.5 py-1.5">
-        <Zap className="size-3.5 text-edge" aria-hidden />
-        <span className={edgeNavTag}>Edge</span>
-        <span className={cn(captionHeading, "text-edge")}>Today</span>
+    <div className={racePicksNest}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/50 px-3 py-2.5">
+        <Zap className="size-3 shrink-0 text-edge" aria-hidden />
+        <span className="text-xs font-semibold text-foreground">
+          Race picks for this offer
+        </span>
+        <span className={proNavTag}>Pro</span>
       </div>
       <ul>
         {plays.map((play) => (
@@ -131,7 +138,7 @@ export function OfferEdgePanel({
         ))}
       </ul>
       {unmeasuredRetention && (
-        <p className="border-t border-border/50 px-2.5 py-1.5 text-[10px] text-muted-foreground">
+        <p className={cn(sectionDescription, "border-t border-border/50 px-3 py-2.5")}>
           Free-bet value assumes {assumedRetention}% retention until you have settled
           some free bets.
         </p>

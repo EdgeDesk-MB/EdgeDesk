@@ -45,6 +45,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     quickLogged: null,
     source: null,
     purpose: null,
+    sport: null,
     ...partial,
   };
 }
@@ -114,6 +115,40 @@ describe("computeOfferProfitBreakdown", () => {
     expect(breakdown.freeBetProfit).toBe(0);
     expect(breakdown.totalProfit).toBe(-1.51);
     expect(breakdown.freeBetStage).toBe("awarded");
+  });
+
+  it("keeps awarded when a later promo sits unused after an earlier convert settled", () => {
+    // Cycle 1: convert settled (bet 2). Cycle 2: new qualify + promo (bet 3), no convert yet.
+    // Worked by hand: freeBetSettledCount=1 but the award on bet 3 has no later usage → awarded.
+    const linked = [
+      bet({
+        id: 2,
+        betType: "free_snr",
+        actualProfit: 6.4,
+        status: "lost",
+        triggerText: null,
+        createdAt: 100,
+        settledAt: 200,
+      }),
+      bet({
+        id: 3,
+        betType: "qualifying",
+        actualProfit: -1.2,
+        status: "lost",
+        label: "Acca · Bet £10 get £10 free bet",
+        createdAt: 300,
+        settledAt: 400,
+      }),
+    ];
+    const promo = { 3: { amount: 10, reason: "Offer unlocked" } };
+
+    const breakdown = computeOfferProfitBreakdown(linked, promo);
+
+    expect(breakdown.freeBetAwarded).toBe(true);
+    expect(breakdown.freeBetAwardAmount).toBe(10);
+    expect(breakdown.freeBetSettledCount).toBe(1);
+    expect(breakdown.freeBetStage).toBe("awarded");
+    expect(isOfferCampaignComplete(linked, breakdown)).toBe(false);
   });
 
   it("shows not awarded when place-refund qualifying settles without promo", () => {
@@ -231,16 +266,36 @@ describe("resolveOfferForFreeBetUsage", () => {
       })
       .run();
 
+    // Live Add bet: never infer a campaign from bookie+stake alone.
     expect(
       resolveOfferForFreeBetUsage({
         betType: "free_snr",
-        bookmaker: "InBet Bookie",
+        bookmaker: "Betfair Sportsbook",
         backStake: 50,
       })
     ).toBeNull();
 
     expect(
       resolveOfferForFreeBetUsage({
+        betType: "free_snr",
+        bookmaker: "InBet Bookie",
+        backStake: 50,
+        allowInfer: true,
+      })
+    ).toBeNull();
+
+    expect(
+      resolveOfferForFreeBetUsage({
+        betType: "free_snr",
+        bookmaker: "Betfair Sportsbook",
+        backStake: 50,
+        allowInfer: true,
+      })
+    ).toBe(offer.id);
+
+    expect(
+      resolveOfferForFreeBetUsage({
+        offerId: offer.id,
         betType: "free_snr",
         bookmaker: "Betfair Sportsbook",
         backStake: 50,
@@ -309,6 +364,7 @@ function offerRow(partial: Partial<OfferRow> & Pick<OfferRow, "id">): OfferRow {
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: null,
     createdAt: 1,
     ...partial,
   };

@@ -5,6 +5,10 @@ import { OfferDialog } from "@/components/offers/offer-dialog";
 import { OfferViewDialog } from "@/components/offers/offer-view-dialog";
 import type { OfferEditorPrefill } from "@/components/offers/offer-editor-form";
 import { useAppState } from "@/hooks/use-app-state";
+import {
+  useDevStickyJson,
+  useDevStickyOpen,
+} from "@/lib/dev/use-dev-sticky-open";
 import { deriveOfferNextAction, offerNextActionLabel } from "@/lib/offers/next-actions";
 import type { OfferSummary } from "@/lib/services/offers.types";
 
@@ -24,10 +28,14 @@ export function useOfferDialog() {
 }
 
 export function OfferProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+  // Dev sticky: HMR remounts wipe useState; keep shell open while iterating.
+  const [open, setOpen] = useDevStickyOpen("offer-editor");
   const [prefill, setPrefill] = useState<OfferEditorPrefill | undefined>();
   const [formKey, setFormKey] = useState(0);
-  const [viewSeedId, setViewSeedId] = useState<number | null>(null);
+  const [viewSeedId, setViewSeedId] = useDevStickyJson<number | null>(
+    "offer-view-id",
+    null
+  );
   const { state, refresh } = useAppState(5000);
 
   const openOffer = useCallback((next?: OfferEditorPrefill) => {
@@ -78,6 +86,7 @@ export function OfferProvider({ children }: { children: React.ReactNode }) {
         formKey={formKey}
         onSaved={handleRefresh}
       />
+      {/* Campaign details modal — keep OfferViewDialog import graph stable for HMR. */}
       <OfferViewDialog
         open={viewOpen}
         onOpenChange={handleViewOpenChange}

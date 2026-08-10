@@ -9,11 +9,28 @@ import {
 } from "@/lib/offers/offer-recurrence";
 import { summariseOffer } from "@/lib/services/offers";
 import { quietOfferAlerts } from "@/lib/services/quiet-alerts";
+import { cancelPendingRemindersForOffer } from "@/lib/services/user-reminders";
 import { MISTAKE_TAGS, setMistakeTag, writeEvLock, type MistakeTag } from "@/lib/services/ev-snapshot";
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
 import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
+import { normalizeOfferUrl } from "@/lib/offers/offer-url";
+import { retireUnusedSameDayOfferSiblings } from "@/lib/offers/course-offer-sync";
+import {
+  markPlaybookStepDone,
+  readPlaybookFromRulesJson,
+  syncPlaybookFromOfferProfit,
+  withPlaybookOnRules,
+} from "@/lib/offers/offer-playbook";
 
 export const dynamic = "force-dynamic";
+
+const offerUrlField = z
+  .string()
+  .nullable()
+  .optional()
+  .refine((v) => v == null || v.trim() === "" || normalizeOfferUrl(v) != null, {
+    message: "Enter a valid http(s) link",
+  });
 
 const patchSchema = z.object({
   bookmaker: z.string().optional(),
@@ -30,11 +47,14 @@ const patchSchema = z.object({
   scopeRaceId: z.string().nullable().optional(),
   scopeRaceLabel: z.string().nullable().optional(),
   rules: z.string().nullable().optional(),
+  offerUrl: offerUrlField,
   stopRecurrence: z.boolean().optional(),
   /** When true, push campaign fields onto the series template and untouched repeats */
   updateSeries: z.boolean().optional(),
   /** B7: tag the latest settled EV snapshot (null clears) */
   mistakeTag: z.enum(MISTAKE_TAGS).nullable().optional(),
+  /** O1: mark a playbook step done (hybrid wizard) */
+  playbookStepDone: z.string().min(1).optional(),
 });
 
 const deleteScopeSchema = z.enum(["instance", "future"]).default("instance");
@@ -56,6 +76,29 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   if (p.mistakeTag !== undefined) {
     setMistakeTag(offerId, p.mistakeTag as MistakeTag | null);
+  }
+
+  let rulesFromPlaybook: string | undefined;
+  if (p.playbookStepDone) {
+    try {
+      const parsedRules = existing.rules
+        ? (JSON.parse(existing.rules) as Record<string, unknown>)
+        : { type: "promo_terms" };
+      const pb = readPlaybookFromRulesJson(existing.rules);
+      if (!pb) {
+        return NextResponse.json(
+          { error: "Offer has no completion playbook" },
+          { status: 400 }
+        );
+      }
+      const linked = db.select().from(bets).where(eq(bets.offerId, offerId)).all();
+      const summary = summariseOffer(existing, linked, getPromoAwardsByBetId());
+      const synced = syncPlaybookFromOfferProfit(pb, summary.profit);
+      const marked = markPlaybookStepDone(synced, p.playbookStepDone);
+      rulesFromPlaybook = JSON.stringify(withPlaybookOnRules(parsedRules, marked));
+    } catch {
+      return NextResponse.json({ error: "Could not update playbook" }, { status: 400 });
+    }
   }
 
   // Manual expire: stamp a past deadline so syncOfferStatuses does not revive
@@ -81,7 +124,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(p.eventDate !== undefined ? { eventDate: p.eventDate } : {}),
       ...(p.scopeRaceId !== undefined ? { scopeRaceId: p.scopeRaceId } : {}),
       ...(p.scopeRaceLabel !== undefined ? { scopeRaceLabel: p.scopeRaceLabel } : {}),
-      ...(p.rules !== undefined ? { rules: p.rules } : {}),
+      ...(p.rules !== undefined
+        ? { rules: p.rules }
+        : rulesFromPlaybook !== undefined
+          ? { rules: rulesFromPlaybook }
+          : {}),
+      ...(p.offerUrl !== undefined ? { offerUrl: normalizeOfferUrl(p.offerUrl) } : {}),
       ...(p.status === "completed" ? { completedAt: Date.now() } : {}),
       ...expireStamp,
     })
@@ -112,12 +160,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     syncOfferSeriesTemplateFromOffer(offerId);
   }
 
-  // Campaign finished or missed: pull down any £unclaimed push still on devices.
+  // Campaign finished or missed: pull down any £unclaimed push still on devices,
+  // and drop pending user reminders that no longer make sense.
   if (
     (p.status === "completed" || p.status === "expired") &&
     existing.status !== p.status
   ) {
     quietOfferAlerts(offerId);
+    cancelPendingRemindersForOffer(offerId);
+    // Unused same-day twins would otherwise keep Race picks recommending.
+    retireUnusedSameDayOfferSiblings(offerId);
   }
 
   return NextResponse.json({ offer: updated });
@@ -136,5 +188,6 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
 
   deleteOfferWithScope(existing, scopeParsed.data);
   quietOfferAlerts(offerId);
+  cancelPendingRemindersForOffer(offerId);
   return NextResponse.json({ ok: true });
 }

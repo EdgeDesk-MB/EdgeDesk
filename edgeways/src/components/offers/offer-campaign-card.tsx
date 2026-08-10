@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,27 +14,24 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { MoneyFlow } from "@/components/money-flow";
+import {
+  OfferPendingReminders,
+  OfferSetReminderDialog,
+} from "@/components/offers/offer-set-reminder-dialog";
 import { api, useAppState } from "@/hooks/use-app-state";
-import {
-  offerExpiringAlertDedupePrefix,
-  offerExpiringAlertKeys,
-} from "@/lib/alerts/rules";
-import {
-  dismissAlertNotifications,
-  suppressAlertKeys,
-} from "@/lib/alerts/seen";
+import { offerExpiringAlertDedupePrefix } from "@/lib/alerts/rules";
+import { quietOfferPromptToasts } from "@/lib/alerts/quiet-offer-toasts";
 import { DEFAULT_TUNING } from "@/lib/services/settings-shared";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";
 import {
   canManuallyCompleteOffer,
-  offerManualCompleteBlockedReason,
 } from "@/lib/offers/offer-complete";
 import {
   offerCategoryFromSport,
   offerCategoryLabel,
 } from "@/lib/offers/offer-categories";
-import { formatOfferExpiry } from "@/lib/offers/offer-terms";
-import { buildCampaignDetailsContext } from "@/lib/offers/offer-campaign-details";
+import { formatOfferExpiryCompact } from "@/lib/offers/offer-terms";
+import { buildCampaignDetailsContext, campaignDetailTextsOverlap } from "@/lib/offers/offer-campaign-details";
 import {
   offerIssueStatusLabel,
   effectiveOfferExpiryMs,
@@ -46,6 +43,10 @@ import { formatGbp } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { offerStatusBadgeVariant } from "@/lib/ui/status-badges";
 import { OfferPipelineStrip } from "@/components/offers/offer-pipeline-strip";
+import {
+  OfferPlaybookPanel,
+  offerPlaybookIsPrimary,
+} from "@/components/offers/offer-playbook-panel";
 import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import {
   isOfferExpired,
@@ -67,11 +68,25 @@ import {
   offerHasFreeBetReward,
 } from "@/lib/offers/offer-ui";
 import { outlineButtonGroup } from "@/components/layout/page-header-actions";
-import { Check, ChevronDown, Eye, Pencil, Trash2, Zap } from "lucide-react";
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { localCalendarDate } from "@/lib/events";
+import {
+  campaignCardBadge,
+  campaignCardDetailsLabel,
+  campaignCardDetailsSummary,
+  campaignCardFooterMeta,
+  campaignCardHeader,
+  campaignCardHeaderBlock,
+  campaignCardHeaderBlockSm,
+  campaignCardNextAction,
+  campaignCardOpenLink,
+  campaignCardPnl,
+  campaignCardPnlLabel,
+  campaignCardTitle,
+  campaignFbBadge,
+  offerCampaignCardInteractive,
+  offerCampaignCardShell,
+} from "@/lib/ui/surface-styles";
+import { Check, ChevronDown, ExternalLink, Eye, Pencil, Trash2, Zap } from "lucide-react";
 
 export function OfferCampaignCard({
   offer,
@@ -92,7 +107,27 @@ export function OfferCampaignCard({
   onView?: (offer: OfferSummary) => void;
   defaultDetailsOpen?: boolean;
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(defaultDetailsOpen);
+  // When a completion playbook is showing, keep Details collapsed so Steps stay
+  // the focus (Important notes often duplicate the current step).
+  const playbookPrimary = offerPlaybookIsPrimary(offer);
+  const [detailsOpen, setDetailsOpen] = useState(
+    () => defaultDetailsOpen && !offerPlaybookIsPrimary(offer)
+  );
+  const [reminders, setReminders] = useState(offer.reminders ?? []);
+  const reminderSyncKey = (offer.reminders ?? [])
+    .map((r) => `${r.id}:${r.remindAt}:${r.cancelledAt ?? ""}`)
+    .join("|");
+  useEffect(() => {
+    setReminders(offer.reminders ?? []);
+    // Sync when the server snapshot of pending reminders changes (poll / refresh).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by reminderSyncKey
+  }, [offer.id, reminderSyncKey]);
+  useEffect(() => {
+    setDetailsOpen(defaultDetailsOpen && !offerPlaybookIsPrimary(offer));
+    // Reset only when switching campaigns (or default prop), not on every poll tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- offer.id gates playbook check
+  }, [offer.id, defaultDetailsOpen]);
+  const offerWithReminders: OfferSummary = { ...offer, reminders };
   const {
     rulesSummary,
     descriptionLine,
@@ -102,14 +137,15 @@ export function OfferCampaignCard({
   const racingRules = offer.sport === "horse_racing" ? parseOfferRules(offer) : null;
   const minRunners = racingRules?.minRunners ?? null;
 
-  // Offer Edge only makes sense while the offer is still live and there are races
-  // to run it on, so an undated or finished campaign shows nothing.
-  const edgeDate = offer.eventDate ?? todayIso();
+  // Offer Edge answers "which race / horse today". Future series instances stay
+  // on the list for planning, but must not carry live picks (or a Today label).
+  const today = localCalendarDate();
+  const edgeDate = offer.eventDate ?? today;
   const showEdgePanel =
     racingRules != null &&
     offerHasResultTrigger(racingRules) &&
     (offer.status === "active" || offer.status === "planned") &&
-    edgeDate >= todayIso();
+    edgeDate === today;
   const categoryId = offerCategoryFromSport(offer.sport);
   const categoryLabel = offerCategoryLabel(offer.sport);
   const hasFreeBet = offerHasFreeBetReward(offer);
@@ -138,18 +174,24 @@ export function OfferCampaignCard({
     Boolean(scopeLine) ||
     hasProfitLines;
 
-  const detailsSummary = [
-    rulesSummary?.split(" · ")[0] ?? descriptionLine?.slice(0, 48) ?? null,
-    uniqueImportant?.split("\n")[0]?.slice(0, 48) ?? null,
-    hasProfitLines ? "Profit & Loss breakdown" : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const detailsSummary = (() => {
+    const parts: string[] = [];
+    const primary = rulesSummary?.split(" · ")[0] ?? descriptionLine ?? null;
+    const importantPreview = uniqueImportant?.split("\n")[0]?.trim() || null;
+    if (primary) parts.push(primary);
+    if (
+      importantPreview &&
+      !(primary && campaignDetailTextsOverlap(primary, importantPreview))
+    ) {
+      parts.push(importantPreview);
+    }
+    if (hasProfitLines) parts.push("Profit & Loss breakdown");
+    // Full string; CSS ellipsis on the collapsed row (no mid-word JS slice).
+    return parts.join(" · ");
+  })();
 
   function quietOfferNotifications() {
-    const alertKeys = offerExpiringAlertKeys(offer.id);
-    suppressAlertKeys(alertKeys);
-    void dismissAlertNotifications(alertKeys);
+    quietOfferPromptToasts(offer.id, { suppressAll: true });
   }
 
   async function markComplete() {
@@ -190,7 +232,6 @@ export function OfferCampaignCard({
         : null;
   const inactiveFigure = offerInactiveFigureClass(isExpired);
   const canComplete = canManuallyCompleteOffer(offer);
-  const completeBlockedReason = offerManualCompleteBlockedReason(offer);
   const issueStatusLabel = offerIssueStatusLabel(offer);
 
   function handleCardActivate() {
@@ -218,42 +259,57 @@ export function OfferCampaignCard({
           : undefined
       }
       className={cn(
-        "offer-campaign-card gap-0 overflow-hidden py-0 dark:ring-[color-mix(in_oklch,black_55%,var(--border))] dark:ring-opacity-100",
+        offerCampaignCardShell,
+        "gap-0 overflow-hidden py-0",
         highlighted && "bet-row-highlight",
-        onView && "cursor-pointer transition-[box-shadow] hover:ring-foreground/20"
+        onView && offerCampaignCardInteractive
       )}
     >
       <CardHeader
-        className={cn("space-y-0 pt-(--card-spacing) pb-3", headerTintClass ?? "bg-card")}
+        className={cn(campaignCardHeader, headerTintClass ?? "bg-card")}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               {offer.bookmaker ? <VenueBadge name={offer.bookmaker} size="md" /> : null}
               {issueStatusLabel ? (
-                <Badge variant={offerStatusBadgeVariant(offer.status)}>
+                <Badge
+                  variant={offerStatusBadgeVariant(offer.status)}
+                  className={campaignCardBadge}
+                >
                   {issueStatusLabel}
                 </Badge>
               ) : null}
-              <Badge variant="outline" className="font-normal">
-                <OfferCategoryIcon category={categoryId} size={12} className="opacity-80" />
+              <Badge variant="outline" className={cn("font-normal", campaignCardBadge)}>
+                <OfferCategoryIcon category={categoryId} size={13} className="opacity-80" />
                 {categoryLabel}
               </Badge>
               {hasFreeBet ? (
                 <Badge
                   variant="outline"
-                  className="border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                  className={cn(campaignFbBadge, campaignCardBadge)}
                 >
                   <Zap className="size-3" />
                   {freeBetAmt != null ? `${formatGbp(freeBetAmt)} FB` : "Free bet"}
                 </Badge>
               ) : null}
             </div>
-            <CardTitle className="mt-2 text-xl font-bold leading-snug text-foreground">
-              {offer.title}
-            </CardTitle>
-            {nextActionDetail ? (
-              <p className="mt-1 text-xs text-primary-text/90">{nextActionDetail}</p>
+            <CardTitle className={campaignCardTitle}>{offer.title}</CardTitle>
+            {offer.offerUrl ? (
+              <a
+                href={offer.offerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={stopCardActivate}
+                className={campaignCardOpenLink}
+              >
+                <ExternalLink className="size-3 shrink-0" />
+                Open offer
+              </a>
+            ) : null}
+            {/* Playbook Steps own the “what now” essay — avoid repeating it here. */}
+            {nextActionDetail && !playbookPrimary ? (
+              <p className={campaignCardNextAction}>{nextActionDetail}</p>
             ) : null}
           </div>
           <div className="shrink-0 text-right">
@@ -265,19 +321,18 @@ export function OfferCampaignCard({
               if (hasExpected && hasActual) {
                 return (
                   <>
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Total
-                    </p>
+                    <p className={campaignCardPnlLabel}>Total</p>
                     <MoneyFlow
                       value={actual}
                       signColor={!isExpired}
-                      className={cn("text-xl font-bold tabular-nums", inactiveFigure)}
+                      className={cn(campaignCardPnl, inactiveFigure)}
                     />
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       Exp. profit{" "}
                       <MoneyFlow
                         value={expected}
                         signColor={false}
+                        estimate
                         className={cn(
                           "inline font-medium tabular-nums",
                           isExpired
@@ -292,14 +347,13 @@ export function OfferCampaignCard({
               if (hasExpected) {
                 return (
                   <>
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Exp. profit
-                    </p>
+                    <p className={campaignCardPnlLabel}>Exp. profit</p>
                     <MoneyFlow
                       value={expected}
                       signColor={false}
+                      estimate
                       className={cn(
-                        "text-xl font-bold tabular-nums",
+                        campaignCardPnl,
                         isExpired
                           ? inactiveFigure
                           : "text-emerald-600 dark:text-emerald-400"
@@ -310,13 +364,11 @@ export function OfferCampaignCard({
               }
               return (
                 <>
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Total
-                  </p>
+                  <p className={campaignCardPnlLabel}>Total</p>
                   <MoneyFlow
                     value={actual}
                     signColor={!isExpired}
-                    className={cn("text-xl font-bold tabular-nums", inactiveFigure)}
+                    className={cn(campaignCardPnl, inactiveFigure)}
                   />
                 </>
               );
@@ -324,20 +376,41 @@ export function OfferCampaignCard({
           </div>
         </div>
 
-        <OfferPipelineStrip offer={offer} className="mt-3" />
+        <OfferPlaybookPanel
+          offer={offer}
+          className={campaignCardHeaderBlock}
+          onPointerDown={stopCardActivate}
+        />
+
+        <OfferPipelineStrip
+          offer={offer}
+          className={cn(
+            campaignCardHeaderBlock,
+            // Dim under playbook Steps — opacity only. Never force
+            // `[&_p]:text-muted-foreground`: it beats light-mode stage colours
+            // on specificity while `dark:` variants still win (purple in dark,
+            // grey in light).
+            playbookPrimary && "opacity-70"
+          )}
+        />
 
         {offer.evLock ? (() => {
           const captureLine = formatCaptureLine(offer.evLock);
           if (!captureLine) return null;
           return (
-            <div className="mt-2 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5">
+            <div
+              className={cn(
+                campaignCardHeaderBlockSm,
+                "rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5"
+              )}
+            >
               <div className="flex items-center gap-1.5">
                 <EvBasisBadge basis={offer.evLock.basis} />
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   <OfferInactiveCurrencyText text={captureLine} inactive={isExpired} />
                 </span>
                 {offer.evLock.version > 1 ? (
-                  <span className="ml-auto shrink-0 rounded bg-border/60 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="ml-auto shrink-0 rounded bg-border/60 px-1 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     re-locked v{offer.evLock.version}
                   </span>
                 ) : null}
@@ -348,7 +421,11 @@ export function OfferCampaignCard({
         })() : null}
 
         {showEdgePanel ? (
-          <div className="mt-2" onClick={stopCardActivate} onKeyDown={stopCardActivate}>
+          <div
+            className={campaignCardHeaderBlockSm}
+            onClick={stopCardActivate}
+            onKeyDown={stopCardActivate}
+          >
             <OfferEdgePanel offerId={offer.id} eventDate={edgeDate} />
           </div>
         ) : null}
@@ -363,21 +440,18 @@ export function OfferCampaignCard({
           <button
             type="button"
             onClick={() => setDetailsOpen((v) => !v)}
-            className="flex w-full min-h-9 items-baseline gap-2 px-(--card-spacing) py-2.5 text-left transition-colors hover:bg-foreground/5"
+            className="flex w-full min-h-9 min-w-0 items-center gap-2 overflow-hidden px-(--card-spacing) py-2.5 text-left transition-colors hover:bg-foreground/5"
+            aria-expanded={detailsOpen}
           >
-            <span className="shrink-0 text-xs font-semibold tracking-wide text-foreground">
-              Details
-            </span>
+            <span className={campaignCardDetailsLabel}>Details</span>
             {!detailsOpen && detailsSummary ? (
-              <span className="min-w-0 flex-1 text-[11px] leading-normal text-muted-foreground line-clamp-2">
-                {detailsSummary}
-              </span>
+              <span className={campaignCardDetailsSummary}>{detailsSummary}</span>
             ) : (
               <span className="min-w-0 flex-1" aria-hidden />
             )}
             <ChevronDown
               className={cn(
-                "size-3.5 shrink-0 self-center text-muted-foreground transition-transform",
+                "size-3.5 shrink-0 text-muted-foreground transition-transform",
                 detailsOpen && "rotate-180"
               )}
             />
@@ -385,18 +459,18 @@ export function OfferCampaignCard({
           {detailsOpen ? (
             <div className="flex flex-col gap-2 border-t border-border/50 px-(--card-spacing) py-2.5">
               {rulesSummary ? (
-                <p className="text-xs leading-normal text-muted-foreground">{rulesSummary}</p>
+                <p className="text-[13px] leading-normal text-muted-foreground">{rulesSummary}</p>
               ) : null}
               {descriptionLine ? (
-                <p className="text-xs leading-snug text-muted-foreground">{descriptionLine}</p>
+                <p className="text-[13px] leading-snug text-muted-foreground">{descriptionLine}</p>
               ) : null}
               {uniqueImportant ? (
-                <p className="whitespace-pre-line rounded-md border border-amber-500/25 bg-amber-500/5 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-300">
+                <p className="whitespace-pre-line rounded-md border border-border/50 bg-muted/40 px-3 py-2.5 text-[13px] text-muted-foreground">
                   {uniqueImportant}
                 </p>
               ) : null}
               {scopeLine ? (
-                <p className="text-[11px] text-muted-foreground">{scopeLine}</p>
+                <p className="text-xs text-muted-foreground">{scopeLine}</p>
               ) : null}
               {/* Meeting times only for course-wide scope. Race-scoped offers
                   already show the single race in scopeLine above. */}
@@ -417,62 +491,82 @@ export function OfferCampaignCard({
       ) : null}
 
       <CardContent
-        className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]"
+        className="flex flex-col gap-2.5 border-t border-border/50 py-3.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]"
         onClick={stopCardActivate}
         onKeyDown={stopCardActivate}
       >
-        <span className="text-xs text-muted-foreground">
-          {offer.status === "planned" && offer.startsOn ? (
-            <>
-              <span className="font-medium text-foreground">Starts {offer.startsOn}</span>
-              {" · "}
-            </>
-          ) : null}
-          {offer.betCount} bet{offer.betCount === 1 ? "" : "s"}
-          {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
-          {expiryMs != null && expiryUrgency === "today" ? (
-            <>{" · "}<span className="font-medium text-rose-600 dark:text-rose-400">{formatOfferDaysLeftLabel(expiryDaysLeft)}</span></>
-          ) : expiryMs != null && expiryUrgency === "tomorrow" ? (
-            <>{" · "}<span className="font-medium text-orange-600 dark:text-orange-400">{formatOfferDaysLeftLabel(expiryDaysLeft)}</span></>
-          ) : expiryMs != null ? (
-            ` · expires ${formatOfferExpiry(expiryMs)}`
-          ) : null}
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {(offer.status === "active" || offer.status === "planned") && (
-            <Button size="sm" variant="ghost" onClick={() => void markExpired()}>
-              Expire
-            </Button>
-          )}
-          <DeleteOfferDialog offer={offer} onDeleted={onRefresh} />
-          <div className={outlineButtonGroup}>
-            <Button size="sm" variant="outline" onClick={() => onEdit(offer)}>
-              <Pencil className="size-3.5" /> Edit
-            </Button>
-            {onView ? (
-              <Button size="sm" variant="outline" onClick={() => onView(offer)}>
-                <Eye className="size-3.5" /> View
-              </Button>
+        <OfferPendingReminders
+          offer={offerWithReminders}
+          onChanged={(next) => setReminders(next.reminders ?? [])}
+        />
+        <div className="flex w-full flex-col gap-2">
+          <p className={campaignCardFooterMeta}>
+            {offer.status === "planned" && offer.startsOn ? (
+              <>
+                <span className="font-medium text-foreground">Starts {offer.startsOn}</span>
+                {" · "}
+              </>
             ) : null}
-            {offer.status === "active" && offer.betCount > 0 ? (
-              <span title={completeBlockedReason ?? undefined} className="inline-flex">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void markComplete()}
-                  disabled={!canComplete}
-                >
-                  <Check className="size-3.5 text-violet-600 dark:text-violet-400" />
+            {offer.betCount} bet{offer.betCount === 1 ? "" : "s"}
+            {offer.openBets > 0 ? ` · ${offer.openBets} open` : ""}
+            {expiryMs != null && expiryUrgency === "today" ? (
+              <>
+                {" · "}
+                <span className="font-medium text-rose-600 dark:text-rose-400">
+                  {formatOfferDaysLeftLabel(expiryDaysLeft)}
+                </span>
+              </>
+            ) : expiryMs != null && expiryUrgency === "tomorrow" ? (
+              <>
+                {" · "}
+                <span className="font-medium text-orange-600 dark:text-orange-400">
+                  {formatOfferDaysLeftLabel(expiryDaysLeft)}
+                </span>
+              </>
+            ) : expiryMs != null ? (
+              ` · Expires ${formatOfferExpiryCompact(expiryMs)}`
+            ) : null}
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {(offer.status === "active" || offer.status === "planned") && (
+              <Button size="sm" variant="ghost" onClick={() => void markExpired()}>
+                Expire
+              </Button>
+            )}
+            <DeleteOfferDialog offer={offer} onDeleted={onRefresh} />
+            <div className={outlineButtonGroup}>
+              <Button size="sm" variant="outline" onClick={() => onEdit(offer)}>
+                <Pencil className="size-3.5" /> Edit
+              </Button>
+              {offer.status === "planned" || offer.status === "active" ? (
+                <OfferSetReminderDialog
+                  offer={offerWithReminders}
+                  onChanged={(next) => {
+                    setReminders(next.reminders ?? []);
+                    onRefresh();
+                  }}
+                />
+              ) : null}
+              {onView ? (
+                <Button size="sm" variant="outline" onClick={() => onView(offer)}>
+                  <Eye className="size-3.5" /> View
+                </Button>
+              ) : null}
+              {/* Only when Complete is the real next action — hide when disabled
+                  (e.g. Convert / settle still outstanding; footer owns that CTA). */}
+              {canComplete ? (
+                <Button size="sm" variant="outline" onClick={() => void markComplete()}>
+                  <Check className="size-3.5 text-edge" />
                   Complete
                 </Button>
-              </span>
-            ) : null}
+              ) : null}
+            </div>
+            {(offer.status === "completed" || offer.status === "expired") && (
+              <Button size="sm" variant="ghost" onClick={() => void reactivate()}>
+                Reactivate
+              </Button>
+            )}
           </div>
-          {(offer.status === "completed" || offer.status === "expired") && (
-            <Button size="sm" variant="ghost" onClick={() => void reactivate()}>
-              Reactivate
-            </Button>
-          )}
         </div>
       </CardContent>
     </Card>
@@ -523,10 +617,7 @@ function OfferProfitLines({
             <span className="text-right">
               {profit.freeBetAwarded ? (
                 <span
-                  className={cn(
-                    "font-medium text-violet-700 dark:text-violet-300",
-                    inactiveFigure
-                  )}
+                  className={cn("font-medium text-edge", inactiveFigure)}
                 >
                   {formatGbp(profit.freeBetAwardAmount ?? 0)} awarded
                   {profit.freeBetAwardReason ? ` · ${profit.freeBetAwardReason}` : ""}
@@ -580,11 +671,9 @@ function DeleteOfferDialog({
 
   async function confirmDelete() {
     setBusy(true);
-    const alertKeys = offerExpiringAlertKeys(offer.id);
-    // Suppress before DELETE returns so a stale Do Next poll cannot toast/push
-    // for a campaign the user has just removed.
-    suppressAlertKeys(alertKeys);
-    void dismissAlertNotifications(alertKeys);
+    // Suppress + dismiss sticky/OS before DELETE returns so a stale Do Next
+    // poll cannot toast/push for a campaign the user has just removed.
+    quietOfferPromptToasts(offer.id, { suppressAll: true });
     try {
       const qs = recurring && scope === "future" ? "?scope=future" : "";
       await api(`/api/offers/${offer.id}${qs}`, { method: "DELETE" });
@@ -725,7 +814,7 @@ function MistakeTagRow({
       MISTAKE_TAG_OPTIONS.find((o) => o.tag === evLock.mistakeTag)?.label ??
       evLock.mistakeTag;
     return (
-      <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+      <div className="mt-1.5 flex items-center gap-1.5 text-xs">
         <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-medium text-rose-700 dark:text-rose-300">
           Leak: {label}
         </span>
@@ -747,7 +836,7 @@ function MistakeTagRow({
 
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
-      <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         What went wrong?
       </span>
       {MISTAKE_TAG_OPTIONS.map((o) => (
@@ -765,7 +854,7 @@ function MistakeTagRow({
       <button
         type="button"
         disabled={saving}
-        className="ml-0.5 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+        className="ml-0.5 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
         onClick={() => {
           if (editing && evLock.mistakeTag) void setTag(null);
           setSkipped(true);

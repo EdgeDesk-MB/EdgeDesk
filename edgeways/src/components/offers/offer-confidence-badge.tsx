@@ -51,7 +51,7 @@ export function OfferConfidenceBadge({
       <Badge
         variant="outline"
         className={cn(
-          "h-4 shrink-0 border-edge/40 text-[9px] uppercase text-edge",
+          "h-5 shrink-0 border-edge/40 text-[11px] uppercase text-edge",
           className
         )}
       >
@@ -66,7 +66,7 @@ export function OfferConfidenceBadge({
     <Badge
       variant="outline"
       className={cn(
-        "h-4 shrink-0 text-[9px] uppercase",
+        "h-5 shrink-0 text-[11px] uppercase",
         trustTone(oddsSource, exchangeSource, confidence),
         className
       )}

@@ -69,7 +69,7 @@ export function RecurrenceRuleFields({
     <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-2.5">
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <Label className="text-[11px] text-muted-foreground">Frequency</Label>
+          <Label className="text-xs text-muted-foreground">Frequency</Label>
           <Select
             value={value.freq}
             onValueChange={(v) => onChange({ ...value, freq: v as OfferRecurrenceFreq })}
@@ -85,7 +85,7 @@ export function RecurrenceRuleFields({
           </Select>
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="recurrence-interval" className="text-[11px] text-muted-foreground">
+          <Label htmlFor="recurrence-interval" className="text-xs text-muted-foreground">
             Every
           </Label>
           <div className="flex items-center gap-1.5">
@@ -110,7 +110,7 @@ export function RecurrenceRuleFields({
 
       {value.freq === "weekly" ? (
         <div className="flex flex-col gap-1">
-          <Label className="text-[11px] text-muted-foreground">On</Label>
+          <Label className="text-xs text-muted-foreground">On</Label>
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAY_LABELS.map((label, day) => {
               const active = value.weekdays.includes(day);
@@ -143,7 +143,7 @@ export function RecurrenceRuleFields({
 
       {value.freq === "monthly" ? (
         <div className="flex flex-col gap-1">
-          <Label htmlFor="recurrence-monthday" className="text-[11px] text-muted-foreground">
+          <Label htmlFor="recurrence-monthday" className="text-xs text-muted-foreground">
             Day of month
           </Label>
           <Input
@@ -158,7 +158,7 @@ export function RecurrenceRuleFields({
         </div>
       ) : null}
 
-      {helpText ? <p className="text-[11px] text-muted-foreground">{helpText}</p> : null}
+      {helpText ? <p className="text-xs text-muted-foreground">{helpText}</p> : null}
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function CourseRaceTimes({
 
   return (
     <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {scopeLabel} races
       </p>
       <div className="flex flex-wrap gap-1.5">

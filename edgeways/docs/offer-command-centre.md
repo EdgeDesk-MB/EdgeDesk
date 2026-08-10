@@ -63,6 +63,9 @@ Edgeways answers three questions every day:
 5. **Month-end / export polish** ✅ (monthly P&L + offers CSV)
 6. **OCR screenshot import** - deprioritized (flaky; not a core path). Keep as optional fallback only.
 
+**Self-improving paste (planned):** local correction log → rule promotion →
+optional ML later. See [`offer-paste-learning.md`](./offer-paste-learning.md).
+
 ## Phase A+ fixes
 - ✅ Don’t auto-complete offers while free bet still needs converting
 - ✅ Reopen wrongly completed campaigns on sync

@@ -14,9 +14,21 @@ import {
 } from "@/components/ui/dialog";
 import { SplitButton } from "@/components/ui/split-button";
 import { useAddBet } from "@/components/add-bet-provider";
+import { useAccaRun } from "@/components/acca-run-provider";
+import { useBetBuilderRun } from "@/components/bet-builder-run-provider";
+import { useScopePlaceChooser } from "@/components/scope-place-chooser-provider";
 import { OfferCampaignCard } from "@/components/offers/offer-campaign-card";
 import { api, useAppState } from "@/hooks/use-app-state";
-import { deriveTrackBetAction } from "@/lib/offers/offer-track-bet";
+import {
+  completedKindFromBetType,
+  notifyOfferStepDone,
+  quietOfferPromptToasts,
+} from "@/lib/alerts/quiet-offer-toasts";
+import { buildCampaignDialogDescription } from "@/lib/offers/offer-campaign-details";
+import {
+  deriveTrackBetAction,
+  resolveTrackBetDestination,
+} from "@/lib/offers/offer-track-bet";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { formatApiError } from "@/lib/api-errors";
 import type { OfferSummary } from "@/lib/services/offers.types";
@@ -40,44 +52,83 @@ export function OfferViewDialog({
   onEdit: (offer: OfferSummary) => void;
 }) {
   const { openAddBet } = useAddBet();
+  const { openAccaRun } = useAccaRun();
+  const { openBetBuilderRun } = useBetBuilderRun();
+  const { openScopeChooser } = useScopePlaceChooser();
   const { state } = useAppState(5000);
   const [marking, setMarking] = useState(false);
 
   if (!offer) return null;
 
   const trackBet = deriveTrackBetAction(offer, state?.settings);
+  const isConvertAction = trackBet.prefill?.betType === "free_snr";
+  const isPlaybookMarkDone = trackBet.destination.kind === "playbook_mark_done";
+  const canQuickMark =
+    trackBet.enabled && trackBet.prefill != null && !isPlaybookMarkDone;
 
   function handleTrackBet() {
-    if (!trackBet.prefill) return;
-    onOpenChange(false);
-    openAddBet(trackBet.prefill);
+    if (isPlaybookMarkDone) {
+      void handlePlaybookMarkDone();
+      return;
+    }
+    resolveTrackBetDestination(trackBet, {
+      openAddBet,
+      openAccaRun,
+      openBetBuilderRun,
+      openScopeChooser,
+      beforeOpen: () => onOpenChange(false),
+    });
   }
 
-  // Not every campaign gets auto-linked to a bet - this quick-logs a minimal
-  // bet from the same prefill data (no odds/selection yet) so the campaign
-  // still progresses. Mirrors the mobile quick-log flow: capture now, tidy
-  // details in the Tracker later.
-  async function handleMarkPlaced() {
-    if (!trackBet.prefill) return;
-    const p = trackBet.prefill;
+  async function handlePlaybookMarkDone() {
+    if (trackBet.destination.kind !== "playbook_mark_done") return;
     setMarking(true);
     try {
-      await api("/api/bets", {
+      await api(`/api/offers/${offer!.id}`, {
+        method: "PATCH",
+        json: { playbookStepDone: trackBet.destination.stepId },
+      });
+      toast.success("Step marked done", { description: trackBet.label });
+      onRefresh();
+    } catch (err) {
+      toast.error("Could not update step", { description: formatApiError(err) });
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  // Quick-logs a minimal bet (no odds/selection yet) so the campaign progresses
+  // when the qualifying leg was placed outside Acca Desk / Add bet / chooser.
+  async function handleMarkPlaced() {
+    const p = trackBet.prefill;
+    if (!p) return;
+    setMarking(true);
+    try {
+      const betType = p.betType ?? "qualifying";
+      const offerId = p.offerId ?? offer!.id;
+      const { bet } = await api<{ bet: { id: number } }>("/api/bets", {
         method: "POST",
         json: {
           label: p.label || p.labelSuggestion || offer!.title,
           market: p.market,
-          betType: p.betType ?? "qualifying",
+          betType,
           bookmaker: p.bookmaker,
           backStake: p.backStake ?? 0,
           backOdds: p.backOdds ?? 0,
           triggerText: p.triggerText,
-          offerId: p.offerId,
+          offerId,
           quickLogged: true,
         },
       });
-      toast.success("Qualifying bet marked as placed", {
-        description: "Quick-logged - add odds and details from the Tracker when you can.",
+      quietOfferPromptToasts(offerId, {
+        completedKind: completedKindFromBetType(betType),
+      });
+      notifyOfferStepDone({
+        offerId,
+        betId: bet.id,
+        betType,
+        bookmaker: p.bookmaker,
+        offerTitle: offer!.title,
       });
       onRefresh();
     } catch (err) {
@@ -99,11 +150,9 @@ export function OfferViewDialog({
           <DialogTitle className="text-[25px] font-extrabold tracking-tight">
             Campaign details
           </DialogTitle>
-          <DialogDescription>
-            {nextActionDetail?.trim() ||
-              (nextActionLabel
-                ? `${nextActionLabel} — ${offer.title}`
-                : offer.title)}
+          {/* Screen readers only — no visible subtitle (duplicated the card title). */}
+          <DialogDescription className="sr-only">
+            {buildCampaignDialogDescription(offer.title, nextActionLabel)}
           </DialogDescription>
         </DialogHeader>
 
@@ -118,41 +167,68 @@ export function OfferViewDialog({
           />
         </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-4 border-t px-6 py-5">
-          <span className="mr-auto">
+        <div className="flex w-full shrink-0 items-center gap-4 border-t px-6 py-5">
+          <div className="min-w-0 flex-1">
             <OfferEffortLine offerId={offer.id} />
-          </span>
-          <Button variant="outline" size="lg" asChild>
-            <Link
-              href={`/offers?highlight=${offer.id}`}
-              onClick={() => onOpenChange(false)}
-            >
-              <ExternalLink className="size-4" />
-              Open in Campaigns
-            </Link>
-          </Button>
-          <SplitButton title={trackBet.reason ?? undefined}>
-            <SplitButton.Leading
-              size="lg"
-              onClick={handleTrackBet}
-              disabled={!trackBet.enabled || !trackBet.prefill}
-            >
-              {trackBet.label}
-            </SplitButton.Leading>
-            <SplitButton.Trailing
-              size="icon-lg"
-              onClick={() => void handleMarkPlaced()}
-              disabled={!trackBet.enabled || !trackBet.prefill || marking}
-              aria-label="Mark qualifying bet as placed"
-              title="Not linked automatically? Tick to mark the qualifying bet as placed."
-            >
-              {marking ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Check className="size-4" />
-              )}
-            </SplitButton.Trailing>
-          </SplitButton>
+          </div>
+          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
+            <Button variant="outline" size="lg" asChild>
+              <Link
+                href={`/offers?highlight=${offer.id}`}
+                onClick={() => onOpenChange(false)}
+              >
+                <ExternalLink className="size-4" />
+                Open in Campaigns
+              </Link>
+            </Button>
+            {isPlaybookMarkDone ? (
+              <Button
+                size="lg"
+                onClick={() => void handlePlaybookMarkDone()}
+                disabled={!trackBet.enabled || marking}
+              >
+                {marking ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Check className="size-4" />
+                )}
+                {trackBet.label}
+              </Button>
+            ) : (
+              <SplitButton title={trackBet.reason ?? undefined}>
+                <SplitButton.Leading
+                  size="lg"
+                  variant={isConvertAction ? "edge" : "default"}
+                  onClick={handleTrackBet}
+                  disabled={!trackBet.enabled}
+                >
+                  {trackBet.label}
+                </SplitButton.Leading>
+                <SplitButton.Trailing
+                  size="icon-lg"
+                  variant={isConvertAction ? "edge" : "default"}
+                  onClick={() => void handleMarkPlaced()}
+                  disabled={!canQuickMark || marking}
+                  aria-label={
+                    isConvertAction
+                      ? "Mark free bet conversion as placed"
+                      : "Mark qualifying bet as placed"
+                  }
+                  title={
+                    isConvertAction
+                      ? "Already converted outside Edgeways? Tick to quick-log the free bet leg."
+                      : "Already placed outside Edgeways? Tick to quick-log the qualifying bet."
+                  }
+                >
+                  {marking ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Check className="size-4" />
+                  )}
+                </SplitButton.Trailing>
+              </SplitButton>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
