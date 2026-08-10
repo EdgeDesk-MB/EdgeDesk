@@ -5,6 +5,10 @@
 > this file is the operational wrapper: automation setup, payments, legal, and the
 > pre-launch checklist. Nothing here overrides the D1 gate (§7.1) — most items are
 > "prepare now, flip at the gate".
+>
+> Infrastructure (hosting, database, environments, go-live hygiene):
+> `docs/hosting-and-environments.md`. Architecture decision brief:
+> `docs/decisions/d6-architecture-route.md` (EDGE-18).
 
 **Status snapshot (2026-08-10):** the D1 gate was **opened for launch-path work** by
 Sam on 10 Aug 2026 — the three gate criteria (§7.1) remain tracked as evidence
