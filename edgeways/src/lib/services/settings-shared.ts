@@ -5,8 +5,26 @@
 
 import { DEFAULT_TIME_FORMAT, type TimeFormatPreference } from "@/lib/time-format";
 import { DEFAULT_HOME_LAYOUT, type HomeLayoutSettings } from "@/lib/ui/home-layout";
+import type { PlanPreview } from "@/lib/entitlements/acca-desk";
+import { isKnownSport, type SportValue } from "@/lib/sports";
 
 export { normalizeHomeLayout, type HomeLayoutSettings } from "@/lib/ui/home-layout";
+
+export type { PlanPreview };
+
+export function normalizePlanPreview(value: string | null | undefined): PlanPreview {
+  if (value === "free" || value === "core" || value === "edge" || value === "unlocked") {
+    return value;
+  }
+  return "unlocked";
+}
+
+/** Stored as a stringified ms epoch; anything unparseable means unconfirmed. */
+export function normalizeAgeConfirmedAt(value: string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
 
 export interface OfferBetPref {
   stake: number;
@@ -16,6 +34,8 @@ export interface OfferBetPref {
 export interface AppSettings {
   defaultBackStake: number;
   defaultBetType: "qualifying" | "free_snr" | "free_sr" | "risk_free";
+  /** Pre-fill Add bet sport when opened from the nav. */
+  defaultSport: SportValue;
   defaultBookmaker: string;
   offerRemindersEnabled: boolean;
   offerReminderDays: number[];
@@ -51,6 +71,13 @@ export interface AppSettings {
   uiFont: string;
   /** Top bar Hero Pattern id (`diagonal-lines`, …). */
   headerPattern: string;
+  /**
+   * Preview entitlement tier until N0 billing. Default unlocked = full desk access.
+   * `free` blocks Acca Desk offer routing (falls back to Add bet).
+   */
+  planPreview: PlanPreview;
+  /** ms epoch when the user confirmed they are 18+ (EDGE-13); null = not yet. */
+  ageConfirmedAt: number | null;
 }
 
 /**
@@ -127,12 +154,18 @@ export function normalizeMobileDeckPin(value: string | null | undefined): Mobile
     : "auto";
 }
 
+export function normalizeDefaultSport(value: string | null | undefined): SportValue {
+  return isKnownSport(value) ? value : "football";
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultBackStake: 10,
   defaultBetType: "qualifying",
+  defaultSport: "football",
   defaultBookmaker: "",
   offerRemindersEnabled: true,
-  offerReminderDays: [7, 3, 1],
+  /** Horizon days for the morning "Your tasks today" digest (Do Next expiry filter). */
+  offerReminderDays: [3, 1],
   offerBetPrefs: {},
   ocrAutoMatchEvents: true,
   dashboardPollMs: 3000,
@@ -152,6 +185,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   brandAccentHex: "#FFC71E",
   uiFont: "default",
   headerPattern: "diagonal-lines",
+  planPreview: "unlocked",
+  ageConfirmedAt: null,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

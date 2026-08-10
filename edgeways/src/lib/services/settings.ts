@@ -7,8 +7,11 @@ import { db, appSettings } from "@/lib/db";
 import {
   DEFAULT_SETTINGS,
   bookmakerFromOfferPrefs,
+  normalizeDefaultSport,
   normalizeHomeLayout,
   normalizeMobileDeckPin,
+  normalizePlanPreview,
+  normalizeAgeConfirmedAt,
   normalizeTuning,
   stakeFromOfferPrefs,
   type AppSettings,
@@ -115,6 +118,7 @@ export function getAppSettings(): AppSettings {
   const settings: AppSettings = {
     defaultBackStake: Number.isFinite(stake) && stake > 0 ? stake : DEFAULT_SETTINGS.defaultBackStake,
     defaultBetType: validBetType,
+    defaultSport: normalizeDefaultSport(readRaw("defaultSport")),
     defaultBookmaker: readRaw("defaultBookmaker") ?? DEFAULT_SETTINGS.defaultBookmaker,
     offerRemindersEnabled: readRaw("offerRemindersEnabled") !== "false",
     offerReminderDays: reminderDays,
@@ -152,6 +156,8 @@ export function getAppSettings(): AppSettings {
     })(),
     uiFont: normalizeUiFont(readRaw("uiFont")),
     headerPattern: normalizeHeaderPattern(readRaw("headerPattern")),
+    planPreview: normalizePlanPreview(readRaw("planPreview")),
+    ageConfirmedAt: normalizeAgeConfirmedAt(readRaw("ageConfirmedAt")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -213,6 +219,7 @@ export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning" | "homeLayout"
 export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   if (patch.defaultBackStake != null) writeRaw("defaultBackStake", String(patch.defaultBackStake));
   if (patch.defaultBetType != null) writeRaw("defaultBetType", patch.defaultBetType);
+  if (patch.defaultSport != null) writeRaw("defaultSport", normalizeDefaultSport(patch.defaultSport));
   if (patch.defaultBookmaker != null) writeRaw("defaultBookmaker", patch.defaultBookmaker);
   if (patch.offerRemindersEnabled != null) {
     writeRaw("offerRemindersEnabled", patch.offerRemindersEnabled ? "true" : "false");
@@ -290,6 +297,15 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.headerPattern != null) {
     writeRaw("headerPattern", normalizeHeaderPattern(patch.headerPattern));
+  }
+  if (patch.planPreview != null) {
+    writeRaw("planPreview", normalizePlanPreview(patch.planPreview));
+  }
+  if (patch.ageConfirmedAt !== undefined) {
+    writeRaw(
+      "ageConfirmedAt",
+      patch.ageConfirmedAt == null ? "" : String(Math.trunc(patch.ageConfirmedAt))
+    );
   }
   return getAppSettings();
 }

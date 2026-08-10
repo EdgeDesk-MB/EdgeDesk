@@ -22,6 +22,7 @@ import { DemoModeCard } from "@/components/settings/demo-mode-card";
 import { PushDeviceControl } from "@/components/settings/push-device-control";
 import { Switch } from "@/components/ui/switch";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
   DEFAULT_TUNING,
@@ -43,11 +44,8 @@ import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import { ThemeSelect } from "@/components/theme-select";
 import { BrandAccentSelect } from "@/components/brand-accent-select";
-import { useBrandAccent } from "@/components/brand-accent-provider";
 import { UiFontSelect } from "@/components/ui-font-select";
-import { useUiFont } from "@/components/ui-font-provider";
 import { HeaderPatternSelect } from "@/components/header-pattern-select";
-import { useHeaderPattern } from "@/components/header-pattern-provider";
 import { APP_VERSION, APP_VERSION_LABEL } from "@/lib/app-version";
 import type { BrandAccentPresetId } from "@/lib/brand-accent";
 import type { UiFontId } from "@/lib/ui-font";
@@ -55,6 +53,8 @@ import type { HeaderPatternId } from "@/lib/header-pattern";
 import { Bell, BellRing, ChevronDown, ChevronUp, Download, Gauge, LayoutGrid, Palette, SlidersHorizontal, BookOpen, Map, RotateCcw, Target, Globe } from "lucide-react";
 import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
+import { SPORTS } from "@/lib/sports";
+import { SportLabel } from "@/components/sport-icon";
 
 type SettingsTab =
   | "appearance"
@@ -71,26 +71,15 @@ export default function SettingsPage() {
   const { resetAndOpenWelcome, openSetup } = useOnboarding();
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
-  const { syncFromSettings } = useBrandAccent();
-  const { syncFromSettings: syncFontFromSettings } = useUiFont();
-  const { syncFromSettings: syncPatternFromSettings } = useHeaderPattern();
   const settings = state?.settings;
   const [tab, setTab] = useState<SettingsTab>("appearance");
 
   useEffect(() => {
-    if (!settings) return;
-    syncFromSettings(settings.brandAccentPreset, settings.brandAccentHex);
-  }, [settings?.brandAccentPreset, settings?.brandAccentHex, settings, syncFromSettings]);
-
-  useEffect(() => {
-    if (!settings) return;
-    syncFontFromSettings(settings.uiFont);
-  }, [settings?.uiFont, settings, syncFontFromSettings]);
-
-  useEffect(() => {
-    if (!settings) return;
-    syncPatternFromSettings(settings.headerPattern);
-  }, [settings?.headerPattern, settings, syncPatternFromSettings]);
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("tab") === "alerts") {
+      setTab("alerts");
+    }
+  }, []);
 
   async function setDefaultExchange(id: number) {
     const name = exchanges.find((e) => e.id === id)?.name ?? "Exchange";
@@ -158,6 +147,7 @@ export default function SettingsPage() {
           <p className="w-full text-xs text-muted-foreground pt-1">
             Edgeways {APP_VERSION_LABEL} ({APP_VERSION})
           </p>
+          <ResponsibleGamblingNote className="w-full" />
         </CardContent>
       </Card>
 
@@ -182,6 +172,8 @@ export default function SettingsPage() {
         <CardContent className="pt-4">
           {tab === "appearance" && (
             <AppearanceCard
+              planPreview={settings?.planPreview ?? "unlocked"}
+              onPatch={patchSettings}
               onPersistFont={async (fontId) => {
                 try {
                   await api("/api/settings", {
@@ -280,10 +272,14 @@ export default function SettingsPage() {
 }
 
 function AppearanceCard({
+  planPreview,
+  onPatch,
   onPersistFont,
   onPersistPattern,
   onPersistAccent,
 }: {
+  planPreview: AppSettings["planPreview"];
+  onPatch: (patch: Partial<AppSettings>) => void;
   onPersistFont: (fontId: UiFontId) => void;
   onPersistPattern: (patternId: HeaderPatternId) => void;
   onPersistAccent: (presetId: BrandAccentPresetId, hex: string) => void;
@@ -295,7 +291,7 @@ function AppearanceCard({
           <Palette className="size-4 text-muted-foreground" aria-hidden />
           <Label className="text-sm font-semibold">Theme</Label>
         </div>
-        <p className="text-[11px] text-muted-foreground">Light or dark.</p>
+        <p className="text-xs text-muted-foreground">Light or dark.</p>
         <ThemeSelect className="max-w-xs" />
       </div>
 
@@ -310,6 +306,32 @@ function AppearanceCard({
       <div className="h-px bg-border" />
 
       <HeaderPatternSelect onPersist={onPersistPattern} />
+
+      <div className="h-px bg-border" />
+
+      <div className="flex flex-col gap-2">
+        <Label className="text-sm font-semibold">Plan preview</Label>
+        <p className="text-xs text-muted-foreground">
+          Temporary entitlement preview until billing. Free blocks Acca Desk routing from offers
+          (Add bet fallback). Unlocked matches today&apos;s full desk.
+        </p>
+        <Select
+          value={planPreview}
+          onValueChange={(v) =>
+            onPatch({ planPreview: v as AppSettings["planPreview"] })
+          }
+        >
+          <SelectTrigger className="max-w-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unlocked">Unlocked (default)</SelectItem>
+            <SelectItem value="free">Free</SelectItem>
+            <SelectItem value="core">Core</SelectItem>
+            <SelectItem value="edge">Edge</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
@@ -403,7 +425,7 @@ function HomeLayoutCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {/* pr-4 = row px-3 + inner pr-1, so captions sit over the switch columns */}
-        <div className="flex items-center justify-end gap-4 pr-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center justify-end gap-4 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="w-12 text-center">Desktop</span>
           <span className="w-12 text-center">Deck</span>
         </div>
@@ -735,6 +757,24 @@ function BetDefaultsCard({
           />
         </div>
         <div className="flex flex-col gap-1.5">
+          <Label>Default sport</Label>
+          <Select
+            value={settings.defaultSport}
+            onValueChange={(v) => onPatch({ defaultSport: v as AppSettings["defaultSport"] })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SPORTS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  <SportLabel sport={s.value} size={14} />
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
           <Label>Default bet type</Label>
           <Select
             value={settings.defaultBetType}
@@ -815,20 +855,20 @@ function AutomationCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <Bell className="size-4" /> Automation
         </CardTitle>
-        <CardDescription>Live dashboard polling, offer reminders and OCR matching.</CardDescription>
+        <CardDescription>Live dashboard polling, morning tasks digest and OCR matching.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 lg:max-w-xl">
         <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
           <div>
-            <p className="text-sm font-medium">Offer expiry reminders</p>
+            <p className="text-sm font-medium">Daily tasks digest</p>
             <p className="text-xs text-muted-foreground">
-              Remind before expiry (default {settings.offerReminderDays.join(", ")}{" "}
-              days). Repeating offers: current occurrence only.
+              One morning briefing (from 09:00) of Do Next work due in the next
+              3 days, inbox + push. Same-day interrupts still use Alerts.
             </p>
           </div>
           <Switch
             checked={settings.offerRemindersEnabled}
-            aria-label="Offer expiry reminders"
+            aria-label="Daily tasks digest"
             onCheckedChange={(v) => onPatch({ offerRemindersEnabled: v })}
           />
         </div>
@@ -905,8 +945,9 @@ function AlertsCard({
           <BellRing className="size-4" /> Alerts
         </CardTitle>
         <CardDescription>
-          Local notifications while Edgeways is open (browser permission needed), with
-          in-app toast fallback.
+          Background and automation alerts stay until you dismiss them. Settles you
+          confirm yourself auto-dismiss. Browser notifications (permission needed) fire
+          as well when Edgeways is open.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 lg:grid-cols-2">
@@ -940,7 +981,9 @@ function AlertsCard({
           <div>
             <p className="text-sm font-medium">Result settled</p>
             <p className="text-xs text-muted-foreground">
-              &ldquo;🟢 +£4.10 settled&rdquo; with Qualifying · offer title (bookie) in the body
+              Wins as &ldquo;You just made £4.10 · Bet won&rdquo; with bookie pill above
+              the title. When you settle yourself, the toast auto-dismisses. Background
+              settles stay until you close them
             </p>
           </div>
           <Switch
@@ -1200,7 +1243,7 @@ function IntegrationsPanel({
           <p className="text-xs text-muted-foreground">
             If you later open Edgeways to subscribers, API costs should be covered by plan pricing -
             never by your personal free keys. See{" "}
-            <code className="rounded bg-muted px-1 text-[11px]">docs/api-dependencies-and-tiers.md</code>
+            <code className="rounded bg-muted px-1 text-xs">docs/api-dependencies-and-tiers.md</code>
             .
           </p>
           <div className="rounded-md border px-3 py-2 space-y-2">
@@ -1336,7 +1379,7 @@ function IntegrationsPanel({
               className="flex items-center justify-between rounded-md border px-3 py-2 text-xs"
             >
               <span className="capitalize">{p.provider}</span>
-              <Badge variant={exchangeBadgeVariant(p.status)} className="text-[10px]">
+              <Badge variant={exchangeBadgeVariant(p.status)} className="text-[11px]">
                 {exchangeStatusLabel(p)}
               </Badge>
             </div>
@@ -1412,22 +1455,24 @@ function NotificationPermissionButton() {
   if (status === "unsupported") {
     return (
       <p className="text-xs text-muted-foreground">
-        This browser does not support notifications - alerts show as in-app toasts.
+        This browser does not support notifications - background alerts show as sticky
+        in-app toasts; settles you confirm yourself auto-dismiss.
       </p>
     );
   }
   if (status === "granted") {
     return (
       <p className="text-xs text-muted-foreground">
-        Browser notifications enabled. Alerts also show as toasts when the tab is focused.
+        Browser notifications enabled. Background alerts also show as sticky toasts when
+        the tab is focused; settles you confirm yourself auto-dismiss.
       </p>
     );
   }
   if (status === "denied") {
     return (
       <p className="text-xs text-muted-foreground">
-        Notifications are blocked for this site - alerts fall back to in-app toasts. Allow
-        notifications in your browser settings to change this.
+        Notifications are blocked for this site - background alerts still show as sticky
+        in-app toasts. Allow notifications in your browser settings to change this.
       </p>
     );
   }

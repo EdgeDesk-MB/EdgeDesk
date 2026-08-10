@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAppSettings, patchAppSettings, type AppSettingsPatch } from "@/lib/services/settings";
-import { normalizeMobileDeckPin } from "@/lib/services/settings-shared";
+import {
+  normalizeDefaultSport,
+  normalizeMobileDeckPin,
+  normalizePlanPreview,
+} from "@/lib/services/settings-shared";
 import { normalizeTimeFormat } from "@/lib/time-format";
 
 export async function GET() {
@@ -14,6 +18,9 @@ export async function PATCH(req: Request) {
   if (typeof body.defaultBackStake === "number") patch.defaultBackStake = body.defaultBackStake;
   if (typeof body.defaultBetType === "string") {
     patch.defaultBetType = body.defaultBetType as AppSettingsPatch["defaultBetType"];
+  }
+  if (typeof body.defaultSport === "string") {
+    patch.defaultSport = normalizeDefaultSport(body.defaultSport);
   }
   if (typeof body.defaultBookmaker === "string") patch.defaultBookmaker = body.defaultBookmaker;
   if (typeof body.offerRemindersEnabled === "boolean") {
@@ -72,6 +79,12 @@ export async function PATCH(req: Request) {
   }
   if (typeof body.headerPattern === "string") {
     patch.headerPattern = body.headerPattern;
+  }
+  if (typeof body.planPreview === "string") {
+    patch.planPreview = normalizePlanPreview(body.planPreview);
+  }
+  if (typeof body.ageConfirmedAt === "number" || body.ageConfirmedAt === null) {
+    patch.ageConfirmedAt = body.ageConfirmedAt;
   }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {

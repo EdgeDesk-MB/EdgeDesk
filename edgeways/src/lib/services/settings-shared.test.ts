@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TUNING, normalizeTuning } from "./settings-shared";
+import {
+  DEFAULT_TUNING,
+  normalizeAgeConfirmedAt,
+  normalizeTuning,
+} from "./settings-shared";
+
+describe("normalizeAgeConfirmedAt", () => {
+  it("treats missing, empty and garbage as unconfirmed", () => {
+    expect(normalizeAgeConfirmedAt(undefined)).toBeNull();
+    expect(normalizeAgeConfirmedAt(null)).toBeNull();
+    expect(normalizeAgeConfirmedAt("")).toBeNull();
+    expect(normalizeAgeConfirmedAt("nonsense")).toBeNull();
+    expect(normalizeAgeConfirmedAt("0")).toBeNull();
+    expect(normalizeAgeConfirmedAt("-5")).toBeNull();
+  });
+
+  it("parses a stored ms epoch", () => {
+    expect(normalizeAgeConfirmedAt("1754870400000")).toBe(1754870400000);
+  });
+});
 
 describe("normalizeTuning", () => {
   it("returns exact defaults for missing or garbage input", () => {

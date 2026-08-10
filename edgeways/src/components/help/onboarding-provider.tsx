@@ -11,6 +11,7 @@ import {
 } from "react";
 import { SetupWizard } from "@/components/help/setup-wizard";
 import { WelcomeDialog } from "@/components/help/welcome-dialog";
+import { AgeGateDialog } from "@/components/compliance/age-gate-dialog";
 import { useAppState } from "@/hooks/use-app-state";
 import { hasDeskActivity } from "@/lib/dashboard-empty";
 import {
@@ -35,7 +36,8 @@ export function useOnboarding() {
 }
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const { state } = useAppState();
+  const { state, refresh } = useAppState();
+  const [ageOpen, setAgeOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -48,6 +50,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     decidedRef.current = true;
 
     queueMicrotask(() => {
+      // The 18+ gate (EDGE-13) precedes everything, welcome tour included.
+      if (state.settings?.ageConfirmedAt == null) {
+        setAgeOpen(true);
+        setChecked(true);
+        return;
+      }
       if (hasDeskActivity(state)) {
         markOnboardingComplete();
         setChecked(true);
@@ -58,6 +66,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setChecked(true);
     });
   }, [state]);
+
+  const handleAgeConfirmed = useCallback(() => {
+    setAgeOpen(false);
+    refresh();
+    // Run the welcome decision the gate deferred.
+    if (state && !hasDeskActivity(state) && !isOnboardingComplete()) {
+      setWelcomeOpen(true);
+    }
+  }, [refresh, state]);
 
   const openWelcome = useCallback(() => setWelcomeOpen(true), []);
 
@@ -78,6 +95,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       {children}
       {checked && (
         <>
+          <AgeGateDialog open={ageOpen} onConfirmed={handleAgeConfirmed} />
           <WelcomeDialog
             open={welcomeOpen}
             onOpenChange={setWelcomeOpen}
