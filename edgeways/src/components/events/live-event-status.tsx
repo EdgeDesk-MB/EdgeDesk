@@ -47,13 +47,13 @@ export function LiveEventStatusPanel({
         )}
       >
         {status === "live" && (
-          <Badge variant="active" className={cn("gap-1", compact && "text-[10px]")}>
-            <Radio className={cn("animate-pulse", compact ? "size-2.5" : "size-3")} />
+          <Badge variant="active" className={cn("gap-1", compact && "text-[11px]")}>
+            <Radio className="size-3 animate-pulse" />
             Off
           </Badge>
         )}
         {status === "finished" && (
-          <Badge variant="secondary" className={compact ? "text-[10px]" : undefined}>
+          <Badge variant="secondary" className={compact ? "text-[11px]" : undefined}>
             Result
           </Badge>
         )}

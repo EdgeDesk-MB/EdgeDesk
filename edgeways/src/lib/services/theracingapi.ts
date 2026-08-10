@@ -14,6 +14,7 @@ import {
   serializeRaceResults,
 } from "@/lib/racing";
 import type { RacingRunnerDetail } from "@/lib/racing-desk/types";
+import { spLabelMarksFavourite } from "@/lib/racing/odds";
 import { parseJockeyName } from "@/lib/racing/runner-display";
 import { localCalendarDate, londonWallToUtcMs } from "@/lib/events";
 
@@ -41,6 +42,10 @@ export interface RacingRacecard {
   type?: string;
   prize?: string;
   region?: string;
+  /** Provider race_status when present (often empty on free tier). */
+  raceStatus?: string;
+  /** Provider is_abandoned flag. */
+  abandoned?: boolean;
   runnerDetails: RacingRunnerDetail[];
 }
 
@@ -51,14 +56,20 @@ interface CacheEntry<T> {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 const RACECARDS_TTL = 15 * 60 * 1000;
-// The app-wide state poll (every few seconds, on every page - not just
-// Racing Desk) transitively calls resultsToday() via getAppState() ->
-// refreshRacingApiEvents()/resolveRacingResultsTier(), every tick. A short
-// TTL here means that drip alone burns the whole daily request budget
-// within a few hours of the app just being open. Race results don't need
-// sub-minute freshness for auto-settlement, so 5 minutes cuts the "always
-// on" drain ~3x with no meaningful UX cost.
-const RESULTS_TTL = 5 * 60 * 1000;
+// Idle browsing / desk refresh: longer TTL protects the rate limit while the
+// app is open. Open-bet sync uses RESULTS_TTL_ACTIVE so fast results are not
+// stuck behind the idle window.
+const RESULTS_TTL_IDLE = 5 * 60 * 1000;
+/** Fresher window when settling open bets / incomplete tracked races. */
+export const RESULTS_TTL_ACTIVE = 90 * 1000;
+
+export type ResultsTodayOptions = {
+  /**
+   * Maximum age of a cached `/v1/results/today` payload before refetching.
+   * Defaults to idle TTL (5 min). Pass RESULTS_TTL_ACTIVE for settle sync.
+   */
+  maxStaleMs?: number;
+};
 
 /** Drop cached `/v1/results/today` so a manual Fetch results hits the API. */
 export function clearRacingResultsCache(): void {
@@ -187,6 +198,13 @@ function mapRacecard(item: any, now: number): RacingRacecard {
         ? `${String(distanceF).replace(/f$/i, "")}f`
         : undefined;
 
+  const raceStatusRaw = item.race_status;
+  const raceStatus =
+    raceStatusRaw != null && String(raceStatusRaw).trim() !== ""
+      ? String(raceStatusRaw).trim()
+      : undefined;
+  const abandoned = Boolean(item.is_abandoned);
+
   return {
     externalId: String(item.race_id ?? `${item.course}-${item.off_time}-${item.race_name}`),
     sport: "horse_racing",
@@ -209,6 +227,8 @@ function mapRacecard(item: any, now: number): RacingRacecard {
     type: item.type ? String(item.type) : undefined,
     prize: item.prize ? String(item.prize) : undefined,
     region: item.region ? String(item.region) : undefined,
+    raceStatus,
+    abandoned: abandoned || undefined,
     runnerDetails,
   };
 }
@@ -223,13 +243,21 @@ function mapResult(item: any): { raceId: string; result: RaceResult } | null {
     const spRaw = r.sp ?? r.sp_fraction;
     const spLabel =
       spRaw != null && String(spRaw).trim() !== "" ? String(spRaw).trim() : undefined;
-    const favMarked = /\bj?fav\b/i.test(String(spLabel ?? ""));
+    const favMarked = spLabelMarksFavourite(spLabel);
+    const btnRaw = r.btn ?? r.distance_beaten;
+    const btn =
+      btnRaw != null && String(btnRaw).trim() !== "" ? String(btnRaw).trim() : undefined;
+    const ovrRaw = r.ovr_btn ?? r.ovrBtn;
+    const ovrBtn =
+      ovrRaw != null && String(ovrRaw).trim() !== "" ? String(ovrRaw).trim() : undefined;
     return {
       horse: String(r.horse ?? "").trim(),
       position: runnerPosition(r.position),
       ...(spDecimal != null ? { spDecimal } : {}),
       ...(spLabel != null ? { spLabel } : {}),
       ...(favMarked ? { isSpFavourite: true as const } : {}),
+      ...(btn != null ? { btn } : {}),
+      ...(ovrBtn != null ? { ovrBtn } : {}),
     };
   });
 
@@ -366,10 +394,13 @@ export async function resolveRacingResultsTier(): Promise<RacingResultsTier> {
 }
 
 /** Basic tier - today's results with finishing positions. */
-export async function resultsToday(): Promise<ResultsTodayPayload> {
+export async function resultsToday(
+  options: ResultsTodayOptions = {}
+): Promise<ResultsTodayPayload> {
+  const maxStaleMs = options.maxStaleMs ?? RESULTS_TTL_IDLE;
   const cacheKey = "results:today";
   const hit = cache.get(cacheKey) as CacheEntry<ResultsCacheData> | undefined;
-  if (hit && Date.now() - hit.at < RESULTS_TTL) {
+  if (hit && Date.now() - hit.at < maxStaleMs) {
     rememberResultsTier(hit.data.tier);
     return {
       results: hit.data.results,
@@ -456,13 +487,14 @@ export async function racecardsByDate(
 }
 
 export async function resultsForRaceIds(
-  raceIds: string[]
+  raceIds: string[],
+  options: ResultsTodayOptions = {}
 ): Promise<{ results: Map<string, RaceResult>; tierBlocked: boolean; tier: RacingResultsTier }> {
   if (raceIds.length === 0) {
     const tier = getCachedRacingResultsTier();
     return { results: new Map(), tierBlocked: tier === "free", tier };
   }
-  const today = await resultsToday();
+  const today = await resultsToday(options);
   const out = new Map<string, RaceResult>();
   for (const id of raceIds) {
     const hit = today.results.get(id);
@@ -493,12 +525,23 @@ export async function fetchRunnerOddsHistory(
   }
 }
 
-/** Demo racecards when no API key is configured. */
-export function demoRacecards(): RacingRacecard[] {
+/**
+ * Demo racecards when no API key is configured.
+ * When `date` (YYYY-MM-DD) is set, races are pinned to that calendar day so
+ * future desk / Edge queries do not reuse "next off" times from today.
+ */
+export function demoRacecards(date?: string): RacingRacecard[] {
   const now = Date.now();
   const base = new Date();
-  base.setHours(14, 30, 0, 0);
-  if (base.getTime() < now) base.setDate(base.getDate() + 1);
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split("-").map(Number);
+    base.setFullYear(y!, m! - 1, d!);
+    base.setHours(14, 30, 0, 0);
+  } else {
+    base.setHours(14, 30, 0, 0);
+    if (base.getTime() < now) base.setDate(base.getDate() + 1);
+  }
+  const dayKey = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
 
   const runnerDetails: RacingRunnerDetail[] = [
     { horseId: "h1", name: "Constitution Hill", number: "1", jockey: "Nico de Boinville", trainer: "N Henderson", form: "1111", spDecimal: 2.5, spFraction: "6/4", nonRunner: false },
@@ -513,7 +556,7 @@ export function demoRacecards(): RacingRacecard[] {
 
   return [
     {
-      externalId: "demo-race-1",
+      externalId: `demo-race-1-${dayKey}`,
       sport: "horse_racing",
       competition: "Lingfield",
       raceName: "Demo Handicap Hurdle",
@@ -532,7 +575,7 @@ export function demoRacecards(): RacingRacecard[] {
       runnerDetails,
     },
     {
-      externalId: "demo-race-2",
+      externalId: `demo-race-2-${dayKey}`,
       sport: "horse_racing",
       competition: "Kempton",
       raceName: "Extra Place Handicap Chase",

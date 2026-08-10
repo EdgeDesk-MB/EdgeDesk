@@ -309,7 +309,7 @@ export function RacingPlacingsDialog({
           ) : (
             <ScanLine className="size-4 text-muted-foreground" />
           )}
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {ocrBusy
               ? "Reading result…"
               : "Paste a result or drop a screenshot (⌘V)"}
@@ -347,11 +347,11 @@ export function RacingPlacingsDialog({
             </p>
             {(raceHeader.metaParts.length > 0 || raceHeader.startLabel) && (
               <div className="mt-1 flex items-baseline justify-between gap-2">
-                <p className="min-w-0 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">
                   {raceHeader.metaParts.join(" · ")}
                 </p>
                 {raceHeader.startLabel ? (
-                  <p className="shrink-0 text-[11px] text-muted-foreground">
+                  <p className="shrink-0 text-xs text-muted-foreground">
                     Start {raceHeader.startLabel}
                   </p>
                 ) : null}
@@ -359,13 +359,13 @@ export function RacingPlacingsDialog({
             )}
           </div>
           <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_4.5rem] gap-x-2 border-b border-border/50 bg-muted/40 px-2.5 py-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               #
             </span>
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Horse
             </span>
-            <span className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               SP
             </span>
           </div>
@@ -402,7 +402,7 @@ export function RacingPlacingsDialog({
                 >
                   <span>{place}.</span>
                   {isFav ? (
-                    <span className="text-[9px] font-semibold uppercase tracking-wide">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide">
                       Fav
                     </span>
                   ) : null}
@@ -458,7 +458,7 @@ export function RacingPlacingsDialog({
                     aria-label={`SP for ${place}`}
                   />
                   {isFav ? (
-                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                       Fav
                     </span>
                   ) : null}

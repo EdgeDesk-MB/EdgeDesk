@@ -15,6 +15,7 @@ import {
   getCachedRacingResultsTier,
   hasRacingApiKey,
   resultsForRaceIds,
+  RESULTS_TTL_ACTIVE,
   type RacingResultsTier,
 } from "@/lib/services/theracingapi";
 
@@ -33,7 +34,7 @@ export interface SyncRacingOptions {
    * Also skips the 6-hour sync window so older races can be corrected.
    */
   force?: boolean;
-  /** Bypass the 90s results cache (manual Fetch results). */
+  /** Bypass the results cache (manual Fetch results). */
   skipCache?: boolean;
 }
 
@@ -102,8 +103,10 @@ export async function syncRacingResultsForEvents(
   const settledLabels: string[] = [];
 
   try {
+    // Prefer a fresher cache when settling open / incomplete races (fast results).
     const { results, tierBlocked, tier } = await resultsForRaceIds(
-      candidates.map((e) => e.externalId!)
+      candidates.map((e) => e.externalId!),
+      { maxStaleMs: RESULTS_TTL_ACTIVE }
     );
 
     if (tierBlocked) {
@@ -162,18 +165,21 @@ export async function syncRacingResultsForEvents(
   }
 }
 
-/** Sync results for every horse-racing event linked to an open bet. */
-export async function syncRacingResultsForOpenBets(): Promise<RacingSyncResult> {
+/** Sync results for every horse-racing event linked to an open bet or desk leg. */
+export async function syncRacingResultsForOpenBets(
+  extraEventIds: Iterable<number> = []
+): Promise<RacingSyncResult> {
   const eventIds = [
-    ...new Set(
-      db
+    ...new Set([
+      ...db
         .select({ eventId: bets.eventId })
         .from(bets)
         .where(eq(bets.status, "open"))
         .all()
         .map((b) => b.eventId)
-        .filter((id): id is number => id != null)
-    ),
+        .filter((id): id is number => id != null),
+      ...extraEventIds,
+    ]),
   ];
   if (eventIds.length === 0) return emptySync();
   return syncRacingResultsForEvents(eventIds);

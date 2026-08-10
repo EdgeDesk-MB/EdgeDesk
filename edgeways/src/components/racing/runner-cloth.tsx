@@ -12,7 +12,7 @@ export function RunnerCloth({
   size?: "sm" | "md";
   className?: string;
 }) {
-  const dim = size === "sm" ? "size-7 text-[11px]" : "size-8 text-xs";
+  const dim = size === "sm" ? "size-7 text-xs" : "size-8 text-xs";
 
   if (silkUrl?.trim()) {
     return (

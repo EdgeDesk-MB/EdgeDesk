@@ -1,7 +1,33 @@
-/** Parse fractional odds (e.g. "5/1", "11/4") to decimal. */
+/** SP favourite tag as printed beside a price (F / Fav / JFav). */
+export type SpFavouriteMarker = "F" | "Fav" | "JFav";
+
+/**
+ * Split an SP label into the price part and an optional favourite marker.
+ * Handles spaced tags ("6/4 Fav", "11/4 F", "5/2 JFav") and Racing API
+ * glued joint-fav suffixes ("100/30J", "5/2F", "100/30JF").
+ */
+export function splitSpLabel(raw: string | null | undefined): {
+  oddsPart: string;
+  marker: SpFavouriteMarker | null;
+} {
+  if (!raw?.trim()) return { oddsPart: "", marker: null };
+  const s = raw.trim();
+  // Longest tags first so "JFav" / "JF" are not read as trailing "F" / "J".
+  // Separator is optional: The Racing API often emits "100/30J" with no space.
+  const m = s.match(/^(.*?)(?:\s+|-)?(JFav|Fav|JF|F|J)\s*$/i);
+  if (!m || !m[1]?.trim()) return { oddsPart: s, marker: null };
+  const tag = m[2].toUpperCase();
+  const marker: SpFavouriteMarker =
+    tag === "JFAV" || tag === "JF" || tag === "J" ? "JFav" : tag === "FAV" ? "Fav" : "F";
+  return { oddsPart: m[1].trim(), marker };
+}
+
+/** Parse fractional odds (e.g. "5/1", "11/4", "100/30J") to decimal. */
 export function fractionalToDecimal(raw: string | null | undefined): number | undefined {
   if (!raw?.trim()) return undefined;
-  const s = raw.trim().toLowerCase();
+  // Strip trailing Fav / J / F before parsing so "100/30J" is not parseFloat'd as 100.
+  const s = splitSpLabel(raw).oddsPart.trim().toLowerCase();
+  if (!s) return undefined;
   if (s === "evs" || s === "evens") return 2;
   const slash = s.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
   if (slash) {
@@ -9,6 +35,9 @@ export function fractionalToDecimal(raw: string | null | undefined): number | un
     const den = parseFloat(slash[2]);
     if (den > 0 && num >= 0) return 1 + num / den;
   }
+  // Failed fraction (e.g. junk after the slash) must not fall through to parseFloat,
+  // which would turn "100/30x" into 100.
+  if (s.includes("/")) return undefined;
   const dec = parseFloat(s);
   return Number.isFinite(dec) && dec > 1 ? dec : undefined;
 }
@@ -17,6 +46,48 @@ export function fractionalToDecimal(raw: string | null | undefined): number | un
 export function formatDecimalOdds(decimal: number | null | undefined): string {
   if (decimal == null || !Number.isFinite(decimal) || decimal <= 1) return "-";
   return decimal.toFixed(2);
+}
+
+/** True when the SP string or explicit flag marks this runner as (joint) favourite. */
+export function spLabelMarksFavourite(
+  spFraction?: string | null,
+  isSpFavourite?: boolean
+): boolean {
+  if (isSpFavourite) return true;
+  return splitSpLabel(spFraction).marker != null;
+}
+
+/**
+ * Format SP for the result grid. When `decimal` is true, convert the fractional
+ * price and keep any F / Fav / JFav marker intact.
+ */
+export function formatSpOddsDisplay(
+  input: {
+    spFraction?: string | null;
+    spDecimal?: number | null;
+    isSpFavourite?: boolean;
+  },
+  options: { decimal: boolean }
+): string {
+  const { oddsPart, marker } = splitSpLabel(input.spFraction);
+  const favMarker = marker ?? (input.isSpFavourite ? "F" : null);
+
+  let price: string;
+  if (options.decimal) {
+    const dec =
+      fractionalToDecimal(oddsPart) ??
+      (input.spDecimal != null && input.spDecimal > 1 ? input.spDecimal : undefined);
+    price = formatDecimalOdds(dec);
+  } else if (oddsPart) {
+    price = oddsPart;
+  } else if (input.spDecimal != null && input.spDecimal > 1) {
+    price = formatDecimalOdds(input.spDecimal);
+  } else {
+    price = "-";
+  }
+
+  if (price === "-") return favMarker ?? "-";
+  return favMarker ? `${price} ${favMarker}` : price;
 }
 
 export function formatWeightStones(lbs: number | null | undefined): string {

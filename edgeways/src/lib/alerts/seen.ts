@@ -6,6 +6,16 @@
 
 const SEEN_KEY = "edgeways-alerts-seen";
 
+/** Test helper - clear session dedupe between vitest cases. */
+export function resetSeenForTests(): void {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.removeItem(SEEN_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
 export function readSeenAlertKeys(): Set<string> {
   if (typeof sessionStorage === "undefined") return new Set();
   try {

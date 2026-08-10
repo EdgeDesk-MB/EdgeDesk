@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { PlaceZoneBar } from "@/components/racing/place-zone-bar";
 import type { ExchangeProvider } from "@/lib/services/exchange/types";
 import { Calculator } from "lucide-react";
 
@@ -31,6 +32,9 @@ export interface RacingDeskSettingsDialogProps {
   onBookiePlacesChange: (v: number) => void;
   exchangePlaces: number;
   onExchangePlacesChange: (v: number) => void;
+  /** null = use UK race terms per card */
+  placeFraction: number | null;
+  onPlaceFractionChange: (v: number | null) => void;
   deskExchange: ExchangeProvider | "default";
   onDeskExchangeChange: (v: string) => void;
   defaultExchangeName?: string;
@@ -49,6 +53,8 @@ export function RacingDeskSettingsDialog({
   onBookiePlacesChange,
   exchangePlaces,
   onExchangePlacesChange,
+  placeFraction,
+  onPlaceFractionChange,
   deskExchange,
   onDeskExchangeChange,
   defaultExchangeName,
@@ -69,18 +75,18 @@ export function RacingDeskSettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 px-5 py-4">
+        <div className="space-y-5 px-5 pt-4 pb-7">
           <section className="space-y-3">
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Betting defaults
               </h3>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 Used when opening win, lay, place-refund, or EP bets from a runner.
               </p>
             </div>
             <div className="flex w-28 flex-col gap-1">
-              <Label htmlFor="desk-default-stake" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <Label htmlFor="desk-default-stake" className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Stake (£)
               </Label>
               <Input
@@ -99,13 +105,13 @@ export function RacingDeskSettingsDialog({
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Extra place
               </h3>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 Bookie vs exchange place terms for EP actions on the racecard.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <div className="flex w-24 flex-col gap-1">
-                <Label htmlFor="desk-bookie-places" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <Label htmlFor="desk-bookie-places" className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Bookie places
                 </Label>
                 <Input
@@ -119,7 +125,7 @@ export function RacingDeskSettingsDialog({
                 />
               </div>
               <div className="flex w-24 flex-col gap-1">
-                <Label htmlFor="desk-exch-places" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <Label htmlFor="desk-exch-places" className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Exch. places
                 </Label>
                 <Input
@@ -133,7 +139,33 @@ export function RacingDeskSettingsDialog({
                 />
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="flex max-w-xs flex-col gap-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Place terms default
+              </Label>
+              <Select
+                value={placeFraction == null ? "auto" : String(placeFraction)}
+                onValueChange={(v) =>
+                  onPlaceFractionChange(v === "auto" ? null : parseFloat(v))
+                }
+              >
+                <SelectTrigger size="sm" className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto from race (UK terms)</SelectItem>
+                  <SelectItem value="0.25">Force 1/4 odds</SelectItem>
+                  <SelectItem value="0.2">Force 1/5 odds</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {epValid && (
+              <PlaceZoneBar
+                exchangePlaces={exchangePlaces}
+                bookiePlaces={bookiePlaces}
+              />
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               {epValid ? (
                 <span className="text-emerald-600 dark:text-emerald-400">
                   EP zone: {exchangePlaces + 1}–{bookiePlaces}
@@ -155,7 +187,7 @@ export function RacingDeskSettingsDialog({
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Exchange
               </h3>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 Which exchange feeds lay prices on this desk. Default follows app Settings.
               </p>
             </div>
@@ -198,7 +230,7 @@ export function RacingDeskSettingsDialog({
                 <Label htmlFor="desk-show-offer-guide" className="text-sm font-medium">
                   Offer workflow
                 </Label>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Show the place-refund checklist on qualifying races.
                 </p>
               </div>

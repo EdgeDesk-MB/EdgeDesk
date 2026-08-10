@@ -8,19 +8,86 @@
  * Android Chrome always draws TWO icon slots in the shade:
  *   badge (left / status) → monochrome only; omit it and you get the default bell
  *   icon  (right / large) → full colour yellow plate + #111 bolt (mark.svg)
- * A single yellow-only notification is not available to web push on Android.
+ * A single yellow-only notification is not available to web push on Android,
+ * and the right slot cannot be hidden - omitting `icon` yields a letter avatar.
  * Bump NOTIF_V when assets change so clients pick up a new SW + fresh PNGs.
+ *
+ * Icons are precached and shown via blob URLs so push art still works when the
+ * home server is unreachable (push arrives via the browser relay offline).
  */
-const NOTIF_V = "notif5";
+const NOTIF_V = "notif6";
 const NOTIFICATION_ICON = `/icon-192.png?v=${NOTIF_V}`;
 const NOTIFICATION_BADGE = `/badge-192.png?v=${NOTIF_V}`;
+const NOTIF_CACHE = `edgeways-notif-${NOTIF_V}`;
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+function absUrl(pathOrUrl) {
+  if (!pathOrUrl) return null;
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+    return pathOrUrl;
+  }
+  return `${self.location.origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+}
+
+async function precacheNotificationArt() {
+  const cache = await caches.open(NOTIF_CACHE);
+  const urls = [absUrl(NOTIFICATION_ICON), absUrl(NOTIFICATION_BADGE)];
+  await Promise.all(
+    urls.map(async (url) => {
+      if (!url) return;
+      try {
+        const res = await fetch(url, { cache: "reload" });
+        if (res.ok) await cache.put(url, res.clone());
+      } catch {
+        /* install may be offline - push handler retries */
+      }
+    })
+  );
+}
+
+/** Resolve a notification asset to a blob: URL from cache (or network). */
+async function notificationAssetUrl(pathOrUrl) {
+  const url = absUrl(pathOrUrl);
+  if (!url) return undefined;
+  const cache = await caches.open(NOTIF_CACHE);
+  let res = await cache.match(url);
+  if (!res) {
+    try {
+      res = await fetch(url);
+      if (res.ok) await cache.put(url, res.clone());
+    } catch {
+      return url;
+    }
+  }
+  if (!res || !res.ok) return url;
+  try {
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return url;
+  }
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      await precacheNotificationArt();
+      await self.skipWaiting();
+    })()
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((k) => k.startsWith("edgeways-notif-") && k !== NOTIF_CACHE)
+          .map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+    })()
+  );
 });
 
 // F3: background push - the server signs alerts with VAPID and this shows
@@ -48,17 +115,12 @@ self.addEventListener("push", (event) => {
         }
         return;
       }
-      const origin = self.location.origin;
-      const icon = data.icon
-        ? data.icon.startsWith("http")
-          ? data.icon
-          : `${origin}${data.icon}`
-        : `${origin}${NOTIFICATION_ICON}`;
-      const badge = data.badge
-        ? data.badge.startsWith("http")
-          ? data.badge
-          : `${origin}${data.badge}`
-        : `${origin}${NOTIFICATION_BADGE}`;
+      const iconPath = data.icon || NOTIFICATION_ICON;
+      const badgePath = data.badge || NOTIFICATION_BADGE;
+      const [icon, badge] = await Promise.all([
+        notificationAssetUrl(iconPath),
+        notificationAssetUrl(badgePath),
+      ]);
       await self.registration.showNotification(data.title, {
         body: data.body || undefined,
         icon,

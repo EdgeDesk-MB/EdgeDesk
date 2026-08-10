@@ -17,7 +17,9 @@ import { MoneyFlow } from "@/components/money-flow";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
-import { FlashscoreRacecard } from "@/components/racing/flashscore-racecard";
+import { ActiveBetsStrip } from "@/components/racing/active-bets-strip";
+import { DeskRacecard } from "@/components/racing/desk-racecard";
+import { RacingPnlTodayView } from "@/components/racing/racing-pnl-today-view";
 import {
   DeskFilterPills,
   RacingIntelligenceDialog,
@@ -27,10 +29,23 @@ import {
 import { RacingDeskSettingsDialog } from "@/components/racing/racing-desk-settings-dialog";
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
 import { useAddBet } from "@/components/add-bet-provider";
-import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
+import { useEachWayCalculator } from "@/components/each-way-calculator-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
-import { api, useAppState } from "@/hooks/use-app-state";
+import {
+  Tabs,
+  TabsLineBar,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { estimateLayPlaceOdds } from "@/lib/calc/estimate-lay-place-odds";
+import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
   countRecommendedRaces,
@@ -43,26 +58,46 @@ import {
 import type { RacingDeskPayload, RacingDeskRace } from "@/lib/racing-desk/types";
 import type { ExchangeProvider } from "@/lib/services/exchange/types";
 import { exchangeNameToProvider } from "@/lib/services/exchange/client";
-import { extraPlace } from "@/lib/calc";
-import { serializeEwMeta } from "@/lib/bets/ew-meta";
+import { placePositions } from "@/lib/racing";
+import { ukPlaceTerms } from "@/lib/racing/place-terms";
 import {
   ExternalLink,
+  HelpCircle,
+  Loader2,
   Plus,
   RefreshCw,
   Trophy,
   Zap,
 } from "lucide-react";
+
+/** Client remount TTL — server racecards cache is 15m; keep this shorter for lays. */
+const DESK_GET_TTL_MS = 45_000;
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { RegionFlag } from "@/components/region-flag";
 import { cn } from "@/lib/utils";
-import { edgeMarkerPill, listRowSelected } from "@/lib/ui/surface-styles";
+import { deskCardShell, edgeMarkerPill } from "@/lib/ui/surface-styles";
 import {
   deskRaceToPendingSettle,
   isDeskRacePendingSettle,
 } from "@/lib/racing/pending-settle";
 
 const DESK_EXCHANGE_KEY = "edgeways:racing-desk-exchange";
+const DESK_PLACE_FRACTION_KEY = "edgeways:racing-desk-place-fraction";
 const EMPTY_EDGE_PLAYS: NonNullable<RacingDeskPayload["edgePlays"]> = [];
+
+/** Summary strip tabs — Races is the default desk board. */
+type DeskSummaryTab = "races" | "tracked" | "active_bets" | "pnl";
+
+function readDeskPlaceFraction(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DESK_PLACE_FRACTION_KEY);
+    if (raw === "0.25" || raw === "0.2") return parseFloat(raw);
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 function readDeskExchangeOverride(): ExchangeProvider | null {
   if (typeof window === "undefined") return null;
@@ -81,6 +116,7 @@ export function RacingDeskView() {
   const searchParams = useSearchParams();
   const raceParam = searchParams.get("race");
   const { openAddBet } = useAddBet();
+  const { openEachWayCalculator } = useEachWayCalculator();
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openOffer, viewOffer } = useOfferDialog();
   const { defaultExchange, exchanges } = useExchanges();
@@ -95,15 +131,15 @@ export function RacingDeskView() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const hasPayloadRef = useRef(false);
-  // Courses is a full-width horizontal pill row (drag-to-pan when it overflows).
-  const coursesScrollRef = useRef<HTMLDivElement>(null);
-  const coursesDrag = useDragToScroll(coursesScrollRef);
   const [bookiePlaces, setBookiePlaces] = useState(4);
   const [exchangePlaces, setExchangePlaces] = useState(3);
+  /** null = derive from race UK terms; else force 1/4 or 1/5 from Settings. */
+  const [placeFractionOverride, setPlaceFractionOverride] = useState<number | null>(null);
   const [epStake, setEpStake] = useState(10);
   const [intelligenceOpen, setIntelligenceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [raceFilter, setRaceFilter] = useState<DeskRaceFilter>("all");
+  const [deskTab, setDeskTab] = useState<DeskSummaryTab>("races");
   const [advancedMode, setAdvancedMode] = useState(false);
   const [showOfferGuide, setShowOfferGuide] = useState(true);
   const [deskExchange, setDeskExchange] = useState<ExchangeProvider | "default">("default");
@@ -113,6 +149,8 @@ export function RacingDeskView() {
     queueMicrotask(() => {
       const stored = readDeskExchangeOverride();
       if (stored) setDeskExchange(stored);
+      const frac = readDeskPlaceFraction();
+      if (frac != null) setPlaceFractionOverride(frac);
     });
   }, []);
 
@@ -156,7 +194,13 @@ export function RacingDeskView() {
     try {
       const qs = new URLSearchParams({ date });
       if (activeDeskProvider) qs.set("exchange", activeDeskProvider);
-      const res = await api<RacingDeskPayload>(`/api/racing/desk?${qs}`);
+      const path = `/api/racing/desk?${qs}`;
+      // Hard mount uses apiGet so side-nav remounts reuse a warm payload.
+      // Soft polls / manual refresh bypass the client cache for fresher lays;
+      // theracingapi still serves racecards from its 15m server TTL.
+      const res = soft
+        ? await api<RacingDeskPayload>(path)
+        : await apiGet<RacingDeskPayload>(path, DESK_GET_TTL_MS);
       hasPayloadRef.current = true;
       setPayload(res);
       setLoadedAt(Date.now());
@@ -174,6 +218,8 @@ export function RacingDeskView() {
 
   useEffect(() => {
     hasPayloadRef.current = false;
+    setPayload(null);
+    setLoading(true);
     queueMicrotask(() => void load({ soft: false }));
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps -- hard reload on date only
 
@@ -344,6 +390,24 @@ export function RacingDeskView() {
 
   const edgePlays = payload?.edgePlays ?? EMPTY_EDGE_PLAYS;
 
+  const qualifyingRaceTotal = useMemo(
+    () =>
+      courses.reduce(
+        (n, [, races]) =>
+          n + races.filter((r) => r.offerTags.some((t) => t.qualifies)).length,
+        0
+      ),
+    [courses]
+  );
+
+  const racePicksTotal = useMemo(
+    () => countRecommendedRaces(
+      edgePlays,
+      courses.flatMap(([, races]) => races)
+    ),
+    [courses, edgePlays]
+  );
+
   const visibleCourses = useMemo(() => {
     if (raceFilter === "all") return courses;
     const recommendedIds =
@@ -361,12 +425,32 @@ export function RacingDeskView() {
       .filter(([, races]) => races.length > 0);
   }, [courses, raceFilter, edgePlays]);
 
-  // When the filter hides the current race, land on the first visible pick
-  // and keep ?race= in sync so the deep-link effect does not fight the tab.
+  /** Summary-tab filter on top of offer Qualifying / Edge pills. */
+  const boardCourses = useMemo(() => {
+    if (deskTab !== "tracked") return visibleCourses;
+    return visibleCourses
+      .map(
+        ([course, races]) =>
+          [course, races.filter((r) => r.trackedEventId != null)] as [
+            string,
+            RacingDeskRace[],
+          ]
+      )
+      .filter(([, races]) => races.length > 0);
+  }, [visibleCourses, deskTab]);
+
+  const showRaceBoard =
+    deskTab === "races" || deskTab === "tracked";
+  const showActiveBets = deskTab === "active_bets";
+  const showRacingPnl = deskTab === "pnl";
+
+  // When a filter / summary tab hides the current race, land on the first
+  // visible pick and keep ?race= in sync so the deep-link effect does not fight.
   useEffect(() => {
-    if (raceFilter === "all") return;
+    if (!showRaceBoard) return;
+    if (raceFilter === "all" && deskTab === "races") return;
     const visibleIds = new Set(
-      visibleCourses.flatMap(([, races]) => races.map((r) => r.externalId))
+      boardCourses.flatMap(([, races]) => races.map((r) => r.externalId))
     );
     if (selectedId != null && visibleIds.has(selectedId)) return;
     queueMicrotask(() => {
@@ -375,7 +459,7 @@ export function RacingDeskView() {
         return;
       }
       const now = Date.now();
-      for (const [, races] of visibleCourses) {
+      for (const [, races] of boardCourses) {
         const next =
           races.find((r) => r.status === "live") ??
           races.find((r) => r.status === "upcoming" && r.startTime > now) ??
@@ -387,7 +471,15 @@ export function RacingDeskView() {
         }
       }
     });
-  }, [raceFilter, visibleCourses, selectedId, selectRace, clearRaceParam]);
+  }, [
+    raceFilter,
+    deskTab,
+    showRaceBoard,
+    boardCourses,
+    selectedId,
+    selectRace,
+    clearRaceParam,
+  ]);
 
   async function trackRace(race: RacingDeskRace) {
     try {
@@ -437,13 +529,24 @@ export function RacingDeskView() {
   function openBetForRunner(
     race: RacingDeskRace,
     runnerName: string,
-    mode: "win" | "extra_place" | "place_refund" | "lay",
+    mode: "win" | "each_way" | "extra_place" | "place_refund" | "lay",
     offerId?: number
   ) {
     const runner = race.runners.find((r) => r.name === runnerName);
     const winOdds = runner?.bookieDecimal ?? runner?.spDecimal ?? 8;
     const layOdds = runner?.exchangeDecimal ?? winOdds * 1.03;
     const offerTag = findOfferTag(race, offerId);
+    const fieldSize = race.fieldSize ?? race.runners.filter((r) => !r.nonRunner).length;
+    const terms = ukPlaceTerms(fieldSize, {
+      type: race.type,
+      raceName: race.raceName,
+    });
+    const raceExchangePlaces =
+      race.standardPlaces ?? (terms.places || placePositions(fieldSize));
+    // Desk settings are the bookie EP offer; exchange places prefer the race ladder.
+    const raceBookiePlaces = Math.max(bookiePlaces, raceExchangePlaces);
+    const placeFraction =
+      placeFractionOverride ?? terms.placeFraction ?? (fieldSize <= 7 ? 0.25 : 0.2);
 
     if (mode === "lay") {
       openMatchedCalculator({
@@ -474,6 +577,11 @@ export function RacingDeskView() {
       raceExternalId: race.externalId,
       raceEventDate: date,
     };
+    // Seed Selection options from the desk row's card so the horse is visible
+    // before /api/racing/runners returns.
+    const deskRunners = race.runners
+      .filter((r) => !r.nonRunner && r.name.trim())
+      .map((r) => r.name);
 
     if (mode === "place_refund") {
       if (!offerTag) {
@@ -484,6 +592,7 @@ export function RacingDeskView() {
         sport: "horse_racing",
         market: "win",
         selection: runnerName,
+        runners: deskRunners,
         homeTeam: race.raceName,
         awayTeam: race.offTime,
         ...raceLink,
@@ -504,39 +613,38 @@ export function RacingDeskView() {
       return;
     }
 
-    if (mode === "extra_place" && bookiePlaces > exchangePlaces) {
-      const ep = extraPlace({
+    if (mode === "each_way" || mode === "extra_place") {
+      const epMode =
+        mode === "extra_place" && raceBookiePlaces > raceExchangePlaces
+          ? "extra_place"
+          : mode === "extra_place"
+            ? "each_way"
+            : "each_way";
+      if (mode === "extra_place" && epMode === "each_way") {
+        toast.message("No extra place vs exchange", {
+          description: "Opening standard each-way. Raise bookie places in Settings if the offer pays more.",
+        });
+      }
+      openEachWayCalculator({
+        mode: epMode,
+        selection: runnerName,
         stakePerPart: epStake,
         winOdds,
-        placeFraction: 0.2,
         layWinOdds: layOdds,
-        layPlaceOdds: 2.8,
-        commission: 0.02,
-        bookiePlaces,
-        exchangePlaces,
-      });
-      openAddBet({
-        sport: "horse_racing",
-        market: "extra_place",
-        selection: runnerName,
+        layPlaceOdds: estimateLayPlaceOdds(winOdds, placeFraction),
+        placeFraction,
+        fieldSize,
+        bookiePlaces: epMode === "extra_place" ? raceBookiePlaces : raceExchangePlaces,
+        exchangePlaces: raceExchangePlaces,
+        commission: deskExchangeRow?.commissionPct,
+        exchangeId: deskExchangeRow?.id,
         homeTeam: race.raceName,
         awayTeam: race.offTime,
         ...raceLink,
-        backStake: epStake * 2,
-        backOdds: winOdds,
-        layOdds: layOdds,
-        layStake: ep.layWinStake + ep.layPlaceStake,
-        expectedProfit: ep.worstCase,
-        labelSuggestion: `${race.course} · ${runnerName} EP ${bookiePlaces}p`,
-        notes: serializeEwMeta({
-          stakePerPart: epStake,
-          placeFraction: 0.2,
-          layWin: { stake: ep.layWinStake, odds: layOdds },
-          layPlace: { stake: ep.layPlaceStake, odds: 2.8 },
-          bookiePlaces,
-          exchangePlaces,
-          mode: "extra_place",
-        }),
+        labelSuggestion:
+          epMode === "extra_place"
+            ? `${race.course} · ${runnerName} EP ${raceBookiePlaces}p`
+            : `${race.course} · ${runnerName} EW`,
       });
       return;
     }
@@ -545,6 +653,7 @@ export function RacingDeskView() {
       sport: "horse_racing",
       market: "win",
       selection: runnerName,
+      runners: deskRunners,
       homeTeam: race.raceName,
       awayTeam: race.offTime,
       ...raceLink,
@@ -583,6 +692,22 @@ export function RacingDeskView() {
     () => (payload?.races ?? []).filter(isDeskRacePendingSettle).map(deskRaceToPendingSettle),
     [payload?.races]
   );
+
+  // Match home: hold the desk until the first racecard payload lands.
+  if (loading && payload == null) {
+    return (
+      <PageShell fullHeight>
+        <div
+          className="flex min-h-[var(--layout-page-min-h)] flex-1 flex-col items-center justify-center"
+          role="status"
+          aria-live="polite"
+          aria-label="Loading racing desk"
+        >
+          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
+        </div>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell>
@@ -655,11 +780,26 @@ export function RacingDeskView() {
       )}
 
       {summary && (
-        <StatStrip columns={5}>
-          <StatTile label="Races" value={String(summary.raceCount)} sub={`${summary.upcomingCount} upcoming`} />
-          <StatTile label="Live / off" value={String(summary.liveCount)} />
-          <StatTile label="Tracked" value={String(summary.trackedCount)} />
-          <StatTile label="Open positions" value={String(summary.openPositions)} />
+        <StatStrip columns={4}>
+          <StatTile
+            label="Races"
+            value={String(summary.raceCount)}
+            sub={`${summary.upcomingCount} upcoming`}
+            active={deskTab === "races"}
+            onClick={() => setDeskTab("races")}
+          />
+          <StatTile
+            label="Tracked"
+            value={String(summary.trackedCount)}
+            active={deskTab === "tracked"}
+            onClick={() => setDeskTab("tracked")}
+          />
+          <StatTile
+            label="Active bets"
+            value={String(summary.openPositions)}
+            active={deskTab === "active_bets"}
+            onClick={() => setDeskTab("active_bets")}
+          />
           <StatTile
             label="Racing P&L today"
             value={<MoneyFlow value={summary.racingPnlToday} signColor />}
@@ -668,8 +808,41 @@ export function RacingDeskView() {
                 ? "By race day · open at worst case"
                 : "By race day"
             }
+            active={deskTab === "pnl"}
+            onClick={() => setDeskTab("pnl")}
           />
         </StatStrip>
+      )}
+
+      {showActiveBets && (
+        <ActiveBetsStrip
+          bets={payload?.activeBets ?? []}
+          onSelectRace={(id) => {
+            setDeskTab("races");
+            setSelectedId(id);
+            setRaceFilter("all");
+          }}
+          onBrowseRaces={() => {
+            setDeskTab("races");
+            setRaceFilter("all");
+          }}
+        />
+      )}
+
+      {showRacingPnl && (
+        <RacingPnlTodayView
+          report={payload?.racingPnlDay}
+          dateLabel={new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+          onSelectRace={(id) => {
+            setDeskTab("races");
+            setSelectedId(id);
+            setRaceFilter("all");
+          }}
+        />
       )}
 
       {payload?.error && (
@@ -678,7 +851,7 @@ export function RacingDeskView() {
         </p>
       )}
 
-      {!loading && (payload?.races.length ?? 0) === 0 && (
+      {showRaceBoard && !loading && (payload?.races.length ?? 0) === 0 && (
         <EmptyState
           icon={Trophy}
           title={summary?.source === "demo" ? "Demo racecards" : "No races for this date"}
@@ -695,12 +868,6 @@ export function RacingDeskView() {
         />
       )}
 
-      <DeskFilterPills
-        filter={raceFilter}
-        onFilterChange={setRaceFilter}
-        onSettingsClick={() => setSettingsOpen(true)}
-      />
-
       <RacingDeskSettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
@@ -710,6 +877,16 @@ export function RacingDeskView() {
         onBookiePlacesChange={setBookiePlaces}
         exchangePlaces={exchangePlaces}
         onExchangePlacesChange={setExchangePlaces}
+        placeFraction={placeFractionOverride}
+        onPlaceFractionChange={(v) => {
+          setPlaceFractionOverride(v);
+          try {
+            if (v == null) localStorage.removeItem(DESK_PLACE_FRACTION_KEY);
+            else localStorage.setItem(DESK_PLACE_FRACTION_KEY, String(v));
+          } catch {
+            /* ignore */
+          }
+        }}
         deskExchange={deskExchange}
         onDeskExchangeChange={onDeskExchangeChange}
         defaultExchangeName={defaultExchange?.name}
@@ -719,66 +896,89 @@ export function RacingDeskView() {
         onShowOfferGuideChange={setShowOfferGuide}
       />
 
-      <div className="flex min-w-0 flex-col gap-3">
-        <Card className="min-w-0">
-          <CardHeader className="pb-2">
-            <CardTitle section>Courses</CardTitle>
-            <CardDescription compact>
-              {visibleCourses.length} meeting{visibleCourses.length === 1 ? "" : "s"}
-              {raceFilter === "qualifying"
-                ? " · qualifying"
-                : raceFilter === "recommended"
-                  ? " · recommended"
+      {showRaceBoard && (
+        <Card className={cn(deskCardShell, "min-w-0 gap-0 py-0")}>
+          <DeskFilterPills
+            embedded
+            filter={raceFilter}
+            onFilterChange={setRaceFilter}
+            onSettingsClick={() => setSettingsOpen(true)}
+            qualifyingCount={qualifyingRaceTotal}
+            racePicksCount={racePicksTotal}
+          />
+          <div className="bg-selection-subtle/50">
+          <CardHeader className="gap-0 pt-4 pb-0">
+            <CardTitle section className="flex items-center gap-1.5 text-lg">
+              Courses
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label="Courses legend"
+                      >
+                        <HelpCircle className="size-3.5" aria-hidden />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="gap-2 py-2">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Zap className="size-3.5 shrink-0 text-edge" aria-hidden />
+                        Edge (on course tabs in Qualifying)
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="size-2.5 shrink-0 rounded-full bg-background/45"
+                          aria-hidden
+                        />
+                        Near min runners
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardTitle>
+              <CardDescription compact>
+                {boardCourses.length} meeting{boardCourses.length === 1 ? "" : "s"}
+                {deskTab === "tracked" ? " · tracked" : ""}
+                {raceFilter === "qualifying"
+                  ? " · qualifying"
+                  : raceFilter === "recommended"
+                    ? " · recommended"
+                    : ""}
+                {(payload?.activeOffers.length ?? 0) > 0
+                  ? ` · ${payload!.activeOffers.length} active offer${
+                      payload!.activeOffers.length === 1 ? "" : "s"
+                    }`
                   : ""}
-              {(payload?.activeOffers.length ?? 0) > 0
-                ? ` · ${payload!.activeOffers.length} active offer${
-                    payload!.activeOffers.length === 1 ? "" : "s"
-                  }`
-                : ""}
-            </CardDescription>
-            <CardAction>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5"
-                onClick={() => openOffer({ category: "horse_racing", eventDate: date })}
-              >
-                <Plus className="size-3.5" />
-                Add racing offer
-              </Button>
-            </CardAction>
-          </CardHeader>
-          <CardContent
-            ref={coursesScrollRef}
-            className="app-scroll-nested min-w-0 flex cursor-grab gap-1.5 overflow-x-auto pb-1 active:cursor-grabbing"
-            onPointerDown={coursesDrag.onPointerDown}
-            onPointerMove={coursesDrag.onPointerMove}
-            onPointerUp={coursesDrag.onPointerUp}
-            onPointerCancel={coursesDrag.onPointerCancel}
-            onClickCapture={coursesDrag.onClickCapture}
-          >
-            {visibleCourses.length === 0 && (
-              <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                {raceFilter === "recommended"
-                  ? "No recommended races today - Offer Edge has no modelled plays."
-                  : raceFilter === "qualifying"
-                    ? "No qualifying races for your offers today."
-                    : "No meetings for this date."}
-              </p>
-            )}
-            {visibleCourses.map(([course, races]) => {
-              const active = selected?.course === course;
-              const region = races[0]?.region;
-              const qualifyingRaceCount = races.filter((r) =>
-                r.offerTags.some((t) => t.qualifies)
-              ).length;
-              const recommendedRaceCount = countRecommendedRaces(edgePlays, races);
-              return (
-                <button
-                  key={course}
+              </CardDescription>
+              <CardAction>
+                <Button
                   type="button"
-                  onClick={() => {
+                  variant="outline"
+                  size="default"
+                  onClick={() => openOffer({ category: "horse_racing", eventDate: date })}
+                >
+                  <Plus className="size-3.5" />
+                  Add racing offer
+                </Button>
+              </CardAction>
+            </CardHeader>
+            <CardContent className="min-w-0 px-0 pb-0 pt-5">
+              {boardCourses.length === 0 ? (
+                <p className="px-(--card-spacing) pb-4 text-center text-xs text-muted-foreground">
+                  {deskTab === "tracked"
+                    ? "No tracked races for this date."
+                    : raceFilter === "recommended"
+                      ? "No recommended races today - Offer Edge has no modelled plays."
+                      : raceFilter === "qualifying"
+                        ? "No qualifying races for your offers today."
+                        : "No meetings for this date."}
+                </p>
+              ) : (
+                <Tabs
+                  value={selected?.course ?? boardCourses[0]?.[0] ?? ""}
+                  onValueChange={(course) => {
+                    const races = boardCourses.find(([c]) => c === course)?.[1] ?? [];
                     const now = Date.now();
                     const nextRace =
                       races.find((r) => r.status === "live") ??
@@ -788,88 +988,85 @@ export function RacingDeskView() {
                     if (nextRace) selectRace(nextRace.externalId);
                     else setSelectedId(null);
                   }}
-                  className={cn(
-                    listRowSelected(active),
-                    "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-left text-sm"
-                  )}
+                  className="gap-0"
                 >
-                  <span className="flex min-w-0 items-center gap-1.5 font-medium">
-                    <RegionFlag code={region} />
-                    <span className="truncate">{course}</span>
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {races.length}
-                    {qualifyingRaceCount > 0 && (
-                      <span
-                        className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-success/15 px-1 text-[9px] font-bold tabular-nums text-success"
-                        title={`${qualifyingRaceCount} qualifying race${qualifyingRaceCount === 1 ? "" : "s"}`}
-                      >
-                        {qualifyingRaceCount}
-                      </span>
-                    )}
-                    {recommendedRaceCount > 0 && (
-                      <span
-                        className={edgeMarkerPill}
-                        title={`${recommendedRaceCount} recommended race${recommendedRaceCount === 1 ? "" : "s"} (Offer Edge)`}
-                      >
-                        <Zap className="size-2" aria-hidden />
-                        {recommendedRaceCount}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </CardContent>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 px-3 py-2 text-[10px] text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wide">Legend</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-success/15 px-1 text-[9px] font-bold tabular-nums text-success">
-                n
-              </span>
-              Qualifies
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className={edgeMarkerPill}>
-                <Zap className="size-2" aria-hidden />
-                n
-              </span>
-              Edge
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                className="inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground/60"
-                aria-hidden
-              />
-              Near min runners
-            </span>
+                  {/* No card bleed — CardContent is already px-0; pad via TabsList. */}
+                  <TabsLineBar className="border-b-0">
+                    <TabsList
+                      variant="line"
+                      className="justify-start"
+                      fadeClassName="from-selection-subtle/50"
+                    >
+                      {boardCourses.map(([course, races]) => {
+                        const region = races[0]?.region;
+                        // All races: no counters. Qualifying/Race picks: race
+                        // count only; qualify totals live on the filter pills.
+                        // Edge badges stay in Qualifying so picks still stand out.
+                        const showCounters = raceFilter !== "all";
+                        const recommendedRaceCount =
+                          raceFilter === "qualifying"
+                            ? countRecommendedRaces(edgePlays, races)
+                            : 0;
+                        return (
+                          <TabsTrigger
+                            key={course}
+                            value={course}
+                            className="gap-1.5"
+                          >
+                            <RegionFlag code={region} />
+                            <span className="truncate">{course}</span>
+                            {showCounters && (
+                              <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                {races.length}
+                                {recommendedRaceCount > 0 && (
+                                  <span
+                                    className={edgeMarkerPill}
+                                    title={`${recommendedRaceCount} recommended race${recommendedRaceCount === 1 ? "" : "s"} (Offer Edge)`}
+                                  >
+                                    <Zap className="size-3" aria-hidden />
+                                    {recommendedRaceCount}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+                  </TabsLineBar>
+                </Tabs>
+              )}
+            </CardContent>
           </div>
-        </Card>
 
-        <FlashscoreRacecard
-          courses={visibleCourses}
-          selected={selected}
-          selectedId={selectedId}
-          onSelectRace={selectRace}
-          bookiePlaces={bookiePlaces}
-          exchangePlaces={exchangePlaces}
-          onTrack={trackRace}
-          onUntrack={untrackRace}
-          onBet={openBetForRunner}
-          onOddsOverride={saveOddsOverride}
-          backColor={summary?.backColor ?? deskExchangeRow?.backColor}
-          layColor={summary?.layColor ?? deskExchangeRow?.layColor}
-          advancedMode={advancedMode}
-          onAdvancedModeChange={setAdvancedMode}
-          showOfferGuide={showOfferGuide}
-          refreshLabel={refreshLabel}
-          refreshing={refreshing}
-          exchangeStatusLabel={exchangeStatusLabel}
-          bookmakerColors={bookmakerColors}
-          edgePlays={edgePlays}
-          dataSource={summary?.source}
-        />
-      </div>
+          <DeskRacecard
+            embedded
+            courses={boardCourses}
+            selected={selected}
+            selectedId={selectedId}
+            onSelectRace={selectRace}
+            bookiePlaces={bookiePlaces}
+            exchangePlaces={exchangePlaces}
+            onTrack={trackRace}
+            onUntrack={untrackRace}
+            onBet={openBetForRunner}
+            onOddsOverride={saveOddsOverride}
+            backColor={summary?.backColor ?? deskExchangeRow?.backColor}
+            layColor={summary?.layColor ?? deskExchangeRow?.layColor}
+            advancedMode={advancedMode}
+            onAdvancedModeChange={setAdvancedMode}
+            showOfferGuide={showOfferGuide}
+            refreshLabel={refreshLabel}
+            refreshing={refreshing}
+            exchangeStatusLabel={exchangeStatusLabel}
+            bookmakerColors={bookmakerColors}
+            edgePlays={edgePlays}
+            showEdgeTabCounters={raceFilter === "qualifying"}
+            defaultGuideExpanded={raceFilter !== "all"}
+            dataSource={summary?.source}
+          />
+        </Card>
+      )}
     </PageShell>
   );
 }

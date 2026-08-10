@@ -32,8 +32,10 @@ import type { SuggestedRace, SuggestedRunner } from "@/lib/racing-desk/types";
 import { RegionFlag } from "@/components/region-flag";
 import { FilterPill } from "@/components/ui/filter-pill";
 import {
+  captionHeading,
   edgeNavTag,
   filterPillCountState,
+  filterPillGroup,
   listRowInteractive,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -76,9 +78,14 @@ function EvLine({ runner }: { runner: SuggestedRunner }) {
 
 function EvFigure({ value, strong }: { value: number; strong?: boolean }) {
   return (
-    <span className={cn("inline-flex items-baseline gap-1", strong ? "text-sm" : "text-xs")}>
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">EV</span>
-      <MoneyFlow value={value} signColor signDisplay className={cn(strong && "font-semibold")} />
+    <span
+      className={cn(
+        "inline-flex items-baseline gap-1",
+        strong ? "text-sm font-semibold" : "text-xs"
+      )}
+    >
+      <span className="uppercase tracking-wide text-muted-foreground">EV</span>
+      <MoneyFlow value={value} signColor signDisplay estimate />
     </span>
   );
 }
@@ -88,7 +95,7 @@ function WarningLines({ warnings }: { warnings: string[] }) {
   return (
     <div className="mt-2 space-y-1">
       {warnings.map((warning) => (
-        <p key={warning} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+        <p key={warning} className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <AlertTriangle className="mt-px size-3 shrink-0 text-muted-foreground" aria-hidden />
           <span>{warning}</span>
         </p>
@@ -181,7 +188,7 @@ function SuggestionRow({
               )}
 
               {reasons.length > 0 && (
-                <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                   {reasons.map((reason) => (
                     <li key={reason} className="max-w-full">
                       {reason}
@@ -193,7 +200,7 @@ function SuggestionRow({
               {edge && <WarningLines warnings={edge.warnings} />}
 
               {advanced && (
-                <div className="mt-2 space-y-1 border-t border-border/50 pt-2 text-[11px] text-muted-foreground">
+                <div className="mt-2 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
                   <p className="truncate">{suggestion.raceName}</p>
                   {edge ? (
                     <p className="tabular-nums">
@@ -240,7 +247,7 @@ function SuggestionRow({
             <button
               type="button"
               onClick={onToggle}
-              className="ml-auto flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              className="ml-auto flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               <ChevronDown
                 className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
@@ -268,9 +275,9 @@ function SuggestionRow({
                     dataSource={dataSource}
                   />
                 </span>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{runner.summary}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{runner.summary}</p>
                 {runner.qualLoss != null && (
-                  <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
+                  <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                     Qual £{runner.qualLoss.toFixed(2)}
                     {runner.freeBetEv != null && ` · FB EV £${runner.freeBetEv.toFixed(2)}`}
                   </p>
@@ -315,6 +322,33 @@ function bestOfferId(offers: OfferOption[]): number | null {
     if (evA !== evB) return evB - evA;
     return b.pickCount - a.pickCount;
   })[0]!.id;
+}
+
+function bookieKey(bookmaker: string | null | undefined): string {
+  return (bookmaker?.trim() ?? "").toLowerCase();
+}
+
+/** Bookie when unique; bookie + title when the same bookie has multiple campaigns. */
+function offerSwitcherLabel(offer: OfferOption, offers: OfferOption[]): string {
+  const bookie = offer.bookmaker?.trim();
+  if (!bookie) return offer.title;
+  const sameBookie = offers.filter((o) => bookieKey(o.bookmaker) === bookieKey(bookie));
+  if (sameBookie.length <= 1) return bookie;
+  return `${bookie} · ${offer.title}`;
+}
+
+function offerSwitcherNeedsTruncate(offer: OfferOption, offers: OfferOption[]): boolean {
+  const bookie = offer.bookmaker?.trim();
+  if (!bookie) return offer.title.length > 18;
+  return (
+    offers.filter((o) => bookieKey(o.bookmaker) === bookieKey(bookie)).length > 1
+  );
+}
+
+function offerSwitcherAriaLabel(offer: OfferOption): string {
+  return offer.bookmaker
+    ? `${offer.bookmaker}: ${offer.title}`
+    : offer.title;
 }
 
 export function RacingIntelligenceDialog({
@@ -436,99 +470,116 @@ export function RacingIntelligenceDialog({
     onOpenChange(false);
   }
 
-  const useDropdown = offerOptions.length > 3;
+  // Bookie-only pills stay short; keep the dropdown threshold higher than when
+  // tabs carried the full offer title.
+  const useDropdown = offerOptions.length > 5;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[min(90vh,840px)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-4xl">
-        <DialogHeader className="shrink-0 rounded-t-xl border-b bg-selection-subtle px-5 py-4 pr-14">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <DialogTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
-                <Zap className="size-4 text-edge" />
-                Race picks
-              </DialogTitle>
-              <DialogDescription className="mt-1 text-[11px]">
-                Edge race and horse for this offer on {dateLabel}
-                {dataSource === "demo" && (
-                  <span className="ml-1 text-edge"> (demo data)</span>
+        <DialogHeader className="shrink-0 gap-0 rounded-t-xl border-b bg-selection-subtle p-0">
+          <div className="px-5 py-4 pr-14">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
+                  <Zap className="size-4 text-edge" aria-hidden />
+                  Race picks
+                  <span className={edgeNavTag}>Edge</span>
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-xs">
+                  Edge race and horse for this offer on {dateLabel}
+                  {dataSource === "demo" && (
+                    <span className="ml-1 text-edge"> (demo data)</span>
+                  )}
+                </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="intel-advanced" className={captionHeading}>
+                  Details
+                </Label>
+                <Switch
+                  id="intel-advanced"
+                  size="sm"
+                  checked={advanced}
+                  onCheckedChange={setAdvanced}
+                />
+              </div>
+            </div>
+
+            {offerOptions.length > 1 && (
+              <div className="mt-3">
+                {useDropdown ? (
+                  <Select
+                    value={activeOfferId != null ? String(activeOfferId) : undefined}
+                    onValueChange={(value) => selectOffer(Number(value))}
+                  >
+                    <SelectTrigger className="h-9 w-full bg-card text-left text-xs">
+                      <SelectValue placeholder="Choose a bookie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {offerOptions.map((offer) => {
+                        const label = offerSwitcherLabel(offer, offerOptions);
+                        return (
+                          <SelectItem
+                            key={offer.id}
+                            value={String(offer.id)}
+                            title={offerSwitcherAriaLabel(offer)}
+                            className="max-w-[min(100vw-2rem,28rem)]"
+                          >
+                            <span className="truncate">
+                              {label}
+                              {` · ${offer.pickCount}`}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className={filterPillGroup}>
+                    {offerOptions.map((offer) => {
+                      const active = activeOfferId === offer.id;
+                      const label = offerSwitcherLabel(offer, offerOptions);
+                      const aria = offerSwitcherAriaLabel(offer);
+                      const truncate = offerSwitcherNeedsTruncate(
+                        offer,
+                        offerOptions
+                      );
+                      return (
+                        <FilterPill
+                          key={offer.id}
+                          tone="edge"
+                          active={active}
+                          onClick={() => selectOffer(offer.id)}
+                          hasCount
+                          className={cn("text-xs", truncate && "max-w-[14rem]")}
+                          title={aria}
+                          aria-label={`${aria}, ${offer.pickCount} picks`}
+                        >
+                          <span className="truncate">{label}</span>
+                          <span className={filterPillCountState(active)}>
+                            {offer.pickCount}
+                          </span>
+                        </FilterPill>
+                      );
+                    })}
+                  </div>
                 )}
-              </DialogDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label
-                htmlFor="intel-advanced"
-                className="text-[10px] uppercase tracking-wide text-muted-foreground"
-              >
-                Details
-              </Label>
-              <Switch
-                id="intel-advanced"
-                size="sm"
-                checked={advanced}
-                onCheckedChange={setAdvanced}
-              />
-            </div>
+              </div>
+            )}
           </div>
 
-          {offerOptions.length > 1 && (
-            <div className="mt-3">
-              {useDropdown ? (
-                <Select
-                  value={activeOfferId != null ? String(activeOfferId) : undefined}
-                  onValueChange={(value) => selectOffer(Number(value))}
-                >
-                  <SelectTrigger className="h-9 w-full max-w-md bg-card text-left text-xs">
-                    <SelectValue placeholder="Choose an offer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {offerOptions.map((offer) => (
-                      <SelectItem key={offer.id} value={String(offer.id)}>
-                        {(offer.bookmaker ? `${offer.bookmaker} · ` : "") + offer.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="flex flex-wrap gap-1">
-                  {offerOptions.map((offer) => {
-                    const active = activeOfferId === offer.id;
-                    return (
-                      <FilterPill
-                        key={offer.id}
-                        active={active}
-                        onClick={() => selectOffer(offer.id)}
-                        hasCount
-                        className="max-w-[260px] text-[10px]"
-                        title={offer.title}
-                      >
-                        <span className="truncate">
-                          {offer.bookmaker
-                            ? `${offer.bookmaker}: ${offer.title}`
-                            : offer.title}
-                        </span>
-                        <span className={filterPillCountState(active)}>
-                          {offer.pickCount}
-                        </span>
-                      </FilterPill>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
           {activeOffer && (
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border/50 bg-card px-3 py-2.5">
+            <div className="flex w-full flex-wrap items-start justify-between gap-3 border-t border-border/50 bg-card px-5 py-3">
               <div className="min-w-0 flex-1">
                 {activeOffer.bookmaker ? (
                   <VenueBadge name={activeOffer.bookmaker} kind="bookie" size="md" />
                 ) : (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Offer
-                  </span>
+                  <span className={captionHeading}>Offer</span>
                 )}
-                <p className="mt-1.5 text-sm font-semibold leading-snug">{activeOffer.title}</p>
+                <p className="mt-1.5 text-sm font-semibold leading-snug">
+                  {activeOffer.title}
+                </p>
               </div>
               <Button
                 type="button"
@@ -544,7 +595,7 @@ export function RacingIntelligenceDialog({
           )}
 
           {scoped.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1">
+            <div className={cn(filterPillGroup, "px-5 py-3")}>
               {CONFIDENCE_FILTERS.map((f) => {
                 const count = tierCounts[f.id];
                 if (f.id !== "all" && count === 0) return null;
@@ -555,7 +606,7 @@ export function RacingIntelligenceDialog({
                     active={active}
                     onClick={() => setConfidenceFilter(f.id)}
                     hasCount
-                    className="text-[10px]"
+                    className="text-xs"
                   >
                     {f.label}
                     <span className={filterPillCountState(active)}>{count}</span>
@@ -628,14 +679,16 @@ export function RacingIntelligenceTrigger({
       className="gap-2"
       onClick={onClick}
     >
-      <Zap className="size-4 text-edge" />
+      <Zap className="size-4 text-edge" aria-hidden />
       Race picks
       {showEv && (
-        <span className="hidden items-center gap-1.5 sm:inline-flex">
-          <span className={edgeNavTag}>Edge</span>
-          <span className={cn("text-xs font-semibold tabular-nums", moneyPositiveClass)}>
-            +£{topEv.toFixed(2)}
-          </span>
+        <span
+          className={cn(
+            "hidden text-xs font-semibold tabular-nums sm:inline",
+            moneyPositiveClass
+          )}
+        >
+          +£{topEv.toFixed(2)}
         </span>
       )}
     </Button>
@@ -648,13 +701,31 @@ export function DeskFilterPills({
   filter,
   onFilterChange,
   onSettingsClick,
+  qualifyingCount = 0,
+  racePicksCount = 0,
+  /** Inside a parent card — no own plate; use a light bottom rule. */
+  embedded = false,
 }: {
   filter: DeskRaceFilter;
   onFilterChange: (v: DeskRaceFilter) => void;
   onSettingsClick: () => void;
+  /** Races that qualify for at least one active offer (All-races universe). */
+  qualifyingCount?: number;
+  /** Races with at least one Offer Edge play (All-races universe). */
+  racePicksCount?: number;
+  embedded?: boolean;
 }) {
   return (
-    <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 ring-1 ring-border/45">
+    <div
+      className={cn(
+        "flex w-full flex-wrap items-center justify-between gap-3",
+        // py-2 (8px) + 4px → 12px vertical
+        embedded
+          ? // Keep the tighter inset — do not follow desk --card-spacing (+4px).
+            "border-b border-border/60 px-3 py-3"
+          : "rounded-lg bg-muted/50 px-3 py-3 ring-1 ring-border/45"
+      )}
+    >
       <div className="flex flex-wrap items-center gap-1.5">
         <FilterPill active={filter === "all"} onClick={() => onFilterChange("all")}>
           All races
@@ -662,29 +733,39 @@ export function DeskFilterPills({
         <FilterPill
           active={filter === "qualifying"}
           onClick={() => onFilterChange("qualifying")}
+          hasCount
         >
           Qualifying
+          <span className={filterPillCountState(filter === "qualifying")}>
+            {qualifyingCount}
+          </span>
         </FilterPill>
         <FilterPill
+          tone="edge"
           active={filter === "recommended"}
           onClick={() => onFilterChange("recommended")}
+          hasCount
         >
           <Zap
             className={cn("size-3", filter !== "recommended" && "text-edge")}
             aria-hidden
           />
-          Edge
+          Race picks
+          <span className={filterPillCountState(filter === "recommended")}>
+            {racePicksCount}
+          </span>
         </FilterPill>
       </div>
       <Button
         type="button"
-        variant="outline"
-        size="sm"
-        className="h-8 gap-1.5"
+        variant="ghost"
+        size="icon"
+        className="size-8"
         onClick={onSettingsClick}
+        aria-label="Settings"
+        title="Settings"
       >
-        <Settings2 className="size-3.5" />
-        Settings
+        <Settings2 className="size-4" />
       </Button>
     </div>
   );

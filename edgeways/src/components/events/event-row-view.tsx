@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +71,12 @@ export function EventRowView({
   const status = effectiveEventStatus(event);
   const live = status === "live";
   const raceResult = isRacing ? parseRaceResults(event.goals) : null;
+  const betCount = linkedBets.length;
+  const openBetCount = linkedBets.filter((b) => b.status === "open").length;
+  const betsHref =
+    betCount === 1
+      ? `/tracker?highlight=${linkedBets[0]!.id}&queue=all`
+      : `/tracker?event=${event.id}&queue=all`;
   let goals: GoalEvent[] = [];
   if (!isRacing && event.goals) {
     try {
@@ -101,6 +108,19 @@ export function EventRowView({
               </>
             )}
           </div>
+          {betCount > 0 ? (
+            <Link
+              href={betsHref}
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-text underline-offset-2 hover:underline"
+            >
+              <span>
+                {betCount === 1 ? "1 bet" : `${betCount} bets`}
+                {openBetCount > 0 ? ` · ${openBetCount} open` : null}
+              </span>
+            </Link>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">No bets</p>
+          )}
           {isRacing &&
             linkedBets.map((bet) => {
               const outcome = betRaceOutcome(bet, event, promoAwards);

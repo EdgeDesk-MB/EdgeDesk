@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FIXTURE_SPORTS, type Fixture, type RacingFixture } from "@/components/events/types";
-import { FlashscoreFixtureBoard } from "@/components/events/flashscore-fixture-board";
+import { DeskFixtureBoard } from "@/components/events/desk-fixture-board";
 import { toastAddedToTrackedEvents, toastAlreadyTracked } from "@/components/events/track-toast";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
@@ -364,7 +364,7 @@ export function FixtureBrowserContent({
         : "No live or upcoming fixtures - finished matches are hidden. Try Refresh or another filter.";
 
   const board = (
-    <FlashscoreFixtureBoard
+    <DeskFixtureBoard
       sport={fixtureSport}
       football={filteredFixtures}
       racing={filteredRaces}

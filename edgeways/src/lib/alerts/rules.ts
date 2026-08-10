@@ -7,6 +7,7 @@
  * soon as an offer is created on the same calendar day.
  */
 
+import { isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { nakedExposureAlertKey } from "@/lib/bets/naked-exposure";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import type { DoNextItem } from "@/lib/offers/do-next";
@@ -19,6 +20,7 @@ import {
   resolveOfferImpact,
   type OfferImpactOffer,
 } from "./offer-impact";
+import { formatAlertMinutes } from "./toast-age";
 import type { AlertPrefs, EdgeAlert } from "./types";
 
 /** Ignore sub-£1 edges - a notification interrupt has a price. */
@@ -45,6 +47,11 @@ export interface SettledBetNotice {
   /** Linked campaign title when the bet belongs to an offer. */
   offerTitle?: string | null;
   bookmaker?: string | null;
+  /**
+   * Linked event result for the body lead, e.g. "Finished 4th" or "2–1".
+   * Omitted when the event/selection result is unknown.
+   */
+  resultSummary?: string | null;
 }
 
 export interface NakedExposureNotice {
@@ -78,19 +85,21 @@ export function alertBetTypeLabel(betType: string | null | undefined): string {
 
 /**
  * Identity line under settlement / exposure titles.
- * Prefer the offer title when linked: "Qualifying · Bet £10 get £10 (Ivybet)".
- * Fall back to the bet label when there is no offer.
+ * Prefer the offer title when linked: "Qualifying · Bet £10 get £10".
+ * Bookie is carried on EdgeAlert.bookmaker (toast VenueBadge / plain suffix).
  */
 export function formatAlertIdentityBody(input: {
   label: string;
   betType?: string | null;
   offerTitle?: string | null;
-  bookmaker?: string | null;
+  /** Optional event result lead ("Finished 4th", "2–1"). */
+  resultSummary?: string | null;
 }): string {
   const type = alertBetTypeLabel(input.betType);
   const subject = input.offerTitle?.trim() || input.label.trim() || "Bet";
-  const bookie = input.bookmaker?.trim() || null;
-  return bookie ? `${type} · ${subject} (${bookie})` : `${type} · ${subject}`;
+  const identity = `${type} · ${subject}`;
+  const result = input.resultSummary?.trim();
+  return result ? `${result} · ${identity}` : identity;
 }
 
 export interface TwoUpLockNotice {
@@ -145,6 +154,36 @@ function formatSignedGbp(value: number): string {
   return `${sign}£${Math.abs(value).toFixed(2)}`;
 }
 
+function formatGbpAmount(value: number): string {
+  return `£${Math.abs(value).toFixed(2)}`;
+}
+
+/**
+ * Secondary settlement outcome for alert titles (after the £ amount).
+ * Aligns with Profit Tracker history wording; void/push use their own titles.
+ */
+export function settlementOutcomeLabel(status: string | undefined): string | null {
+  switch (status) {
+    case "won":
+      return "Bet won";
+    case "lost":
+      return "Bet lost";
+    case "early_payout":
+      return "2UP paid early";
+    case "half_win":
+      return "Bet half won";
+    case "half_lose":
+      return "Bet half lost";
+    default:
+      return null;
+  }
+}
+
+function withOutcomeSuffix(title: string, status: string | undefined): string {
+  const outcome = settlementOutcomeLabel(status);
+  return outcome ? `${title} · ${outcome}` : title;
+}
+
 /** Title/body for a settlement alert (void/push match Profit Tracker treatment). */
 export function settledResultAlertCopy(settled: SettledBetNotice): {
   title: string;
@@ -154,7 +193,7 @@ export function settledResultAlertCopy(settled: SettledBetNotice): {
     label: settled.label,
     betType: settled.betType,
     offerTitle: settled.offerTitle,
-    bookmaker: settled.bookmaker,
+    resultSummary: settled.resultSummary,
   });
   if (settled.status === "void") {
     return {
@@ -168,21 +207,48 @@ export function settledResultAlertCopy(settled: SettledBetNotice): {
       body,
     };
   }
-  // Value in the title (OS-bold on lock screens); one polarity emoji only.
-  const emoji = settled.profit >= 0 ? "🟢" : "🔴";
+  if (settled.profit > 0) {
+    return {
+      title: withOutcomeSuffix(
+        `You just made ${formatGbpAmount(settled.profit)}`,
+        settled.status
+      ),
+      body,
+    };
+  }
+  if (settled.profit < 0) {
+    // Sober ledger line - no emoji (web toast + inbox). Push adds ⚡ if needed.
+    return {
+      title: withOutcomeSuffix(
+        `${formatSignedGbp(settled.profit)} settled`,
+        settled.status
+      ),
+      body,
+    };
+  }
   return {
-    title: `${emoji} ${formatSignedGbp(settled.profit)} settled`,
+    title: withOutcomeSuffix(`${formatGbpAmount(0)} settled`, settled.status),
     body,
   };
 }
 
 export function settledResultAlert(settled: SettledBetNotice): EdgeAlert {
   const copy = settledResultAlertCopy(settled);
+  const voidOrPush = settled.status === "void" || settled.status === "push";
+  const tone = voidOrPush
+    ? null
+    : settled.profit > 0
+      ? "positive"
+      : settled.profit < 0
+        ? "negative"
+        : null;
   return {
     key: `result_settled:${settled.betId}`,
     kind: "result_settled",
     title: copy.title,
     body: copy.body,
+    bookmaker: settled.bookmaker?.trim() || null,
+    tone,
     href: `/tracker?highlight=${settled.betId}`,
   };
 }
@@ -211,8 +277,8 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
           label: exposed.label,
           betType: exposed.betType,
           offerTitle: exposed.offerTitle,
-          bookmaker: exposed.bookmaker,
         }),
+        bookmaker: exposed.bookmaker?.trim() || null,
         href: `/tracker?highlight=${exposed.betId}`,
       });
     }
@@ -293,6 +359,7 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
         kind: "offer_expiring",
         title: copy.title,
         body: copy.body,
+        bookmaker: item.bookmaker?.trim() || null,
         // P1: land on the campaign details modal, not the add-bet flow
         href: item.offerId != null ? `/offers?view=${item.offerId}` : (item.href ?? "/offers"),
       });
@@ -308,7 +375,7 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
       alerts.push({
         key: `race_off_soon:${race.eventId}`,
         kind: "race_off_soon",
-        title: `⏰ ${race.course} off in ${mins} min`,
+        title: `⏰ ${race.course} off in ${formatAlertMinutes(mins)}`,
         body: "No bet logged · finish the workflow",
         href: "/racing",
       });
@@ -317,6 +384,17 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
 
   if (prefs.resultSettled) {
     for (const settled of settledSinceLastPoll) {
+      // Acca desk lay losses are liabilities paid mid-campaign. The desk
+      // pushes `acca_next_lay` with the cover stake instead of a ledger line.
+      if (
+        isAccaDeskLay({
+          label: settled.label,
+          betType: settled.betType ?? "",
+        }) &&
+        settled.profit < 0
+      ) {
+        continue;
+      }
       alerts.push(settledResultAlert(settled));
     }
   }

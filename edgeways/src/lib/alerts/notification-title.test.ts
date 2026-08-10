@@ -3,22 +3,25 @@ import { ensureNotificationTitleEmoji } from "./notification-title";
 
 describe("ensureNotificationTitleEmoji", () => {
   it("keeps a single brand bolt on offer titles", () => {
-    expect(ensureNotificationTitleEmoji("⚡ £4 edge · Galway starts in 15 min")).toBe(
-      "⚡ £4 edge · Galway starts in 15 min"
+    expect(ensureNotificationTitleEmoji("⚡ £4 edge · Galway starts in 15 minutes")).toBe(
+      "⚡ £4 edge · Galway starts in 15 minutes"
     );
   });
 
   it("collapses stacked brand bolts from push + title", () => {
-    expect(ensureNotificationTitleEmoji("⚡ ⚡ £4 edge · Galway starts in 15 min")).toBe(
-      "⚡ £4 edge · Galway starts in 15 min"
+    expect(ensureNotificationTitleEmoji("⚡ ⚡ £4 edge · Galway starts in 15 minutes")).toBe(
+      "⚡ £4 edge · Galway starts in 15 minutes"
     );
   });
 
   it("keeps semantic settlement / race / exposure emojis", () => {
     expect(ensureNotificationTitleEmoji("🟢 +£4.10 settled")).toBe("🟢 +£4.10 settled");
+    expect(ensureNotificationTitleEmoji("You just made £4.10")).toBe(
+      "⚡ You just made £4.10"
+    );
     expect(ensureNotificationTitleEmoji("🔴 -£1.51 settled")).toBe("🔴 -£1.51 settled");
-    expect(ensureNotificationTitleEmoji("⏰ Ascot off in 12 min")).toBe(
-      "⏰ Ascot off in 12 min"
+    expect(ensureNotificationTitleEmoji("⏰ Ascot off in 12 minutes")).toBe(
+      "⏰ Ascot off in 12 minutes"
     );
     expect(ensureNotificationTitleEmoji("⚠️ Lay missing · full stake exposed")).toBe(
       "⚠️ Lay missing · full stake exposed"
@@ -30,6 +33,9 @@ describe("ensureNotificationTitleEmoji", () => {
 
   it("strips a brand bolt stacked in front of a semantic emoji", () => {
     expect(ensureNotificationTitleEmoji("⚡ 🟢 +£4.10 settled")).toBe("🟢 +£4.10 settled");
+    expect(ensureNotificationTitleEmoji("⚡ You just made £4.10")).toBe(
+      "⚡ You just made £4.10"
+    );
   });
 
   it("adds a brand bolt when the title has none", () => {

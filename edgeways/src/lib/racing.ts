@@ -2,6 +2,7 @@
  * Horse racing helpers - name matching, place terms, results stored in events.goals.
  */
 
+import { placePositionsFromTerms } from "@/lib/racing/place-terms";
 import { formatClockTime } from "@/lib/time-format";
 
 export interface RaceRunnerResult {
@@ -17,6 +18,27 @@ export interface RaceRunnerResult {
    * When set, takes precedence over deriving favourite from min spDecimal.
    */
   isSpFavourite?: boolean;
+  /** Distance beaten vs previous horse (Racing API `btn`), e.g. "nk", "1½". */
+  btn?: string;
+  /** Overall distance beaten vs winner (Racing API `ovr_btn`). */
+  ovrBtn?: string;
+}
+
+/** Compact finishing position for desk grids, e.g. "1st", "2nd". */
+export function formatPositionOrdinal(position: number): string | null {
+  if (position <= 0) return null;
+  const mod100 = position % 100;
+  const suffix =
+    mod100 >= 11 && mod100 <= 13
+      ? "th"
+      : position % 10 === 1
+        ? "st"
+        : position % 10 === 2
+          ? "nd"
+          : position % 10 === 3
+            ? "rd"
+            : "th";
+  return `${position}${suffix}`;
 }
 
 /** Racecard details kept on tracked events for result-dialog headers. */
@@ -49,11 +71,15 @@ export function horseNamesMatch(a: string, b: string): boolean {
   return false;
 }
 
-/** UK place terms by field size (standard each-way rules). */
-export function placePositions(fieldSize: number): number {
-  if (fieldSize <= 4) return 1;
-  if (fieldSize <= 7) return 2;
-  return 3;
+/**
+ * UK place count by field size (and optional handicap context).
+ * Prefer `ukPlaceTerms` when you also need 1/4 vs 1/5.
+ */
+export function placePositions(
+  fieldSize: number,
+  opts?: { isHandicap?: boolean; type?: string | null; raceName?: string | null }
+): number {
+  return placePositionsFromTerms(fieldSize, opts);
 }
 
 export function runnerPosition(raw: string | number | null | undefined): number {
@@ -261,7 +287,8 @@ export function selectionWonRace(selection: string, result: RaceResult): boolean
 export function selectionPlaced(selection: string, result: RaceResult): boolean {
   const pos = selectionPosition(selection, result);
   if (pos <= 0) return false;
-  return pos <= placePositions(result.fieldSize);
+  // Handicap-aware when result carries race type (API / display meta).
+  return pos <= placePositions(result.fieldSize, { type: result.type });
 }
 
 /**
@@ -290,6 +317,21 @@ export function winnerIsSpFavourite(result: RaceResult): boolean | null {
   const favs = spFavouriteHorses(result);
   if (favs.length === 0) return null;
   return favs.some((h) => horseNamesMatch(h, result.winner));
+}
+
+/**
+ * Starting Price of the SP favourite(s) — shortest SP among marked / derived favs.
+ * `null` when no favourite SP is recorded.
+ */
+export function favouriteSpOdds(result: RaceResult): number | null {
+  const favs = spFavouriteHorses(result);
+  if (favs.length === 0) return null;
+  const sps = result.runners
+    .filter((r) => favs.some((h) => horseNamesMatch(h, r.horse)))
+    .map((r) => r.spDecimal)
+    .filter((n): n is number => n != null && Number.isFinite(n) && n > 1);
+  if (sps.length === 0) return null;
+  return Math.min(...sps);
 }
 
 /** Mark the winner as SP favourite when SP decimals are absent (manual Set result). */

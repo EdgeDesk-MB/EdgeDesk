@@ -24,7 +24,13 @@ import {
   sortFixturesByKickoff,
 } from "@/lib/events";
 import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
-import { listRow, sectionBar, sectionMeta, sectionTitle } from "@/lib/ui/surface-styles";
+import {
+  captionHeading,
+  listRow,
+  sectionBar,
+  sectionMeta,
+  sectionTitle,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Flame, ChevronDown, NotebookPen, Plus } from "lucide-react";
 
@@ -258,9 +264,9 @@ function FootballCompetitionSection({
   const now = useNow(30_000);
 
   return (
-    <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none">
+    <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
       <CollapsibleSectionHeader open={open} onToggle={() => setOpen((v) => !v)}>
-        <p className={cn(sectionTitle, "flex items-center gap-1.5 normal-case")}>
+        <p className={cn(sectionTitle, "flex items-center gap-1.5")}>
           <CompetitionHeaderIcon
             competition={competition}
             leagueFlag={leagueFlag}
@@ -298,7 +304,7 @@ function FootballCompetitionSection({
                     {fixture.awayTeam}
                   </span>
                   {live ? (
-                    <Badge className="bg-emerald-600 text-[10px] tabular-nums">
+                    <Badge className="bg-emerald-600 text-[11px] tabular-nums">
                       {fixture.homeScore}–{fixture.awayScore}
                       {fixture.minute > 0 ? ` · ${fixture.minute}'` : ""}
                     </Badge>
@@ -347,9 +353,9 @@ function RacingCourseSection({
   const hasRegionFlag = Boolean(toIsoCountryCode(region));
 
   return (
-    <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/50 dark:shadow-none">
+    <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
       <CollapsibleSectionHeader open={open} onToggle={() => setOpen((v) => !v)}>
-        <p className={cn(sectionTitle, "flex items-center gap-1.5")}>
+        <p className={cn(captionHeading, "flex items-center gap-1.5 text-foreground")}>
           {hasRegionFlag ? (
             <RegionFlag code={region} size="md" />
           ) : (
@@ -381,12 +387,12 @@ function RacingCourseSection({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium leading-snug">{race.raceName}</p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {race.fieldSize} runners
                     {raceLive ? (
-                      <Badge className="ml-2 bg-emerald-600 text-[10px]">Off</Badge>
+                      <Badge className="ml-2 bg-emerald-600 text-[11px]">Off</Badge>
                     ) : (
-                      <Badge variant="outline" className="ml-2 text-[10px]">
+                      <Badge variant="outline" className="ml-2 text-[11px]">
                         Upcoming
                       </Badge>
                     )}
@@ -409,7 +415,7 @@ function RacingCourseSection({
   );
 }
 
-export function FlashscoreFixtureBoard({
+export function DeskFixtureBoard({
   sport,
   football,
   racing,
@@ -489,6 +495,7 @@ export function FlashscoreFixtureBoard({
           <Tabs
             value={statusFilter}
             onValueChange={(v) => setStatusFilter(v as FixtureStatusFilter)}
+            activationMode="manual"
             className="w-fit shrink-0"
           >
             <TabsList variant="segmented">
@@ -513,6 +520,7 @@ export function FlashscoreFixtureBoard({
               <Tabs
                 value={competitionFilter}
                 onValueChange={(v) => onCompetitionFilterChange(v as "all" | "world_cup")}
+                activationMode="manual"
               >
                 <TabsList variant="segmented">
                   <TabsTrigger value="all">All comps</TabsTrigger>

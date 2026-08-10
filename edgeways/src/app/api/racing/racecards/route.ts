@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("date") ?? localCalendarDate();
 
   if (!hasRacingApiKey()) {
-    return NextResponse.json({ source: "demo", racecards: demoRacecards() });
+    return NextResponse.json({ source: "demo", racecards: demoRacecards(date) });
   }
 
   try {

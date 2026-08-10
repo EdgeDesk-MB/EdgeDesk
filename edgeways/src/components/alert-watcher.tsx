@@ -11,17 +11,23 @@ import {
   clearedConditionAlertKeys,
   isConditionAlertKey,
 } from "@/lib/alerts/condition-keys";
-import { createLocalAlertChannel } from "@/lib/alerts/local-channel";
+import {
+  createLocalAlertChannel,
+  ensureAlertToastLifecycle,
+} from "@/lib/alerts/local-channel";
+import { plainAlertBody } from "@/lib/alerts/plain-body";
 import {
   evaluateAlertRules,
   type SettledBetNotice,
   type TwoUpLockNotice,
 } from "@/lib/alerts/rules";
+import { settlementEventResultLabel } from "@/lib/alerts/settlement-result";
 import {
   dismissAlertNotifications,
   readSeenAlertKeys,
   storeSeenAlertKeys,
 } from "@/lib/alerts/seen";
+import { consumeUserOriginatedAlertKey } from "@/lib/alerts/user-originated";
 import { detectNakedExposure } from "@/lib/bets/naked-exposure";
 import { suggestTwoUpLock } from "@/lib/calc/two-up-lock";
 import { parseRaceDisplayMeta, parseRacecardRunners } from "@/lib/racing";
@@ -39,6 +45,10 @@ export function AlertWatcher() {
   const settledStatusRef = useRef<Map<number, string> | null>(null);
 
   useEffect(() => {
+    ensureAlertToastLifecycle();
+  }, []);
+
+  useEffect(() => {
     if (!state) return;
     if (seenRef.current == null) seenRef.current = readSeenAlertKeys();
 
@@ -50,11 +60,13 @@ export function AlertWatcher() {
     const previous = settledStatusRef.current;
     settledStatusRef.current = new Map(settledNow.map((b) => [b.id, b.status]));
     const offersById = new Map((state.offers ?? []).map((o) => [o.id, o]));
+    const eventsById = new Map((state.events ?? []).map((e) => [e.id, e]));
     const settledSinceLastPoll: SettledBetNotice[] = [];
     if (previous != null) {
       for (const b of settledNow) {
         const prev = previous.get(b.id);
         const offer = b.offerId != null ? offersById.get(b.offerId) : undefined;
+        const event = b.eventId != null ? eventsById.get(b.eventId) : undefined;
         const notice: SettledBetNotice = {
           betId: b.id,
           label: b.label,
@@ -63,6 +75,11 @@ export function AlertWatcher() {
           betType: b.betType,
           offerTitle: offer?.title ?? null,
           bookmaker: b.bookmaker ?? offer?.bookmaker ?? null,
+          resultSummary: settlementEventResultLabel({
+            selection: b.selection,
+            sport: b.sport ?? event?.sport ?? null,
+            event: event ?? null,
+          }),
         };
         if (prev == null) {
           // First settle: skip pure void/push (no toast); won/lost etc. announce.
@@ -220,17 +237,30 @@ export function AlertWatcher() {
     const toDismiss = [...cleared].filter((k) => !dismissedRef.current.has(k));
     if (toDismiss.length > 0) {
       for (const key of toDismiss) dismissedRef.current.add(key);
+      channel.dismiss?.(toDismiss);
       void dismissAlertNotifications(toDismiss);
     }
 
     let dirty = false;
     const fresh: typeof alerts = [];
     for (const alert of alerts) {
-      if (seen.has(alert.key)) continue;
+      if (seen.has(alert.key)) {
+        // Condition still live: refresh countdown copy on the open toast.
+        if (isConditionAlertKey(alert.key)) {
+          channel.refresh?.({ ...alert, delivery: "sticky" });
+        }
+        continue;
+      }
       seen.add(alert.key);
       dirty = true;
-      fresh.push(alert);
-      channel.notify(alert);
+      // User just settled / actioned this in-tab → ephemeral toast (no X).
+      // Background / API autopilot settles stay sticky until dismissed.
+      const delivery = consumeUserOriginatedAlertKey(alert.key)
+        ? ("ephemeral" as const)
+        : ("sticky" as const);
+      const delivered = { ...alert, delivery };
+      fresh.push(delivered);
+      channel.notify(delivered);
       dismissedRef.current.delete(alert.key);
     }
     if (dirty) {
@@ -245,7 +275,7 @@ export function AlertWatcher() {
             key: a.key,
             kind: a.kind,
             title: a.title,
-            body: a.body,
+            body: plainAlertBody(a),
             href: a.href,
           })),
         }),

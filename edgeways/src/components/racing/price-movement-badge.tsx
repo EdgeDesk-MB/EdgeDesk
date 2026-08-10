@@ -62,7 +62,7 @@ export function PriceMovementBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center justify-end gap-0.5 text-[10px] font-medium tabular-nums",
+          "inline-flex items-center justify-end gap-0.5 text-[11px] font-medium tabular-nums",
           isSteamer && "text-emerald-600 dark:text-emerald-400",
           isDrifter && "text-red-600 dark:text-red-400",
           !isSteamer && !isDrifter && "text-muted-foreground",
@@ -85,7 +85,7 @@ export function PriceMovementBadge({
       {change != null && movement.open != null && (
         <span
           className={cn(
-            "inline-flex items-center gap-0.5 text-[10px] font-medium tabular-nums",
+            "inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums",
             isSteamer && "text-emerald-600 dark:text-emerald-400",
             isDrifter && "text-red-600 dark:text-red-400",
             !isSteamer && !isDrifter && "text-muted-foreground"

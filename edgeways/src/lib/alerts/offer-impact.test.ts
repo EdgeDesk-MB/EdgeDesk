@@ -223,10 +223,27 @@ describe("offerExpiringAlertCopy", () => {
       actionKind: "place_qualifying",
       stake: 5,
     });
-    expect(copy.title).toBe("⚡ £4 edge · Galway starts in 15 min");
+    expect(copy.title).toBe("⚡ £4 edge · Galway starts in 15 minutes");
     expect(copy.body).toBe(
-      `Betfred · Bet £5 get £5 free bet · place the £5 qualifying bet · first race ${CLOCK_1400} · 5 races qualify`
+      `Bet £5 get £5 free bet · place the £5 qualifying bet · first race ${CLOCK_1400} · 5 races qualify`
     );
+  });
+
+  it("singularises a one-minute countdown", () => {
+    const copy = offerExpiringAlertCopy({
+      remainingEv: 4,
+      offerTitle: "Bet £5 get £5 free bet",
+      impact: impact({
+        at: FIRST_OFF,
+        source: "course",
+        label: "Galway",
+        firstOffHhmm: "14:00",
+      }),
+      now: FIRST_OFF - 60_000,
+      actionKind: "place_qualifying",
+      stake: 5,
+    });
+    expect(copy.title).toBe("⚡ £4 edge · Galway starts in 1 minute");
   });
 
   it("uses Meeting starts with open clock and qualify count when regional", () => {
@@ -244,9 +261,9 @@ describe("offerExpiringAlertCopy", () => {
       actionKind: "place_qualifying",
       stake: 10,
     });
-    expect(copy.title).toBe("⚡ £12 edge · Meeting starts in 15 min");
+    expect(copy.title).toBe("⚡ £12 edge · Meeting starts in 15 minutes");
     expect(copy.body).toBe(
-      `Bet365 · Bet £10 get £10 · place the £10 qualifying bet · opens ${CLOCK_1400} · 18 races qualify`
+      `Bet £10 get £10 · place the £10 qualifying bet · opens ${CLOCK_1400} · 18 races qualify`
     );
   });
 
@@ -268,9 +285,9 @@ describe("offerExpiringAlertCopy", () => {
       actionKind: "place_qualifying",
       stake: 20,
     });
-    expect(copy.title).toBe(`⚡ £8 edge · Galway ${CLOCK_1400} starts in 15 min`);
+    expect(copy.title).toBe(`⚡ £8 edge · Galway ${CLOCK_1400} starts in 15 minutes`);
     expect(copy.body).toBe(
-      `Coral · Bet £20 get £10 · place the £20 qualifying bet · on the ${CLOCK_1400}`
+      `Bet £20 get £10 · place the £20 qualifying bet · on the ${CLOCK_1400}`
     );
   });
 
@@ -291,9 +308,9 @@ describe("offerExpiringAlertCopy", () => {
       actionKind: "place_qualifying",
       stake: 10,
     });
-    expect(copy.title).toBe("⚡ £15 edge · Galway & Goodwood start in 15 min");
+    expect(copy.title).toBe("⚡ £15 edge · Galway & Goodwood start in 15 minutes");
     expect(copy.body).toBe(
-      `Paddy Power · Bet £10 get £10 · place the £10 qualifying bet · first race ${CLOCK_1400} · 9 races qualify across Galway & Goodwood`
+      `Bet £10 get £10 · place the £10 qualifying bet · first race ${CLOCK_1400} · 9 races qualify across Galway & Goodwood`
     );
   });
 
@@ -316,7 +333,7 @@ describe("offerExpiringAlertCopy", () => {
     });
     expect(copy.title).toBe("⚡ £4 edge · Galway under way");
     expect(copy.body).toBe(
-      "Betfred · Bet £5 get £5 free bet · finish the £5 qualifying bet while Galway is live · 5 races qualify"
+      "Bet £5 get £5 free bet · finish the £5 qualifying bet while Galway is live · 5 races qualify"
     );
   });
 
@@ -338,7 +355,7 @@ describe("offerExpiringAlertCopy", () => {
       stake: null,
     });
     expect(copy.body).toBe(
-      `Bet365 · Boosted odds special · place the qualifying bet · first race ${formatClockString("15:30")} · 6 races`
+      `Boosted odds special · place the qualifying bet · first race ${formatClockString("15:30")} · 6 races`
     );
   });
 
@@ -354,7 +371,7 @@ describe("offerExpiringAlertCopy", () => {
     });
     expect(copy.title).toMatch(/⚡ £12 edge ends in/i);
     expect(copy.body).toMatch(
-      /^Bet365 · Bet £10 get £10 · place the £10 qualifying bet before /
+      /^Bet £10 get £10 · place the £10 qualifying bet before /
     );
   });
 
@@ -369,6 +386,6 @@ describe("offerExpiringAlertCopy", () => {
       freeBetAmount: 10,
     });
     expect(copy.title).toMatch(/⚡ £9 edge ends in/i);
-    expect(copy.body).toMatch(/^Sky Bet · Free bet £10 · convert the £10 free bet before /);
+    expect(copy.body).toMatch(/^Free bet £10 · convert the £10 free bet before /);
   });
 });

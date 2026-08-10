@@ -1,10 +1,11 @@
 /**
  * Alerts inbox (F2) - persistent record of every emitted EdgeAlert. The
- * toast/notification channels deliver; this is the source of truth, so a
+ * sticky toast and notification channels deliver; this is the source of truth, so a
  * missed alert is never a lost alert. Rows key on the rules' stable dedupe
  * keys: a re-firing rule updates its row instead of stacking copies.
  */
 import { desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { plainAlertBody } from "@/lib/alerts/plain-body";
 import { settledResultAlertCopy } from "@/lib/alerts/rules";
 import { db, alertsInbox, bets, offers, type AlertsInboxRow } from "@/lib/db";
 
@@ -98,11 +99,16 @@ export function reconcileVoidedSettlementAlerts(now = Date.now()): number {
       offerTitle: bet.offerId != null ? offerTitleById.get(bet.offerId) ?? null : null,
       bookmaker: bet.bookmaker,
     });
-    if (existing.title === copy.title && (existing.body ?? "") === copy.body) continue;
+    const body = plainAlertBody({
+      body: copy.body,
+      bookmaker: bet.bookmaker,
+      kind: "result_settled",
+    });
+    if (existing.title === copy.title && (existing.body ?? "") === body) continue;
     db.update(alertsInbox)
       .set({
         title: copy.title,
-        body: copy.body,
+        body,
         updatedAt: now,
       })
       .where(eq(alertsInbox.dedupe, dedupe))

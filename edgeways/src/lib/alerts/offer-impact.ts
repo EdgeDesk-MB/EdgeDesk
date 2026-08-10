@@ -17,6 +17,10 @@ import {
   isRegionalScope,
   parseScopeCourses,
 } from "@/lib/offers/racing-offer-rules";
+import {
+  formatAlertHours,
+  formatAlertMinutes,
+} from "@/lib/alerts/toast-age";
 import { formatClockString, formatClockTime } from "@/lib/time-format";
 
 /** Lead before a race / first course off. Matches race_off_soon. */
@@ -273,11 +277,9 @@ export function isOfferImpactAlertDue(
   return true;
 }
 
-function bodyLead(bookmaker: string | null | undefined, offerTitle: string): string {
-  const venue = bookmaker?.trim() || null;
-  const title = offerTitle.trim();
-  if (venue && title) return `${venue} · ${title}`;
-  return title || venue || "Offer";
+/** Offer title only - bookie is EdgeAlert.bookmaker (toast badge / plain prefix). */
+function bodyLead(offerTitle: string): string {
+  return offerTitle.trim() || "Offer";
 }
 
 /** Compact £ amount for notification CTA copy. */
@@ -367,6 +369,7 @@ export function offerExpiringAlertCopy(args: {
   offerTitle: string;
   impact: OfferImpact;
   now: number;
+  /** Kept for call-site symmetry; bookie is EdgeAlert.bookmaker, not body text. */
   bookmaker?: string | null;
   actionKind?: OfferImpactActionKind | null;
   /** Qualifying stake when known (rules / title). */
@@ -374,9 +377,10 @@ export function offerExpiringAlertCopy(args: {
   /** Free-bet amount for convert actions. */
   freeBetAmount?: number | null;
 }): { title: string; body: string } {
+  void args.bookmaker;
   const pounds = Math.max(0, Math.round(args.remainingEv));
   const until = args.impact.at - args.now;
-  const lead = bodyLead(args.bookmaker, args.offerTitle);
+  const lead = bodyLead(args.offerTitle);
   const place = formatImpactPlace(args.impact);
   const qualifying = isQualifyingAction(args.actionKind);
   const card = raceCardSuffix(args.impact);
@@ -384,7 +388,7 @@ export function offerExpiringAlertCopy(args: {
 
   if (args.impact.source !== "expiry" && until > 0) {
     const mins = Math.max(1, Math.round(until / 60_000));
-    const title = `⚡ £${pounds} edge · ${place} ${startVerb(args.impact)} in ${mins} min`;
+    const title = `⚡ £${pounds} edge · ${place} ${startVerb(args.impact)} in ${formatAlertMinutes(mins)}`;
 
     if (args.impact.source === "race" && args.impact.raceClockHhmm) {
       const clock = formatClockString(args.impact.raceClockHhmm);
@@ -442,8 +446,8 @@ export function offerExpiringAlertCopy(args: {
     const mins = Math.round(until / 60_000);
     const when =
       mins >= 60
-        ? `${Math.round(mins / 60)}h`
-        : `${Math.max(1, mins)} min`;
+        ? formatAlertHours(Math.round(mins / 60))
+        : formatAlertMinutes(Math.max(1, mins));
     const title = `⚡ £${pounds} edge ends in ${when}`;
     if (args.actionKind === "convert_free_bet") {
       return {

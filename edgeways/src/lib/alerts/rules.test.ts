@@ -184,11 +184,12 @@ describe("offer_expiring rule", () => {
       ],
     });
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.title).toBe("⚡ £4 edge · Galway starts in 15 min");
+    expect(alerts[0]!.title).toBe("⚡ £4 edge · Galway starts in 15 minutes");
     expect(alerts[0]!.body).toMatch(
-      /^Bet365 · Bet £5 get £5 free bet · place the £5 qualifying bet · first race /
+      /^Bet £5 get £5 free bet · place the £5 qualifying bet · first race /
     );
     expect(alerts[0]!.body).toMatch(/ · 2 races qualify$/);
+    expect(alerts[0]!.bookmaker).toBe("Bet365");
   });
 
   it("falls back to the item href when the do-next item has no offer id", () => {
@@ -373,6 +374,7 @@ describe("result_settled rule", () => {
           betId: 42,
           label: "Qualify · Ivybet",
           profit: 4.1,
+          status: "won",
           betType: "qualifying",
           offerTitle: "Bet £10 get £10 free bet",
           bookmaker: "Ivybet",
@@ -381,6 +383,7 @@ describe("result_settled rule", () => {
           betId: 43,
           label: "Kempton EW",
           profit: -1.51,
+          status: "lost",
           betType: "free_snr",
           offerTitle: "Bet £10 get £10 free bet",
           bookmaker: "Bet365",
@@ -392,14 +395,49 @@ describe("result_settled rule", () => {
       "result_settled:43",
     ]);
     expect(alerts[0]).toMatchObject({
-      title: "🟢 +£4.10 settled",
-      body: "Qualifying · Bet £10 get £10 free bet (Ivybet)",
+      title: "You just made £4.10 · Bet won",
+      body: "Qualifying · Bet £10 get £10 free bet",
+      bookmaker: "Ivybet",
+      tone: "positive",
     });
     expect(alerts[1]).toMatchObject({
-      title: "🔴 -£1.51 settled",
-      body: "Free bet · Bet £10 get £10 free bet (Bet365)",
+      title: "-£1.51 settled · Bet lost",
+      body: "Free bet · Bet £10 get £10 free bet",
+      bookmaker: "Bet365",
+      tone: "negative",
     });
     expect(alerts[0]!.href).toBe("/tracker?highlight=42");
+  });
+
+  it("leads the body with a race or match result when provided", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      settledSinceLastPoll: [
+        {
+          betId: 42,
+          label: "Galway 14:00",
+          profit: 4.1,
+          status: "won",
+          betType: "qualifying",
+          offerTitle: "Bet £20 get £20 free bet",
+          bookmaker: "Betfair Sportsbook",
+          resultSummary: "Finished 4th",
+        },
+        {
+          betId: 43,
+          label: "Arsenal v Chelsea",
+          profit: -1.51,
+          status: "lost",
+          betType: "qualifying",
+          bookmaker: "Bet365",
+          resultSummary: "2–1",
+        },
+      ],
+    });
+    expect(alerts[0]!.body).toBe(
+      "Finished 4th · Qualifying · Bet £20 get £20 free bet"
+    );
+    expect(alerts[1]!.body).toBe("2–1 · Qualifying · Arsenal v Chelsea");
   });
 
   it("falls back to the bet label when there is no linked offer", () => {
@@ -410,12 +448,59 @@ describe("result_settled rule", () => {
           betId: 42,
           label: "Haydock 13:35",
           profit: 4.1,
+          status: "won",
           betType: "qualifying",
           bookmaker: "Paddy Power",
         },
       ],
     });
-    expect(alerts[0]!.body).toBe("Qualifying · Haydock 13:35 (Paddy Power)");
+    expect(alerts[0]!.title).toBe("You just made £4.10 · Bet won");
+    expect(alerts[0]!.body).toBe("Qualifying · Haydock 13:35");
+    expect(alerts[0]!.bookmaker).toBe("Paddy Power");
+  });
+
+  it("keeps P&L-only titles when settlement status is unknown", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      settledSinceLastPoll: [
+        { betId: 42, label: "X", profit: 1.5 },
+        { betId: 43, label: "Y", profit: -0.5 },
+      ],
+    });
+    expect(alerts[0]!.title).toBe("You just made £1.50");
+    expect(alerts[1]!.title).toBe("-£0.50 settled");
+  });
+
+  it("appends early payout and half-result outcomes after the amount", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      settledSinceLastPoll: [
+        {
+          betId: 1,
+          label: "2UP",
+          profit: 3.2,
+          status: "early_payout",
+          betType: "qualifying",
+        },
+        {
+          betId: 2,
+          label: "EW place",
+          profit: 1.1,
+          status: "half_win",
+          betType: "qualifying",
+        },
+        {
+          betId: 3,
+          label: "EW place lose",
+          profit: -0.8,
+          status: "half_lose",
+          betType: "qualifying",
+        },
+      ],
+    });
+    expect(alerts[0]!.title).toBe("You just made £3.20 · 2UP paid early");
+    expect(alerts[1]!.title).toBe("You just made £1.10 · Bet half won");
+    expect(alerts[2]!.title).toBe("-£0.80 settled · Bet half lost");
   });
 
   it("uses Profit Tracker-style void/push copy with no signed P&L", () => {
@@ -443,13 +528,16 @@ describe("result_settled rule", () => {
     expect(alerts[0]).toMatchObject({
       key: "result_settled:7",
       title: "Void · stakes returned",
-      body: "Qualifying · Bet £5 get £5 free bet (Paddy Power)",
+      body: "Qualifying · Bet £5 get £5 free bet",
+      bookmaker: "Paddy Power",
+      tone: null,
     });
     expect(alerts[0]!.title).not.toContain("£");
     expect(alerts[1]).toMatchObject({
       key: "result_settled:8",
       title: "Push · stakes returned",
       body: "Qualifying · Push pick",
+      tone: null,
     });
   });
 
@@ -461,6 +549,43 @@ describe("result_settled rule", () => {
         prefs: { ...base.prefs, resultSettled: false },
       })
     ).toHaveLength(0);
+  });
+
+  it("skips Acca desk lay losses (next-lay push owns that moment)", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      settledSinceLastPoll: [
+        {
+          betId: 10,
+          label: "Acca lay · Middlesbrough",
+          profit: -16.2,
+          status: "lost",
+          betType: "lay_only",
+        },
+        {
+          betId: 11,
+          label: "Qualify · Ivybet",
+          profit: 2,
+          status: "won",
+          betType: "qualifying",
+        },
+        {
+          betId: 12,
+          label: "Acca lay · Cambridge United",
+          profit: 36.2,
+          status: "won",
+          betType: "lay_only",
+        },
+      ],
+    });
+    expect(alerts.map((a) => a.key)).toEqual([
+      "result_settled:11",
+      "result_settled:12",
+    ]);
+    expect(alerts[1]).toMatchObject({
+      title: "You just made £36.20 · Bet won",
+      body: "Lay · Acca lay · Cambridge United",
+    });
   });
 });
 
@@ -484,7 +609,8 @@ describe("naked_exposure rule", () => {
     });
     expect(alerts[0]).toMatchObject({
       title: "⚠️ Lay missing · full stake exposed",
-      body: "Qualifying · Bet £20 get £10 free bet (Bet365)",
+      body: "Qualifying · Bet £20 get £10 free bet",
+      bookmaker: "Bet365",
     });
     expect(
       evaluateAlertRules({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRaceResultDialogHeader,
+  formatPositionOrdinal,
   parseRaceDisplayMeta,
   parseRacecardRunners,
   racingEventStatusDetail,
@@ -8,6 +9,21 @@ import {
   serializeRaceResults,
   withPreservedRaceDisplayMeta,
 } from "@/lib/racing";
+
+describe("formatPositionOrdinal", () => {
+  it("formats common finishing places", () => {
+    expect(formatPositionOrdinal(1)).toBe("1st");
+    expect(formatPositionOrdinal(2)).toBe("2nd");
+    expect(formatPositionOrdinal(3)).toBe("3rd");
+    expect(formatPositionOrdinal(4)).toBe("4th");
+    expect(formatPositionOrdinal(11)).toBe("11th");
+    expect(formatPositionOrdinal(21)).toBe("21st");
+  });
+
+  it("returns null for unplaced", () => {
+    expect(formatPositionOrdinal(0)).toBeNull();
+  });
+});
 
 describe("racingEventStatusDetail", () => {
   it("shows awaiting result when no card or result", () => {

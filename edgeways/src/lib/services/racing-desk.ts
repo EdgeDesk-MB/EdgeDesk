@@ -8,8 +8,16 @@ import {
   type OddsSource,
 } from "@/lib/racing/odds";
 import type { RacingRunnerDetail } from "@/lib/racing-desk/types";
-import { placePositions } from "@/lib/racing";
+import {
+  horseNamesMatch,
+  isRaceResultIncomplete,
+  parseRaceResults,
+  placePositions,
+  type RaceResult,
+} from "@/lib/racing";
+import { isDeskRacePast } from "@/lib/racing-desk/past";
 import type {
+  RacingDeskActiveBet,
   RacingDeskActiveOffer,
   RacingDeskPayload,
   RacingDeskRace,
@@ -17,6 +25,11 @@ import type {
   RaceOfferTag,
   SuggestedRace,
 } from "@/lib/racing-desk/types";
+import { parseEwMeta } from "@/lib/bets/ew-meta";
+import { extraPlace } from "@/lib/calc/extra-place";
+import { openBetOutcomeKind } from "@/lib/pnl/open-bet-valuation";
+
+export { isDeskRacePast } from "@/lib/racing-desk/past";
 import {
   formatBetGetFreePlaceSummary,
   isRegionalScope,
@@ -28,6 +41,8 @@ import {
   scorePlaceRefundStrategy,
 } from "@/lib/offers/racing-offer-rules";
 import { syncOfferSeriesInstances } from "@/lib/offers/offer-recurrence";
+import { localYmd } from "@/lib/offers/offer-recurrence-shared";
+import { repairMismatchedTitlePlaceRules } from "@/lib/offers/repair-title-place-rules";
 import { resolveOfferConfidence } from "@/lib/offers/place-refund-ev";
 import { buildOfferEdgePlays } from "@/lib/offers/offer-edge";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
@@ -58,14 +73,68 @@ import {
   type ExchangeProvider,
 } from "@/lib/services/exchange";
 import { syncCourseOfferExpiryFromRaces } from "@/lib/offers/course-offer-sync";
-import { racingPnlToday } from "@/lib/racing/pnl-today";
+import { racingPnlByRace, racingPnlToday } from "@/lib/racing/pnl-today";
+
+/** Merge API / tracked race result onto desk runners (position, SP, distances). */
+export function applyRaceResultToDeskRunners(
+  runners: RacingRunnerDetail[],
+  result: RaceResult
+): RacingRunnerDetail[] {
+  return runners.map((runner) => {
+    const hit = result.runners.find((r) => horseNamesMatch(r.horse, runner.name));
+    if (!hit) return runner;
+    return {
+      ...runner,
+      finishingPosition: hit.position > 0 ? hit.position : undefined,
+      spDecimal: hit.spDecimal ?? runner.spDecimal,
+      spFraction: hit.spLabel ?? runner.spFraction,
+      ...(hit.isSpFavourite ? { isSpFavourite: true as const } : {}),
+      ...(hit.btn != null ? { btn: hit.btn } : {}),
+      ...(hit.ovrBtn != null ? { ovrBtn: hit.ovrBtn } : {}),
+    };
+  });
+}
+
+/** Tag desk runners that appear as selections on linked tracked-event bets. */
+export function applyRunnerBetMarks(
+  runners: RacingRunnerDetail[],
+  linkedBets: Array<Pick<BetRow, "selection" | "status">>
+): RacingRunnerDetail[] {
+  if (linkedBets.length === 0) return runners;
+
+  const openSelections = linkedBets.filter((b) => b.status === "open");
+  const settledSelections = linkedBets.filter((b) => b.status !== "open");
+
+  return runners.map((runner) => {
+    const openCount = openSelections.filter((b) =>
+      horseNamesMatch(b.selection, runner.name)
+    ).length;
+    if (openCount > 0) {
+      return { ...runner, betMark: { kind: "open" as const, betCount: openCount } };
+    }
+    const settledCount = settledSelections.filter((b) =>
+      horseNamesMatch(b.selection, runner.name)
+    ).length;
+    if (settledCount > 0) {
+      return {
+        ...runner,
+        betMark: { kind: "settled" as const, betCount: settledCount },
+      };
+    }
+    return runner;
+  });
+}
 
 async function loadRacecards(
   date: string,
   source: "demo" | "api"
-): Promise<{ cards: RacingRacecard[]; oddsTier: "free" | "standard" | "demo" | "proxy" }> {
+): Promise<{
+  cards: RacingRacecard[];
+  oddsTier: "free" | "standard" | "demo" | "proxy";
+  results: Map<string, RaceResult>;
+}> {
   if (source === "demo") {
-    return { cards: demoRacecards(), oddsTier: "demo" };
+    return { cards: demoRacecards(date), oddsTier: "demo", results: new Map() };
   }
 
   let cards: RacingRacecard[];
@@ -89,6 +158,7 @@ async function loadRacecards(
   const { results } = await resultsToday();
   return {
     oddsTier,
+    results,
     cards: cards.map((card) => {
       const result = results.get(card.externalId);
       if (!result) return card;
@@ -200,22 +270,54 @@ function raceOddsSource(runners: RacingRunnerDetail[]): OddsSource {
 
 /**
  * Whether a racing offer should appear on the desk for a race day.
- * Recurring instances stay `planned` until their calendar day rolls to
- * `active`, so future dates must include dated planned rows.
+ *
+ * - With `eventDate` (place-refund meeting day, race-scoped): pinned to that day.
+ * - Without (straight bet&get / multi-day promo): every desk day from Starts on
+ *   through the Expires calendar day.
+ * Recurring instances stay `planned` until their calendar day rolls to `active`.
  */
 export function isRacingOfferActiveForDate(
-  offer: Pick<OfferRow, "status" | "sport" | "eventDate">,
+  offer: Pick<OfferRow, "status" | "sport" | "eventDate"> &
+    Partial<Pick<OfferRow, "startsOn" | "expiresAt">>,
   date: string
 ): boolean {
   if (offer.sport !== "horse_racing") return false;
-  if (offer.eventDate != null && offer.eventDate !== date) return false;
+  if (offer.status !== "active" && offer.status !== "planned") return false;
+
+  const eventDate = offer.eventDate?.trim() || null;
+  if (eventDate) {
+    if (eventDate !== date) return false;
+    return offer.status === "active" || offer.status === "planned";
+  }
+
+  const startsOn = offer.startsOn?.trim() || null;
+  if (startsOn && date < startsOn) return false;
+  if (offer.expiresAt != null) {
+    const expiresYmd = localYmd(new Date(offer.expiresAt));
+    if (date > expiresYmd) return false;
+  }
+
   if (offer.status === "active") return true;
-  // Dated future (or not-yet-rolled) instances: show on their event day only.
-  return offer.status === "planned" && offer.eventDate === date;
+  // Planned + no pin: only once Starts on is set, so drafts without a schedule
+  // do not flood every desk day.
+  return startsOn != null && startsOn <= date;
+}
+
+/**
+ * Desk Qualifying: horse-racing offers live for the viewed desk day.
+ * Edge / place suggestions still require a result trigger (see evaluateOfferTags).
+ * Same-day sibling spawn is only for result-conditional multi-race scopes.
+ */
+export function isRacingDeskOffer(
+  offer: Pick<OfferRow, "status" | "sport" | "eventDate" | "offerType" | "rules"> &
+    Partial<Pick<OfferRow, "startsOn" | "expiresAt">>,
+  date: string
+): boolean {
+  return isRacingOfferActiveForDate(offer, date);
 }
 
 function loadActiveRacingOffers(date: string): OfferRow[] {
-  return db.select().from(offers).all().filter((o) => isRacingOfferActiveForDate(o, date));
+  return db.select().from(offers).all().filter((o) => isRacingDeskOffer(o, date));
 }
 
 function buildActiveOfferSummaries(activeOffers: OfferRow[]): RacingDeskActiveOffer[] {
@@ -234,13 +336,22 @@ function buildActiveOfferSummaries(activeOffers: OfferRow[]): RacingDeskActiveOf
   });
 }
 
+/**
+ * Desk scoring uses persisted rules. Title/rules healing runs in
+ * repairMismatchedTitlePlaceRules() before the desk builds; do not overlay a
+ * stale OCR title onto a deliberate user edit of qualifyingPlaces.
+ */
+function rulesForDeskOffer(offer: OfferRow) {
+  return parseOfferRules(offer);
+}
+
 function evaluateOfferTags(
   race: Omit<RacingDeskRace, "offerTags">,
   activeOffers: OfferRow[],
   date: string
 ): RaceOfferTag[] {
   return activeOffers.map((offer) => {
-    const rules = parseOfferRules(offer);
+    const rules = rulesForDeskOffer(offer);
     const { qualifies, reasons } = raceQualifiesForOffer(offer, race, date);
     if (!qualifies) {
       return { offerId: offer.id, offerTitle: offer.title, qualifies: false, reasons };
@@ -253,6 +364,13 @@ function evaluateOfferTags(
       freeBetAmount: rules?.freeBetAmount,
       bookmaker: offer.bookmaker,
       triggerText: rules ? placeRefundTriggerText(rules) : undefined,
+      qualifyingPlaces: rules?.qualifyingPlaces,
+      ...(rules?.winnerMustBeSpFavourite
+        ? { winnerMustBeSpFavourite: true as const }
+        : {}),
+      ...(rules?.minFavouriteSpOdds != null && rules.minFavouriteSpOdds > 1
+        ? { minFavouriteSpOdds: rules.minFavouriteSpOdds }
+        : {}),
       minRunners:
         offer.scopeCourse?.trim() && !isRegionalScope(offer.scopeCourse)
           ? (rules?.minRunners ?? null)
@@ -274,6 +392,49 @@ function evaluateOfferTags(
       }),
     };
   });
+}
+
+/**
+ * Past / finished races clear live Edge tags, but still need free-bet place
+ * decoration when the user logged a bet linked to a place-refund offer.
+ * Hatch-only tags: qualifies + qualifyingPlaces, no runner scoring.
+ */
+export function freeBetPlaceTagsFromLinkedBets(
+  race: Omit<RacingDeskRace, "offerTags">,
+  linkedBets: Array<Pick<BetRow, "offerId">>,
+  offersById: Map<number, OfferRow>,
+  date: string
+): RaceOfferTag[] {
+  const seen = new Set<number>();
+  const tags: RaceOfferTag[] = [];
+  for (const bet of linkedBets) {
+    if (bet.offerId == null || seen.has(bet.offerId)) continue;
+    seen.add(bet.offerId);
+    const offer = offersById.get(bet.offerId);
+    if (!offer || offer.sport !== "horse_racing") continue;
+    const rules = rulesForDeskOffer(offer);
+    if (!rules?.qualifyingPlaces?.length) continue;
+    const { qualifies, reasons } = raceQualifiesForOffer(offer, race, date);
+    tags.push({
+      offerId: offer.id,
+      offerTitle: offer.title,
+      qualifies,
+      reasons,
+      betStake: rules.betStake,
+      freeBetAmount: rules.freeBetAmount,
+      bookmaker: offer.bookmaker,
+      triggerText: placeRefundTriggerText(rules),
+      qualifyingPlaces: rules.qualifyingPlaces,
+      ...(rules.winnerMustBeSpFavourite
+        ? { winnerMustBeSpFavourite: true as const }
+        : {}),
+      ...(rules.minFavouriteSpOdds != null && rules.minFavouriteSpOdds > 1
+        ? { minFavouriteSpOdds: rules.minFavouriteSpOdds }
+        : {}),
+      minRunners: rules.minRunners,
+    });
+  }
+  return tags;
 }
 
 function applyRunnerOfferTargets(race: RacingDeskRace): RacingDeskRace {
@@ -316,13 +477,14 @@ function buildEdgePlays(
 ): OfferEdgePlay[] {
   const plays: OfferEdgePlay[] = [];
 
+  const eligibleRaces = races.filter((r) => !isDeskRacePast(r));
   for (const offer of activeOffers) {
     const rules = parseOfferRules(offer);
     if (!rules || !offerHasResultTrigger(rules)) continue;
     plays.push(
       ...buildOfferEdgePlays(
         { id: offer.id, title: offer.title, bookmaker: offer.bookmaker, rules, row: offer },
-        races,
+        eligibleRaces,
         { date, retention, retentionSampleSize }
       )
     );
@@ -392,19 +554,22 @@ export async function getRacingDesk(
 ): Promise<RacingDeskPayload> {
   // Ensure recurring racing offers for the selected day exist before filtering.
   syncOfferSeriesInstances();
+  repairMismatchedTitlePlaceRules();
 
   const source = hasRacingApiKey() ? "api" : "demo";
   let error: string | undefined;
 
   let cards: RacingRacecard[];
   let apiOddsTier: "free" | "standard" | "demo" | "proxy" = "demo";
+  let resultsByRace = new Map<string, RaceResult>();
   try {
     const loaded = await loadRacecards(date, source);
     cards = loaded.cards;
     apiOddsTier = loaded.oddsTier;
+    resultsByRace = loaded.results;
   } catch (e) {
     error = String(e);
-    cards = demoRacecards();
+    cards = demoRacecards(date);
     apiOddsTier = "demo";
   }
 
@@ -428,15 +593,16 @@ export async function getRacingDesk(
   const isDemo = source === "demo" && !hasRacingApiKey();
   const useProxyOdds = !isDemo && apiOddsTier === "free";
 
-  // Only show offers that haven't had a qualifying bet placed yet (planned stage).
-  // Offers with open bets are at "awaiting" or beyond — suppress from the desk.
-  const offerIdsWithOpenBets = new Set(
+  // Desk Qualifying / Edge only show unused campaigns. Same-day sibling spawn
+  // creates a fresh row when a bet is linked, so the title stays on the desk
+  // without the used card (open or settled) reappearing alongside it.
+  const offerIdsWithLinkedBets = new Set(
     allBets
-      .filter((b) => b.status === "open" && b.offerId != null)
+      .filter((b) => b.offerId != null)
       .map((b) => b.offerId as number)
   );
   const activeOffers = loadActiveRacingOffers(date).filter(
-    (o) => !offerIdsWithOpenBets.has(o.id)
+    (o) => !offerIdsWithLinkedBets.has(o.id)
   );
   const primaryBookmaker = activeOffers[0]?.bookmaker ?? null;
 
@@ -491,14 +657,25 @@ export async function getRacingDesk(
   }
 
   const overridesByRace = listOverridesForRaces(cards.map((c) => c.externalId));
+  const offersById = new Map(
+    db
+      .select()
+      .from(offers)
+      .all()
+      .map((o) => [o.id, o] as const)
+  );
 
+  const now = Date.now();
   let races: RacingDeskRace[] = cards.map((card) => {
     const tracked = eventByExternal.get(card.externalId);
     const linkedBets = tracked ? (betsByEvent.get(tracked.id) ?? []) : [];
     const openBetCount = linkedBets.filter((b) => b.status === "open").length;
-    const standardPlaces = placePositions(card.fieldSize);
+    const standardPlaces = placePositions(card.fieldSize, {
+      type: card.type,
+      raceName: card.raceName,
+    });
 
-    const runners = enrichRunners(
+    let runners = enrichRunners(
       card,
       isDemo,
       card.externalId.length,
@@ -507,10 +684,23 @@ export async function getRacingDesk(
       exchangeLayByRace.get(card.externalId),
       overridesByRace.get(card.externalId)
     );
+
+    const apiResult = resultsByRace.get(card.externalId);
+    const trackedResult =
+      !apiResult && tracked ? parseRaceResults(tracked.goals) : null;
+    const result = apiResult ?? trackedResult;
+    if (result) {
+      runners = applyRaceResultToDeskRunners(runners, result);
+    }
+    if (linkedBets.length > 0) {
+      runners = applyRunnerBetMarks(runners, linkedBets);
+    }
+
     const pricedRunnerCount = runners.filter((r) => (r.bookieDecimal ?? 0) > 1).length;
     const oddsSource = raceOddsSource(runners);
     const liveLayCount = runners.filter((r) => r.exchangeSource === "live").length;
     const meta = exchangeMetaByRace.get(card.externalId);
+    const status = result ? ("finished" as const) : card.status;
 
     const baseRace = {
       externalId: card.externalId,
@@ -518,7 +708,9 @@ export async function getRacingDesk(
       raceName: card.raceName,
       startTime: card.startTime,
       offTime: card.offTime,
-      status: card.status,
+      status,
+      raceStatus: card.raceStatus,
+      abandoned: card.abandoned,
       fieldSize: card.fieldSize,
       distance: card.distance,
       going: card.going,
@@ -531,6 +723,8 @@ export async function getRacingDesk(
       type: card.type,
       prize: card.prize,
       region: card.region,
+      winner: result?.winner,
+      resultIncomplete: result ? isRaceResultIncomplete(result) : undefined,
       runners,
       trackedEventId: tracked?.id,
       openBetCount,
@@ -542,9 +736,13 @@ export async function getRacingDesk(
       liveLayCount,
     };
 
+    const past = isDeskRacePast(baseRace, now);
     return {
       ...baseRace,
-      offerTags: evaluateOfferTags(baseRace, activeOffers, date),
+      // Past: no live Edge workflow, but keep hatch tags from offer-linked bets.
+      offerTags: past
+        ? freeBetPlaceTagsFromLinkedBets(baseRace, linkedBets, offersById, date)
+        : evaluateOfferTags(baseRace, activeOffers, date),
     };
   });
 
@@ -642,14 +840,13 @@ export async function getRacingDesk(
   const summary: RacingDeskSummary = {
     raceCount: races.length,
     upcomingCount: races.filter((r) => r.status === "upcoming").length,
-    liveCount: races.filter((r) => r.status === "live").length,
     trackedCount,
     openPositions: allBets.filter((b) => {
       if (b.status !== "open" || b.eventId == null) return false;
       const ev = allEvents.find((e) => e.id === b.eventId);
       return ev?.sport === "horse_racing";
     }).length,
-    racingPnlToday: racingPnlToday(allBets, allEvents),
+    racingPnlToday: racingPnlToday(allBets, allEvents, date),
     source: error ? "error" : source === "demo" ? "demo" : "racing-api",
     oddsSnapshotsEnabled: true,
     premiumOddsApi: hasRacingApiKey(),
@@ -677,11 +874,87 @@ export async function getRacingDesk(
     layColor: exchangeColors.layColor,
   };
 
+  const raceByExternal = new Map(races.map((r) => [r.externalId, r]));
+  const activeBets: RacingDeskActiveBet[] = allBets
+    .filter((b) => b.status === "open" && b.eventId != null)
+    .map((b) => {
+      const ev = allEvents.find((e) => e.id === b.eventId);
+      if (!ev || ev.sport !== "horse_racing") return null;
+      const race = ev.externalId ? raceByExternal.get(ev.externalId) : undefined;
+      const meta = parseEwMeta(b.notes);
+      let qualifyingLoss: number | null = null;
+      let impliedExtraPlaceOdds: number | null = null;
+      let profitIfExtraPlace: number | null = null;
+      if (
+        meta?.mode === "extra_place" &&
+        meta.bookiePlaces > meta.exchangePlaces &&
+        b.backOdds > 1
+      ) {
+        const ep = extraPlace({
+          stakePerPart: meta.stakePerPart,
+          winOdds: b.backOdds,
+          placeFraction: meta.placeFraction,
+          layWinOdds: meta.layWin.odds,
+          layPlaceOdds: meta.layPlace.odds,
+          commission: b.commission,
+          bookiePlaces: meta.bookiePlaces,
+          exchangePlaces: meta.exchangePlaces,
+        });
+        qualifyingLoss = ep.qualifyingLoss;
+        impliedExtraPlaceOdds = ep.impliedExtraPlaceOdds;
+        profitIfExtraPlace = ep.profitIfExtraPlace;
+      }
+      const outcomeKind =
+        meta?.mode === "each_way" || meta?.mode === "extra_place"
+          ? ("worst" as const)
+          : openBetOutcomeKind(b);
+
+      return {
+        betId: b.id,
+        eventId: b.eventId!,
+        raceExternalId: ev.externalId,
+        label: b.label,
+        selection: b.selection,
+        market: b.market,
+        bookmaker: b.bookmaker,
+        backStake: b.backStake,
+        backOdds: b.backOdds,
+        expectedProfit: b.expectedProfit,
+        outcomeKind,
+        course: race?.course ?? ev.competition ?? null,
+        offTime: race?.offTime ?? null,
+        startTime: race?.startTime ?? ev.startTime ?? null,
+        bookiePlaces: meta?.bookiePlaces,
+        exchangePlaces: meta?.exchangePlaces,
+        mode: meta?.mode,
+        qualifyingLoss,
+        impliedExtraPlaceOdds,
+        profitIfExtraPlace,
+      } satisfies RacingDeskActiveBet;
+    })
+    .filter((b): b is RacingDeskActiveBet => b != null)
+    .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
+
+  const racingPnlDay = racingPnlByRace(allBets, allEvents, date);
+  for (const row of racingPnlDay.rows) {
+    const race = row.raceExternalId
+      ? raceByExternal.get(row.raceExternalId)
+      : races.find((r) => r.trackedEventId === row.eventId);
+    if (!race) continue;
+    if (race.course) row.course = race.course;
+    if (race.raceName) row.raceName = race.raceName;
+    if (race.offTime) row.offTime = race.offTime;
+    if (race.region) row.region = race.region;
+    if (!row.raceExternalId) row.raceExternalId = race.externalId;
+  }
+
   return {
     date,
     summary,
     races,
     activeOffers: activeOfferSummaries,
+    activeBets,
+    racingPnlDay,
     suggestedRaces,
     edgePlays,
     error,

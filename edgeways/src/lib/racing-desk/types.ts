@@ -46,6 +46,8 @@ export interface RacingRunnerDetail {
   form?: string;
   spDecimal?: number;
   spFraction?: string;
+  /** SP favourite (Fav / JFav) from result or racecard. */
+  isSpFavourite?: boolean;
   /** Raw bookmaker quotes from Racing API standard tier (stripped after resolve). */
   oddsList?: unknown[];
   /** Resolved bookie win price for display / scoring */
@@ -75,6 +77,20 @@ export interface RacingRunnerDetail {
   movement?: PriceMovement;
   /** Live exchange lay movement (separate from bookie) */
   exchangeMovement?: PriceMovement;
+  /** Finishing position when a result is known (1 = winner; 0 = unplaced). */
+  finishingPosition?: number;
+  /** Distance beaten vs previous (result view). */
+  btn?: string;
+  /** Overall distance beaten vs winner (result view). */
+  ovrBtn?: string;
+  /**
+   * Linked tracker bets on this runner (matched by selection name).
+   * Open takes priority over settled when both exist.
+   */
+  betMark?: {
+    kind: "open" | "settled";
+    betCount: number;
+  };
 }
 
 export interface RacingDeskRace {
@@ -84,6 +100,10 @@ export interface RacingDeskRace {
   startTime: number;
   offTime: string;
   status: "upcoming" | "live" | "finished";
+  /** Provider race_status when present (OFF, DELAYED, …). */
+  raceStatus?: string;
+  /** True when the provider marks the race abandoned. */
+  abandoned?: boolean;
   fieldSize: number;
   distance?: string;
   going?: string;
@@ -102,6 +122,8 @@ export interface RacingDeskRace {
   prize?: string;
   region?: string;
   winner?: string;
+  /** True when result has winner but fewer than two placings (fast result). */
+  resultIncomplete?: boolean;
   runners: RacingRunnerDetail[];
   /** Linked tracked event id, if any */
   trackedEventId?: number;
@@ -153,6 +175,12 @@ export interface RaceOfferTag {
   freeBetAmount?: number;
   bookmaker?: string | null;
   triggerText?: string;
+  /** Place finishes that award the free bet (e.g. 2, 3, 4) */
+  qualifyingPlaces?: number[];
+  /** Place hatch / award only when the winner was the SP favourite. */
+  winnerMustBeSpFavourite?: boolean;
+  /** Optional floor on the favourite's Starting Price (decimal). */
+  minFavouriteSpOdds?: number | null;
   suggestedRunners?: SuggestedRunner[];
   /** Minimum runners required by the offer rules (qualifying tags only) */
   minRunners?: number | null;
@@ -195,7 +223,6 @@ export interface SuggestedRace {
 export interface RacingDeskSummary {
   raceCount: number;
   upcomingCount: number;
-  liveCount: number;
   trackedCount: number;
   openPositions: number;
   racingPnlToday: number;
@@ -223,11 +250,79 @@ export interface RacingDeskSummary {
   layColor?: string;
 }
 
+/** Open horse-racing bets linked to today's desk (Active bets strip). */
+export interface RacingDeskActiveBet {
+  betId: number;
+  eventId: number;
+  raceExternalId: string | null;
+  label: string;
+  selection: string;
+  market: string;
+  bookmaker: string | null;
+  backStake: number;
+  backOdds: number;
+  expectedProfit: number | null;
+  /**
+   * How to label `expectedProfit`:
+   * - locked — both matched outcomes equal (no Est. language)
+   * - worst — show the worse of the two sides
+   * - estimate — naked / incomplete lay
+   */
+  outcomeKind: "locked" | "worst" | "estimate";
+  course: string | null;
+  offTime: string | null;
+  startTime: number | null;
+  /** From ew meta when present */
+  bookiePlaces?: number;
+  exchangePlaces?: number;
+  mode?: "each_way" | "extra_place";
+  qualifyingLoss?: number | null;
+  impliedExtraPlaceOdds?: number | null;
+  profitIfExtraPlace?: number | null;
+}
+
+/** Day P&L series + by-race table for Racing Desk “Racing P&L today”. */
+export interface RacingDeskPnlDay {
+  total: number;
+  openCount: number;
+  settledCount: number;
+  rows: Array<{
+    eventId: number;
+    raceExternalId: string | null;
+    startTime: number;
+    course: string;
+    raceName: string;
+    offTime: string | null;
+    /** Racing API region (GB / IRE) when known */
+    region?: string | null;
+    profit: number;
+    betCount: number;
+    openCount: number;
+    settledCount: number;
+  }>;
+  cumulative: Array<{ t: number; value: number }>;
+  /** Home-chart prior-plateau markers for each racing bet tip */
+  markers: Array<{
+    id: number;
+    kind?: "bet" | "adjustment" | "casino";
+    label: string;
+    status: string;
+    settledAtSec: number;
+    betProfit: number;
+    cumulativeValue: number;
+    tone: "win" | "loss" | "neutral";
+  }>;
+}
+
 export interface RacingDeskPayload {
   date: string;
   summary: RacingDeskSummary;
   races: RacingDeskRace[];
   activeOffers: RacingDeskActiveOffer[];
+  /** Open positions with race linkage for the Active bets strip */
+  activeBets: RacingDeskActiveBet[];
+  /** Race-day P&L chart + breakdown for the selected desk date */
+  racingPnlDay: RacingDeskPnlDay;
   suggestedRaces: SuggestedRace[];
   /** Offer Edge plays across every active offer, best expected value first */
   edgePlays: OfferEdgePlay[];
