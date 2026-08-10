@@ -15,9 +15,15 @@ test protocol.
 
 Other pointers:
 - Model routing strategy (local Ollama backbone vs Cursor Ultra / Claude Code):
-  `docs/Local-vs-Cloud-Model-Strategy.md`. Day-to-day habits: `docs/ai-playbook.md`.
-  Enable-list: `docs/cursor-setup.md`. Always-on rule: `.cursor/rules/model-routing.mdc`.
-- Claude Code skills and subagents: `.claude/skills/`, `.claude/agents/`.
+ `docs/Local-vs-Cloud-Model-Strategy.md`. Day-to-day habits: `docs/ai-playbook.md`.
+ Enable-list: `docs/cursor-setup.md`. Always-on rule: `.cursor/rules/model-routing.mdc`.
+- Bet-type taxonomy (structure × market × modifier, full-cover families, MB utility):
+ `docs/betting-methods-guide.md` (parent docs, outside the app).
+- Cursor skills, subagents and slash commands: `.cursor/skills/`, `.cursor/agents/`,
+  `.cursor/commands/`. Claude Code mirror: `.claude/skills/`, `.claude/agents/`.
+  Full harness map: `docs/cursor-kit.md`. Daily go-to guide (incl. automation
+  recipes): `docs/cursor-daily-guide.md`. Launch path (payments, legal,
+  go-live gates): `docs/live-readiness.md`.
 - Run all npm commands from `edgeways/`, not from this directory.
 
 ## Model routing (agents)

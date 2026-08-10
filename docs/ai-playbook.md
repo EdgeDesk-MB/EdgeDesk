@@ -1,9 +1,11 @@
 # AI stack playbook
 
-**Updated:** 2 August 2026  
+**Updated:** 6 August 2026  
 **Scope:** how to actually drive the stack day to day. Routing analysis and
 subscription strategy live in `docs/Local-vs-Cloud-Model-Strategy.md`. Cursor
-enable-list and one-off setup live in `docs/cursor-setup.md`.
+enable-list and one-off setup live in `docs/cursor-setup.md`. Bet-type
+taxonomy (Lucky / Yankee / systems modelling) lives in
+`docs/betting-methods-guide.md`.
 
 Note: app UI details (menu names, shortcuts) drift between versions. Where a
 shortcut below is wrong, the in-app command palette or help is the truth.
@@ -90,9 +92,22 @@ Local parallel ladder: `qwen3-coder-ctx` → `bb-deepseek-70b` → escalate clou
 workspace root.
 
 ### Commands (project slash commands)
-`.cursor/commands/*.md` mirrors Claude Code skills; type `/` in chat:
+`.cursor/commands/*.md` points at `.cursor/skills/` and `.cursor/agents/`; type `/` in chat:
 - `/calc-change`, `/brief`, `/delegate-local`
 - `/calc-audit`, `/design-review` (switch to a frontier model first)
+
+### Skills (auto-triggered workflows)
+`.cursor/skills/*/SKILL.md` — also mirrored under `.claude/skills/` for Claude Code:
+- **Calc:** `calc-change`, `delegate-local`
+- **Roadmap:** `brief`
+- **UI build:** `design-system-consistency`, `design-taste`, `ux-heuristics`, `visual-qa-loop`
+
+### Subagents (read-only auditors)
+`.cursor/agents/*.md` — also mirrored under `.claude/agents/`:
+- `calc-auditor` — money-maths diffs (frontier model)
+- `design-reviewer` — design-system conformance + quality
+- `consistency-checker` — fast token/pattern drift (background, fast model)
+- `ux-qa-auditor` — interaction, states, a11y, resilience
 
 ### Claude Code inside Cursor
 Install the Claude Code extension for a side panel, or run `claude` in the
@@ -122,7 +137,8 @@ not a full editor replacement.
 - Plan mode: Shift+Tab; use for non-trivial work before edits land.
 - Skills: `/calc-change`, `/brief`, `/delegate-local`, `/code-review`, `/verify`,
   `/security-review`.
-- Subagents: `calc-auditor`, `design-reviewer` (read-only PASS/FAIL).
+- Subagents: `calc-auditor`, `design-reviewer`, `consistency-checker`, `ux-qa-auditor`
+  (read-only reports).
 
 ### Launching inside Cursor
 Run `claude` once in Cursor's integrated terminal; then `Cmd+Esc` quick launch
