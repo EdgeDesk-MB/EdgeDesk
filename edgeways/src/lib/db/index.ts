@@ -215,6 +215,72 @@ CREATE TABLE IF NOT EXISTS offers (
     )
   `);
 
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS bet_builder_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      offer_id INTEGER,
+      label TEXT NOT NULL,
+      method TEXT NOT NULL,
+      stake REAL NOT NULL,
+      bookmaker TEXT,
+      commission REAL NOT NULL DEFAULT 0,
+      back_odds REAL NOT NULL,
+      back_bet_id INTEGER,
+      whole_lay_bet_id INTEGER,
+      whole_lay_stake REAL,
+      whole_lay_odds REAL,
+      event_label TEXT,
+      scheduled_at INTEGER,
+      mute_alerts INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at INTEGER NOT NULL,
+      settled_at INTEGER
+    )
+  `);
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS bet_builder_selections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      market TEXT,
+      selection TEXT,
+      result TEXT NOT NULL DEFAULT 'pending'
+    )
+  `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS system_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      offer_id INTEGER,
+      label TEXT NOT NULL,
+      structure TEXT NOT NULL,
+      unit_stake REAL NOT NULL,
+      lines INTEGER NOT NULL,
+      total_stake REAL NOT NULL,
+      each_way INTEGER NOT NULL DEFAULT 0,
+      place_fraction REAL,
+      bookmaker TEXT,
+      classification TEXT NOT NULL DEFAULT 'ev_play',
+      back_bet_id INTEGER,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at INTEGER NOT NULL,
+      settled_at INTEGER
+    )
+  `);
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS system_legs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL,
+      seq INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      market TEXT,
+      selection TEXT,
+      odds_decimal REAL NOT NULL,
+      result TEXT NOT NULL DEFAULT 'pending'
+    )
+  `);
+
 sqlite.exec(`
     CREATE TABLE IF NOT EXISTS mug_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -295,6 +361,16 @@ CREATE TABLE IF NOT EXISTS user_reminders (
 );
 CREATE INDEX IF NOT EXISTS idx_user_reminders_due
   ON user_reminders(remind_at) WHERE fired_at IS NULL AND cancelled_at IS NULL;
+CREATE TABLE IF NOT EXISTS feedback_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  details TEXT NOT NULL,
+  reply_email TEXT,
+  diagnostics_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  linear_issue_id TEXT
+);
 CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,
@@ -427,6 +503,8 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("casino_offers", "series_id INTEGER");
   addColumn("casino_offers", "instance_date TEXT");
   addColumn("user_reminders", "context_venue TEXT");
+  addColumn("system_runs", "place_fraction REAL");
+  addColumn("feedback_reports", "linear_issue_id TEXT");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS casino_offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -476,6 +554,8 @@ CREATE INDEX IF NOT EXISTS idx_casino_offer_series_components_series
   addColumn("offers", "series_id INTEGER");
   addColumn("offers", "instance_date TEXT");
   addColumn("offers", "starts_on TEXT");
+  addColumn("offers", "offer_url TEXT");
+  addColumn("casino_offers", "offer_url TEXT");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -500,7 +580,9 @@ CREATE TABLE IF NOT EXISTS offer_series (
 );
 `);
   addColumn("offer_series", "skipped_dates_json TEXT");
+  addColumn("offer_series", "offer_url TEXT");
   addColumn("casino_offer_series", "skipped_dates_json TEXT");
+  addColumn("casino_offer_series", "offer_url TEXT");
   addColumn("accounts", "access_status TEXT NOT NULL DEFAULT 'available'");
   addColumn("accounts", "notes TEXT");
   addColumn("accounts", "funded_by_account_id INTEGER");
@@ -525,6 +607,15 @@ WHERE casino_offer_id IS NOT NULL
 `);
   addColumn("racing_odds_snapshots", "kind TEXT NOT NULL DEFAULT 'bookie'");
   addColumn("acca_runs", "boost_pct REAL");
+  addColumn("acca_runs", "no_lay INTEGER NOT NULL DEFAULT 0");
+  // Desk sport / event linking + denormalised bets.sport for tracker filters
+  addColumn("bets", "sport TEXT");
+  addColumn("acca_legs", "sport TEXT");
+  addColumn("bet_builder_runs", "event_id INTEGER");
+  addColumn("bet_builder_runs", "sport TEXT");
+  addColumn("system_legs", "event_id INTEGER");
+  addColumn("system_legs", "sport TEXT");
+  addColumn("system_legs", "scheduled_at INTEGER");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS offer_ev_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

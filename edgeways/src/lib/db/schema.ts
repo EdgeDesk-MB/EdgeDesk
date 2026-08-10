@@ -86,6 +86,11 @@ export const bets = sqliteTable("bets", {
   source: text("source"),
   /** J5: null/'edge' = normal; 'mug' = camouflage bet, excluded from edge analytics */
   purpose: text("purpose"),
+  /**
+   * Denormalised sport for rows without a linked event (desk backs, quick-log).
+   * Prefer events.sport when eventId is set.
+   */
+  sport: text("sport"),
 });
 
 /** Mug-bet cadence plan per bookie account (J5) - camouflage budgeting. */
@@ -105,8 +110,10 @@ export const accaRuns = sqliteTable("acca_runs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   offerId: integer("offer_id"),
   label: text("label").notNull(),
-  /** sequential lock, or insurance laid leg-by-leg / once at combined odds */
-  method: text("method", { enum: ["sequential", "insurance_legs", "insurance_whole"] }).notNull(),
+  /** sequential, insurance (legs/whole), or combined one-lay (Smarkets-style) */
+  method: text("method", {
+    enum: ["sequential", "insurance_legs", "insurance_whole", "combined"],
+  }).notNull(),
   stake: real("stake").notNull(),
   bookmaker: text("bookmaker"),
   commission: real("commission").notNull().default(0),
@@ -114,12 +121,14 @@ export const accaRuns = sqliteTable("acca_runs", {
   refundAmount: real("refund_amount"),
   /** The acca back itself as a REAL bets row - tracker owns the money */
   backBetId: integer("back_bet_id"),
-  /** insurance_whole: the single combined lay, also a real lay_only bet */
+  /** insurance_whole / combined: the single combined lay, also a real lay_only bet */
   wholeLayBetId: integer("whole_lay_bet_id"),
   wholeLayStake: real("whole_lay_stake"),
   wholeLayOdds: real("whole_lay_odds"),
   /** Bookmaker acca boost, e.g. 50 for a 50% boost on the combined price (winnings-only convention) */
   boostPct: real("boost_pct"),
+  /** 1 = deliberate back-only (no exchange lay); Combined method */
+  noLay: integer("no_lay").notNull().default(0),
   muteAlerts: integer("mute_alerts").notNull().default(0),
   status: text("status", { enum: ["active", "completed", "abandoned"] })
     .notNull()
@@ -135,7 +144,9 @@ export const accaLegs = sqliteTable("acca_legs", {
   seq: integer("seq").notNull(),
   label: text("label").notNull(),
   eventId: integer("event_id"),
-  /** For auto-results from a linked event (match_odds selections v1) */
+  /** Sport when no event linked; when eventId is set, prefer events.sport. */
+  sport: text("sport"),
+  /** For auto-results from a linked event (football + horse racing via desk helper) */
   market: text("market"),
   selection: text("selection"),
   backOdds: real("back_odds").notNull(),
@@ -143,6 +154,108 @@ export const accaLegs = sqliteTable("acca_legs", {
   layStake: real("lay_stake"),
   layBetId: integer("lay_bet_id"),
   result: text("result", { enum: ["pending", "won", "lost", "void"] })
+    .notNull()
+    .default("pending"),
+  scheduledAt: integer("scheduled_at"),
+});
+
+/** Bet Builder desk run — same-event combo, one kick-off, combined lay or no lay. */
+export const betBuilderRuns = sqliteTable("bet_builder_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  offerId: integer("offer_id"),
+  label: text("label").notNull(),
+  method: text("method", { enum: ["combined", "no_lay"] }).notNull(),
+  stake: real("stake").notNull(),
+  bookmaker: text("bookmaker"),
+  commission: real("commission").notNull().default(0),
+  /** Combined bookie BB price (decimal) */
+  backOdds: real("back_odds").notNull(),
+  backBetId: integer("back_bet_id"),
+  wholeLayBetId: integer("whole_lay_bet_id"),
+  wholeLayStake: real("whole_lay_stake"),
+  wholeLayOdds: real("whole_lay_odds"),
+  eventLabel: text("event_label"),
+  /** Linked tracked event (same-event builder); sport preferably from events.sport. */
+  eventId: integer("event_id"),
+  /** Sport when no event linked. */
+  sport: text("sport"),
+  scheduledAt: integer("scheduled_at"),
+  muteAlerts: integer("mute_alerts").notNull().default(0),
+  status: text("status", { enum: ["active", "completed", "abandoned"] })
+    .notNull()
+    .default("active"),
+  createdAt: integer("created_at").notNull(),
+  settledAt: integer("settled_at"),
+});
+
+/** One selection inside a bet builder (checklist; no per-selection lay). */
+export const betBuilderSelections = sqliteTable("bet_builder_selections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  runId: integer("run_id").notNull(),
+  seq: integer("seq").notNull(),
+  label: text("label").notNull(),
+  market: text("market"),
+  selection: text("selection"),
+  result: text("result", { enum: ["pending", "won", "lost", "void"] })
+    .notNull()
+    .default("pending"),
+});
+
+/**
+ * Systems desk — full-cover tickets (Trixie / Yankee / Lucky family).
+ * Organisation + settle only; no Acca-style lay workflow.
+ */
+export const systemRuns = sqliteTable("system_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  offerId: integer("offer_id"),
+  label: text("label").notNull(),
+  structure: text("structure", {
+    enum: [
+      "trixie",
+      "patent",
+      "yankee",
+      "canadian",
+      "heinz",
+      "super_heinz",
+      "goliath",
+      "lucky_15",
+      "lucky_31",
+      "lucky_63",
+    ],
+  }).notNull(),
+  unitStake: real("unit_stake").notNull(),
+  lines: integer("lines").notNull(),
+  totalStake: real("total_stake").notNull(),
+  /** 1 = each-way */
+  eachWay: integer("each_way").notNull().default(0),
+  /** Place fraction when each-way, e.g. 0.2 = 1/5, 0.25 = 1/4 */
+  placeFraction: real("place_fraction"),
+  bookmaker: text("bookmaker"),
+  /** ev_play | mug_bet | qualifying */
+  classification: text("classification").notNull().default("ev_play"),
+  backBetId: integer("back_bet_id"),
+  status: text("status", { enum: ["active", "completed", "abandoned"] })
+    .notNull()
+    .default("active"),
+  createdAt: integer("created_at").notNull(),
+  settledAt: integer("settled_at"),
+});
+
+export const systemLegs = sqliteTable("system_legs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  runId: integer("run_id").notNull(),
+  seq: integer("seq").notNull(),
+  label: text("label").notNull(),
+  eventId: integer("event_id"),
+  /** Sport when no event linked; when eventId is set, prefer events.sport. */
+  sport: text("sport"),
+  market: text("market"),
+  selection: text("selection"),
+  oddsDecimal: real("odds_decimal").notNull(),
+  /** placed = finished in places but not 1st (each-way place part only) */
+  result: text("result", {
+    enum: ["pending", "won", "placed", "lost", "void"],
+  })
     .notNull()
     .default("pending"),
   scheduledAt: integer("scheduled_at"),
@@ -183,6 +296,8 @@ export const offers = sqliteTable("offers", {
   instanceDate: text("instance_date"),
   /** J6: 'email' = created by email intake (drafts land planned for review) */
   source: text("source"),
+  /** External bookmaker/casino promo page URL ("Link to offer") */
+  offerUrl: text("offer_url"),
 });
 
 /** Immutable EV baseline written when a campaign goes active; versioned on re-lock. */
@@ -225,6 +340,8 @@ export const offerSeries = sqliteTable("offer_series", {
   scopeRaceId: text("scope_race_id"),
   scopeRaceLabel: text("scope_race_label"),
   rules: text("rules"),
+  /** External bookmaker promo page URL ("Link to offer") */
+  offerUrl: text("offer_url"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
@@ -274,6 +391,24 @@ export const userReminders = sqliteTable("user_reminders", {
   createdAt: integer("created_at").notNull(),
   firedAt: integer("fired_at"),
   cancelledAt: integer("cancelled_at"),
+});
+
+/**
+ * Local feedback / bug reports. Stored on-device; the UI can also open a
+ * mailto so a copy can be sent to the maintainer.
+ */
+export const feedbackReports = sqliteTable("feedback_reports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** bug | idea | other */
+  kind: text("kind").notNull(),
+  summary: text("summary").notNull(),
+  details: text("details").notNull(),
+  replyEmail: text("reply_email"),
+  /** JSON FeedbackDiagnostics snapshot */
+  diagnosticsJson: text("diagnostics_json").notNull(),
+  createdAt: integer("created_at").notNull(),
+  /** Linear issue id once triaged (e.g. "EDGE-12"); null until filed */
+  linearIssueId: text("linear_issue_id"),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */
@@ -484,6 +619,8 @@ export const casinoOffers = sqliteTable("casino_offers", {
   seriesId: integer("series_id"),
   /** YYYY-MM-DD occurrence date for recurring instances */
   instanceDate: text("instance_date"),
+  /** External casino promo page URL ("Link to offer") */
+  offerUrl: text("offer_url"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
 });
@@ -503,6 +640,8 @@ export const casinoOfferSeries = sqliteTable("casino_offer_series", {
   casino: text("casino"),
   title: text("title").notNull(),
   notes: text("notes"),
+  /** External casino promo page URL ("Link to offer") */
+  offerUrl: text("offer_url"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
@@ -610,6 +749,7 @@ export type NewAccountRow = typeof accounts.$inferInsert;
 export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type UserReminderRow = typeof userReminders.$inferSelect;
+export type FeedbackReportRow = typeof feedbackReports.$inferSelect;
 export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
@@ -627,3 +767,7 @@ export type BoostDiaryRow = typeof boostDiary.$inferSelect;
 export type MugPlanRow = typeof mugPlans.$inferSelect;
 export type AccaRunRow = typeof accaRuns.$inferSelect;
 export type AccaLegRow = typeof accaLegs.$inferSelect;
+export type BetBuilderRunRow = typeof betBuilderRuns.$inferSelect;
+export type BetBuilderSelectionRow = typeof betBuilderSelections.$inferSelect;
+export type SystemRunRow = typeof systemRuns.$inferSelect;
+export type SystemLegRow = typeof systemLegs.$inferSelect;
