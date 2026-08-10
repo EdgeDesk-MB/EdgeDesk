@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
 import { cn } from "@/lib/utils";
 import type { LayBounds, PartLay } from "@/lib/calc";
@@ -35,6 +35,10 @@ export function AdvancedLaySection({
 }) {
   const [minOverride, setMinOverride] = useState<number | null>(null);
   const [maxOverride, setMaxOverride] = useState<number | null>(null);
+  /** Local thumb while dragging so the track stays 1:1 with the pointer. */
+  const [dragStake, setDragStake] = useState<number | null>(null);
+  const pendingStake = useRef<number | null>(null);
+  const rafId = useRef(0);
 
   const { lo, hi } = useMemo(() => {
     const values = [bounds.underlay, bounds.overlay, bounds.standard].filter(
@@ -48,6 +52,42 @@ export function AdvancedLaySection({
 
   const min = minOverride ?? lo;
   const max = Math.max(maxOverride ?? hi, min + 0.01);
+  const displayStake = dragStake ?? layStake;
+
+  useEffect(() => {
+    return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
+  }, []);
+
+  function flushLayStake() {
+    if (rafId.current) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = 0;
+    }
+    if (pendingStake.current != null) {
+      onLayStake(pendingStake.current);
+      pendingStake.current = null;
+    }
+  }
+
+  /** At most one parent update per frame while scrubbing the range. */
+  function scheduleLayStake(next: number) {
+    pendingStake.current = next;
+    if (rafId.current) return;
+    rafId.current = requestAnimationFrame(() => {
+      rafId.current = 0;
+      if (pendingStake.current != null) {
+        onLayStake(pendingStake.current);
+        pendingStake.current = null;
+      }
+    });
+  }
+
+  function endDrag() {
+    flushLayStake();
+    setDragStake(null);
+  }
 
   const snaps: { key: keyof LayBounds; label: string; hint: string }[] = [
     { key: "underlay", label: "Underlay", hint: "£0 if bookie bet loses" },
@@ -55,7 +95,7 @@ export function AdvancedLaySection({
     { key: "overlay", label: "Overlay", hint: "£0 if bookie bet wins" },
   ];
 
-  const active = (v: number) => Math.abs(layStake - v) < 0.005;
+  const active = (v: number) => Math.abs(displayStake - v) < 0.005;
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
@@ -67,7 +107,7 @@ export function AdvancedLaySection({
         return (
         <div key={i} className="flex items-end gap-2">
           <label className="flex flex-1 flex-col gap-1">
-            <span className="text-[11px] font-medium text-black/60 dark:text-white/60">
+            <span className="text-xs font-medium text-black/60 dark:text-white/60">
               Part lay {i + 1} odds
             </span>
             <input
@@ -87,7 +127,7 @@ export function AdvancedLaySection({
             />
           </label>
           <label className="flex flex-1 flex-col gap-1">
-            <span className="text-[11px] font-medium text-black/60 dark:text-white/60">Stake</span>
+            <span className="text-xs font-medium text-black/60 dark:text-white/60">Stake</span>
             <span className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-black/50 dark:text-white/50">
                 £
@@ -135,7 +175,11 @@ export function AdvancedLaySection({
             key={snap.key}
             type="button"
             title={snap.hint}
-            onClick={() => onLayStake(Math.round(bounds[snap.key] * 100) / 100)}
+            onClick={() => {
+              setDragStake(null);
+              flushLayStake();
+              onLayStake(Math.round(bounds[snap.key] * 100) / 100);
+            }}
             className={cn(
               "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
               active(bounds[snap.key])
@@ -155,8 +199,15 @@ export function AdvancedLaySection({
         min={min}
         max={max}
         step={0.01}
-        value={Math.min(Math.max(layStake, min), max)}
-        onChange={(e) => onLayStake(parseFloat(e.target.value))}
+        value={Math.min(Math.max(displayStake, min), max)}
+        onChange={(e) => {
+          const next = parseFloat(e.target.value);
+          setDragStake(next);
+          scheduleLayStake(next);
+        }}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onBlur={endDrag}
         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-black/20 dark:bg-white/20"
         style={{ accentColor: accent }}
       />
@@ -174,7 +225,7 @@ export function AdvancedLaySection({
           />
         </label>
         <span className="font-semibold tabular-nums text-black/70 dark:text-white/80">
-          £ {Number.isFinite(layStake) ? layStake.toFixed(2) : "-"}
+          £ {Number.isFinite(displayStake) ? displayStake.toFixed(2) : "-"}
         </span>
         <label className="flex items-center gap-1.5">
           <span className="font-medium text-black/60 dark:text-white/60">Max £</span>

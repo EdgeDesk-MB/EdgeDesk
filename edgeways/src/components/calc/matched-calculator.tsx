@@ -39,6 +39,7 @@ import {
   type SpecialBonusKind,
 } from "@/lib/calc";
 import type { ExchangeRow } from "@/lib/db/schema";
+import { panelSurface } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import type { MatchedCalculatorPrefill } from "@/components/matched-calculator-provider";
 
@@ -212,7 +213,7 @@ export function MatchedCalculator({
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
-      <div className="rounded-xl border bg-card p-4">
+      <div className={cn(panelSurface, "p-4")}>
         <div className={cn("grid gap-3", showBonus ? "sm:grid-cols-2" : "grid-cols-1")}>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Bet type</Label>
@@ -350,7 +351,7 @@ export function MatchedCalculator({
           <span className="flex items-center gap-3">
             {exchange && (
               <span
-                className="rounded px-2 py-0.5 text-[10px] font-bold"
+                className="rounded px-2 py-0.5 text-[11px] font-bold"
                 style={{
                   backgroundColor: exchange.brandColor,
                   color: contrastText(exchange.brandColor),
@@ -362,6 +363,7 @@ export function MatchedCalculator({
             <label className="flex items-center gap-1.5 text-xs font-semibold text-black/70 dark:text-white/80">
               Advanced
               <Switch
+                tone="onPanel"
                 checked={advanced}
                 onCheckedChange={(on) => {
                   setAdvanced(on);

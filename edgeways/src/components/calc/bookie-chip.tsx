@@ -18,7 +18,7 @@ export function BookieChip({
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       <span
-        className="flex size-5 items-center justify-center rounded border text-[9px] font-bold"
+        className="flex size-5 items-center justify-center rounded border text-[11px] font-bold"
         style={{
           backgroundColor: style.bg,
           color: style.fg,

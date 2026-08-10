@@ -5,6 +5,13 @@
  */
 import { matchBookmakerFromText } from "@/lib/bookmakers";
 import { fractionalToDecimal } from "@/lib/calc/odds";
+import {
+  extractBetStructure,
+  extractEachWayFlag,
+  extractSlipLegs,
+  extractUnitStake,
+} from "@/lib/bets/parse-bet-structure";
+import type { OcrBetStructure } from "@/lib/ocr/types";
 
 export interface ParsedField<T> {
   value: T;
@@ -21,6 +28,10 @@ export interface ParsedBet {
   betType: ParsedField<"qualifying" | "free_snr" | "free_sr"> | null;
   marketHint: ParsedField<string> | null;
   isFreeBet: boolean;
+  structure: ParsedField<OcrBetStructure> | null;
+  unitStake: ParsedField<number> | null;
+  eachWay: boolean;
+  legs: Array<{ label: string; odds?: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,9 +226,26 @@ export function parseBetText(raw: string): ParsedBet | null {
   const selection = extractSelection(text);
   const { betType, isFreeBet } = extractBetType(text);
   const marketHint = extractMarketHint(text);
+  const structureRaw = extractBetStructure(text);
+  const structure = structureRaw
+    ? { value: structureRaw, confident: true }
+    : null;
+  const unitRaw = extractUnitStake(text);
+  const unitStake = unitRaw != null ? { value: unitRaw, confident: true } : null;
+  const eachWay = extractEachWayFlag(text);
+  const legs = extractSlipLegs(text);
 
   // Return null if we found literally nothing useful
-  if (!bookmaker && !backStake && !backOdds && !selection) return null;
+  if (
+    !bookmaker &&
+    !backStake &&
+    !backOdds &&
+    !selection &&
+    !structure &&
+    legs.length === 0
+  ) {
+    return null;
+  }
 
   return {
     bookmaker,
@@ -227,5 +255,9 @@ export function parseBetText(raw: string): ParsedBet | null {
     betType,
     marketHint,
     isFreeBet,
+    structure,
+    unitStake,
+    eachWay,
+    legs,
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { NumberFlowGroup } from "@number-flow/react";
 import { MoneyFlow } from "@/components/money-flow";
 import { SportIcon } from "@/components/sport-icon";
 import {
@@ -11,12 +12,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAppState } from "@/hooks/use-app-state";
 import { bookiePanelTint } from "@/lib/brands/bookies";
 import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
 import type { ExchangeRow } from "@/lib/db/schema";
 import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
 import { cn } from "@/lib/utils";
 import { Copy, ChevronDown } from "lucide-react";
+
+/** Settings `brandColor` for a venue name, matching VenueBadge / VenueSelect. */
+function useVenueBrandOverride(venue?: string): string | null {
+  const { state } = useAppState(0);
+  return useMemo(() => {
+    const trimmed = venue?.trim();
+    if (!trimmed) return null;
+    const key = trimmed.toLowerCase();
+    return (
+      state?.balances?.accounts?.find(
+        (a) => a.name.toLowerCase() === key && a.brandColor?.trim()
+      )?.brandColor?.trim() ?? null
+    );
+  }, [venue, state?.balances?.accounts]);
+}
 
 /**
  * Neutral panel until a bookie (back) or exchange (lay) brand is known.
@@ -49,7 +66,7 @@ function Panel({ title, children, className, color, chip }: PanelProps) {
   const base = color ?? PANEL_NEUTRAL;
   return (
     <div
-      className={cn("overflow-hidden rounded-xl", className)}
+      className={cn("surface-glass overflow-hidden rounded-xl", className)}
       style={
         {
           "--panel": base,
@@ -89,7 +106,10 @@ export function BackPanel({
   /** Explicit tint wins over venue / exchange. */
   color?: string;
 }) {
-  const venueTint = venue?.trim() ? bookiePanelTint(venue) : null;
+  const brandOverride = useVenueBrandOverride(venue);
+  const venueTint = venue?.trim()
+    ? bookiePanelTint(venue, brandOverride)
+    : null;
   // No bookie: use the selected exchange's back colour (Calculators, matched, etc.).
   // Still grey until an exchange is known - never the old MBB green default.
   return (
@@ -127,6 +147,7 @@ export function PanelInput({
   placeholder,
   inputClassName,
   exchangeOddsStepping,
+  disabled,
 }: {
   label: string;
   value: number;
@@ -139,14 +160,16 @@ export function PanelInput({
   inputClassName?: string;
   /** Exchange lay-odds ladder for ArrowUp/ArrowDown only */
   exchangeOddsStepping?: boolean;
+  disabled?: boolean;
 }) {
-  const exchangeStep = exchangeOddsStepping
-    ? exchangeOddsStepHandlers(value, onChange)
-    : null;
+  const exchangeStep =
+    !disabled && exchangeOddsStepping
+      ? exchangeOddsStepHandlers(value, onChange)
+      : null;
 
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">{label}</span>
+      <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <span className="relative">
         {prefix && (
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-semibold text-black/45 dark:text-white/50">
@@ -159,6 +182,7 @@ export function PanelInput({
           step={step}
           min={min}
           placeholder={placeholder}
+          disabled={disabled}
           value={Number.isFinite(value) ? value : ""}
           onChange={(e) => onChange(parseFloat(e.target.value))}
           onKeyDown={exchangeStep?.onKeyDown}
@@ -168,6 +192,7 @@ export function PanelInput({
             PANEL_TINT_TRANSITION,
             prefix && "pl-8",
             suffix && "pr-9",
+            disabled && "opacity-60",
             inputClassName
           )}
         />
@@ -197,7 +222,7 @@ export function PanelTextInput({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">{label}</span>
+      <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <input
         type="text"
         value={value}
@@ -229,7 +254,7 @@ export function PanelBookieInput({
 }) {
   return (
     <label className={cn("flex flex-col gap-1", className)}>
-      <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">{label}</span>
+      <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <input
         type="text"
         value={value}
@@ -251,23 +276,27 @@ export function PanelSelect({
   onChange,
   children,
   selectClassName,
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   children: React.ReactNode;
   selectClassName?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">{label}</span>
+      <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <span className="relative">
         <select
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           className={cn(
             "h-11 w-full appearance-none rounded-md border-0 bg-[var(--pi)] py-0 pl-3 pr-10 text-lg font-bold text-black/85 outline-none ring-primary/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95",
             PANEL_TINT_TRANSITION,
+            disabled && "opacity-60",
             selectClassName
           )}
         >
@@ -304,7 +333,7 @@ export function PanelIconSelect({
   const selectedLabel = options.find((o) => o.value === value)?.label;
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">{label}</span>
+      <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <Select value={value || undefined} onValueChange={onChange}>
         <SelectTrigger
           className={cn(
@@ -449,7 +478,7 @@ export function LayStakeBanner({
           <button
             type="button"
             aria-label="Fill exchange slip"
-            className="shrink-0 rounded bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/80 transition-colors hover:text-white"
+            className="shrink-0 rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white/80 transition-colors hover:text-white"
             onClick={fillSlip}
           >
             Fill slip
@@ -491,7 +520,7 @@ export function LayStakeBanner({
           <button
             type="button"
             aria-label="Fill exchange slip"
-            className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80 transition-colors hover:text-white"
+            className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-white/80 transition-colors hover:text-white"
             onClick={fillSlip}
           >
             Fill slip
@@ -519,7 +548,7 @@ export interface OutcomeRow {
  * MBB-style settlement table: coloured chevron row labels (green back / blue
  * lay, or the selected exchange's colours), Bookie | Exchange | = Total.
  */
-export function ProfitTable({
+export const ProfitTable = memo(function ProfitTable({
   rows,
   totalLabel = "Total profit",
   guaranteed,
@@ -533,72 +562,75 @@ export function ProfitTable({
   /** Selected bookmaker/venue name for the back leg - see `BackPanel`. */
   venue?: string;
 }) {
+  const brandOverride = useVenueBrandOverride(venue);
   const hasVenueTint = !!venue?.trim();
   const backBase = hasVenueTint
-    ? bookiePanelTint(venue!)
+    ? bookiePanelTint(venue!, brandOverride)
     : (exchange?.backColor ?? PANEL_NEUTRAL);
   const layBase = exchange?.layColor ?? PANEL_NEUTRAL;
   return (
-    <div className="flex flex-col gap-3">
-      <div className="overflow-hidden rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/60 text-xs text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium" />
-              <th className="px-3 py-2 text-right font-medium">Bookie</th>
-              <th className="px-3 py-2 text-right font-medium">Exchange</th>
-              <th className="px-3 py-2 text-right font-semibold text-foreground">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const isBack = row.accent !== "lay";
-              const accent = isBack ? backBase : layBase;
-              // Bookie tints are always a pastel (lightened toward white), same
-              // assumption the rest of the panel family makes - contrastText
-              // can't parse that `color-mix(...)` string, so skip it here.
-              const chevText = isBack && hasVenueTint ? "#1a1a1a" : contrastText(accent);
-              return (
-                <tr key={row.label} className="border-t">
-                  <td className="py-2 pr-3">
-                    <span
-                      className={cn(
-                        "flex min-h-9 items-center bg-[var(--chev)] py-1 pl-3 pr-6 text-[13px] font-bold leading-tight text-[var(--chev-text)] dark:bg-[var(--chev-dark)] dark:text-white/95",
-                        PANEL_TINT_TRANSITION
-                      )}
-                      style={
-                        {
-                          "--chev": accent,
-                          "--chev-dark": darken(accent, 0.45),
-                          "--chev-text": chevText,
-                          clipPath:
-                            "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)",
-                        } as React.CSSProperties
-                      }
-                    >
-                      {row.label}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums">
-                    <MoneyFlow value={row.bookie} signColor signDisplay />
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums">
-                    <MoneyFlow value={row.exchange} signColor signDisplay />
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-[15px] font-extrabold tabular-nums">
-                    <span className="mr-0.5 text-muted-foreground">=</span>
-                    <MoneyFlow value={row.bookie + row.exchange} signColor signDisplay />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    <NumberFlowGroup>
+      <div className="flex flex-col gap-3">
+        <div className="overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/60 text-xs text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium" />
+                <th className="px-3 py-2 text-right font-medium">Bookie</th>
+                <th className="px-3 py-2 text-right font-medium">Exchange</th>
+                <th className="px-3 py-2 text-right font-semibold text-foreground">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const isBack = row.accent !== "lay";
+                const accent = isBack ? backBase : layBase;
+                // Bookie tints are always a pastel (lightened toward white), same
+                // assumption the rest of the panel family makes - contrastText
+                // can't parse that `color-mix(...)` string, so skip it here.
+                const chevText = isBack && hasVenueTint ? "#1a1a1a" : contrastText(accent);
+                return (
+                  <tr key={row.label} className="border-t">
+                    <td className="py-2 pr-3">
+                      <span
+                        className={cn(
+                          "flex min-h-9 items-center bg-[var(--chev)] py-1 pl-3 pr-6 text-[13px] font-bold leading-tight text-[var(--chev-text)] dark:bg-[var(--chev-dark)] dark:text-white/95",
+                          PANEL_TINT_TRANSITION
+                        )}
+                        style={
+                          {
+                            "--chev": accent,
+                            "--chev-dark": darken(accent, 0.45),
+                            "--chev-text": chevText,
+                            clipPath:
+                              "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)",
+                          } as React.CSSProperties
+                        }
+                      >
+                        {row.label}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums">
+                      <MoneyFlow value={row.bookie} signColor signDisplay />
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums">
+                      <MoneyFlow value={row.exchange} signColor signDisplay />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-[15px] font-extrabold tabular-nums">
+                      <span className="mr-0.5 text-muted-foreground">=</span>
+                      <MoneyFlow value={row.bookie + row.exchange} signColor signDisplay />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between rounded-lg bg-muted/60 px-4 py-3">
+          <span className="text-sm font-bold">{totalLabel}</span>
+          <MoneyFlow value={guaranteed} signColor signDisplay className="text-2xl font-extrabold" />
+        </div>
       </div>
-      <div className="flex items-center justify-between rounded-lg bg-muted/60 px-4 py-3">
-        <span className="text-sm font-bold">{totalLabel}</span>
-        <MoneyFlow value={guaranteed} signColor signDisplay className="text-2xl font-extrabold" />
-      </div>
-    </div>
+    </NumberFlowGroup>
   );
-}
+});

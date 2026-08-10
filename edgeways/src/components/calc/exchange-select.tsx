@@ -41,13 +41,13 @@ export function ExchangeSelect({
         <Label
           className={cn(
             "text-xs text-muted-foreground",
-            onPanel && "text-[11px] font-semibold text-black/60 dark:text-white/70"
+            onPanel && "text-xs font-semibold text-black/60 dark:text-white/70"
           )}
         >
           {label}
         </Label>
         {showCommission && value && (
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-xs tabular-nums text-muted-foreground">
             {value.commissionPct}% commission
           </span>
         )}
@@ -75,7 +75,7 @@ export function ExchangeSelect({
               {value ? (
                 <span className="flex items-center gap-2">
                   <span
-                    className="inline-block size-2.5 shrink-0 rounded-full"
+                    className="inline-block size-3 shrink-0 rounded-full"
                     style={{ backgroundColor: value.brandColor }}
                   />
                   {value.name}
@@ -88,7 +88,7 @@ export function ExchangeSelect({
               <SelectItem key={exchange.id} value={String(exchange.id)}>
                 <span className="flex items-center gap-2">
                   <span
-                    className="inline-block size-2.5 rounded-full"
+                    className="inline-block size-3 rounded-full"
                     style={{ backgroundColor: exchange.brandColor }}
                   />
                   {exchange.name}

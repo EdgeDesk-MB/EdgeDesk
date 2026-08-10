@@ -1,14 +1,28 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { db, accaLegs, accaRuns, bets } from "@/lib/db";
 import {
+  accounts,
+  alertsInbox,
+  balanceTransactions,
+  db,
+  accaLegs,
+  accaRuns,
+  bets,
+  events,
+} from "@/lib/db";
+import { listFreeBetLots } from "@/lib/accounts/free-bet-lot-balance";
+import { serializeRaceResults } from "@/lib/racing";
+import {
+  autoResultLinkedLegs,
   createAccaRun,
   legDueState,
   listAccaRuns,
   logLegLay,
   logWholeLay,
+  markAccaNoLay,
   setLegResult,
   setRunBoost,
+  updateAccaRun,
 } from "./acca-desk";
 
 function bet(id: number | null) {
@@ -19,9 +33,11 @@ function bet(id: number | null) {
 }
 
 function reset() {
+  db.delete(alertsInbox).run();
   db.delete(accaLegs).run();
   db.delete(accaRuns).run();
   db.delete(bets).run();
+  db.delete(events).run();
 }
 
 const THREE_FOLD = {
@@ -69,6 +85,41 @@ describe("acca-desk settlement (auditor F3)", () => {
     expect(bet(run.backBetId).status).toBe("lost");
     expect(bet(run.backBetId).actualProfit).toBe(-10);
     expect(bet(legs[0].layBetId ?? db.select().from(accaLegs).where(eq(accaLegs.id, legs[0].id)).get()!.layBetId).actualProfit).toBeCloseTo(10.0, 2);
+  });
+
+  it("mid-run leg win pushes next cover stake, not the settled lay liability", () => {
+    // Same shape as Sam's first live treble: £20 @ 1.81 → liability £16.20 → next £36.20
+    const { run, legs } = createAccaRun({
+      label: "Accumulator Treble",
+      method: "sequential",
+      stake: 20,
+      commission: 0,
+      legs: [
+        { label: "Middlesbrough", backOdds: 1.75 },
+        { label: "Cambridge United", backOdds: 1.75 },
+        { label: "Stockport County", backOdds: 1.65 },
+      ],
+    });
+    logLegLay(legs[0].id, 1.81, 20);
+    const out = setLegResult(legs[0].id, "won");
+    expect(out?.runCompleted).toBe(false);
+
+    const alert = db
+      .select()
+      .from(alertsInbox)
+      .where(eq(alertsInbox.dedupe, `acca_next_lay:${legs[1].id}`))
+      .get();
+    expect(alert).toMatchObject({
+      kind: "acca_next_lay",
+      title: "Next lay · ~£36.20",
+      body: "Accumulator Treble · Cambridge United · enter live exchange lay odds and stake on Acca Desk",
+      href: "/acca",
+    });
+    // No misleading liability-paid inbox row from the desk path.
+    expect(
+      db.select().from(alertsInbox).where(eq(alertsInbox.kind, "result_settled")).all()
+    ).toHaveLength(0);
+    expect(run.id).toBeTruthy();
   });
 
   it("void legs return the lay and drop out of the combined odds", () => {
@@ -125,6 +176,76 @@ describe("acca-desk settlement (auditor F3)", () => {
     expect(bet(updated.backBetId).actualProfit).toBe(62);
     expect(bet(updated.wholeLayBetId).status).toBe("lost");
     expect(bet(updated.wholeLayBetId).actualProfit).toBe(-62.4); // 9.6 × 6.5
+  });
+
+  it("combined: whole-ticket lay settles opposite the acca (no insurance refund)", () => {
+    const { run, legs } = createAccaRun({
+      ...THREE_FOLD,
+      method: "combined",
+    });
+    expect(run.method).toBe("combined");
+    expect(run.noLay).toBe(0);
+    logWholeLay(run.id, 7.5, 9.6);
+    setLegResult(legs[0].id, "won");
+    setLegResult(legs[1].id, "won");
+    setLegResult(legs[2].id, "won");
+    const updated = listAccaRuns().find((r) => r.run.id === run.id)!.run;
+    expect(updated.status).toBe("completed");
+    expect(bet(updated.backBetId).actualProfit).toBe(62);
+    expect(bet(updated.wholeLayBetId).status).toBe("lost");
+    expect(bet(updated.wholeLayBetId).actualProfit).toBe(-62.4);
+  });
+
+  it("combined + noLay at create: cash lose settles at −stake without a lay bet", () => {
+    const { run, legs } = createAccaRun({
+      ...THREE_FOLD,
+      method: "combined",
+      noLay: true,
+    });
+    expect(run.noLay).toBe(1);
+    expect(run.wholeLayBetId).toBeNull();
+    expect(logWholeLay(run.id, 7.5, 9.6)).toBeNull();
+
+    setLegResult(legs[0].id, "lost");
+    setLegResult(legs[1].id, "won");
+    setLegResult(legs[2].id, "won");
+    const updated = listAccaRuns().find((r) => r.run.id === run.id)!.run;
+    expect(updated.status).toBe("completed");
+    expect(updated.wholeLayBetId).toBeNull();
+    expect(bet(run.backBetId).status).toBe("lost");
+    expect(bet(run.backBetId).actualProfit).toBe(-10);
+  });
+
+  it("markAccaNoLay flips an active combined run and blocks later whole lays", () => {
+    const { run, legs } = createAccaRun({
+      ...THREE_FOLD,
+      method: "combined",
+    });
+    const marked = markAccaNoLay(run.id);
+    expect(marked?.noLay).toBe(1);
+    expect(logWholeLay(run.id, 7.5, 9.6)).toBeNull();
+
+    setLegResult(legs[0].id, "lost");
+    setLegResult(legs[1].id, "won");
+    setLegResult(legs[2].id, "won");
+    expect(bet(run.backBetId).actualProfit).toBe(-10);
+    expect(listAccaRuns().find((r) => r.run.id === run.id)!.run.wholeLayBetId).toBeNull();
+  });
+
+  it("logLegLay with £0 stake records no lay without creating a bet", () => {
+    const { run, legs } = createAccaRun(THREE_FOLD);
+    const updated = logLegLay(legs[0].id, 2.5, 0);
+    expect(updated?.layStake).toBe(0);
+    expect(updated?.layOdds).toBe(0);
+    expect(updated?.layBetId).toBeNull();
+    expect(db.select().from(bets).all().filter((b) => b.betType === "lay_only")).toHaveLength(0);
+    // Decision is logged: not lay-due anymore, results can settle the naked back.
+    expect(legDueState(run, legs.map((l) => (l.id === updated!.id ? updated! : l)), updated!, Date.now()).due).toBe(
+      false
+    );
+    const out = setLegResult(legs[0].id, "lost");
+    expect(out?.runCompleted).toBe(true);
+    expect(bet(run.backBetId).actualProfit).toBe(-10);
   });
 
   it("a 50% boost (winnings-only) reaches the real settlement, not just display", () => {
@@ -193,5 +314,282 @@ describe("acca-desk settlement (auditor F3)", () => {
     expect(result).toBeNull();
     expect(bet(run.backBetId).backOdds).toBe(oddsBeforeAttempt); // untouched
     expect(listAccaRuns().find((r) => r.run.id === run.id)?.run.boostPct).toBeNull(); // untouched
+  });
+
+  it("persists leg sport/event and denormalises sport onto the back bet", () => {
+    const { run, legs } = createAccaRun({
+      label: "Racing 2-fold",
+      method: "sequential",
+      stake: 5,
+      bookmaker: "Bet365",
+      commission: 0,
+      legs: [
+        {
+          label: "Horse A",
+          backOdds: 3,
+          sport: "horse_racing",
+          market: "win",
+          selection: "Horse A",
+        },
+        {
+          label: "Horse B",
+          backOdds: 2.5,
+          sport: "horse_racing",
+          market: "win",
+          selection: "Horse B",
+        },
+      ],
+    });
+    expect(legs.every((l) => l.sport === "horse_racing")).toBe(true);
+    expect(legs[0]!.market).toBe("win");
+    expect(bet(run.backBetId).sport).toBe("horse_racing");
+  });
+
+  it("free_sr convert debits the free-bet lot", () => {
+    const bookie = db
+      .insert(accounts)
+      .values({ name: "AccaSr Bookie", type: "bookie", isActive: 1, createdAt: Date.now() })
+      .returning()
+      .get();
+    db.insert(balanceTransactions)
+      .values({
+        accountId: bookie.id,
+        amount: 10,
+        category: "free_bet",
+        note: "Free bet promo - Acca SR test",
+        createdAt: Date.now(),
+        pending: 0,
+      })
+      .run();
+    const { run } = createAccaRun({
+      label: "FB SR 2-fold",
+      method: "combined",
+      stake: 10,
+      bookmaker: "AccaSr Bookie",
+      backBetType: "free_sr",
+      noLay: true,
+      commission: 0,
+      legs: [
+        { label: "A", backOdds: 2.0, sport: "football" },
+        { label: "B", backOdds: 2.0, sport: "football" },
+      ],
+    });
+    expect(bet(run.backBetId).betType).toBe("free_sr");
+    expect(listFreeBetLots(bookie.id).reduce((s, l) => s + l.remaining, 0)).toBe(0);
+    db.delete(balanceTransactions).where(eq(balanceTransactions.accountId, bookie.id)).run();
+    db.delete(accounts).where(eq(accounts.id, bookie.id)).run();
+  });
+
+  it("free_snr convert debits the free-bet lot and loses at £0 P&L", () => {
+    const bookie = db
+      .insert(accounts)
+      .values({ name: "AccaFb Bookie", type: "bookie", isActive: 1, createdAt: Date.now() })
+      .returning()
+      .get();
+    db.insert(balanceTransactions)
+      .values({
+        accountId: bookie.id,
+        amount: 10,
+        category: "free_bet",
+        note: "Free bet promo - Acca convert test",
+        createdAt: Date.now(),
+        pending: 0,
+      })
+      .run();
+    expect(listFreeBetLots(bookie.id).reduce((s, l) => s + l.remaining, 0)).toBe(10);
+
+    const { run, legs } = createAccaRun({
+      label: "FB convert 2-fold",
+      method: "sequential",
+      stake: 10,
+      bookmaker: "AccaFb Bookie",
+      backBetType: "free_snr",
+      commission: 0,
+      legs: [
+        { label: "A", backOdds: 2.0 },
+        { label: "B", backOdds: 2.0 },
+      ],
+    });
+    const back = bet(run.backBetId);
+    expect(back.betType).toBe("free_snr");
+    expect(back.balanceLedgered).toBe(1);
+    expect(listFreeBetLots(bookie.id).reduce((s, l) => s + l.remaining, 0)).toBe(0);
+
+    setLegResult(legs[0].id, "lost");
+    expect(bet(run.backBetId).status).toBe("lost");
+    expect(bet(run.backBetId).actualProfit).toBe(0);
+
+    db.delete(balanceTransactions).where(eq(balanceTransactions.accountId, bookie.id)).run();
+    db.delete(accounts).where(eq(accounts.id, bookie.id)).run();
+  });
+});
+
+describe("acca-desk autoResultLinkedLegs", () => {
+  beforeEach(reset);
+
+  it("auto-results a horse racing win leg lost and completes sequential run", () => {
+    const event = db
+      .insert(events)
+      .values({
+        sport: "horse_racing",
+        externalId: "test-race-1",
+        competition: "Downpatrick",
+        homeTeam: "Randox Rated Hurdle",
+        awayTeam: "2:33",
+        startTime: Date.now() - 60_000,
+        status: "finished",
+        homeScore: 1,
+        awayScore: 0,
+        goals: serializeRaceResults({
+          winner: "Malbay Madness (IRE)",
+          runners: [
+            { horse: "Malbay Madness (IRE)", position: 1 },
+            { horse: "Trasna Na Pairce (IRE)", position: 4 },
+          ],
+          fieldSize: 7,
+          type: "Hurdle",
+        }),
+        source: "manual",
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+
+    const { run, legs } = createAccaRun({
+      label: "Racing convert",
+      method: "sequential",
+      stake: 10,
+      commission: 0,
+      backBetType: "free_snr",
+      legs: [
+        {
+          label: "Trasna Na Pairce",
+          backOdds: 4,
+          eventId: event.id,
+          sport: "horse_racing",
+          market: "win",
+          selection: "Trasna Na Pairce",
+        },
+        {
+          label: "Gortmore Lady",
+          backOdds: 5,
+          sport: "horse_racing",
+          market: "win",
+          selection: "Gortmore Lady",
+        },
+      ],
+    });
+    logLegLay(legs[0]!.id, 4.4, 10);
+    const laid = db.select().from(accaLegs).where(eq(accaLegs.id, legs[0]!.id)).get()!;
+
+    expect(autoResultLinkedLegs()).toBe(1);
+
+    const leg1 = db.select().from(accaLegs).where(eq(accaLegs.id, legs[0]!.id)).get()!;
+    expect(leg1.result).toBe("lost");
+    const completed = db.select().from(accaRuns).where(eq(accaRuns.id, run.id)).get()!;
+    expect(completed.status).toBe("completed");
+    expect(bet(run.backBetId).status).toBe("lost");
+    expect(bet(run.backBetId).actualProfit).toBe(0);
+    const lay = bet(laid.layBetId);
+    expect(lay.status).toBe("won");
+    expect(lay.actualProfit).toBeCloseTo(10, 2);
+  });
+
+  it("auto-results football match_odds (unchanged path)", () => {
+    const event = db
+      .insert(events)
+      .values({
+        sport: "football",
+        externalId: "test-fb-1",
+        competition: "PL",
+        homeTeam: "Home FC",
+        awayTeam: "Away FC",
+        startTime: Date.now() - 60_000,
+        status: "finished",
+        homeScore: 0,
+        awayScore: 1,
+        homeLed2: 0,
+        awayLed2: 0,
+        source: "manual",
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+
+    const { run, legs } = createAccaRun({
+      label: "Footy",
+      method: "sequential",
+      stake: 10,
+      commission: 0,
+      legs: [
+        {
+          label: "Home",
+          backOdds: 2,
+          eventId: event.id,
+          sport: "football",
+          market: "match_odds",
+          selection: "home",
+        },
+        { label: "Next", backOdds: 2 },
+      ],
+    });
+    logLegLay(legs[0]!.id, 2.1, 10);
+    expect(autoResultLinkedLegs()).toBe(1);
+    expect(db.select().from(accaLegs).where(eq(accaLegs.id, legs[0]!.id)).get()!.result).toBe(
+      "lost"
+    );
+    expect(db.select().from(accaRuns).where(eq(accaRuns.id, run.id)).get()!.status).toBe(
+      "completed"
+    );
+  });
+});
+
+describe("acca-desk updateAccaRun", () => {
+  beforeEach(reset);
+
+  it("updates label, bookmaker and legs before any lays", () => {
+    const { run, legs } = createAccaRun({ ...THREE_FOLD, bookmaker: null });
+    const view = updateAccaRun(run.id, {
+      label: "Renamed",
+      bookmaker: "Ivybet",
+      stake: 20,
+      commission: 0.02,
+      legs: [
+        { id: legs[0]!.id, label: "Alpha", backOdds: 2.1, scheduledAt: null },
+        { id: legs[1]!.id, label: "Beta", backOdds: 2.0, scheduledAt: null },
+        { id: legs[2]!.id, label: "Gamma", backOdds: 1.9, scheduledAt: null },
+      ],
+    });
+    expect(view?.run.label).toBe("Renamed");
+    expect(view?.run.bookmaker).toBe("Ivybet");
+    expect(view?.run.stake).toBe(20);
+    expect(view?.legs.map((l) => l.label)).toEqual(["Alpha", "Beta", "Gamma"]);
+    const back = bet(run.backBetId);
+    expect(back.label).toBe("Acca · Renamed");
+    expect(back.bookmaker).toBe("Ivybet");
+    expect(back.backStake).toBe(20);
+    expect(back.backOdds).toBeCloseTo(2.1 * 2.0 * 1.9, 4);
+  });
+
+  it("locks stake and odds once a lay is logged, but still allows bookmaker", () => {
+    const { run, legs } = createAccaRun(THREE_FOLD);
+    logLegLay(legs[0]!.id, 2.02, 10);
+    const view = updateAccaRun(run.id, {
+      label: "After lay",
+      bookmaker: "Sky Bet",
+      stake: 99,
+      legs: legs.map((l) => ({
+        id: l.id,
+        label: `${l.label} x`,
+        backOdds: l.backOdds,
+        scheduledAt: l.scheduledAt,
+      })),
+    });
+    expect(view?.run.label).toBe("After lay");
+    expect(view?.run.bookmaker).toBe("Sky Bet");
+    expect(view?.run.stake).toBe(10);
+    expect(view?.legs[0]?.label).toBe("A x");
+    expect(bet(run.backBetId).backStake).toBe(10);
+    expect(bet(run.backBetId).bookmaker).toBe("Sky Bet");
   });
 });

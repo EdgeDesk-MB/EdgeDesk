@@ -32,7 +32,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     status: partial.status ?? "open",
     expectedProfit: null,
     actualProfit: null,
-    notes: null,
+    notes: partial.notes ?? null,
     balanceLedgered: 0,
     balanceSettled: 0,
     createdAt: partial.createdAt ?? Date.now(),
@@ -41,6 +41,7 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     quickLogged: partial.quickLogged ?? null,
     source: partial.source ?? null,
     purpose: partial.purpose ?? null,
+    sport: partial.sport ?? null,
   };
 }
 
@@ -52,6 +53,34 @@ describe("betNeedsLay", () => {
   it("ignores hedged and settled bets", () => {
     expect(betNeedsLay(bet({ id: 2, backStake: 20, layStake: 18 }))).toBe(false);
     expect(betNeedsLay(bet({ id: 3, status: "won", backStake: 20, layStake: 0 }))).toBe(false);
+  });
+
+  it("ignores Acca Desk backs (hedged via separate lay_only bets)", () => {
+    expect(
+      betNeedsLay(
+        bet({
+          id: 4,
+          backStake: 20,
+          layStake: 0,
+          label: "Acca · Offer",
+          notes: "Acca desk run - hedged leg-by-leg on the exchange",
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("ignores Bet Builder Desk backs (combined lay or deliberate no lay)", () => {
+    expect(
+      betNeedsLay(
+        bet({
+          id: 5,
+          backStake: 10,
+          layStake: 0,
+          label: "BB · Arsenal builder",
+          notes: "Bet Builder desk - no lay",
+        })
+      )
+    ).toBe(false);
   });
 });
 
@@ -117,6 +146,7 @@ describe("groupBetsByCampaign", () => {
           instanceDate: null,
           startsOn: null,
           source: null,
+          offerUrl: null,
           betCount: 2,
           openBets: 2,
           actualProfit: 0,
@@ -151,7 +181,8 @@ describe("groupBetsByCampaign", () => {
     expect(groups).toHaveLength(2);
     expect(groups[0]?.offerId).toBe(10);
     expect(groups[0]?.title).toBe("Bet £50 get £50");
-    expect(groups[0]?.bets.map((b) => b.id)).toEqual([1, 2]);
+    // Oldest first within a campaign (narrative order).
+    expect(groups[0]?.bets.map((b) => b.id)).toEqual([2, 1]);
     expect(groups[1]?.offerId).toBeNull();
     expect(groups[1]?.title).toBe("Unlinked bets");
   });

@@ -12,11 +12,13 @@ export function CalculatorAddBetButton({
   disabled,
   className,
   children = "Add to profit tracker",
+  onSaved,
 }: {
   prefill: AddBetPrefill;
   disabled?: boolean;
   className?: string;
   children?: React.ReactNode;
+  onSaved?: (betId: number) => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -26,22 +28,25 @@ export function CalculatorAddBetButton({
       <Button onClick={() => setOpen(true)} disabled={disabled} className={className}>
         {children}
       </Button>
-      <AddBetDialog
-        open={open}
-        onOpenChange={setOpen}
-        highlightEmpty
-        toastOnSave={false}
-        onSaved={(betId) => {
-          toast.success("Bet added", {
-            description: "It's in the Profit Tracker.",
-            action: {
-              label: "View bet",
-              onClick: () => router.push(`/tracker?highlight=${betId}`),
-            },
-          });
-        }}
-        prefill={prefill}
-      />
+      {open ? (
+        <AddBetDialog
+          open={open}
+          onOpenChange={setOpen}
+          highlightEmpty
+          toastOnSave={false}
+          onSaved={(betId) => {
+            toast.success("Bet added", {
+              description: "It's in the Profit Tracker.",
+              action: {
+                label: "View bet",
+                onClick: () => router.push(`/tracker?highlight=${betId}`),
+              },
+            });
+            onSaved?.(betId);
+          }}
+          prefill={prefill}
+        />
+      ) : null}
     </>
   );
 }

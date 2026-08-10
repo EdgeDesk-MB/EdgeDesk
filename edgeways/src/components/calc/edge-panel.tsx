@@ -47,10 +47,10 @@ export function EdgePanel({ backOdds, layOdds, stake }: EdgePanelProps) {
         <div>
           <div className="text-xs text-muted-foreground">EV of back stake</div>
           <div className="font-semibold">
-            {ev ? <MoneyFlow value={ev.evForStake} signColor signDisplay /> : "-"}
+            {ev ? <MoneyFlow value={ev.evForStake} signColor signDisplay estimate /> : "-"}
           </div>
         </div>
-        <p className="col-span-2 pt-1 text-[11px] leading-relaxed text-muted-foreground lg:col-span-4">
+        <p className="col-span-2 pt-1 text-xs leading-relaxed text-muted-foreground lg:col-span-4">
           Exchange lay odds are your best public estimate of true probability. Backing above fair
           odds is +EV; the lay locks the profit in regardless.
         </p>

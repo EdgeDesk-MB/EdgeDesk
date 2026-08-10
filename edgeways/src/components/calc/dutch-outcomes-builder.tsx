@@ -31,6 +31,7 @@ import {
   type DutchResult,
 } from "@/lib/calc";
 import { campaignHeaderBand } from "@/lib/ui/surface-styles";
+import { panelSurface } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Gift, Plus, X } from "lucide-react";
 
@@ -163,7 +164,7 @@ export function DutchOutcomesBuilder({
     // `campaignHeaderBand`) - the account-default tint now applies per
     // outcome box below, not to this shared shell, so a leg's own bookie
     // tint can stand apart from its siblings.
-    <div className={cn("overflow-hidden rounded-xl border bg-card", className)}>
+    <div className={cn(panelSurface, className)}>
       <div
         className={cn(
           "flex items-center justify-between border-b border-border/50 px-4 py-2.5",
@@ -173,7 +174,11 @@ export function DutchOutcomesBuilder({
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       <div className="flex flex-col gap-3 p-4">
-      <Tabs value={mode} onValueChange={(v) => setMode(v as DutchStakeMode)}>
+      <Tabs
+        value={mode}
+        onValueChange={(v) => setMode(v as DutchStakeMode)}
+        activationMode="manual"
+      >
         <TabsList variant="segmented">
           <TabsTrigger value="total">Total stake</TabsTrigger>
           <TabsTrigger value="profit">Target profit</TabsTrigger>
@@ -209,7 +214,7 @@ export function DutchOutcomesBuilder({
         <>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-muted-foreground">
+              <span className="text-xs font-semibold text-muted-foreground">
                 Fix stake on
               </span>
               <select
@@ -271,17 +276,17 @@ export function DutchOutcomesBuilder({
                     <button
                       type="button"
                       onClick={() => setFixedLegStakeInput(fixedLegFreeBets)}
-                      className="rounded-full border border-violet-500/35 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold text-violet-900 dark:text-violet-200"
+                      className="rounded-full border border-violet-500/35 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-900 dark:text-violet-200"
                     >
                       Use £{fixedLegFreeBets.toFixed(2)} available
                     </button>
                   ) : (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       No free bet balance tracked for {fixedLegVenue}
                     </span>
                   )
                 ) : (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Pick a venue below to see its free bet balance
                   </span>
                 )}
@@ -354,7 +359,7 @@ export function DutchOutcomesBuilder({
                   inputClassName="h-10 text-sm"
                 />
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-black/60 dark:text-white/70">
+                  <span className="text-xs font-semibold text-black/60 dark:text-white/70">
                     Stake
                   </span>
                   <div className="flex h-10 items-center gap-1 rounded-md bg-[var(--pi)] px-2.5 dark:bg-[var(--pi-dark)]">
@@ -384,7 +389,7 @@ export function DutchOutcomesBuilder({
 
       <div className="grid grid-cols-3 gap-3 border-t border-black/10 pt-3 dark:border-white/15">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
             Equal profit
           </div>
           <div className="text-lg font-bold">
@@ -392,7 +397,7 @@ export function DutchOutcomesBuilder({
           </div>
         </div>
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
             {freeLegActive ? "Cash outlay" : "Total stake"}
           </div>
           <div className="text-lg font-bold tabular-nums">
@@ -402,7 +407,7 @@ export function DutchOutcomesBuilder({
           </div>
         </div>
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
             Overround
           </div>
           <div className="text-lg font-bold">

@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { db, betBuilderRuns, betBuilderSelections, bets } from "@/lib/db";
+import {
+  logBetBuilderWholeLay,
+  markBetBuilderNoLay,
+  settleBetBuilderRun,
+  updateBetBuilderRun,
+} from "@/lib/services/bet-builder-desk";
+
+export const dynamic = "force-dynamic";
+
+const patchSchema = z.object({
+  muteAlerts: z.boolean().optional(),
+  noLay: z.literal(true).optional(),
+  status: z.literal("abandoned").optional(),
+  /** Whole-ticket settle (builder wins or loses as one unit). */
+  result: z.enum(["won", "lost", "void"]).optional(),
+  wholeLay: z
+    .object({
+      layOdds: z.number().gt(1),
+      layStake: z.number().gt(0),
+      exchangeId: z.number().int().positive().nullable().optional(),
+    })
+    .optional(),
+  /** Full edit payload from Bet Builder Desk Edit dialog. */
+  label: z.string().min(1).optional(),
+  bookmaker: z.string().nullable().optional(),
+  stake: z.number().gt(0).optional(),
+  backOdds: z.number().gt(1).optional(),
+  commission: z.number().min(0).max(0.5).optional(),
+  eventLabel: z.string().nullable().optional(),
+  eventId: z.number().nullable().optional(),
+  sport: z.string().max(40).nullable().optional(),
+  scheduledAt: z.number().int().nullable().optional(),
+  backBetType: z.enum(["qualifying", "free_snr", "free_sr"]).optional(),
+  selections: z
+    .array(
+      z.object({
+        id: z.number().int().positive().optional(),
+        label: z.string().min(1),
+        market: z.string().nullable().optional(),
+        selection: z.string().nullable().optional(),
+      })
+    )
+    .min(2)
+    .optional(),
+});
+
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const parsed = patchSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  const p = parsed.data;
+  if (p.wholeLay) {
+    const run = logBetBuilderWholeLay(
+      Number(id),
+      p.wholeLay.layOdds,
+      p.wholeLay.layStake,
+      p.wholeLay.exchangeId
+    );
+    if (!run) return NextResponse.json({ error: "Cannot log whole lay" }, { status: 400 });
+    return NextResponse.json({ run });
+  }
+  if (p.noLay) {
+    const run = markBetBuilderNoLay(Number(id));
+    if (!run) return NextResponse.json({ error: "Cannot mark no lay" }, { status: 400 });
+    return NextResponse.json({ run });
+  }
+  if (p.result) {
+    const run = settleBetBuilderRun(Number(id), p.result);
+    if (!run) return NextResponse.json({ error: "Cannot settle bet builder" }, { status: 400 });
+    return NextResponse.json({ run });
+  }
+  if (p.label != null && p.selections != null) {
+    const view = updateBetBuilderRun(Number(id), {
+      label: p.label,
+      bookmaker: p.bookmaker,
+      stake: p.stake,
+      backOdds: p.backOdds,
+      commission: p.commission,
+      eventLabel: p.eventLabel,
+      eventId: p.eventId,
+      sport: p.sport,
+      scheduledAt: p.scheduledAt,
+      backBetType: p.backBetType,
+      selections: p.selections,
+    });
+    if (!view) {
+      return NextResponse.json(
+        { error: "Cannot update bet builder - check selections, or money fields after lay/results" },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(view);
+  }
+  const run = db
+    .update(betBuilderRuns)
+    .set({
+      ...(p.muteAlerts !== undefined ? { muteAlerts: p.muteAlerts ? 1 : 0 } : {}),
+      ...(p.status ? { status: p.status } : {}),
+    })
+    .where(eq(betBuilderRuns.id, Number(id)))
+    .returning()
+    .get();
+  if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ run });
+}
+
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const run = db.select().from(betBuilderRuns).where(eq(betBuilderRuns.id, Number(id))).get();
+  const linkedBetIds = [run?.backBetId, run?.wholeLayBetId].filter(
+    (x): x is number => x != null
+  );
+  for (const betId of linkedBetIds) {
+    db.update(bets)
+      .set({ status: "void", actualProfit: 0, settledAt: Date.now() })
+      .where(and(eq(bets.id, betId), eq(bets.status, "open")))
+      .run();
+  }
+  db.delete(betBuilderSelections).where(eq(betBuilderSelections.runId, Number(id))).run();
+  db.delete(betBuilderRuns).where(eq(betBuilderRuns.id, Number(id))).run();
+  return NextResponse.json({ ok: true });
+}

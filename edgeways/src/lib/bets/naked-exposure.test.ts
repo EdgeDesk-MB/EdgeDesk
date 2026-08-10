@@ -43,6 +43,7 @@ function bet(over: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     quickLogged: null,
     source: null,
     purpose: null,
+    sport: null,
     ...over,
   };
 }
@@ -109,6 +110,32 @@ describe("isNakedExposed - clause by clause", () => {
   it("mug bets are deliberately unlaid - never exposed (J5)", () => {
     expect(
       isNakedExposed(bet({ id: 17, purpose: "mug" }), NOW)
+    ).toBe(false);
+  });
+
+  it("Acca Desk backs are hedged off-row - never naked-exposure", () => {
+    expect(
+      isNakedExposed(
+        bet({
+          id: 21,
+          label: "Acca · Weekend 4-fold",
+          notes: "Acca desk run - hedged leg-by-leg on the exchange",
+        }),
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("Bet Builder Desk backs are hedged off-row - never naked-exposure", () => {
+    expect(
+      isNakedExposed(
+        bet({
+          id: 22,
+          label: "BB · Arsenal builder",
+          notes: "Bet Builder desk - combined lay",
+        }),
+        NOW
+      )
     ).toBe(false);
   });
 

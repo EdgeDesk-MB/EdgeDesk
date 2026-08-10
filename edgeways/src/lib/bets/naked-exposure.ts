@@ -7,6 +7,9 @@
  */
 
 import type { BetRow } from "@/lib/db/schema";
+import { isAccaDeskBack } from "@/lib/bets/acca-desk-bets";
+import { isBetBuilderDeskBack } from "@/lib/bets/bet-builder-desk-bets";
+import { isSystemsDeskBack } from "@/lib/bets/systems-desk-bets";
 
 export const INTENTIONAL_NOHEDGE_MARKER = "[intentional-nohedge]";
 
@@ -40,6 +43,10 @@ export function isNakedExposed(
   if (bet.legs != null) return false; // dutch bets hedge internally
   if (bet.notes?.includes(INTENTIONAL_NOHEDGE_MARKER)) return false;
   if (bet.purpose === "mug") return false; // camouflage is deliberately unlaid (J5)
+  // Acca / Bet Builder Desk hedge via separate lay_only bets (or deliberate no lay).
+  if (isAccaDeskBack(bet) || isBetBuilderDeskBack(bet) || isSystemsDeskBack(bet)) {
+    return false;
+  }
 
   // Starting soon OR already in play - in-play is the most urgent case of
   // all (a deliberate widening of the brief's "starting < 60 min away").

@@ -1,5 +1,8 @@
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import { isAccaDeskBack, sortCampaignBetsWithAcca } from "@/lib/bets/acca-desk-bets";
+import { isBetBuilderDeskBack } from "@/lib/bets/bet-builder-desk-bets";
+import { isSystemsDeskBack } from "@/lib/bets/systems-desk-bets";
 
 export type BetDeskQueue =
   | "all"
@@ -22,6 +25,10 @@ export const BET_DESK_QUEUES: { id: BetDeskQueue; label: string }[] = [
 
 /** Open back bet with no exchange hedge logged yet. */
 export function betNeedsLay(bet: BetRow): boolean {
+  // Desk backs hedge via separate lay_only bets (or deliberate no lay), never row layStake.
+  if (isAccaDeskBack(bet) || isBetBuilderDeskBack(bet) || isSystemsDeskBack(bet)) {
+    return false;
+  }
   return bet.status === "open" && bet.backStake > 0 && !(bet.layStake > 0);
 }
 
@@ -115,7 +122,7 @@ export function groupBetsByCampaign(
       offerId,
       offer,
       title: offer?.title ?? `Offer #${offerId}`,
-      bets: sortBetsNewestFirst(offerBets),
+      bets: sortCampaignBetsWithAcca(offerBets),
       openCount: offerBets.filter((b) => b.status === "open").length,
       needsLayCount: offerBets.filter(betNeedsLay).length,
     });
@@ -135,17 +142,13 @@ export function groupBetsByCampaign(
       offerId: null,
       offer: null,
       title: "Unlinked bets",
-      bets: sortBetsNewestFirst(orphans),
+      bets: sortCampaignBetsWithAcca(orphans),
       openCount: orphans.filter((b) => b.status === "open").length,
       needsLayCount: orphans.filter(betNeedsLay).length,
     });
   }
 
   return groups;
-}
-
-function sortBetsNewestFirst(bets: BetRow[]): BetRow[] {
-  return [...bets].sort((a, b) => b.createdAt - a.createdAt || b.id - a.id);
 }
 
 export function deskQueueEmptyCopy(queue: BetDeskQueue): {
