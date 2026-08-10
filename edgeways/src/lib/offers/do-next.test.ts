@@ -49,6 +49,7 @@ function offer(
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: null,
     betCount: partial.betCount ?? 0,
     openBets: 0,
     actualProfit: 0,
@@ -117,6 +118,40 @@ describe("buildDoNextItems", () => {
     ).toHaveLength(1);
   });
 
+  it("matches convert lots by awarding offerId even when bookmaker names differ", () => {
+    const offers = [
+      offer({
+        id: 174,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Betfair Sportsbook",
+        profit: emptyProfit({
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+          qualifyingSettledCount: 1,
+        }),
+      }),
+    ];
+    const lots = [
+      {
+        id: 577,
+        accountId: 4,
+        accountName: "Betfair Sportsbook",
+        remaining: 10,
+        note: "Free bet promo - Offer unlocked (Acca · Bet £10 get £10 free bet)",
+        createdAt: 1,
+        betId: 151,
+        offerId: 174,
+      },
+    ];
+
+    const items = buildDoNextItems(offers, lots);
+    const convert = items.find((i) => i.kind === "convert_free_bet");
+    expect(convert?.offerId).toBe(174);
+    expect(convert?.convertLot?.remaining).toBe(10);
+    expect(items.some((i) => i.kind === "orphan_free_bet")).toBe(false);
+  });
+
   it("sorts by edge vs priority", () => {
     const items = buildDoNextItems(
       [
@@ -141,10 +176,57 @@ describe("buildDoNextItems", () => {
     );
 
     const byEdge = sortDoNextItems(items, "edge");
-    expect(byEdge[0]?.offerId).toBe(2);
+    expect(byEdge[0]?.kind).toBe("convert_free_bet");
 
     const byPriority = sortDoNextItems(items, "priority");
     expect(byPriority[0]?.kind).toBe("convert_free_bet");
+  });
+
+  it("ranks convert free bets first by face value, even when qualifying expires soon", () => {
+    const soon = Date.now() + 12 * 60 * 60 * 1000;
+    const items = buildDoNextItems(
+      [
+        offer({
+          id: 1,
+          title: "Urgent qualify",
+          expectedProfit: 14,
+          betCount: 0,
+          expiresAt: soon,
+        }),
+        offer({
+          id: 2,
+          title: "Ladbrokes convert",
+          bookmaker: "Ladbrokes",
+          profit: emptyProfit({
+            freeBetStage: "awarded",
+            freeBetAwarded: true,
+            freeBetAwardAmount: 10,
+            qualifyingSettledCount: 1,
+          }),
+        }),
+        offer({
+          id: 3,
+          title: "Big convert",
+          bookmaker: "Sky Bet",
+          profit: emptyProfit({
+            freeBetStage: "awarded",
+            freeBetAwarded: true,
+            freeBetAwardAmount: 30,
+            qualifyingSettledCount: 1,
+          }),
+        }),
+      ],
+      []
+    );
+
+    const ranked = sortDoNextItems(items, "priority");
+    expect(ranked.slice(0, 2).map((i) => i.kind)).toEqual([
+      "convert_free_bet",
+      "convert_free_bet",
+    ]);
+    expect(ranked[0]?.freeBetAmount).toBe(30);
+    expect(ranked[1]?.freeBetAmount).toBe(10);
+    expect(ranked[2]?.kind).toBe("place_qualifying");
   });
 
   it("rate sort: a £2/1.5-min item outranks a £5/20-min item", () => {
@@ -372,17 +454,14 @@ describe("buildDoNextItems — bankroll-aware funding (B3)", () => {
     expect(item?.funding).toBeUndefined();
   });
 
-  it("adds a synthetic fund_account item for each shortfall account", () => {
+  it("does not emit a separate fund_account card when the offer already shows shortfall", () => {
     const balances: BookieBalanceMap = new Map([["bet365", 2]]);
     const items = buildDoNextItems([qualifyOffer], [], Date.now(), undefined, balances);
-    const fundItem = items.find((i) => i.kind === "fund_account");
-    expect(fundItem).toBeDefined();
-    expect(fundItem?.bookmaker).toBe("Bet365");
-    expect(fundItem?.href).toBe("/balances");
-    expect(fundItem?.remainingEv).toBeGreaterThan(0);
+    expect(items.some((i) => i.kind === "fund_account")).toBe(false);
+    expect(items.find((i) => i.offerId === 100)?.funding?.short).toBeCloseTo(8);
   });
 
-  it("sums EV across multiple blocked offers on the same account", () => {
+  it("flags shortfall on each blocked offer without a fund_account duplicate", () => {
     const offer2 = offer({
       id: 101,
       title: "Second at Bet365",
@@ -393,9 +472,8 @@ describe("buildDoNextItems — bankroll-aware funding (B3)", () => {
     });
     const balances: BookieBalanceMap = new Map([["bet365", 0]]);
     const items = buildDoNextItems([qualifyOffer, offer2], [], Date.now(), undefined, balances);
-    const fundItems = items.filter((i) => i.kind === "fund_account");
-    expect(fundItems).toHaveLength(1); // one per account
-    expect(fundItems[0]?.remainingEv).toBeGreaterThan(0); // sum of both blocked EVs
+    expect(items.filter((i) => i.kind === "fund_account")).toHaveLength(0);
+    expect(items.filter((i) => i.funding && i.funding.short > 0)).toHaveLength(2);
   });
 });
 

@@ -35,6 +35,7 @@ function offer(
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: null,
     createdAt: Date.now(),
     betCount: rest.betCount ?? 0,
     openBets: rest.openBets ?? 0,
@@ -79,7 +80,7 @@ describe("deriveOfferPipelineStage", () => {
       },
     });
     expect(deriveOfferPipelineStage(awarded)).toBe("awarded");
-    expect(formatOfferPipelineStageLabel(awarded)).toBe("Free bet due");
+    expect(formatOfferPipelineStageLabel(awarded)).toBe("Free bet awarded");
   });
 
   it("maps planned with no bets", () => {

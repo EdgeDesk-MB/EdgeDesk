@@ -217,14 +217,32 @@ export function buildInstructions(
         "Do not cash out; avoid combining with free bets.",
       ].filter(Boolean);
 
-    case "bet_get_free_bet":
+    case "bet_get_free_bet": {
+      const depositFirst =
+        ctx.important.depositRequired ||
+        ctx.important.minDeposit != null ||
+        Boolean(ctx.important.promoCode);
+      const depositStep = depositFirst
+        ? ctx.important.promoCode && ctx.important.minDeposit != null
+          ? `Deposit £${ctx.important.minDeposit}+ on ${bookie} using promo code ${ctx.important.promoCode}.`
+          : ctx.important.promoCode
+            ? `Deposit on ${bookie} using promo code ${ctx.important.promoCode}.`
+            : ctx.important.minDeposit != null
+              ? `Deposit £${ctx.important.minDeposit}+ on ${bookie} before qualifying.`
+              : `Deposit on ${bookie} before qualifying.`
+        : "";
       return [
+        depositStep,
         `Place qualifying cash bet${ctx.betStake != null ? ` of £${ctx.betStake}` : ""} on ${bookie}${minOdds != null ? ` at min odds ${minOdds}` : ""}.`,
         "Pick a market with the closest back/lay match to keep qualifying loss tiny.",
         "Lay the same selection on the exchange at nearly the same odds.",
         `When the free bet lands, extract it SNR on ${bookie}: back at reasonably high odds and lay close to that price for best retention.`,
         signals.snrFreeBet ? "Free bet is SNR - higher matched odds improve extraction." : "",
+        ctx.important.rewardEventLabel
+          ? `Free bet is locked to ${ctx.important.rewardEventLabel}.`
+          : "",
       ].filter((s) => s.length > 0);
+    }
 
     case "place_refund":
       return [
@@ -290,6 +308,10 @@ export function buildImportantHints(
   if (signals.snrFreeBet && archetype !== "bet_boost") hints.push("SNR free bet");
   if (signals.minSelections != null) hints.push(`Min ${signals.minSelections} selections`);
   if (signals.inPlayAllowed) hints.push("In-play OK");
+  if (ctx.important.promoCode) hints.push(`Promo code ${ctx.important.promoCode}`);
+  if (ctx.important.minDeposit != null) {
+    hints.push(`Deposit £${ctx.important.minDeposit}+ first`);
+  }
 
   if (archetype === "bet_boost" && signals.boostPercent != null) {
     hints.push(`${signals.boostPercent}% winnings boost`);

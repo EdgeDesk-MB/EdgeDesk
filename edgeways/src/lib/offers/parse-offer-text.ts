@@ -4,6 +4,7 @@
  */
 import {
   inferAiEffectsFromText,
+  parseMinFavouriteSpOdds,
   parsePlacePositions,
   textRequiresSpFavouriteWinner,
 } from "@/lib/calc/ai-triggers";
@@ -22,6 +23,11 @@ import {
   type OfferIntelligenceResult,
 } from "@/lib/offers/offer-intelligence";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
+import {
+  deriveOfferPlaybook,
+  playbookFactsFromImportant,
+  type OfferPlaybook,
+} from "@/lib/offers/offer-playbook";
 
 export type ParsedOfferCategory = OfferCategoryId;
 
@@ -32,7 +38,9 @@ export interface ParsedOfferDraft {
   description: string | null;
   expectedProfit: number | null;
   expiresAt: number | null;
-  /** YYYY-MM-DD for racing day */
+  /** YYYY-MM-DD when Starts on can be inferred (promo window open). */
+  startsOn: string | null;
+  /** YYYY-MM-DD for racing day (place-refund / race-scoped pin). */
   eventDate: string | null;
   scopeMode: "uk_ire" | "course" | "race";
   scopeCourse: string;
@@ -45,6 +53,8 @@ export interface ParsedOfferDraft {
   qualifyingPlaces: number[];
   rules: BetGetFreePlaceRules | null;
   important: OfferImportantTerms;
+  /** O1 completion playbook derived from facts */
+  playbook: OfferPlaybook | null;
   /** Matched-betting intelligence (archetype, EP, workflow) */
   intelligence: OfferIntelligenceResult | null;
   /** Human-readable parse notes for the preview UI */
@@ -174,23 +184,150 @@ function parseImportantNotes(text: string): string {
     bits.push("In-play restrictions");
   }
   if (/\bsingles?\s+or\s+multis?\b/i.test(text)) bits.push("Singles or Multis");
+  if (/\bprogress\s*play\b/i.test(text)) bits.push("ProgressPlay network");
   const importantLine = text.match(
     /\b(?:important|note|must|don'?t\s+forget)\s*[:\-–]\s*(.+?)(?:\n|$)/i
   );
   if (importantLine) {
     const line = importantLine[1].trim().replace(/\s+/g, " ");
-    if (line.length >= 8 && line.length <= 160) bits.push(line);
+    // Skip email-footer “add us to contacts” boilerplate (Dynobet / ProgressPlay).
+    if (
+      line.length >= 8 &&
+      line.length <= 160 &&
+      !/add our email|contacts list|progressplay\.com/i.test(line)
+    ) {
+      bits.push(line);
+    }
   }
   return bits.join(" · ");
 }
 
-function parseImportantTerms(text: string): OfferImportantTerms {
+/** Promo / deposit code: "promo code UEFA", "using the code UEFA", "code: UEFA". */
+function parsePromoCode(text: string): string | null {
+  const patterns = [
+    /\bpromo(?:tion)?\s+codes?\s*[:#]?\s*([A-Z0-9][A-Z0-9_-]{1,19})\b/i,
+    /\busing\s+(?:the\s+)?(?:promo(?:tion)?\s+)?codes?\s+([A-Z0-9][A-Z0-9_-]{1,19})\b/i,
+    /\b(?:enter|with)\s+(?:the\s+)?(?:promo(?:tion)?\s+)?codes?\s+([A-Z0-9][A-Z0-9_-]{1,19})\b/i,
+    /\bcodes?\s*[:#]\s*([A-Z0-9][A-Z0-9_-]{1,19})\b/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m?.[1]) continue;
+    const code = m[1].toUpperCase();
+    if (/^(OR|AND|THE|FOR|ONLY|WITH|FROM|THIS)$/i.test(code)) continue;
+    return code;
+  }
+  return null;
+}
+
+function parseMinDeposit(text: string): number | null {
+  const m =
+    text.match(/\bdeposit\s+(?:£\s*\/\s*€|€\s*\/\s*£|£|€)?\s*(\d+(?:\.\d{1,2})?)\s*(?:\+|or\s+more)?/i) ||
+    text.match(/\bmin(?:imum)?\s+deposit\s*(?:of\s*)?(?:£|€)?\s*(\d+(?:\.\d{1,2})?)/i) ||
+    text.match(/\bdeposit\s+(?:of\s+)?(?:£|€)?\s*(\d+(?:\.\d{1,2})?)\s+or\s+more\b/i);
+  return m ? parseMoney(m[1]) : null;
+}
+
+function parsePaymentExclusionsFromText(text: string): string[] {
+  const out: string[] = [];
+  if (/\bskrill\b/i.test(text)) out.push("Skrill");
+  if (/\bneteller\b/i.test(text)) out.push("Neteller");
+  return out;
+}
+
+function parseWinningsWageringX(text: string): number | null {
+  const m =
+    text.match(
+      /\b(?:winnings?\s+from\s+(?:the\s+)?free\s*bets?\s+)?(?:must\s+be\s+)?wagered\s+(\d+(?:\.\d+)?)\s*x?\s*times?\b/i
+    ) ||
+    text.match(/\b(\d+(?:\.\d+)?)\s*[x×]\s+wagering\s+requirement\s+on\s+(?:the\s+)?winnings?\b/i) ||
+    text.match(/\b(\d+(?:\.\d+)?)\s*[x×]\s+wagering\s+requirement\b/i) ||
+    text.match(/\bwagering\s+requirement[:\s]+(\d+(?:\.\d+)?)\s*[x×]?\b/i) ||
+    text.match(/\b[x×]\s*(\d+(?:\.\d+)?)\s+wagering\s+requirement\b/i);
+  if (!m?.[1]) return null;
+  const n = parseFloat(m[1]);
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
+}
+
+function parseMaxConversion(text: string): number | null {
+  const m =
+    text.match(
+      /\bmax(?:imum)?\s+(?:amount\s+)?(?:that\s+can\s+be\s+)?converted\b[\s\S]{0,40}?(?:£|€)?\s*(\d+(?:\.\d{1,2})?)/i
+    ) ||
+    text.match(/\bmax(?:imum)?\s+conversion\s*(?:of\s*)?(?:£|€)?\s*(\d+(?:\.\d{1,2})?)/i);
+  return m ? parseMoney(m[1]) : null;
+}
+
+/** "PSG vs Aston Villa" / "PSG v Aston Villa" near free-bet / Super Cup wording. */
+function parseRewardEventLabel(text: string): string | null {
+  const vs = text.match(
+    /\b([A-Z][A-Za-z0-9&.']+(?:\s+[A-Z][A-Za-z0-9&.']+){0,3})\s+(?:vs?\.?|v)\s+([A-Z][A-Za-z0-9&.']+(?:\s+[A-Z][A-Za-z0-9&.']+){0,3})\b/
+  );
+  if (!vs) return null;
+  const label = `${vs[1].trim()} vs ${vs[2].trim()}`.replace(/\s+/g, " ");
+  if (label.length < 5 || label.length > 80) return null;
+  // Avoid matching random "A or B" — prefer when free bet / match context nearby
+  const near = text.slice(Math.max(0, (vs.index ?? 0) - 80), (vs.index ?? 0) + vs[0].length + 80);
+  if (
+    !/\bfree\s*bet|match|super\s+cup|only\b/i.test(near) &&
+    !/\bfree\s*bet|match|super\s+cup\b/i.test(text)
+  ) {
+    return null;
+  }
+  return label;
+}
+
+function parseRewardEventDate(text: string, now = new Date()): string | null {
+  // "on 12/8/26 only" / "match on 12/8/26"
+  const slash = text.match(
+    /\b(?:on|for|match(?:\s+on)?)\s+(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?\b/i
+  );
+  if (slash) {
+    const day = parseInt(slash[1], 10);
+    const month = parseInt(slash[2], 10) - 1;
+    let year = slash[3] ? parseInt(slash[3], 10) : null;
+    if (year != null && year < 100) year += 2000;
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+      const y = resolveYear(day, month, year, now);
+      return localYmd(new Date(y, month, day));
+    }
+  }
+  const named = text.match(
+    /\b(?:on|for)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(\d{4}))?\b/i
+  );
+  if (named) {
+    const day = parseInt(named[1], 10);
+    const mon = MONTHS[named[2].toLowerCase()];
+    if (mon != null && day >= 1 && day <= 31) {
+      const y = resolveYear(day, mon, named[3] ? parseInt(named[3], 10) : null, now);
+      return localYmd(new Date(y, mon, day));
+    }
+  }
+  return null;
+}
+
+function parseImportantTerms(text: string, now = new Date()): OfferImportantTerms {
   const { minStake, maxStake } = parseMinMaxStake(text);
+  const promoCode = parsePromoCode(text);
+  const minDeposit = parseMinDeposit(text);
+  const depositRequired =
+    minDeposit != null ||
+    Boolean(promoCode) ||
+    /\bdeposit\s+(?:£|€|\d)/i.test(text);
   return {
+    ...emptyImportantTerms(),
     minOdds: parseMinOdds(text),
     minStake,
     maxStake,
     importantNotes: normalizeOfferDetailsText(parseImportantNotes(text)),
+    promoCode,
+    minDeposit,
+    depositRequired,
+    rewardEventLabel: parseRewardEventLabel(text),
+    rewardEventDate: parseRewardEventDate(text, now),
+    winningsWageringX: parseWinningsWageringX(text),
+    maxConversion: parseMaxConversion(text),
+    paymentExclusions: parsePaymentExclusionsFromText(text),
   };
 }
 
@@ -486,7 +623,8 @@ function parseClockToken(raw: string): ParsedTod | null {
  * Currency amount prefix used by UK/ROI bookies: £5, €5, £/€5, €/£5.
  * Optional so "Bet 5 get 5" still matches.
  */
-const MONEY_PREFIX = String.raw`(?:£\s*/\s*€|€\s*/\s*£|£|€)?\s*`;
+/** £/€ plus OCR "E10" when Tesseract drops the pound sign. */
+const MONEY_PREFIX = String.raw`(?:£\s*/\s*€|€\s*/\s*£|£|€|E)?\s*`;
 const MONEY_AMOUNT = String.raw`(\d+(?:\.\d{1,2})?)`;
 
 /** True when a bet-get match sits inside a T&C currency-conversion example. */
@@ -648,6 +786,20 @@ function resolveYear(day: number, month: number, year: number | null, now: Date)
   return y;
 }
 
+/**
+ * For "from A – B … Qualifying after C", prefer B (the range end) over later
+ * dates that fall in the same scan window.
+ */
+function pickWindowEndDate(slice: string, dates: UkDateParts[]): UkDateParts {
+  if (dates.length >= 2) {
+    const a = dates[0]!;
+    const b = dates[1]!;
+    const between = slice.slice(a.index, b.index + b.length);
+    if (/[–—\-]|\bto\b|\buntil\b|\bthrough\b/i.test(between)) return b;
+  }
+  return dates[dates.length - 1]!;
+}
+
 function toEpoch(
   day: number,
   month: number,
@@ -699,17 +851,17 @@ function parseExpiry(text: string, now = new Date()): number | null {
 
   // Qualifying / promo window: "from … – …" / "from … to …" → use end date
   const windowMatch = text.match(
-    /\b(?:qualifying\s+period|promo(?:tion)?\s+period|offer\s+(?:runs|period)|runs?|available)\s*(?:from|:)?\s*/i
+    /\b(?:qualifying\s+period|promo(?:tion)?\s+period|offer\s+(?:runs|period)|runs?|available|(?:multiples?|racing|bets?)\s+only)\s*(?:from|:)?\s*/i
   );
   if (windowMatch && windowMatch.index != null) {
     const from = windowMatch.index + windowMatch[0].length;
     const slice = text.slice(from, from + 120);
     const dates = findUkDates(slice);
     if (dates.length >= 2) {
-      const end = dates[dates.length - 1];
-      const absIndex = from + end.index;
-      const tod = parseTimeNear(text, absIndex, end.length);
+      const end = pickWindowEndDate(slice, dates);
       const year = resolveYear(end.day, end.month, end.year, now);
+      // Time next to the end date only (e.g. "19:00pm 11/07"), not earlier clauses.
+      const tod = parseTimeNear(text, from + end.index, end.length);
       return toEpoch(end.day, end.month, year, tod, true);
     }
     if (dates.length === 1) {
@@ -718,6 +870,21 @@ function parseExpiry(text: string, now = new Date()): number | null {
       const tod = parseTimeNear(text, from + end.index, end.length);
       const year = resolveYear(end.day, end.month, end.year, now);
       return toEpoch(end.day, end.month, year, tod, true);
+    }
+  }
+
+  // "from Saturday 8th August – Sunday 9th August" (Betfair weekend windows)
+  const fromWeekday = text.match(
+    /\bfrom\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+/i
+  );
+  if (fromWeekday && fromWeekday.index != null) {
+    const from = Math.max(0, fromWeekday.index);
+    const slice = text.slice(from, from + 90);
+    const dates = findUkDates(slice);
+    if (dates.length >= 2) {
+      const end = pickWindowEndDate(slice, dates);
+      const year = resolveYear(end.day, end.month, end.year, now);
+      return toEpoch(end.day, end.month, year, null, true);
     }
   }
 
@@ -772,6 +939,35 @@ function parseEventDate(text: string, now = new Date()): string | null {
   return null;
 }
 
+/** Promo window open date: "after 7pm Friday 7th August" / "from Saturday 8th August". */
+function parseStartsOn(text: string, now = new Date()): string | null {
+  const after = text.match(
+    /\b(?:placed\s+)?after\s+(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(\d{4}))?/i
+  );
+  if (after) {
+    const day = parseInt(after[1], 10);
+    const mon = MONTHS[after[2].toLowerCase()];
+    if (mon != null && day >= 1 && day <= 31) {
+      const year = resolveYear(day, mon, after[3] ? parseInt(after[3], 10) : null, now);
+      return localYmd(new Date(year, mon, day));
+    }
+  }
+
+  const from = text.match(
+    /\bfrom\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(\d{4}))?/i
+  );
+  if (from) {
+    const day = parseInt(from[1], 10);
+    const mon = MONTHS[from[2].toLowerCase()];
+    if (mon != null && day >= 1 && day <= 31) {
+      const year = resolveYear(day, mon, from[3] ? parseInt(from[3], 10) : null, now);
+      return localYmd(new Date(year, mon, day));
+    }
+  }
+
+  return null;
+}
+
 function looksLikeRacing(text: string, places: number[]): boolean {
   if (places.length > 0) return true;
   return (
@@ -788,7 +984,7 @@ function looksLikeCasino(text: string): boolean {
 }
 
 function looksLikeFootball(text: string): boolean {
-  return /\b(football|soccer|premier\s+league|epl|championship|world\s+cup|champions\s+league|acca|accumulator|correct\s+score|2\s*up|early\s+payout|goal\s*line)\b/i.test(
+  return /\b(football|soccer|premier\s+league|epl|championship|world\s+cup|champions\s+league|super\s+cup|uefa|acca|accumulator|correct\s+score|2\s*up|early\s+payout|goal\s*line)\b/i.test(
     text
   );
 }
@@ -855,6 +1051,14 @@ function firstMeaningfulLine(text: string): string {
     if (/^(http|www\.|terms|t&cs|eligible|opt-in|exclusions|online only)/i.test(t)) continue;
     // Skip OCR fragments that are just a badge word or truncated junk
     if (/^(money\s+back|'?s\s+money\s+back)$/i.test(t)) continue;
+    // Promo T&C section headers (Betfair / Sky) — never use as the offer title
+    if (
+      /^(who can take part|things to know|what do you win|how and when|other boring|remaining steps|terms\s*(?:&|and)\s*conditions)\b/i.test(
+        t
+      )
+    ) {
+      continue;
+    }
     // "16:45 NEWMARKET" is scope metadata, not the offer headline
     if (looksLikeRaceHeader(t)) continue;
     return t.length > 100 ? `${t.slice(0, 97)}…` : t;
@@ -893,13 +1097,53 @@ function extractMoneyBackTitle(text: string): string | null {
   return `Money Back ${places}`;
 }
 
+/**
+ * Bare "5 Freebet" / "10 FB" without currency. Skip monthly caps and offer
+ * counts ("Limited to 5 Freebet offers", "up to 5 (five) free bet bonus").
+ */
+function matchBareFreeBetAmount(text: string): RegExpMatchArray | null {
+  const re = /\b(\d+(?:\.\d{1,2})?)\s*(?:free\s*bets?|fb)\b/gi;
+  for (const m of text.matchAll(re)) {
+    if (m.index == null) continue;
+    const before = text.slice(Math.max(0, m.index - 48), m.index);
+    const after = text.slice(m.index, m.index + m[0].length + 48);
+    if (
+      /\b(?:limited\s+to|up\s+to|receive\s+up\s+to|max(?:imum)?(?:\s+of)?|per\s+month|across\s+the\s+network)\b/i.test(
+        before
+      ) ||
+      /\b(?:offers?|bonus(?:es)?|per\s+month|across\s+the\s+network)\b/i.test(after) ||
+      /\(\s*(?:one|two|three|four|five|six|seven|eight|nine|ten)\s*\)/i.test(after)
+    ) {
+      continue;
+    }
+    return m;
+  }
+  return null;
+}
+
 function extractBetGetStakes(text: string): {
   betStake: number | null;
   freeBetAmount: number | null;
 } {
+  // Betfair-style: "FREE £10 BET WHEN YOU PLACE £10 WORTH OF MULTIPLES"
+  const freeWhenPlace = text.match(
+    new RegExp(
+      String.raw`\bfree\s+${MONEY_PREFIX}${MONEY_AMOUNT}\s+bets?\b[\s\S]{0,80}?\bplace\s+${MONEY_PREFIX}${MONEY_AMOUNT}\b`,
+      "i"
+    )
+  );
+  if (freeWhenPlace) {
+    const freeBetAmount = parseMoney(freeWhenPlace[1]);
+    const betStake = parseMoney(freeWhenPlace[2]);
+    if (betStake != null && freeBetAmount != null) {
+      return { betStake, freeBetAmount };
+    }
+  }
+
   // "Bet £5 get £5" / "Bet £/€5 Get a £/€5 Free Bet" — first non-example wins
+  // OCR often reads Bet as Set / Get as Cet.
   const betGetRe = new RegExp(
-    String.raw`\bbet\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s+get\s+(?:a\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}`,
+    String.raw`\b(?:bet|set)\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s+(?:get|cet)\s+(?:a\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}`,
     "gi"
   );
   for (const m of text.matchAll(betGetRe)) {
@@ -911,11 +1155,13 @@ function extractBetGetStakes(text: string): {
     }
   }
 
-  // Money-back / refund: "up to £10 back", "up to £/€10 in Tote Credit", "get … £10 … free bet"
+  // Money-back / refund: "up to £10 back", "up to £/€10 in Tote Credit".
+  // Suffix (or "same value …") is required — bare "up to 5 (five) free bet
+  // bonus per month" must never become a £5 money-back offer.
   const moneyBack =
     text.match(
       new RegExp(
-        String.raw`\bup\s+to\s+${MONEY_PREFIX}${MONEY_AMOUNT}\s*(?:back\b|in\s+\w+\s+credit\b|as\s+a\s+free\s*bet\b)?`,
+        String.raw`\bup\s+to\s+${MONEY_PREFIX}${MONEY_AMOUNT}\s*(?:back\b|in\s+\w+\s+credit\b|as\s+a\s+free\s*bet\b)`,
         "i"
       )
     ) ||
@@ -959,34 +1205,105 @@ function extractBetGetStakes(text: string): {
       ) ||
       text.match(
         new RegExp(
-          String.raw`\b(?:qualifying\s+)?(?:bet|stake)\s+(?:of\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\+?`,
+          String.raw`\b(?:qualifying\s+)?(?:bet|stake|set)\s+(?:of\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\+?`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\bplace\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s*(?:worth\s+of\s+)?(?:bets?|multiples?)?`,
+          "i"
+        )
+      ) ||
+      // "Place qualifying bets worth £20" / "bets totaling £20 or more"
+      text.match(
+        new RegExp(
+          String.raw`\b(?:qualifying\s+)?bets?\s+(?:worth|total(?:l?ing)?|of)\s+${MONEY_PREFIX}${MONEY_AMOUNT}`,
+          "i"
+        )
+      ) ||
+      // "Minimum of £20 worth of qualifying bets" / "£20 worth of bets"
+      text.match(
+        new RegExp(
+          String.raw`\b${MONEY_PREFIX}${MONEY_AMOUNT}\s+worth\s+of\s+(?:qualifying\s+)?bets?\b`,
+          "i"
+        )
+      ) ||
+      // "place bets to the value of £20" / "accumulated the £20 of real bets"
+      text.match(
+        new RegExp(
+          String.raw`\b(?:bets?\s+to\s+the\s+value\s+of|accumulated\s+the)\s+${MONEY_PREFIX}${MONEY_AMOUNT}`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\bwager\s+${MONEY_PREFIX}${MONEY_AMOUNT}\b`,
           "i"
         )
       );
-    const betStake = stakeOnly ? parseMoney(stakeOnly[1]) : freeBetAmount;
+    // Do not fall back to free-bet face value as qual stake — deposit-gated
+    // "get £10 FB" promos often have a different qualifying turnover.
+    const betStake = stakeOnly ? parseMoney(stakeOnly[1]) : null;
     if (freeBetAmount != null) return { betStake, freeBetAmount };
   }
 
-  // "Free Bet value is £10" / "free bet of £10" / "£10 free bet"
+  // "Free Bet value is £10" / "free bet of £10" / OCR "fre bet of £10" / "£10 free bet"
+  // Currency-marked forms only here — bare "5 Freebet offers" uses matchBareFreeBetAmount
+  // with count-context rejection.
   const freeValue =
     text.match(
       new RegExp(
-        String.raw`\bfree\s*bets?\s*(?:value|amount|worth)?\s*(?:is|of|=|:)?\s*${MONEY_PREFIX}${MONEY_AMOUNT}`,
+        String.raw`\bfree?\s*bets?\s*(?:value|amount|worth)?\s*(?:is|of|=|:)?\s*${MONEY_PREFIX}${MONEY_AMOUNT}`,
         "i"
       )
     ) ||
     text.match(
-      new RegExp(String.raw`\b${MONEY_PREFIX}${MONEY_AMOUNT}\s*(?:free\s*bets?|fb|back)\b`, "i")
-    ) ||
-    text.match(/\b(\d+(?:\.\d{1,2})?)\s*(?:free\s*bets?|fb)\b/i);
-  if (freeValue) {
-    const freeBetAmount = parseMoney(freeValue[1]);
-    const stakeOnly = text.match(
       new RegExp(
-        String.raw`\b(?:qualifying\s+)?(?:bet|stake)\s+(?:of\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\+?`,
+        String.raw`\b(?:£\s*/\s*€|€\s*/\s*£|£|€|\$|E)\s*${MONEY_AMOUNT}\s*(?:free\s*bets?|fb|back)\b`,
         "i"
       )
-    );
+    ) ||
+    matchBareFreeBetAmount(text);
+  if (freeValue) {
+    const freeBetAmount = parseMoney(freeValue[1]);
+    const stakeOnly =
+      text.match(
+        new RegExp(
+          String.raw`\b(?:qualifying\s+)?(?:bet|stake|set)\s+(?:of\s+)?${MONEY_PREFIX}${MONEY_AMOUNT}\+?`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\b(?:bet|set)\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s+on\b`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\bplace\s+${MONEY_PREFIX}${MONEY_AMOUNT}\+?\s*(?:worth\s+of\s+)?(?:bets?|multiples?)?`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\b(?:qualifying\s+)?bets?\s+(?:worth|total(?:l?ing)?|of)\s+${MONEY_PREFIX}${MONEY_AMOUNT}`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\b${MONEY_PREFIX}${MONEY_AMOUNT}\s+worth\s+of\s+(?:qualifying\s+)?bets?\b`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\b(?:bets?\s+to\s+the\s+value\s+of|accumulated\s+the)\s+${MONEY_PREFIX}${MONEY_AMOUNT}`,
+          "i"
+        )
+      );
     return {
       betStake: stakeOnly ? parseMoney(stakeOnly[1]) : null,
       freeBetAmount,
@@ -1019,6 +1336,21 @@ function formatPlaceLabel(places: number[]): string {
   return places.map(ordinal).join(", ");
 }
 
+/** Sport / product label for title parentheses. Racing uses place bands instead. */
+function titleSportLabel(text: string, category: OfferCategoryId): string | null {
+  if (/\bcricket\b/i.test(text)) return "Cricket";
+  if (category === "casino") return null;
+  const meta = offerCategoryById(category);
+  if (meta.isRacing) return null;
+  if (meta.label === "General") return null;
+  return meta.label;
+}
+
+/**
+ * Standard campaign titles — process-first, not reward-only.
+ * Prefer: `Bet £20 get £10 free bet (Football)`
+ * Racing place refunds keep the place band in the paren slot.
+ */
 function buildOfferTitle(
   text: string,
   category: OfferCategoryId,
@@ -1032,31 +1364,41 @@ function buildOfferTitle(
   const moneyBackTitle = extractMoneyBackTitle(text);
   if (moneyBackTitle) return moneyBackTitle;
 
-  if (offerCategoryById(category).isRacing && betStake != null && freeBetAmount != null) {
+  if (category === "casino" && freeBetAmount != null) {
+    return `£${freeBetAmount} casino reward`;
+  }
+
+  const sport = titleSportLabel(text, category);
+
+  if (betStake != null && freeBetAmount != null) {
+    const core = `Bet £${betStake} get £${freeBetAmount} free bet`;
     if (places.length > 0) {
-      return `Bet £${betStake} get £${freeBetAmount} free bet (${formatPlaceLabel(places)})`;
+      return `${core} (${formatPlaceLabel(places)})`;
     }
-    return `Bet £${betStake} get £${freeBetAmount} free bet`;
+    if (sport) return `${core} (${sport})`;
+    return core;
   }
+
   if (freeBetAmount != null) {
-    if (/\bcricket\b/i.test(text)) return `£${freeBetAmount} free bet - Cricket`;
-    if (category === "football") return `£${freeBetAmount} free bet - Football`;
-    if (category === "casino") return `£${freeBetAmount} casino reward`;
-    const sportLabel = offerCategoryById(category).label;
-    if (sportLabel !== "General") return `£${freeBetAmount} free bet - ${sportLabel}`;
-    return `£${freeBetAmount} free bet`;
+    const core = `£${freeBetAmount} free bet`;
+    if (sport) return `${core} (${sport})`;
+    return core;
   }
+
   return firstMeaningfulLine(text);
 }
 
 /** Extract place positions from money-back / finish wording. */
 function extractQualifyingPlaces(text: string, awardPositions: number[]): number[] {
+  // Ignore How-to-match appendices — they often restate a shorter place list.
+  const primary = (text.split(/\bHow to match:/i)[0] ?? text).trim();
+
   if (awardPositions.length > 0 && awardPositions.every((n) => n <= 6)) {
     return [...awardPositions];
   }
 
   // "2nd-4th" / "2–4"
-  const range = text.match(/\b(\d+)(?:st|nd|rd|th)?\s*[-–]\s*(\d+)(?:st|nd|rd|th)?\b/i);
+  const range = primary.match(/\b(\d+)(?:st|nd|rd|th)?\s*[-–]\s*(\d+)(?:st|nd|rd|th)?\b/i);
   if (range) {
     const a = parseInt(range[1], 10);
     const b = parseInt(range[2], 10);
@@ -1068,7 +1410,7 @@ function extractQualifyingPlaces(text: string, awardPositions: number[]): number
   }
 
   // "2nd & 3rd" / "2nd or 3rd" / "2nd, 3rd or 4th" (with optional & / and)
-  const list = text.match(
+  const list = primary.match(
     /\b(\d+(?:st|nd|rd|th)?(?:\s*(?:[&+,/]|and|or)\s*\d+(?:st|nd|rd|th)?){1,5})\b/i
   );
   if (list) {
@@ -1080,7 +1422,7 @@ function extractQualifyingPlaces(text: string, awardPositions: number[]): number
   }
 
   // "if … 2nd or 3rd" — handles "if your horse finishes", "if you finish", "if selection finishes"
-  const ifClause = text.match(
+  const ifClause = primary.match(
     /\bif\s+(?:(?:you|your(?:\s+\w+)?)\s+)?(?:horse\s+)?(?:finishes?|finish|comes?\s*(?:in)?|places?)?\s*((?:\d+(?:st|nd|rd|th)?[\s,&+/]*(?:(?:and|or)\s+)?){1,6})/i
   );
   if (ifClause) {
@@ -1089,7 +1431,7 @@ function extractQualifyingPlaces(text: string, awardPositions: number[]): number
   }
 
   // "finish 2nd" / "finishes 2nd or 3rd" — catches "if you finish 2nd" and standalone usages
-  const finishNth = text.match(
+  const finishNth = primary.match(
     /\bfinish(?:es|ed)?\s+((?:\d+(?:st|nd|rd|th)?(?:\s*(?:[,&+/]|and|or)\s*)?){1,6})/i
   );
   if (finishNth) {
@@ -1097,10 +1439,10 @@ function extractQualifyingPlaces(text: string, awardPositions: number[]): number
     if (places.length > 0) return places;
   }
 
-  if (/\b2nd.?4th|2nd,\s*3rd,?\s*(?:or\s+)?4th\b/i.test(text)) {
+  if (/\b2nd.?4th|2nd,\s*3rd,?\s*(?:or\s+)?4th\b/i.test(primary)) {
     return [2, 3, 4];
   }
-  if (/\b2nd\s*(?:&|and|or)\s*3rd\b/i.test(text)) {
+  if (/\b2nd\s*(?:&|and|or)\s*3rd\b/i.test(primary)) {
     return [2, 3];
   }
 
@@ -1123,6 +1465,9 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
   const award = effects.find((e) => e.kind === "free_bet_award");
   const winnerMustBeSpFavourite =
     award?.winnerMustBeSpFavourite === true || textRequiresSpFavouriteWinner(text);
+  const minFavouriteSpOdds = winnerMustBeSpFavourite
+    ? award?.minFavouriteSpOdds ?? parseMinFavouriteSpOdds(text)
+    : null;
   const places = extractQualifyingPlaces(
     text,
     award && award.positions.length > 0 ? award.positions : []
@@ -1137,12 +1482,34 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
   const scope = parseScopeCourse(text);
   const statedProfit = parseExpectedProfit(text);
   const expiresAt = parseExpiry(text, now);
+  const startsOn = parseStartsOn(text, now);
   const eventDate = parseEventDate(text, now);
-  const important = parseImportantTerms(text);
+  const important = parseImportantTerms(text, now);
+
+  // Qual turnover often appears as "bets worth £20", not "min stake £20"
+  if (important.minStake == null && betStake != null) {
+    important.minStake = betStake;
+  }
 
   // Opt-in / cash bet / valid N days → important notes
   if (/\bopt[- ]?in\s+required\b/i.test(text) && !/opt-in/i.test(important.importantNotes)) {
     important.importantNotes = [important.importantNotes, "Opt-in required"]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (important.promoCode && !new RegExp(`code\\s+${important.promoCode}`, "i").test(important.importantNotes)) {
+    important.importantNotes = [important.importantNotes, `Promo code ${important.promoCode}`]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (
+    important.minDeposit != null &&
+    !/deposit £/i.test(important.importantNotes)
+  ) {
+    important.importantNotes = [
+      important.importantNotes,
+      `Deposit £${important.minDeposit}+ first`,
+    ]
       .filter(Boolean)
       .join(" · ");
   }
@@ -1186,16 +1553,34 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
 
   const enrichedImportant = enrichImportantTerms(important, intelligence);
 
+  const playbook = deriveOfferPlaybook(
+    playbookFactsFromImportant(enrichedImportant, {
+      betStake,
+      freeBetAmount,
+      bookmaker,
+      optInRequired: /\bopt[- ]?in\b/i.test(text) && !enrichedImportant.depositRequired,
+    })
+  );
+
   const intelEv =
     statedProfit == null ? intelligence.expectedProfit : null;
   const legacyEv = statedProfit == null ? estimateFreeBetEv(freeBetAmount) : null;
   const estimatedEv = intelEv ?? legacyEv;
   const expectedProfit = statedProfit ?? estimatedEv;
 
+  if (enrichedImportant.promoCode) {
+    notes.push(`Promo code: ${enrichedImportant.promoCode}`);
+  }
+  if (enrichedImportant.minDeposit != null) {
+    notes.push(`Min deposit £${enrichedImportant.minDeposit}`);
+  }
   if (betStake != null && freeBetAmount != null) {
     notes.push(`Bet £${betStake} → £${freeBetAmount} free bet`);
   } else if (freeBetAmount != null) {
     notes.push(`Free bet £${freeBetAmount}`);
+  }
+  if (playbook.steps[0]?.kind === "deposit") {
+    notes.push(`→ ${playbook.steps[0].title}`);
   }
   if (places.length > 0) {
     notes.push(
@@ -1256,6 +1641,9 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
       betStake,
       freeBetAmount,
       ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
+      ...(minFavouriteSpOdds != null && minFavouriteSpOdds > 1
+        ? { minFavouriteSpOdds }
+        : {}),
     };
     notes.push(formatBetGetFreePlaceSummary(rules));
   } else if (isRacing && freeBetAmount != null && places.length > 0) {
@@ -1268,6 +1656,9 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
       betStake: betStake ?? freeBetAmount,
       freeBetAmount,
       ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
+      ...(minFavouriteSpOdds != null && minFavouriteSpOdds > 1
+        ? { minFavouriteSpOdds }
+        : {}),
     };
     notes.push(formatBetGetFreePlaceSummary(rules));
   }
@@ -1281,7 +1672,15 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
     description: text.length > 280 ? `${text.slice(0, 277)}…` : text,
     expectedProfit,
     expiresAt,
-    eventDate: eventDate ?? (isRacing ? localYmd(now) : null),
+    startsOn,
+    // Pin a meeting day for place-refund / race-scoped only. Straight bet&get
+    // uses Starts→Expires on the desk, so leave eventDate unset unless parsed.
+    eventDate:
+      eventDate ??
+      (isRacing &&
+      (places.length > 0 || winnerMustBeSpFavourite || scope.mode === "race")
+        ? localYmd(now)
+        : null),
     scopeMode: scope.mode,
     scopeCourse: scope.course,
     preferredOffTime: scope.preferredOffTime,
@@ -1292,6 +1691,7 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
     qualifyingPlaces: places,
     rules,
     important: enrichedImportant,
+    playbook,
     intelligence,
     notes,
     confidence,
@@ -1306,6 +1706,7 @@ function emptyDraft(note: string): ParsedOfferDraft {
     description: null,
     expectedProfit: null,
     expiresAt: null,
+    startsOn: null,
     eventDate: null,
     scopeMode: "uk_ire",
     scopeCourse: "",
@@ -1317,6 +1718,7 @@ function emptyDraft(note: string): ParsedOfferDraft {
     qualifyingPlaces: [],
     rules: null,
     important: emptyImportantTerms(),
+    playbook: null,
     intelligence: null,
     notes: [note],
     confidence: "low",

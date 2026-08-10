@@ -17,6 +17,11 @@ export interface BetGetFreePlaceRules {
   freeBetAmount: number;
   /** Place pays only when the race winner was the Starting Price favourite. */
   winnerMustBeSpFavourite?: boolean;
+  /**
+   * Optional floor on the SP favourite's Starting Price (decimal), e.g. 2.5.
+   * Only meaningful with `winnerMustBeSpFavourite`.
+   */
+  minFavouriteSpOdds?: number;
 }
 
 export function normalizeCourseName(name: string): string {
@@ -131,9 +136,16 @@ export function formatBetGetFreePlaceSummary(
   let rewardClause = stakeClause;
   if (offerHasResultTrigger(rules)) {
     const places = rules.qualifyingPlaces.join(", ");
-    const placeClause = rules.winnerMustBeSpFavourite
+    let placeClause = rules.winnerMustBeSpFavourite
       ? `${rules.qualifyingPlaces.map(placeOrdinal).join(", ")} to SP favourite`
       : `places ${places}`;
+    if (
+      rules.winnerMustBeSpFavourite &&
+      rules.minFavouriteSpOdds != null &&
+      rules.minFavouriteSpOdds > 1
+    ) {
+      placeClause += ` (min fav SP ${rules.minFavouriteSpOdds})`;
+    }
     rewardClause = `${stakeClause} if ${placeClause}`;
   }
   const parts = [rewardClause, `min ${rules.minRunners} runners`];
@@ -150,7 +162,11 @@ export function placeRefundTriggerText(rules: BetGetFreePlaceRules): string {
   const places = rules.qualifyingPlaces.join(", ");
   if (rules.winnerMustBeSpFavourite) {
     const ordinals = rules.qualifyingPlaces.map(placeOrdinal).join(", ");
-    return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB if ${ordinals} to SP favourite`;
+    const minSp =
+      rules.minFavouriteSpOdds != null && rules.minFavouriteSpOdds > 1
+        ? ` (min fav SP ${rules.minFavouriteSpOdds})`
+        : "";
+    return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB if ${ordinals} to SP favourite${minSp}`;
   }
   return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB if ${places}`;
 }

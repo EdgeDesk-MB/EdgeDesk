@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deriveTrackBetAction, qualifyingOfferTriggerText } from "./offer-track-bet";
+import {
+  deriveFreeBetLotConvertAction,
+  deriveTrackBetAction,
+  qualifyingOfferTriggerText,
+} from "./offer-track-bet";
 import type { OfferSummary } from "@/lib/services/offers.types";
 
 function offer(
@@ -29,6 +33,7 @@ function offer(
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: null,
     createdAt: Date.now(),
     betCount: rest.betCount ?? 0,
     openBets: 0,
@@ -62,6 +67,58 @@ const rules = JSON.stringify({
 });
 
 describe("deriveTrackBetAction", () => {
+  it("enables footer mark-done for deposit playbook steps", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 90,
+        title: "Bet £20 get £10 free bet (Football)",
+        bookmaker: "Dynobet",
+        sport: "football",
+        offerType: "promo_terms",
+        rules: JSON.stringify({
+          type: "promo_terms",
+          promoCode: "UEFA",
+          minDeposit: 30,
+          depositRequired: true,
+          minStake: 20,
+          minOdds: 1.5,
+          playbook: {
+            version: 1,
+            steps: [
+              {
+                id: "deposit",
+                kind: "deposit",
+                title: "Deposit £30+ with code UEFA",
+                detail: "Deposit into Dynobet.",
+                sortOrder: 0,
+                status: "pending",
+                completion: null,
+                completedAt: null,
+              },
+              {
+                id: "qualify",
+                kind: "qualify",
+                title: "Place £20 qualifying bet",
+                detail: "Cash bet.",
+                sortOrder: 1,
+                status: "pending",
+                completion: null,
+                completedAt: null,
+              },
+            ],
+          },
+        }),
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Mark deposit done");
+    expect(action.destination).toEqual({
+      kind: "playbook_mark_done",
+      stepId: "deposit",
+    });
+    expect(action.prefill).toBeNull();
+  });
+
   it("prefills qualifying stake and bookie for new campaigns", () => {
     const action = deriveTrackBetAction(
       offer({
@@ -123,9 +180,10 @@ describe("deriveTrackBetAction", () => {
     expect(action.label).toBe("Convert free bet");
     expect(action.prefill?.betType).toBe("free_snr");
     expect(action.prefill?.backStake).toBe(50);
+    expect(action.prefill?.triggerText).toBeUndefined();
   });
 
-  it("disables when qualifying bet is still open", () => {
+  it("disables when qualifying bet is still open and free bet not awarded", () => {
     const action = deriveTrackBetAction(
       offer({
         id: 3,
@@ -138,6 +196,31 @@ describe("deriveTrackBetAction", () => {
     expect(action.enabled).toBe(false);
     expect(action.label).toBe("Awaiting result");
     expect(action.prefill).toBeNull();
+  });
+
+  it("enables convert when free bet is awarded on placement while qualifying is open", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 31,
+        title: "Bet £10 get £10 free bet",
+        rules: JSON.stringify({
+          type: "promo_terms",
+          minOdds: 2,
+          importantNotes: "SNR free bet",
+        }),
+        betCount: 1,
+        profit: {
+          qualifyingOpenCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Convert free bet");
+    expect(action.prefill?.betType).toBe("free_snr");
+    expect(action.prefill?.backStake).toBe(10);
   });
 
   it("prefills raceExternalId for a race-scoped campaign", () => {
@@ -214,5 +297,266 @@ describe("deriveTrackBetAction", () => {
       })
     );
     expect(action.prefill?.scopeCourse).toBeUndefined();
+  });
+
+  it("routes Acca-scoped qualifying offers to Acca Desk when entitled", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 20,
+        title: "Bet £20 ACCA get £10 free bet",
+        bookmaker: "Ivybet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          minOdds: 2,
+          minStake: 20,
+          qualifierScope: "acca",
+          minSelections: 3,
+          importantNotes: "Must be next promo",
+        }),
+        betCount: 0,
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Build acca");
+    expect(action.destination.kind).toBe("acca_desk");
+    if (action.destination.kind !== "acca_desk") return;
+    expect(action.destination.prefill.offerId).toBe(20);
+    expect(action.destination.prefill.stake).toBe(20);
+    expect(action.destination.prefill.bookmaker).toBe("Ivybet");
+    expect(action.destination.prefill.minSelections).toBe(3);
+    expect(action.destination.prefill.minOdds).toBe(2);
+    // Orphan mark-placed still gets an Add-bet style stub prefill.
+    expect(action.prefill?.offerId).toBe(20);
+    expect(action.prefill?.betType).toBe("qualifying");
+    expect(action.prefill?.backStake).toBe(20);
+    expect(action.prefill?.bookmaker).toBe("Ivybet");
+  });
+
+  it("falls back to Add bet for Acca scope when Acca Desk is not entitled", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 21,
+        title: "Bet £20 ACCA get £10 free bet",
+        bookmaker: "Ivybet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          qualifierScope: "acca",
+          minSelections: 3,
+        }),
+        betCount: 0,
+      }),
+      { offerBetPrefs: {}, defaultBackStake: 10, planPreview: "free" }
+    );
+    expect(action.destination.kind).toBe("add_bet");
+    expect(action.label).toBe("Place qualifying bet");
+    expect(action.prefill?.betType).toBe("qualifying");
+  });
+
+  it("keeps free-bet convert on Add bet when only qualifier is Acca", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 22,
+        title: "Bet £20 ACCA get £10 free bet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          qualifierScope: "acca",
+          minSelections: 3,
+        }),
+        betCount: 1,
+        profit: {
+          qualifyingSettledCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.destination.kind).toBe("add_bet");
+    expect(action.label).toBe("Convert free bet");
+    expect(action.prefill?.betType).toBe("free_snr");
+  });
+
+  it("routes reward Acca convert to Acca Desk as free_snr", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 24,
+        title: "Bet £20 get £10 Acca free bet",
+        bookmaker: "Ivybet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          rewardScope: "acca",
+          rewardMinSelections: 4,
+        }),
+        betCount: 1,
+        profit: {
+          qualifyingSettledCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Convert on Acca Desk");
+    expect(action.destination.kind).toBe("acca_desk");
+    if (action.destination.kind !== "acca_desk") return;
+    expect(action.destination.prefill.purpose).toBe("convert");
+    expect(action.destination.prefill.backBetType).toBe("free_snr");
+    expect(action.destination.prefill.stake).toBe(10);
+    expect(action.destination.prefill.minSelections).toBe(4);
+  });
+
+  it("routes bet_builder scope to Bet Builder Desk when entitled", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 23,
+        title: "Build a bet get free bet",
+        sport: "football",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          qualifierScope: "bet_builder",
+          minSelections: 4,
+        }),
+        betCount: 0,
+      })
+    );
+    expect(action.destination.kind).toBe("bet_builder_desk");
+    expect(action.label).toBe("Build bet builder");
+    if (action.destination.kind !== "bet_builder_desk") return;
+    expect(action.destination.prefill.minSelections).toBe(4);
+    expect(action.destination.prefill.suggestedMethod).toBe("combined");
+  });
+
+  it("falls back to Add bet for bet_builder when not entitled", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 23,
+        title: "Build a bet get free bet",
+        sport: "football",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          qualifierScope: "bet_builder",
+          minSelections: 4,
+        }),
+        betCount: 0,
+      }),
+      { offerBetPrefs: {}, defaultBackStake: 10, planPreview: "free" }
+    );
+    expect(action.destination.kind).toBe("add_bet");
+    if (action.destination.kind === "add_bet") {
+      expect(action.destination.scopeHint).toBe("bet_builder");
+    }
+  });
+
+  it("offers a chooser when Acca and Bet builder are both allowed", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 25,
+        title: "FREE £5 BET - JUST BET £10 ON ACCAS OR BET BUILDERS",
+        bookmaker: "Betfair",
+        sport: "football",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          qualifierScopes: ["acca", "bet_builder"],
+          minSelections: 3,
+          minStake: 10,
+        }),
+        betCount: 0,
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Place qualifying bet");
+    expect(action.destination.kind).toBe("choose");
+    if (action.destination.kind !== "choose") return;
+    expect(action.destination.options.map((o) => o.scope)).toEqual([
+      "acca",
+      "bet_builder",
+    ]);
+    expect(action.destination.options[0]?.destination.kind).toBe("acca_desk");
+    expect(action.destination.options[1]?.destination.kind).toBe("bet_builder_desk");
+    expect(action.prefill?.offerId).toBe(25);
+    expect(action.prefill?.betType).toBe("qualifying");
+    expect(action.prefill?.backStake).toBe(10);
+    expect(action.prefill?.bookmaker).toBe("Betfair");
+  });
+
+  it("chooser convert path when reward allows Acca or Bet builder", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 26,
+        title: "Weekly Acca/BB free bet",
+        sport: "football",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          rewardScopes: ["acca", "bet_builder"],
+          rewardMinSelections: 3,
+        }),
+        betCount: 1,
+        profit: {
+          qualifyingSettledCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 5,
+        },
+      })
+    );
+    expect(action.destination.kind).toBe("choose");
+    if (action.destination.kind !== "choose") return;
+    expect(action.destination.options).toHaveLength(2);
+    expect(action.destination.options[0]?.destination.kind).toBe("acca_desk");
+  });
+});
+
+describe("deriveFreeBetLotConvertAction", () => {
+  it("opens Acca Desk when linked offer has reward Acca", () => {
+    const action = deriveFreeBetLotConvertAction(
+      { remaining: 10, accountName: "Ivybet" },
+      offer({
+        id: 30,
+        title: "Promo",
+        bookmaker: "Ivybet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          rewardScope: "acca",
+          rewardMinSelections: 3,
+        }),
+      })
+    );
+    expect(action.destination.kind).toBe("acca_desk");
+    if (action.destination.kind !== "acca_desk") return;
+    expect(action.destination.prefill.backBetType).toBe("free_snr");
+    expect(action.destination.prefill.stake).toBe(10);
+  });
+
+  it("falls back to Add bet when lot is unlinked", () => {
+    const action = deriveFreeBetLotConvertAction(
+      { remaining: 15, accountName: "Sky Bet" },
+      null
+    );
+    expect(action.destination.kind).toBe("add_bet");
+    expect(action.prefill?.backStake).toBe(15);
   });
 });

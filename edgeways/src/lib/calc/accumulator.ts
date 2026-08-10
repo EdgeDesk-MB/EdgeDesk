@@ -9,6 +9,10 @@ export type AccaStructureType =
   | "trixie"
   | "patent"
   | "yankee"
+  | "canadian"
+  | "heinz"
+  | "super_heinz"
+  | "goliath"
   | "lucky_15"
   | "lucky_31"
   | "lucky_63";
@@ -68,7 +72,7 @@ function combinationsOfSize(n: number, size: number): number[][] {
   return out;
 }
 
-function comboSizes(type: AccaStructureType, legCount: number): number[] {
+export function comboSizes(type: AccaStructureType, legCount: number): number[] {
   switch (type) {
     case "double":
       return legCount === 2 ? [2] : [];
@@ -82,6 +86,14 @@ function comboSizes(type: AccaStructureType, legCount: number): number[] {
       return legCount === 3 ? [1, 2, 3] : [];
     case "yankee":
       return legCount === 4 ? [2, 3, 4] : [];
+    case "canadian":
+      return legCount === 5 ? [2, 3, 4, 5] : [];
+    case "heinz":
+      return legCount === 6 ? [2, 3, 4, 5, 6] : [];
+    case "super_heinz":
+      return legCount === 7 ? [2, 3, 4, 5, 6, 7] : [];
+    case "goliath":
+      return legCount === 8 ? [2, 3, 4, 5, 6, 7, 8] : [];
     case "lucky_15":
       return legCount === 4 ? [1, 2, 3, 4] : [];
     case "lucky_31":
@@ -100,6 +112,10 @@ const TYPE_LABELS: Record<AccaStructureType, string> = {
   trixie: "Trixie",
   patent: "Patent",
   yankee: "Yankee",
+  canadian: "Canadian",
+  heinz: "Heinz",
+  super_heinz: "Super Heinz",
+  goliath: "Goliath",
   lucky_15: "Lucky 15",
   lucky_31: "Lucky 31",
   lucky_63: "Lucky 63",
@@ -117,10 +133,16 @@ export function requiredLegCount(type: AccaStructureType): number {
     case "yankee":
     case "lucky_15":
       return 4;
+    case "canadian":
     case "lucky_31":
       return 5;
+    case "heinz":
     case "lucky_63":
       return 6;
+    case "super_heinz":
+      return 7;
+    case "goliath":
+      return 8;
   }
 }
 
@@ -234,6 +256,10 @@ const FULL_COVER_TYPES: AccaStructureType[] = [
   "trixie",
   "patent",
   "yankee",
+  "canadian",
+  "heinz",
+  "super_heinz",
+  "goliath",
   "lucky_15",
   "lucky_31",
   "lucky_63",

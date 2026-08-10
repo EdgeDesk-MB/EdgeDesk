@@ -13,7 +13,12 @@ import type { TriggerRule } from "./trigger";
 import { parseTrigger } from "./trigger";
 import { formatGbp } from "@/lib/format-money";
 import type { RaceResult } from "@/lib/racing";
-import { selectionPosition, winnerIsSpFavourite } from "@/lib/racing";
+import {
+  favouriteSpOdds,
+  isRaceResultIncomplete,
+  selectionPosition,
+  winnerIsSpFavourite,
+} from "@/lib/racing";
 
 export type AiEffect = {
   kind: "free_bet_award";
@@ -25,6 +30,8 @@ export type AiEffect = {
    * ("2nd to the SP favourite"). Settled from recorded result SP, never pre-race odds.
    */
   winnerMustBeSpFavourite?: boolean;
+  /** Optional floor on the SP favourite's Starting Price (decimal). */
+  minFavouriteSpOdds?: number;
 };
 
 export interface TriggerBundle {
@@ -60,7 +67,11 @@ export function describeAiEffect(effect: AiEffect): string {
     return `${formatGbp(effect.amount)} free bet - credits bookie balance when this bet settles (or mark awarded early if the bookie releases it on placement)`;
   }
   if (effect.winnerMustBeSpFavourite) {
-    return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} to the SP favourite - credits bookie balance`;
+    const minSp =
+      effect.minFavouriteSpOdds != null && effect.minFavouriteSpOdds > 1
+        ? ` (min fav SP ${effect.minFavouriteSpOdds})`
+        : "";
+    return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} to the SP favourite${minSp} - credits bookie balance`;
   }
   return `${formatGbp(effect.amount)} free bet if selection finishes ${formatPositions(effect.positions)} - credits bookie balance`;
 }
@@ -74,6 +85,39 @@ export function textRequiresSpFavouriteWinner(text: string): boolean {
   );
 }
 
+/**
+ * Parse an optional floor on the SP favourite's price from trigger / offer text.
+ * Accepts "min fav SP 2.5", "favourite SP 2.50+", "fav at least 5/2".
+ */
+export function parseMinFavouriteSpOdds(text: string): number | null {
+  const decimal = text.match(
+    /\bmin\s+fav(?:ourite)?\s+sp\s+(\d+(?:\.\d{1,2})?)\b/i
+  );
+  if (decimal) {
+    const n = parseFloat(decimal[1]!);
+    return n > 1 ? n : null;
+  }
+  const atLeast = text.match(
+    /\bfav(?:ourite)?\s+(?:sp\s+)?(?:odds\s+)?(?:of\s+|at\s+least\s+|≥\s*|>=\s*)(\d+(?:\.\d{1,2})?)\+?/i
+  );
+  if (atLeast) {
+    const n = parseFloat(atLeast[1]!);
+    return n > 1 ? n : null;
+  }
+  const frac = text.match(
+    /\bfav(?:ourite)?\s+(?:of\s+)?(\d+)\s*\/\s*(\d+)\s+(?:or\s+)?(?:bigger|longer|more)/i
+  );
+  if (frac) {
+    const a = parseInt(frac[1]!, 10);
+    const b = parseInt(frac[2]!, 10);
+    if (b > 0) {
+      const n = Math.round((a / b + 1) * 100) / 100;
+      return n > 1 ? n : null;
+    }
+  }
+  return null;
+}
+
 /** Parse "2nd, 3rd, 4th" or "2 3 4" into [2,3,4]. */
 export function parsePlacePositions(text: string): number[] {
   const matches = text.match(/\d+(?:st|nd|rd|th)?/gi) ?? [];
@@ -82,10 +126,14 @@ export function parsePlacePositions(text: string): number[] {
 }
 
 function parsePlacePositionsFromText(text: string): number[] {
-  const trimmed = text.trim();
+  // Workflow appendices often restate places incorrectly ("refund if 3rd or 4th").
+  // No trailing \b after ":" — ":" is non-word so `\b` before " 1." never matches.
+  const trimmed = (text.split(/\bHow to match:/i)[0] ?? text).trim();
   if (!trimmed) return [];
 
-  const ifMatch = trimmed.match(/\bif\s+(.+)$/i);
+  // First "if …" on the same line only. `(.+)$` cannot cross newlines (`.` excludes
+  // `\n`), so it used to skip a headline "if 2nd…" and match a later "refund if".
+  const ifMatch = trimmed.match(/\bif\s+([^\n]+)/i);
   const placePart = ifMatch?.[1]?.trim() ?? trimmed;
 
   // "2nd-4th" / "2-4" / "2nd – 4th"
@@ -161,11 +209,15 @@ function freeBetEffect(amount: number, text: string): AiEffect | null {
     positions = positions.filter((n) => n >= 2 && n <= 6);
     if (positions.length === 0) positions = [2];
   }
+  const minFavouriteSpOdds = winnerMustBeSpFavourite
+    ? parseMinFavouriteSpOdds(text)
+    : null;
   return {
     kind: "free_bet_award",
     amount,
     positions,
     ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
+    ...(minFavouriteSpOdds != null ? { minFavouriteSpOdds } : {}),
   };
 }
 
@@ -338,6 +390,10 @@ export function evaluateFreeBetAward(
   if (effect.positions.length === 0) {
     return { met: false, reason: "Unconditional free bet - not a place trigger" };
   }
+  // Winner-only fast results lack 2nd/3rd — wait before awarding place free bets.
+  if (isRaceResultIncomplete(race)) {
+    return { met: false, reason: "Result incomplete - awaiting placings" };
+  }
   const pos = selectionPosition(selection, race);
   if (pos <= 0) {
     return { met: false, reason: "Selection not found in result" };
@@ -361,6 +417,22 @@ export function evaluateFreeBetAward(
         met: false,
         reason: `Finished ${ordinal(pos)} but winner was not the SP favourite`,
       };
+    }
+    const minSp = effect.minFavouriteSpOdds;
+    if (minSp != null && minSp > 1) {
+      const favSp = favouriteSpOdds(race);
+      if (favSp == null) {
+        return {
+          met: false,
+          reason: "Favourite SP not recorded on result",
+        };
+      }
+      if (favSp + 0.0001 < minSp) {
+        return {
+          met: false,
+          reason: `Favourite SP ${favSp} below min ${minSp}`,
+        };
+      }
     }
     return {
       met: true,

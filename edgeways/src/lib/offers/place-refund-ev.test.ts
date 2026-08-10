@@ -6,6 +6,7 @@ import {
   placeRefundRunnerEv,
   resolveOfferConfidence,
   triggerProbFromModel,
+  triggerProbWithFavouriteConstraint,
 } from "./place-refund-ev";
 import { offerTargetOutcome } from "./target-outcome";
 
@@ -98,6 +99,68 @@ describe("triggerProbFromModel", () => {
   it("counts the win when the offer pays on it", () => {
     const target = offerTargetOutcome({ ...rules, qualifyingPlaces: [1, 2, 3] });
     expect(triggerProbFromModel([0.2, 0.18, 0.15, 0.12], target)).toBeCloseTo(0.53, 12);
+  });
+});
+
+describe("triggerProbWithFavouriteConstraint", () => {
+  const placeRules = {
+    type: "bet_get_free_place" as const,
+    minRunners: 6,
+    regions: ["GB" as const],
+    qualifyingPlaces: [2],
+    betStake: 10,
+    freeBetAmount: 10,
+    winnerMustBeSpFavourite: true as const,
+  };
+
+  // Worked example (Harville): fav p=0.40, selection p=0.20, rest share 0.40.
+  // P(fav wins and selection 2nd) = 0.40 * 0.20/(1-0.40) = 0.40 * 1/3 ≈ 0.1333.
+  const field = [
+    { horseId: "fav", winProb: 0.4 },
+    { horseId: "sel", winProb: 0.2 },
+    { horseId: "a", winProb: 0.15 },
+    { horseId: "b", winProb: 0.1 },
+    { horseId: "c", winProb: 0.08 },
+    { horseId: "d", winProb: 0.07 },
+  ];
+
+  it("gives the favourite zero trigger prob on 2nd-to-SP-favourite", () => {
+    const target = offerTargetOutcome(placeRules);
+    expect(
+      triggerProbWithFavouriteConstraint({
+        selectionHorseId: "fav",
+        selectionPositionProbs: [0.4, 0.2, 0.15, 0.1],
+        field,
+        target,
+      })
+    ).toBe(0);
+  });
+
+  it("uses Harville P(fav wins and selection 2nd) for a non-favourite", () => {
+    const target = offerTargetOutcome(placeRules);
+    const expected = 0.4 * (0.2 / (1 - 0.4));
+    expect(
+      triggerProbWithFavouriteConstraint({
+        selectionHorseId: "sel",
+        selectionPositionProbs: [0.2, 0.22, 0.18, 0.12],
+        field,
+        target,
+      })
+    ).toBeCloseTo(expected, 10);
+  });
+
+  it("falls back to plain place sum when the offer has no SP-favourite clause", () => {
+    const { winnerMustBeSpFavourite: _drop, ...plain } = placeRules;
+    const target = offerTargetOutcome(plain);
+    // Place-only [2]: sum is just P(2nd) = 0.2, and the favourite is allowed.
+    expect(
+      triggerProbWithFavouriteConstraint({
+        selectionHorseId: "fav",
+        selectionPositionProbs: [0.4, 0.2, 0.15, 0.1],
+        field,
+        target,
+      })
+    ).toBeCloseTo(0.2, 12);
   });
 });
 

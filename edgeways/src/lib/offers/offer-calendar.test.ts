@@ -36,6 +36,7 @@ function offer(
     instanceDate: rest.instanceDate ?? null,
     startsOn: rest.startsOn ?? null,
     source: null,
+    offerUrl: rest.offerUrl ?? null,
     betCount: rest.betCount ?? 0,
     openBets: 0,
     actualProfit: 0,
@@ -311,6 +312,54 @@ describe("buildOfferCalendarBoard", () => {
     );
     const all = columns.flatMap((c) => c.items);
     expect(all.filter((i) => i.offerId === 11)).toHaveLength(1);
+  });
+
+  it("puts convert free bets ahead of expiring qualifying work, highest FB first", () => {
+    const columns = buildOfferCalendarBoard(
+      [
+        offer({
+          id: 40,
+          title: "Urgent qualify",
+          status: "active",
+          betCount: 0,
+          expectedProfit: 14,
+          expiresAt: new Date(2026, 6, 8, 20, 0, 0).getTime(),
+        }),
+        offer({
+          id: 41,
+          title: "Ladbrokes FB",
+          bookmaker: "Ladbrokes",
+          status: "active",
+          betCount: 1,
+          profit: {
+            qualifyingSettledCount: 1,
+            freeBetStage: "awarded",
+            freeBetAwardAmount: 10,
+          },
+        }),
+        offer({
+          id: 42,
+          title: "Sky FB",
+          bookmaker: "Sky Bet",
+          status: "active",
+          betCount: 1,
+          profit: {
+            qualifyingSettledCount: 1,
+            freeBetStage: "awarded",
+            freeBetAwardAmount: 25,
+          },
+        }),
+      ],
+      { now, horizonDays: 14 }
+    );
+    const today = columns.find((c) => c.id === "today")!;
+    const kinds = today.items.map((i) => i.actionKind ?? i.kind);
+    expect(kinds.slice(0, 2)).toEqual(["convert_free_bet", "convert_free_bet"]);
+    expect(today.items[0]?.freeBetAmount).toBe(25);
+    expect(today.items[1]?.freeBetAmount).toBe(10);
+    expect(today.items.some((i) => i.offerId === 40 && i.actionKind === "place_qualifying")).toBe(
+      true
+    );
   });
 
   it("keeps future recurring instances out of Today column", () => {

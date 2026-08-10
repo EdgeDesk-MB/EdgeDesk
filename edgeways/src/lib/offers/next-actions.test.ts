@@ -52,7 +52,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     status: rest.status ?? "active",
     sport: rest.sport ?? null,
     offerType: rest.offerType ?? null,
-    rules: null,
+    rules: rest.rules ?? null,
     scopeCourse: null,
     scopeRaceId: null,
     scopeRaceLabel: null,
@@ -63,6 +63,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: null,
     createdAt: Date.now(),
     betCount: rest.betCount ?? 0,
     openBets: rest.openBets ?? 0,
@@ -88,6 +89,76 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
 
 describe("deriveOfferNextAction", () => {
   const now = new Date("2026-07-08T12:00:00Z").getTime();
+
+  it("surfaces deposit playbook step before place qualifying", () => {
+    const rules = JSON.stringify({
+      type: "promo_terms",
+      promoCode: "UEFA",
+      minDeposit: 30,
+      depositRequired: true,
+      minOdds: 1.5,
+      minStake: 20,
+      playbook: {
+        version: 1,
+        steps: [
+          {
+            id: "deposit",
+            kind: "deposit",
+            title: "Deposit £30+ with code UEFA",
+            detail: "Enter promo code UEFA on deposit.",
+            sortOrder: 0,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+          {
+            id: "qualify",
+            kind: "qualify",
+            title: "Place £20 qualifying bet",
+            detail: "Cash bet",
+            sortOrder: 1,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+          {
+            id: "done",
+            kind: "done",
+            title: "Offer complete",
+            detail: "",
+            sortOrder: 2,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+        ],
+      },
+    });
+    const action = deriveOfferNextAction(
+      offer({
+        id: 90,
+        title: "UEFA Super Cup",
+        bookmaker: "Dynobet",
+        status: "active",
+        rules,
+        betCount: 0,
+      })
+    );
+    expect(action?.kind).toBe("playbook_deposit");
+    expect(action?.title).toMatch(/UEFA/);
+
+    const planned = deriveOfferNextAction(
+      offer({
+        id: 91,
+        title: "UEFA Super Cup",
+        bookmaker: "Dynobet",
+        status: "planned",
+        rules,
+        betCount: 0,
+      })
+    );
+    expect(planned?.kind).toBe("playbook_deposit");
+  });
 
   it("asks to convert when free bet is awarded", () => {
     const action = deriveOfferNextAction(

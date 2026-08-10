@@ -1,8 +1,17 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, offers, bets } from "@/lib/db";
-import { ensureCourseOfferSiblings } from "./course-offer-sync";
-import { spawnCourseOfferSiblingsIfNeeded, syncOfferStatuses } from "@/lib/services/offers";
+import {
+  ensureSameDayOfferSiblings,
+  isSameDayMultiRaceOffer,
+  reconcileSameDayOfferSiblings,
+  retireUnusedSameDayOfferSiblings,
+} from "./course-offer-sync";
+import {
+  spawnCourseOfferSiblingsIfNeeded,
+  spawnSameDayOfferSiblingsIfNeeded,
+  syncOfferStatuses,
+} from "@/lib/services/offers";
 
 beforeEach(() => {
   db.delete(bets).run();
@@ -17,6 +26,8 @@ function insertOffer(partial: {
   eventDate?: string | null;
   bookmaker?: string | null;
   createdAt?: number;
+  rules?: string | null;
+  seriesId?: number | null;
 }): number {
   const row = db
     .insert(offers)
@@ -32,7 +43,8 @@ function insertOffer(partial: {
       eventDate: partial.eventDate ?? "2026-08-01",
       scopeRaceId: partial.scopeRaceId ?? null,
       scopeRaceLabel: partial.scopeRaceId ? "1:50 · Test" : null,
-      rules: null,
+      rules: partial.rules !== undefined ? partial.rules : placeRules,
+      seriesId: partial.seriesId ?? null,
       expiresAt: null,
       createdAt: partial.createdAt ?? Date.now(),
     })
@@ -59,12 +71,68 @@ function linkBet(offerId: number): void {
     .run();
 }
 
-describe("ensureCourseOfferSiblings", () => {
+const placeRules = JSON.stringify({
+  type: "bet_get_free_place",
+  minRunners: 8,
+  regions: ["GB", "IRE"],
+  qualifyingPlaces: [2, 3],
+  betStake: 10,
+  freeBetAmount: 10,
+});
+
+const regionalRules = JSON.stringify({
+  type: "bet_get_free_place",
+  minRunners: 6,
+  regions: ["GB", "IRE"],
+  qualifyingPlaces: [2],
+  betStake: 10,
+  freeBetAmount: 10,
+  winnerMustBeSpFavourite: true,
+});
+
+const unconditionalRules = JSON.stringify({
+  type: "bet_get_free_place",
+  minRunners: 8,
+  regions: ["GB", "IRE"],
+  qualifyingPlaces: [],
+  betStake: 10,
+  freeBetAmount: 10,
+});
+
+describe("isSameDayMultiRaceOffer", () => {
+  it("accepts regional UK & Ireland place-refund day offers", () => {
+    const id = insertOffer({
+      scopeCourse: "uk_ire",
+      scopeRaceId: null,
+      rules: regionalRules,
+    });
+    const row = db.select().from(offers).where(eq(offers.id, id)).get()!;
+    expect(isSameDayMultiRaceOffer(row)).toBe(true);
+  });
+
+  it("rejects race-scoped offers", () => {
+    const id = insertOffer({ scopeRaceId: "rac_1", rules: placeRules });
+    const row = db.select().from(offers).where(eq(offers.id, id)).get()!;
+    expect(isSameDayMultiRaceOffer(row)).toBe(false);
+  });
+
+  it("rejects straight bet&get / multiples with no result trigger", () => {
+    const id = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: unconditionalRules,
+      title: "Bet £10 get £10 free bet",
+    });
+    const row = db.select().from(offers).where(eq(offers.id, id)).get()!;
+    expect(isSameDayMultiRaceOffer(row)).toBe(false);
+  });
+});
+
+describe("ensureSameDayOfferSiblings", () => {
   it("spawns a fresh course sibling when a course-scoped offer has been used", () => {
     const usedId = insertOffer({ scopeRaceId: null });
     linkBet(usedId);
 
-    ensureCourseOfferSiblings(
+    ensureSameDayOfferSiblings(
       db.select().from(offers).all(),
       db.select({ offerId: bets.offerId }).from(bets).all()
     );
@@ -77,12 +145,65 @@ describe("ensureCourseOfferSiblings", () => {
     expect(fresh?.scopeCourse).toBe("Goodwood");
   });
 
-  it("does not spawn when a fresh course sibling already exists", () => {
-    const usedId = insertOffer({ scopeRaceId: null, createdAt: 1 });
+  it("does not spawn for an unconditional multiples-style offer", () => {
+    const usedId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: unconditionalRules,
+      title: "Bet £10 get £10 free bet",
+    });
     linkBet(usedId);
-    insertOffer({ scopeRaceId: null, createdAt: 2 });
 
-    ensureCourseOfferSiblings(
+    ensureSameDayOfferSiblings(
+      db.select().from(offers).all(),
+      db.select({ offerId: bets.offerId }).from(bets).all()
+    );
+
+    expect(db.select().from(offers).all()).toHaveLength(1);
+  });
+
+  it("spawns a fresh sibling for a UK & Ireland day offer after the first bet", () => {
+    const usedId = insertOffer({
+      bookmaker: "QuinnBet",
+      title: "Bet £10 get £10 free bet (2nd to SP favourite)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-07",
+      rules: regionalRules,
+    });
+    linkBet(usedId);
+
+    ensureSameDayOfferSiblings(
+      db.select().from(offers).all(),
+      db.select({ offerId: bets.offerId }).from(bets).all()
+    );
+
+    const rows = db.select().from(offers).all();
+    expect(rows).toHaveLength(2);
+    const fresh = rows.find((o) => o.id !== usedId);
+    expect(fresh).toMatchObject({
+      status: "active",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-07",
+      bookmaker: "QuinnBet",
+      title: "Bet £10 get £10 free bet (2nd to SP favourite)",
+      scopeRaceId: null,
+    });
+    expect(fresh?.rules).toBe(regionalRules);
+  });
+
+  it("does not spawn when a fresh regional sibling already exists", () => {
+    const usedId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: regionalRules,
+      createdAt: 1,
+    });
+    linkBet(usedId);
+    insertOffer({
+      scopeCourse: "uk_ire",
+      rules: regionalRules,
+      createdAt: 2,
+    });
+
+    ensureSameDayOfferSiblings(
       db.select().from(offers).all(),
       db.select({ offerId: bets.offerId }).from(bets).all()
     );
@@ -90,13 +211,24 @@ describe("ensureCourseOfferSiblings", () => {
     expect(db.select().from(offers).all()).toHaveLength(2);
   });
 
-  it("does not treat a race-scoped offer as a reason to spawn a course sibling", () => {
-    // Deleting the auto-spawned course card used to come back on the next
-    // /api/state sync because the race-scoped bet counted as "group all used".
+  it("does not spawn when a fresh course sibling already exists", () => {
+    const usedId = insertOffer({ scopeRaceId: null, createdAt: 1 });
+    linkBet(usedId);
+    insertOffer({ scopeRaceId: null, createdAt: 2 });
+
+    ensureSameDayOfferSiblings(
+      db.select().from(offers).all(),
+      db.select({ offerId: bets.offerId }).from(bets).all()
+    );
+
+    expect(db.select().from(offers).all()).toHaveLength(2);
+  });
+
+  it("does not treat a race-scoped offer as a reason to spawn a sibling", () => {
     const raceScopedId = insertOffer({ scopeRaceId: "rac_32293062958" });
     linkBet(raceScopedId);
 
-    ensureCourseOfferSiblings(
+    ensureSameDayOfferSiblings(
       db.select().from(offers).all(),
       db.select({ offerId: bets.offerId }).from(bets).all()
     );
@@ -111,19 +243,17 @@ describe("ensureCourseOfferSiblings", () => {
     const raceScoped = insertOffer({ scopeRaceId: "rac_99", createdAt: 2 });
     linkBet(raceScoped);
 
-    ensureCourseOfferSiblings(
+    ensureSameDayOfferSiblings(
       db.select().from(offers).all(),
       db.select({ offerId: bets.offerId }).from(bets).all()
     );
 
     const rows = db.select().from(offers).all();
     expect(rows).toHaveLength(3);
-    expect(rows.some((o) => o.scopeRaceId == null && (o.id !== courseUsed))).toBe(true);
+    expect(rows.some((o) => o.scopeRaceId == null && o.id !== courseUsed)).toBe(true);
   });
 
   it("does not respawn a deleted fresh sibling on status sync", () => {
-    // Ladbrokes Galway-style: used card + auto fresh. Deleting the fresh one
-    // used to come back on the next /api/state syncOfferStatuses pass.
     const usedId = insertOffer({
       bookmaker: "Ladbrokes",
       title: "Bet £5 get £5 free bet",
@@ -132,7 +262,7 @@ describe("ensureCourseOfferSiblings", () => {
       createdAt: 1,
     });
     linkBet(usedId);
-    spawnCourseOfferSiblingsIfNeeded();
+    spawnSameDayOfferSiblingsIfNeeded();
 
     const fresh = db
       .select()
@@ -147,5 +277,119 @@ describe("ensureCourseOfferSiblings", () => {
     const after = db.select().from(offers).all();
     expect(after).toHaveLength(1);
     expect(after[0]?.id).toBe(usedId);
+  });
+
+  it("keeps the deprecated spawnCourseOfferSiblingsIfNeeded alias working", () => {
+    const usedId = insertOffer({ scopeCourse: "uk_ire", rules: regionalRules });
+    linkBet(usedId);
+    spawnCourseOfferSiblingsIfNeeded();
+    expect(db.select().from(offers).all()).toHaveLength(2);
+  });
+
+  it("does not spawn a same-day twin for a recurring series instance", () => {
+    // Daily Betfair B20G20: one use per day; tomorrow is a separate series row.
+    const usedId = insertOffer({
+      bookmaker: "Betfair Sportsbook",
+      title: "Bet £20 get £20 free bet (2nd, 3rd, 4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-10",
+      rules: regionalRules,
+      seriesId: 2,
+    });
+    linkBet(usedId);
+
+    ensureSameDayOfferSiblings(
+      db.select().from(offers).all(),
+      db.select({ offerId: bets.offerId }).from(bets).all()
+    );
+
+    expect(db.select().from(offers).all()).toHaveLength(1);
+  });
+});
+
+describe("retireUnusedSameDayOfferSiblings", () => {
+  it("completes unused twins when a recurring series day is marked complete", () => {
+    const usedId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: regionalRules,
+      seriesId: 2,
+      createdAt: 1,
+    });
+    linkBet(usedId);
+    const freshId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: regionalRules,
+      seriesId: null,
+      createdAt: 2,
+    });
+
+    db.update(offers)
+      .set({ status: "completed", completedAt: Date.now() })
+      .where(eq(offers.id, usedId))
+      .run();
+
+    retireUnusedSameDayOfferSiblings(usedId);
+
+    expect(db.select().from(offers).where(eq(offers.id, freshId)).get()?.status).toBe(
+      "completed"
+    );
+  });
+
+  it("leaves a non-series fresh twin active so multi-use Race picks can continue", () => {
+    const usedId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: regionalRules,
+      createdAt: 1,
+    });
+    linkBet(usedId);
+    const freshId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: regionalRules,
+      createdAt: 2,
+    });
+
+    db.update(offers)
+      .set({ status: "completed", completedAt: Date.now() })
+      .where(eq(offers.id, usedId))
+      .run();
+
+    retireUnusedSameDayOfferSiblings(usedId);
+
+    expect(db.select().from(offers).where(eq(offers.id, freshId)).get()?.status).toBe(
+      "active"
+    );
+  });
+});
+
+describe("reconcileSameDayOfferSiblings", () => {
+  it("retires an orphan unused twin once the series day already has a linked bet", () => {
+    const seriesDay = insertOffer({
+      bookmaker: "Betfair Sportsbook",
+      title: "Bet £20 get £20 free bet (2nd, 3rd, 4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-10",
+      rules: regionalRules,
+      seriesId: 2,
+      createdAt: 1,
+    });
+    linkBet(seriesDay);
+    const orphan = insertOffer({
+      bookmaker: "Betfair Sportsbook",
+      title: "Bet £20 get £20 free bet (2nd, 3rd, 4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-10",
+      rules: regionalRules,
+      seriesId: null,
+      createdAt: 2,
+    });
+
+    reconcileSameDayOfferSiblings();
+
+    expect(db.select().from(offers).where(eq(offers.id, orphan)).get()?.status).toBe(
+      "completed"
+    );
+    expect(db.select().from(offers).where(eq(offers.id, seriesDay)).get()?.status).toBe(
+      "active"
+    );
   });
 });

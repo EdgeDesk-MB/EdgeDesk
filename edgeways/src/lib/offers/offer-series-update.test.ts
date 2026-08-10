@@ -18,6 +18,7 @@ const baseTemplate: OfferInstanceTemplate = {
   scopeRaceId: null,
   scopeRaceLabel: null,
   rules: JSON.stringify({ betStake: 20, freeBetAmount: 20, minRunners: 8 }),
+  offerUrl: "https://www.betfair.com/promo",
   expiresAt: new Date(2026, 6, 9, 23, 59, 0).getTime(),
 };
 

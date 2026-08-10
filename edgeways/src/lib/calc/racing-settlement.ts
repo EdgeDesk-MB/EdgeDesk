@@ -11,6 +11,7 @@ import {
 } from "@/lib/calc/each-way-outcomes";
 import type { RaceResult } from "@/lib/racing";
 import {
+  isRaceResultIncomplete,
   placePositions,
   selectionPosition,
   selectionWonRace,
@@ -21,6 +22,26 @@ import {
   type SettleableBet,
   type SettlementOutcome,
 } from "@/lib/calc/settlement";
+
+/**
+ * Win markets can settle from a winner-only (fast) result.
+ * Place / each-way / extra-place need at least two placings so non-winners
+ * are not treated as unplaced before the field order is known.
+ */
+export function racingMarketReadyToSettle(
+  market: SettleableBet["market"] | string,
+  result: RaceResult
+): boolean {
+  if (market === "win") return true;
+  if (
+    market === "place" ||
+    market === "each_way" ||
+    market === "extra_place"
+  ) {
+    return !isRaceResultIncomplete(result);
+  }
+  return !isRaceResultIncomplete(result);
+}
 
 function settleDualLayEachWay(
   bet: SettleableBet,

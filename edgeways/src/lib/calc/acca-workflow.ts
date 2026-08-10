@@ -130,6 +130,11 @@ export interface AccaProfitRun {
   wholeLayOdds?: number | null;
   /** Bookmaker acca boost %, winnings-only convention - see applyAccaBoost */
   boostPct?: number | null;
+  /**
+   * Linked acca back bet type. Free bets lose at £0 on the bookie side
+   * (mirrors backLostProfit in acca-desk.ts); cash qualify loses the stake.
+   */
+  backBetType?: string | null;
 }
 
 /**
@@ -161,7 +166,11 @@ export function accaCampaignProfit(run: AccaProfitRun, legs: AccaProfitLeg[]): n
   const allResolved = legs.length > 0 && legs.every((l) => l.result !== "pending");
 
   if (anyLost) {
-    total -= run.stake;
+    // Free bets (SNR or SR): the stake was never cash at risk - mirrors
+    // backLostProfit in acca-desk.ts, which exempts both free types.
+    if (run.backBetType !== "free_snr" && run.backBetType !== "free_sr") {
+      total -= run.stake;
+    }
     if (run.wholeLayStake != null && run.wholeLayOdds != null) {
       total += roundPence(run.wholeLayStake * (1 - run.commission));
     }
@@ -195,22 +204,43 @@ export interface AccaOutcomePercentages {
   atLeastOneLosePct: number;
 }
 
+export type AccaOutcomePercentageMode = "live" | "at_start";
+
+export interface AccaOutcomePercentageOptions {
+  /**
+   * `live` (default): settled legs are certain (won→1, lost→0) so the
+   * breakdown sharpens as the run plays out; use on active cards.
+   * `at_start`: ignore results and use naive 1/backOdds for every non-void
+   * leg; the going-in estimate for History / completed reflection.
+   */
+  mode?: AccaOutcomePercentageMode;
+}
+
 /**
  * ALL WIN / 1 LOSE / 1+ LOSE breakdown for the run card. Each leg's implied
  * probability is the NAIVE 1/backOdds (no market-wide prices exist for an
- * ad-hoc acca leg, so there's no no-vig fair price to fall back on) -
+ * ad-hoc acca leg, so there's no no-vig fair price to fall back on),
  * callers MUST render this behind a heuristic basis badge, never as a
- * measured probability. A settled leg is certain, not probabilistic: won
- * forces p=1, lost forces p=0, so the breakdown sharpens as the run plays
- * out. Void legs are excluded entirely, same convention as combinedBackOdds
- * in acca-desk.ts.
+ * measured probability. Void legs are excluded entirely, same convention
+ * as combinedBackOdds in acca-desk.ts.
+ *
+ * Mode:
+ *  - live: won forces p=1, lost forces p=0 (active desk).
+ *  - at_start: every non-void leg uses 1/backOdds regardless of result
+ *    (completed History, reflect against the anticipated breakdown).
  */
-export function accaOutcomePercentages(legs: AccaOutcomeLeg[]): AccaOutcomePercentages {
+export function accaOutcomePercentages(
+  legs: AccaOutcomeLeg[],
+  options?: AccaOutcomePercentageOptions
+): AccaOutcomePercentages {
+  const mode = options?.mode ?? "live";
   const probs = legs
     .filter((l) => l.result !== "void")
     .map((l) => {
-      if (l.result === "won") return 1;
-      if (l.result === "lost") return 0;
+      if (mode === "live") {
+        if (l.result === "won") return 1;
+        if (l.result === "lost") return 0;
+      }
       return l.backOdds > 1 ? 1 / l.backOdds : 0;
     });
 
@@ -241,4 +271,106 @@ export function accaOutcomePercentages(legs: AccaOutcomeLeg[]): AccaOutcomePerce
 export function applyAccaBoost(rawCombinedOdds: number, boostPct: number | null | undefined): number {
   if (!(rawCombinedOdds > 1) || boostPct == null || !(boostPct > 0)) return rawCombinedOdds;
   return 1 + (rawCombinedOdds - 1) * (1 + boostPct / 100);
+}
+
+const OUTCOME_EQUAL_EPS = 0.02;
+
+export type AccaMethodKind =
+  | "sequential"
+  | "insurance_legs"
+  | "insurance_whole"
+  | "combined";
+
+export interface AccaSquareLeg extends AccaProfitLeg {
+  seq: number;
+}
+
+export interface AccaSquareProvisional {
+  /** Campaign P&L floor for the two known outcomes on the square leg. */
+  value: number;
+  /** Equalised final / whole lay → locked; cover lose-path floor → worst. */
+  kind: "locked" | "worst";
+  squareLegSeq: number | null;
+}
+
+/**
+ * When the next actionable leg is already laid ("square"), both outcomes of
+ * that leg are known for campaign P&L:
+ *  - leg loses → run ends (cover ≈ £0 on sequential; insurance refund is
+ *    separate); whole-lay methods settle the combined hedge;
+ *  - leg wins → on the final pending leg the run also ends (all-win path);
+ *    otherwise the campaign continues and only the lose-path floor is a
+ *    known terminal outcome.
+ * Returns null when not square (next leg still unlaid) or the run already
+ * has a loss — callers should leave provisional empty in those states.
+ */
+export function accaSquareProvisional(
+  run: AccaProfitRun & { method: AccaMethodKind },
+  legs: AccaSquareLeg[]
+): AccaSquareProvisional | null {
+  if (legs.some((l) => l.result === "lost")) return null;
+
+  if (run.method === "insurance_whole" || run.method === "combined") {
+    if (run.wholeLayStake == null || run.wholeLayOdds == null) return null;
+    if (!(run.wholeLayStake > 0) || !(run.wholeLayOdds > 1)) return null;
+    if (!legs.some((l) => l.result === "pending")) return null;
+
+    const ifAnyLose = accaCampaignProfit(
+      run,
+      legs.map((l) =>
+        l.result === "pending" ? { ...l, result: "lost" as const } : l
+      )
+    );
+    const ifAllWin = accaCampaignProfit(
+      run,
+      legs.map((l) =>
+        l.result === "pending" ? { ...l, result: "won" as const } : l
+      )
+    );
+    const spread = Math.abs(ifAllWin - ifAnyLose);
+    return {
+      value: roundPence(Math.min(ifAllWin, ifAnyLose)),
+      kind: spread <= OUTCOME_EQUAL_EPS ? "locked" : "worst",
+      squareLegSeq: null,
+    };
+  }
+
+  // sequential / insurance_legs — square on the next pending laid leg
+  const square = [...legs]
+    .sort((a, b) => a.seq - b.seq)
+    .find((l) => {
+      if (l.result !== "pending") return false;
+      if (l.layStake == null || l.layOdds == null || !(l.layOdds > 1) || !(l.layStake > 0)) {
+        return false;
+      }
+      return !legs.some((earlier) => earlier.seq < l.seq && earlier.result === "pending");
+    });
+  if (!square) return null;
+
+  const pendingOthers = legs.filter(
+    (l) => l.result === "pending" && l.seq !== square.seq
+  );
+  const isFinalPending = pendingOthers.length === 0;
+
+  const ifLose = accaCampaignProfit(
+    run,
+    legs.map((l) => (l.seq === square.seq ? { ...l, result: "lost" as const } : l))
+  );
+
+  if (!isFinalPending) {
+    // Only the bust path is a known terminal campaign figure; cover sizes
+    // that to ≈ £0 (cash) / free-stake extraction (free_snr).
+    return { value: ifLose, kind: "worst", squareLegSeq: square.seq };
+  }
+
+  const ifWin = accaCampaignProfit(
+    run,
+    legs.map((l) => (l.seq === square.seq ? { ...l, result: "won" as const } : l))
+  );
+  const spread = Math.abs(ifWin - ifLose);
+  return {
+    value: roundPence(Math.min(ifWin, ifLose)),
+    kind: spread <= OUTCOME_EQUAL_EPS ? "locked" : "worst",
+    squareLegSeq: square.seq,
+  };
 }

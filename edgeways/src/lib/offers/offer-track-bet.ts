@@ -1,12 +1,27 @@
 import type { AddBetPrefill } from "@/components/add-bet-dialog";
+import type { AccaRunPrefill } from "@/lib/acca/acca-run-prefill";
+import type { BetBuilderRunPrefill } from "@/lib/bet-builder/bet-builder-run-prefill";
 import type { BetMode } from "@/lib/calc";
 import { offerTriggerDetectedInLabel } from "@/lib/calc/ai-triggers";
+import { canUseAccaDesk } from "@/lib/entitlements/acca-desk";
+import { canUseBetBuilderDesk } from "@/lib/entitlements/bet-builder-desk";
 import { deriveOfferNextAction } from "@/lib/offers/next-actions";
+import {
+  currentPlaybookStep,
+  readPlaybookFromRulesJson,
+  syncPlaybookFromOfferProfit,
+} from "@/lib/offers/offer-playbook";
 import {
   isRegionalScope,
   parseOfferRules,
   placeRefundTriggerText,
 } from "@/lib/offers/racing-offer-rules";
+import {
+  betScopeLabel,
+  readImportantTerms,
+  type BetScope,
+  type OfferImportantTerms,
+} from "@/lib/offers/offer-terms";
 import {
   bookmakerFromOfferPrefs,
   stakeFromOfferPrefs,
@@ -45,51 +60,478 @@ export function qualifyingOfferTriggerText(
   return null;
 }
 
+export type ConcreteTrackBetDestination =
+  | { kind: "add_bet"; prefill: AddBetPrefill; scopeHint: BetScope }
+  | { kind: "acca_desk"; prefill: AccaRunPrefill }
+  | { kind: "bet_builder_desk"; prefill: BetBuilderRunPrefill };
+
+export type PlacementOption = {
+  id: string;
+  scope: BetScope;
+  label: string;
+  description: string;
+  destination: ConcreteTrackBetDestination;
+  /** Minimal Add-bet shape for orphan "mark placed" quick-log. */
+  markPrefill: AddBetPrefill;
+};
+
+export type TrackBetDestination =
+  | ConcreteTrackBetDestination
+  | { kind: "choose"; options: PlacementOption[] }
+  /** Soft playbook gates (deposit / opt-in / WR / await) — footer confirms the step. */
+  | { kind: "playbook_mark_done"; stepId: string }
+  | { kind: "none" };
+
 export interface TrackBetAction {
   enabled: boolean;
   label: string;
   reason: string | null;
+  destination: TrackBetDestination;
+  /**
+   * Prefill for Add bet and for orphan "mark placed" quick-log.
+   * Present whenever the track action is enabled (including Acca Desk / chooser).
+   */
   prefill: AddBetPrefill | null;
 }
 
-/** Build Add bet prefill for the campaign's current pipeline step. */
+export type TrackBetSettings = Pick<
+  AppSettings,
+  "offerBetPrefs" | "defaultBackStake" | "planPreview"
+>;
+
+function rewardEventNote(important: OfferImportantTerms): string | null {
+  if (!important.rewardEventLabel?.trim()) return null;
+  const date = important.rewardEventDate?.trim();
+  return date
+    ? `Free bet locked to ${important.rewardEventLabel.trim()} (${date})`
+    : `Free bet locked to ${important.rewardEventLabel.trim()}`;
+}
+
+function mergeImportantNotes(
+  important: OfferImportantTerms,
+  purpose: "qualify" | "convert"
+): string | null {
+  const bits = [important.importantNotes.trim()].filter(Boolean);
+  if (purpose === "convert") {
+    const locked = rewardEventNote(important);
+    if (locked && !bits.some((b) => b.includes(important.rewardEventLabel!.trim()))) {
+      bits.unshift(locked);
+    }
+  }
+  return bits.length > 0 ? bits.join(" · ") : null;
+}
+
+function buildAccaPrefill(input: {
+  offer: OfferSummary;
+  important: OfferImportantTerms;
+  stake: number;
+  bookmaker: string | undefined;
+  purpose: "qualify" | "convert";
+}): AccaRunPrefill {
+  const { offer, important, stake, bookmaker, purpose } = input;
+  const isConvert = purpose === "convert";
+  const minSelections = isConvert
+    ? important.rewardMinSelections ?? important.minSelections
+    : important.minSelections;
+  const eventLabel = important.rewardEventLabel?.trim();
+  return {
+    offerId: offer.id,
+    label: isConvert
+      ? eventLabel
+        ? `Convert FB · ${eventLabel}`
+        : `Convert FB · ${bookmaker ?? offer.title}`
+      : offer.title.trim() || `Qualify · ${bookmaker ?? "Acca"}`,
+    stake,
+    bookmaker,
+    sport: offer.sport ?? null,
+    minOdds: important.minOdds,
+    minStake: isConvert ? null : important.minStake,
+    maxStake: important.maxStake,
+    minSelections,
+    importantNotes: mergeImportantNotes(important, purpose),
+    suggestedMethod: "sequential",
+    scope: "acca",
+    purpose,
+    backBetType: isConvert ? "free_snr" : "qualifying",
+  };
+}
+
+function buildBetBuilderPrefill(input: {
+  offer: OfferSummary;
+  important: OfferImportantTerms;
+  stake: number;
+  bookmaker: string | undefined;
+  purpose: "qualify" | "convert";
+}): BetBuilderRunPrefill {
+  const { offer, important, stake, bookmaker, purpose } = input;
+  const isConvert = purpose === "convert";
+  const minSelections = isConvert
+    ? important.rewardMinSelections ?? important.minSelections
+    : important.minSelections;
+  const eventLabel = important.rewardEventLabel?.trim();
+  return {
+    offerId: offer.id,
+    label: isConvert
+      ? eventLabel
+        ? `Convert FB · ${eventLabel}`
+        : `Convert FB · ${bookmaker ?? offer.title}`
+      : offer.title.trim() || `Qualify · ${bookmaker ?? "Bet builder"}`,
+    stake,
+    bookmaker,
+    sport: offer.sport ?? null,
+    minOdds: important.minOdds,
+    minStake: isConvert ? null : important.minStake,
+    maxStake: important.maxStake,
+    minSelections,
+    importantNotes: mergeImportantNotes(important, purpose),
+    suggestedMethod: "combined",
+    purpose,
+    backBetType: isConvert ? "free_snr" : "qualifying",
+  };
+}
+
+function buildAddBetPrefill(input: {
+  offer: OfferSummary;
+  important: OfferImportantTerms;
+  betType: BetMode;
+  stake: number;
+  bookmaker: string | undefined;
+}): AddBetPrefill {
+  const { offer, important, betType, stake, bookmaker } = input;
+  const eventLabel = important.rewardEventLabel?.trim();
+  const prefill: AddBetPrefill = {
+    offerId: offer.id,
+    betType,
+    backStake: stake,
+    bookmaker,
+    sport: offer.sport ?? undefined,
+    labelSuggestion:
+      betType === "free_snr"
+        ? eventLabel
+          ? `Convert FB · ${eventLabel}`
+          : `Convert FB · ${bookmaker ?? offer.title}`
+        : `Qualify · ${bookmaker ?? offer.title}`,
+  };
+
+  if (betType === "qualifying") {
+    const trigger = qualifyingOfferTriggerText(offer);
+    if (trigger) prefill.triggerText = trigger;
+  }
+  if (betType === "free_snr") {
+    const locked = rewardEventNote(important);
+    if (locked) {
+      prefill.triggerText = [prefill.triggerText, locked].filter(Boolean).join(" · ");
+    }
+  }
+
+  if (offer.sport === "horse_racing") {
+    prefill.sport = "horse_racing";
+    prefill.market = "win";
+    const course = offer.scopeCourse?.trim();
+    if (course && !isRegionalScope(course)) {
+      prefill.scopeCourse = course;
+      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
+    }
+    if (offer.scopeRaceLabel?.trim()) {
+      prefill.labelSuggestion = course
+        ? `${course} · ${offer.scopeRaceLabel.trim()}`
+        : offer.scopeRaceLabel.trim();
+    }
+    if (offer.scopeRaceId?.trim()) {
+      prefill.raceExternalId = offer.scopeRaceId.trim();
+      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
+    }
+  }
+
+  return prefill;
+}
+
+function optionForScope(input: {
+  scope: BetScope;
+  purpose: "qualify" | "convert";
+  offer: OfferSummary;
+  important: OfferImportantTerms;
+  betType: BetMode;
+  stake: number;
+  bookmaker: string | undefined;
+  settings?: TrackBetSettings | null;
+}): PlacementOption {
+  const { scope, purpose, offer, important, betType, stake, bookmaker, settings } = input;
+  const id = `${purpose}-${scope}`;
+  const addPrefill = buildAddBetPrefill({ offer, important, betType, stake, bookmaker });
+
+  if (scope === "acca") {
+    if (canUseAccaDesk(settings)) {
+      return {
+        id,
+        scope,
+        label: purpose === "convert" ? "Acca Desk" : "Acca Desk",
+        description:
+          purpose === "convert"
+            ? "Convert the free bet with legs and sequential lay."
+            : "Build the qualifying Acca with legs and sequential lay.",
+        markPrefill: addPrefill,
+        destination: {
+          kind: "acca_desk",
+          prefill: buildAccaPrefill({
+            offer,
+            important,
+            stake,
+            bookmaker,
+            purpose,
+          }),
+        },
+      };
+    }
+    return {
+      id,
+      scope,
+      label: "Acca",
+      description: "Log the Acca in Add bet (Acca Desk needs a paid plan).",
+      markPrefill: addPrefill,
+      destination: { kind: "add_bet", prefill: addPrefill, scopeHint: "acca" },
+    };
+  }
+
+  if (scope === "bet_builder") {
+    if (canUseBetBuilderDesk(settings)) {
+      return {
+        id,
+        scope,
+        label: "Bet Builder Desk",
+        description:
+          purpose === "convert"
+            ? "Convert the free bet on Bet Builder Desk (combined lay or no lay)."
+            : "Build the qualifying bet builder (combined lay or no lay).",
+        markPrefill: addPrefill,
+        destination: {
+          kind: "bet_builder_desk",
+          prefill: buildBetBuilderPrefill({
+            offer,
+            important,
+            stake,
+            bookmaker,
+            purpose,
+          }),
+        },
+      };
+    }
+    return {
+      id,
+      scope,
+      label: "Bet builder",
+      description: "Log the bet builder in Add bet (Bet Builder Desk needs a paid plan).",
+      markPrefill: addPrefill,
+      destination: { kind: "add_bet", prefill: addPrefill, scopeHint: "bet_builder" },
+    };
+  }
+
+  return {
+    id,
+    scope: "single",
+    label: "Single",
+    description: "Log a single selection in Add bet.",
+    markPrefill: addPrefill,
+    destination: { kind: "add_bet", prefill: addPrefill, scopeHint: "single" },
+  };
+}
+
+function finalizeFromOptions(
+  options: PlacementOption[],
+  fallbackLabel: string,
+  purpose: "qualify" | "convert"
+): TrackBetAction {
+  if (options.length === 0) {
+    return {
+      enabled: false,
+      label: fallbackLabel,
+      reason: "Nothing to log at this campaign step.",
+      destination: { kind: "none" },
+      prefill: null,
+    };
+  }
+
+  if (options.length === 1) {
+    const only = options[0]!;
+    const dest = only.destination;
+    let label = fallbackLabel;
+    if (dest.kind === "acca_desk") {
+      label = purpose === "convert" ? "Convert on Acca Desk" : "Build acca";
+    } else if (dest.kind === "bet_builder_desk") {
+      label =
+        purpose === "convert" ? "Convert on Bet Builder Desk" : "Build bet builder";
+    }
+    return {
+      enabled: true,
+      label,
+      reason: null,
+      destination: dest,
+      prefill: only.markPrefill,
+    };
+  }
+
+  return {
+    enabled: true,
+    label: fallbackLabel,
+    reason: null,
+    destination: { kind: "choose", options },
+    // First option is enough for orphan quick-log (stake / bookie / offer shared).
+    prefill: options[0]!.markPrefill,
+  };
+}
+
+function buildOptionsForScopes(input: {
+  scopes: readonly BetScope[];
+  purpose: "qualify" | "convert";
+  offer: OfferSummary;
+  important: OfferImportantTerms;
+  betType: BetMode;
+  stake: number;
+  bookmaker: string | undefined;
+  settings?: TrackBetSettings | null;
+}): PlacementOption[] {
+  return input.scopes.map((scope) =>
+    optionForScope({
+      scope,
+      purpose: input.purpose,
+      offer: input.offer,
+      important: input.important,
+      betType: input.betType,
+      stake: input.stake,
+      bookmaker: input.bookmaker,
+      settings: input.settings,
+    })
+  );
+}
+
+/** Open the destination from a track / convert action (handles chooser). */
+export function resolveTrackBetDestination(
+  action: TrackBetAction,
+  handlers: {
+    openAddBet: (prefill: AddBetPrefill) => void;
+    openAccaRun: (prefill: AccaRunPrefill) => void;
+    openBetBuilderRun: (prefill: BetBuilderRunPrefill) => void;
+    openScopeChooser: (options: PlacementOption[]) => void;
+    beforeOpen?: () => void;
+  }
+): boolean {
+  if (!action.enabled) return false;
+  const d = action.destination;
+  if (d.kind === "none" || d.kind === "playbook_mark_done") return false;
+  handlers.beforeOpen?.();
+  if (d.kind === "choose") {
+    handlers.openScopeChooser(d.options);
+    return true;
+  }
+  if (d.kind === "acca_desk") {
+    handlers.openAccaRun(d.prefill);
+    return true;
+  }
+  if (d.kind === "bet_builder_desk") {
+    handlers.openBetBuilderRun(d.prefill);
+    return true;
+  }
+  if (d.kind === "add_bet") {
+    handlers.openAddBet(d.prefill);
+    return true;
+  }
+  return false;
+}
+
+/** Apply a chooser option (same destinations as a concrete track action). */
+export function resolvePlacementOption(
+  option: PlacementOption,
+  handlers: {
+    openAddBet: (prefill: AddBetPrefill) => void;
+    openAccaRun: (prefill: AccaRunPrefill) => void;
+    openBetBuilderRun: (prefill: BetBuilderRunPrefill) => void;
+  }
+): void {
+  const d = option.destination;
+  if (d.kind === "acca_desk") {
+    handlers.openAccaRun(d.prefill);
+    return;
+  }
+  if (d.kind === "bet_builder_desk") {
+    handlers.openBetBuilderRun(d.prefill);
+    return;
+  }
+  if (d.kind === "add_bet") {
+    handlers.openAddBet(d.prefill);
+  }
+}
+
+/** Build place / convert action for the campaign's current pipeline step. */
 export function deriveTrackBetAction(
   offer: OfferSummary,
-  settings?: Pick<AppSettings, "offerBetPrefs" | "defaultBackStake"> | null
+  settings?: TrackBetSettings | null
 ): TrackBetAction {
   const prefs = settings?.offerBetPrefs ?? {};
   const defaultStake = settings?.defaultBackStake ?? 10;
   const rules = parseOfferRules(offer);
   const action = deriveOfferNextAction(offer);
   const profit = offer.profit;
+  const important = readImportantTerms(offer);
+
+  const disabled = (label: string, reason: string): TrackBetAction => ({
+    enabled: false,
+    label,
+    reason,
+    destination: { kind: "none" },
+    prefill: null,
+  });
 
   if (offer.status === "completed" || offer.status === "expired") {
+    return disabled(
+      offer.status === "completed" ? "Campaign complete" : "Campaign expired",
+      "This campaign is finished."
+    );
+  }
+
+  if (
+    action?.kind === "playbook_deposit" ||
+    action?.kind === "playbook_opt_in" ||
+    action?.kind === "playbook_clear_wagering" ||
+    action?.kind === "playbook_await_award"
+  ) {
+    const rawPb = readPlaybookFromRulesJson(offer.rules);
+    const step = rawPb
+      ? currentPlaybookStep(syncPlaybookFromOfferProfit(rawPb, profit))
+      : null;
+    if (!step) {
+      return disabled(action.title, action.detail || action.title);
+    }
+    const label =
+      action.kind === "playbook_deposit"
+        ? "Mark deposit done"
+        : action.kind === "playbook_opt_in"
+          ? "Mark opt-in done"
+          : action.kind === "playbook_clear_wagering"
+            ? "Mark WR cleared"
+            : "Mark award received";
     return {
-      enabled: false,
-      label: offer.status === "completed" ? "Campaign complete" : "Campaign expired",
-      reason: "This campaign is finished.",
+      enabled: true,
+      label,
+      reason: null,
+      destination: { kind: "playbook_mark_done", stepId: step.id },
       prefill: null,
     };
   }
 
-  if (profit.qualifyingOpenCount > 0) {
-    return {
-      enabled: false,
-      label: ctaLabelForAction(action, "qualifying", false),
-      reason:
-        action?.detail ??
-        "Qualifying bet is still open — settle when the result lands.",
-      prefill: null,
-    };
+  // Bookies like Ladbrokes release the free bet on placement while the
+  // qualifying leg is still open — only block when the FB isn't awarded yet.
+  if (profit.qualifyingOpenCount > 0 && profit.freeBetStage !== "awarded") {
+    return disabled(
+      ctaLabelForAction(action, "qualifying", false),
+      action?.detail ?? "Qualifying bet is still open — settle when the result lands."
+    );
   }
 
   if (profit.freeBetStage === "in_use" || profit.freeBetStage === "awaiting_result") {
-    return {
-      enabled: false,
-      label: ctaLabelForAction(action, "free_snr", false),
-      reason: action?.detail ?? "Awaiting result on an open bet.",
-      prefill: null,
-    };
+    return disabled(
+      ctaLabelForAction(action, "free_snr", false),
+      action?.detail ?? "Awaiting result on an open bet."
+    );
   }
 
   let betType: BetMode = "qualifying";
@@ -111,54 +553,138 @@ export function deriveTrackBetAction(
     betType = "qualifying";
     label = ctaLabelForAction(action, "qualifying", true);
   } else {
-    return {
-      enabled: false,
-      label: ctaLabelForAction(action, "qualifying", false),
-      reason: action?.detail ?? "Nothing to log at this campaign step.",
-      prefill: null,
-    };
+    return disabled(
+      ctaLabelForAction(action, "qualifying", false),
+      action?.detail ?? "Nothing to log at this campaign step."
+    );
+  }
+
+  // Prefer Important min stake when racing rules have no betStake (qualify only).
+  if (betType === "qualifying" && stakeSource == null && important.minStake != null) {
+    stakeSource = important.minStake;
   }
 
   const stake = stakeFromOfferPrefs(prefs, offer.id, stakeSource, defaultStake);
   const bookmaker =
     bookmakerFromOfferPrefs(prefs, offer.id, offer.bookmaker, "") || undefined;
 
-  const prefill: AddBetPrefill = {
-    offerId: offer.id,
+  const purpose = betType === "free_snr" ? "convert" : "qualify";
+  const scopes =
+    purpose === "convert" ? important.rewardScopes : important.qualifierScopes;
+
+  const options = buildOptionsForScopes({
+    scopes,
+    purpose,
+    offer,
+    important,
     betType,
-    backStake: stake,
+    stake,
     bookmaker,
-    sport: offer.sport ?? undefined,
-    labelSuggestion:
-      betType === "free_snr"
-        ? `Convert FB · ${bookmaker ?? offer.title}`
-        : `Qualify · ${bookmaker ?? offer.title}`,
+    settings,
+  });
+
+  return finalizeFromOptions(options, label, purpose);
+}
+
+/**
+ * Convert path for an Accounts free-bet lot linked to an offer (via award bet).
+ * Uses rewardScopes; falls back to Add bet when unlinked or not Acca-entitled.
+ */
+export function deriveFreeBetLotConvertAction(
+  lot: { remaining: number; accountName: string },
+  offer: OfferSummary | null | undefined,
+  settings?: TrackBetSettings | null
+): TrackBetAction {
+  const addBetPrefill: AddBetPrefill = {
+    offerId: offer?.id,
+    betType: "free_snr",
+    bookmaker: lot.accountName,
+    backStake: lot.remaining,
+    labelSuggestion: `Convert FB · ${lot.accountName}`,
   };
 
-  if (betType === "qualifying") {
-    const trigger = qualifyingOfferTriggerText(offer);
-    if (trigger) prefill.triggerText = trigger;
+  if (!offer) {
+    return {
+      enabled: true,
+      label: "Convert free bet",
+      reason: null,
+      destination: { kind: "add_bet", prefill: addBetPrefill, scopeHint: "single" },
+      prefill: addBetPrefill,
+    };
   }
 
-  if (offer.sport === "horse_racing") {
-    prefill.sport = "horse_racing";
-    prefill.market = "win";
-    const course = offer.scopeCourse?.trim();
-    if (course && !isRegionalScope(course)) {
-      prefill.scopeCourse = course;
-      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
-    }
-    if (offer.scopeRaceLabel?.trim()) {
-      prefill.labelSuggestion = course
-        ? `${course} · ${offer.scopeRaceLabel.trim()}`
-        : offer.scopeRaceLabel.trim();
-    }
-    // Race-scoped campaigns must open Add bet on that exact meeting race.
-    if (offer.scopeRaceId?.trim()) {
-      prefill.raceExternalId = offer.scopeRaceId.trim();
-      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
-    }
-  }
+  const important = readImportantTerms(offer);
+  const bookmaker =
+    bookmakerFromOfferPrefs(
+      settings?.offerBetPrefs ?? {},
+      offer.id,
+      offer.bookmaker,
+      lot.accountName
+    ) || lot.accountName;
 
-  return { enabled: true, label, reason: null, prefill };
+  const options = buildOptionsForScopes({
+    scopes: important.rewardScopes,
+    purpose: "convert",
+    offer,
+    important,
+    betType: "free_snr",
+    stake: lot.remaining,
+    bookmaker,
+    settings,
+  }).map((opt) => {
+    const lotPrefill = {
+      ...opt.markPrefill,
+      bookmaker: lot.accountName,
+      backStake: lot.remaining,
+      labelSuggestion: `Convert FB · ${lot.accountName}`,
+    };
+    if (opt.destination.kind === "add_bet") {
+      return {
+        ...opt,
+        markPrefill: lotPrefill,
+        destination: {
+          ...opt.destination,
+          prefill: lotPrefill,
+        },
+      } satisfies PlacementOption;
+    }
+    if (opt.destination.kind === "bet_builder_desk") {
+      return {
+        ...opt,
+        markPrefill: lotPrefill,
+        destination: {
+          ...opt.destination,
+          prefill: {
+            ...opt.destination.prefill,
+            bookmaker: lot.accountName,
+            stake: lot.remaining,
+            label: `Convert FB · ${lot.accountName}`,
+          },
+        },
+      } satisfies PlacementOption;
+    }
+    if (opt.destination.kind === "acca_desk") {
+      return {
+        ...opt,
+        markPrefill: lotPrefill,
+        destination: {
+          ...opt.destination,
+          prefill: {
+            ...opt.destination.prefill,
+            bookmaker: lot.accountName,
+            stake: lot.remaining,
+            label: `Convert FB · ${lot.accountName}`,
+          },
+        },
+      } satisfies PlacementOption;
+    }
+    return { ...opt, markPrefill: lotPrefill };
+  });
+
+  return finalizeFromOptions(options, "Convert free bet", "convert");
+}
+
+/** Display helper for tests / UI. */
+export function placementOptionLabel(scope: BetScope): string {
+  return betScopeLabel(scope);
 }

@@ -41,7 +41,10 @@ export {
   parseRecurrenceRule,
 } from "@/lib/offers/offer-recurrence-shared";
 
-export type CasinoInstanceTemplate = Pick<CasinoOfferRow, "casino" | "title" | "notes" | "expiresAt">;
+export type CasinoInstanceTemplate = Pick<
+  CasinoOfferRow,
+  "casino" | "title" | "notes" | "offerUrl" | "expiresAt"
+>;
 
 function instanceStatusForDate(
   instanceDate: string,
@@ -220,6 +223,7 @@ function insertCasinoInstance(
       game: null,
       status,
       notes: series.notes,
+      offerUrl: series.offerUrl,
       expiresAt,
       seriesId: series.id,
       instanceDate,
@@ -449,6 +453,7 @@ export function createCasinoOfferSeriesWithInstance(
       casino: template.casino,
       title: template.title,
       notes: template.notes,
+      offerUrl: template.offerUrl,
       createdAt: now,
       updatedAt: now,
     })
@@ -469,6 +474,7 @@ export function createCasinoOfferSeriesWithInstance(
       game: null,
       status: instanceStatusForDate(instanceDate, todayKey),
       notes: template.notes,
+      offerUrl: template.offerUrl,
       expiresAt: instanceExpiresAt(
         template.expiresAt ?? null,
         instanceDate,

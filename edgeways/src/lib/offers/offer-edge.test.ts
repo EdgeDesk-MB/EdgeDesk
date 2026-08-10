@@ -117,6 +117,42 @@ describe("buildOfferEdgePlays", () => {
     expect(plays[0].runner.marketRank).toBeGreaterThan(1);
   });
 
+  it("never backs the market favourite on a 2nd-to-SP-favourite offer", () => {
+    // QuinnBet-style: free bet only if selection is 2nd and the winner was SP fav.
+    // Backing the current favourite can never trigger that clause.
+    const spFavOffer: OfferEdgeOffer = {
+      id: 2,
+      title: "Bet £10 get £10 free bet (2nd to SP favourite)",
+      bookmaker: "QuinnBet",
+      rules: {
+        ...rules,
+        betStake: 10,
+        freeBetAmount: 10,
+        qualifyingPlaces: [2],
+        winnerMustBeSpFavourite: true,
+      },
+    };
+    // Same shape as the Haydock case: clear-ish favourite around 3.9, then a cluster.
+    const plays = buildOfferEdgePlays(
+      spFavOffer,
+      [race([3.9, 5, 7.6, 9, 12, 16, 22, 28, 35, 40, 50])],
+      opts
+    );
+
+    expect(plays).toHaveLength(1);
+    expect(plays[0].runner.marketRank).toBeGreaterThan(1);
+    expect(plays[0].runner.name).not.toBe("Horse 1");
+    expect(
+      plays[0].reasons.some((r) => r.includes("favourite to win") && r.includes("behind them"))
+    ).toBe(true);
+  });
+
+  it("still allows a weak favourite on ordinary place-refund offers", () => {
+    // Guard: the SP-favourite constraint must not leak into plain 2nd–4th offers.
+    const plays = buildOfferEdgePlays(offer, [race([6, 8, 9, 10, 11, 12, 14, 16])], opts);
+    expect(plays[0]?.runner.marketRank).toBe(1);
+  });
+
   it("skips races below the offer's minimum field size", () => {
     expect(buildOfferEdgePlays(offer, [race([2.5, 4, 6, 9, 14, 20])], opts)).toEqual([]);
   });
@@ -142,6 +178,8 @@ describe("buildOfferEdgePlays", () => {
     expect(play.warnings).toContain(
       "Exactly 8 runners, one non-runner and this offer no longer qualifies"
     );
+    // Warning owns the min-field story; do not also credit it as a reason.
+    expect(play.reasons.join(" ")).not.toContain("the minimum this offer allows");
   });
 
   it("does not warn about non-runners when the field has room to spare", () => {
@@ -170,11 +208,19 @@ describe("buildOfferEdgePlays", () => {
     expect(play.confidence).not.toBe("live");
   });
 
-  it("credits a minimum-sized field and a dominant favourite in its reasons", () => {
-    const [play] = buildOfferEdgePlays(offer, [race([1.4, 6, 8, 11, 16, 22, 28, 40])], opts);
+  it("credits a near-minimum field and a dominant favourite in its reasons", () => {
+    // 9 runners = minRunners + 1: reason mentions the small field; no NR warning.
+    const [play] = buildOfferEdgePlays(
+      offer,
+      [race([1.4, 6, 8, 11, 16, 22, 28, 40, 50])],
+      opts
+    );
 
-    expect(play.reasons.join(" | ")).toContain("Only 8 runners, the minimum this offer allows");
+    expect(play.reasons.join(" | ")).toContain(
+      "Small 9-runner field, fewer horses to beat you"
+    );
     expect(play.reasons.some((r) => r.includes("favourite should take the win"))).toBe(true);
+    expect(play.warnings.join(" ")).not.toContain("no longer qualifies");
     expect(play.reasons.length).toBeLessThanOrEqual(3);
   });
 

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCampaignDetailsContext,
   buildCampaignImportantDisplay,
   buildCampaignScopeLine,
+  campaignDetailTextsOverlap,
+  filterImportantNotesForDisplay,
 } from "./offer-campaign-details";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { emptyImportantTerms } from "./offer-terms";
@@ -11,7 +14,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     id: partial.id,
     bookmaker: partial.bookmaker ?? "Betfair Sportsbook",
     title: partial.title,
-    description: null,
+    description: partial.description ?? null,
     expectedProfit: null,
     status: partial.status ?? "active",
     sport: partial.sport ?? "horse_racing",
@@ -27,6 +30,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: null,
     createdAt: Date.now(),
     betCount: 0,
     openBets: 0,
@@ -84,5 +88,79 @@ describe("buildCampaignImportantDisplay", () => {
     expect(text).toContain("How to match:");
     expect(text).toContain("1. First step");
     expect(text).not.toMatch(/\nany\n/);
+  });
+
+  it("strips deposit / promo / opt-in bullets already owned by Steps", () => {
+    const text = filterImportantNotesForDisplay(
+      "ProgressPlay network · Opt-in required · Promo code UEFA · Deposit £30+ first · Cash out voids offer · SNR free bet",
+      {
+        ...emptyImportantTerms(),
+        promoCode: "UEFA",
+        minDeposit: 30,
+        depositRequired: true,
+      },
+      {
+        alreadyShown: [
+          "Deposit £30+ with code UEFA",
+          "Deposit into Dynobet via the sports cashier. Enter promo code UEFA on deposit.",
+        ],
+        stripHowToMatch: true,
+      }
+    );
+    expect(text).toBe(
+      "ProgressPlay network · Cash out voids offer · SNR free bet"
+    );
+  });
+});
+
+describe("buildCampaignDetailsContext", () => {
+  const howToMatch =
+    "Cash out voids offer · SNR free bet · Expires Fri 14 Aug, 23:59\n\nHow to match:\n1. Place qualifying cash bet of £10 on Ladbrokes.";
+
+  it("drops descriptionLine when it duplicates the important warning box", () => {
+    const ctx = buildCampaignDetailsContext(
+      offer({
+        id: 10,
+        title: "Bet £10 get £10 free bet",
+        sport: "general",
+        offerType: "promo_terms",
+        description: howToMatch,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          importantNotes: howToMatch,
+        }),
+      })
+    );
+    expect(ctx.uniqueImportant).toContain("How to match:");
+    expect(ctx.descriptionLine).toBeNull();
+  });
+
+  it("keeps distinct description when it adds context beyond important notes", () => {
+    const ctx = buildCampaignDetailsContext(
+      offer({
+        id: 11,
+        title: "Bet £10 get £10 free bet",
+        sport: "general",
+        offerType: "promo_terms",
+        description: "Extra campaign context only shown in description.",
+        rules: JSON.stringify({
+          type: "promo_terms",
+          importantNotes: "SNR free bet · min odds 2.0",
+        }),
+      })
+    );
+    expect(ctx.descriptionLine).toContain("Extra campaign context");
+    expect(ctx.uniqueImportant).toContain("SNR free bet");
+  });
+});
+
+describe("campaignDetailTextsOverlap", () => {
+  it("detects near-identical blocks", () => {
+    expect(
+      campaignDetailTextsOverlap(
+        "Cash out voids offer · SNR free bet",
+        "Cash out voids offer · SNR free bet · Expires Fri 14 Aug"
+      )
+    ).toBe(true);
   });
 });

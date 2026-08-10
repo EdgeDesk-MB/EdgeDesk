@@ -20,6 +20,7 @@ const baseTemplate: OfferInstanceTemplate = {
   scopeRaceId: null,
   scopeRaceLabel: null,
   rules: null,
+  offerUrl: null,
   expiresAt: null,
 };
 

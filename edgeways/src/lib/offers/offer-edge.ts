@@ -7,6 +7,11 @@
  * excluded the favourite outright, which is wrong whenever the favourite is weak:
  * a 6.0 favourite in a competitive handicap frames often, wins rarely, and has the
  * tightest spread in the race, so it is regularly the best play. EV decides.
+ *
+ * Exception: offers with `winnerMustBeSpFavourite` (QuinnBet-style "2nd to SP
+ * favourite"). Backing the market favourite can never trigger a place-only clause
+ * of that form, so trigger probability for that horse is zero and EV picks a
+ * runner that can finish behind the favourite when the favourite wins.
  */
 
 import {
@@ -18,7 +23,7 @@ import { roundPence } from "@/lib/calc/money";
 import {
   placeRefundRunnerEv,
   resolveOfferConfidence,
-  triggerProbFromModel,
+  triggerProbWithFavouriteConstraint,
   type OfferConfidence,
   type TriggerBasis,
 } from "@/lib/offers/place-refund-ev";
@@ -219,19 +224,27 @@ function buildReasons(input: {
   const byWinProb = [...field].sort((a, b) => b.winProb - a.winProb);
   const favourite = byWinProb[0];
 
-  if (race.fieldSize <= rules.minRunners) {
-    reasons.push(`Only ${race.fieldSize} runners, the minimum this offer allows`);
-  } else if (race.fieldSize <= rules.minRunners + 1) {
+  // At exactly minRunners the non-runner warning already owns the field-size
+  // story; repeating "Only N runners, the minimum…" next to it reads as a dupe.
+  if (race.fieldSize > rules.minRunners && race.fieldSize <= rules.minRunners + 1) {
     reasons.push(`Small ${race.fieldSize}-runner field, fewer horses to beat you`);
   }
 
   if (favourite && favourite.detail.horseId !== runner.detail.horseId) {
-    if (favourite.winProb >= DOMINANT_FAVOURITE_PROB) {
+    if (target.winnerMustBeSpFavourite) {
+      reasons.push(
+        `Needs the ${formatDecimalOdds(favourite.backDecimal)} favourite to win, with you behind them`
+      );
+    } else if (favourite.winProb >= DOMINANT_FAVOURITE_PROB) {
       reasons.push(
         `The ${formatDecimalOdds(favourite.backDecimal)} favourite should take the win`
       );
     }
-  } else if (favourite && favourite.detail.horseId === runner.detail.horseId) {
+  } else if (
+    favourite &&
+    favourite.detail.horseId === runner.detail.horseId &&
+    !target.winnerMustBeSpFavourite
+  ) {
     reasons.push("Favourite, but short enough on wins to keep landing in the frame");
   }
 
@@ -324,8 +337,18 @@ export function buildOfferEdgePlays(
     // pick never turns on a sub-penny rounding artefact.
     let bestRawEv = Number.NEGATIVE_INFINITY;
 
+    const fieldForConstraint = field.map((r) => ({
+      horseId: r.detail.horseId,
+      winProb: r.winProb,
+    }));
+
     for (const runner of field) {
-      const triggerProb = triggerProbFromModel(runner.positionProbs, target);
+      const triggerProb = triggerProbWithFavouriteConstraint({
+        selectionHorseId: runner.detail.horseId,
+        selectionPositionProbs: runner.positionProbs,
+        field: fieldForConstraint,
+        target,
+      });
 
       const ev = placeRefundRunnerEv({
         betStake: rules.betStake,

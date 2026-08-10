@@ -20,7 +20,7 @@ export const OFFER_PIPELINE_STAGES: {
   { id: "planned", label: "Planned" },
   { id: "qualifying", label: "Qualifying" },
   { id: "awaiting", label: "Awaiting result" },
-  { id: "awarded", label: "Free bet due" },
+  { id: "awarded", label: "Free bet awarded" },
   { id: "converting", label: "Converting" },
   { id: "completed", label: "Completed" },
   { id: "settled", label: "Settled" },

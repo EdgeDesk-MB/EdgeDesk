@@ -60,6 +60,24 @@ describe("inferAiEffectsFromText", () => {
     expect(effects[0].positions).toEqual([2, 3, 4]);
   });
 
+  // How-to-match notes used to win because `.` cannot cross newlines, so
+  // /\bif\s+(.+)$/ skipped the headline "if 2nd…" and matched "refund if 3rd…".
+  it("prefers headline 2nd–4th over How to match 'refund if 3rd or 4th'", () => {
+    const effects = inferAiEffectsFromText(
+      `Bet £20 get £20 free bet if 2nd, 3rd or 4th
+How to match: 1. Pick a runner in a suitable race (refund if 3rd or 4th).`
+    );
+    expect(effects[0].positions).toEqual([2, 3, 4]);
+  });
+
+  it("reads (2nd, 3rd, 4th) from title when How to match restates 3rd/4th only", () => {
+    const effects = inferAiEffectsFromText(
+      `Bet £20 get £20 free bet (2nd, 3rd, 4th)
+SNR free bet How to match: 1. Pick a runner (refund if 3rd or 4th).`
+    );
+    expect(effects[0].positions).toEqual([2, 3, 4]);
+  });
+
   it("does not treat an ordinal horse name as a place condition", () => {
     const effects = inferAiEffectsFromText(
       "Ascot · 2nd Thought · Bet £50 get £50 free bet"
@@ -129,6 +147,54 @@ describe("evaluateFreeBetAward SP favourite", () => {
     expect(result.reason).toMatch(/not recorded/i);
   });
 
+  it("does not award when favourite SP is below the offer floor", () => {
+    const result = evaluateFreeBetAward(
+      {
+        kind: "free_bet_award",
+        amount: 10,
+        positions: [2],
+        winnerMustBeSpFavourite: true,
+        minFavouriteSpOdds: 2.5,
+      },
+      "Bravo",
+      race([
+        { horse: "Alpha", position: 1, spDecimal: 2.2, isSpFavourite: true },
+        { horse: "Bravo", position: 2, spDecimal: 8 },
+      ])
+    );
+    expect(result.met).toBe(false);
+    expect(result.reason).toMatch(/below min/i);
+  });
+
+  it("awards when favourite SP meets the offer floor", () => {
+    const result = evaluateFreeBetAward(
+      {
+        kind: "free_bet_award",
+        amount: 10,
+        positions: [2],
+        winnerMustBeSpFavourite: true,
+        minFavouriteSpOdds: 2.5,
+      },
+      "Bravo",
+      race([
+        { horse: "Alpha", position: 1, spDecimal: 2.5, isSpFavourite: true },
+        { horse: "Bravo", position: 2, spDecimal: 8 },
+      ])
+    );
+    expect(result.met).toBe(true);
+  });
+
+  it("parses min fav SP from trigger text", () => {
+    const effects = inferAiEffectsFromText(
+      "Bet £10 get £10 FB if 2nd to SP favourite (min fav SP 2.5)"
+    );
+    expect(effects[0]).toMatchObject({
+      winnerMustBeSpFavourite: true,
+      minFavouriteSpOdds: 2.5,
+      positions: [2],
+    });
+  });
+
   it("awards when winner was manually marked SP favourite", () => {
     const result = evaluateFreeBetAward(
       { kind: "free_bet_award", amount: 10, positions: [2], winnerMustBeSpFavourite: true },
@@ -139,6 +205,16 @@ describe("evaluateFreeBetAward SP favourite", () => {
       ])
     );
     expect(result.met).toBe(true);
+  });
+
+  it("does not award on winner-only (fast) results", () => {
+    const result = evaluateFreeBetAward(
+      { kind: "free_bet_award", amount: 10, positions: [2] },
+      "Bravo",
+      race([{ horse: "Alpha", position: 1 }])
+    );
+    expect(result.met).toBe(false);
+    expect(result.reason).toMatch(/incomplete/i);
   });
 });
 

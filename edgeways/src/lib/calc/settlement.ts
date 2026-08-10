@@ -153,7 +153,12 @@ export function settlePartialOutcome(
   };
 }
 
-function selectionWon(market: Market, selection: string, outcomes: DerivedOutcomes): boolean | null {
+/** Did this market/selection win given derived football outcomes? null = underivable / voidable. */
+export function selectionWon(
+  market: Market | string,
+  selection: string,
+  outcomes: DerivedOutcomes
+): boolean | null {
   switch (market) {
     case "match_odds":
       return outcomes.matchOdds === selection;

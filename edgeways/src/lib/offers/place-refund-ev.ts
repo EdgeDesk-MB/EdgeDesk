@@ -1,6 +1,10 @@
 import { matchedBet } from "@/lib/calc/matched";
-import { sumPositions } from "@/lib/calc/racing/finish-positions";
+import {
+  finishPositionProbs,
+  sumPositions,
+} from "@/lib/calc/racing/finish-positions";
 import type { TargetOutcome } from "@/lib/offers/target-outcome";
+import { maxTargetPosition } from "@/lib/offers/target-outcome";
 import type { OddsSource } from "@/lib/racing/odds";
 import type { ExchangeOddsSource } from "@/lib/services/exchange/types";
 
@@ -63,6 +67,77 @@ export function triggerProbFromModel(
   target: TargetOutcome
 ): number {
   return sumPositions(positionProbs, target.positions);
+}
+
+export interface FavouriteConstraintFieldRunner {
+  horseId: string;
+  winProb: number;
+}
+
+/**
+ * P(offer triggers), honouring QuinnBet-style "places to the SP favourite".
+ *
+ * Before the off we use the market favourite (highest modelled win probability)
+ * as the SP-favourite proxy. Backing that horse can never pay a place-only
+ * SP-favourite clause: if it wins the winner is the fav but the selection did
+ * not place; if it places, the winner was not the fav.
+ *
+ * For every other runner: P(fav wins) × Harville P(selection in target places |
+ * fav already taken the win). Target place k overall becomes place k−1 among
+ * the remaining field.
+ */
+export function triggerProbWithFavouriteConstraint(input: {
+  selectionHorseId: string;
+  selectionPositionProbs: number[];
+  field: FavouriteConstraintFieldRunner[];
+  target: TargetOutcome;
+}): number {
+  const { selectionHorseId, selectionPositionProbs, field, target } = input;
+
+  if (!target.winnerMustBeSpFavourite) {
+    return triggerProbFromModel(selectionPositionProbs, target);
+  }
+
+  if (field.length < 2 || target.positions.length === 0) return 0;
+
+  let fav = field[0]!;
+  for (const runner of field) {
+    if (runner.winProb > fav.winProb) fav = runner;
+  }
+
+  const isFavourite = selectionHorseId === fav.horseId;
+  if (isFavourite) {
+    // Only a win-qualifying clause can fire for the favourite itself.
+    return target.positions.includes(1) ? Math.max(0, Math.min(1, fav.winProb)) : 0;
+  }
+
+  const remapped = target.positions.filter((p) => p >= 2).map((p) => p - 1);
+  if (remapped.length === 0) return 0;
+
+  const remaining = field.filter((r) => r.horseId !== fav.horseId);
+  const selectionIndex = remaining.findIndex((r) => r.horseId === selectionHorseId);
+  if (selectionIndex < 0) return 0;
+
+  const maxPos = Math.max(...remapped, maxTargetPosition(target) - 1);
+  const conditional = finishPositionProbs(
+    remaining.map((r) => r.winProb),
+    { maxPosition: Math.max(1, maxPos) }
+  );
+  if (!conditional) {
+    // First-order fallback when enumeration is refused: scale the unconditional
+    // place mass by P(fav wins). Overstates slightly vs the joint, but keeps the
+    // favourite at zero and never invents a place for the fav.
+    return triggerProbFromModel(selectionPositionProbs, {
+      ...target,
+      positions: target.positions.filter((p) => p >= 2),
+    }) * fav.winProb;
+  }
+
+  const placeGivenFavWins = sumPositions(
+    conditional.byRunner[selectionIndex]!,
+    remapped
+  );
+  return Math.max(0, Math.min(1, fav.winProb * placeGivenFavWins));
 }
 
 export interface PlaceRefundEvInput {

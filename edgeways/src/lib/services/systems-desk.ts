@@ -545,10 +545,25 @@ function completeSystemRun(run: SystemRunRow, legs: SystemLegRow[]) {
           ? db.select().from(bets).where(eq(bets.id, run.backBetId)).get()
           : undefined;
       let profit = settled.profit;
-      // Free stake: loss is £0; SNR win matches cash profit; SR win includes stake back.
+      // Free stake: fully-void lines hand the free stake back (not cash), and
+      // each paying line settles SNR/SR individually. Deriving from line
+      // counts keeps a bust at £0 and a partial win from ever recording a
+      // cash loss that never left the wallet.
       if (isDeskFreeBetType(back?.betType)) {
-        if (status === "lost") profit = 0;
-        else if (back?.betType === "free_sr") profit = settled.returns;
+        const refunds = roundPence(
+          run.unitStake * settled.refundedLines * (eachWay ? 2 : 1)
+        );
+        const stakeReturnedWinnings = roundPence(settled.returns - refunds);
+        profit =
+          back?.betType === "free_sr"
+            ? stakeReturnedWinnings
+            : roundPence(
+                stakeReturnedWinnings -
+                  roundPence(
+                    run.unitStake *
+                      (settled.winPayingLines + settled.placePayingLines)
+                  )
+              );
       }
       settleLinkedBet(run.backBetId, status, profit);
     }

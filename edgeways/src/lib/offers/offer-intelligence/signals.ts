@@ -23,7 +23,46 @@ export function extractOfferSignals(text: string): OfferIntelligenceSignals {
     /\baccumulator\s+only\b/i.test(text) ||
     /\bmultiples?\s+only\b/i.test(text);
 
-  const minSel = text.match(/\bmin(?:imum)?\s+(\d+)\s+(?:legs?|selections?|fold)\b/i);
+  const betBuilderMention =
+    /\bbet\s*builders?\b/i.test(text) || /\bbuild\s+a\s+bet\b/i.test(text);
+
+  const accaMention =
+    /\bacca\b/i.test(text) ||
+    /\baccumulator\b/i.test(text) ||
+    /\baccas?\b/i.test(text);
+
+  const accaOrBetBuilder =
+    /\baccas?\s*(?:\/|or|&)\s*bet\s*builders?\b/i.test(text) ||
+    /\bbet\s*builders?\s*(?:\/|or|&)\s*accas?\b/i.test(text) ||
+    /\bon\s+accas?\s+or\s+bet\s*builders?\b/i.test(text) ||
+    /\bon\s+(?:an?\s+)?acca\s+or\s+bet\s*builder\b/i.test(text);
+
+  const rewardAcca =
+    /\bfree\s*bets?\s+must\s+be\s+(?:used\s+)?(?:on|as)\s+(?:an?\s+)?(?:acca|accumulator|multi)/i.test(
+      text
+    ) ||
+    /\bfree\s*bets?\s+(?:valid\s+on|on)\s+(?:an?\s+)?(?:acca|accumulator|multi)/i.test(text) ||
+    /\buse\s+(?:the\s+)?free\s*bet\s+on\s+(?:an?\s+)?(?:acca|accumulator|multi)/i.test(text) ||
+    /\breward\s+(?:must\s+be|valid\s+on)\s+(?:an?\s+)?(?:acca|accumulator)/i.test(text);
+
+  const rewardBetBuilder =
+    /\bfree\s*bets?\s+must\s+be\s+(?:used\s+)?(?:on|as)\s+(?:an?\s+)?bet\s*builder/i.test(
+      text
+    ) ||
+    /\bfree\s*bets?\s+(?:valid\s+on|on)\s+(?:an?\s+)?bet\s*builder/i.test(text) ||
+    /\buse\s+(?:the\s+)?free\s*bet\s+on\s+(?:an?\s+)?bet\s*builder/i.test(text);
+
+  const rewardAccaOrBetBuilder =
+    /\bfree\s*bets?\s+(?:token\s+)?(?:to\s+be\s+used|must\s+be\s+(?:used\s+)?|valid)\s+on\s+(?:bet\s*builder\/acca|acca\/bet\s*builder|accas?\s+or\s+bet\s*builders?|bet\s*builders?\s+or\s+accas?)/i.test(
+      text
+    ) ||
+    /\bbet\s*builder\/acca\s+markets?\s+only/i.test(text) ||
+    /\bon\s+(?:an?\s+)?acca,?\s+bet\s*builder\s+or\s+any\s+multiple/i.test(text) ||
+    /\bfree\s*bet\s+token\s+to\s+be\s+used\s+on\s+bet\s*builder\/acca/i.test(text);
+
+  const minSel =
+    text.match(/\bmin(?:imum)?(?:\s+of)?\s+(\d+)\s+(?:legs?|selections?|fold)\b/i) ??
+    text.match(/\b(\d+)\s+(?:legs?|selections?|fold)\s+or\s+more\b/i);
 
   return {
     boostPercent,
@@ -35,6 +74,12 @@ export function extractOfferSignals(text: string): OfferIntelligenceSignals {
         /\b\d+\s*%\s+boost\b/i.test(text)),
     singlesOnly,
     multisOnly,
+    accaMention,
+    betBuilderMention,
+    accaOrBetBuilder,
+    rewardAcca,
+    rewardBetBuilder,
+    rewardAccaOrBetBuilder,
     inPlayAllowed:
       /\bin[- ]?play\s+(?:and\s+pre[- ]?play|or\s+pre[- ]?play|bets?\s+allowed)\b/i.test(
         text
@@ -58,7 +103,7 @@ export function extractOfferSignals(text: string): OfferIntelligenceSignals {
         /\bfree\s*bet\b/i.test(text) &&
         !/\bstake\s+returned\s+free\s*bet\b/i.test(text)),
     newCustomersOnly: /\bnew\s+customers?\s+only\b/i.test(text),
-    minSelections: minSel ? parseInt(minSel[1], 10) : null,
+    minSelections: minSel?.[1] ? parseInt(minSel[1], 10) : null,
   };
 }
 

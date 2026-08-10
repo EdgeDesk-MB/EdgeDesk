@@ -29,6 +29,7 @@ const baseOffer: OfferRow = {
   instanceDate: null,
   startsOn: null,
   source: null,
+  offerUrl: null,
   sport: "horse_racing",
   offerType: "bet_get_free_place",
   scopeCourse: "all",
@@ -66,6 +67,22 @@ describe("parseOfferRules", () => {
       "Bet £10 get £10 FB if 2nd to SP favourite"
     );
     expect(formatBetGetFreePlaceSummary(rules)).toContain("2nd to SP favourite");
+  });
+
+  it("includes min favourite SP in trigger text when set", () => {
+    const rules = {
+      type: "bet_get_free_place" as const,
+      minRunners: 6,
+      regions: ["GB", "IRE"] as ("GB" | "IRE")[],
+      qualifyingPlaces: [2],
+      betStake: 10,
+      freeBetAmount: 10,
+      winnerMustBeSpFavourite: true,
+      minFavouriteSpOdds: 2.5,
+    };
+    expect(placeRefundTriggerText(rules)).toBe(
+      "Bet £10 get £10 FB if 2nd to SP favourite (min fav SP 2.5)"
+    );
   });
 
   it("returns null for generic offers", () => {

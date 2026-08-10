@@ -20,6 +20,7 @@ import {
   offerExpiryDaysLeft,
 } from "@/lib/offers/offer-expiry";
 import { offerRequiredStake } from "@/lib/offers/offer-required-stake";
+import { campaignFbBadge } from "@/lib/ui/surface-styles";
 
 export type DoNextSort = "priority" | "edge" | "rate";
 
@@ -27,12 +28,18 @@ export type DoNextSort = "priority" | "edge" | "rate";
 export type BookieBalanceMap = Map<string, number>;
 
 /** Estimated effort in minutes per action kind — tune over time. */
-export const EFFORT_MINUTES: Record<OfferNextActionKind | "orphan_free_bet", number> = {
+export const EFFORT_MINUTES: Record<
+  OfferNextActionKind | "orphan_free_bet",
+  number
+> = {
   start_planned: 10,
   place_qualifying: 8,
   convert_free_bet: 6,
   review_expiry: 2,
   await_result: 0,
+  playbook_deposit: 5,
+  playbook_opt_in: 2,
+  playbook_clear_wagering: 8,
   orphan_free_bet: 6,
 };
 
@@ -43,6 +50,10 @@ export type FreeBetLotInput = {
   remaining: number;
   note: string | null;
   createdAt: number;
+  /** Awarding bet id when the lot came from a promo credit. */
+  betId?: number | null;
+  /** Resolved campaign id (via awarding bet) so Acca reward scopes still apply. */
+  offerId?: number | null;
 };
 
 export interface DoNextFunding {
@@ -73,6 +84,8 @@ export type DoNextItem = {
   daysLeft: number | null;
   /** "Ends today", "1 day left", etc. */
   expiryLabel: string | null;
+  /** Nominal free-bet face value (£) — drives convert-first ranking */
+  freeBetAmount?: number;
   /** Prefill for Add bet when converting a free-bet lot */
   convertLot?: {
     accountName: string;
@@ -92,6 +105,7 @@ function normVenue(name: string): string {
 }
 
 function lotMatchesOffer(lot: FreeBetLotInput, offer: OfferSummary): boolean {
+  if (lot.offerId != null) return lot.offerId === offer.id;
   if (!offer.bookmaker) return false;
   return normVenue(lot.accountName) === normVenue(offer.bookmaker);
 }
@@ -132,6 +146,7 @@ export function buildDoNextItems(
     const expiryLabel = formatOfferDaysLeftLabel(daysLeft);
 
     let convertLot: DoNextItem["convertLot"];
+    let freeBetAmount: number | undefined;
     if (action.kind === "convert_free_bet") {
       const match = lots.find(
         (lot) => !claimedLotIds.has(lot.id) && lotMatchesOffer(lot, offer)
@@ -143,6 +158,9 @@ export function buildDoNextItems(
           remaining: match.remaining,
           labelSuggestion: `Convert FB · ${match.accountName}`,
         };
+        freeBetAmount = match.remaining;
+      } else if (offer.profit.freeBetAwardAmount != null) {
+        freeBetAmount = offer.profit.freeBetAwardAmount;
       }
     }
 
@@ -184,6 +202,7 @@ export function buildDoNextItems(
       daysLeft,
       expiryLabel,
       convertLot,
+      freeBetAmount,
       funding,
       health: advantage?.health,
       edge: action.edge,
@@ -205,8 +224,8 @@ export function buildDoNextItems(
       detail: note,
       bookmaker: lot.accountName,
       offerTitle: null,
-      offerId: null,
-      href: null,
+      offerId: lot.offerId ?? null,
+      href: lot.offerId != null ? `/offers?highlight=${lot.offerId}` : null,
       remainingEv: ev,
       basis: (opts?.retentionSampleSize ?? 0) >= 5 ? "estimated" : "heuristic",
       priority: 11,
@@ -216,6 +235,7 @@ export function buildDoNextItems(
         60,
       daysLeft: null,
       expiryLabel: null,
+      freeBetAmount: lot.remaining,
       convertLot: {
         accountName: lot.accountName,
         remaining: lot.remaining,
@@ -224,45 +244,8 @@ export function buildDoNextItems(
     });
   }
 
-  // Synthetic fund_account items: one per shortfall account, carrying unlocked EV sum
-  if (bookieBalances) {
-    const shortfallByAccount = new Map<string, { name: string; evSum: number; short: number }>();
-    for (const item of items) {
-      if (!item.funding || item.funding.short <= 0 || !item.bookmaker) continue;
-      const key = normVenue(item.bookmaker);
-      const existing = shortfallByAccount.get(key);
-      if (existing) {
-        existing.evSum += item.remainingEv;
-        existing.short = Math.max(existing.short, item.funding.short);
-      } else {
-        shortfallByAccount.set(key, {
-          name: item.bookmaker,
-          evSum: item.remainingEv,
-          short: item.funding.short,
-        });
-      }
-    }
-    for (const { name, evSum, short } of shortfallByAccount.values()) {
-      items.push({
-        id: `fund-${normVenue(name)}`,
-        kind: "fund_account",
-        title: `Fund ${name}`,
-        detail: `£${short.toFixed(2)} needed to unlock £${evSum.toFixed(2)} edge`,
-        bookmaker: name,
-        offerTitle: null,
-        offerId: null,
-        href: "/balances",
-        remainingEv: evSum,
-        basis: "estimated",
-        priority: 20,
-        edgeScore: 0,
-        rateScore: 0,
-        daysLeft: null,
-        expiryLabel: null,
-        health: opts?.bookmakerHealth?.get(normVenue(name)),
-      });
-    }
-  }
+  // Shortfalls stay on the offer card (`funding` / "£X short at …"). No separate
+  // fund_account card — that duplicated the same blocker and EV for one bookie.
 
   // J5: camouflage reminders - lowest priority, no EV claim (the point is
   // account longevity, not edge). Clicking opens Add bet pre-set to Mug.
@@ -330,10 +313,34 @@ export function keepFirstRecurringInstance(
   });
 }
 
+export function isConvertFreeBetKind(kind: DoNextItem["kind"]): boolean {
+  return kind === "convert_free_bet" || kind === "orphan_free_bet";
+}
+
+/** Nominal free-bet face value (£) for convert-first ranking. */
+export function freeBetFaceValue(item: DoNextItem): number {
+  return item.freeBetAmount ?? item.convertLot?.remaining ?? 0;
+}
+
+/** Convert free bets always rank first, highest face value first. */
+export function compareConvertFreeBetFirst(a: DoNextItem, b: DoNextItem): number {
+  const aConvert = isConvertFreeBetKind(a.kind);
+  const bConvert = isConvertFreeBetKind(b.kind);
+  if (aConvert && !bConvert) return -1;
+  if (!aConvert && bConvert) return 1;
+  if (aConvert && bConvert) {
+    const byFace = freeBetFaceValue(b) - freeBetFaceValue(a);
+    if (byFace !== 0) return byFace;
+  }
+  return 0;
+}
+
 export function sortDoNextItems(items: DoNextItem[], sort: DoNextSort): DoNextItem[] {
   const copy = [...items];
   if (sort === "edge") {
     return copy.sort((a, b) => {
+      const convertCmp = compareConvertFreeBetFirst(a, b);
+      if (convertCmp !== 0) return convertCmp;
       if (b.edgeScore !== a.edgeScore) return b.edgeScore - a.edgeScore;
       if (a.priority !== b.priority) return a.priority - b.priority;
       return (a.offerTitle ?? a.title).localeCompare(b.offerTitle ?? b.title);
@@ -341,12 +348,16 @@ export function sortDoNextItems(items: DoNextItem[], sort: DoNextSort): DoNextIt
   }
   if (sort === "rate") {
     return copy.sort((a, b) => {
+      const convertCmp = compareConvertFreeBetFirst(a, b);
+      if (convertCmp !== 0) return convertCmp;
       if (b.rateScore !== a.rateScore) return b.rateScore - a.rateScore;
       if (a.priority !== b.priority) return a.priority - b.priority;
       return (a.offerTitle ?? a.title).localeCompare(b.offerTitle ?? b.title);
     });
   }
   return copy.sort((a, b) => {
+    const convertCmp = compareConvertFreeBetFirst(a, b);
+    if (convertCmp !== 0) return convertCmp;
     if (a.priority !== b.priority) return a.priority - b.priority;
     if (b.edgeScore !== a.edgeScore) return b.edgeScore - a.edgeScore;
     return (a.offerTitle ?? a.title).localeCompare(b.offerTitle ?? b.title);
@@ -401,7 +412,7 @@ export function doNextKindBadgeClass(kind: DoNextItem["kind"]): string {
   switch (kind) {
     case "convert_free_bet":
     case "orphan_free_bet":
-      return "border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-300";
+      return campaignFbBadge;
     case "review_expiry":
       return "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-300";
     case "place_qualifying":

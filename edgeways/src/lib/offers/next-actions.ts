@@ -3,6 +3,12 @@ import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { isOfferEffectivelyExpired } from "@/lib/offers/offer-list-groups";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatAwaitingResultLabel } from "@/lib/offers/pipeline";
+import {
+  currentPlaybookStep,
+  readPlaybookFromRulesJson,
+  syncPlaybookFromOfferProfit,
+  type OfferPlaybookStepKind,
+} from "@/lib/offers/offer-playbook";
 import { formatDecimalOdds } from "@/lib/racing/odds";
 import { formatClockTime } from "@/lib/time-format";
 
@@ -11,7 +17,11 @@ export type OfferNextActionKind =
   | "await_result"
   | "convert_free_bet"
   | "review_expiry"
-  | "start_planned";
+  | "start_planned"
+  | "playbook_deposit"
+  | "playbook_opt_in"
+  | "playbook_clear_wagering"
+  | "playbook_await_award";
 
 /** The specific race and runner Offer Edge recommends for this action. */
 export interface OfferNextActionEdge {
@@ -34,6 +44,8 @@ export interface OfferNextAction {
   bookmaker: string | null;
   offerTitle: string;
   expiresAt: number | null;
+  /** Nominal free-bet face value when kind is convert_free_bet */
+  freeBetAmount?: number;
   /** Present when Offer Edge could name a race and horse for this offer. */
   edge?: OfferNextActionEdge;
 }
@@ -106,6 +118,34 @@ export function deriveOfferNextAction(
     href: `/offers?highlight=${offer.id}`,
   };
 
+  // O1 playbook soft gates (deposit / opt-in / WR) — including planned campaigns
+  {
+    const rawPb = readPlaybookFromRulesJson(offer.rules);
+    if (rawPb) {
+      const synced = syncPlaybookFromOfferProfit(rawPb, profit, now);
+      const step = currentPlaybookStep(synced);
+      const softKind = (k: OfferPlaybookStepKind): OfferNextActionKind | null => {
+        if (k === "deposit") return "playbook_deposit";
+        if (k === "opt_in") return "playbook_opt_in";
+        if (k === "clear_wagering") return "playbook_clear_wagering";
+        if (k === "await_award") return "playbook_await_award";
+        return null;
+      };
+      if (step) {
+        const soft = softKind(step.kind);
+        if (soft) {
+          return {
+            ...base,
+            kind: soft,
+            priority: expiringSoon ? 5 : 12,
+            title: step.title,
+            detail: step.detail,
+          };
+        }
+      }
+    }
+  }
+
   if (offer.status === "planned" && offer.betCount === 0) {
     return {
       ...base,
@@ -143,16 +183,18 @@ export function deriveOfferNextAction(
   }
 
   if (profit.freeBetStage === "awarded") {
+    const freeBetAmount = profit.freeBetAwardAmount ?? undefined;
     return {
       ...base,
       kind: "convert_free_bet",
-      priority: expiringSoon ? 5 : 10,
+      priority: 1,
       title: "Convert free bet",
       detail:
         profit.freeBetAwardAmount != null
           ? `£${profit.freeBetAwardAmount.toFixed(2)} free bet ready.`
-          : "Free bet due - place the conversion bet.",
+          : "Free bet ready - place the conversion bet.",
       href: `/tracker?offer=${offer.id}&queue=offers&action=convert`,
+      freeBetAmount,
     };
   }
 
@@ -221,6 +263,12 @@ export function listOfferNextActions(
     .map((o) => deriveOfferNextAction(o, now, opts))
     .filter((a): a is OfferNextAction => a != null && isActionableOfferNext(a.kind))
     .sort((a, b) => {
+      if (a.kind === "convert_free_bet" && b.kind !== "convert_free_bet") return -1;
+      if (b.kind === "convert_free_bet" && a.kind !== "convert_free_bet") return 1;
+      if (a.kind === "convert_free_bet" && b.kind === "convert_free_bet") {
+        const byFace = (b.freeBetAmount ?? 0) - (a.freeBetAmount ?? 0);
+        if (byFace !== 0) return byFace;
+      }
       if (a.priority !== b.priority) return a.priority - b.priority;
       const ae = a.expiresAt ?? Number.POSITIVE_INFINITY;
       const be = b.expiresAt ?? Number.POSITIVE_INFINITY;
@@ -241,6 +289,14 @@ export function offerNextActionLabel(kind: OfferNextActionKind): string {
       return "Expiring";
     case "start_planned":
       return "Start";
+    case "playbook_deposit":
+      return "Deposit";
+    case "playbook_opt_in":
+      return "Opt in";
+    case "playbook_clear_wagering":
+      return "Clear WR";
+    case "playbook_await_award":
+      return "Awaiting award";
     default:
       return kind;
   }

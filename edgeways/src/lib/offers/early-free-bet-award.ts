@@ -3,10 +3,37 @@
  * Some bookies (e.g. Ladbrokes) release the free bet on placement, not settlement.
  */
 
-import { aiEffectsForBet, type AiEffect } from "@/lib/calc/ai-triggers";
+import {
+  aiEffectsForBet,
+  isPlaceFreeBetEffect,
+  type AiEffect,
+} from "@/lib/calc/ai-triggers";
 import type { BetRow, HistoryRow } from "@/lib/db/schema";
 
 export const EARLY_FREE_BET_AWARD_REASON = "Awarded on placement";
+
+/** Place / trigger rewards (e.g. finish 2nd–4th). */
+export const FREE_BET_WON_PHRASE = "Free bet won!";
+/** Standard bet&get / qualifier unlock (no place condition). */
+export const FREE_BET_EARNED_PHRASE = "Free bet earned!";
+
+/**
+ * History / settlement tail for a free-bet promo.
+ * Place-conditional → "won"; ordinary qualifier unlock → "earned".
+ * Defaults to earned when the offer cannot be classified.
+ */
+export function freeBetAwardPhrase(
+  bet: Pick<BetRow, "triggerRule" | "label" | "triggerText">,
+  offerTitle?: string | null
+): typeof FREE_BET_WON_PHRASE | typeof FREE_BET_EARNED_PHRASE {
+  const conditional = freeBetEffectsForBet(bet, offerTitle).some(isPlaceFreeBetEffect);
+  return conditional ? FREE_BET_WON_PHRASE : FREE_BET_EARNED_PHRASE;
+}
+
+/** True when a History title carries either free-bet award phrase. */
+export function titleHasFreeBetAwardPhrase(title: string): boolean {
+  return title.includes(FREE_BET_WON_PHRASE) || title.includes(FREE_BET_EARNED_PHRASE);
+}
 
 /** AI free-bet effects from trigger rule / label, then trigger text, then linked offer title. */
 export function freeBetEffectsForBet(
@@ -34,8 +61,8 @@ export function unconditionalFreeBetEffect(
 
 /**
  * Whether a history "Bet placed" row should show the early free-bet award prompt.
- * Hidden once credited (settlement already shows "Free bet won!"). Place-conditional
- * rewards and void bets never show it.
+ * Hidden once credited (settlement shows "Free bet earned!" / "Free bet won!").
+ * Place-conditional rewards and void bets never show it.
  * `offerTitle` covers bets linked to a campaign whose title carries the reward
  * (e.g. "Bet £10 get £10 free bet") when the bet row itself has no trigger text.
  */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeOfferIntelligence } from "./index";
+import { analyzeOfferIntelligence, enrichImportantTerms } from "./index";
 import { estimateBoostWinningsEv } from "./estimates";
 import { emptyImportantTerms } from "@/lib/offers/offer-terms";
 
@@ -32,7 +32,7 @@ describe("analyzeOfferIntelligence", () => {
       category: "golf",
       betStake: null,
       freeBetAmount: null,
-      important: { minOdds: 2, minStake: null, maxStake: 25, importantNotes: "" },
+      important: { ...emptyImportantTerms(), minOdds: 2, maxStake: 25 },
       qualifyingPlaces: [],
       expiresAt: null,
       isRacing: false,
@@ -83,5 +83,72 @@ describe("analyzeOfferIntelligence", () => {
 
     expect(result.archetype).toBe("place_refund");
     expect(result.expectedProfit).toBeGreaterThan(0);
+  });
+
+  it("suggests Acca qualifier from ACCA bet&get paste without forcing reward Acca", () => {
+    const text =
+      "Bet £20 ACCA get £10 free bet. Minimum 3 selections. Min odds 2.0. SNR free bet.";
+    const result = analyzeOfferIntelligence({
+      text,
+      bookmaker: "Ivybet",
+      category: "football",
+      betStake: 20,
+      freeBetAmount: 10,
+      important: emptyImportantTerms(),
+      qualifyingPlaces: [],
+      expiresAt: null,
+      isRacing: false,
+    });
+    expect(result.signals.accaMention).toBe(true);
+    expect(result.signals.rewardAcca).toBe(false);
+    expect(result.signals.minSelections).toBe(3);
+    const enriched = enrichImportantTerms(emptyImportantTerms(), result);
+    expect(enriched.qualifierScopes).toEqual(["acca"]);
+    expect(enriched.rewardScopes).toEqual(["single"]);
+    expect(enriched.minSelections).toBe(3);
+  });
+
+  it("suggests reward Acca from free-bet Acca T&Cs alone", () => {
+    const text =
+      "Bet £10 get £10 free bet. Free bet must be used on an Acca. Minimum 4 selections.";
+    const result = analyzeOfferIntelligence({
+      text,
+      bookmaker: "Sky Bet",
+      category: "football",
+      betStake: 10,
+      freeBetAmount: 10,
+      important: emptyImportantTerms(),
+      qualifyingPlaces: [],
+      expiresAt: null,
+      isRacing: false,
+    });
+    expect(result.signals.rewardAcca).toBe(true);
+    const enriched = enrichImportantTerms(emptyImportantTerms(), result);
+    expect(enriched.rewardScopes).toEqual(["acca"]);
+    expect(enriched.rewardMinSelections).toBe(4);
+  });
+
+  it("suggests Acca and Bet builder for Accas or Bet Builders offers", () => {
+    const text =
+      "FREE £5 BET - JUST BET £10 ON ACCAS OR BET BUILDERS. Qualifying bets must be a minimum of 3 legs or more on an acca or bet builder. You will receive a £5 free bet token to be used on bet builder/Acca markets only.";
+    const result = analyzeOfferIntelligence({
+      text,
+      bookmaker: "Betfair",
+      category: "football",
+      betStake: 10,
+      freeBetAmount: 5,
+      important: emptyImportantTerms(),
+      qualifyingPlaces: [],
+      expiresAt: null,
+      isRacing: false,
+    });
+    expect(result.signals.accaOrBetBuilder).toBe(true);
+    expect(result.signals.rewardAccaOrBetBuilder).toBe(true);
+    expect(result.signals.minSelections).toBe(3);
+    const enriched = enrichImportantTerms(emptyImportantTerms(), result);
+    expect(enriched.qualifierScopes).toEqual(["acca", "bet_builder"]);
+    expect(enriched.rewardScopes).toEqual(["acca", "bet_builder"]);
+    expect(enriched.minSelections).toBe(3);
+    expect(enriched.rewardMinSelections).toBe(3);
   });
 });

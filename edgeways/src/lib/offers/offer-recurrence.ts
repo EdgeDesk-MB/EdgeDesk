@@ -56,6 +56,7 @@ export type OfferInstanceTemplate = Pick<
   | "scopeRaceId"
   | "scopeRaceLabel"
   | "rules"
+  | "offerUrl"
   | "expiresAt"
 >;
 
@@ -98,6 +99,7 @@ function insertInstance(
       scopeRaceId: series.scopeRaceId,
       scopeRaceLabel: series.scopeRaceLabel,
       rules: series.rules,
+      offerUrl: series.offerUrl,
       seriesId: series.id,
       instanceDate,
       eventDate: racing ? instanceDate : null,
@@ -232,6 +234,7 @@ export function createOfferSeriesWithInstance(
       scopeRaceId: template.scopeRaceId,
       scopeRaceLabel: template.scopeRaceLabel,
       rules: template.rules,
+      offerUrl: template.offerUrl,
       createdAt: now,
       updatedAt: now,
     })
@@ -259,6 +262,7 @@ export function createOfferSeriesWithInstance(
       scopeRaceId: template.scopeRaceId,
       scopeRaceLabel: template.scopeRaceLabel,
       rules: template.rules,
+      offerUrl: template.offerUrl,
       seriesId: series.id,
       instanceDate,
       eventDate: racing ? instanceDate : null,
@@ -310,6 +314,7 @@ function offerTemplateFields(
     | "scopeRaceId"
     | "scopeRaceLabel"
     | "rules"
+    | "offerUrl"
     | "expiresAt"
   >
 ): OfferInstanceTemplate {
@@ -324,6 +329,7 @@ function offerTemplateFields(
     scopeRaceId: row.scopeRaceId,
     scopeRaceLabel: row.scopeRaceLabel,
     rules: row.rules,
+    offerUrl: row.offerUrl,
     expiresAt: row.expiresAt,
   };
 }
@@ -340,6 +346,7 @@ function seriesTemplateFields(series: OfferSeriesRow): OfferInstanceTemplate {
     scopeRaceId: series.scopeRaceId,
     scopeRaceLabel: series.scopeRaceLabel,
     rules: series.rules,
+    offerUrl: series.offerUrl,
     expiresAt: series.templateExpiresAt,
   };
 }
@@ -358,7 +365,8 @@ function offerCampaignFieldsEqual(
     a.scopeCourse === b.scopeCourse &&
     a.scopeRaceId === b.scopeRaceId &&
     a.scopeRaceLabel === b.scopeRaceLabel &&
-    a.rules === b.rules
+    a.rules === b.rules &&
+    a.offerUrl === b.offerUrl
   );
 }
 
@@ -489,6 +497,7 @@ export function syncOfferSeriesTemplateFromOffer(
         scopeRaceId: nextTemplate.scopeRaceId,
         scopeRaceLabel: nextTemplate.scopeRaceLabel,
         rules: nextTemplate.rules,
+        offerUrl: nextTemplate.offerUrl,
         expiresAt: instanceExpiresAt(nextTemplate.expiresAt, inst.instanceDate!, nextOffset),
         ...(racing && inst.instanceDate ? { eventDate: inst.instanceDate } : {}),
       })
@@ -508,6 +517,7 @@ export function syncOfferSeriesTemplateFromOffer(
       scopeRaceId: nextTemplate.scopeRaceId,
       scopeRaceLabel: nextTemplate.scopeRaceLabel,
       rules: nextTemplate.rules,
+      offerUrl: nextTemplate.offerUrl,
       templateExpiresAt: nextTemplate.expiresAt,
       ...(nextRule ? { ruleJson: JSON.stringify(nextRule) } : {}),
       updatedAt: now,

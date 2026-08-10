@@ -24,6 +24,7 @@ const baseTemplate: CasinoInstanceTemplate = {
   casino: "LeoVegas",
   title: "Daily £10 reload",
   notes: null,
+  offerUrl: null,
   expiresAt: null,
 };
 

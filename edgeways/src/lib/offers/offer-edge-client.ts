@@ -19,10 +19,17 @@ const inFlight = new Map<string, Promise<OfferEdgeResponse>>();
 const CACHE_TTL_MS = 60_000;
 const settled = new Map<string, { at: number; value: OfferEdgeResponse }>();
 
-export function fetchOfferEdgePlays(date: string): Promise<OfferEdgeResponse> {
-  const cached = settled.get(date);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-    return Promise.resolve(cached.value);
+export function fetchOfferEdgePlays(
+  date: string,
+  opts?: { force?: boolean }
+): Promise<OfferEdgeResponse> {
+  if (!opts?.force) {
+    const cached = settled.get(date);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      return Promise.resolve(cached.value);
+    }
+  } else {
+    settled.delete(date);
   }
 
   const existing = inFlight.get(date);

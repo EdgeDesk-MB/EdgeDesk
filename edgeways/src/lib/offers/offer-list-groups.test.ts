@@ -35,6 +35,7 @@ function offer(
     instanceDate: null,
     startsOn: null,
     source: null,
+    offerUrl: rest.offerUrl ?? null,
     createdAt: rest.createdAt ?? Date.now(),
     betCount: 0,
     openBets: 0,

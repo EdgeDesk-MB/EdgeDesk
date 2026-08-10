@@ -21,6 +21,18 @@ export interface OfferIntelligenceSignals {
   boostOnWinnings: boolean;
   singlesOnly: boolean;
   multisOnly: boolean;
+  /** Title/body mentions ACCA / accumulator (not only "accas only"). */
+  accaMention: boolean;
+  /** Title/body mentions bet builder. */
+  betBuilderMention: boolean;
+  /** Explicit Accas or Bet builders (either / or). */
+  accaOrBetBuilder: boolean;
+  /** Free bet / reward must be placed as an acca / multi. */
+  rewardAcca: boolean;
+  /** Free bet / reward must be placed as a bet builder. */
+  rewardBetBuilder: boolean;
+  /** Free bet valid on Acca or Bet builder. */
+  rewardAccaOrBetBuilder: boolean;
   inPlayAllowed: boolean;
   tokenSingleUse: boolean;
   cashOutVoids: boolean;

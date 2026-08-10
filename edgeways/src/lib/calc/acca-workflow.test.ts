@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accaCampaignProfit,
   accaOutcomePercentages,
+  accaSquareProvisional,
   applyAccaBoost,
   finalLegLockLay,
   nextSequentialLay,
@@ -118,6 +119,28 @@ describe("accaCampaignProfit - realised campaign P&L", () => {
     expect(accaCampaignProfit(run, legs)).toBeCloseTo(0, 10);
   });
 
+  it("free_snr bust does not subtract the free stake (mirrors backLostProfit £0)", () => {
+    // Same lays as the cash zero-loss vector, but the back was a free bet:
+    // liabilities −10 + lay win +20 + back £0 = +£10 (the extracted free-bet value).
+    const run = { stake: 10, commission: 0, backBetType: "free_snr" };
+    const legs = [
+      { backOdds: 2, result: "won" as const, layStake: 10, layOdds: 2.0 },
+      { backOdds: 2, result: "lost" as const, layStake: 20, layOdds: 3.0 },
+    ];
+    expect(accaCampaignProfit(run, legs)).toBeCloseTo(10, 10);
+  });
+
+  it("free_sr bust does not subtract the free stake either (desk allows free_sr converts)", () => {
+    // Same vector as free_snr: the stake was never cash at risk, so a bust
+    // must not show −stake. +£10 extracted, same as backLostProfit £0.
+    const run = { stake: 10, commission: 0, backBetType: "free_sr" };
+    const legs = [
+      { backOdds: 2, result: "won" as const, layStake: 10, layOdds: 2.0 },
+      { backOdds: 2, result: "lost" as const, layStake: 20, layOdds: 3.0 },
+    ];
+    expect(accaCampaignProfit(run, legs)).toBeCloseTo(10, 10);
+  });
+
   it("all legs winning banks the combined payout minus every paid liability", () => {
     // £10 stake @ combined 2 × 3 = 6 -> back wins £50. Two laid legs won
     // (lays lost), paying liabilities £10 and £5: 50 - 10 - 5 = £35.
@@ -186,6 +209,79 @@ describe("accaCampaignProfit - realised campaign P&L", () => {
   });
 });
 
+describe("accaSquareProvisional - worst/locked when square on next leg", () => {
+  it("returns null when the next pending leg is still unlaid", () => {
+    const run = { stake: 10, commission: 0, method: "sequential" as const };
+    const legs = [
+      { seq: 1, backOdds: 2, result: "won" as const, layStake: 10, layOdds: 2.0 },
+      { seq: 2, backOdds: 2, result: "pending" as const, layStake: null, layOdds: null },
+    ];
+    expect(accaSquareProvisional(run, legs)).toBeNull();
+  });
+
+  it("covered mid-run: next laid leg lose-path floors at £0 (worst)", () => {
+    // Leg 1 won (liability £10 paid); leg 2 square at cover £20 → bust nets £0.
+    const run = { stake: 10, commission: 0, method: "sequential" as const };
+    const legs = [
+      { seq: 1, backOdds: 2, result: "won" as const, layStake: 10, layOdds: 2.0 },
+      { seq: 2, backOdds: 2, result: "pending" as const, layStake: 20, layOdds: 3.0 },
+      { seq: 3, backOdds: 2, result: "pending" as const, layStake: null, layOdds: null },
+    ];
+    const r = accaSquareProvisional(run, legs);
+    expect(r).toEqual({ value: 0, kind: "worst", squareLegSeq: 2 });
+  });
+
+  it("final-leg equalise locks win and lose to the same £", () => {
+    // £10 @ combined 2×2=4, prior liab £10, lay @ 2.0, c=0.
+    // finalLegLockLay: win0=10*(4-1)-10=20, lose0=-(10+10)=-20,
+    // L=(20-(-20))/(2-0)=20; lockedIfWin=20-20*1=0; lockedIfLose=-20+20=0.
+    const run = { stake: 10, commission: 0, method: "sequential" as const };
+    const legs = [
+      { seq: 1, backOdds: 2, result: "won" as const, layStake: 10, layOdds: 2.0 },
+      { seq: 2, backOdds: 2, result: "pending" as const, layStake: 20, layOdds: 2.0 },
+    ];
+    const lock = finalLegLockLay({
+      accaStake: 10,
+      combinedBackOdds: 4,
+      priorLiabilities: 10,
+      legLayOdds: 2,
+      commission: 0,
+    })!;
+    const r = accaSquareProvisional(run, legs);
+    expect(r?.kind).toBe("locked");
+    expect(r?.value).toBeCloseTo(lock.lockedIfLose, 2);
+    expect(r?.value).toBeCloseTo(0, 2);
+  });
+
+  it("whole-acca lay: provisional is the worse of all-win vs any-lose", () => {
+    const whole = wholeAccaLay({
+      stake: 10,
+      combinedOdds: 11.52,
+      layOdds: 12.5,
+      commission: 0,
+    })!;
+    const run = {
+      stake: 10,
+      commission: 0,
+      method: "combined" as const,
+      wholeLayStake: whole.layStake,
+      wholeLayOdds: 12.5,
+    };
+    const legs = [
+      { seq: 1, backOdds: 2, result: "pending" as const, layStake: null, layOdds: null },
+      { seq: 2, backOdds: 2, result: "pending" as const, layStake: null, layOdds: null },
+      { seq: 3, backOdds: 1.8, result: "pending" as const, layStake: null, layOdds: null },
+      { seq: 4, backOdds: 1.6, result: "pending" as const, layStake: null, layOdds: null },
+    ];
+    const r = accaSquareProvisional(run, legs);
+    expect(r?.kind).toBe("worst");
+    expect(r?.value).toBeCloseTo(
+      Math.min(whole.profitIfAllWin, whole.profitIfAnyLose),
+      2
+    );
+  });
+});
+
 describe("accaOutcomePercentages - ALL WIN / 1 LOSE / 1+ LOSE breakdown", () => {
   it("three pending legs at evens-ish 2.0 (p=0.5 each): 12.5% / 37.5% / 87.5%", () => {
     const legs = [
@@ -239,6 +335,38 @@ describe("accaOutcomePercentages - ALL WIN / 1 LOSE / 1+ LOSE breakdown", () => 
   it("guards the degenerate empty/all-void case", () => {
     expect(accaOutcomePercentages([])).toEqual({ allWinPct: 0, oneLosePct: 0, atLeastOneLosePct: 0 });
   });
+
+  it("at_start ignores settled results so History can show the going-in estimate", () => {
+    // Same as three pending 2.0 legs even though one has already lost: 12.5 / 37.5 / 87.5.
+    const legs = [
+      { backOdds: 2, result: "lost" as const },
+      { backOdds: 2, result: "won" as const },
+      { backOdds: 2, result: "pending" as const },
+    ];
+    const r = accaOutcomePercentages(legs, { mode: "at_start" });
+    expect(r.allWinPct).toBeCloseTo(12.5, 10);
+    expect(r.oneLosePct).toBeCloseTo(37.5, 10);
+    expect(r.atLeastOneLosePct).toBeCloseTo(87.5, 10);
+  });
+
+  it("at_start still excludes void legs", () => {
+    const legs = [
+      { backOdds: 2, result: "lost" as const },
+      { backOdds: 3, result: "void" as const },
+    ];
+    const r = accaOutcomePercentages(legs, { mode: "at_start" });
+    expect(r.allWinPct).toBeCloseTo(50, 10);
+    expect(r.oneLosePct).toBeCloseTo(50, 10);
+    expect(r.atLeastOneLosePct).toBeCloseTo(50, 10);
+  });
+
+  it("live is the default mode (settled legs remain certain)", () => {
+    const legs = [
+      { backOdds: 2, result: "lost" as const },
+      { backOdds: 2, result: "pending" as const },
+    ];
+    expect(accaOutcomePercentages(legs)).toEqual(accaOutcomePercentages(legs, { mode: "live" }));
+  });
 });
 
 describe("applyAccaBoost - winnings-only convention (Sam's call, 2026-07-22)", () => {
@@ -256,5 +384,11 @@ describe("applyAccaBoost - winnings-only convention (Sam's call, 2026-07-22)", (
 
   it("20% boost on the 4-fold's combined 11.52: 1 + (11.52 − 1) × 1.2 = 13.624", () => {
     expect(applyAccaBoost(11.52, 20)).toBeCloseTo(13.624, 10);
+  });
+
+  it("30% boost on single-selection 5.75 (bookie slip): 1 + (5.75 − 1) × 1.3 = 7.175", () => {
+    // £20 stake → unboosted win £115, boosted win £143.50
+    expect(applyAccaBoost(5.75, 30)).toBeCloseTo(7.175, 10);
+    expect(20 * applyAccaBoost(5.75, 30)).toBeCloseTo(143.5, 10);
   });
 });

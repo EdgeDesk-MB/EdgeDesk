@@ -1,5 +1,6 @@
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { deriveOfferNextAction } from "@/lib/offers/next-actions";
+import type { OfferNextActionKind } from "@/lib/offers/next-actions";
 import { scoreOfferAdvantage } from "@/lib/offers/advantage";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { isOfferEffectivelyExpired } from "@/lib/offers/offer-list-groups";
@@ -27,6 +28,10 @@ export interface OfferCalendarItem {
   /** Advantage score when available - higher = better to do next */
   advantageScore: number;
   remainingEv: number;
+  /** Set for action cards — drives convert-first ranking */
+  actionKind?: OfferNextActionKind;
+  /** Nominal free-bet face value when actionKind is convert_free_bet */
+  freeBetAmount?: number;
 }
 
 export interface OfferCalendarDay {
@@ -142,16 +147,34 @@ function pickBetterCalendarItem(
   );
 }
 
-function sortCalendarItems(items: OfferCalendarItem[]): OfferCalendarItem[] {
+function isConvertCalendarItem(item: OfferCalendarItem): boolean {
+  return item.kind === "action" && item.actionKind === "convert_free_bet";
+}
+
+function calendarFreeBetFaceValue(item: OfferCalendarItem): number {
+  return item.freeBetAmount ?? item.offer.profit.freeBetAwardAmount ?? 0;
+}
+
+function compareCalendarItems(a: OfferCalendarItem, b: OfferCalendarItem): number {
+  const aConvert = isConvertCalendarItem(a);
+  const bConvert = isConvertCalendarItem(b);
+  if (aConvert && !bConvert) return -1;
+  if (!aConvert && bConvert) return 1;
+  if (aConvert && bConvert) {
+    const byFace = calendarFreeBetFaceValue(b) - calendarFreeBetFaceValue(a);
+    if (byFace !== 0) return byFace;
+  }
   const pRank = { critical: 0, high: 1, medium: 2, low: 3 } as const;
-  return [...items].sort((a, b) => {
-    if (pRank[a.priority] !== pRank[b.priority]) {
-      return pRank[a.priority] - pRank[b.priority];
-    }
-    if (b.advantageScore !== a.advantageScore) return b.advantageScore - a.advantageScore;
-    if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
-    return a.offer.title.localeCompare(b.offer.title);
-  });
+  if (pRank[a.priority] !== pRank[b.priority]) {
+    return pRank[a.priority] - pRank[b.priority];
+  }
+  if (b.advantageScore !== a.advantageScore) return b.advantageScore - a.advantageScore;
+  if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+  return a.offer.title.localeCompare(b.offer.title);
+}
+
+function sortCalendarItems(items: OfferCalendarItem[]): OfferCalendarItem[] {
+  return [...items].sort(compareCalendarItems);
 }
 
 /** One card per offer per day — keeps the most urgent signal (action beats expires). */
@@ -284,6 +307,8 @@ export function buildOfferCalendarDays(
         detail: action.detail,
         sortKey: actionDayMs + action.priority,
         actionPriority: action.priority,
+        actionKind: action.kind,
+        freeBetAmount: action.freeBetAmount,
       });
     }
   }
@@ -372,18 +397,8 @@ export function buildOfferCalendarBoard(
     col.items.push(item);
   }
 
-  const pRank = { critical: 0, high: 1, medium: 2, low: 3 } as const;
   for (const col of columns) {
-    col.items.sort((a, b) => {
-      if (pRank[a.priority] !== pRank[b.priority]) {
-        return pRank[a.priority] - pRank[b.priority];
-      }
-      if (b.advantageScore !== a.advantageScore) return b.advantageScore - a.advantageScore;
-      if ((a.daysLeft ?? 99) !== (b.daysLeft ?? 99)) {
-        return (a.daysLeft ?? 99) - (b.daysLeft ?? 99);
-      }
-      return a.offer.title.localeCompare(b.offer.title);
-    });
+    col.items = sortCalendarItems(col.items);
   }
 
   return columns;
