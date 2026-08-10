@@ -188,13 +188,25 @@ Initiative: **Live Readiness** (target 2 Nov 2026). Team `Edgeways` (key EDGE).
 Milestones in every project: M1 Gate-ready (6 Sep) · M2 Beta (4 Oct) · M3 Launch
 (2 Nov). Cycles: 1 week + 1 week cooldown from 17 Aug, 6 auto-created.
 
+Cycle plan (assigned 10 Aug; every open ticket now sits in a cycle except
+EDGE-43, deliberately deferred until feedback volume exists):
+
+| Cycle | Dates | Theme | Tickets |
+|-------|-------|-------|---------|
+| C1 | 17–24 Aug | Sam's foundation week: decisions, accounts, legal emails | EDGE-1, 2, 8, 9, 10, 18, 23, 24, 46 |
+| C2 | 31 Aug–6 Sep | M1 buffer — processor/solicitor replies land | (spillover from C1) |
+| C3 | 14–20 Sep | M2 build 1: Neon+migrations, auth provider, landing build, provider emails, legal drafts finalised | EDGE-11, 12, 15, 19, 25, 45, 47, 48 |
+| C4 | 28 Sep–4 Oct | M2 build 2: sign-in, handoff, billing build, waitlist+countdown+SEO, beta community, gate evidence, nightly sweep | EDGE-3, 4, 5, 20, 21, 26, 27, 28, 29, 33, 36, 41 |
+| C5 | 12–18 Oct | Launch prep: dunning, billing rehearsal, enforcement, contrast audit, support surface, hygiene scrub | EDGE-6, 7, 22, 32, 34, 49 |
+| C6 | 26 Oct–2 Nov | Launch week: full checklist pass | EDGE-37 |
+
 | Project | Scope | Issues |
 |---------|-------|--------|
 | Payments & Billing | Acceptance → L1 → checkout/webhooks → live | EDGE-1…7 |
-| Compliance & Legal | Solicitor, ICO, trademark, ToS, privacy, 18+, API ToS | EDGE-8…16 |
-| Entitlements & Accounts | N0 matrix, D6, auth, sign-in, enforcement | EDGE-17…22 |
-| Marketing Site & Waitlist | Domain/hosting, landing, waitlist, countdown, SEO, beta | EDGE-23…29 |
-| Launch QA & Polish | E3, G2, G4, onboarding, support, evidence, checklist | EDGE-30…37 |
+| Compliance & Legal | Solicitor, ICO, trademark, ToS, privacy, 18+, API ToS, provider permissions | EDGE-8…16, 45 |
+| Entitlements & Accounts | N0 matrix, D6, auth, sign-in, enforcement, hosted DB | EDGE-17…22, 47 |
+| Marketing Site & Waitlist | Domain/hosting, landing, waitlist, countdown, SEO, beta, Vercel | EDGE-23…29, 46 |
+| Launch QA & Polish | E3, G2, G4, onboarding, support, evidence, checklist, health, hygiene | EDGE-30…37, 48, 49 |
 | Feedback & Automations | Migration, triage loop, hooks, sweeps, errors → Linear | EDGE-38…43 |
 
 Cycle 1 (17–23 Aug): EDGE-1, 2, 8, 9, 17, 18, 23, 24, 38, 39, 40.
