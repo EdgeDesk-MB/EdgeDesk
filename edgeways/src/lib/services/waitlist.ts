@@ -120,15 +120,27 @@ export function buildWaitlistThanksEmail(input: {
   return { subject, html, text };
 }
 
+function resendFrom(): string {
+  // Display name + address, e.g. `Edgeways <hello@edgeways.app>`.
+  // Address-only values show as "hello" in most clients.
+  return process.env.RESEND_FROM?.trim() || "Edgeways <hello@edgeways.app>";
+}
+
+/** Owner inboxes for "someone joined" alerts. Comma-separated. */
+function waitlistNotifyRecipients(): string[] {
+  const raw = process.env.WAITLIST_NOTIFY_TO?.trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length > 0 && isValidWaitlistEmail(part));
+}
+
 async function sendThanksEmail(input: {
   email: string;
   unsubscribeUrl: string;
 }): Promise<{ sent: boolean; skippedReason?: string }> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  // Display name + address, e.g. `Edgeways <hello@edgeways.app>`.
-  // Address-only values show as "hello" in most clients.
-  const from =
-    process.env.RESEND_FROM?.trim() || "Edgeways <hello@edgeways.app>";
   const content = buildWaitlistThanksEmail({
     origin: LIVE_SITE_ORIGIN,
     unsubscribeUrl: input.unsubscribeUrl,
@@ -149,7 +161,7 @@ async function sendThanksEmail(input: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from,
+        from: resendFrom(),
         to: [input.email],
         subject: content.subject,
         html: content.html,
@@ -170,6 +182,52 @@ async function sendThanksEmail(input: {
   } catch (err) {
     console.error("[waitlist] Resend request failed:", err);
     return { sent: false, skippedReason: "resend_error" };
+  }
+}
+
+/** Ping you when someone joins. Failures are logged only — signup still succeeds. */
+async function notifyOwnerOfJoin(input: {
+  email: string;
+  rejoin: boolean;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const to = waitlistNotifyRecipients();
+  if (!apiKey || to.length === 0) return;
+
+  const subject = input.rejoin
+    ? `Waitlist re-join: ${input.email}`
+    : `New waitlist signup: ${input.email}`;
+  const text = [
+    input.rejoin
+      ? "Someone re-joined the Edgeways waitlist (was unsubscribed)."
+      : "Someone joined the Edgeways waitlist.",
+    "",
+    `Email: ${input.email}`,
+    `When: ${new Date().toISOString()}`,
+  ].join("\n");
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: resendFrom(),
+        to,
+        subject,
+        text,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        `[waitlist] Owner notify failed (${res.status}): ${body.slice(0, 300)}`
+      );
+    }
+  } catch (err) {
+    console.error("[waitlist] Owner notify request failed:", err);
   }
 }
 
@@ -201,6 +259,7 @@ export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult
   const token = newListToken();
   const tokenHash = hashToken(token);
   const unsubscribeUrl = `${LIVE_SITE_ORIGIN}/api/waitlist/unsubscribe?token=${encodeURIComponent(token)}`;
+  const rejoin = Boolean(existing?.unsubscribedAt);
 
   if (existing) {
     db.update(waitlistSignups)
@@ -226,6 +285,7 @@ export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult
   }
 
   await sendThanksEmail({ email, unsubscribeUrl });
+  await notifyOwnerOfJoin({ email, rejoin });
   return { status: "joined", email };
 }
 
