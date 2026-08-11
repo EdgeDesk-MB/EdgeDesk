@@ -34,7 +34,7 @@ export type MetaNavItem = {
 export const DESK_NAV_ITEM: MetaNavItem = {
   id: "desk",
   label: "Desk",
-  href: "/",
+  href: "/desk",
   icon: LayoutDashboard,
 };
 

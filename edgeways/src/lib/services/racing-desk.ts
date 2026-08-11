@@ -875,11 +875,11 @@ export async function getRacingDesk(
   };
 
   const raceByExternal = new Map(races.map((r) => [r.externalId, r]));
-  const activeBets: RacingDeskActiveBet[] = allBets
+  const activeBets = allBets
     .filter((b) => b.status === "open" && b.eventId != null)
-    .map((b) => {
+    .flatMap((b): RacingDeskActiveBet[] => {
       const ev = allEvents.find((e) => e.id === b.eventId);
-      if (!ev || ev.sport !== "horse_racing") return null;
+      if (!ev || ev.sport !== "horse_racing") return [];
       const race = ev.externalId ? raceByExternal.get(ev.externalId) : undefined;
       const meta = parseEwMeta(b.notes);
       let qualifyingLoss: number | null = null;
@@ -909,30 +909,31 @@ export async function getRacingDesk(
           ? ("worst" as const)
           : openBetOutcomeKind(b);
 
-      return {
-        betId: b.id,
-        eventId: b.eventId!,
-        raceExternalId: ev.externalId,
-        label: b.label,
-        selection: b.selection,
-        market: b.market,
-        bookmaker: b.bookmaker,
-        backStake: b.backStake,
-        backOdds: b.backOdds,
-        expectedProfit: b.expectedProfit,
-        outcomeKind,
-        course: race?.course ?? ev.competition ?? null,
-        offTime: race?.offTime ?? null,
-        startTime: race?.startTime ?? ev.startTime ?? null,
-        bookiePlaces: meta?.bookiePlaces,
-        exchangePlaces: meta?.exchangePlaces,
-        mode: meta?.mode,
-        qualifyingLoss,
-        impliedExtraPlaceOdds,
-        profitIfExtraPlace,
-      } satisfies RacingDeskActiveBet;
+      return [
+        {
+          betId: b.id,
+          eventId: b.eventId!,
+          raceExternalId: ev.externalId,
+          label: b.label,
+          selection: b.selection,
+          market: b.market,
+          bookmaker: b.bookmaker,
+          backStake: b.backStake,
+          backOdds: b.backOdds,
+          expectedProfit: b.expectedProfit,
+          outcomeKind,
+          course: race?.course ?? ev.competition ?? null,
+          offTime: race?.offTime ?? null,
+          startTime: race?.startTime ?? ev.startTime ?? null,
+          bookiePlaces: meta?.bookiePlaces,
+          exchangePlaces: meta?.exchangePlaces,
+          mode: meta?.mode,
+          qualifyingLoss,
+          impliedExtraPlaceOdds,
+          profitIfExtraPlace,
+        },
+      ];
     })
-    .filter((b): b is RacingDeskActiveBet => b != null)
     .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
 
   const racingPnlDay = racingPnlByRace(allBets, allEvents, date);

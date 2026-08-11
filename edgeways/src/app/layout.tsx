@@ -3,33 +3,8 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Figtree, Noto_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
-import { QuickLogSheet } from "@/components/quick-log-sheet";
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
-import { AlertWatcher } from "@/components/alert-watcher";
-import { CommandPalette } from "@/components/command-palette";
-import { AddBalanceProvider } from "@/components/add-balance-provider";
-import { AddBetProvider } from "@/components/add-bet-provider";
-import { EachWayCalculatorProvider } from "@/components/each-way-calculator-provider";
-import { AccaRunProvider } from "@/components/acca-run-provider";
-import { BetBuilderRunProvider } from "@/components/bet-builder-run-provider";
-import { ScopePlaceChooserProvider } from "@/components/scope-place-chooser-provider";
-import { TrackFixtureProvider } from "@/components/track-fixture-provider";
-import { MatchedCalculatorProvider } from "@/components/matched-calculator-provider";
-import { OfferProvider } from "@/components/offers/offer-provider";
-import { CasinoLogProvider } from "@/components/casino/casino-log-provider";
-import { BoostCheckProvider } from "@/components/boosts/boost-check-provider";
-import { FreeBetsProvider } from "@/components/accounts/free-bets-convert-dialog";
-import { RacingAutopilotListener } from "@/components/racing-autopilot-listener";
-import { UserReminderListener } from "@/components/user-reminder-listener";
-import { AppShell } from "@/components/app-shell";
-import { AppTopBar } from "@/components/app-top-bar";
-import { OnboardingProvider } from "@/components/help/onboarding-provider";
-import { AppStateProvider } from "@/components/app-state-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BrandAccentProvider } from "@/components/brand-accent-provider";
-import { AppearanceSettingsSync } from "@/components/appearance-settings-sync";
-import { DocumentTitleController } from "@/components/document-title-controller";
 import { UiFontProvider } from "@/components/ui-font-provider";
 import { HeaderPatternProvider } from "@/components/header-pattern-provider";
 import { BrandStorageMigration } from "@/components/brand-storage-migration";
@@ -78,7 +53,8 @@ export const metadata: Metadata = {
     default: "Edgeways",
     template: "%s · Edgeways",
   },
-  description: "Calculators, live events and real-time profit tracking for matched betting",
+  description:
+    "The matched betting command centre. Know what's next, execute cleanly, and see what paid.",
   // Outbound bookie/casino clicks must not send Edgeways as Referer.
   referrer: "no-referrer",
   // Icons: src/app/icon.tsx (accent-tinted favicon from brand cookie) and
@@ -115,7 +91,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${notoSans.variable} ${figtree.variable} ${geistMono.variable} h-full overflow-hidden bg-[#111111] antialiased`}
+      className={`${notoSans.variable} ${figtree.variable} ${geistMono.variable} min-h-full antialiased`}
       style={accentStyle}
       {...(accentDerived
         ? { "data-brand-plate": accentDerived.brandPlateDark ? "dark" : "light" }
@@ -129,65 +105,25 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Blocking — paints stored accent before CSS defaults can flash Amber. */}
+        {/*
+          Blocking FOUC scripts. React 19 logs a false-positive
+          “Encountered a script tag” warning for these on client render;
+          ThemeProvider filters that specific console.error in dev.
+        */}
         <script
           dangerouslySetInnerHTML={{ __html: BRAND_ACCENT_FOUC_SCRIPT }}
         />
-        {/* Blocking — paints stored UI font before Default (Noto) can flash. */}
         <script dangerouslySetInnerHTML={{ __html: UI_FONT_FOUC_SCRIPT }} />
-        {/* Blocking — paints stored header pattern before Diagonal lines can flash. */}
         <script
           dangerouslySetInnerHTML={{ __html: HEADER_PATTERN_FOUC_SCRIPT }}
         />
       </head>
-      <body className="h-full overflow-hidden bg-canvas">
+      <body className="min-h-full bg-canvas">
         <BrandStorageMigration />
         <ThemeProvider>
           <BrandAccentProvider>
             <UiFontProvider>
-              <HeaderPatternProvider>
-                <AppStateProvider>
-                  <AppearanceSettingsSync />
-                  <OnboardingProvider>
-                    <AddBalanceProvider>
-                      <EachWayCalculatorProvider>
-                      <AddBetProvider>
-                        <AccaRunProvider>
-                          <BetBuilderRunProvider>
-                          <ScopePlaceChooserProvider>
-                            <TrackFixtureProvider>
-                              <MatchedCalculatorProvider>
-                                <OfferProvider>
-                                  <CasinoLogProvider>
-                                    <BoostCheckProvider>
-                                      <FreeBetsProvider>
-                                        <div className="flex h-dvh flex-col overflow-hidden">
-                                          <AppTopBar />
-                                          <AppShell>{children}</AppShell>
-                                        </div>
-                                        <Toaster richColors position="top-right" />
-                                        <QuickLogSheet />
-                                        <PwaInstallPrompt />
-                                        <CommandPalette />
-                                        <DocumentTitleController />
-                                        <AlertWatcher />
-                                        <RacingAutopilotListener />
-                                        <UserReminderListener />
-                                      </FreeBetsProvider>
-                                    </BoostCheckProvider>
-                                  </CasinoLogProvider>
-                                </OfferProvider>
-                              </MatchedCalculatorProvider>
-                            </TrackFixtureProvider>
-                          </ScopePlaceChooserProvider>
-                          </BetBuilderRunProvider>
-                        </AccaRunProvider>
-                      </AddBetProvider>
-                      </EachWayCalculatorProvider>
-                    </AddBalanceProvider>
-                  </OnboardingProvider>
-                </AppStateProvider>
-              </HeaderPatternProvider>
+              <HeaderPatternProvider>{children}</HeaderPatternProvider>
             </UiFontProvider>
           </BrandAccentProvider>
         </ThemeProvider>
@@ -195,4 +131,3 @@ export default async function RootLayout({
     </html>
   );
 }
-

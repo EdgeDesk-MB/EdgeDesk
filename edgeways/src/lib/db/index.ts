@@ -371,6 +371,15 @@ CREATE TABLE IF NOT EXISTS feedback_reports (
   created_at INTEGER NOT NULL,
   linear_issue_id TEXT
 );
+CREATE TABLE IF NOT EXISTS waitlist_signups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  confirm_token_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  confirmed_at INTEGER,
+  confirm_sent_at INTEGER,
+  unsubscribed_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,
@@ -505,6 +514,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("user_reminders", "context_venue TEXT");
   addColumn("system_runs", "place_fraction REAL");
   addColumn("feedback_reports", "linear_issue_id TEXT");
+  addColumn("waitlist_signups", "unsubscribed_at INTEGER");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS casino_offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

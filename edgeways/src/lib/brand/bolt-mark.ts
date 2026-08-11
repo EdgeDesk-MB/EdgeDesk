@@ -33,15 +33,17 @@ export function accentFaviconDataUrl(hex: string): string {
 /**
  * Swap the tab favicon to the accent-tinted bolt.
  * Keeps apple-touch / PWA icons untouched (those stay the static brand PNGs).
+ *
+ * Never call `.remove()` on Next/React-managed `<link rel="icon">` nodes.
+ * Those are HostHoistables (fiber tag 26); detaching them leaves
+ * `stateNode.parentNode === null`, and React 19 crashes on cleanup with
+ * `Cannot read properties of null (reading 'removeChild')`.
  */
 export function setAccentFavicon(hex: string): void {
   if (typeof document === "undefined") return;
   const href = accentFaviconDataUrl(hex);
   let link = document.querySelector<HTMLLinkElement>(`link[${FAVICON_LINK_ATTR}]`);
   if (!link) {
-    for (const el of document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')) {
-      if (!el.hasAttribute(FAVICON_LINK_ATTR)) el.remove();
-    }
     link = document.createElement("link");
     link.rel = "icon";
     link.type = "image/svg+xml";

@@ -89,11 +89,13 @@ import {
   defaultSelection,
   formatCorrectScore,
   inferSportFromBet,
+  isKnownSport,
   marketDef,
   MARKETS,
   parseCorrectScore,
   SPORTS,
   teamSelectionLabel,
+  type SportValue,
 } from "@/lib/markets";
 import type { BetRow, ExchangeRow } from "@/lib/db/schema";
 import {
@@ -463,7 +465,9 @@ export function AddBetDialog({
   const seedMarket = (MARKETS[seedSport] ?? MARKETS.other)[0].value;
   const [label, setLabel] = useState("");
   const [bookmaker, setBookmaker] = useState(appSettings?.defaultBookmaker ?? "");
-  const [sport, setSport] = useState(seedSport);
+  const [sport, setSport] = useState<SportValue | "">(
+    isKnownSport(seedSport) ? seedSport : "football",
+  );
   const [eventId, setEventId] = useState<string>("none");
   const dateTimeDefaults = defaultEventDateTime();
   const [eventName, setEventName] = useState("");
@@ -510,7 +514,9 @@ export function AddBetDialog({
 
   function resetFormState(opts?: { preserveFixtures?: boolean }) {
     const { date, time } = defaultEventDateTime();
-    const defaultSport = appSettings?.defaultSport ?? "football";
+    const defaultSport: SportValue = isKnownSport(appSettings?.defaultSport)
+      ? appSettings.defaultSport
+      : "football";
     const defaultMarket = (MARKETS[defaultSport] ?? MARKETS.other)[0].value;
     setLabel("");
     setSport(defaultSport);
@@ -754,7 +760,7 @@ export function AddBetDialog({
       if (prefill.advanced !== undefined) setAdvanced(prefill.advanced);
       if (prefill.partLays) setPartLays(prefill.partLays);
       if (prefill.layStakeOverride !== undefined) setLayStakeOverride(prefill.layStakeOverride);
-      if (prefill.sport) setSport(prefill.sport);
+      if (prefill.sport && isKnownSport(prefill.sport)) setSport(prefill.sport);
       if (prefill.market) {
         setMarket(prefill.market);
         setSelection(prefill.selection ?? defaultSelection(prefill.sport ?? "football", prefill.market));
@@ -1204,7 +1210,7 @@ export function AddBetDialog({
       setEventTime(formatEventTime(ev.startTime));
     }
     const nextSport = sportOverride ?? ev.sport;
-    if (nextSport) setSport(nextSport);
+    if (nextSport && isKnownSport(nextSport)) setSport(nextSport);
   }
 
   function applyPendingFixture(fixture: KnownFixtureOption) {
@@ -1419,10 +1425,11 @@ export function AddBetDialog({
 
   function changeSport(s: string) {
     if (editBet || courseScopeLocked) return;
-    setSport(s);
-    const first = (MARKETS[s] ?? MARKETS.other)[0].value;
+    const next: SportValue = isKnownSport(s) ? s : "football";
+    setSport(next);
+    const first = (MARKETS[next] ?? MARKETS.other)[0].value;
     setMarket(first);
-    setSelection(defaultSelection(s, first));
+    setSelection(defaultSelection(next, first));
     setEventId("none");
     setPendingFixture(null);
     setEventName("");
@@ -1514,7 +1521,7 @@ export function AddBetDialog({
         setEventId(String(matched.eventId));
         setManualEntry(false);
         if (ev) {
-          setSport(ev.sport ?? "football");
+          setSport(isKnownSport(ev.sport) ? ev.sport : "football");
           setHomeTeam(ev.homeTeam);
           setAwayTeam(ev.awayTeam);
           if (ev.sport === "horse_racing") {

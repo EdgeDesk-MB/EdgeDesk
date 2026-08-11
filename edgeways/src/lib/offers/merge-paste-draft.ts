@@ -47,6 +47,7 @@ export type OfferPasteFieldKey =
   | "winnerMustBeSpFavourite"
   | "minFavouriteSpOdds"
   | "resultConditional"
+  | "repeatSameDay"
   | "scopeMode"
   | "scopeCourse"
   | "preferredOffTime"
@@ -83,6 +84,7 @@ export type OfferPasteFormSlice = {
   winnerMustBeSpFavourite: boolean;
   minFavouriteSpOdds: string;
   resultConditional: boolean;
+  repeatSameDay: boolean;
   scopeMode: "uk_ire" | "course" | "race";
   scopeCourse: string;
   preferredOffTime: string | null;
@@ -285,6 +287,7 @@ export function draftToOfferFormPatch(
         ? String(draft.rules.minFavouriteSpOdds)
         : "";
     patch.resultConditional = pastedPlaces.length > 0 || pastedSpFav;
+    patch.repeatSameDay = draft.rules?.repeatSameDay === true;
     patch.scopeMode = draft.scopeMode;
     patch.scopeCourse = draft.scopeCourse;
     patch.preferredOffTime = draft.preferredOffTime;
@@ -406,6 +409,14 @@ export function mergeOfferPasteDraft(
       "resultConditional",
       form.resultConditional,
       patch.resultConditional,
+      provenance,
+      outProv,
+      false
+    );
+    next.repeatSameDay = mergeBool(
+      "repeatSameDay",
+      form.repeatSameDay,
+      patch.repeatSameDay,
       provenance,
       outProv,
       false

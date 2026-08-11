@@ -11,6 +11,7 @@ import {
 
 describe("pageLabelFromPathname", () => {
   it("matches longest desk prefixes", () => {
+    expect(pageLabelFromPathname("/desk")).toBe("Home");
     expect(pageLabelFromPathname("/")).toBe("Home");
     expect(pageLabelFromPathname("/racing")).toBe("Racing Desk");
     expect(pageLabelFromPathname("/offers/calendar")).toBe("Offer calendar");

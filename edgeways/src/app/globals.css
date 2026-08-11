@@ -464,10 +464,20 @@
   * {
     @apply border-border outline-ring/50;
   }
-  /* App-like chrome, not a page of prose - selection is opt-in via the
-     overrides below (inputs, contenteditable, copyable code/values). */
+  /*
+   * Default document scrolls (marketing / public pages). Desk locks the
+   * viewport via html.desk-surface (set by (app)/layout).
+   */
   body {
-    @apply h-full overflow-hidden bg-background text-foreground select-none;
+    @apply min-h-full bg-background text-foreground;
+  }
+  html.desk-surface,
+  html.desk-surface body {
+    @apply h-full overflow-hidden;
+  }
+  /* App-like chrome: selection is opt-in on the desk only. */
+  html.desk-surface body {
+    @apply select-none;
   }
   input, textarea, [contenteditable], [contenteditable="true"], code, pre {
     @apply select-text;
@@ -485,7 +495,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   html {
-    @apply h-full overflow-hidden font-sans;
+    @apply min-h-full font-sans;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
@@ -2160,4 +2170,195 @@ html[data-font="figtree"] {
   .aws-btn__content {
   background: var(--secondary) !important;
   color: var(--muted-foreground) !important;
+}
+
+/* Marketing one-pager (waitlist) */
+.marketing-root {
+  --marketing-brand: #ffc71e;
+  --marketing-ink: #111111;
+  --marketing-fg: #f5f5f0;
+  --marketing-band: #121212;
+  --marketing-band-deep: #0c0c0c;
+  /* Desk dark-mode positive £ (MoneyFlow emerald-400) */
+  --marketing-money: #34d399;
+  --marketing-money-soft: color-mix(
+    in srgb,
+    var(--marketing-money) 15%,
+    transparent
+  );
+  --marketing-panel-inset: #1a1a1a;
+}
+
+/* Quiet wash only — yellow stays on CTA + key words, not the background. */
+.marketing-atmosphere {
+  background: radial-gradient(
+    ellipse 70% 45% at 50% -8%,
+    oklch(0.856 0.17 87.3 / 0.07),
+    transparent 60%
+  );
+}
+
+/*
+ * Lighter section bands: desk diagonal-lines tile (same SVG as header
+ * pattern), low-opacity white ink. Use sparingly on lifted backgrounds.
+ */
+.marketing-band {
+  position: relative;
+  isolation: isolate;
+  /* Lifted vs pure ink, but quieter than the first #161616 pass */
+  background-color: var(--marketing-band);
+}
+
+.marketing-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Same tile as html[data-header-pattern="diagonal-lines"] .bg-topbar */
+  background-color: rgb(255 255 255 / 0.045);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='1' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 6V5zM6 5v1H5z'/%3E%3C/g%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='1' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 6V5zM6 5v1H5z'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-size: auto;
+  mask-size: auto;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+
+.marketing-band > * {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Product peeks / hero artefact: skeuo rim + border-only shine.
+ * Shine uses a real .marketing-panel-shine node (transform rotate) —
+ * more reliable than animating @property angles.
+ */
+.marketing-panel {
+  --marketing-shine-delay: 0s;
+  --marketing-shine-duration: 80s;
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.055) 0%,
+    rgb(255 255 255 / 0.025) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.4);
+}
+
+/* Glimpse cards: 40% black plate */
+.marketing-glimpse-rail .marketing-panel {
+  background: rgb(0 0 0 / 0.4);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.12),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.45);
+}
+
+/* Border ring mask — hard 1px rim (no drop-shadow blur) */
+.marketing-panel-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.marketing-panel-shine::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 250%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  /* Narrow peak on the 1px ring — crisp, no filter blur */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 300deg,
+    rgb(255 255 255 / 0.06) 318deg,
+    rgb(255 255 255 / 0.35) 328deg,
+    rgb(255 255 255 / 0.55) 333deg,
+    rgb(255 255 255 / 0.28) 338deg,
+    rgb(255 255 255 / 0.06) 348deg,
+    transparent 360deg
+  );
+  animation: marketing-shine-spin var(--marketing-shine-duration) linear
+    infinite;
+  animation-delay: var(--marketing-shine-delay);
+  will-change: transform;
+}
+
+/* Hero Do Next strip: wider arc, quicker loop */
+.marketing-panel-hero {
+  --marketing-shine-duration: 28s;
+  --marketing-shine-delay: 0s;
+}
+
+.marketing-panel-hero .marketing-panel-shine::before {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 240deg,
+    rgb(255 255 255 / 0.05) 270deg,
+    rgb(255 255 255 / 0.22) 295deg,
+    rgb(255 255 255 / 0.5) 318deg,
+    rgb(255 255 255 / 0.7) 330deg,
+    rgb(255 255 255 / 0.4) 342deg,
+    rgb(255 255 255 / 0.1) 352deg,
+    transparent 360deg
+  );
+}
+
+.marketing-panel > *:not(.marketing-panel-shine) {
+  position: relative;
+  z-index: 1;
+}
+
+/* One entrance beat for the hero block. */
+.marketing-fade-up {
+  animation: marketing-fade-up 0.55s ease-out both;
+}
+
+@keyframes marketing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marketing-shine-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-fade-up,
+  .marketing-panel-shine::before {
+    animation: none !important;
+  }
+
+  .marketing-panel-shine {
+    display: none;
+  }
 }

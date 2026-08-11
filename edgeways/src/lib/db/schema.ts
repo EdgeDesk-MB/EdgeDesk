@@ -411,6 +411,20 @@ export const feedbackReports = sqliteTable("feedback_reports", {
   linearIssueId: text("linear_issue_id"),
 });
 
+/** Launch waitlist (EDGE-26). Single opt-in; token used for unsubscribe (+ legacy confirm). */
+export const waitlistSignups = sqliteTable("waitlist_signups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  /** SHA-256 hex of the raw list token (unsubscribe / legacy confirm) */
+  confirmTokenHash: text("confirm_token_hash").notNull(),
+  createdAt: integer("created_at").notNull(),
+  confirmedAt: integer("confirmed_at"),
+  /** When the thanks / confirm email was last sent (ms) */
+  confirmSentAt: integer("confirm_sent_at"),
+  /** When the address opted out of waitlist mail */
+  unsubscribedAt: integer("unsubscribed_at"),
+});
+
 /** Bookie, exchange, or bank wallet for bankroll tracking */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -750,6 +764,7 @@ export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type UserReminderRow = typeof userReminders.$inferSelect;
 export type FeedbackReportRow = typeof feedbackReports.$inferSelect;
+export type WaitlistSignupRow = typeof waitlistSignups.$inferSelect;
 export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;

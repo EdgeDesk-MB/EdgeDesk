@@ -17,9 +17,34 @@ Expires 31/07/2026
     expect(draft.qualifyingPlaces).toEqual([2, 3, 4]);
     expect(draft.minRunners).toBe(8);
     expect(draft.rules?.type).toBe("bet_get_free_place");
+    expect(draft.rules?.repeatSameDay).toBeUndefined();
     expect(draft.expectedProfit).toBe(12);
     expect(draft.expiresAt).toBeTruthy();
     expect(draft.confidence).toBe("high");
+  });
+
+  it("sets repeatSameDay when paste says unlimited / every race", () => {
+    const draft = parseOfferFromText(`
+Paddy Power
+Bet £10 get £10 free bet if 2nd or 3rd
+Available on every race today · unlimited place refunds
+Min 8 runners · UK & Ireland
+`);
+    expect(draft.category).toBe("horse_racing");
+    expect(draft.qualifyingPlaces).toEqual([2, 3]);
+    expect(draft.rules?.repeatSameDay).toBe(true);
+    expect(draft.notes.some((n) => /multiple times today/i.test(n))).toBe(true);
+  });
+
+  it("does not set repeatSameDay from bare per-race stake wording", () => {
+    const draft = parseOfferFromText(`
+Tote
+Money Back 2nd & 3rd
+Get up to £10 back as a free bet if your horse finishes 2nd or 3rd
+First cash win only per race. Min 5 runners.
+`);
+    expect(draft.rules?.qualifyingPlaces).toEqual([2, 3]);
+    expect(draft.rules?.repeatSameDay).toBeUndefined();
   });
 
   it("parses football welcome offer with min odds and time expiry", () => {

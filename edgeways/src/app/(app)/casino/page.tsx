@@ -106,12 +106,34 @@ const STATUS_LABEL: Record<CasinoOfferRow["status"], string> = {
   expired: "Expired",
 };
 
-function DeleteButton({ onConfirm, label }: { onConfirm: () => void; label: string }) {
+function DeleteButton({
+  onConfirm,
+  label,
+  labelled = false,
+}: {
+  onConfirm: () => void;
+  label: string;
+  /** Campaign footers: labelled destructive ghost. Step rows stay icon-only. */
+  labelled?: boolean;
+}) {
   const [armed, setArmed] = useState(false);
   if (armed) {
     return (
       <Button variant="destructive" size="sm" onClick={onConfirm} onBlur={() => setArmed(false)}>
         Delete?
+      </Button>
+    );
+  }
+  if (labelled) {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-destructive hover:text-destructive"
+        aria-label={label}
+        onClick={() => setArmed(true)}
+      >
+        <Trash2 className="size-3.5" /> Delete
       </Button>
     );
   }
@@ -155,7 +177,13 @@ function DeleteCampaignDialog({
   }
 
   if (!recurring) {
-    return <DeleteButton onConfirm={() => void confirmDelete()} label="Delete campaign" />;
+    return (
+      <DeleteButton
+        onConfirm={() => void confirmDelete()}
+        label="Delete campaign"
+        labelled
+      />
+    );
   }
 
   return (
@@ -168,12 +196,12 @@ function DeleteCampaignDialog({
     >
       <DialogTrigger asChild>
         <Button
+          size="sm"
           variant="ghost"
-          size="icon"
-          className="size-7 text-muted-foreground"
+          className="text-destructive hover:text-destructive"
           aria-label="Delete campaign"
         >
-          <Trash2 className="size-3.5" />
+          <Trash2 className="size-3.5" /> Delete
         </Button>
       </DialogTrigger>
       <DialogContent mobile="center" className="max-w-sm">

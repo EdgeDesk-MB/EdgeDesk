@@ -9,10 +9,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "npx tsx scripts/neon-migrate.ts",
+    "db:neon-smoke": "npx tsx scripts/neon-smoke.ts",
+    "db:resend-smoke": "npx tsx scripts/resend-smoke.ts"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
+    "@neondatabase/serverless": "^1.1.0",
     "@number-flow/react": "^0.6.1",
     "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
@@ -28,6 +33,7 @@
     "next": "16.2.10",
     "next-themes": "^0.4.6",
     "otpauth": "^9.5.1",
+    "pg": "^8.23.0",
     "posthog-js": "^1.415.1",
     "radix-ui": "^1.6.2",
     "react": "19.2.4",
@@ -48,14 +54,19 @@
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
+    "@types/pg": "^8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
+    "@types/ws": "^8.18.1",
+    "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "ws": "^8.21.3"
   }
 }

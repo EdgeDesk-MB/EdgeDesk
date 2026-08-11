@@ -736,7 +736,7 @@ export function RacingDeskView() {
               value={date}
               onChange={setDate}
               size="lg"
-              className="shrink-0"
+              className="w-40 shrink-0"
             />
             <Button
               variant="outline"
@@ -890,7 +890,11 @@ export function RacingDeskView() {
         deskExchange={deskExchange}
         onDeskExchangeChange={onDeskExchangeChange}
         defaultExchangeName={defaultExchange?.name}
-        exchanges={exchanges}
+        exchanges={exchanges.map((e) => ({
+          id: e.id,
+          name: e.name,
+          isDefault: e.isDefault === 1,
+        }))}
         exchangeNameToProvider={exchangeNameToProvider}
         showOfferGuide={showOfferGuide}
         onShowOfferGuideChange={setShowOfferGuide}

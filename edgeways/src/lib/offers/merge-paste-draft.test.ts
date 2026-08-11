@@ -43,6 +43,7 @@ function emptySlice(): OfferPasteFormSlice {
     winnerMustBeSpFavourite: false,
     minFavouriteSpOdds: "",
     resultConditional: false,
+    repeatSameDay: false,
     scopeMode: "uk_ire",
     scopeCourse: "",
     preferredOffTime: null,

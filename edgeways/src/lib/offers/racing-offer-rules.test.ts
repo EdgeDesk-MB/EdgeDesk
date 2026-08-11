@@ -6,6 +6,7 @@ import {
   formatBetGetFreePlaceSummary,
   formatOfferScopeLabel,
   offerHasResultTrigger,
+  offerRepeatsSameDay,
   parseOfferRules,
   parseScopeCourses,
   placeRefundTriggerText,
@@ -111,6 +112,14 @@ describe("formatBetGetFreePlaceSummary", () => {
       "Bet £5 get £5 free · min 8 runners · GB & IRE"
     );
     expect(placeRefundTriggerText(rules)).toBe("Bet £5 get £5 FB");
+  });
+});
+
+describe("offerRepeatsSameDay", () => {
+  it("is false unless the flag is explicitly true", () => {
+    expect(offerRepeatsSameDay(undefined)).toBe(false);
+    expect(offerRepeatsSameDay({ repeatSameDay: false })).toBe(false);
+    expect(offerRepeatsSameDay({ repeatSameDay: true })).toBe(true);
   });
 });
 

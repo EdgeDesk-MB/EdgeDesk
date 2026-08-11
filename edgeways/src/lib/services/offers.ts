@@ -712,8 +712,8 @@ export function syncOfferStatuses(): void {
     }
   }
 
-  // Drop unused same-day twins once a recurring day's play is underway / done,
-  // and after used non-series cards have already been completed.
+  // Drop unused same-day twins for one-shot / series groups once a play is
+  // underway / done. Multi-use (`repeatSameDay`) groups keep their fresh card.
   reconcileSameDayOfferSiblings();
 
   syncOfferPlaybooksFromLedger(now);
@@ -801,10 +801,9 @@ export function syncOfferPlaybooksFromLedger(now = Date.now()): number {
 }
 
 /**
- * Spawn a fresh same-day campaign (course or UK & Ireland) when every live
- * sibling in the group already has a linked bet. Call only after bet create/link,
- * not on every status sync, otherwise deleting an unused fresh card immediately
- * respawns an identical one.
+ * Spawn a fresh same-day twin when a `repeatSameDay` place-refund group is
+ * fully used. One-shot / series campaigns no-op. Call only after bet
+ * create/link; orphan one-shot twins are retired on status sync.
  */
 export function spawnSameDayOfferSiblingsIfNeeded(): void {
   const allBets = db.select().from(bets).all();

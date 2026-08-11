@@ -47,7 +47,7 @@ but it makes the waitlist sell an install.
 
 ## Decision
 
-- [ ] **Route 1 — hosted multi-tenant** (recommended; confirms lean)
+- [x] **Route 1 — hosted multi-tenant** (recommended; confirms lean) — **decided 11 Aug 2026** (EDGE-18)
 - [ ] **Route 2 — local-first + paid sync** (privacy-first fallback)
 
-*Record the pick + date in `product-roadmap.md` D6 and comment it on EDGE-18.*
+*Recorded in `product-roadmap.md` D6 and on EDGE-18. Unlocks EDGE-19 (auth) and EDGE-47 (Neon).*

@@ -92,8 +92,10 @@ export function DatePicker({
           disabled={disabled}
           data-empty={!selected}
           className={cn(
-            "w-full justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
-            size === "lg" ? "px-3" : "px-2.5",
+            // Form fields stretch; header `lg` stays content-width so it can
+            // sit in a PageHeaderActions row without forcing a wrap.
+            size === "lg" ? "w-auto px-3" : "w-full px-2.5",
+            "justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
             className
           )}
         >

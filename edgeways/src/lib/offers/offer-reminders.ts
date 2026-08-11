@@ -4,6 +4,7 @@
  * nearest configured day-threshold, and ranks/caps the toast batch.
  */
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
+import type { OfferRow } from "@/lib/db/schema";
 
 const DAY_MS = 86_400_000;
 
@@ -13,7 +14,7 @@ export type OfferReminderCandidate = {
   id: number;
   title: string;
   bookmaker: string | null;
-  status: string;
+  status: OfferRow["status"];
   seriesId: number | null;
   instanceDate: string | null;
   expiresAt: number | null;

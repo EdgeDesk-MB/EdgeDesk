@@ -41,7 +41,7 @@ const collapseStyle = {
 function BrandLink({ className }: { className?: string }) {
   return (
     <Link
-      href="/"
+      href="/desk"
       aria-label="Edgeways home"
       className={cn(
         "flex shrink-0 items-center gap-2 transition-opacity sm:hover:opacity-90",

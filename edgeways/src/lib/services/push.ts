@@ -142,7 +142,7 @@ export async function sendPush(
     // (🟢/⚠/🔒/⏰), otherwise brand ⚡. Never stack a second bolt.
     title: ensureNotificationTitleEmoji(alert.title),
     body: alert.body ?? "",
-    href: alert.href ?? "/",
+    href: alert.href ?? "/desk",
     tag: alert.key,
     icon: NOTIFICATION_ICON,
     badge: NOTIFICATION_BADGE,

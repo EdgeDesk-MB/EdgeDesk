@@ -86,14 +86,15 @@ already Drizzle.
 
 | Tool | For | Status |
 |------|-----|--------|
-| Domain registrar | `edgeways.app` (registered, parked — confirm it's in your account + auto-renew) | **Sam check** (EDGE-23) |
+| Domain registrar | `edgeways.app` on **GoDaddy** | **Done** (EDGE-23) |
+| Human email | Zoho Mail — `sam@edgeways.app` + `hello@` / `support@` aliases | **Done** (11 Aug) |
 | GitHub | Private repo `EdgeDesk-MB/EdgeDesk`, branch protection, Actions for migration deploys | Exists — **confirm private** |
-| Vercel | Hosting, previews (staging), env vars, cron | **Sam account** (EDGE-23) |
-| Neon | Managed Postgres + branches + PITR | Post-D6 (EDGE-18) |
+| Vercel | Hosting, previews (staging), env vars, cron — team `edgeways` (Pro trial) | **In progress** (EDGE-46 — import repo) |
+| Neon | Managed Postgres + branches + PITR | **In progress** (EDGE-47; EDGE-18 Route 1 Done 11 Aug) |
 | PostHog EU | Analytics + error tracking, cookieless, `/ingest` proxy | **Done** (EDGE-35) |
 | Stripe *or* MoR (Paddle/Lemon Squeezy/Polar) | Payments | Awaiting EDGE-1 replies → EDGE-2 |
-| Transactional email (Resend / Postmark) | Waitlist confirmation now, auth emails later | Not yet — needed by EDGE-26 |
-| Uptime monitor (Better Stack / UptimeRobot free) | Hits `/api/health`, alerts to email | Not yet |
+| Transactional email (Resend) | Waitlist + auth emails; domain Verified Ireland | **Account done** (11 Aug); app wiring EDGE-26 |
+| Uptime monitor (Better Stack / UptimeRobot free) | Hits `/api/health`, alerts to email | Not yet (needs prod URL) |
 | Linear | Planning | Done |
 | **Later (native):** Google Play + TWA; Apple Developer + Capacitor/PWABuilder | App store wrappers | Post-launch |
 
@@ -131,9 +132,9 @@ beacons to our own domain — exactly what the privacy policy describes.
 | Task | Ticket | Milestone |
 |------|--------|-----------|
 | Confirm domain control + pick Vercel | EDGE-23 | M1 |
-| Provision Vercel project (previews = staging, prod on main) | new — EDGE-46 | M1 |
-| Transactional email account (Resend/Postmark) for waitlist | part of EDGE-26 | M2 |
-| Hosted Postgres (Neon) + Drizzle migration pipeline | new — EDGE-47, blocked by EDGE-18 | M2 |
+| Provision Vercel project (previews = staging, prod on main) | EDGE-46 | M1 |
+| Transactional email (Resend verified; waitlist form) | EDGE-26 | M2 |
+| Hosted Postgres (Neon) + Drizzle migration pipeline | EDGE-47 (Route 1 Done — unblocked) | M2 |
 | `/api/health` + uptime monitor | new — EDGE-48 | M2 |
 | Go-live hygiene scrub (section 6 checklist) | new — EDGE-49 | M3 |
 | DB restore drill | part of EDGE-47 done-when | M3 |

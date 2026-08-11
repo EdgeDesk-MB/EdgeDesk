@@ -73,7 +73,7 @@ describe("maybeSendDailyTasksDigest", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.kind).toBe("daily_tasks");
     expect(rows[0]?.title).toMatch(/^Your tasks today/);
-    expect(rows[0]?.href).toBe("/");
+    expect(rows[0]?.href).toBe("/desk");
     expect(rows[0]?.dedupe).toBe(`daily_tasks:${localDayKey(new Date(AFTER_NINE))}`);
 
     expect(maybeSendDailyTasksDigest(AFTER_NINE + 60_000)).toBe(false);

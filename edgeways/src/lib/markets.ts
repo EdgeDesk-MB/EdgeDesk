@@ -4,9 +4,10 @@
  * through a "The bet wins IF …" trigger.
  */
 
-import { SPORTS, type SportValue } from "@/lib/sports";
+import { SPORTS, isKnownSport, type SportValue } from "@/lib/sports";
 
-export { SPORTS };
+export { SPORTS, isKnownSport };
+export type { SportValue };
 
 export interface MarketDef {
   value: string;
@@ -139,14 +140,24 @@ export function inferSportFromBet(
   offerSport?: string | null,
   /** Denormalised bets.sport (desk backs, quick-log without event). */
   betSport?: string | null
-): string {
-  if (eventSport) return eventSport;
-  if (betSport?.trim()) return betSport.trim();
-  if (offerSport?.trim()) return offerSport.trim();
-  if (HORSE_RACING_MARKETS.has(market)) return "horse_racing";
-  if (TENNIS_MARKETS.has(market)) return "tennis";
-  if (OUTRIGHT_MARKETS.has(market)) return "golf";
-  return "football";
+): SportValue {
+  const pick = (s?: string | null): SportValue | null => {
+    const t = s?.trim();
+    if (!t) return null;
+    return isKnownSport(t) ? t : null;
+  };
+  return (
+    pick(eventSport) ??
+    pick(betSport) ??
+    pick(offerSport) ??
+    (HORSE_RACING_MARKETS.has(market)
+      ? "horse_racing"
+      : TENNIS_MARKETS.has(market)
+        ? "tennis"
+        : OUTRIGHT_MARKETS.has(market)
+          ? "golf"
+          : "football")
+  );
 }
 
 /** Events eligible for "Link event" on a bet of this sport (includes finished / past). */

@@ -289,6 +289,7 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
       resultConditional:
         (rules?.qualifyingPlaces?.length ?? 0) > 0 ||
         rules?.winnerMustBeSpFavourite === true,
+      repeatSameDay: rules?.repeatSameDay === true,
       scopeMode,
       scopeCourse: raceScoped || courseScoped ? (offer.scopeCourse ?? "") : "",
       scopeRaceId: offer.scopeRaceId ?? "",
@@ -348,6 +349,8 @@ function initialFromPrefill(prefill?: OfferEditorPrefill) {
     minFavouriteSpOdds: "",
     /** Off = straight bet&get; on = place/trigger refund (drives Offer Edge). */
     resultConditional: false,
+    /** Opt-in: spawn a fresh desk twin after each play today. */
+    repeatSameDay: false,
     scopeMode: "uk_ire" as ScopeMode,
     scopeCourse: "",
     scopeRaceId: "",
@@ -415,6 +418,7 @@ export function OfferEditorForm({
   );
   const [minFavouriteSpOdds, setMinFavouriteSpOdds] = useState(boot.minFavouriteSpOdds);
   const [resultConditional, setResultConditional] = useState(boot.resultConditional);
+  const [repeatSameDay, setRepeatSameDay] = useState(boot.repeatSameDay);
   const [scopeMode, setScopeMode] = useState<ScopeMode>(boot.scopeMode);
   const [scopeCourse, setScopeCourse] = useState(boot.scopeCourse);
   const [scopeRaceId, setScopeRaceId] = useState(boot.scopeRaceId);
@@ -520,6 +524,7 @@ export function OfferEditorForm({
     setWinnerMustBeSpFavourite(next.winnerMustBeSpFavourite);
     setMinFavouriteSpOdds(next.minFavouriteSpOdds);
     setResultConditional(next.resultConditional);
+    setRepeatSameDay(next.repeatSameDay);
     setScopeMode(next.scopeMode);
     setScopeCourse(next.scopeCourse);
     setScopeRaceId(next.scopeRaceId);
@@ -774,6 +779,13 @@ export function OfferEditorForm({
           minFavSp > 1
             ? { minFavouriteSpOdds: minFavSp }
             : {}),
+          // Series = once per day; race-scoped never twins. Opt-in multi-use only.
+          ...(resultConditional &&
+          scopeMode !== "race" &&
+          !seriesRecurrence?.enabled &&
+          repeatSameDay
+            ? { repeatSameDay: true as const }
+            : {}),
         }
       : null;
 
@@ -1004,6 +1016,7 @@ export function OfferEditorForm({
       winnerMustBeSpFavourite,
       minFavouriteSpOdds,
       resultConditional,
+      repeatSameDay,
       scopeMode,
       scopeCourse,
       preferredOffTime,
@@ -1051,6 +1064,7 @@ export function OfferEditorForm({
       setWinnerMustBeSpFavourite(merged.winnerMustBeSpFavourite);
       setMinFavouriteSpOdds(merged.minFavouriteSpOdds);
       setResultConditional(merged.resultConditional);
+      setRepeatSameDay(merged.repeatSameDay);
       setScopeMode(merged.scopeMode);
       setScopeCourse(merged.scopeCourse);
       setScopeRaceId("");
@@ -1329,19 +1343,59 @@ Expires 12 Aug 2026, 23:59`}
                   setQualifyingPlaces([]);
                   setWinnerMustBeSpFavourite(false);
                   setMinFavouriteSpOdds("");
+                  setRepeatSameDay(false);
                 }
               }}
             />
             <span>
               <span className="font-medium text-foreground">Reward depends on result</span>
               <span className="mt-0.5 block text-muted-foreground">
-                Place refunds and similar. Off = straight bet & get (once per campaign).
+                Place refunds and similar. Off = straight bet & get. How often it can be played
+                is set below when this is on.
               </span>
             </span>
           </label>
 
           {resultConditional ? (
             <div className="flex flex-col gap-3 border-l-2 border-border/70 pl-3">
+              {scopeMode !== "race" ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">How often today</Label>
+                  {seriesRecurrence?.enabled ? (
+                    <p className="text-xs text-muted-foreground">
+                      Recurring series: one play per day (tomorrow is a new instance).
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-1.5">
+                        <FilterPill
+                          active={!repeatSameDay}
+                          onClick={() => {
+                            setRepeatSameDay(false);
+                            touchPasteUser("repeatSameDay");
+                          }}
+                        >
+                          One-time today
+                        </FilterPill>
+                        <FilterPill
+                          active={repeatSameDay}
+                          onClick={() => {
+                            setRepeatSameDay(true);
+                            touchPasteUser("repeatSameDay");
+                          }}
+                        >
+                          Multiple times today
+                        </FilterPill>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {repeatSameDay
+                          ? "After each play, a fresh card stays on Racing Desk for another race."
+                          : "After you log a qualifying bet, this offer leaves Racing Desk."}
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : null}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">Qualifying places</Label>
                 <div className="flex flex-wrap gap-1.5">

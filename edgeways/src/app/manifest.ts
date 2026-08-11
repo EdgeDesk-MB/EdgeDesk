@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Edgeways",
     description:
       "Calculators, live events and real-time profit tracking for matched betting",
-    start_url: "/",
+    start_url: process.env.SITE_SURFACE === "app" ? "/desk" : "/",
     display: "standalone",
     // Ink chrome — matches viewport themeColor / topbar stripe so Arc & PWAs
     // don’t tint from the yellow dark-mode header plate.

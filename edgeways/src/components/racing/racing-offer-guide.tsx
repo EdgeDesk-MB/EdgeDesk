@@ -12,6 +12,7 @@ import {
   offerTagDisplayEv,
   qualifyingOfferTags,
 } from "@/lib/racing/offer-tags";
+import { findQualifyingBetForOfferOnRace } from "@/lib/racing/offer-linked-bet";
 import { formatClockTime } from "@/lib/time-format";
 import { formatDecimalOdds } from "@/lib/racing/odds";
 import { VenueBadge } from "@/components/venue-badge";
@@ -30,6 +31,7 @@ import {
   Zap,
 } from "lucide-react";
 import {
+  backedNavTag,
   edgeNavTag,
   edgePanel,
   qualifyPanel,
@@ -64,6 +66,8 @@ function HeightCollapse({
       className="grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none"
       style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       aria-hidden={!open}
+      // Closed panel must not keep focusables in tab order (aria-hidden alone does not).
+      {...(!open ? { inert: true } : {})}
     >
       <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
@@ -107,7 +111,10 @@ function StepRow({
   tone?: WorkflowTone;
 }) {
   return (
-    <div className="flex items-start gap-2 px-2.5 py-2 text-xs">
+    <div
+      className="flex items-start gap-2 px-2.5 py-2 text-xs"
+      aria-current={active ? "step" : undefined}
+    >
       <span
         className={cn(
           "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
@@ -119,6 +126,7 @@ function StepRow({
         )}
       >
         {done ? <Check className="size-3" aria-hidden /> : null}
+        {done ? <span className="sr-only">Done</span> : null}
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-medium">{label}</p>
@@ -270,28 +278,18 @@ function OfferWorkflowBody({
     heuristicRunner ??
     race.runners.find((r) => !r.nonRunner)?.name;
 
-  const linkedBackBet = useMemo(() => {
-    if (race.trackedEventId == null) return null;
-    const bets = state?.bets ?? [];
-    return (
-      bets.find(
-        (b) =>
-          b.status === "open" &&
-          b.eventId === race.trackedEventId &&
-          b.offerId === offerTag.offerId &&
-          (b.betType === "qualifying" || b.betType === "risk_free") &&
-          b.selection?.trim()
-      ) ??
-      bets.find(
-        (b) =>
-          b.status === "open" &&
-          b.eventId === race.trackedEventId &&
-          (b.betType === "qualifying" || b.betType === "risk_free") &&
-          b.selection?.trim()
-      ) ??
-      null
-    );
-  }, [state?.bets, race.trackedEventId, offerTag.offerId]);
+  const linkedBackBet = useMemo(
+    () =>
+      findQualifyingBetForOfferOnRace(
+        state?.bets,
+        race.trackedEventId,
+        offerTag.offerId,
+        offerTag.bookmaker,
+        // Settled still counts — same-day siblings keep the strip after use.
+        { includeSettled: true }
+      ),
+    [state?.bets, race.trackedEventId, offerTag.offerId, offerTag.bookmaker]
+  );
 
   const actualSelection = linkedBackBet?.selection?.trim() || null;
   const usedDifferentHorse =
@@ -300,8 +298,10 @@ function OfferWorkflowBody({
     !namesMatch(actualSelection, targetRunner);
 
   const tracked = race.trackedEventId != null;
-  const hasOpenBet = race.openBetCount > 0 || linkedBackBet != null;
-  const logged = tracked || hasOpenBet;
+  // Per-offer / same-bookie on this race only — never race.openBetCount or
+  // "any bet on the event" (that marked every qualifying bookie done).
+  const hasLinkedBet = linkedBackBet != null;
+  const logged = hasLinkedBet && tracked;
   const hasLayStake = (linkedBackBet?.layStake ?? 0) > 0;
   const layStepDone = layDone || hasLayStake;
 
@@ -309,14 +309,14 @@ function OfferWorkflowBody({
     { id: "pick", done: true, active: false },
     {
       id: "back",
-      done: backDone || hasOpenBet,
-      active: !backDone && !hasOpenBet,
+      done: backDone || hasLinkedBet,
+      active: !backDone && !hasLinkedBet,
     },
-    { id: "lay", done: layStepDone, active: (backDone || hasOpenBet) && !layStepDone },
+    { id: "lay", done: layStepDone, active: (backDone || hasLinkedBet) && !layStepDone },
     {
       id: "log",
       done: logged,
-      active: (backDone || hasOpenBet) && !logged,
+      active: (backDone || hasLinkedBet) && !logged,
     },
   ];
 
@@ -364,7 +364,7 @@ function OfferWorkflowBody({
             active={nextStep === "pick"}
             tone={tone}
             label="Race qualifies"
-            detail={`${race.course} ${race.startTime ? formatClockTime(race.startTime) : race.offTime} - eligible for ${offerTag.bookmaker ?? "your offer"}`}
+            detail={`${race.course} ${race.startTime ? formatClockTime(race.startTime) : race.offTime}, eligible for ${offerTag.bookmaker ?? "your offer"}`}
           />
         </li>
         <li className={cn(workflowPanel, "overflow-hidden")}>
@@ -431,7 +431,17 @@ function OfferWorkflowBody({
             active={nextStep === "log"}
             tone={tone}
             label="Log in tracker"
-            detail={tracked ? "Race tracked - bets linked" : "Track race so results settle your bets"}
+            detail={
+              logged
+                ? "Race tracked, qualifying bet linked"
+                : hasLinkedBet && !tracked
+                  ? "Track race so results settle your bets"
+                  : tracked
+                    ? offerTag.bookmaker
+                      ? `Add a qualifying bet for ${offerTag.bookmaker}`
+                      : "Add this offer's qualifying bet"
+                    : "Track race so results settle your bets"
+            }
             action={
               !tracked ? (
                 <Button
@@ -443,6 +453,20 @@ function OfferWorkflowBody({
                 >
                   <Pin className="size-3" />
                   Track
+                </Button>
+              ) : !hasLinkedBet && targetRunner ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 px-2 text-xs"
+                  onClick={() => {
+                    onBack(targetRunner, offerTag.offerId);
+                    setBackDone(true);
+                  }}
+                >
+                  <Gift className="size-3" />
+                  Back
                 </Button>
               ) : (
                 <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" asChild>
@@ -465,12 +489,15 @@ function CompactOfferCard({
   edge,
   isBest,
   selected,
+  backed,
   onSelect,
 }: {
   tag: RaceOfferTag;
   edge?: OfferEdgePlay;
   isBest: boolean;
   selected: boolean;
+  /** Open qualifying bet linked to this offer on the race. */
+  backed: boolean;
   onSelect: () => void;
 }) {
   const ev = offerTagDisplayEv(tag, edge);
@@ -481,8 +508,9 @@ function CompactOfferCard({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className={cn(
-        "flex w-[11.5rem] shrink-0 flex-col gap-1 rounded-lg border px-2.5 py-2 text-left transition-colors",
+        "flex w-[14rem] shrink-0 flex-col gap-1.5 rounded-lg border px-3.5 py-3 text-left transition-colors",
         selected
           ? cn(
               edge
@@ -490,10 +518,12 @@ function CompactOfferCard({
                 : "border-success/45 bg-success/10 ring-1 ring-success/30",
               tintCardWash
             )
-          : "border-border/70 bg-card hover:border-foreground/25 hover:bg-selection-subtle"
+          : backed
+            ? "border-foreground/25 bg-card ring-1 ring-foreground/10"
+            : "border-border/70 bg-card hover:border-foreground/25 hover:bg-selection-subtle"
       )}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {isBest ? (
           edge ? (
             <span className="inline-flex items-center gap-1">
@@ -506,10 +536,16 @@ function CompactOfferCard({
             </span>
           )
         ) : (
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="inline-flex items-center rounded-[3px] bg-muted px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-muted-foreground">
             Offer
           </span>
         )}
+        {backed ? (
+          <span className={backedNavTag} title="Qualifying bet logged for this offer">
+            <Check className="size-3 stroke-[2.5]" aria-hidden />
+            Backed
+          </span>
+        ) : null}
         {hasEv ? (
           <span className="ml-auto text-[11px] font-semibold tabular-nums">
             <MoneyFlow value={ev} signColor signDisplay estimate />
@@ -519,7 +555,7 @@ function CompactOfferCard({
       <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
         {tag.offerTitle}
       </p>
-      <div className="flex min-w-0 items-center gap-1 truncate text-[11px] text-muted-foreground">
+      <div className="flex min-w-0 items-center gap-1.5 truncate text-[11px] text-muted-foreground">
         {tag.bookmaker ? <VenueBadge name={tag.bookmaker} /> : <span>Any bookie</span>}
         {tag.betStake != null && tag.freeBetAmount != null ? (
           <span className="truncate">
@@ -554,10 +590,29 @@ export function RacingOfferGuide({
   onLay,
   onTrack,
 }: RacingOfferGuideProps) {
+  const { state } = useAppState();
   const tags = useMemo(() => qualifyingOfferTags(race, edgePlays), [race, edgePlays]);
   const bestId = tags[0]?.offerId ?? null;
   const [selectedId, setSelectedId] = useState<number | null>(bestId);
   const [workflowOpen, setWorkflowOpen] = useState(defaultExpanded);
+
+  const backedOfferIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const tag of tags) {
+      if (
+        findQualifyingBetForOfferOnRace(
+          state?.bets,
+          race.trackedEventId,
+          tag.offerId,
+          tag.bookmaker,
+          { includeSettled: true }
+        ) != null
+      ) {
+        ids.add(tag.offerId);
+      }
+    }
+    return ids;
+  }, [tags, state?.bets, race.trackedEventId]);
 
   // Adjust-during-render: new race / best / filter default re-selects and
   // re-applies expand preference (All races → collapsed).
@@ -589,34 +644,38 @@ export function RacingOfferGuide({
     ? edgePlayForRaceOffer(edgePlays, race.externalId, bestId) != null
     : false;
 
+  const backedCount = backedOfferIds.size;
+
   return (
     <div className="mt-4">
       {multi ? (
-        <HeightCollapse open={workflowOpen}>
-          <div className="mb-2 space-y-1.5">
-            <div className="flex items-center justify-between gap-2 px-0.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {tags.length} qualifying offers
-              </p>
-              <p className="text-[11px] text-muted-foreground">Scroll for more · tap to select</p>
-            </div>
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
-              {tags.map((tag) => (
-                <CompactOfferCard
-                  key={tag.offerId}
-                  tag={tag}
-                  edge={edgePlayForRaceOffer(edgePlays, race.externalId, tag.offerId)}
-                  isBest={tag.offerId === bestId}
-                  selected={tag.offerId === activeId}
-                  onSelect={() => {
-                    setSelectedId(tag.offerId);
-                    setWorkflowOpen(true);
-                  }}
-                />
-              ))}
-            </div>
+        <div className="mb-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {tags.length} qualifying offers
+              {backedCount > 0
+                ? ` · ${backedCount} of ${tags.length} backed`
+                : ""}
+            </p>
+            <p className="text-[11px] text-muted-foreground">Scroll for more · tap to select</p>
           </div>
-        </HeightCollapse>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1.5 [scrollbar-width:thin]">
+            {tags.map((tag) => (
+              <CompactOfferCard
+                key={tag.offerId}
+                tag={tag}
+                edge={edgePlayForRaceOffer(edgePlays, race.externalId, tag.offerId)}
+                isBest={tag.offerId === bestId}
+                selected={tag.offerId === activeId}
+                backed={backedOfferIds.has(tag.offerId)}
+                onSelect={() => {
+                  setSelectedId(tag.offerId);
+                  setWorkflowOpen(true);
+                }}
+              />
+            ))}
+          </div>
+        </div>
       ) : null}
 
       <div

@@ -69,7 +69,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "improvement",
         area: "Home",
-        href: "/",
+        href: "/desk",
         text: "Do next surfaces playbook steps first (deposit / opt-in / clear wagering) so deposit-gated campaigns do not look like ready-to-qualify Track cards.",
       },
       {
@@ -200,7 +200,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Home",
-        href: "/",
+        href: "/desk",
         text: "Monthly target: set one in Settings and the Monthly P&L chip shows factual pace - \"£162 of £250 · on pace\" or the £/day needed over the days left. No streaks, no confetti; a bad-variance week is not behind plan if the edge was captured.",
       },
       {
@@ -321,7 +321,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Home",
-        href: "/",
+        href: "/desk",
         text: "Home layout is yours: show or hide any widget per mode and reorder the mobile deck. Desktop keeps its two-column design and adapts - hide the chart and the plan takes the full width. Hidden widgets stay reachable from their own pages.",
       },
       {
@@ -371,7 +371,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "improvement",
         area: "Home",
-        href: "/",
+        href: "/desk",
         text: "Gubbed bookies' offers sink to the bottom of Do next (and wear a Gubbed chip) but are never hidden - closed accounts drop out entirely.",
       },
       {
@@ -390,7 +390,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Alerts",
-        href: "/",
+        href: "/desk",
         text: "Naked-exposure sentinel: an open qualifying or risk-free back with no lay raises an amber Home banner and an alert after 10 minutes (3 minutes near the off). One tap marks it intentional.",
       },
       {
@@ -416,7 +416,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Mobile",
-        href: "/",
+        href: "/desk",
         text: "Home is a swipeable deck on the phone - Overview, Today's plan, Chart, Feed and Do next as full-screen cards with pagination dots, remembered position and a context-aware start card (pin it in Settings).",
       },
       {
@@ -452,25 +452,25 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Home",
-        href: "/",
+        href: "/desk",
         text: "Today's plan: offer deadlines, race off-times and kick-offs in one timeline, each slot with its expected £. Completed slots collapse but never reorder.",
       },
       {
         kind: "feature",
         area: "Chart",
-        href: "/",
+        href: "/desk",
         text: "Retained | Gross toggle - gross adds back exchange commission so the cost of commission is visible rather than silently netted.",
       },
       {
         kind: "improvement",
         area: "Chart",
-        href: "/",
+        href: "/desk",
         text: "Markers are directional triangles (green up = profit in, red down = loss out), sit exactly on the plotted line, and balance corrections get their own markers at the foot of their step.",
       },
       {
         kind: "fix",
         area: "Chart",
-        href: "/",
+        href: "/desk",
         text: "Markers no longer drift off the line after a P&L-affecting balance adjustment.",
       },
     ],
@@ -510,13 +510,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Home",
-        href: "/",
+        href: "/desk",
         text: "Every £-EV on screen carries a provenance badge - live, estimated or heuristic - and Home leads with the edge on the table.",
       },
       {
         kind: "feature",
         area: "Do next",
-        href: "/",
+        href: "/desk",
         text: "£/hr rate sort, bankroll-aware ranking with funding shortfall chips, and paste-to-log that turns bookie confirmation text into a prefilled bet.",
       },
       {

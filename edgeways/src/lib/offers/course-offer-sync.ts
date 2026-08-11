@@ -1,14 +1,15 @@
 /**
- * Same-day multi-race offer persistence.
+ * Same-day place-refund offer continuity.
  *
- * When a one-shot course-day or regional (UK & Ireland) racing offer gets its
- * first linked bet, spawn a fresh sibling with the same scope/rules/date so the
- * Racing Desk keeps showing the offer for the next race — no visual gap.
+ * Default is one-shot: first linked bet uses the campaign; no twin is spawned.
+ * When `rules.repeatSameDay` is true, a fresh twin is spawned after each play
+ * so Racing Desk can keep offering later races.
  *
- * Race-scoped campaigns are one-shot and never spawn.
- * Recurring series instances (`seriesId`) are one use per `eventDate` — tomorrow
- * is a separate series row, so they never spawn same-day twins (otherwise Race
- * picks keeps recommending after today's play).
+ * Recurring series instances (`seriesId`) are always one use per `eventDate` —
+ * tomorrow is a separate series row; they never spawn twins.
+ *
+ * `reconcileSameDayOfferSiblings` retires leftover unused twins for one-shot /
+ * series groups so Race picks stops.
  *
  * Also: course expiry sync — when we have live racecard data, set expiresAt
  * to 30 min after the last race at that course starts (null expires only).
@@ -21,6 +22,7 @@ import {
   isRegionalScope,
   normalizeCourseName,
   offerHasResultTrigger,
+  offerRepeatsSameDay,
   parseOfferRules,
   parseScopeCourses,
 } from "@/lib/offers/racing-offer-rules";
@@ -40,9 +42,8 @@ export function isSpecificCourseOffer(
 type GroupKey = string;
 
 /**
- * Same-day multi-race cards: dated place-refund offers that are not locked
- * to a single race — either a named course day or regional UK & Ireland.
- * Straight bet&get / multiples (no result trigger) never spawn siblings.
+ * Same-day place-refund cards: dated offers with a result trigger that are not
+ * locked to a single race — named course day or regional UK & Ireland.
  */
 export function isSameDayMultiRaceOffer(offer: OfferRow): boolean {
   if (offer.sport !== "horse_racing") return false;
@@ -100,10 +101,13 @@ function completeUnusedOffer(offerId: number, now: number): void {
     .run();
 }
 
+function groupAllowsSameDayRepeat(group: OfferRow[]): boolean {
+  return group.some((o) => offerRepeatsSameDay(parseOfferRules(o)));
+}
+
 /**
- * After a recurring series day's instance is finished, retire unused same-day
- * twins so Race picks stops. Non-series multi-use keeps its fresh desk card
- * (user deletes it when done — sync must not respawn).
+ * After a one-shot / series place-refund campaign is finished, retire unused
+ * twins in the same group. Multi-use (`repeatSameDay`) groups keep their fresh card.
  */
 export function retireUnusedSameDayOfferSiblings(completedOfferId: number): void {
   const completed = db.select().from(offers).where(eq(offers.id, completedOfferId)).get();
@@ -116,8 +120,9 @@ export function retireUnusedSameDayOfferSiblings(completedOfferId: number): void
     .from(offers)
     .all()
     .filter((o) => isSameDayMultiRaceOffer(o) && groupKey(o) === key);
-  // Only series days are one-shot; course multi-use twins stay for the next race.
-  if (!group.some((o) => o.seriesId != null)) return;
+
+  // Opt-in multi-use: leave the fresh desk card for the next race.
+  if (groupAllowsSameDayRepeat(group)) return;
 
   const betCounts = betCountByOfferId(
     db.select({ offerId: bets.offerId }).from(bets).all()
@@ -133,12 +138,10 @@ export function retireUnusedSameDayOfferSiblings(completedOfferId: number): void
 }
 
 /**
- * Recurring series days are one play per eventDate. If today's series instance
- * already has bets (or is finished), complete any unused orphan twins that an
- * older spawn left behind — otherwise Race picks keeps recommending.
+ * Retire unused orphan twins for one-shot / series groups when any member is
+ * used or finished. Skips `repeatSameDay` multi-use groups.
  *
- * Safe on every status sync — never inserts rows. Does not touch non-series
- * multi-use continuity cards.
+ * Safe on every status sync — never inserts rows.
  */
 export function reconcileSameDayOfferSiblings(): void {
   const allOffers = db.select().from(offers).all();
@@ -157,16 +160,13 @@ export function reconcileSameDayOfferSiblings(): void {
   }
 
   for (const [, group] of groups) {
-    if (!group.some((o) => o.seriesId != null)) continue;
+    if (groupAllowsSameDayRepeat(group)) continue;
 
-    const seriesUsed = group.some(
-      (o) => o.seriesId != null && (betCounts.get(o.id) ?? 0) > 0
+    const groupUsed = group.some((o) => (betCounts.get(o.id) ?? 0) > 0);
+    const groupFinished = group.some(
+      (o) => o.status === "completed" || o.status === "expired"
     );
-    const seriesFinished = group.some(
-      (o) =>
-        o.seriesId != null && (o.status === "completed" || o.status === "expired")
-    );
-    if (!seriesUsed && !seriesFinished) continue;
+    if (!groupUsed && !groupFinished) continue;
 
     for (const offer of group) {
       if (offer.status !== "active" && offer.status !== "planned") continue;
@@ -177,16 +177,11 @@ export function reconcileSameDayOfferSiblings(): void {
 }
 
 /**
- * Ensure there is always exactly one "fresh" (no linked bets) sibling offer for
- * each same-day multi-race group that has all been used.
- *
- * Race-scoped campaigns are excluded: counting them as "used" was recreating a
- * course-wide duplicate every time the user deleted the fresh sibling.
- * Recurring series instances are excluded: one play per eventDate.
+ * Spawn a fresh twin when every live sibling in a `repeatSameDay` group has
+ * been used. Series and one-shot campaigns never spawn.
  *
  * Call only after a bet is created or linked to an offer, not on every
- * syncOfferStatuses() / state poll. Otherwise deleting an unused fresh card
- * immediately respawns an identical one while a used sibling still exists.
+ * syncOfferStatuses() / state poll.
  */
 export function ensureSameDayOfferSiblings(
   allOffers: OfferRow[],
@@ -194,13 +189,13 @@ export function ensureSameDayOfferSiblings(
 ): void {
   const betCountByOffer = betCountByOfferId(allBets);
 
-  // Group active/planned same-day offers by (scope, date, bookie, title)
   const groups = new Map<GroupKey, OfferRow[]>();
   for (const offer of allOffers) {
     if (offer.status !== "active" && offer.status !== "planned") continue;
     if (!isSameDayMultiRaceOffer(offer)) continue;
     // Recurring daily campaigns: tomorrow is a separate series row.
     if (offer.seriesId != null) continue;
+    if (!offerRepeatsSameDay(parseOfferRules(offer))) continue;
 
     const key = groupKey(offer);
     const group = groups.get(key) ?? [];
@@ -216,9 +211,10 @@ export function ensureSameDayOfferSiblings(
 
     if (withBets.length === 0 || fresh.length > 0) continue;
 
-    // Every card in this group has been used — spawn one fresh sibling
     const source = withBets.sort((a, b) => b.createdAt - a.createdAt)[0]!;
     if (source.seriesId != null) continue;
+    if (!offerRepeatsSameDay(parseOfferRules(source))) continue;
+
     db.insert(offers)
       .values({
         bookmaker: source.bookmaker,
@@ -235,7 +231,6 @@ export function ensureSameDayOfferSiblings(
         rules: source.rules,
         offerUrl: source.offerUrl,
         startsOn: source.startsOn,
-        // Inherit any already-computed race-expiry (may be null until Racing Desk runs)
         expiresAt: source.expiresAt,
         createdAt: now,
       })

@@ -1,0 +1,9 @@
+# Keep CLI deploys small — local DB and build artifacts stay off Vercel uploads.
+data
+.next
+node_modules
+coverage
+*.db
+*.db-*
+.env*
+!.env.example

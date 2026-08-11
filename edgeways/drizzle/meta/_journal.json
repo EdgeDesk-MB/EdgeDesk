@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786482771952,
+      "tag": "0000_nifty_rachel_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786485600000,
+      "tag": "0001_waitlist_signups",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786489200000,
+      "tag": "0002_waitlist_unsubscribed_at",
+      "breakpoints": true
+    }
+  ]
+}

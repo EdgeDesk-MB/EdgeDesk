@@ -83,7 +83,7 @@ export function maybeSendDailyTasksDigest(nowMs = Date.now()): boolean {
     kind: "daily_tasks",
     title: content.title,
     body: content.body,
-    href: "/",
+    href: "/desk",
   };
   recordAlerts([alert]);
   void sendPush(alert).catch(() => {});

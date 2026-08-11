@@ -111,6 +111,21 @@ function parseMinRunners(text: string): number | null {
   return n >= 4 && n <= 40 ? n : null;
 }
 
+/**
+ * Explicit multi-play wording only — place refund alone stays one-time.
+ * Avoid bare "per race" (often means stake/award limits, not unlimited plays).
+ */
+function parseRepeatSameDay(text: string): boolean {
+  return (
+    /\bunlimited\b/i.test(text) ||
+    /\bas\s+many\s+times\b/i.test(text) ||
+    /\bmultiple\s+times\b/i.test(text) ||
+    /\b(?:on\s+)?every\s+race\b/i.test(text) ||
+    /\b(?:on\s+)?each\s+race\b/i.test(text) ||
+    /\brepeat(?:able|ed)?\s+(?:today|same\s+day|daily)\b/i.test(text)
+  );
+}
+
 function parseFractionalOdds(raw: string): number | null {
   const m = raw.trim().match(/^(\d+)\s*\/\s*(\d+)$/);
   if (!m) return null;
@@ -1465,6 +1480,7 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
   const award = effects.find((e) => e.kind === "free_bet_award");
   const winnerMustBeSpFavourite =
     award?.winnerMustBeSpFavourite === true || textRequiresSpFavouriteWinner(text);
+  const repeatSameDay = parseRepeatSameDay(text);
   const minFavouriteSpOdds = winnerMustBeSpFavourite
     ? award?.minFavouriteSpOdds ?? parseMinFavouriteSpOdds(text)
     : null;
@@ -1644,8 +1660,12 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
       ...(minFavouriteSpOdds != null && minFavouriteSpOdds > 1
         ? { minFavouriteSpOdds }
         : {}),
+      ...(repeatSameDay && places.length > 0 ? { repeatSameDay: true } : {}),
     };
     notes.push(formatBetGetFreePlaceSummary(rules));
+    if (repeatSameDay && places.length > 0) {
+      notes.push("Multiple times today (can replay on other races)");
+    }
   } else if (isRacing && freeBetAmount != null && places.length > 0) {
     // Money-back style: refund capped at freeBetAmount for places
     rules = {
@@ -1659,8 +1679,12 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
       ...(minFavouriteSpOdds != null && minFavouriteSpOdds > 1
         ? { minFavouriteSpOdds }
         : {}),
+      ...(repeatSameDay ? { repeatSameDay: true } : {}),
     };
     notes.push(formatBetGetFreePlaceSummary(rules));
+    if (repeatSameDay) {
+      notes.push("Multiple times today (can replay on other races)");
+    }
   }
 
   notes.unshift(`Detected as ${offerCategoryById(category).label.toLowerCase()} offer`);

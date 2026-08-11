@@ -124,8 +124,13 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
       `ageConfirmedAt`; reusable `ResponsibleGamblingNote` in the gate and
       Settings → Help & about; the same component serves signup (EDGE-19+)
       and the marketing footer (EDGE-26).
-- [ ] **Solicitor confirmation that no gambling licence is needed** (§7.6 — the
-      product never takes a wager; confirm anyway, in writing).
+- [~] **Gambling licence assessment** (§7.6) — re-scoped 11 Aug (EDGE-8):
+      self-assessment evidence file drafted
+      (`docs/legal/gambling-licence-assessment.md`): no operating, software or
+      intermediary licence required — the GC licenses operators, not tools,
+      and 15+ years of unlicensed matched betting precedent holds. Solicitor
+      letter only if a trigger fires (Stripe/bank demand, server-placed bets,
+      EDGE-45 pooled feeds, GC guidance, big marketing push).
 - [~] **Terms of Service** — drafted 10 Aug (`docs/legal/terms-of-service.draft.md`,
       EDGE-11): subscription terms (renewal, cancellation, refund, trial),
       no-guarantee-of-profit disclaimer, "not gambling advice", user
@@ -152,8 +157,8 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
       points at the Software Vendor Licence (£1,499 + certification), BYOK
       recommended.
 
-*Not legal advice — the solicitor conversation is a checklist item, not a
-replacement for one.*
+*Not legal advice — the assessment file documents our own analysis; a
+solicitor reviews it if a trigger fires.*
 
 ## 5. Pre-launch readiness checklist
 
@@ -218,23 +223,23 @@ per-sale, not fixed costs. API feed COGS only starts when the Edge tier ships
 
 | Item | Cost | Ticket | Notes |
 |------|------|--------|-------|
-| Domain `edgeways.app` (year 1) | **£10.10 — paid ✓** | EDGE-23 | Cloudflare Registrar, auto-renew on |
+| Domain `edgeways.app` (year 1) | **paid ✓** | EDGE-23 | GoDaddy registrar; DNS may use Cloudflare |
 | ICO data protection fee | ~£40/yr | EDGE-9 | Mandatory once processing personal data |
-| Solicitor confirmation letter | £150–750 | EDGE-8 | Fixed-fee UK advice; gambling specialists at the top of the range |
+| Solicitor (only if triggered) | £0 now · £150–750 if triggered | EDGE-8 | Re-scoped 11 Aug: evidence file drafted; letter only if Stripe/bank or EDGE-45 trigger fires |
 | Trademark "Edgeways" (UK IPO) | £170 (+£50 per extra class) | EDGE-10 | Classes 9 + 42 = £220; optional but cheaper than a second forced rename |
-| **Pre-launch total** | **~£370–1,020** | | £230 of it near-certain (ICO + trademark + domain) |
+| **Pre-launch total** | **~£270** | | ICO + trademark + domain, all near-certain; +£150–750 only if a solicitor trigger fires |
 
 ### Monthly run-rate at launch
 
 | Item | Cost | Ticket | Notes |
 |------|------|--------|-------|
-| Vercel Pro | ~£20/mo | EDGE-46 | Required once commercial (Hobby is non-commercial); £0 until then |
-| Neon Postgres | £0 → ~£15–19/mo | EDGE-47 | Free tier covers beta; paid as data grows |
+| Vercel Pro | ~£20/mo | EDGE-46 | Team `edgeways` on Pro trial (11 Aug); ~$20/seat after trial |
+| Neon Postgres | £0 → ~£15–19/mo | EDGE-47 | Free tier covers beta; Route 1 unlocked 11 Aug |
 | PostHog EU | £0 | done | Free allowance covers launch scale (1M events/mo) |
-| Transactional email (Resend/Postmark) | £0 | EDGE-26 | Free tiers cover waitlist + auth volumes |
+| Transactional email (Resend) | £0 | EDGE-26 | Domain verified Ireland eu-west-1 (11 Aug); form still M2 |
 | Uptime monitor | £0 | EDGE-48 | Free tier |
 | Auth (Clerk/Supabase/Auth.js) | £0 | EDGE-19 | Free tiers cover 10k+ MAU; Auth.js is £0 self-hosted |
-| Support email | £0 | EDGE-34 | Cloudflare Email Routing (free forwarding) |
+| Support / human email | ~£3.20/mo | EDGE-34 | Zoho Mail Standard — `sam@` + aliases `hello@`, `support@` |
 | **Run-rate** | **~£20–39/mo** | | Before processing fees |
 
 ### Per-sale (only when money moves)
@@ -258,7 +263,8 @@ per-sale, not fixed costs. API feed COGS only starts when the Edge tier ships
 Apple Developer $99/yr · Google Play $25 one-off — only when the TWA/Capacitor
 wrappers happen.
 
-**Bottom line:** ~£370–1,020 to the launch gate, then ~£20–39/mo before
+**Bottom line:** ~£270 to the launch gate (+£150–750 only if a solicitor
+trigger fires), then ~£20–39/mo before
 per-sale fees. The first Core subscriber (£9.99/mo) covers a third to a half
 of the monthly run-rate; three subscribers cover it all.
 | Feedback & Automations | Migration, triage loop, hooks, sweeps, errors → Linear | EDGE-38…43 |

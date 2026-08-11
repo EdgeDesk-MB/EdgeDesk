@@ -50,7 +50,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return inFlight.current;
     }
 
-    const run = (async () => {
+    let run!: Promise<void>;
+    run = (async () => {
       try {
         const res = await fetch("/api/state", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

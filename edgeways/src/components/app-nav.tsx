@@ -124,7 +124,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: null,
     entries: [
-      { kind: "link", href: "/", label: "Home", icon: Home },
+      { kind: "link", href: "/desk", label: "Home", icon: Home },
       { kind: "link", href: "/alerts", label: "Alerts", icon: BellRing },
       { kind: "link", href: "/history", label: "History", icon: History },
       {
@@ -264,7 +264,7 @@ export function flattenNavEntries(
 }
 
 export function isLinkActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
+  if (href === "/desk") return pathname === "/desk";
   if (href === "/offers") {
     return pathname === "/offers" || pathname.startsWith("/offers?");
   }
@@ -534,15 +534,15 @@ export function AppNav() {
                 : undefined;
     const onQuickAction =
       quickAction === "addBalance"
-        ? openAddBalance
+        ? () => openAddBalance()
         : quickAction === "addBet"
           ? () => openAddBet()
           : quickAction === "matchedCalculator"
             ? () => openMatchedCalculator()
             : quickAction === "trackFixture"
-              ? openTrackFixture
+              ? () => openTrackFixture()
               : quickAction === "boostCheck"
-                ? openBoostCheck
+                ? () => openBoostCheck()
                 : undefined;
 
     const leafBadge =

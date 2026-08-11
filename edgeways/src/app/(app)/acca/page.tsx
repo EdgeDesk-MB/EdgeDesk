@@ -587,12 +587,12 @@ function RunCard({
       </div>
 
       <CardContent className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 py-3.5 pl-(--card-spacing) pr-[calc(var(--card-spacing)-4px)]">
-        <span className={campaignCardFooterMeta}>
-          {legs.length} leg{legs.length === 1 ? "" : "s"}
-          {laidCount > 0 ? ` · ${laidCount} laid` : ""}
-          {stillOpen ? " · in progress" : ` · ${statusLabel}`}
-        </span>
-        <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={campaignCardFooterMeta}>
+            {legs.length} leg{legs.length === 1 ? "" : "s"}
+            {laidCount > 0 ? ` · ${laidCount} laid` : ""}
+            {stillOpen ? " · in progress" : ` · ${statusLabel}`}
+          </span>
           <DeleteRunButton
             label={run.label}
             onDeleted={async () => {
@@ -600,11 +600,11 @@ function RunCard({
               onChanged();
             }}
           />
-          <EditAccaRunDialog
-            edit={{ run, legs, backBetType }}
-            onSaved={onChanged}
-          />
         </div>
+        <EditAccaRunDialog
+          edit={{ run, legs, backBetType }}
+          onSaved={onChanged}
+        />
       </CardContent>
     </Card>
   );

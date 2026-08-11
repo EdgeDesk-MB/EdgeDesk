@@ -43,7 +43,7 @@ const stickyToastMeta = new Map<string, StickyToastMeta>();
 
 let lifecycleStarted = false;
 let hiddenAt: number | null = null;
-let staleTimer: ReturnType<typeof window.setInterval> | null = null;
+let staleTimer: ReturnType<typeof setInterval> | null = null;
 
 function edgeAlertToastClassName(alert: EdgeAlert): string {
   return cn(
@@ -150,7 +150,7 @@ export function ensureAlertToastLifecycle(): void {
     hiddenAt = null;
   });
 
-  staleTimer = window.setInterval(() => {
+  staleTimer = setInterval(() => {
     dismissStaleStickyAlertToasts();
   }, ALERT_TOAST_AGE_TICK_MS);
   void staleTimer;

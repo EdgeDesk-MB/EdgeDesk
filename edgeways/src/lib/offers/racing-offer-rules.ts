@@ -22,6 +22,11 @@ export interface BetGetFreePlaceRules {
    * Only meaningful with `winnerMustBeSpFavourite`.
    */
   minFavouriteSpOdds?: number;
+  /**
+   * When true, Racing Desk spawns a fresh twin after each play today.
+   * Default / absent = one-time (no twin).
+   */
+  repeatSameDay?: boolean;
 }
 
 export function normalizeCourseName(name: string): string {
@@ -112,6 +117,13 @@ export function offerHasResultTrigger(
   if (!rules) return false;
   if (rules.winnerMustBeSpFavourite) return true;
   return rules.qualifyingPlaces.some((p) => Number.isInteger(p) && p >= 1);
+}
+
+/** True when the offer may be played again today (desk spawns a twin after each bet). */
+export function offerRepeatsSameDay(
+  rules: Pick<BetGetFreePlaceRules, "repeatSameDay"> | null | undefined
+): boolean {
+  return rules?.repeatSameDay === true;
 }
 
 function placeOrdinal(n: number): string {

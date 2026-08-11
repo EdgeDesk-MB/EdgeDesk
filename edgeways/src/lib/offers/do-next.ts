@@ -40,6 +40,7 @@ export const EFFORT_MINUTES: Record<
   playbook_deposit: 5,
   playbook_opt_in: 2,
   playbook_clear_wagering: 8,
+  playbook_await_award: 0,
   orphan_free_bet: 6,
 };
 

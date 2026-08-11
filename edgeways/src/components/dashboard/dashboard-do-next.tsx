@@ -37,35 +37,41 @@ import type { EvBasis } from "@/lib/offers/advantage";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { formatEvGbp } from "@/lib/format-money";
 
-/** Matches Offer calendar board cards — Est. label + amount, top-right on header tint. */
+/**
+ * Matches Offer calendar board cards — Est. label + amount, top-right on header tint.
+ * Keep the Est. + amount stack mounted (invisible when empty) so cards without a
+ * figure do not pull the title row up relative to neighbours that show one.
+ */
 function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: EvBasis }) {
-  if (remainingEv <= 0.5) return null;
+  const show = remainingEv > 0.5;
   return (
-    <div className="shrink-0 text-right">
+    <div
+      className={cn("shrink-0 text-right", !show && "invisible pointer-events-none")}
+      aria-hidden={!show}
+    >
       <EvBasisBadge basis={basis} className="mb-0.5 justify-end" />
       <p className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-        {formatEvGbp(remainingEv)}
+        {show ? formatEvGbp(remainingEv) : "£0.00"}
       </p>
     </div>
   );
 }
 
+/**
+ * Tint follows offer EV: Est. remaining when shown, else campaign expected.
+ * Never use realised totalProfit — sunk qualifying losses paint a false loss tint
+ * (e.g. Await free bet with EST. £8.50 green text but red header).
+ */
 function doNextHeaderTint(item: DoNextItem, offer?: OfferSummary): string | null {
   if (offer && isOfferExpired(offer)) return "offer-header-tint-expired";
 
-  // Convert-free-bet cards are about the free bet still on the table, not the
-  // (already realised) qualifying-leg cost baked into offer.profit.totalProfit -
-  // tint those on the remaining EV like orphan free-bet cards.
-  if (offer && item.kind !== "convert_free_bet") {
-    const tintValue =
-      Math.abs(offer.profit.totalProfit) > 0.005
-        ? offer.profit.totalProfit
-        : (offer.expectedProfit ?? offer.expectedFromBets);
-    if (tintValue > 0.005) return "offer-header-tint-win";
-    if (tintValue < -0.005) return "offer-header-tint-loss";
-    return null;
-  }
-  if (item.remainingEv > 0.5) return "offer-header-tint-win";
+  const tintValue =
+    Math.abs(item.remainingEv) > 0.5
+      ? item.remainingEv
+      : (offer?.expectedProfit ?? offer?.expectedFromBets ?? item.remainingEv);
+
+  if (tintValue > 0.005) return "offer-header-tint-win";
+  if (tintValue < -0.005) return "offer-header-tint-loss";
   return null;
 }
 

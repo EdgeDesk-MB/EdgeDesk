@@ -73,6 +73,7 @@ import { racingRegionLabel } from "@/lib/geo/region";
 import { countRecommendedOffersOnRace } from "@/lib/racing/offer-tags";
 import {
   edgeMarkerPill,
+  backedNavTag,
   edgeNavTag,
   listPillState,
   listRow,
@@ -533,24 +534,6 @@ function RunnerRow({
         <div className="flex flex-wrap items-center gap-2">
           <RegionFlag code={race.region} className="opacity-90" />
           <span className="font-semibold leading-tight">{runner.name}</span>
-          {betMark != null && (
-            <span
-              className="inline-flex items-center gap-1 rounded-[3px] bg-foreground px-1.5 py-0.5 text-xs font-bold uppercase leading-none tracking-wide text-background"
-              title={
-                betMark.kind === "open"
-                  ? betMark.betCount > 1
-                    ? `${betMark.betCount} open bets on this runner`
-                    : "Open bet on this runner"
-                  : betMark.betCount > 1
-                    ? `${betMark.betCount} settled bets on this runner`
-                    : "Settled bet on this runner"
-              }
-            >
-              <Check className="size-3 stroke-[2.5]" aria-hidden />
-              Backed
-              {betMark.betCount > 1 ? ` · ${betMark.betCount}` : ""}
-            </span>
-          )}
           {resultMode && isSpFavourite && (
             <Badge
               variant="outline"
@@ -588,6 +571,24 @@ function RunnerRow({
           {showRecommended && (
             <span className={edgeNavTag} title="Offer Edge recommended play">
               Edge
+            </span>
+          )}
+          {betMark != null && (
+            <span
+              className={backedNavTag}
+              title={
+                betMark.kind === "open"
+                  ? betMark.betCount > 1
+                    ? `${betMark.betCount} open bets on this runner`
+                    : "Open bet on this runner"
+                  : betMark.betCount > 1
+                    ? `${betMark.betCount} settled bets on this runner`
+                    : "Settled bet on this runner"
+              }
+            >
+              <Check className="size-3 stroke-[2.5]" aria-hidden />
+              Backed
+              {betMark.betCount > 1 ? ` · ${betMark.betCount}` : ""}
             </span>
           )}
           {isOfferTarget && (

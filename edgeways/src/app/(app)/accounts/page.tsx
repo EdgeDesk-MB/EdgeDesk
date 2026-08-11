@@ -180,7 +180,7 @@ function AccountsContent() {
             >
               <ArrowLeftRight className="size-4" /> Transfer
             </Button>
-            <Button {...pagePrimaryButtonProps} onClick={openAddBalance}>
+            <Button {...pagePrimaryButtonProps} onClick={() => openAddBalance()}>
               <Plus className="size-4" /> Adjust balance
             </Button>
           </PageHeaderActions>

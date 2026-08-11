@@ -192,6 +192,13 @@ export const edgeNavTag =
   "inline-flex items-center rounded-[3px] bg-edge px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-edge-foreground";
 
 /**
+ * Settled/open bet mark on Racing Desk runners — same box as `edgeNavTag`
+ * (11px, px-1.5 py-0.5, rounded-[3px]); ink plate + canvas type.
+ */
+export const backedNavTag =
+  "inline-flex items-center gap-1 rounded-[3px] bg-foreground px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-background";
+
+/**
  * Brand-plate counter for sitting on ink / neutral chrome (not on active
  * filter pills — those are already brand/edge filled).
  */
