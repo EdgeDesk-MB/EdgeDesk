@@ -207,6 +207,60 @@ EDGE-43, deliberately deferred until feedback volume exists):
 | Entitlements & Accounts | N0 matrix, D6, auth, sign-in, enforcement, hosted DB | EDGE-17…22, 47 |
 | Marketing Site & Waitlist | Domain/hosting, landing, waitlist, countdown, SEO, beta, Vercel | EDGE-23…29, 46 |
 | Launch QA & Polish | E3, G2, G4, onboarding, support, evidence, checklist, health, hygiene | EDGE-30…37, 48, 49 |
+
+## 7. Anticipated costs (11 Aug 2026)
+
+Confirmed figures where known, honest ranges elsewhere. Processing fees are
+per-sale, not fixed costs. API feed COGS only starts when the Edge tier ships
+(post-EDGE-45) and is designed to be covered by Edge revenue (§7.2).
+
+### One-off, pre-launch
+
+| Item | Cost | Ticket | Notes |
+|------|------|--------|-------|
+| Domain `edgeways.app` (year 1) | **£10.10 — paid ✓** | EDGE-23 | Cloudflare Registrar, auto-renew on |
+| ICO data protection fee | ~£40/yr | EDGE-9 | Mandatory once processing personal data |
+| Solicitor confirmation letter | £150–750 | EDGE-8 | Fixed-fee UK advice; gambling specialists at the top of the range |
+| Trademark "Edgeways" (UK IPO) | £170 (+£50 per extra class) | EDGE-10 | Classes 9 + 42 = £220; optional but cheaper than a second forced rename |
+| **Pre-launch total** | **~£370–1,020** | | £230 of it near-certain (ICO + trademark + domain) |
+
+### Monthly run-rate at launch
+
+| Item | Cost | Ticket | Notes |
+|------|------|--------|-------|
+| Vercel Pro | ~£20/mo | EDGE-46 | Required once commercial (Hobby is non-commercial); £0 until then |
+| Neon Postgres | £0 → ~£15–19/mo | EDGE-47 | Free tier covers beta; paid as data grows |
+| PostHog EU | £0 | done | Free allowance covers launch scale (1M events/mo) |
+| Transactional email (Resend/Postmark) | £0 | EDGE-26 | Free tiers cover waitlist + auth volumes |
+| Uptime monitor | £0 | EDGE-48 | Free tier |
+| Auth (Clerk/Supabase/Auth.js) | £0 | EDGE-19 | Free tiers cover 10k+ MAU; Auth.js is £0 self-hosted |
+| Support email | £0 | EDGE-34 | Cloudflare Email Routing (free forwarding) |
+| **Run-rate** | **~£20–39/mo** | | Before processing fees |
+
+### Per-sale (only when money moves)
+
+| Stack | Fee | On a £9.99 Core month |
+|-------|-----|----------------------|
+| Stripe direct | ~1.5% + 25p (UK) | ~£0.40 |
+| Merchant of Record | ~5% + 50p | ~£1.00 (but absorbs all VAT admin) |
+
+### Edge-tier COGS (post-launch, permission-gated)
+
+| Item | Cost | Ticket |
+|------|------|--------|
+| The Racing API (Basic/Standard) | ~£25+/mo | EDGE-45 |
+| API-Football Pro | ~£15/mo | EDGE-45 |
+| Betfair Software Vendor Licence | £1,499 one-off + security certification | EDGE-14 — only if exchange integration ships hosted |
+| Pooled-feed target | £2–6/mo total at 50–100 subscribers (§7.2) | design goal |
+
+### Parked (native apps, post-launch)
+
+Apple Developer $99/yr · Google Play $25 one-off — only when the TWA/Capacitor
+wrappers happen.
+
+**Bottom line:** ~£370–1,020 to the launch gate, then ~£20–39/mo before
+per-sale fees. The first Core subscriber (£9.99/mo) covers a third to a half
+of the monthly run-rate; three subscribers cover it all.
 | Feedback & Automations | Migration, triage loop, hooks, sweeps, errors → Linear | EDGE-38…43 |
 
 Cycle 1 (17–23 Aug): EDGE-1, 2, 8, 9, 17, 18, 23, 24, 38, 39, 40.
