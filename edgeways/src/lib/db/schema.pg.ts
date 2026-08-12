@@ -1,9 +1,10 @@
 /**
  * Postgres schema for hosted Neon (EDGE-47).
  * Parallel to schema.ts (SQLite) — local Mac keeps SQLite until async cutover.
- * Do not import this from app code yet; used by drizzle-kit + neon smoke only.
+ * Waitlist store imports waitlistSignups from here when DATABASE_URL is set.
  */
 import {
+  bigint,
   doublePrecision,
   integer,
   pgTable,
@@ -428,12 +429,13 @@ export const waitlistSignups = pgTable("waitlist_signups", {
   email: text("email").notNull().unique(),
   /** SHA-256 hex of the raw list token (unsubscribe / legacy confirm) */
   confirmTokenHash: text("confirm_token_hash").notNull(),
-  createdAt: integer("created_at").notNull(),
-  confirmedAt: integer("confirmed_at"),
+  /** ms epoch — bigint: Postgres integer cannot hold Date.now() */
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  confirmedAt: bigint("confirmed_at", { mode: "number" }),
   /** When the thanks / confirm email was last sent (ms) */
-  confirmSentAt: integer("confirm_sent_at"),
+  confirmSentAt: bigint("confirm_sent_at", { mode: "number" }),
   /** When the address opted out of waitlist mail */
-  unsubscribedAt: integer("unsubscribed_at"),
+  unsubscribedAt: bigint("unsubscribed_at", { mode: "number" }),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */
