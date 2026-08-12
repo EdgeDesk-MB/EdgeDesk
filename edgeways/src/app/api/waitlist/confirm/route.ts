@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token") ?? "";
-  const result = confirmWaitlist(token);
+  const result = await confirmWaitlist(token);
 
   const dest = new URL("/waitlist/confirmed", url.origin);
   if (result.status === "invalid_token") {

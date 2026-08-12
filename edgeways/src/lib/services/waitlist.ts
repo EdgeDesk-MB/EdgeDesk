@@ -4,8 +4,12 @@
  */
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { db, waitlistSignups, type WaitlistSignupRow } from "@/lib/db";
+import {
+  findWaitlistByEmail,
+  findWaitlistByTokenHash,
+  insertWaitlistSignup,
+  updateWaitlistSignup,
+} from "@/lib/services/waitlist-store";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BRAND = "#FFC71E";
@@ -245,11 +249,7 @@ export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult
     throw new Error("Enter a valid email address.");
   }
 
-  const existing = db
-    .select()
-    .from(waitlistSignups)
-    .where(eq(waitlistSignups.email, email))
-    .get() as WaitlistSignupRow | undefined;
+  const existing = await findWaitlistByEmail(email);
 
   if (existing?.confirmedAt != null && existing.unsubscribedAt == null) {
     return { status: "already_confirmed", email };
@@ -262,26 +262,20 @@ export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult
   const rejoin = Boolean(existing?.unsubscribedAt);
 
   if (existing) {
-    db.update(waitlistSignups)
-      .set({
-        confirmTokenHash: tokenHash,
-        confirmedAt: existing.confirmedAt ?? now,
-        confirmSentAt: now,
-        unsubscribedAt: null,
-      })
-      .where(eq(waitlistSignups.id, existing.id))
-      .run();
+    await updateWaitlistSignup(existing.id, {
+      confirmTokenHash: tokenHash,
+      confirmedAt: existing.confirmedAt ?? now,
+      confirmSentAt: now,
+      unsubscribedAt: null,
+    });
   } else {
-    db.insert(waitlistSignups)
-      .values({
-        email,
-        confirmTokenHash: tokenHash,
-        createdAt: now,
-        confirmedAt: now,
-        confirmSentAt: now,
-        unsubscribedAt: null,
-      })
-      .run();
+    await insertWaitlistSignup({
+      email,
+      confirmTokenHash: tokenHash,
+      createdAt: now,
+      confirmedAt: now,
+      confirmSentAt: now,
+    });
   }
 
   await sendThanksEmail({ email, unsubscribeUrl });
@@ -295,28 +289,20 @@ export type ConfirmWaitlistResult =
   | { status: "invalid_token" };
 
 /** Legacy confirm links from the old double-opt-in flow. */
-export function confirmWaitlist(rawToken: string): ConfirmWaitlistResult {
+export async function confirmWaitlist(
+  rawToken: string
+): Promise<ConfirmWaitlistResult> {
   const token = rawToken.trim();
   if (!token || token.length > 200) return { status: "invalid_token" };
 
-  const tokenHash = hashToken(token);
-  const row = db
-    .select()
-    .from(waitlistSignups)
-    .where(eq(waitlistSignups.confirmTokenHash, tokenHash))
-    .get() as WaitlistSignupRow | undefined;
+  const row = await findWaitlistByTokenHash(hashToken(token));
 
   if (!row) return { status: "invalid_token" };
   if (row.confirmedAt != null) {
     return { status: "already_confirmed", email: row.email };
   }
 
-  const now = Date.now();
-  db.update(waitlistSignups)
-    .set({ confirmedAt: now })
-    .where(eq(waitlistSignups.id, row.id))
-    .run();
-
+  await updateWaitlistSignup(row.id, { confirmedAt: Date.now() });
   return { status: "confirmed", email: row.email };
 }
 
@@ -325,27 +311,19 @@ export type UnsubscribeWaitlistResult =
   | { status: "already_unsubscribed"; email: string }
   | { status: "invalid_token" };
 
-export function unsubscribeWaitlist(rawToken: string): UnsubscribeWaitlistResult {
+export async function unsubscribeWaitlist(
+  rawToken: string
+): Promise<UnsubscribeWaitlistResult> {
   const token = rawToken.trim();
   if (!token || token.length > 200) return { status: "invalid_token" };
 
-  const tokenHash = hashToken(token);
-  const row = db
-    .select()
-    .from(waitlistSignups)
-    .where(eq(waitlistSignups.confirmTokenHash, tokenHash))
-    .get() as WaitlistSignupRow | undefined;
+  const row = await findWaitlistByTokenHash(hashToken(token));
 
   if (!row) return { status: "invalid_token" };
   if (row.unsubscribedAt != null) {
     return { status: "already_unsubscribed", email: row.email };
   }
 
-  const now = Date.now();
-  db.update(waitlistSignups)
-    .set({ unsubscribedAt: now })
-    .where(eq(waitlistSignups.id, row.id))
-    .run();
-
+  await updateWaitlistSignup(row.id, { unsubscribedAt: Date.now() });
   return { status: "unsubscribed", email: row.email };
 }

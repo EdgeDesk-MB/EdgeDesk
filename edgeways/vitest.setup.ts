@@ -8,3 +8,5 @@ import path from "node:path";
  */
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "edgeways-vitest-"));
 process.env.EDGEWAYS_DB_PATH = path.join(dir, "edgeways-test.db");
+// Waitlist tests use SQLite; don't hit Neon even if .env.local has DATABASE_URL.
+delete process.env.DATABASE_URL;

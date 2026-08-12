@@ -49,11 +49,12 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
     expect(row?.unsubscribedAt).toBeNull();
     expect(row?.confirmTokenHash).toBeTruthy();
 
-    // Reconstruct a token by joining again after a fake unsubscribe via hash lookup is hard;
-    // instead set unsubscribed via the service using a known token by re-joining after
-    // manually clearing — use join → already_confirmed, then unsubscribe with invalid.
-    expect(confirmWaitlist("not-a-real-token")).toEqual({ status: "invalid_token" });
-    expect(unsubscribeWaitlist("not-a-real-token")).toEqual({ status: "invalid_token" });
+    expect(await confirmWaitlist("not-a-real-token")).toEqual({
+      status: "invalid_token",
+    });
+    expect(await unsubscribeWaitlist("not-a-real-token")).toEqual({
+      status: "invalid_token",
+    });
 
     const again = await joinWaitlist(email);
     expect(again).toEqual({ status: "already_confirmed", email });
@@ -70,7 +71,6 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
       .get();
     expect(row).toBeTruthy();
 
-    // Inject a known token hash so we can exercise unsubscribe without capturing the raw token.
     const { createHash, randomBytes } = await import("node:crypto");
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -79,7 +79,7 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
       .where(eq(waitlistSignups.email, email))
       .run();
 
-    const unsub = unsubscribeWaitlist(token);
+    const unsub = await unsubscribeWaitlist(token);
     expect(unsub).toEqual({ status: "unsubscribed", email });
 
     const after = db
@@ -89,7 +89,7 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
       .get();
     expect(after?.unsubscribedAt).toBeTypeOf("number");
 
-    expect(unsubscribeWaitlist(token)).toEqual({
+    expect(await unsubscribeWaitlist(token)).toEqual({
       status: "already_unsubscribed",
       email,
     });

@@ -3,9 +3,9 @@ import { unsubscribeWaitlist } from "@/lib/services/waitlist";
 
 export const dynamic = "force-dynamic";
 
-function redirectFor(req: Request, token: string) {
+async function redirectFor(req: Request, token: string) {
   const url = new URL(req.url);
-  const result = unsubscribeWaitlist(token);
+  const result = await unsubscribeWaitlist(token);
   const dest = new URL("/waitlist/unsubscribed", url.origin);
   if (result.status === "invalid_token") {
     dest.searchParams.set("status", "invalid");

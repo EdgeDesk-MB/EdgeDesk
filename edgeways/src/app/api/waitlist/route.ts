@@ -29,7 +29,13 @@ export async function POST(req: Request) {
     return NextResponse.json(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not join the waitlist.";
-    const status = message.includes("valid email") ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    if (message.includes("valid email")) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    console.error("[waitlist] join failed:", e);
+    return NextResponse.json(
+      { error: "Could not join the waitlist. Please try again." },
+      { status: 500 }
+    );
   }
 }
