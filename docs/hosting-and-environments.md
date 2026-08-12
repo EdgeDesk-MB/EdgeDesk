@@ -89,12 +89,12 @@ already Drizzle.
 | Domain registrar | `edgeways.app` on **GoDaddy** | **Done** (EDGE-23) |
 | Human email | Zoho Mail — `sam@edgeways.app` + `hello@` / `support@` aliases | **Done** (11 Aug) |
 | GitHub | Private repo `EdgeDesk-MB/EdgeDesk`, branch protection, Actions for migration deploys | Exists — **confirm private** |
-| Vercel | Hosting, previews (staging), env vars, cron — team `edgeways` (Pro trial) | **In progress** (EDGE-46 — import repo) |
-| Neon | Managed Postgres + branches + PITR | **In progress** (EDGE-47; EDGE-18 Route 1 Done 11 Aug) |
+| Vercel | Hosting, previews (staging), env vars, cron — team `edgeways` (Pro trial) | **Done** (EDGE-46 — prod live at edgeways.app) |
+| Neon | Managed Postgres + branches + PITR | **In progress** (EDGE-47; scaffold + migrations; app cutover open) |
 | PostHog EU | Analytics + error tracking, cookieless, `/ingest` proxy | **Done** (EDGE-35) |
 | Stripe *or* MoR (Paddle/Lemon Squeezy/Polar) | Payments | Awaiting EDGE-1 replies → EDGE-2 |
-| Transactional email (Resend) | Waitlist + auth emails; domain Verified Ireland | **Account done** (11 Aug); app wiring EDGE-26 |
-| Uptime monitor (Better Stack / UptimeRobot free) | Hits `/api/health`, alerts to email | Not yet (needs prod URL) |
+| Transactional email (Resend) | Waitlist + auth emails; domain Verified Ireland | **Done** for waitlist (EDGE-26); auth emails later |
+| Uptime monitor (Better Stack / UptimeRobot free) | Hits `/api/health`, alerts to email | Sam: point at `https://edgeways.app/api/health` (EDGE-48) |
 | Linear | Planning | Done |
 | **Later (native):** Google Play + TWA; Apple Developer + Capacitor/PWABuilder | App store wrappers | Post-launch |
 

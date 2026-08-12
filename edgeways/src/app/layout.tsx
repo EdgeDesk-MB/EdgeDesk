@@ -2,6 +2,11 @@ import type { CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Figtree, Noto_Sans, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import {
+  EDGEWAYS_CLERK_APPEARANCE,
+  EDGEWAYS_CLERK_LOCALIZATION,
+} from "@/lib/clerk-appearance";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BrandAccentProvider } from "@/components/brand-accent-provider";
@@ -119,14 +124,19 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full bg-canvas">
-        <BrandStorageMigration />
-        <ThemeProvider>
-          <BrandAccentProvider>
-            <UiFontProvider>
-              <HeaderPatternProvider>{children}</HeaderPatternProvider>
-            </UiFontProvider>
-          </BrandAccentProvider>
-        </ThemeProvider>
+        <ClerkProvider
+          appearance={EDGEWAYS_CLERK_APPEARANCE}
+          localization={EDGEWAYS_CLERK_LOCALIZATION}
+        >
+          <BrandStorageMigration />
+          <ThemeProvider>
+            <BrandAccentProvider>
+              <UiFontProvider>
+                <HeaderPatternProvider>{children}</HeaderPatternProvider>
+              </UiFontProvider>
+            </BrandAccentProvider>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

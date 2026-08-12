@@ -3,20 +3,22 @@
 > What stands between today and a paying, compliant, automated product.
 > Strategy lives in `edgeways/docs/roadmap/product-roadmap.md` (§7 business path);
 > this file is the operational wrapper: automation setup, payments, legal, and the
-> pre-launch checklist. Nothing here overrides the D1 gate (§7.1) — most items are
+> pre-launch checklist. **Daily checklist:** `docs/follow-this-plan.md`.
+> Folder rules: `docs/repo-layout.md`. Nothing here overrides the D1 gate (§7.1) — most items are
 > "prepare now, flip at the gate".
 >
 > Infrastructure (hosting, database, environments, go-live hygiene):
 > `docs/hosting-and-environments.md`. Architecture decision brief:
 > `docs/decisions/d6-architecture-route.md` (EDGE-18).
 
-**Status snapshot (2026-08-10):** the D1 gate was **opened for launch-path work** by
-Sam on 10 Aug 2026 — the three gate criteria (§7.1) remain tracked as evidence
-(Linear EDGE-36), not blockers. Work is planned and tracked in Linear: initiative
+**Status snapshot (2026-08-12):** waitlist site live at https://edgeways.app
+(`SITE_SURFACE=waitlist`). Desk routes redirect to `/` on production. Neon
+scaffold + Vercel project Done for first cut; auth/billing still open. The D1
+gate was opened for launch-path work on 10 Aug 2026 — evidence tracked as
+Linear EDGE-36. Work is in Linear: initiative
 **[Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c)**
 (team `Edgeways`, key `EDGE`), six projects, milestones M1 Gate-ready (6 Sep) →
-M2 Beta (4 Oct) → M3 Launch (2 Nov), 1-week cycles from 17 Aug. Product is a single
-unlocked local app; N0 entitlement scaffolding is promoted.
+M2 Beta (4 Oct) → M3 Launch (2 Nov).
 
 ## 1. The path, in order
 

@@ -7,3 +7,7 @@ coverage
 *.db-*
 .env*
 !.env.example
+# Engineering/strategy markdown is not needed on the builder for CLI uploads.
+# (Git-connected deploys still clone the monorepo; Root Directory is edgeways/.)
+docs
+PLAN.md

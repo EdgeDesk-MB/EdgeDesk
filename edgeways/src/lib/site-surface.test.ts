@@ -12,6 +12,8 @@ describe("site surface", () => {
 
   it("allows marketing and waitlist routes", () => {
     expect(isWaitlistAllowedPath("/")).toBe(true);
+    expect(isWaitlistAllowedPath("/login")).toBe(true);
+    expect(isWaitlistAllowedPath("/sign-up")).toBe(true);
     expect(isWaitlistAllowedPath("/waitlist/confirmed")).toBe(true);
     expect(isWaitlistAllowedPath("/waitlist/unsubscribed")).toBe(true);
     expect(isWaitlistAllowedPath("/api/waitlist")).toBe(true);

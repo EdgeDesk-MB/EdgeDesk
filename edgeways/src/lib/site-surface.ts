@@ -11,6 +11,8 @@ export function isWaitlistSurface(): boolean {
 
 const WAITLIST_PAGES = new Set([
   "/",
+  "/login",
+  "/sign-up",
   "/waitlist/confirmed",
   "/waitlist/unsubscribed",
 ]);

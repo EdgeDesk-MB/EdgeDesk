@@ -9,9 +9,11 @@ import {
   useRef,
   useState,
 } from "react";
+import { useUser } from "@clerk/nextjs";
 import { SetupWizard } from "@/components/help/setup-wizard";
 import { WelcomeDialog } from "@/components/help/welcome-dialog";
 import { AgeGateDialog } from "@/components/compliance/age-gate-dialog";
+import { SyncClerkAgeConfirmation } from "@/components/compliance/sync-clerk-age";
 import { useAppState } from "@/hooks/use-app-state";
 import { hasDeskActivity } from "@/lib/dashboard-empty";
 import {
@@ -35,8 +37,16 @@ export function useOnboarding() {
   return ctx;
 }
 
+function clerkAgeConfirmed(
+  meta: Record<string, unknown> | undefined
+): boolean {
+  if (!meta) return false;
+  return meta.ageConfirmed === true || typeof meta.ageConfirmedAt === "number";
+}
+
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const { state, refresh } = useAppState();
+  const { user, isLoaded: clerkLoaded } = useUser();
   const [ageOpen, setAgeOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -47,11 +57,19 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (state == null || decidedRef.current) return;
+    // Wait for Clerk so sign-up metadata can suppress a duplicate gate.
+    if (!clerkLoaded) return;
     decidedRef.current = true;
 
     queueMicrotask(() => {
       // The 18+ gate (EDGE-13) precedes everything, welcome tour included.
+      // Skip opening it when Clerk already holds a sign-up confirmation; sync
+      // will write ageConfirmedAt and refresh.
       if (state.settings?.ageConfirmedAt == null) {
+        if (clerkAgeConfirmed(user?.unsafeMetadata as Record<string, unknown>)) {
+          setChecked(true);
+          return;
+        }
         setAgeOpen(true);
         setChecked(true);
         return;
@@ -65,7 +83,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       if (!isOnboardingComplete()) setWelcomeOpen(true);
       setChecked(true);
     });
-  }, [state]);
+  }, [state, clerkLoaded, user]);
 
   const handleAgeConfirmed = useCallback(() => {
     setAgeOpen(false);
@@ -74,6 +92,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     if (state && !hasDeskActivity(state) && !isOnboardingComplete()) {
       setWelcomeOpen(true);
     }
+  }, [refresh, state]);
+
+  const handleClerkAgeSynced = useCallback(() => {
+    refresh().then(() => {
+      if (state && !hasDeskActivity(state) && !isOnboardingComplete()) {
+        setWelcomeOpen(true);
+      }
+    });
   }, [refresh, state]);
 
   const openWelcome = useCallback(() => setWelcomeOpen(true), []);
@@ -93,6 +119,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   return (
     <OnboardingContext.Provider value={value}>
       {children}
+      <SyncClerkAgeConfirmation
+        localAgeConfirmedAt={state?.settings?.ageConfirmedAt}
+        onSynced={handleClerkAgeSynced}
+      />
       {checked && (
         <>
           <AgeGateDialog open={ageOpen} onConfirmed={handleAgeConfirmed} />

@@ -100,8 +100,8 @@ export default function RoadmapPage() {
           each release. Full product vision in{" "}
           <Link href="/help?guide=getting-started" className="text-primary-text hover:underline">
             Help → Getting started
-          </Link>{" "}
-          and <code className="rounded bg-muted px-1 text-xs">PLAN.md</code>.
+          </Link>
+          .
         </CardContent>
       </Card>
     </PageShell>

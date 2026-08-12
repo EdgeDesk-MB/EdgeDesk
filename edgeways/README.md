@@ -1,7 +1,7 @@
 # Edgeways - Matched Betting Command Centre
 
 Local-first matched betting toolkit: calculators, live events, result-driven auto-settlement
-and a real-time P&L dashboard. See `PLAN.md` for the full MVP scope and phased roadmap.
+and a real-time P&L dashboard. See `../docs/PLAN.md` for the full MVP scope and phased roadmap.
 
 ## Run it
 

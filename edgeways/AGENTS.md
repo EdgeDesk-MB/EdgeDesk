@@ -53,7 +53,8 @@ the app derives every market and auto-settles linked bets.
 - Calc engine: `src/lib/calc`
 - Offers logic: `src/lib/offers` (advantage.ts, do-next.ts)
 - Roadmap data: `src/content/roadmap.ts`
-- Product vision: `PLAN.md`, `docs/roadmap/`
+- Product vision: `../docs/PLAN.md`, `docs/roadmap/` (strategy research lives in
+  parent `../docs/strategy/` — see `../docs/repo-layout.md`)
 - Design system: `docs/design-system.md`
 
 ## Skills, subagents and delegation

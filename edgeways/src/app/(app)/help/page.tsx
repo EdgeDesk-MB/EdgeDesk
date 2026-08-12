@@ -114,9 +114,8 @@ function HelpPageContent() {
           <Card className="mt-4 border-dashed">
             <CardContent className="py-4 text-sm text-muted-foreground">
               <p>
-                Need more detail on API tiers? See{" "}
-                <code className="rounded bg-muted px-1 text-xs">docs/api-dependencies-and-tiers.md</code>{" "}
-                in the project folder, or check Settings → Data &amp; API for live connection status.
+                For live connection status, open Settings → Data &amp; API. Optional provider keys
+                power fixtures, racecards and exchange prices when configured.
               </p>
               <p className="mt-2">
                 Support channel coming in v1.0. For now, use the Roadmap page to see what&apos;s

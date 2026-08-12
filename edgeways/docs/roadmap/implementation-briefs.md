@@ -935,7 +935,7 @@ complete → expected-vs-realised line renders); mobile 390×844 pass; suite + b
 
 # PHASE 11 — EXECUTION EDGE (promoted from §9, 2026-07-16)
 
-> Landscape research (`docs/roadmap/competitive-landscape.md`) showed the incumbents optimise
+> Landscape research (`../../docs/strategy/competitive-landscape.md`) showed the incumbents optimise
 > *finding* offers; nobody measures *executing* them. These nine briefs are that gap. Sam's
 > design decisions (2026-07-16) are baked in below. Build in waves: W1 = J1–J3, W2 = J4–J6,
 > W3 = J7–J9. Standing process per item: brief → tests-first lib → UI → harness verify (dev on
@@ -2267,7 +2267,7 @@ and optionally preview the locked UX. Auth + Stripe wait for the business gate (
 | Settings "preview as Free/Core/Edge" | ❌ Missing | Useful pre-gate for Sam |
 | Auth / accounts / multi-tenant data | ❌ Deferred (D1) | Local-first single user |
 | Billing (Stripe) | ❌ Deferred (D1) | No customer identity yet |
-| Per-subscriber API keys / pooled feeds | ❌ Deferred | See `docs/api-dependencies-and-tiers.md` |
+| Per-subscriber API keys / pooled feeds | ❌ Deferred | See `../../docs/strategy/api-dependencies-and-tiers.md` |
 
 **Proposed entitlement matrix (v1 draft — confirm with Sam before coding)**
 

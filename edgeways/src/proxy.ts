@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import {
   isPublicAssetPath,
   isWaitlistAllowedPath,
@@ -7,11 +7,10 @@ import {
 } from "@/lib/site-surface";
 
 /**
- * When SITE_SURFACE=waitlist (production marketing deploy), only the landing
- * page, waitlist follow-up pages, and waitlist API routes are reachable.
- * Everything else redirects to /.
+ * Next.js 16+: file must be named proxy.ts (Clerk + Next convention).
+ * Combines Clerk session handling with SITE_SURFACE=waitlist gate.
  */
-export function middleware(request: NextRequest) {
+export default clerkMiddleware(async (_auth, request) => {
   if (!isWaitlistSurface()) {
     return NextResponse.next();
   }
@@ -26,14 +25,12 @@ export function middleware(request: NextRequest) {
   home.pathname = "/";
   home.search = "";
   return NextResponse.redirect(home);
-}
+});
 
 export const config = {
   matcher: [
-    /*
-     * Run on all paths except static files in /public (images, sw.js, etc.).
-     * Asset allowlist in isPublicAssetPath covers Next internals and metadata.
-     */
-    "/((?!_next/static|_next/image|.*\\.(?:png|svg|ico|webp|js)$).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+    "/__clerk/(.*)",
   ],
 };

@@ -1242,9 +1242,7 @@ function IntegrationsPanel({
           </div>
           <p className="text-xs text-muted-foreground">
             If you later open Edgeways to subscribers, API costs should be covered by plan pricing -
-            never by your personal free keys. See{" "}
-            <code className="rounded bg-muted px-1 text-xs">docs/api-dependencies-and-tiers.md</code>
-            .
+            never by personal free-tier keys. Connection status for each provider is shown below.
           </p>
           <div className="rounded-md border px-3 py-2 space-y-2">
             <p className="text-xs font-medium text-foreground">Setup checklist</p>

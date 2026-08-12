@@ -115,4 +115,4 @@ puts `exchange_lay` in Edge only).
 | 1 | Email The Racing API + API-Football for written redistribution permission (pooled subscriber feeds) | Sam | Before §7.2 feed proxy work — EDGE-45 |
 | 2 | Decide Betfair path for hosted: Software Vendor Licence + BYOK (recommended) vs no exchange integration at v1 | Sam | With D6 (EDGE-18) |
 | 3 | Include this review in the solicitor pack | Sam | EDGE-8 |
-| 4 | Keep free-tier onboarding (paste odds, manual settle, simulator) as the default path so attrition never burns API budget | Product rule, already in `api-dependencies-and-tiers.md` | Ongoing |
+| 4 | Keep free-tier onboarding (paste odds, manual settle, simulator) as the default path so attrition never burns API budget | Product rule, already in `docs/strategy/api-dependencies-and-tiers.md` | Ongoing |

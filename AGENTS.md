@@ -2,6 +2,10 @@
 
 Git root is THIS directory. The product is Edgeways, a local-first matched
 betting command centre, and it lives entirely in `edgeways/` (Next.js 16 app).
+Vercel Root Directory is `edgeways/` — see `docs/repo-layout.md` for what
+belongs in the app vs parent `docs/`.
+
+**Sam daily plan:** `docs/follow-this-plan.md`.
 
 Before doing any work:
 1. Read `edgeways/AGENTS.md`. It holds the product context, hard rules and the
@@ -23,7 +27,7 @@ Other pointers:
   `.cursor/commands/`. Claude Code mirror: `.claude/skills/`, `.claude/agents/`.
   Full harness map: `docs/cursor-kit.md`. Daily go-to guide (incl. automation
   recipes): `docs/cursor-daily-guide.md`. Launch path (payments, legal,
-  go-live gates): `docs/live-readiness.md`.
+  go-live gates): `docs/live-readiness.md` and `docs/follow-this-plan.md`.
 - Run all npm commands from `edgeways/`, not from this directory.
 
 ## Model routing (agents)
