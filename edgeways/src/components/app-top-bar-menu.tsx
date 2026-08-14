@@ -19,7 +19,7 @@ import {
   isLinkActive,
 } from "@/components/app-nav";
 import { ThemeSelect } from "@/components/theme-select";
-import { TopBarLoginButton } from "@/components/top-bar-login-button";
+import { MobileDrawerLogoutButton } from "@/components/top-bar-login-button";
 import { useAppState } from "@/hooks/use-app-state";
 import {
   useOfferEdgeRaceCount,
@@ -27,11 +27,8 @@ import {
 } from "@/hooks/use-offer-edge-race-count";
 import { isEventPendingSettle } from "@/lib/racing/pending-settle";
 import { META_NAV_ITEMS } from "@/content/meta-nav";
-import { captionHeading } from "@/lib/ui/surface-styles";
+import { captionHeading, drawerUtilityRow } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-
-const utilityRow =
-  "flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60";
 
 function UtilityLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -40,7 +37,7 @@ function UtilityLinks({ onNavigate }: { onNavigate?: () => void }) {
         <Link
           key={href}
           href={href}
-          className={cn(utilityRow, "border-t border-border/80")}
+          className={cn(drawerUtilityRow, "border-t border-border/80")}
           onClick={onNavigate}
         >
           <Icon className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
@@ -108,9 +105,8 @@ function MobileNavDrawer() {
           className="fixed inset-y-0 right-0 z-50 flex h-dvh w-[min(20rem,85vw)] flex-col border-l border-border/80 bg-popover text-popover-foreground shadow-xl duration-200 data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right"
           aria-describedby={undefined}
         >
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-3">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-b border-border/80 px-4 py-3">
             <DialogPrimitive.Title className="sr-only">Menu</DialogPrimitive.Title>
-            <TopBarLoginButton mobileSwap />
             <DialogPrimitive.Close
               className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Close menu"
@@ -177,6 +173,7 @@ function MobileNavDrawer() {
             <div className="mt-4 border-t border-border/80">
               <AppearanceRow />
               <UtilityLinks onNavigate={close} />
+              <MobileDrawerLogoutButton onLoggedOut={close} />
             </div>
           </nav>
         </DialogPrimitive.Content>

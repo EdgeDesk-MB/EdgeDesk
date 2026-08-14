@@ -36,9 +36,7 @@ function CasinoCalendarItemCard({
   onOfferClick?: (offer: CasinoOfferSummary) => void;
 }) {
   const { offer } = item;
-  // EV tint + urgency colour only for today / tomorrow expiries.
-  const nearTerm = item.urgency === "today" || item.urgency === "tomorrow";
-  const tint = nearTerm ? headerTint(offer) : null;
+  const tint = headerTint(offer);
   const urgencyClass =
     item.urgency === "today"
       ? "text-rose-700 dark:text-rose-300"

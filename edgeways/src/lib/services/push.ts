@@ -139,7 +139,7 @@ export async function sendPush(
 ): Promise<PushFanoutResult> {
   const payload = JSON.stringify({
     // Exactly one leading emoji: keep semantic marks from alert rules
-    // (🟢/⚠/🔒/⏰), otherwise brand ⚡. Never stack a second bolt.
+    // (🟢/⚠/🔒/⏰/🛎️), otherwise brand ⚡. Never stack a second bolt.
     title: ensureNotificationTitleEmoji(alert.title),
     body: alert.body ?? "",
     href: alert.href ?? "/desk",

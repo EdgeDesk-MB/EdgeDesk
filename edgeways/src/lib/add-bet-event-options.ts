@@ -203,6 +203,10 @@ export function formatEventHourBandLabel(startTime: number): string {
 /**
  * Nest hour bands under a day when fixtures span 2+ hours.
  * Single-hour days stay flat (one band with an empty label — skip the subheader).
+ *
+ * Merges by hour key (not only consecutive rows). Live-first sorts put in-play
+ * kick-offs ahead of later upcoming rows, so the same hour can reappear — a
+ * consecutive-only merge produced duplicate React keys in the event picker.
  */
 export function groupByHourBandIfDense<T extends { startTime?: number }>(
   items: T[]
@@ -214,22 +218,32 @@ export function groupByHourBandIfDense<T extends { startTime?: number }>(
   if (distinctHours.size < 2) {
     return [{ key: "all", label: "", items }];
   }
-  const bands: EventDayBand<T>[] = [];
+  const byHour = new Map<
+    string,
+    { label: string; items: T[]; sortKey: number }
+  >();
   for (const item of items) {
     const start = item.startTime ?? 0;
     const key = eventHourKey(start);
-    const last = bands[bands.length - 1];
-    if (last && last.key === key) {
-      last.items.push(item);
+    const existing = byHour.get(key);
+    if (existing) {
+      existing.items.push(item);
+      existing.sortKey = Math.min(existing.sortKey, start);
       continue;
     }
-    bands.push({
-      key,
+    byHour.set(key, {
       label: formatEventHourBandLabel(start),
       items: [item],
+      sortKey: start,
     });
   }
-  return bands;
+  return [...byHour.entries()]
+    .sort((a, b) => a[1].sortKey - b[1].sortKey)
+    .map(([key, band]) => ({
+      key,
+      label: band.label,
+      items: band.items,
+    }));
 }
 
 /**

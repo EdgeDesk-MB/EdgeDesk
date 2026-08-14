@@ -132,6 +132,7 @@ export function getAppSettings(): AppSettings {
     timeFormat: normalizeTimeFormat(readRaw("timeFormat")),
     mobileDeckPin: normalizeMobileDeckPin(readRaw("mobileDeckPin")),
     alertsOfferExpiring: readRaw("alertsOfferExpiring") !== "false",
+    alertsFreeBetExpiring: readRaw("alertsFreeBetExpiring") !== "false",
     alertsRaceOffSoon: readRaw("alertsRaceOffSoon") !== "false",
     alertsResultSettled: readRaw("alertsResultSettled") !== "false",
     alertsNakedExposure: readRaw("alertsNakedExposure") !== "false",
@@ -252,6 +253,9 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.alertsOfferExpiring != null) {
     writeRaw("alertsOfferExpiring", patch.alertsOfferExpiring ? "true" : "false");
+  }
+  if (patch.alertsFreeBetExpiring != null) {
+    writeRaw("alertsFreeBetExpiring", patch.alertsFreeBetExpiring ? "true" : "false");
   }
   if (patch.alertsRaceOffSoon != null) {
     writeRaw("alertsRaceOffSoon", patch.alertsRaceOffSoon ? "true" : "false");

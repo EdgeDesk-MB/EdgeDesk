@@ -45,12 +45,14 @@ export function CasinoCampaignSimDialog({
   analyticEv,
   defaultVolatility,
   triggerClassName,
+  mobile = "sheet",
 }: {
   title: string;
   components: CampaignSimComponent[];
   analyticEv: number;
   defaultVolatility?: SlotVolatility;
   triggerClassName?: string;
+  mobile?: "sheet" | "center";
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -65,7 +67,7 @@ export function CasinoCampaignSimDialog({
       >
         <ChartColumn className="size-3.5" aria-hidden /> Simulate
       </Button>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto" mobile={mobile}>
         {open ? (
           <CasinoCampaignSimContent
             title={title}

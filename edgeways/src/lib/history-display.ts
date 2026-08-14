@@ -12,6 +12,14 @@ import {
 } from "@/lib/offers/early-free-bet-award";
 import { formatClockTime } from "@/lib/time-format";
 import { MARKET_LABELS } from "@/lib/markets";
+import {
+  goalHistoryCopyFromEntry,
+  goalHistoryScorelineParts,
+  inferGoalScoringSidesFromEntries,
+  type GoalScorelineParts,
+  type HistoryTitlePart,
+} from "@/lib/history-goal-copy";
+import type { Side } from "@/lib/calc/trigger";
 
 export type HistoryFilter =
   | "all"
@@ -42,19 +50,24 @@ export interface HistoryContext {
   promoByBetId: Record<number, { amount: number; reason: string }>;
   /** Linked offer titles for early free-bet award eligibility on bet_placed rows. */
   offerTitleById: Map<number, string>;
+  /** Scoring side per goal row, inferred from successive scorelines in the feed. */
+  goalScoringSideById: Map<number, Side>;
 }
 
 export function buildHistoryContext(
   events: EventRow[],
   bets: BetRow[],
   promoByBetId: Record<number, { amount: number; reason: string }> = {},
-  offerTitles: Array<{ id: number; title: string }> = []
+  offerTitles: Array<{ id: number; title: string }> = [],
+  historyEntries: HistoryRow[] = []
 ): HistoryContext {
+  const eventsById = new Map(events.map((e) => [e.id, e]));
   return {
-    eventsById: new Map(events.map((e) => [e.id, e])),
+    eventsById,
     betsById: new Map(bets.map((b) => [b.id, b])),
     promoByBetId,
     offerTitleById: new Map(offerTitles.map((o) => [o.id, o.title])),
+    goalScoringSideById: inferGoalScoringSidesFromEntries(historyEntries, eventsById),
   };
 }
 
@@ -261,7 +274,33 @@ export function isDeskCampaignLayHistoryEntry(
 /** Display title - upgrades legacy "Bet placed" rows when the bet is a free bet. */
 export function historyEntryTitle(entry: HistoryRow, ctx: HistoryContext): string {
   if (isFreeBetPlacedHistoryEntry(entry, ctx)) return "Free bet placed";
+  if (entry.kind === "goal") {
+    return goalHistoryCopyFromEntry(entry, resolveHistoryEvent(entry, ctx)).title;
+  }
   return entry.title;
+}
+
+/** Structured title for goal rows. Null when the title is plain (no mixed weight). */
+export function historyEntryTitleParts(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): HistoryTitlePart[] | null {
+  if (entry.kind !== "goal") return null;
+  const parts = goalHistoryCopyFromEntry(entry, resolveHistoryEvent(entry, ctx)).parts;
+  if (!parts.some((part) => part.emphasize)) return null;
+  return parts;
+}
+
+/** Scoreline pieces for goal rows, with the scoring side marked for emphasis. */
+export function historyGoalScoreline(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): GoalScorelineParts | null {
+  if (entry.kind !== "goal") return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  const copy = goalHistoryCopyFromEntry(entry, event);
+  const scoringSide = copy.scoringSide ?? ctx.goalScoringSideById.get(entry.id) ?? null;
+  return goalHistoryScorelineParts(entry, event, scoringSide);
 }
 
 /** Where a feed row should navigate when clicked. */

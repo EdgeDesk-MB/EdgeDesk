@@ -1,7 +1,7 @@
 /**
  * Postgres schema for hosted Neon (EDGE-47).
  * Parallel to schema.ts (SQLite) — local Mac keeps SQLite until async cutover.
- * Waitlist store imports waitlistSignups from here when DATABASE_URL is set.
+ * Waitlist and app_users import from here when DATABASE_URL is set.
  */
 import {
   bigint,
@@ -438,6 +438,17 @@ export const waitlistSignups = pgTable("waitlist_signups", {
   unsubscribedAt: bigint("unsubscribed_at", { mode: "number" }),
 });
 
+/**
+ * Hosted account row keyed by Clerk user id (EDGE-20 / EDGE-47).
+ * Entitlement tier lands later via billing webhooks; this table is the join key.
+ */
+export const appUsers = pgTable("app_users", {
+  clerkUserId: text("clerk_user_id").primaryKey(),
+  email: text("email"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+
 /** Bookie, exchange, or bank wallet for bankroll tracking */
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
@@ -511,6 +522,8 @@ export const balanceTransactions = pgTable("balance_transactions", {
   confirmedAt: integer("confirmed_at"),
   /** 1 = this adjustment should be included in the P&L chart and settledProfit total */
   affectPnl: integer("affect_pnl").notNull().default(0),
+  /** Free-bet credit deadline (epoch ms). Ignored on non-credit / non-free_bet rows. */
+  expiresAt: integer("expires_at"),
 });
 
 /**
@@ -696,6 +709,8 @@ export const casinoOfferSeriesComponents = pgTable("casino_offer_series_componen
   cashbackPct: doublePrecision("cashback_pct"),
   cashbackCap: doublePrecision("cashback_cap"),
   game: text("game"),
+  /** JSON string[] of eligible game names selected in the picker */
+  eligibleGamesJson: text("eligible_games_json"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
@@ -738,6 +753,8 @@ export const casinoOfferComponents = pgTable("casino_offer_components", {
   cashbackCap: doublePrecision("cashback_cap"),
   /** Recommended eligible game for this component (bonus / free_spins) */
   game: text("game"),
+  /** JSON string[] of eligible game names selected in the picker */
+  eligibleGamesJson: text("eligible_games_json"),
   /** This component's own EV, locked at save time - negative for qualifying_wager */
   expectedEv: doublePrecision("expected_ev").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),

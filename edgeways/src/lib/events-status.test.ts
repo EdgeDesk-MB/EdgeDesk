@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEventStatus, formatRacingEventStatus } from "./events";
+import { countLiveNavEvents, formatEventStatus, formatRacingEventStatus } from "./events";
 
 const NOW = Date.parse("2026-08-01T14:00:00+01:00");
 
@@ -59,5 +59,45 @@ describe("formatEventStatus", () => {
         NOW
       )
     ).toBe("Live");
+  });
+});
+
+describe("countLiveNavEvents", () => {
+  const liveFootball = {
+    sport: "football",
+    status: "live",
+    startTime: NOW - 57 * 60_000,
+  };
+  const finishedRace = {
+    sport: "horse_racing",
+    status: "finished",
+    startTime: NOW - 2 * 60 * 60_000,
+  };
+  const liveRace = {
+    sport: "horse_racing",
+    status: "upcoming",
+    startTime: NOW - 5 * 60_000,
+  };
+
+  it("pulses Tracked Events for any live sport, including football", () => {
+    expect(countLiveNavEvents([liveFootball, finishedRace], "all", NOW)).toBe(1);
+  });
+
+  it("does not pulse Racing Desk for a live football match with only finished races", () => {
+    expect(countLiveNavEvents([liveFootball, finishedRace], "racing", NOW)).toBe(0);
+  });
+
+  it("pulses Racing Desk when a tracked horse race is live", () => {
+    expect(countLiveNavEvents([liveFootball, liveRace], "racing", NOW)).toBe(1);
+  });
+
+  it("treats greyhounds as racing for the Racing Desk pulse", () => {
+    expect(
+      countLiveNavEvents(
+        [{ sport: "greyhounds", status: "live", startTime: NOW - 60_000 }],
+        "racing",
+        NOW
+      )
+    ).toBe(1);
   });
 });

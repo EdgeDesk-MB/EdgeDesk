@@ -9,6 +9,8 @@ import {
   formatHistoryTimeBadgeParts,
   historyEntrySubtitle,
   historyEntryTitle,
+  historyEntryTitleParts,
+  historyGoalScoreline,
   historyEntryHref,
   isFreeBetWonHistoryEntry,
   historyKindLabel,
@@ -196,6 +198,87 @@ describe("isFreeBetPlacedHistoryEntry", () => {
         ctx
       )
     ).toBe(true);
+  });
+});
+
+describe("historyEntryTitle for goals", () => {
+  const event: EventRow = {
+    id: 4,
+    sport: "football",
+    externalId: null,
+    competition: "Champions League",
+    homeTeam: "Paris Saint Germain",
+    awayTeam: "Aston Villa",
+    startTime: Date.now(),
+    status: "live",
+    homeScore: 2,
+    awayScore: 1,
+    minute: 66,
+    homeLed2: 0,
+    awayLed2: 0,
+    source: "api",
+    goals: JSON.stringify([{ minute: 21, side: "home", player: "K. Mbappé" }]),
+    ftHomeScore: null,
+    ftAwayScore: null,
+    matchEnding: null,
+    simScript: null,
+    simStartedAt: null,
+    createdAt: Date.now(),
+  };
+  const ctx = buildHistoryContext([event], [], {});
+
+  it("names the player when the timeline has a scorer", () => {
+    const entry = row({
+      kind: "goal",
+      title: "K. Mbappé",
+      eventId: 4,
+      betId: undefined,
+      minute: 21,
+      dedupe: "goal:4:0",
+      detail: "1st goalscorer - Paris Saint Germain 1-0 Aston Villa",
+    });
+    expect(historyEntryTitle(entry, ctx)).toBe("Goal: K. Mbappé!");
+    expect(historyEntryTitleParts(entry, ctx)).toBeNull();
+    expect(historyGoalScoreline(entry, ctx)?.scoringSide).toBe("home");
+  });
+
+  it("keeps Goal in the title when there is no scorer", () => {
+    const noTimeline = buildHistoryContext([{ ...event, goals: null }], [], {});
+    const opening = row({
+      kind: "goal",
+      title: "Goal",
+      eventId: 4,
+      betId: undefined,
+      minute: 21,
+      dedupe: "score:4:1-0",
+      detail: "Paris Saint Germain 1-0 Aston Villa",
+    });
+    expect(historyEntryTitle(opening, noTimeline)).toBe("Goal!");
+    expect(historyGoalScoreline(opening, noTimeline)?.scoringSide).toBe("home");
+  });
+
+  it("bolds the equaliser from the previous scoreline", () => {
+    const g1 = row({
+      id: 11,
+      kind: "goal",
+      title: "Goal",
+      eventId: 4,
+      betId: undefined,
+      minute: 21,
+      detail: "Paris Saint Germain 1-0 Aston Villa",
+    });
+    const g2 = row({
+      id: 12,
+      kind: "goal",
+      title: "Goal",
+      eventId: 4,
+      betId: undefined,
+      minute: 45,
+      detail: "Paris Saint Germain 1-1 Aston Villa",
+    });
+    const sequenced = buildHistoryContext([{ ...event, goals: null }], [], {}, [], [g1, g2]);
+    expect(historyEntryTitle(g2, sequenced)).toBe("Goal!");
+    expect(historyGoalScoreline(g2, sequenced)?.scoringSide).toBe("away");
   });
 });
 

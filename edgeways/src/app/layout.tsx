@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
-import { Figtree, Noto_Sans, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import {
   EDGEWAYS_CLERK_APPEARANCE,
@@ -13,6 +12,7 @@ import { BrandAccentProvider } from "@/components/brand-accent-provider";
 import { UiFontProvider } from "@/components/ui-font-provider";
 import { HeaderPatternProvider } from "@/components/header-pattern-provider";
 import { BrandStorageMigration } from "@/components/brand-storage-migration";
+import { SyncAppUser } from "@/components/sync-app-user";
 import { BRAND_ACCENT_FOUC_SCRIPT } from "@/lib/brand-accent-fouc";
 import {
   BRAND_ACCENT_COOKIE_KEY,
@@ -34,30 +34,13 @@ import {
   HEADER_PATTERN_COOKIE_KEY,
   normalizeHeaderPattern,
 } from "@/lib/header-pattern";
+import { figtree, geistMono, notoSans } from "@/fonts";
 import {
   SHARE_LOCALE,
   SHARE_SITE_NAME,
   marketingShareCopy,
   publicSiteUrl,
 } from "@/lib/marketing/share-metadata";
-
-const notoSans = Noto_Sans({
-  // Keep the Tailwind v4 pass-through name (`@theme --font-sans: var(--font-sans)`).
-  variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const figtree = Figtree({
-  variable: "--font-figtree",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const rootShare = marketingShareCopy("waitlist");
 
@@ -146,6 +129,7 @@ export default async function RootLayout({
           localization={EDGEWAYS_CLERK_LOCALIZATION}
         >
           <BrandStorageMigration />
+          <SyncAppUser />
           <ThemeProvider>
             <BrandAccentProvider>
               <UiFontProvider>

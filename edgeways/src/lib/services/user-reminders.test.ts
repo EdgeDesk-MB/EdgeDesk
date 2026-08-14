@@ -52,7 +52,7 @@ describe("user reminders", () => {
       offerTitle: "Wager £85 get 85 spins",
       href: "/casino",
     });
-    expect(alert.title).toBe("Reminder · Tote · Wager £85 get 85 spins");
+    expect(alert.title).toBe("🛎️ Reminder · Tote · Wager £85 get 85 spins");
     expect(alert.body).toBe("Free spins credited - claim on Bigger Piggy Bank");
   });
 
@@ -70,7 +70,7 @@ describe("user reminders", () => {
     );
     const first = fireDueUserReminders(now);
     expect(first).toHaveLength(1);
-    expect(first[0]?.title).toBe("Reminder · Tote · Wager £5 get 5 spins");
+    expect(first[0]?.title).toBe("🛎️ Reminder · Tote · Wager £5 get 5 spins");
     expect(first[0]?.body).toBe("Claim spins");
     expect(db.select().from(alertsInbox).all()).toHaveLength(1);
 

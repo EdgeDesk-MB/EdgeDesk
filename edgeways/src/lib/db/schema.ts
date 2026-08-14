@@ -425,6 +425,17 @@ export const waitlistSignups = sqliteTable("waitlist_signups", {
   unsubscribedAt: integer("unsubscribed_at"),
 });
 
+/**
+ * Hosted account row keyed by Clerk user id (EDGE-20 / EDGE-47).
+ * Entitlement tier lands later via billing webhooks; this table is the join key.
+ */
+export const appUsers = sqliteTable("app_users", {
+  clerkUserId: text("clerk_user_id").primaryKey(),
+  email: text("email"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 /** Bookie, exchange, or bank wallet for bankroll tracking */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -498,6 +509,8 @@ export const balanceTransactions = sqliteTable("balance_transactions", {
   confirmedAt: integer("confirmed_at"),
   /** 1 = this adjustment should be included in the P&L chart and settledProfit total */
   affectPnl: integer("affect_pnl").notNull().default(0),
+  /** Free-bet credit deadline (epoch ms). Ignored on non-credit / non-free_bet rows. */
+  expiresAt: integer("expires_at"),
 });
 
 /**
@@ -683,6 +696,8 @@ export const casinoOfferSeriesComponents = sqliteTable("casino_offer_series_comp
   cashbackPct: real("cashback_pct"),
   cashbackCap: real("cashback_cap"),
   game: text("game"),
+  /** JSON string[] of eligible game names selected in the picker */
+  eligibleGamesJson: text("eligible_games_json"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
@@ -725,6 +740,8 @@ export const casinoOfferComponents = sqliteTable("casino_offer_components", {
   cashbackCap: real("cashback_cap"),
   /** Recommended eligible game for this component (bonus / free_spins) */
   game: text("game"),
+  /** JSON string[] of eligible game names selected in the picker */
+  eligibleGamesJson: text("eligible_games_json"),
   /** This component's own EV, locked at save time - negative for qualifying_wager */
   expectedEv: real("expected_ev").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -765,6 +782,7 @@ export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type UserReminderRow = typeof userReminders.$inferSelect;
 export type FeedbackReportRow = typeof feedbackReports.$inferSelect;
 export type WaitlistSignupRow = typeof waitlistSignups.$inferSelect;
+export type AppUserRow = typeof appUsers.$inferSelect;
 export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;

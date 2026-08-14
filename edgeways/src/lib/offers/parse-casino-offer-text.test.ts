@@ -124,6 +124,24 @@ describe("parseCasinoOfferText - K1 reward-type detection", () => {
     expect(d.likelyComponentType).toBe("free_spins");
   });
 
+  it("spin value stated as 'The value of each Free Spin is £0.10'", () => {
+    const d = parseCasinoOfferText(
+      "Earn up to 100 Free Spins on Age of the Gods.\nThe value of each Free Spin is £0.10.\nMaximum Free Spins winnings: £500."
+    );
+    expect(d.spins).toBe(100);
+    expect(d.spinValue).toBeCloseTo(0.1, 10);
+    expect(d.likelyComponentType).toBe("free_spins");
+  });
+
+  it("does not treat max winnings or a bare 'worth £X' as the per-spin value", () => {
+    const d = parseCasinoOfferText(
+      "Get 50 free spins worth £5 when you stake £10. Maximum Free Spins winnings: £500."
+    );
+    expect(d.spins).toBe(50);
+    expect(d.spinValue).toBeNull();
+    expect(d.bonusAmount).toBe(5);
+  });
+
   it("does not populate spins/spinValue for a plain bonus offer", () => {
     const d = parseCasinoOfferText("Sky Vegas\nStake £10 get a £20 casino bonus\n35x wagering.");
     expect(d.spins).toBeNull();
@@ -181,5 +199,33 @@ describe("parseCasinoOfferText - K1 reward-type detection", () => {
     );
     expect(d.bonusAmount).toBe(5);
     expect(d.spins).toBe(50);
+  });
+
+  it("10bet Divine Wins ladder: £0.10 per spin, not the £0.40 default phrasing", () => {
+    const d = parseCasinoOfferText(`
+Hit the Opt In button
+Play any game in the Divine Wins section
+Earn up to 100 Free Spins on Age of the Gods: God of Storms 3 as you play
+For the Free Spins bettor.
+
+Significant Terms
+
+Valid: 11/08 12:00 - 17/08 23:59; Opt-in required; Bet £25+ on the Divine Wins section for up to 100 Free Spins; T&Cs apply; 18+
+
+The promotion runs from 11/08 12:00 to 17/08 23:59.
+Opt in and bet £25+ in real money (from your Cash balance) on any qualifying game:
+Earn Free Spins as you bet more, credited automatically based on your total bet:
+The value of each Free Spin is £0.10.
+Free Spins can be used on the following game: 'Age of the Gods: God of Storms 3'.
+Free Spins must be used within 7 days.
+Winnings from Free Spins are paid as cash.
+Maximum Free Spins winnings: £500.
+`);
+    expect(d.qualifyStake).toBe(25);
+    expect(d.spins).toBe(100);
+    expect(d.spinValue).toBeCloseTo(0.1, 10);
+    expect(d.likelyComponentType).toBe("free_spins");
+    expect(draftNeedsQualifyThenReward(d)).toBe(true);
+    expect(d.bonusAmount).toBeNull();
   });
 });

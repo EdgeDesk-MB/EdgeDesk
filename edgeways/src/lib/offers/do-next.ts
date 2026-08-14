@@ -20,6 +20,7 @@ import {
   offerExpiryDaysLeft,
 } from "@/lib/offers/offer-expiry";
 import { offerRequiredStake } from "@/lib/offers/offer-required-stake";
+import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
 import { campaignFbBadge } from "@/lib/ui/surface-styles";
 
 export type DoNextSort = "priority" | "edge" | "rate";
@@ -55,6 +56,8 @@ export type FreeBetLotInput = {
   betId?: number | null;
   /** Resolved campaign id (via awarding bet) so Acca reward scopes still apply. */
   offerId?: number | null;
+  /** User-set conversion deadline (epoch ms). */
+  expiresAt?: number | null;
 };
 
 export interface DoNextFunding {
@@ -214,8 +217,7 @@ export function buildDoNextItems(
     if (claimedLotIds.has(lot.id)) continue;
     if (lot.remaining <= 0.005) continue;
 
-    const note =
-      lot.note?.replace(/^Free bet promo - /, "").trim() || "Free bet credit";
+    const note = freeBetLotNoteLabel(lot.note);
     const ev = lot.remaining * (opts?.retention ?? 0.8);
 
     items.push({

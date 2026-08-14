@@ -1,6 +1,7 @@
 /** Shared helpers for tracked events in bet entry and the Events page. */
 
 import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
+import { isRacingSport } from "@/lib/sports";
 import { formatClockString, formatClockTime } from "@/lib/time-format";
 
 /** Default fixture/event timezone (London). Prefer settings.displayTimezone in UI code. */
@@ -302,6 +303,31 @@ export function effectiveEventStatus(
     }
   }
   return "upcoming";
+}
+
+export type NavLivePulseScope = "all" | "racing";
+
+type LiveNavEvent = {
+  sport?: string;
+  status: string;
+  source?: string | null;
+  startTime?: number;
+};
+
+/**
+ * How many tracked events should drive a sidebar live-pulse.
+ * Racing Desk only pulses for horse racing / greyhounds, not a live football match.
+ */
+export function countLiveNavEvents(
+  events: LiveNavEvent[],
+  scope: NavLivePulseScope = "all",
+  now = Date.now()
+): number {
+  return events.filter((e) => {
+    if (effectiveEventStatus(e, now) !== "live") return false;
+    if (scope === "racing") return isRacingSport(e.sport);
+    return true;
+  }).length;
 }
 
 /** Label for the Events dropdown in Add bet. */

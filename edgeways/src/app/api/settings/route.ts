@@ -41,6 +41,9 @@ export async function PATCH(req: Request) {
   if (typeof body.alertsOfferExpiring === "boolean") {
     patch.alertsOfferExpiring = body.alertsOfferExpiring;
   }
+  if (typeof body.alertsFreeBetExpiring === "boolean") {
+    patch.alertsFreeBetExpiring = body.alertsFreeBetExpiring;
+  }
   if (typeof body.alertsRaceOffSoon === "boolean") {
     patch.alertsRaceOffSoon = body.alertsRaceOffSoon;
   }

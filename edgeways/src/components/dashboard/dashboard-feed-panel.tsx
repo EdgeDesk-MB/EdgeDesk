@@ -80,7 +80,8 @@ export function DashboardFeedPanel({
         casinoFeed.events,
         casinoFeed.bets,
         casinoFeed.promoAwards,
-        casinoFeed.offerTitles ?? []
+        casinoFeed.offerTitles ?? [],
+        casinoFeed.entries
       );
     }
     return state
@@ -88,7 +89,8 @@ export function DashboardFeedPanel({
           state.events,
           state.bets,
           state.promoAwards,
-          (state.offers ?? []).map((o) => ({ id: o.id, title: o.title }))
+          (state.offers ?? []).map((o) => ({ id: o.id, title: o.title })),
+          state.history
         )
       : buildHistoryContext([], [], {});
   }, [feedFilter, casinoFeed, state]);

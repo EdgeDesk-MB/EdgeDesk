@@ -7,6 +7,7 @@ import { enGB as dayPickerEnGB } from "react-day-picker/locale";
 import { CalendarCheck, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { FilterPill } from "@/components/ui/filter-pill";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Tooltip,
@@ -17,10 +18,12 @@ import {
 import {
   formatYmdLocal,
   parseYmdLocal,
+  ymdDaysFromToday,
 } from "@/components/date-picker";
 import { parseHm, TimeWheels } from "@/components/time-picker";
 import { formatClockTime } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
+import { filterPillGroup } from "@/lib/ui/surface-styles";
 
 /** Split datetime-local `YYYY-MM-DDTHH:mm` into date + time parts. */
 export function splitDatetimeLocal(value: string): { date: string; time: string } {
@@ -76,15 +79,24 @@ export function DateTimePicker({
   placeholder = "Pick date & time",
   /** Empty-state aria/tooltip label (icon trigger) and field placeholder fallback. */
   emptyLabel,
+  /** Override the visible label (link trigger: "Set expiry" / "Expires 20 Aug"). */
+  displayLabel,
+  /** When opening empty, seed the wheels (expiry defaults to end of day). */
+  defaultTime,
+  /** Ending/expiry fields: Tomorrow + 7 days under the calendar, End of day under the wheels. */
+  shortcuts,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   id?: string;
   className?: string;
-  trigger?: "field" | "icon";
+  trigger?: "field" | "icon" | "link";
   placeholder?: string;
   emptyLabel?: string;
+  displayLabel?: string;
+  defaultTime?: string;
+  shortcuts?: "ending";
 }) {
   const [open, setOpen] = useState(false);
   const parts = splitDatetimeLocal(value);
@@ -100,15 +112,22 @@ export function DateTimePicker({
     queueMicrotask(() => {
       const next = splitDatetimeLocal(value);
       setDraftDate(next.date || formatYmdLocal(now));
-      const hm = parseHm(next.time) ?? parseHm(nowHm(now))!;
+      const hm =
+        parseHm(next.time) ??
+        parseHm(defaultTime?.trim() ?? "") ??
+        parseHm(nowHm(now))!;
       setHour(hm.hour);
       setMinute(hm.minute);
     });
-  }, [open, value]);
+  }, [open, value, defaultTime]);
 
   const draftSelected = parseYmdLocal(draftDate);
   const set = Boolean(parseDatetimeLocal(value));
-  const label = formatDatetimeLabel(value, vacantLabel);
+  const label = displayLabel ?? formatDatetimeLabel(value, vacantLabel);
+  const endOfDayActive = hour === "23" && minute === "59";
+  const now = new Date();
+  const tomorrowYmd = ymdDaysFromToday(1, now);
+  const inSevenYmd = ymdDaysFromToday(7, now);
 
   function commitWheels(nextHour: string, nextMinute: string) {
     setHour(nextHour);
@@ -130,42 +149,81 @@ export function DateTimePicker({
     setOpen(false);
   }
 
+  function handleEndOfDay() {
+    const date = draftDate || formatYmdLocal(new Date());
+    commitWheels("23", "59");
+    apply(date, "23", "59");
+    setOpen(false);
+  }
+
   function handleToday() {
-    const today = formatYmdLocal(new Date());
-    setDraftDate(today);
+    setDraftDate(formatYmdLocal(new Date()));
   }
 
   const panel = (
     <PopoverContent
-      align="end"
+      align={trigger === "link" ? "start" : "end"}
       className="w-auto gap-0 p-0"
       onOpenAutoFocus={(e) => e.preventDefault()}
       onWheel={(e) => e.stopPropagation()}
     >
       <div className="flex flex-col sm:flex-row">
-        <Calendar
-          mode="single"
-          locale={dayPickerEnGB}
-          captionLayout="dropdown"
-          startMonth={new Date(new Date().getFullYear() - 1, 0)}
-          endMonth={new Date(new Date().getFullYear() + 2, 11)}
-          selected={draftSelected}
-          defaultMonth={draftSelected ?? new Date()}
-          onSelect={(date) => {
-            if (!date) return;
-            setDraftDate(formatYmdLocal(date));
-          }}
-        />
-        <div className="flex flex-col justify-center border-t px-3 py-2 sm:border-l sm:border-t-0">
-          <p className="mb-1 text-center text-xs font-medium text-muted-foreground">
-            Time
-          </p>
-          <TimeWheels
-            hour={hour}
-            minute={minute}
-            active={open}
-            onChange={commitWheels}
+        <div className="flex flex-col">
+          <Calendar
+            mode="single"
+            locale={dayPickerEnGB}
+            captionLayout="dropdown"
+            startMonth={new Date(new Date().getFullYear() - 1, 0)}
+            endMonth={new Date(new Date().getFullYear() + 2, 11)}
+            selected={draftSelected}
+            defaultMonth={draftSelected ?? new Date()}
+            onSelect={(date) => {
+              if (!date) return;
+              setDraftDate(formatYmdLocal(date));
+            }}
           />
+          {shortcuts === "ending" ? (
+            <div className={cn(filterPillGroup, "border-t px-2 py-2")}>
+              <FilterPill
+                compact
+                active={draftDate === tomorrowYmd}
+                onClick={() => setDraftDate(tomorrowYmd)}
+              >
+                Tomorrow
+              </FilterPill>
+              <FilterPill
+                compact
+                active={draftDate === inSevenYmd}
+                onClick={() => setDraftDate(inSevenYmd)}
+              >
+                7 days
+              </FilterPill>
+            </div>
+          ) : null}
+        </div>
+        <div className="flex flex-col justify-center border-t sm:border-l sm:border-t-0">
+          <div className="px-3 py-2">
+            <p className="mb-1 text-center text-xs font-medium text-muted-foreground">
+              Time
+            </p>
+            <TimeWheels
+              hour={hour}
+              minute={minute}
+              active={open}
+              onChange={commitWheels}
+            />
+          </div>
+          {shortcuts === "ending" ? (
+            <div className={cn(filterPillGroup, "justify-center border-t px-2 py-2")}>
+              <FilterPill
+                compact
+                active={endOfDayActive}
+                onClick={handleEndOfDay}
+              >
+                End of day
+              </FilterPill>
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5">
@@ -200,6 +258,32 @@ export function DateTimePicker({
       </div>
     </PopoverContent>
   );
+
+  if (trigger === "link") {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            type="button"
+            variant="link"
+            size="xs"
+            disabled={disabled}
+            aria-label={emptyLabel ?? label}
+            className={cn("h-auto min-h-6 justify-start px-0 underline", className)}
+          >
+            {set ? (
+              <CalendarCheck className="size-3 text-current" />
+            ) : (
+              <CalendarClock className="size-3 text-current" />
+            )}
+            {set ? label : placeholder}
+          </Button>
+        </PopoverTrigger>
+        {panel}
+      </Popover>
+    );
+  }
 
   if (trigger === "icon") {
     return (

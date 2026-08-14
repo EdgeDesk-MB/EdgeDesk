@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, accounts, balanceTransactions } from "@/lib/db";
-import { listFreeBetLots, removeFreeBetLot, sumFreeBetLotBalance } from "./free-bet-lots";
+import { listFreeBetLots, removeFreeBetLot, setFreeBetLotExpiry, sumFreeBetLotBalance } from "./free-bet-lots";
 
 describe("listFreeBetLots", () => {
   beforeEach(() => {
@@ -104,6 +104,39 @@ describe("listFreeBetLots", () => {
     expect(debit?.amount).toBeCloseTo(-50);
     expect(debit?.note).toMatch(/Free bet removed/);
     expect(debit?.note).toMatch(/\[\[lot:\d+\]\]/);
+  });
+
+  it("setFreeBetLotExpiry stores and clears the deadline on the credit", () => {
+    const bookie = db
+      .insert(accounts)
+      .values({
+        name: "FbLot Expiry",
+        type: "bookie",
+        isActive: 1,
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+
+    const credit = db
+      .insert(balanceTransactions)
+      .values({
+        accountId: bookie.id,
+        amount: 10,
+        category: "free_bet",
+        note: "Free bet promo - Offer unlocked",
+        createdAt: Date.now(),
+        pending: 0,
+      })
+      .returning()
+      .get();
+
+    expect(listFreeBetLots(bookie.id)[0]?.expiresAt).toBeNull();
+    const at = Date.now() + 86_400_000;
+    setFreeBetLotExpiry(credit.id, at);
+    expect(listFreeBetLots(bookie.id)[0]?.expiresAt).toBe(at);
+    setFreeBetLotExpiry(credit.id, null);
+    expect(listFreeBetLots(bookie.id)[0]?.expiresAt).toBeNull();
   });
 
   it("removeFreeBetLot targets the chosen lot, not FIFO older credit", () => {

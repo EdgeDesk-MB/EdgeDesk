@@ -57,7 +57,7 @@ import { useBoostCheck } from "@/components/boosts/boost-check-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { effectiveEventStatus } from "@/lib/events";
+import { countLiveNavEvents, type NavLivePulseScope } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
 import {
   offerMatchesAvailableBookies,
@@ -78,7 +78,7 @@ type NavLeaf = {
   label: string;
   icon: NavIcon;
   quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "boostCheck";
-  livePulse?: boolean;
+  livePulse?: NavLivePulseScope;
 };
 
 type NavGroup = {
@@ -140,7 +140,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/tracked-events",
         label: "Tracked Events",
         icon: Radio,
-        livePulse: true,
+        livePulse: "all",
         quickAction: "trackFixture",
       },
     ],
@@ -200,7 +200,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/racing",
         label: "Racing Desk",
         icon: Trophy,
-        livePulse: true,
+        livePulse: "racing",
       },
       {
         kind: "link",
@@ -447,7 +447,11 @@ export function AppNav() {
   const { openOffer } = useOfferDialog();
   const { state } = useAppState(5000);
   const liveTrackedCount = useMemo(
-    () => (state?.events ?? []).filter((e) => effectiveEventStatus(e) === "live").length,
+    () => countLiveNavEvents(state?.events ?? [], "all"),
+    [state?.events]
+  );
+  const liveRacingCount = useMemo(
+    () => countLiveNavEvents(state?.events ?? [], "racing"),
     [state?.events]
   );
   const offerActionCount = useMemo(() => {
@@ -513,7 +517,12 @@ export function AppNav() {
     const active = isLinkActive(pathname, item.href);
     const quickAction = item.quickAction;
     const livePulse = item.livePulse;
-    const iconLive = livePulse && liveTrackedCount > 0;
+    const iconLive =
+      livePulse === "racing"
+        ? liveRacingCount > 0
+        : livePulse === "all"
+          ? liveTrackedCount > 0
+          : false;
     const quickIcon =
       quickAction === "matchedCalculator" ? (
         <Calculator className="size-3.5" />

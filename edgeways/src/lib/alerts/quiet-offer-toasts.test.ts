@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { offerExpiringAlertKeys } from "./rules";
+import { offerExpiringAlertKeys } from "./expiring-alert-keys";
 import { readSeenAlertKeys, resetSeenForTests } from "./seen";
 import { EPHEMERAL_ALERT_TOAST_MS, resetAlertToastChannelForTests } from "./local-channel";
 import {

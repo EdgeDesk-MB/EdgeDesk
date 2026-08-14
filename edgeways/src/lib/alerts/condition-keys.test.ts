@@ -4,6 +4,7 @@ import { clearedConditionAlertKeys, isConditionAlertKey } from "./condition-keys
 describe("isConditionAlertKey", () => {
   it("matches live prompt kinds only", () => {
     expect(isConditionAlertKey("offer_expiring:offer-5-place_qualifying:2026-08-03")).toBe(true);
+    expect(isConditionAlertKey("free_bet_expiring:lot-12:2026-08-03")).toBe(true);
     expect(isConditionAlertKey("naked_exposure:97")).toBe(true);
     expect(isConditionAlertKey("race_off_soon:evt-1")).toBe(true);
     expect(isConditionAlertKey("two_up_lock:12")).toBe(true);

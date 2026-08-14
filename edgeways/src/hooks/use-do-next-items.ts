@@ -44,7 +44,7 @@ export function useDoNextItems(pollMs?: number): {
     apiGet<{ lots: FreeBetLotInput[] }>("/api/accounts/free-bets")
       .then((r) => setLots(r.lots ?? []))
       .catch(() => setLots([]));
-  }, [freeBetTotal]);
+  }, [freeBetTotal, now]);
 
   const bets = state?.bets;
   const lotsWithOffers = useMemo(() => {

@@ -69,6 +69,7 @@ type ComponentTemplateFields = {
   cashbackPct: number | null;
   cashbackCap: number | null;
   game: string | null;
+  eligibleGamesJson: string | null;
   sortOrder: number;
 };
 
@@ -88,6 +89,7 @@ function componentTemplateFields(
     | "cashbackPct"
     | "cashbackCap"
     | "game"
+    | "eligibleGamesJson"
     | "sortOrder"
   >
 ): ComponentTemplateFields {
@@ -105,6 +107,7 @@ function componentTemplateFields(
     cashbackPct: row.cashbackPct,
     cashbackCap: row.cashbackCap,
     game: row.game,
+    eligibleGamesJson: row.eligibleGamesJson,
     sortOrder: row.sortOrder,
   };
 }
@@ -131,6 +134,7 @@ function componentFieldsEqual(
       left.cashbackPct !== right.cashbackPct ||
       left.cashbackCap !== right.cashbackCap ||
       left.game !== right.game ||
+      left.eligibleGamesJson !== right.eligibleGamesJson ||
       left.sortOrder !== right.sortOrder
     ) {
       return false;

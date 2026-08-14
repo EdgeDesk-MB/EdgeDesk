@@ -19,7 +19,7 @@ import {
   OfferSetReminderDialog,
 } from "@/components/offers/offer-set-reminder-dialog";
 import { api, useAppState } from "@/hooks/use-app-state";
-import { offerExpiringAlertDedupePrefix } from "@/lib/alerts/rules";
+import { offerExpiringAlertDedupePrefix } from "@/lib/alerts/expiring-alert-keys";
 import { quietOfferPromptToasts } from "@/lib/alerts/quiet-offer-toasts";
 import { DEFAULT_TUNING } from "@/lib/services/settings-shared";
 import type { OfferSummary, OfferProfitBreakdown } from "@/lib/services/offers.types";

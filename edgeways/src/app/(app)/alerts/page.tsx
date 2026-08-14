@@ -17,6 +17,7 @@ import {
   CheckCheck,
   CircleCheck,
   Flag,
+  Gift,
   ListChecks,
   ShieldAlert,
   Timer,
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils";
 
 const KIND_ICONS: Record<string, LucideIcon> = {
   offer_expiring: AlarmClock,
+  free_bet_expiring: Gift,
   race_off_soon: Timer,
   result_settled: CircleCheck,
   naked_exposure: ShieldAlert,

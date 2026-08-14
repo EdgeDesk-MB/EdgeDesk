@@ -13,7 +13,9 @@
  * K3: repeats can be enabled on step 1; sealing the series template happens
  * when components are saved (and re-syncs if further steps are added).
  *
- * Saving fires CASINO_CHANGED_EVENT so the Casino page refreshes if mounted.
+ * Saving fires CASINO_CHANGED_EVENT so the Casino page and calendar refresh
+ * if mounted. Calendar tiles open the campaign in CasinoViewDialog via
+ * `viewCasino`, matching the offers calendar → OfferViewDialog path.
  */
 
 import { createContext, useCallback, useContext, useState } from "react";
@@ -32,6 +34,8 @@ import { Label } from "@/components/ui/label";
 import { DatePicker, formatYmdLocal } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
 import { CasinoComponentForm } from "@/components/casino/casino-component-form";
+import { CasinoOfferEditDialog } from "@/components/casino/casino-offer-edit-dialog";
+import { CasinoViewDialog } from "@/components/casino/casino-view-dialog";
 import { CASINO_CHANGED_EVENT } from "@/components/casino/casino-ui";
 import { InlinePasteStrip } from "@/components/offers/inline-paste-strip";
 import {
@@ -49,6 +53,7 @@ import { OfferUrlField } from "@/components/offers/offer-url-field";
 import { VenueSelect } from "@/components/venue-select";
 import { api } from "@/hooks/use-app-state";
 import type { CasinoComponentType } from "@/lib/calc/casino-reward-ev";
+import { parseEligibleGamesJson } from "@/lib/casino/eligible-games";
 import {
   countPasteFields,
   markCasinoFieldUser,
@@ -85,10 +90,12 @@ type StepPhase = "qualify" | "reward";
 type CarriedStepDefaults = {
   rtp: number | null;
   game: string | null;
+  eligibleGames: string[];
 };
 
 type CasinoLogContextValue = {
   openCasinoLog: () => void;
+  viewCasino: (offer: CasinoOfferSummary) => void;
 };
 
 const CasinoLogContext = createContext<CasinoLogContextValue | null>(null);
@@ -124,12 +131,28 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
   const [pasteConfidence, setPasteConfidence] = useState<
     "high" | "medium" | "low" | null
   >(null);
+  const [viewOffer, setViewOffer] = useState<CasinoOfferSummary | null>(null);
+  const [editOffer, setEditOffer] = useState<CasinoOfferSummary | null>(null);
 
   const openCasinoLog = useCallback(() => {
     setExpiresDate(defaultExpiresDate());
     setExpiresTime(DEFAULT_EXPIRES_TIME);
     setOpen(true);
   }, []);
+
+  const viewCasino = useCallback((offer: CasinoOfferSummary) => {
+    setEditOffer(null);
+    setViewOffer(offer);
+  }, []);
+
+  function handleViewEdit(offer: CasinoOfferSummary) {
+    setViewOffer(null);
+    setEditOffer(offer);
+  }
+
+  function announceCasinoChanged() {
+    window.dispatchEvent(new Event(CASINO_CHANGED_EVENT));
+  }
 
   function resetForm() {
     setCasino("");
@@ -181,6 +204,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
     setCarriedStep({
       rtp: qw?.rtp ?? null,
       game: qw?.game?.trim() || null,
+      eligibleGames: parseEligibleGamesJson(qw?.eligibleGamesJson),
     });
     setStepPhase("reward");
   }
@@ -237,7 +261,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
   const onQualifyPhase = createdOfferId != null && stepPhase === "qualify" && twoStep;
 
   return (
-    <CasinoLogContext.Provider value={{ openCasinoLog }}>
+    <CasinoLogContext.Provider value={{ openCasinoLog, viewCasino }}>
       {children}
       <Dialog
         open={open}
@@ -420,6 +444,7 @@ Stake £10 get a £20 casino bonus
                   }
                   sourceText={draft?.sourceText}
                   initialGameName={carriedStep?.game}
+                  initialGameNames={carriedStep?.eligibleGames}
                   initialValues={
                     draft || carriedStep
                       ? {
@@ -446,6 +471,38 @@ Stake £10 get a £20 casino bonus
           )}
         </DialogContent>
       </Dialog>
+      <CasinoViewDialog
+        open={viewOffer != null}
+        offer={viewOffer}
+        onOpenChange={(next) => {
+          if (!next) setViewOffer(null);
+        }}
+        onChanged={(updated) => {
+          setViewOffer(updated);
+          announceCasinoChanged();
+        }}
+        onRemoved={() => {
+          setViewOffer(null);
+          announceCasinoChanged();
+        }}
+        onEdit={handleViewEdit}
+      />
+      {editOffer ? (
+        <CasinoOfferEditDialog
+          offer={editOffer}
+          showTrigger={false}
+          open
+          mobile="center"
+          onOpenChange={(next) => {
+            if (!next) setEditOffer(null);
+          }}
+          onSaved={(updated) => {
+            setEditOffer(null);
+            announceCasinoChanged();
+            setViewOffer(updated);
+          }}
+        />
+      ) : null}
     </CasinoLogContext.Provider>
   );
 }

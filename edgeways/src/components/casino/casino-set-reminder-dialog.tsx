@@ -46,9 +46,11 @@ function formatReminderWhen(ms: number): string {
 export function CasinoSetReminderDialog({
   offer,
   onChanged,
+  mobile = "sheet",
 }: {
   offer: CasinoOfferSummary;
   onChanged: (offer: CasinoOfferSummary) => void;
+  mobile?: "sheet" | "center";
 }) {
   const noteId = useId();
   const dateId = useId();
@@ -119,7 +121,7 @@ export function CasinoSetReminderDialog({
         <Bell className="size-3.5" aria-hidden />
         Set reminder
       </Button>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" mobile={mobile}>
         <DialogHeader>
           <DialogTitle>Set your reminder</DialogTitle>
           <DialogDescription>

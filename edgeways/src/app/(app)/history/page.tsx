@@ -117,7 +117,8 @@ export default function HistoryPage() {
             data.events,
             data.bets,
             data.promoAwards,
-            data.offerTitles ?? []
+            data.offerTitles ?? [],
+            data.entries
           )
         : buildHistoryContext([], [], {}),
     [data]

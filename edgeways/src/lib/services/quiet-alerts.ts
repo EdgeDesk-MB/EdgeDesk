@@ -5,9 +5,11 @@
  */
 import "server-only";
 import {
+  freeBetExpiringAlertDedupePrefix,
+  freeBetExpiringAlertKeys,
   offerExpiringAlertDedupePrefix,
   offerExpiringAlertKeys,
-} from "@/lib/alerts/rules";
+} from "@/lib/alerts/expiring-alert-keys";
 import { markReadByDedupe, markReadByDedupePrefix } from "@/lib/services/alerts-inbox";
 import { dismissPush } from "@/lib/services/push";
 
@@ -27,6 +29,22 @@ export function quietOfferAlerts(offerId: number, now = Date.now()): void {
   if (!Number.isFinite(offerId) || offerId <= 0) return;
   markReadByDedupePrefix(offerExpiringAlertDedupePrefix(offerId), now);
   void dismissPush(offerExpiringDismissTags(offerId, now)).catch(() => {});
+}
+
+/** Tags AlertWatcher may have used for this free-bet lot today or yesterday. */
+export function freeBetExpiringDismissTags(lotId: number, now = Date.now()): string[] {
+  return [
+    ...new Set([
+      ...freeBetExpiringAlertKeys(lotId, now),
+      ...freeBetExpiringAlertKeys(lotId, now - DAY_MS),
+    ]),
+  ];
+}
+
+export function quietFreeBetAlerts(lotId: number, now = Date.now()): void {
+  if (!Number.isFinite(lotId) || lotId <= 0) return;
+  markReadByDedupePrefix(freeBetExpiringAlertDedupePrefix(lotId), now);
+  void dismissPush(freeBetExpiringDismissTags(lotId, now)).catch(() => {});
 }
 
 /** Mark inbox rows read (by exact dedupe) and dismiss matching push tags. */

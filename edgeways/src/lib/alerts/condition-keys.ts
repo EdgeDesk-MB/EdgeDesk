@@ -6,6 +6,7 @@
 
 const CONDITION_PREFIXES = [
   "offer_expiring:",
+  "free_bet_expiring:",
   "naked_exposure:",
   "race_off_soon:",
   "two_up_lock:",

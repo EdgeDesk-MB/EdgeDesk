@@ -15,8 +15,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChromeTab } from "@/components/chrome-tab";
-import { TopBarLoginButton } from "@/components/top-bar-login-button";
-import { TOP_SUB_NAV_ITEMS, activeMetaNavId } from "@/content/meta-nav";
+import { TopBarLogoutButton } from "@/components/top-bar-login-button";
+import { TOP_SUB_NAV_ITEMS, activeMetaNavId, type MetaNavItem } from "@/content/meta-nav";
+import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
 import { META_TAB_DURATION_S, META_TAB_EASE } from "@/lib/ui/motion";
 import { appShellMaxWidth } from "@/lib/ui/app-shell-layout";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,46 @@ function applyPillBox(
   el.style.width = `${box.width}px`;
 }
 
+function MetaNavTab({
+  item,
+  active,
+}: {
+  item: MetaNavItem;
+  active: boolean;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <Link
+      href={item.href}
+      data-meta-nav={item.id}
+      aria-current={active ? "page" : undefined}
+      prefetch
+      className={cn(
+        "group/meta-tab relative z-[1] flex shrink-0 touch-manipulation items-center gap-1.5 px-2.5 pt-1.5 pb-2 text-[13px] font-semibold tracking-tight",
+        "outline-none ring-0 motion-reduce:transition-none",
+        "focus-visible:outline-none focus-visible:ring-0",
+        active ? "text-foreground" : "text-topbar-muted"
+      )}
+    >
+      {!active ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -bottom-px z-0 opacity-0 transition-opacity duration-100 group-hover/meta-tab:opacity-10 group-focus-visible/meta-tab:opacity-10 group-active/meta-tab:opacity-[0.14]"
+        >
+          <ChromeTab edge="rise" className="absolute inset-0" />
+        </span>
+      ) : null}
+      <Icon
+        className="relative z-[1] size-3.5 shrink-0"
+        strokeWidth={2.25}
+        aria-hidden
+      />
+      <span className="relative z-[1]">{item.label}</span>
+    </Link>
+  );
+}
+
 export function AppTopBarMetaNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -73,6 +114,8 @@ export function AppTopBarMetaNav() {
   const placedRef = useRef(false);
   const animRef = useRef<Animation | null>(null);
   const [pillReady, setPillReady] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const drag = useDragToScroll(scrollRef);
 
   // Warm meta + desk routes so flip/phone tab switches aren’t cold compiles.
   useEffect(() => {
@@ -195,65 +238,50 @@ export function AppTopBarMetaNav() {
           appShellMaxWidth
         )}
       >
-        {/*
-          overflow-x + overflow-y:visible computes y to auto — a nested
-          scrollport that eats taps on iOS. Use clip (not visible) on y.
-        */}
-        <div className="overscroll-x-contain overflow-x-auto overflow-y-clip [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <nav
-            ref={navRef}
-            aria-label="Site sections"
-            className="relative flex w-max min-w-full items-end gap-0.5 pl-1 pr-[var(--chrome-tab-r)] sm:px-[var(--chrome-tab-r)]"
+        <div className="flex min-w-0 items-end gap-0.5">
+          {/*
+            overflow-x + overflow-y:visible computes y to auto — a nested
+            scrollport that eats taps on iOS. Use clip (not visible) on y.
+            No edge fades on the submenu. Mouse drag-to-pan; touch keeps native scroll.
+          */}
+          <div
+            ref={scrollRef}
+            className="app-scroll-overlay min-w-0 flex-1 overscroll-x-contain overflow-x-auto overflow-y-clip"
+            onPointerDown={drag.onPointerDown}
+            onPointerMove={drag.onPointerMove}
+            onPointerUp={drag.onPointerUp}
+            onPointerEnter={drag.onPointerEnter}
+            onPointerLeave={drag.onPointerLeave}
+            onPointerCancel={drag.onPointerCancel}
+            onClickCapture={drag.onClickCapture}
           >
-            {pillReady ? (
-              <div
-                ref={pillRef}
-                aria-hidden
-                className="pointer-events-none absolute top-0 -bottom-px left-0 z-0 will-change-transform"
-              >
-                <ChromeTab edge="rise" className="absolute inset-0" />
-              </div>
-            ) : null}
-
-            {TOP_SUB_NAV_ITEMS.map((item) => {
-              const active = item.id === activeId;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  data-meta-nav={item.id}
-                  aria-current={active ? "page" : undefined}
-                  prefetch
-                  className={cn(
-                    "group/meta-tab relative z-[1] flex shrink-0 touch-manipulation items-center gap-1.5 px-2.5 pt-1.5 pb-2 text-[13px] font-semibold tracking-tight",
-                    "outline-none ring-0 motion-reduce:transition-none",
-                    "focus-visible:outline-none focus-visible:ring-0",
-                    active ? "text-foreground" : "text-topbar-muted"
-                  )}
+            <nav
+              ref={navRef}
+              aria-label="Site sections"
+              className="relative flex w-max min-w-full items-end gap-0.5 pl-1 pr-[var(--chrome-tab-r)] sm:px-[var(--chrome-tab-r)]"
+            >
+              {pillReady ? (
+                <div
+                  ref={pillRef}
+                  aria-hidden
+                  className="pointer-events-none absolute top-0 -bottom-px left-0 z-0 will-change-transform"
                 >
-                  {/* Hover / focus / press: rise-tab chrome at 10% (14% while pressed) */}
-                  {!active ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 -bottom-px z-0 opacity-0 transition-opacity duration-100 group-hover/meta-tab:opacity-10 group-focus-visible/meta-tab:opacity-10 group-active/meta-tab:opacity-[0.14]"
-                    >
-                      <ChromeTab edge="rise" className="absolute inset-0" />
-                    </span>
-                  ) : null}
-                  <Icon
-                    className="relative z-[1] size-3.5 shrink-0"
-                    strokeWidth={2.25}
-                    aria-hidden
-                  />
-                  <span className="relative z-[1]">{item.label}</span>
-                </Link>
-              );
-            })}
+                  <ChromeTab edge="rise" className="absolute inset-0" />
+                </div>
+              ) : null}
 
-            {/* Temporary: Login lives in the submenu until auth ships. */}
-            <TopBarLoginButton variant="meta" className="hidden md:flex" />
-          </nav>
+              {TOP_SUB_NAV_ITEMS.map((item) => (
+                <MetaNavTab
+                  key={item.id}
+                  item={item}
+                  active={item.id === activeId}
+                />
+              ))}
+            </nav>
+          </div>
+          <div className="hidden shrink-0 items-end pr-8 md:flex">
+            <TopBarLogoutButton />
+          </div>
         </div>
       </div>
     </div>

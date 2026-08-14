@@ -56,6 +56,10 @@ the app derives every market and auto-settles linked bets.
 - Product vision: `../docs/PLAN.md`, `docs/roadmap/` (strategy research lives in
   parent `../docs/strategy/` — see `../docs/repo-layout.md`)
 - Design system: `docs/design-system.md`
+- Alert quieting: `src/lib/services/quiet-alerts.ts` (server-only). Dedupe keys
+  live in `src/lib/alerts/expiring-alert-keys.ts`. Never import quiet-alerts
+  from `free-bet-lots` or other `/api/state` graph modules. Call `quiet*` from
+  the mutation API.
 
 ## Skills, subagents and delegation
 Harness at the git root: Cursor reads `../.cursor/` (skills, agents, commands);

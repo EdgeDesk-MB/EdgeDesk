@@ -109,6 +109,11 @@ import {
   formatSettlementTitleWithFreeBet,
 } from "@/lib/history-display";
 import {
+  formatGoalHistoryCopy,
+  inferScoringSide,
+  previousScorelineFromDedupe,
+} from "@/lib/history-goal-copy";
+import {
   autoResultLinkedLegs,
   legDueState,
   listAccaRuns,
@@ -604,29 +609,58 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
     goals.forEach((goal, i) => {
       if (goal.side === "home") h++;
       else a++;
-      const scorer = goal.player ?? (goal.side === "home" ? event.homeTeam : event.awayTeam);
       const flags = [
         i === 0 && !goal.og ? "1st goalscorer" : null,
         goal.og ? "own goal" : null,
       ].filter(Boolean);
-      put({
+      const copy = formatGoalHistoryCopy({
+        side: goal.side,
+        player: goal.player,
+        og: goal.og,
+        homeTeam: event.homeTeam,
+        awayTeam: event.awayTeam,
+      });
+      upsert({
         dedupe: `goal:${event.id}:${i}`,
         kind: "goal",
         eventId: event.id,
         minute: goal.minute,
-        title: scorer,
+        title: copy.title,
         detail: `${flags.length ? flags.join(" · ") + " - " : ""}${event.homeTeam} ${h}-${a} ${event.awayTeam}`,
       });
     });
-    // API events without a scorer feed: log score changes generically so the
-    // feed never goes quiet just because no player trigger is watching.
+    // API events without a scorer feed: log score changes so the feed never
+    // goes quiet just because no player trigger is watching. Name the team
+    // when the score ticked by exactly one goal.
     if (goals.length < event.homeScore + event.awayScore && event.homeScore + event.awayScore > 0) {
-      put({
+      const existing = db
+        .select({ dedupe: history.dedupe })
+        .from(history)
+        .where(eq(history.eventId, event.id))
+        .all();
+      const side = inferScoringSide({
+        knownHome: h,
+        knownAway: a,
+        currentHome: event.homeScore,
+        currentAway: event.awayScore,
+        previousScore: previousScorelineFromDedupe(
+          existing.map((row) => row.dedupe),
+          event.id,
+          event.homeScore,
+          event.awayScore
+        ),
+      });
+      const copy = formatGoalHistoryCopy({
+        side,
+        homeTeam: event.homeTeam,
+        awayTeam: event.awayTeam,
+      });
+      upsert({
         dedupe: `score:${event.id}:${event.homeScore}-${event.awayScore}`,
         kind: "goal",
         eventId: event.id,
         minute: event.minute,
-        title: "Goal",
+        title: copy.title,
         detail: `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`,
       });
     }

@@ -79,8 +79,10 @@ idempotent always, budget-aware models, every run logged.
 
 ## 3. Payments
 
-Pricing intent already drafted in §7.5 (Free £0 / Core ~£9.99 / Edge ~£24.99,
-annual ≈ 2 months free, 14-day Edge trial). What the roadmap does not yet cover:
+Offer **locked 12 Aug 2026** in `docs/strategy/subscriptions.md` (Free £0 /
+Core £9.99 · £99.90/yr / Edge £24.99 · £249.90/yr, 14-day Edge trial, Founding
+= 3 months Edge at Core price after trial). Feature matrix remains §7.5.
+What that doc does not cover:
 
 ### 3.1 The first task is not code — it is processor acceptance
 
@@ -151,7 +153,8 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
       liability justifies. Affects contracts, banking, and tax.
 - [ ] **Trademark** — D7 renamed EdgeDesk → Edgeways after a clash. Before launch:
       UK IPO search + consider registering "Edgeways"; confirm edgeways.app and
-      social handles are secured (Sam handles, per D7).
+      social handles are secured (Sam handles, per D7). Page names, bios, which
+      networks to claim, and asset sizes: `docs/strategy/social-presence.md`.
 - [x] **API ToS re-reads** (§7.6) — done 10 Aug (EDGE-16 + EDGE-14):
       `docs/legal/api-terms-review.md`. Personal own-key use is clear for all
       three providers; pooled subscriber feeds need written permission

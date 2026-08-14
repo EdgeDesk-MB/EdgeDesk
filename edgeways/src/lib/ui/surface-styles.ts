@@ -86,6 +86,10 @@ export const sectionStack = "flex flex-col gap-[var(--layout-stack-gap)]";
 export const captionHeading =
   "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
+/** Burger drawer utility row (meta links, Log out). `w-full` so buttons fill like links. */
+export const drawerUtilityRow =
+  "flex w-full items-center gap-3 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60";
+
 export const tableHeaderCell =
   "h-8 px-2 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
@@ -178,6 +182,13 @@ export const brandChipCount =
   "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#111111] px-1.5 text-[11px] font-bold tabular-nums text-[#fafafa] dark:bg-foreground/10 dark:text-foreground/70";
 
 /**
+ * Shared box for Core / Edge / Backed marks. Floor 11px.
+ * Logo / nav lockup chips stay on `text-xs` + `scale-[0.625]` (`proNavTag`).
+ */
+export const navTag =
+  "inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide";
+
+/**
  * Pro tier mark beside nav section labels — Offer Edge violet plate, same
  * scaled geometry as top-bar Beta (`text-xs` + `scale-[0.625]`).
  */
@@ -185,11 +196,9 @@ export const proNavTag =
   "inline-flex origin-left scale-[0.625] -mr-[37.5%] items-center rounded-[3px] bg-edge px-1.5 py-0.5 text-xs font-bold uppercase leading-none tracking-wide text-edge-foreground";
 
 /**
- * Edge tier mark — same geometry/colour as `proNavTag`, Offer Edge violet plate.
- * Contrast type via `--edge-foreground` (white in light, ink in dark). Floor 11px.
+ * Edge tier mark — Offer Edge violet plate. Contrast type via `--edge-foreground`.
  */
-export const edgeNavTag =
-  "inline-flex items-center rounded-[3px] bg-edge px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-edge-foreground";
+export const edgeNavTag = `${navTag} bg-edge text-edge-foreground`;
 
 /**
  * Settled/open bet mark on Racing Desk runners — same box as `edgeNavTag`

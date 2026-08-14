@@ -32,6 +32,7 @@ import {
   type CasinoComponentType,
 } from "@/lib/calc/casino-reward-ev";
 import { bestGame, matchGamesInText, type CasinoGame } from "@/lib/casino/game-library";
+import { parseEligibleGamesJson } from "@/lib/casino/eligible-games";
 import type { CasinoOfferComponentRow } from "@/lib/db/schema";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function CasinoComponentForm({
   initialComponentType,
   sourceText,
   initialGameName,
+  initialGameNames,
   onSaved,
   initialValues,
   onCancel,
@@ -71,6 +73,8 @@ export function CasinoComponentForm({
   sourceText?: string;
   /** Add-mode only - preselect a library game by name (e.g. carried from prior wizard step) */
   initialGameName?: string | null;
+  /** Add-mode only - full picker selection to restore (paste match or prior step) */
+  initialGameNames?: string[] | null;
   /** Add-mode only - prefill from a paste-parser draft (fractions 0-1) */
   initialValues?: {
     amount?: number | null;
@@ -136,24 +140,51 @@ export function CasinoComponentForm({
     api<{ games: CasinoGame[] }>("/api/casino/games")
       .then((r) => {
         setGames(r.games);
-        const seedName = (initialGameName ?? existing?.game)?.trim();
-        if (seedName) {
-          const exact = r.games.find(
-            (g) => g.name.toLowerCase() === seedName.toLowerCase()
-          );
-          if (exact) {
-            applySelection([exact.id], r.games);
-            return;
-          }
+        const ids = idsForNames(resolveSeedNames(), r.games);
+        if (ids.length > 0) {
+          applySelection(ids, r.games);
+          return;
         }
         if (sourceText) {
           const matched = matchGamesInText(sourceText, r.games);
-          if (matched.length > 0) applySelection(matched.map((g) => g.id), r.games);
+          if (matched.length > 0) {
+            applySelection(matched.map((g) => g.id), r.games);
+            return;
+          }
+        }
+        const fallback = (initialGameName ?? "").trim();
+        if (fallback) {
+          const exact = r.games.find((g) => g.name.toLowerCase() === fallback.toLowerCase());
+          if (exact) applySelection([exact.id], r.games);
         }
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function resolveSeedNames(): string[] {
+    if (existing) {
+      const stored = parseEligibleGamesJson(existing.eligibleGamesJson);
+      if (stored.length > 0) return stored;
+      const single = existing.game?.trim();
+      return single ? [single] : [];
+    }
+    if (initialGameNames && initialGameNames.length > 0) return initialGameNames;
+    return [];
+  }
+
+  function idsForNames(names: string[], pool: CasinoGame[]): number[] {
+    if (names.length === 0 || pool.length === 0) return [];
+    const ids: number[] = [];
+    const seen = new Set<number>();
+    for (const name of names) {
+      const exact = pool.find((g) => g.name.toLowerCase() === name.toLowerCase());
+      if (!exact || seen.has(exact.id)) continue;
+      seen.add(exact.id);
+      ids.push(exact.id);
+    }
+    return ids;
+  }
 
   function applySelection(ids: number[], pool: CasinoGame[] = games) {
     setSelectedGameIds(ids);
@@ -200,14 +231,19 @@ export function CasinoComponentForm({
 
   const recommendedGame = bestGame(games.filter((g) => selectedGameIds.includes(g.id)));
 
+  function selectedGameNames(): string[] {
+    return games.filter((g) => selectedGameIds.includes(g.id)).map((g) => g.name);
+  }
+
   function buildPayload(): Record<string, unknown> {
     const rtp = rtpEntered ? rtpPct / 100 : null;
     const game = recommendedGame?.name ?? null;
+    const eligibleGames = selectedGameNames();
     switch (componentType) {
       case "qualifying_wager":
-        return { componentType, amount, rtp, game };
+        return { componentType, amount, rtp, game, eligibleGames };
       case "cash":
-        return { componentType, amount };
+        return { componentType, amount, eligibleGames };
       case "bonus":
         return {
           componentType,
@@ -216,6 +252,7 @@ export function CasinoComponentForm({
           rtp,
           contributionPct: pctToFraction(contributionPct) ?? null,
           game,
+          eligibleGames,
         };
       case "free_spins":
         return {
@@ -226,9 +263,17 @@ export function CasinoComponentForm({
           wageringMultiplier: Number.isFinite(wageringMultiplier) ? wageringMultiplier : null,
           contributionPct: pctToFraction(contributionPct) ?? null,
           game,
+          eligibleGames,
         };
       case "golden_chips":
-        return { componentType, chipCount, chipValue, rtp: rtp ?? 1 - EUROPEAN_ROULETTE_EDGE, houseEdgePreset };
+        return {
+          componentType,
+          chipCount,
+          chipValue,
+          rtp: rtp ?? 1 - EUROPEAN_ROULETTE_EDGE,
+          houseEdgePreset,
+          eligibleGames,
+        };
       case "cashback":
         return {
           componentType,
@@ -237,6 +282,7 @@ export function CasinoComponentForm({
           cashbackPct: pctToFraction(cashbackPct) ?? 0.1,
           cashbackCap: Number.isFinite(cashbackCap) ? cashbackCap : null,
           game,
+          eligibleGames,
         };
     }
   }

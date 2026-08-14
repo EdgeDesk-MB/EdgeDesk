@@ -241,7 +241,7 @@ function calendarHeaderTint(offer: OfferSummary, remainingEv: number): string | 
 function CalendarItemCard({
   item,
   variant = "board",
-  /** Priority bar + EV header tint: today column, or Ends tomorrow. */
+  /** Priority bar: today column, or Ends tomorrow. EV tint is always on. */
   priorityChrome = false,
   onOfferClick,
 }: {
@@ -252,9 +252,7 @@ function CalendarItemCard({
 }) {
   const p = priorityStyles(item.priority);
   const expiry = formatOfferDaysLeftLabel(item.daysLeft);
-  const headerTint = priorityChrome
-    ? calendarHeaderTint(item.offer, item.remainingEv)
-    : null;
+  const headerTint = calendarHeaderTint(item.offer, item.remainingEv);
   const categoryId = offerCategoryFromSport(item.offer.sport);
   const categoryLabel = offerCategoryLabel(item.offer.sport);
   // Bar-offset inset ring only when the priority bar is present.

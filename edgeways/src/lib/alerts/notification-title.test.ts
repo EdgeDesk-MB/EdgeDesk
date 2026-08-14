@@ -29,19 +29,22 @@ describe("ensureNotificationTitleEmoji", () => {
     expect(ensureNotificationTitleEmoji("🔒 2UP · lock £11.29")).toBe(
       "🔒 2UP · lock £11.29"
     );
+    expect(ensureNotificationTitleEmoji("🛎️ Reminder · Bet365 · Free spins")).toBe(
+      "🛎️ Reminder · Bet365 · Free spins"
+    );
   });
 
   it("strips a brand bolt stacked in front of a semantic emoji", () => {
     expect(ensureNotificationTitleEmoji("⚡ 🟢 +£4.10 settled")).toBe("🟢 +£4.10 settled");
+    expect(ensureNotificationTitleEmoji("⚡ 🛎️ Reminder · Bet365 · Free spins")).toBe(
+      "🛎️ Reminder · Bet365 · Free spins"
+    );
     expect(ensureNotificationTitleEmoji("⚡ You just made £4.10")).toBe(
       "⚡ You just made £4.10"
     );
   });
 
   it("adds a brand bolt when the title has none", () => {
-    expect(ensureNotificationTitleEmoji("Reminder · Bet365 · Free spins")).toBe(
-      "⚡ Reminder · Bet365 · Free spins"
-    );
     expect(ensureNotificationTitleEmoji("Void · stakes returned")).toBe(
       "⚡ Void · stakes returned"
     );

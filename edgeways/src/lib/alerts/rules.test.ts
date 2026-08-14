@@ -52,6 +52,7 @@ const base: AlertRuleInput = {
   now: NOW,
   prefs: {
     offerExpiring: true,
+    freeBetExpiring: true,
     raceOffSoon: true,
     resultSettled: true,
     nakedExposure: true,
@@ -656,6 +657,60 @@ describe("two_up_lock rule", () => {
         ...base,
         twoUpTriggered,
         prefs: { ...base.prefs, twoUpLock: false },
+      })
+    ).toHaveLength(0);
+  });
+});
+
+describe("free_bet_expiring rule", () => {
+  const lot = {
+    id: 12,
+    accountName: "Ivybet",
+    remaining: 10,
+    note: "Free bet promo - Offer unlocked (Qualify · Ivybet)",
+    expiresAt: NOW + 90 * MIN,
+  };
+
+  it("fires inside the 2-hour expiry lead", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      freeBetLots: [lot],
+    });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      kind: "free_bet_expiring",
+      key: "free_bet_expiring:lot-12:2026-07-13",
+      href: "/desk?freeBets=1",
+      bookmaker: "Ivybet",
+    });
+    expect(alerts[0]!.title).toMatch(/⚡ £10 free bet ends in/i);
+    expect(alerts[0]!.body).toMatch(/Offer unlocked \(Qualify · Ivybet\) · convert before /);
+  });
+
+  it("stays quiet hours before expiry, after expiry, or when toggled off", () => {
+    expect(
+      evaluateAlertRules({
+        ...base,
+        freeBetLots: [{ ...lot, expiresAt: NOW + 3 * HOUR }],
+      })
+    ).toHaveLength(0);
+    expect(
+      evaluateAlertRules({
+        ...base,
+        freeBetLots: [{ ...lot, expiresAt: NOW - MIN }],
+      })
+    ).toHaveLength(0);
+    expect(
+      evaluateAlertRules({
+        ...base,
+        freeBetLots: [lot],
+        prefs: { ...base.prefs, freeBetExpiring: false },
+      })
+    ).toHaveLength(0);
+    expect(
+      evaluateAlertRules({
+        ...base,
+        freeBetLots: [{ ...lot, expiresAt: null }],
       })
     ).toHaveLength(0);
   });

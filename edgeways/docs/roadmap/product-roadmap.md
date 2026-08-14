@@ -9,8 +9,8 @@
 > Companion docs: `../../docs/strategy/api-dependencies-and-tiers.md` (API cost/tier detail),
 > `docs/offer-command-centre.md` (offer pipeline spec), `docs/design-system.md`.
 
-Last updated: 2026-07-31 (Phase 14 — Offer Edge cohesion + `--edge` pro signature colour.
-N0 entitlement scaffolding brief added (gated on D1). Phase 12–13 ✅ DONE)
+Last updated: 2026-08-12 (subscription offer locked — `docs/strategy/subscriptions.md`.
+N0 matrix + Clerk/`app_users` exist; processor still EDGE-1/2.)
 
 > **Roadmap hygiene.** This document is kept current as work ships: statuses flip in the §6 table
 > the day a phase lands, and *new* feature ideas are never scheduled directly — they land in
@@ -466,22 +466,24 @@ replicable by an incumbent bolting on a tracker, because it requires the executi
 *through* the product. Marketing writes itself from B8: "I captured 91% of my theoretical edge
 this month."
 
-### 7.5 Tiers & pricing (draft, revisit at gate)
+### 7.5 Tiers & pricing (locked 12 Aug 2026)
 
-| Tier | Price       | Contents (intent)                                                                                                                               | Logic                                                                       |
-| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Free | £0          | Calculators, manual bet logging, basic P&L, demo Racing Desk                                                                                    | Funnel + community trust                                                    |
-| Core | \~£9.99/mo  | Offers pipeline, Do Next / Daily Plan, EV capture analytics, Edge Report, tracker, free-bet lots                                                | All-lib features, near-zero COGS                                            |
-| Edge | \~£24.99/mo | **Offer Edge** (modelled race/horse picks + recommended desk chrome), Racing Desk live/delayed feeds, 2UP sentinel + push, exchange integration | Carries API cost + the pro differentiator; signature `--edge` violet chrome |
+Commercial terms (trial, Founding, feedback credit, annual pence): **`docs/strategy/subscriptions.md`**
+(repo root). Do not invent a second public price on the homepage.
 
-**Readiness (2026-07-31):** product features mostly exist as a single unlocked local app. There is
-**no** auth, billing, or entitlement gate today. Splitting Free / Core / Edge for real subscribers
-needs N0 (entitlement matrix + UI chrome first; Stripe/auth only at the D1 business gate). Until
-then Sam runs everything unlocked; a Settings "preview as Free/Core/Edge" switch is the only
-pre-gate scaffolding worth building.
+| Tier | Price | Contents (intent) | Logic |
+| ---- | ----- | ----------------- | ----- |
+| Free | £0 | Calculators, manual bet logging, basic P&L, demo Racing Desk | Funnel + community trust |
+| Core | £9.99/mo · £99.90/yr | Offers pipeline, Do Next / Daily Plan, EV capture analytics, Edge Report, tracker, free-bet lots | All-lib features, near-zero COGS |
+| Edge | £24.99/mo · £249.90/yr | **Offer Edge** (modelled race/horse picks + recommended desk chrome), Racing Desk live/delayed feeds, 2UP sentinel + push, exchange integration | Carries API cost + the pro differentiator; signature `--edge` violet chrome |
 
-Annual ≈ 2 months free. 14-day Edge trial. Gate by *data cost and edge delivered* — which maps
-cleanly onto the existing desks.
+**Public mechanics:** 14-day Edge trial (one per person), then Core or Edge at list.
+Annual ≈ 2 months free (10× monthly). **Founding** (waitlist/beta, not on public cards):
+three months of Edge at Core price after the trial. Gate by *data cost and edge delivered*.
+
+**Readiness (12 Aug 2026):** N0 matrix + Settings plan preview exist. Clerk + `app_users`
+exist. Processor (EDGE-1/2) still open. Landing shows this table on the **launch variant**
+(EDGE-21); live `/` stays waitlist until `LANDING_VARIANT=launch`.
 
 A fourth tier is under consideration (2026-08-02): an **Elite** level bundling direct exchange
 connections (e.g. Betdaq partner API) once Edge-tier revenue funds the integration and data

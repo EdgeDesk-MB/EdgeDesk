@@ -105,12 +105,12 @@ export function getHistoryFeed(options?: {
   const allBets = db.select().from(bets).all();
   const promoAwards = getPromoAwardsByBetId();
   const offerTitles = loadOfferTitles();
-  const context = buildHistoryContext(allEvents, allBets, promoAwards, offerTitles);
 
   const raw = dedupeHistoryForDisplay(
     db.select().from(history).orderBy(desc(history.createdAt), desc(history.id)).limit(limit * 2).all(),
     allEvents
   );
+  const context = buildHistoryContext(allEvents, allBets, promoAwards, offerTitles, raw);
 
   let entries = sortHistoryEntries(raw, context).filter(
     (e) => !isDeskCampaignLayHistoryEntry(e, context)

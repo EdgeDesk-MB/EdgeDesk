@@ -22,7 +22,7 @@ export interface ParsedCasinoOfferDraft {
   contributionPct: number | null;
   /** K1: number of spins, e.g. "20 Free Spins" */
   spins: number | null;
-  /** K1: £ value per spin, only when the text disambiguates with "each"/"p each" */
+  /** K1: £ value per spin, when the text states a per-spin amount */
   spinValue: number | null;
   /** K1: number of golden chips */
   chipCount: number | null;
@@ -101,17 +101,34 @@ function parseSpinsCount(text: string): number | null {
   return Number.isFinite(v) && v > 0 && v <= 1000 ? v : null;
 }
 
-/** Only matches when the text disambiguates "per spin" - a bare "worth £X" is the pre-K1 total-value phrasing (parseBonus), not per-spin. */
+/**
+ * Per-spin stake only. A bare "worth £X" (no each/per) is the pre-K1 total-value
+ * phrasing handled by parseBonus, not a spin value.
+ */
 function parseSpinValue(text: string): number | null {
-  const poundsEach = text.match(new RegExp(`worth\\s+£\\s*${NUM}\\s+each`, "i"));
-  if (poundsEach) {
-    const v = Number(poundsEach[1]);
-    if (Number.isFinite(v) && v > 0) return v;
-  }
-  const penceEach = text.match(new RegExp(`worth\\s+${NUM}p\\s+each`, "i"));
-  if (penceEach) {
-    const v = Number(penceEach[1]);
-    if (Number.isFinite(v) && v > 0) return v / 100;
+  const patterns: Array<{ re: RegExp; pence?: boolean }> = [
+    { re: new RegExp(`worth\\s+£\\s*${NUM}\\s+each`, "i") },
+    { re: new RegExp(`worth\\s+${NUM}p\\s+each`, "i"), pence: true },
+    // "The value of each Free Spin is £0.10"
+    { re: new RegExp(`value\\s+of\\s+each\\s+(?:free\\s+)?spin\\s+is\\s+£\\s*${NUM}`, "i") },
+    { re: new RegExp(`value\\s+of\\s+each\\s+(?:free\\s+)?spin\\s+is\\s+${NUM}p\\b`, "i"), pence: true },
+    // "each Free Spin is worth £0.10" / "each spin worth 10p"
+    { re: new RegExp(`each\\s+(?:free\\s+)?spin\\s+(?:is\\s+)?worth\\s+£\\s*${NUM}`, "i") },
+    { re: new RegExp(`each\\s+(?:free\\s+)?spin\\s+(?:is\\s+)?worth\\s+${NUM}p\\b`, "i"), pence: true },
+    // "£0.10 per (free) spin" / "10p per spin"
+    { re: new RegExp(`£\\s*${NUM}\\s+per\\s+(?:free\\s+)?spin`, "i") },
+    { re: new RegExp(`${NUM}p\\s+per\\s+(?:free\\s+)?spin`, "i"), pence: true },
+    // "Free Spins are £0.10 each"
+    { re: new RegExp(`(?:free\\s+)?spins?\\s+are\\s+£\\s*${NUM}\\s+each`, "i") },
+    // "each Free Spin is £0.10" (no "worth"/"value")
+    { re: new RegExp(`each\\s+(?:free\\s+)?spin\\s+is\\s+£\\s*${NUM}`, "i") },
+  ];
+  for (const { re, pence } of patterns) {
+    const m = text.match(re);
+    if (!m) continue;
+    const v = Number(m[1]);
+    if (!Number.isFinite(v) || v <= 0) continue;
+    return pence ? v / 100 : v;
   }
   return null;
 }

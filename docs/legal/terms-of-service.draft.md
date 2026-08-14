@@ -50,9 +50,18 @@ changes will not remove core functionality from an active paid term.
 selected at checkout) until cancelled. Prices are in GBP and include VAT where
 applicable [CONFIRM: VAT handling depends on processor decision, EDGE-2].
 
-4.3 **Trial.** New subscribers may receive a 14-day trial of the Edge tier. At
+4.3 **Trial.** New subscribers receive a 14-day trial of the Edge tier. At
 the end of the trial, your chosen paid plan begins unless you cancel before the
 trial ends. One trial per person.
+
+4.3a **Founding.** Invited beta / waitlist accounts may receive a Founding
+term: after the trial, three months of the Edge tier billed at the Core
+monthly price, then Edge at the then-current list price. Founding is granted
+on the account, not advertised as a public sitewide sale.
+
+4.3b **Feedback credit.** During beta we may grant one extra month of a paid
+or Founding term for useful product feedback, once per person. This is not
+payment for public reviews.
 
 4.4 **Cancellation.** You can cancel at any time in Settings or via the checkout
 portal. Cancellation takes effect at the end of the current billing period; you

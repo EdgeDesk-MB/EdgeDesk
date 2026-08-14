@@ -11,30 +11,36 @@ import { isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { nakedExposureAlertKey } from "@/lib/bets/naked-exposure";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import type { DoNextItem } from "@/lib/offers/do-next";
-import type { OfferNextActionKind } from "@/lib/offers/next-actions";
 import type { DailyPlanRaceInput } from "@/lib/plan/daily-plan";
+import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
+import { formatClockTime } from "@/lib/time-format";
+import {
+  alertDayKey,
+  freeBetExpiringAlertKey,
+} from "./expiring-alert-keys";
 import {
   alertCopyAmounts,
+  formatAlertStake,
   isOfferImpactAlertDue,
   offerExpiringAlertCopy,
+  OFFER_EXPIRY_LEAD_MS,
   resolveOfferImpact,
   type OfferImpactOffer,
 } from "./offer-impact";
-import { formatAlertMinutes } from "./toast-age";
+import { formatAlertHours, formatAlertMinutes } from "./toast-age";
 import type { AlertPrefs, EdgeAlert } from "./types";
+
+export {
+  freeBetExpiringAlertDedupePrefix,
+  freeBetExpiringAlertKeys,
+  offerExpiringAlertDedupePrefix,
+  offerExpiringAlertKeys,
+} from "./expiring-alert-keys";
 
 /** Ignore sub-£1 edges - a notification interrupt has a price. */
 const OFFER_EV_FLOOR = 1;
 /** "Race off soon" window before the off. */
 const RACE_WINDOW_MS = 15 * 60_000;
-
-/** Action kinds that can produce an offer_expiring alert (see evaluateAlertRules). */
-const OFFER_EXPIRING_ACTION_KINDS: OfferNextActionKind[] = [
-  "place_qualifying",
-  "convert_free_bet",
-  "start_planned",
-  "review_expiry",
-];
 
 export interface SettledBetNotice {
   betId: number;
@@ -110,10 +116,20 @@ export interface TwoUpLockNotice {
   suggestion: { fairBackOdds: number; backStake: number; lockedProfit: number } | null;
 }
 
+export type FreeBetExpiringLot = {
+  id: number;
+  accountName: string;
+  remaining: number;
+  note: string | null;
+  expiresAt: number | null;
+};
+
 export interface AlertRuleInput {
   now: number;
   prefs: AlertPrefs;
   doNext: DoNextItem[];
+  /** Open free-bet lots with an optional user-set conversion deadline. */
+  freeBetLots?: FreeBetExpiringLot[];
   /** Offer rows used to resolve race/course/expiry impact times. */
   offers: OfferImpactOffer[];
   races: Array<
@@ -129,24 +145,33 @@ export interface AlertRuleInput {
   twoUpTriggered: TwoUpLockNotice[];
 }
 
-function dayKey(now: number): string {
-  const d = new Date(now);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-/** Dedupe keys AlertWatcher may have used for this offer today. */
-export function offerExpiringAlertKeys(offerId: number, now = Date.now()): string[] {
-  const day = dayKey(now);
-  return OFFER_EXPIRING_ACTION_KINDS.map(
-    (kind) => `offer_expiring:offer-${offerId}-${kind}:${day}`
-  );
-}
-
-/** Inbox LIKE pattern covering every offer_expiring key for one offer. */
-export function offerExpiringAlertDedupePrefix(offerId: number): string {
-  return `offer_expiring:offer-${offerId}-`;
+/** Title/body for a free-bet conversion deadline (same 2-hour lead as promo expiry). */
+export function freeBetExpiringAlertCopy(args: {
+  remaining: number;
+  expiresAt: number;
+  now: number;
+  note: string | null;
+}): { title: string; body: string } {
+  const stake = formatAlertStake(args.remaining);
+  const amount = stake ? `£${stake}` : "Free bet";
+  const until = args.expiresAt - args.now;
+  const clock = formatClockTime(args.expiresAt);
+  const note = freeBetLotNoteLabel(args.note);
+  if (until > 0 && until <= OFFER_EXPIRY_LEAD_MS) {
+    const mins = Math.round(until / 60_000);
+    const when =
+      mins >= 60
+        ? formatAlertHours(Math.round(mins / 60))
+        : formatAlertMinutes(Math.max(1, mins));
+    return {
+      title: `⚡ ${amount} free bet ends in ${when}`,
+      body: `${note} · convert before ${clock}`,
+    };
+  }
+  return {
+    title: `⚡ ${amount} free bet ends today`,
+    body: `${note} · convert before it expires`,
+  };
 }
 
 function formatSignedGbp(value: number): string {
@@ -258,6 +283,7 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
     now,
     prefs,
     doNext,
+    freeBetLots,
     offers,
     races,
     settledSinceLastPoll,
@@ -355,13 +381,35 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
         freeBetAmount: amounts.freeBetAmount,
       });
       alerts.push({
-        key: `offer_expiring:${item.id}:${dayKey(now)}`,
+        key: `offer_expiring:${item.id}:${alertDayKey(now)}`,
         kind: "offer_expiring",
         title: copy.title,
         body: copy.body,
         bookmaker: item.bookmaker?.trim() || null,
         // P1: land on the campaign details modal, not the add-bet flow
         href: item.offerId != null ? `/offers?view=${item.offerId}` : (item.href ?? "/offers"),
+      });
+    }
+  }
+
+  if (prefs.freeBetExpiring) {
+    for (const lot of freeBetLots ?? []) {
+      if (lot.expiresAt == null || lot.remaining <= 0.001) continue;
+      const until = lot.expiresAt - now;
+      if (until > OFFER_EXPIRY_LEAD_MS || until <= 0) continue;
+      const copy = freeBetExpiringAlertCopy({
+        remaining: lot.remaining,
+        expiresAt: lot.expiresAt,
+        now,
+        note: lot.note,
+      });
+      alerts.push({
+        key: freeBetExpiringAlertKey(lot.id, now),
+        kind: "free_bet_expiring",
+        title: copy.title,
+        body: copy.body,
+        bookmaker: lot.accountName.trim() || null,
+        href: "/desk?freeBets=1",
       });
     }
   }

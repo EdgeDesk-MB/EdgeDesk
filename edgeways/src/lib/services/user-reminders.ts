@@ -24,7 +24,7 @@ export type UserReminderInput = {
   contextVenue?: string | null;
 };
 
-/** Build the notification title/body: Reminder · bookie · offer, note as body. */
+/** Build the notification title/body: 🛎️ Reminder · bookie · offer, note as body. */
 export function formatUserReminderAlert(input: {
   id: number;
   note: string;
@@ -34,7 +34,7 @@ export function formatUserReminderAlert(input: {
 }): IncomingAlert {
   const venue = input.venue?.trim() || null;
   const offerTitle = input.offerTitle?.trim() || null;
-  const parts = ["Reminder"];
+  const parts = ["🛎️ Reminder"];
   if (venue) parts.push(venue);
   if (offerTitle) parts.push(offerTitle);
   return {

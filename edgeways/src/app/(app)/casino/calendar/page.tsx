@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { CalendarDays, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
@@ -9,6 +8,7 @@ import { PageHeader } from "@/components/help/page-header";
 import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { CasinoDayCalendar } from "@/components/casino/casino-day-calendar";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
+import { CASINO_CHANGED_EVENT } from "@/components/casino/casino-ui";
 import { apiGet, useAppState } from "@/hooks/use-app-state";
 import {
   availableBookieNames,
@@ -19,9 +19,8 @@ import { filterPillCountState } from "@/lib/ui/surface-styles";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
 
 export default function CasinoCalendarPage() {
-  const router = useRouter();
   const { state } = useAppState(4000);
-  const { openCasinoLog } = useCasinoLog();
+  const { openCasinoLog, viewCasino } = useCasinoLog();
   const [offers, setOffers] = useState<CasinoOfferSummary[] | null>(null);
   const [availableOnly, setAvailableOnly] = useState(false);
 
@@ -33,6 +32,8 @@ export default function CasinoCalendarPage() {
 
   useEffect(() => {
     load();
+    window.addEventListener(CASINO_CHANGED_EVENT, load);
+    return () => window.removeEventListener(CASINO_CHANGED_EVENT, load);
   }, [load]);
 
   const availableNames = useMemo(
@@ -85,7 +86,7 @@ export default function CasinoCalendarPage() {
         <CasinoDayCalendar
           offers={bookieScoped}
           standalone
-          onOfferClick={() => router.push("/casino")}
+          onOfferClick={viewCasino}
         />
       )}
     </PageShell>

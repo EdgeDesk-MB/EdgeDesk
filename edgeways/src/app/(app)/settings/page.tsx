@@ -966,6 +966,19 @@ function AlertsCard({
         </div>
         <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
           <div>
+            <p className="text-sm font-medium">Free bet expiring</p>
+            <p className="text-xs text-muted-foreground">
+              A free bet with a set expiry is due within 2 hours
+            </p>
+          </div>
+          <Switch
+            checked={settings.alertsFreeBetExpiring}
+            aria-label="Alert when a free bet expires"
+            onCheckedChange={(v) => onPatch({ alertsFreeBetExpiring: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <div>
             <p className="text-sm font-medium">Race off-time approaching</p>
             <p className="text-xs text-muted-foreground">
               A tracked race goes off within 15 minutes with no bet logged

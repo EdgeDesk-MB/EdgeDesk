@@ -22,6 +22,16 @@ describe("plainAlertBody", () => {
     ).toBe("Bet365 · Bet £5 get £5 free bet · place the £5 qualifying bet");
   });
 
+  it("prefixes free_bet_expiring alerts with Bookie ·", () => {
+    expect(
+      plainAlertBody({
+        body: "Offer unlocked · convert before 14:00",
+        bookmaker: "Ivybet",
+        kind: "free_bet_expiring",
+      })
+    ).toBe("Ivybet · Offer unlocked · convert before 14:00");
+  });
+
   it("leaves body alone when there is no bookie", () => {
     expect(plainAlertBody({ body: "No bet logged · finish the workflow" })).toBe(
       "No bet logged · finish the workflow"

@@ -51,6 +51,7 @@ export interface AppSettings {
   mobileDeckPin: MobileDeckPin;
   /** Alert toggles (C4) - local notifications, toast fallback. */
   alertsOfferExpiring: boolean;
+  alertsFreeBetExpiring: boolean;
   alertsRaceOffSoon: boolean;
   alertsResultSettled: boolean;
   alertsNakedExposure: boolean;
@@ -173,6 +174,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   timeFormat: DEFAULT_TIME_FORMAT,
   mobileDeckPin: "auto",
   alertsOfferExpiring: true,
+  alertsFreeBetExpiring: true,
   alertsRaceOffSoon: true,
   alertsResultSettled: true,
   alertsNakedExposure: true,

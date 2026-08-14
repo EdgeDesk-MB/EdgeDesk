@@ -137,14 +137,14 @@ This is deliberately not "Edgeways does everything OddsMonkey does, cheaper." It
 
 ### Tier ladder
 
-Mirrored from `product-roadmap.md` §7.5 (draft, revisit at gate) — that section is the canonical
-source; update there first if pricing or contents change.
+Mirrored from `product-roadmap.md` §7.5 and `docs/strategy/subscriptions.md`
+(locked 12 Aug 2026). Update those first if pricing or contents change.
 
 | Tier | Price | Contents | Logic |
 |------|-------|----------|-------|
 | **Free** | £0 | Calculators, manual tracking, basic P&L | Funnel + community trust |
-| **Core** | ~£9.99/mo | Pipeline, Do Next, Daily Plan, EV capture analytics, Edge Report | All-lib features, near-zero COGS |
-| **Edge** | ~£24.99/mo | Racing Desk live feeds, 2UP sentinel + push, exchange integration, league table | Carries the API costs; anchored just under Outplayed |
+| **Core** | £9.99/mo (£99.90/yr) | Pipeline, Do Next, Daily Plan, EV capture analytics, Edge Report | All-lib features, near-zero COGS |
+| **Edge** | £24.99/mo (£249.90/yr) | Racing Desk live feeds, 2UP sentinel + push, exchange integration, league table | Carries the API costs; anchored just under Outplayed |
 
 This section adds the competitive reasoning that doesn't belong in the pricing draft itself.
 

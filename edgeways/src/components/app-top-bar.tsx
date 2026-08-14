@@ -235,8 +235,9 @@ function MobileStatStacks({
 
 /**
  * Inverted Chrome tab: canvas plate hanging from the top of the header,
- * bottom radii + top ears blending into the topbar. Desktop: rightmost.
- * Mobile: flush with the burger.
+ * bottom radii + top ears blending into the topbar. Desktop (`md+`):
+ * rightmost. While the burger is visible (`< md`): 12px from the burger,
+ * matching the inset above it.
  *
  * Bottom 12px strip collapses the metrics up into the topbar; collapsed
  * state keeps a short “Show balances” reveal with chevron down.
@@ -384,7 +385,7 @@ function AppTopBarHeader() {
         <BrandLink />
       </div>
 
-      <div className="flex min-w-0 flex-1 items-stretch justify-end gap-1 sm:gap-1.5">
+      <div className="flex min-w-0 flex-1 items-stretch justify-end gap-1 md:gap-1.5">
         {state?.demoMode ? (
           <span className="self-center shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-warning sm:text-[11px]">
             Demo data
@@ -393,7 +394,7 @@ function AppTopBarHeader() {
 
         {state == null ? null : (
           <>
-            <div className="hidden items-stretch overflow-visible px-[var(--chrome-tab-r-hang)] sm:flex">
+            <div className="hidden items-stretch overflow-visible pl-[var(--chrome-tab-r-hang)] sm:flex md:px-[var(--chrome-tab-r-hang)]">
               <BalancePill>
                 <TopBarProfitStack
                   profit={profit}
@@ -409,7 +410,7 @@ function AppTopBarHeader() {
                 />
               </BalancePill>
             </div>
-            <div className="flex items-stretch overflow-visible px-[var(--chrome-tab-r-hang)] sm:hidden">
+            <div className="flex items-stretch overflow-visible pl-[var(--chrome-tab-r-hang)] sm:hidden">
               <BalancePill>
                 <MobileStatStacks
                   profit={profit}
@@ -424,7 +425,7 @@ function AppTopBarHeader() {
           </>
         )}
 
-        <div className="ml-3 flex shrink-0 items-center md:hidden">
+        <div className="ml-2 flex shrink-0 items-center md:hidden">
           <div className="mr-3 self-center">
             <AppTopBarMenu />
           </div>

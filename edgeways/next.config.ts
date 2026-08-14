@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+/** Edgeways Next config. A save here recycles `next dev` without killing the keep supervisor. */
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   // Fully hidden - the on-screen Rendering/Compiling badge is dev-only

@@ -25,10 +25,12 @@ const WAITLIST_PAGES = new Set([
 ]);
 
 const WAITLIST_API_PREFIX = "/api/waitlist";
+const WAITLIST_ACCOUNT_SYNC = "/api/account/sync";
 
 /** Paths reachable when SITE_SURFACE=waitlist. */
 export function isWaitlistAllowedPath(pathname: string): boolean {
   if (WAITLIST_PAGES.has(pathname)) return true;
+  if (pathname === WAITLIST_ACCOUNT_SYNC) return true;
   if (pathname === WAITLIST_API_PREFIX || pathname.startsWith(`${WAITLIST_API_PREFIX}/`)) {
     return true;
   }

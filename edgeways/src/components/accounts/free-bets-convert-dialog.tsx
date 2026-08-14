@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -31,6 +32,9 @@ import {
 } from "@/lib/offers/offer-track-bet";
 import { Gift, Trash2 } from "lucide-react";
 import { convertFreeBetButtonClass } from "@/lib/ui/surface-styles";
+import { useSearchParams } from "next/navigation";
+import { FreeBetExpiryControl } from "@/components/accounts/free-bet-expiry-control";
+import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
 
 type Lot = {
   id: number;
@@ -41,6 +45,7 @@ type Lot = {
   note: string | null;
   createdAt: number;
   betId: number | null;
+  expiresAt: number | null;
 };
 
 type FreeBetsContextValue = {
@@ -62,10 +67,21 @@ export function FreeBetsProvider({ children }: { children: ReactNode }) {
 
   return (
     <FreeBetsContext.Provider value={value}>
+      <Suspense fallback={null}>
+        <FreeBetsQueryOpener onOpen={openFreeBets} />
+      </Suspense>
       {children}
       <FreeBetsConvertDialog open={open} onOpenChange={setOpen} />
     </FreeBetsContext.Provider>
   );
+}
+
+function FreeBetsQueryOpener({ onOpen }: { onOpen: () => void }) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("freeBets") === "1") onOpen();
+  }, [searchParams, onOpen]);
+  return null;
 }
 
 function FreeBetsConvertDialog({
@@ -161,7 +177,14 @@ function FreeBetsLots({
     let live = true;
     apiGet<{ lots: Lot[] }>("/api/accounts/free-bets")
       .then((r) => {
-        if (live) setLots(r.lots ?? []);
+        if (live) {
+          setLots(
+            (r.lots ?? []).map((lot) => ({
+              ...lot,
+              expiresAt: lot.expiresAt ?? null,
+            }))
+          );
+        }
       })
       .catch(() => {
         if (live) setLots([]);
@@ -181,8 +204,7 @@ function FreeBetsLots({
         </p>
       ) : (
         lots.map((lot) => {
-          const note =
-            lot.note?.replace(/^Free bet promo - /, "").trim() || "Free bet credit";
+          const note = freeBetLotNoteLabel(lot.note);
           return (
             <div
               key={lot.id}
@@ -198,6 +220,23 @@ function FreeBetsLots({
                 </span>
                 <span className="mt-0.5 block text-xs leading-snug break-words text-muted-foreground">
                   {note}
+                </span>
+                <span className="mt-0.5 block">
+                  <FreeBetExpiryControl
+                    lotId={lot.id}
+                    expiresAt={lot.expiresAt}
+                    accountName={lot.accountName}
+                    remaining={lot.remaining}
+                    onChanged={(expiresAt) =>
+                      setLots((prev) =>
+                        prev
+                          ? prev.map((row) =>
+                              row.id === lot.id ? { ...row, expiresAt } : row
+                            )
+                          : prev
+                      )
+                    }
+                  />
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-1">

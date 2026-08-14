@@ -5,7 +5,28 @@
 > [Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c).
 > Repo layout rules: `docs/repo-layout.md`.
 >
-> Last updated: **12 Aug 2026** (post waitlist deploy).
+> Last updated: **12 Aug 2026, evening** (subscription offer locked; launch
+> landing is a variant, waitlist stays default `/`).
+
+---
+
+## 👇 You are here
+
+**Thread A — Auth, [EDGE-20](https://linear.app/samhayter/issue/EDGE-20) accounts
+row done; next is [EDGE-21](https://linear.app/samhayter/issue/EDGE-21).**
+
+Clerk is chosen and wired. `/login` and `/sign-up` work (Google + email, 18+
+step on sign-up, Edgeways branding). Production is still waitlist-only: signed-in
+users hit `/desk` then bounce home until `SITE_SURFACE=app`.
+
+**Next on this thread (do not skip ahead to billing):**
+1. ~~Desk Logout chrome.~~ Done (desktop last/right meta tab; mobile Log out at burger bottom). Login stays on the .app homepage (EDGE-21).
+2. ~~Neon user row keyed by Clerk `userId`.~~ Done (`app_users` upsert on sign-in).
+3. 👇 [EDGE-21](https://linear.app/samhayter/issue/EDGE-21) — launch landing
+   **variant** (Login + public pricing table). Waitlist stays on production `/`
+   until `LANDING_VARIANT=launch`. Offer: `docs/strategy/subscriptions.md`.
+
+**Meanwhile (Sam admin, not this agent thread):** EDGE-1 processor emails.
 
 ---
 
@@ -14,13 +35,14 @@
 | Thing | Status |
 |-------|--------|
 | Live marketing site | **https://edgeways.app** — waitlist only |
-| Desk app on production | **Blocked** — middleware redirects `/desk` etc. → `/` when `SITE_SURFACE=waitlist` |
-| Local desk | Still full app on `:3000` (no waitlist lock unless you set the env) |
-| Neon | Project + migrations exist; app still uses **SQLite locally**; hosted desk not wired yet |
-| Auth / SSO | Not started — pick provider first ([EDGE-19](https://linear.app/samhayter/issue/EDGE-19)) |
+| Desk app on production | **Blocked** — `proxy.ts` redirects `/desk` etc. → `/` when `SITE_SURFACE=waitlist` |
+| Local desk | Full app on `:3000`; `/login` and `/sign-up` live |
+| Neon | Waitlist + `app_users` (Clerk `userId` PK). Desk data still **SQLite locally**; full SQLite→Postgres cutover is later |
+| Auth / SSO | **Clerk** — EDGE-19 done. `/login` + `/sign-up` live. Neon `app_users` upserts on sign-in. Google consent still says “Clerk” until a custom Google OAuth client |
+| Waitlist owner alert | Resend sends; **Zoho `sam@` bounces** (`554 ContentRejected`). `WAITLIST_NOTIFY_TO` is Gmail (local + Vercel) |
 | Billing | Blocked on processor acceptance emails ([EDGE-1](https://linear.app/samhayter/issue/EDGE-1)) |
 
-Closed recently: EDGE-24, 25, 26, 34, 46 (see Linear comments).
+Closed recently: EDGE-24, 25, 26, 34, 46, **19**. EDGE-20 in progress.
 
 ---
 
@@ -41,7 +63,7 @@ Full rules: `docs/repo-layout.md`.
 ### 1. Admin / Sam only (~45 min) — do before building
 
 - [ ] **[EDGE-1](https://linear.app/samhayter/issue/EDGE-1)** — Send processor acceptance emails (Stripe + Paddle + Lemon Squeezy). Draft is on the ticket. Highest leverage of anything on the board.
-- [ ] **Waitlist smoke** — Submit your own email on https://edgeways.app; confirm Resend delivery + unsubscribe works.
+- [x] **Waitlist smoke** — Join on https://edgeways.app works; thanks email delivers. Owner alert delivers to Gmail. Unsubscribe still worth one click when you next join. (Zoho `sam@` is a dead end for Resend.)
 - [ ] **[EDGE-48](https://linear.app/samhayter/issue/EDGE-48)** — Point Better Stack or UptimeRobot at `https://edgeways.app/api/health`.
 - [ ] **Domains** — Add `www.edgeways.app` in Vercel; redirect apex → www (or www → apex — pick one canonical).
 - [ ] **[EDGE-8](https://linear.app/samhayter/issue/EDGE-8)** — Read `docs/legal/gambling-licence-assessment.md`; send GC email or skip consciously; mark Done.
@@ -49,15 +71,15 @@ Full rules: `docs/repo-layout.md`.
 
 ### 2. Decisions (~20 min) — unblock agents
 
-- [ ] **[EDGE-19](https://linear.app/samhayter/issue/EDGE-19)** — Choose auth: recommended **Clerk** (Google + Apple + email). Alternatives: Auth.js (more DIY), Supabase Auth (less natural with Neon).
+- [x] **[EDGE-19](https://linear.app/samhayter/issue/EDGE-19)** — Clerk (Google + email now; Apple when Developer account ready).
 - [ ] **[EDGE-2](https://linear.app/samhayter/issue/EDGE-2)** — Stripe direct vs MoR — wait for EDGE-1 replies if you can; default lean MoR for VAT if solo UK.
 
 ### 3. Agent sessions (pick one thread per day)
 
 | Thread | Tickets | Outcome |
 |--------|---------|---------|
-| **A — Auth** | EDGE-19 → 20 → 21 | Sign-in with Google (+ Apple when Apple Developer ready); protect desk routes |
-| **B — Neon slice** | EDGE-47 | Waitlist + users on Neon in production; full SQLite→Postgres cutover is multi-session |
+| 👇 **A — Auth** | EDGE-19 ✓ → **20 in progress** → 21 | `/login` live. Neon `app_users` done. Offer locked. Remaining: launch landing variant (EDGE-21) |
+| **B — Neon slice** | EDGE-47 | Waitlist + `app_users` on Neon. Full SQLite→Postgres cutover is multi-session |
 | **C — QA scrub** | EDGE-49 / EDGE-37 slice | Settings/Help copy: strip `.env.local` / localhost / SQLite developer language for hosted |
 
 Do **not** run A + full Neon cutover + billing in the same day.
@@ -87,14 +109,22 @@ Do **not** run A + full Neon cutover + billing in the same day.
 - After sign-in, redirect target is `/desk` (on production waitlist, middleware
   still bounces desk → `/` until `SITE_SURFACE=app`).
 
-**Subscriptions (factored, not built):**
-1. EDGE-1 processor acceptance → EDGE-2 Stripe vs MoR
+**Subscriptions (locked 12 Aug 2026 — `docs/strategy/subscriptions.md`):**
+1. EDGE-1 processor acceptance → EDGE-2 Stripe vs MoR (does not change prices)
 2. Clerk `userId` is the account key in Neon
-3. Checkout creates/updates Stripe (or MoR) customer linked to that `userId`
-4. Webhooks write entitlement tier (Free / Core / Edge) on the user row
-5. Desk features read tier from DB (EDGE-22), not from Clerk alone
-6. Clerk Billing is optional later — prefer our own Stripe/MoR webhooks so
-   entitlement stays in Neon with the rest of the product
+3. Public: Free £0 / Core £9.99 · £99.90/yr / Edge £24.99 · £249.90/yr
+4. 14-day Edge trial (one per person), then list price
+5. Founding (waitlist/beta, not on public cards): 3 months Edge at Core price after trial
+6. Feedback thank-you: one extra month, once, granted not automated
+7. Checkout (EDGE-4) creates/updates the processor customer linked to that `userId`
+8. Webhooks write entitlement tier (and trial/founding window) on the user row
+9. Desk features read tier from DB (EDGE-22), not from Clerk alone
+10. Clerk Billing is optional later — prefer our own Stripe/MoR webhooks so
+    entitlement stays in Neon with the rest of the product
+11. **Success UX (EDGE-4):** after pay, a tactile receipt printer — paper slides
+    out of the checkout card (plan, tax, total, order id). Spec + clip on
+    [EDGE-4](https://linear.app/samhayter/issue/EDGE-4). Ref:
+    https://x.com/i/status/2087184765765943533
 
 **Onboarding:** Existing 4-step wizard stays; after auth, rewrite welcome/settings copy for hosted (no `.env.local`), then validate with one external user (EDGE-33).
 
@@ -106,8 +136,8 @@ Do **not** run A + full Neon cutover + billing in the same day.
 
 ```text
 EDGE-1 emails ──► EDGE-2 stack ──► EDGE-3…5 billing (Clerk userId → customer → tier)
-EDGE-19 Clerk ✓ ──► EDGE-20 /login live ──► EDGE-21 landing CTA ──► onboarding v2
-EDGE-47 Neon wire ──► hosted waitlist/users durable
+EDGE-19 Clerk ✓ ──► EDGE-20 /login + Neon user ✓ ──► 👇 EDGE-21 landing CTA ──► onboarding v2
+EDGE-47 Neon waitlist + app_users ✓ ──► full desk cutover later
 SITE_SURFACE=waitlist until beta desk is ready
 ```
 

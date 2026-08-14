@@ -2,6 +2,8 @@
 #
 # Local Mac: SQLite via src/lib/db/index.ts (unchanged).
 # Hosted: schema.pg.ts + drizzle/ migrations + neon.ts client.
+# Waitlist (`waitlist_signups`) and Clerk-keyed accounts (`app_users`) use Neon
+# when DATABASE_URL is set. Desk getDb() stays SQLite until the async cutover.
 #
 # Next session: async getDb() cutover, migrate hot paths, deploy-step migrate.
 #

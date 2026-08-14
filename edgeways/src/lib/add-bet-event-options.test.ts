@@ -97,6 +97,21 @@ describe("groupByHourBandIfDense", () => {
     expect(bands[0]?.items.map((i) => i.id)).toEqual(["a", "b"]);
     expect(bands[1]?.items.map((i) => i.id)).toEqual(["c"]);
   });
+
+  it("merges the same hour when live-first sort splits it", () => {
+    // Live 15:05, then upcoming 17:00, then upcoming 15:45 (same hour as live).
+    const bands = groupByHourBandIfDense([
+      { startTime: msOnDay(0, "15:05"), id: "live" },
+      { startTime: msOnDay(0, "17:00"), id: "later" },
+      { startTime: msOnDay(0, "15:45"), id: "upcoming-same-hour" },
+    ]);
+    expect(bands.map((b) => b.key)).toEqual(["15:00", "17:00"]);
+    expect(bands[0]?.items.map((i) => i.id)).toEqual([
+      "live",
+      "upcoming-same-hour",
+    ]);
+    expect(bands[1]?.items.map((i) => i.id)).toEqual(["later"]);
+  });
 });
 
 describe("bandLinkableEventsForPicker", () => {

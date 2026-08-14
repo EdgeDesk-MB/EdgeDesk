@@ -12,6 +12,8 @@ export interface FreeBetLot {
   note: string | null;
   createdAt: number;
   betId: number | null;
+  /** User-set conversion deadline (epoch ms). Null until set. */
+  expiresAt: number | null;
 }
 
 const LOT_MARKER_RE = /\[\[lot:(\d+)\]\]/;
@@ -50,6 +52,7 @@ export function listFreeBetLots(accountId: number): FreeBetLot[] {
         note: t.note,
         createdAt: t.createdAt,
         betId: t.betId,
+        expiresAt: t.expiresAt ?? null,
         _left: t.amount,
       });
       continue;

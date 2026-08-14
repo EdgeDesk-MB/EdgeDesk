@@ -34,6 +34,8 @@ import {
 import { useAddBalance } from "@/components/add-balance-provider";
 import { TransferFundsDialog } from "@/components/accounts/transfer-funds-dialog";
 import { ManageVenuesDialog } from "@/components/accounts/venue-admin-panel";
+import { FreeBetExpiryControl } from "@/components/accounts/free-bet-expiry-control";
+import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
 import { MoneyFlow } from "@/components/money-flow";
 import { isNegativeGbp } from "@/lib/format-money";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
@@ -1139,7 +1141,13 @@ function AccountDetailBody({
   );
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [freeBetLots, setFreeBetLots] = useState<
-    Array<{ id: number; remaining: number; originalAmount: number; note: string | null }>
+    Array<{
+      id: number;
+      remaining: number;
+      originalAmount: number;
+      note: string | null;
+      expiresAt: number | null;
+    }>
   >([]);
   const [saving, setSaving] = useState(false);
   const [loadingTx, setLoadingTx] = useState(true);
@@ -1160,10 +1168,16 @@ function AccountDetailBody({
           remaining: number;
           originalAmount: number;
           note: string | null;
+          expiresAt?: number | null;
         }>;
       }>(`/api/accounts/${accountId}`);
       setTxs(r.transactions ?? []);
-      setFreeBetLots(r.freeBetLots ?? []);
+      setFreeBetLots(
+        (r.freeBetLots ?? []).map((lot) => ({
+          ...lot,
+          expiresAt: lot.expiresAt ?? null,
+        }))
+      );
     } catch {
       if (!opts?.silent) {
         setTxs([]);
@@ -1402,13 +1416,27 @@ function AccountDetailBody({
                 {freeBetLots.map((lot) => (
                   <li
                     key={lot.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-violet-500/20 bg-violet-500/5 px-2.5 py-1.5"
+                    className="flex items-start justify-between gap-2 rounded-md border border-violet-500/20 bg-violet-500/5 px-2.5 py-1.5"
                   >
-                    <span className="min-w-0 truncate text-xs text-muted-foreground">
-                      {lot.note
-                        ?.replace(/^Free bet promo - /, "")
-                        .replace(/\[\[lot:\d+\]\]\s*/g, "")
-                        .slice(0, 48) || "Free bet"}
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {freeBetLotNoteLabel(lot.note)}
+                      </span>
+                      <span className="mt-0.5 block">
+                        <FreeBetExpiryControl
+                          lotId={lot.id}
+                          expiresAt={lot.expiresAt}
+                          accountName={account.name}
+                          remaining={lot.remaining}
+                          onChanged={(expiresAt) =>
+                            setFreeBetLots((prev) =>
+                              prev.map((row) =>
+                                row.id === lot.id ? { ...row, expiresAt } : row
+                              )
+                            )
+                          }
+                        />
+                      </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1">
                       <MoneyFlow

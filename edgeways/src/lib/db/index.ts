@@ -380,6 +380,12 @@ CREATE TABLE IF NOT EXISTS waitlist_signups (
   confirm_sent_at INTEGER,
   unsubscribed_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS app_users (
+  clerk_user_id TEXT PRIMARY KEY,
+  email TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,
@@ -433,6 +439,7 @@ CREATE TABLE IF NOT EXISTS casino_offer_components (
   cashback_pct REAL,
   cashback_cap REAL,
   game TEXT,
+  eligible_games_json TEXT,
   expected_ev REAL NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
@@ -546,6 +553,7 @@ CREATE TABLE IF NOT EXISTS casino_offer_series_components (
   cashback_pct REAL,
   cashback_cap REAL,
   game TEXT,
+  eligible_games_json TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
@@ -566,6 +574,8 @@ CREATE INDEX IF NOT EXISTS idx_casino_offer_series_components_series
   addColumn("offers", "starts_on TEXT");
   addColumn("offers", "offer_url TEXT");
   addColumn("casino_offers", "offer_url TEXT");
+  addColumn("casino_offer_components", "eligible_games_json TEXT");
+  addColumn("casino_offer_series_components", "eligible_games_json TEXT");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS offer_series (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -606,6 +616,7 @@ CREATE TABLE IF NOT EXISTS offer_series (
   addColumn("balance_transactions", "confirmed_at INTEGER");
   addColumn("balance_transactions", "affect_pnl INTEGER NOT NULL DEFAULT 0");
   addColumn("balance_transactions", "casino_offer_id INTEGER");
+  addColumn("balance_transactions", "expires_at INTEGER");
   addColumn("history", "note TEXT");
   // Promote early casino wallet rows (landed as generic adjustments) to the
   // dedicated category so filters and exports can tell them apart.

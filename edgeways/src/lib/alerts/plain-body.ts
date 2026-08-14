@@ -10,6 +10,8 @@ export function plainAlertBody(alert: {
 }): string {
   const bookie = alert.bookmaker?.trim();
   if (!bookie) return alert.body;
-  if (alert.kind === "offer_expiring") return `${bookie} · ${alert.body}`;
+  if (alert.kind === "offer_expiring" || alert.kind === "free_bet_expiring") {
+    return `${bookie} · ${alert.body}`;
+  }
   return `${alert.body} (${bookie})`;
 }

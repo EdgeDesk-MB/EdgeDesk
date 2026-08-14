@@ -6,6 +6,7 @@
 
 export type EdgeAlertKind =
   | "offer_expiring"
+  | "free_bet_expiring"
   | "race_off_soon"
   | "result_settled"
   | "naked_exposure"
@@ -50,6 +51,7 @@ export interface AlertChannel {
 /** Per-kind toggles - mirrors the AppSettings alert fields. */
 export interface AlertPrefs {
   offerExpiring: boolean;
+  freeBetExpiring: boolean;
   raceOffSoon: boolean;
   resultSettled: boolean;
   nakedExposure: boolean;

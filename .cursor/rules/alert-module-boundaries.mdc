@@ -1,0 +1,29 @@
+---
+description: Keep alert quieting out of the /api/state graph so Turbopack cannot drop new exports
+globs: edgeways/src/lib/accounts/**/*.ts,edgeways/src/lib/alerts/**/*.ts,edgeways/src/lib/services/quiet-alerts.ts,edgeways/src/lib/services/daily-tasks-digest.ts,edgeways/src/lib/services/state.ts,edgeways/src/app/api/accounts/**/*.ts
+alwaysApply: false
+---
+
+# Alert module boundaries
+
+`/api/state` imports `daily-tasks-digest` → `free-bet-lots`. If that lots module
+imports `@/lib/services/quiet-alerts`, Turbopack compiles quiet-alerts into the
+state route. A missing or not-yet-bound named export then fails the **entire
+app** with `Export X doesn't exist in target module`.
+
+## Do
+
+- Put dedupe key helpers in `edgeways/src/lib/alerts/expiring-alert-keys.ts`
+  (leaf: no db, no `server-only`, no `rules.ts`).
+- Import those keys from `quiet-alerts.ts`. Do **not** import `@/lib/alerts/rules`
+  from `quiet-alerts.ts`.
+- Call `quietOfferAlerts` / `quietFreeBetAlerts` from the **mutation API**
+  (`api/accounts/free-bets`, `api/offers/[id]`) or from `offers.ts` status
+  transitions. Add a test import of any new `quiet*` export in
+  `quiet-alerts.test.ts` in the same change.
+
+## Do not
+
+- Import `@/lib/services/quiet-alerts` from `free-bet-lots.ts`, other
+  `src/lib/accounts/*` modules, `daily-tasks-digest.ts`, or `state.ts`.
+- Add a `quiet*` function in an importer before it exists on `quiet-alerts.ts`.

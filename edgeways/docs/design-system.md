@@ -9,8 +9,8 @@ Defined in `src/app/globals.css`:
 | Token | Use |
 |-------|-----|
 | `--brand` | **User accent** (default Amber). Raw selected colour — fills (dark primary, topbar in dark) |
-| `--brand-logo` | Light-mode lockup + Beta + Login / burger fill — lifted to ≥ 0.55 luminance on ink when raw brand is dark (same floor as `--brand-text`; saturation preserved) |
-| `--brand-logo-foreground` | Type on the logo plate (light Login / burger) — `#111` / white by logo luminance |
+| `--brand-logo` | Light-mode lockup + Beta + burger fill — lifted to ≥ 0.55 luminance on ink when raw brand is dark (same floor as `--brand-text`; saturation preserved) |
+| `--brand-logo-foreground` | Type on the logo plate (light burger) — `#111` / white by logo luminance |
 | `--brand-text` | **Readable accent type** on dark canvas / ink plates. Raw brand when light; lifted when dark (luminance &lt; 0.45 → ≥ 0.55) |
 | `--brand-highlight` | **Thin accents on light surfaces** (tab underlines, mobile stripe). Raw brand when ≤ 0.45 luminance; darkened when brighter |
 | `--brand-foreground` | Type **on** raw brand fills — `#111` or white by the same luminance threshold |
@@ -29,7 +29,7 @@ Defined in `src/app/globals.css`:
 | `--negative` | Loss P&L + Racing Desk holding/elapsed status. Light = deeper brick (`oklch` ~0.5 / 0.14); dark = lighter red for canvas contrast |
 | `--success` | Qualifying / completed / positive eligibility (not P&L) |
 | `--warning` | Caution and execution risk only (near-min fields, NR traps, real warnings) |
-| `--edge` | **Offer Edge / free-bet campaign signature** (violet). Race picks, recommended markers, Edge today, side-nav `Pro` mark (`proNavTag` = same plate as `edgeNavTag`) with `--edge-foreground` on the plate. Also: FB badge, Convert CTA, campaign pipeline **awarded / converting** label + bar (`text-edge` / `bg-edge`). Gift / promo-balance rows may still use historical `violet-*`; Zap there is the shared lightning motif |
+| `--edge` | **Offer Edge / free-bet campaign signature** (violet). Race picks, recommended markers, Edge today, side-nav `Pro` mark (`proNavTag` = same plate as `edgeNavTag`) with `--edge-foreground` on the plate. Also: FB badge, Convert CTA, campaign pipeline **awarded / converting** label + bar (`text-edge` / `bg-edge`). Gift / promo-balance rows may still use historical `violet-*`; Zap there is the shared lightning motif. Marketing Edge plan: mixed rim, shine, and trial button use `--edge`. Choose Core uses `--marketing-brand`. |
 
 Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrome only.
 
@@ -42,7 +42,7 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 - **On brand fills** (dark primary, CTA faces): `--brand-foreground` is white when brand is dark, `#111` when light. Pro / Edge nav marks use `--edge` / `--edge-foreground` instead. Active filter-pill counts do **not** use brand-on-brand — see Filter pills below.
 - **As type on dark/ink** (selected nav, counters, chips): `--brand-text` keeps light brands as-is and lightness-lifts dark brands to ≥ 0.55 luminance (saturation unchanged) so Viridian etc. stay readable without going neon.
 - **As thin strokes on light surfaces** (line-tab underlines, mobile topbar stripe): `--brand-highlight` keeps mid/dark brands as-is and darkens bright brands to ≤ 0.45 luminance — reverse of the brand-text lift; saturation unchanged.
-- **Topbar:** same flip for lockup / inactive meta (`--brand-on-topbar`). Light mode ink plate uses `--brand-logo` for the lockup, Beta plate, **and** Login / burger (`--topbar-accent`) — dark brands are lifted to the brand-text floor (≥ 0.55) so Viridian etc. clear `#111`; inactive meta tabs are white. Login type uses `--brand-logo-foreground` (logo-plate luminance — ink once the lift crosses 0.45).
+- **Topbar:** same flip for lockup / inactive meta (`--brand-on-topbar`). Light mode ink plate uses `--brand-logo` for the lockup, Beta plate, **and** burger (`--topbar-accent`) — dark brands are lifted to the brand-text floor (≥ 0.55) so Viridian etc. clear `#111`; inactive meta tabs are white. Burger icon uses `--brand-logo-foreground` (logo-plate luminance — ink once the lift crosses 0.45).
 
 **Pressable buttons (react-3d-button).** `default` / `pagePrimary` / `outline` / `secondary` / `destructive` / `success` on `Button` render through `PressButton` (`components/ui/button-3d.tsx`). Depth is **Shopify-style** (Polaris `shadow-button` via `--ew-btn-shadow`): no chunky extruded colour slab — a 1px inset bottom lip + top shine on the face. Press switches to `--ew-btn-shadow-pressed` and shunts content **0.25px** down. Hover is a **stable** 0.5px content shunt (no left/right skew tracking — that jittered icon+label lock-ups). Ghost / link / `asChild` stay flat (no pack press), but share the same face shadow tokens. **Never put `DialogTrigger asChild` / `PopoverTrigger asChild` on a pressable `Button`** — Radix trigger props force the flat path, so the control ends up taller / differently faced than Press siblings. Use controlled `open` + `Button onClick` (dialogs) or `PopoverAnchor` (DatePicker) instead. Icon + label use a **6px** gap (`0.375rem`) on the pack’s inner content span. Campaign-card outline clusters (`outlineButtonGroup`) must keep every outline `sm` control on the Press path at the same height. Toggle: `toggle` + `active` / `onToggleChange` (Racing Desk Track race / Tracked; success when on). Prefer `size="lg"` (`h-9`) for page-header action clusters.
 
@@ -55,6 +55,8 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 **Campaign / Do next cards & modals.** `.offer-campaign-card` / `.modal-surface` use the same glassy Shopify face as ChromeTab plates and chips (`::after` inset: light = rise-tab plate; dark = `--ew-chip-shadow`). Outer `ring-border/50` in light only — dark drops the old black-mixed ring so the lighten rims can read. Token: `offerCampaignCardShell` in `surface-styles.ts`. Whole-card hover brightness only via `offerCampaignCardInteractive` when the card has a real open/navigate handler (list → details, calendar tile, Do next). Static embeds (Campaign details modal, history rows, Acca/Systems cards) stay flat — no hover without interaction. **Do next** cards add `.do-next-card`: stronger top bevel + glass wash + soft outer rim (Priority / ChromeTab language at card scale; padding and `rounded-[20px]` unchanged).
 
 **Lifted containers (site-wide).** Cards, `.surface-lift`, `.page-panel`, bet panels, and `panelSurface` share a **minimal** glassy face via `--ew-surface-face` / `--ew-surface-rim` (softer than chips / Do next — soft top catch, no boxy stroke). Dark drops outer `ring-*` so the face carries the edge. Prefer `panelSurface` over ad-hoc `rounded-xl border bg-card`. Class escape hatch: `.surface-glass`.
+
+**Alert toasts.** Rest on `--page-shadow`. Hover uses `--toast-shadow-hover` plus the campaign-card brightness lift (`0.98` light / `1.12` dark). Shadow and filter only, no padding or size change.
 
 **Control radius.** `--radius-button` (global − 2px, 10→8) on buttons, fields, and selects via `fieldControl`. Sm/xs share the same radius. Cards / popovers keep `rounded-lg` (`--radius`).
 
@@ -76,17 +78,25 @@ Plate colour flips with theme:
 - **Light:** `#111` plate, brand stripe on mobile / canvas stripe on `md+`
   (matches balance/meta tabs), lockup in `--brand-logo`, white
   (`--topbar-muted`) inactive meta labels/icons.
-  Login / burger: `--brand-logo` plate + contrast type
+  Burger: `--brand-logo` plate + contrast type
   (`--topbar-accent-foreground`), `skeuo-solid`. Face uses
   `--topbar-accent-face-shadow` from logo-plate luminance — full
   `--ew-btn-shadow` when ≥ 0.45; soft `--ew-chip-shadow` when darker.
 - **Dark:** brand plate, `#111` stripe, lockup / foreground / inactive meta
   from `--brand-on-topbar` / `--topbar-muted-on-brand` (white or `#111` by
-  luminance). Login / burger: ink plate + white type; face forced to soft
+  luminance). Burger: ink plate + white type; face forced to soft
   chip/`--ew-btn-shadow` (dark theme).
-- **Mobile Login:** top-bar Login is desktop-only; the burger drawer header
-  shows Login (label always on) with colours swapped vs desktop — light:
-  ink + white (always soft chip face); dark: highlight + ink.
+- **Mobile Log out:** the desk is a signed-in surface; there is no Login in
+  the app chrome (that CTA lives on the .app homepage). **Log out** sits at
+  the bottom of the burger drawer with the other utility rows (icon + label,
+  no chevron).
+- **Desktop Log out:** plain type + icon, pinned to the far right of the
+  submenu row (`md+`), outside the scrolling tabs so it stays put. No
+  ChromeTab plate. 12px (`text-xs`) medium. Label is the signed-in email
+  (truncated at 16rem, right-aligned so **Log out** hugs the icon); hover or
+  keyboard focus crossfades it to **Log out** over 500ms (`ease-in-out`,
+  instant when `prefers-reduced-motion`). Icon stays put. Accessible name is
+  always **Log out**. Clerk `signOut` to `/`. Disable while signing out.
 - **Active meta tab / balance pill:** `ChromeTab` (`components/chrome-tab.tsx`)
   — rise (meta) uses `--chrome-tab-r: 12px`; hang (balance) uses larger
   `--chrome-tab-r-hang: 24px` so TL/TR connectors read into the topbar.
@@ -97,7 +107,7 @@ Plate colour flips with theme:
   chunky 3px lip. Meta-nav links press with a 0.25px shunt like PressButton.
   Page panel radius is `0` below `sm`.
 
-1. **`AppTopBarHeader`** — lockup, bankroll stacks, Login. Fixed `h-14` so the
+1. **`AppTopBarHeader`** — lockup, bankroll stacks, burger (mobile). Fixed `h-14` so the
    balance pill can collapse without reflowing the page. Desktop balances sit
    in `ChromeTab edge="hang"`, top-aligned. A 12px bottom strip (chevron up)
    collapses metrics upward with `COLLAPSE_EASE` height + spring fade
@@ -107,8 +117,9 @@ Plate colour flips with theme:
    selection is a `ChromeTab edge="rise"` slid via CSS `translate3d` + width
    (compositor / high-refresh; `META_TAB_*` in `lib/ui/motion.ts`). Label
    colour fades to canvas foreground after the slide. Bottom hairline is
-   `sm+` only (avoids a yellow edge under the pill on mobile). Narrow
-   viewports scroll the row.
+   `sm+` only (avoids a yellow edge under the pill on mobile). Overflowing
+   tabs scroll horizontally (mouse drag-to-pan, native swipe on touch). No
+   edge fades. A clean click selects a tab; a drag does not.
 
 Meta-nav details:
 
@@ -134,7 +145,8 @@ Meta-nav details:
 cluster). Stats stay at 8px; buttons inside the cluster stay at 8px.
 
 **Ending date/time shortcuts** - expiry fields pass `shortcuts="ending"` to `DatePicker`
-(Tomorrow, 7 days) and `TimePicker` / `EventTimeInput` (End of day → `23:59`). Compact
+(Tomorrow, 7 days), `TimePicker` / `EventTimeInput` (End of day → `23:59`), and the combined
+`DateTimePicker` (Tomorrow + 7 days under the calendar, End of day under the wheels). Compact
 `FilterPill` chips sit under the calendar / wheels.
 
 **`CalculatorPageHeader`** - borderless meta band for calculator shells.
@@ -150,7 +162,7 @@ Compact sports-desk density is fine; **illegible micro type is not**.
 | XSmall / captions / dense meta | **12px** (`text-xs`) | 11px (`text-[11px]`) |
 | Inline icons in text lock-ups at this scale | match type (~12px / `size-3`) | 11px |
 
-**Do not use 10px or smaller** for UI copy, badges, counters, table captions, or tier tags (`text-[10px]`, `text-[9px]`, etc.). Prefer shared tokens in `src/lib/ui/surface-styles.ts` (`sectionDescription`, `captionHeading`, `tableHeaderCell`, `filterPillState`, `brandChipCount`, `proNavTag` / `edgeNavTag`) over one-off pixel sizes.
+**Do not use 10px or smaller** for UI copy, badges, counters, table captions, or tier tags (`text-[10px]`, `text-[9px]`, etc.). Prefer shared tokens in `src/lib/ui/surface-styles.ts` (`sectionDescription`, `captionHeading`, `tableHeaderCell`, `filterPillState`, `brandChipCount`, `navTag` / `proNavTag` / `edgeNavTag`) over one-off pixel sizes.
 
 When bumping micro labels, bump sibling lock-up icons (`size-2.5` → `size-3`) so the pair stays balanced. Decorative chrome (tooltip arrows, wheel gutters) is exempt.
 
@@ -238,3 +250,9 @@ From `src/lib/ui/surface-styles.ts`:
   </Card>
 </PageShell>
 ```
+
+## Marketing canvas
+
+Waitlist / launch pages live on `.marketing-root` (`--marketing-brand` yellow, `--marketing-ink`, `--marketing-band` / `--marketing-band-deep`). They pin `--edge` / `--edge-foreground` to the **dark-theme** Offer Edge plate so tags read on ink and do not follow the user’s desk accent.
+
+Product peeks use `.marketing-panel` + `.marketing-panel-shine` (border-only conic shine; off under `prefers-reduced-motion`). Plan cards share `.marketing-panel`. The featured **Edge** plan adds `.marketing-panel-plan`: rim mixed from `--edge` into the default white/10 (not a solid chroma frame), shine, and a purple trial button. **Choose Core** is the yellow fill CTA. Free stays outline (`hover:bg-white/5`). Card titles are the same species: `text-lg font-semibold` white type, no plates. “Recommended” is `text-xs` sentence case, `text-edge` violet, on the right of the Edge title row. Core gets “Popular” in the same spot, muted grey (`text-white/55`). Comparison ticks follow the column (`size-6`): Free white, Core `--marketing-brand`, Edge `--edge`. Crosses stay muted white so colour means included. Table headers are coloured type (Core yellow, Edge `--edge`), not tags. The monthly/yearly control is centred under the heading: a silver chip (“2 months free with yearly”), then the supplied doodle arrow in the gap pointing at **Bill yearly**, then flanking labels plus a recessed track with a **solid** silver thumb (`--marketing-silver` + `--marketing-silver-face`), `radiogroup` / `radio`. Monthly is the default. The chip is a shortcut onto yearly. Sentence case, not brand yellow or money green. Do not override `edgeNavTag` with brand colours. The logo Beta chip stays on the scaled lockup box (`text-xs` + `scale-[0.625]`).

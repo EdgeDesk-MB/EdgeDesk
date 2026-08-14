@@ -1,6 +1,6 @@
 /**
  * Lock-screen titles: exactly one leading emoji.
- * Alert rules own semantic marks (🟢/🔴/⚠/🔒/⏰/⚡); push must not stack another ⚡.
+ * Alert rules own semantic marks (🟢/🔴/⚠/🔒/⏰/🛎️/⚡); push must not stack another ⚡.
  */
 
 /** Collapse stacked brand bolts, keep a semantic emoji, else prepend brand ⚡. */

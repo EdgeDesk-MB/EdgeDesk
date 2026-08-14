@@ -25,7 +25,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { bestGame, formatRtpPct, type CasinoGame } from "@/lib/casino/game-library";
 import { cn } from "@/lib/utils";
@@ -52,13 +51,17 @@ export function CasinoGamePicker({
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">Eligible games</span>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
-              <ListPlus className="size-3.5" />
-              {selected.length > 0 ? "Edit games" : "Pick games"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-sm p-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => setOpen(true)}
+          >
+            <ListPlus className="size-3.5" />
+            {selected.length > 0 ? "Edit games" : "Pick games"}
+          </Button>
+          <DialogContent className="max-w-sm p-0" mobile="center">
             <DialogHeader className="px-4 pt-4">
               <DialogTitle>Eligible games</DialogTitle>
               <DialogDescription>

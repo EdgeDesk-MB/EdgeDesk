@@ -12,20 +12,24 @@
  * edit dialog always resends the whole form).
  */
 import { z } from "zod";
+import { serializeEligibleGames } from "@/lib/casino/eligible-games";
 
 const rtpField = z.number().min(0.5).max(1).nullable().optional();
 const gameField = z.string().max(120).nullable().optional();
+const eligibleGamesField = z.array(z.string().min(1).max(120)).max(80).optional();
 
 export const qualifyingWagerFields = z.object({
   componentType: z.literal("qualifying_wager"),
   amount: z.number().positive(),
   rtp: rtpField,
   game: gameField,
+  eligibleGames: eligibleGamesField,
 });
 
 export const cashFields = z.object({
   componentType: z.literal("cash"),
   amount: z.number().positive(),
+  eligibleGames: eligibleGamesField,
 });
 
 export const bonusFields = z.object({
@@ -35,6 +39,7 @@ export const bonusFields = z.object({
   rtp: rtpField,
   contributionPct: z.number().min(0.01).max(1).nullable().optional(),
   game: gameField,
+  eligibleGames: eligibleGamesField,
 });
 
 export const freeSpinsFields = z.object({
@@ -46,6 +51,7 @@ export const freeSpinsFields = z.object({
   wageringMultiplier: z.number().min(0).max(200).nullable().optional(),
   contributionPct: z.number().min(0.01).max(1).nullable().optional(),
   game: gameField,
+  eligibleGames: eligibleGamesField,
 });
 
 export const goldenChipsFields = z.object({
@@ -55,6 +61,7 @@ export const goldenChipsFields = z.object({
   /** Edge-derived RTP - required, no heuristic default for a fixed-edge game */
   rtp: z.number().min(0.5).max(1),
   houseEdgePreset: z.enum(["european", "american", "custom"]).nullable().optional(),
+  eligibleGames: eligibleGamesField,
 });
 
 export const cashbackFields = z.object({
@@ -65,6 +72,7 @@ export const cashbackFields = z.object({
   cashbackPct: z.number().gt(0).max(1),
   cashbackCap: z.number().positive().nullable().optional(),
   game: gameField,
+  eligibleGames: eligibleGamesField,
 });
 
 export const componentFieldsSchema = z.discriminatedUnion("componentType", [
@@ -93,6 +101,7 @@ export interface ComponentRowValues {
   cashbackPct: number | null;
   cashbackCap: number | null;
   game: string | null;
+  eligibleGamesJson: string | null;
 }
 
 const EMPTY_ROW: Omit<ComponentRowValues, "componentType"> = {
@@ -108,10 +117,12 @@ const EMPTY_ROW: Omit<ComponentRowValues, "componentType"> = {
   cashbackPct: null,
   cashbackCap: null,
   game: null,
+  eligibleGamesJson: null,
 };
 
 /** Maps a parsed component (any branch) to explicit, fully-nulled DB column values. */
 export function toComponentRowValues(input: ComponentFieldsInput): ComponentRowValues {
+  const eligibleGamesJson = serializeEligibleGames(input.eligibleGames);
   switch (input.componentType) {
     case "qualifying_wager":
       return {
@@ -120,9 +131,15 @@ export function toComponentRowValues(input: ComponentFieldsInput): ComponentRowV
         amount: input.amount,
         rtp: input.rtp ?? null,
         game: input.game ?? null,
+        eligibleGamesJson,
       };
     case "cash":
-      return { ...EMPTY_ROW, componentType: input.componentType, amount: input.amount };
+      return {
+        ...EMPTY_ROW,
+        componentType: input.componentType,
+        amount: input.amount,
+        eligibleGamesJson,
+      };
     case "bonus":
       return {
         ...EMPTY_ROW,
@@ -132,6 +149,7 @@ export function toComponentRowValues(input: ComponentFieldsInput): ComponentRowV
         rtp: input.rtp ?? null,
         contributionPct: input.contributionPct ?? null,
         game: input.game ?? null,
+        eligibleGamesJson,
       };
     case "free_spins":
       return {
@@ -143,6 +161,7 @@ export function toComponentRowValues(input: ComponentFieldsInput): ComponentRowV
         wageringMultiplier: input.wageringMultiplier ?? null,
         contributionPct: input.contributionPct ?? null,
         game: input.game ?? null,
+        eligibleGamesJson,
       };
     case "golden_chips":
       return {
@@ -152,6 +171,7 @@ export function toComponentRowValues(input: ComponentFieldsInput): ComponentRowV
         chipValue: input.chipValue,
         rtp: input.rtp,
         houseEdgePreset: input.houseEdgePreset ?? null,
+        eligibleGamesJson,
       };
     case "cashback":
       return {
@@ -162,6 +182,7 @@ export function toComponentRowValues(input: ComponentFieldsInput): ComponentRowV
         cashbackPct: input.cashbackPct,
         cashbackCap: input.cashbackCap ?? null,
         game: input.game ?? null,
+        eligibleGamesJson,
       };
   }
 }

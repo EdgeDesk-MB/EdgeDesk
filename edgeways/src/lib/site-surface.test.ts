@@ -20,12 +20,14 @@ describe("site surface", () => {
     expect(isWaitlistAllowedPath("/api/waitlist")).toBe(true);
     expect(isWaitlistAllowedPath("/api/waitlist/confirm")).toBe(true);
     expect(isWaitlistAllowedPath("/api/waitlist/unsubscribe")).toBe(true);
+    expect(isWaitlistAllowedPath("/api/account/sync")).toBe(true);
   });
 
   it("blocks desk routes", () => {
     expect(isWaitlistAllowedPath("/desk")).toBe(false);
     expect(isWaitlistAllowedPath("/accounts")).toBe(false);
     expect(isWaitlistAllowedPath("/api/bets")).toBe(false);
+    expect(isWaitlistAllowedPath("/api/accounts")).toBe(false);
   });
 
   it("allows public assets", () => {

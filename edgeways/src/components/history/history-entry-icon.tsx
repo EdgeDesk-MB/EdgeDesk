@@ -5,6 +5,7 @@ import {
   isFreeBetWonHistoryEntry,
   type HistoryContext,
 } from "@/lib/history-display";
+import { FootballIcon } from "@/components/sport-icon";
 import { cn } from "@/lib/utils";
 import {
   Banknote,
@@ -13,7 +14,6 @@ import {
   Dices,
   Flag,
   Gift,
-  Goal,
   Play,
   PlusCircle,
   Zap,
@@ -45,7 +45,12 @@ export function HistoryEntryIcon({
     return <PlusCircle className={cn("size-3.5 text-primary-text", className)} />;
   }
   if (entry.kind === "goal") {
-    return <Goal className={cn("size-3.5 text-emerald-600 dark:text-emerald-400", className)} />;
+    return (
+      <FootballIcon
+        size={14}
+        className={cn("text-emerald-600 dark:text-emerald-400", className)}
+      />
+    );
   }
   if (entry.kind === "kickoff") {
     return <Play className={cn("size-3.5 text-primary-text", className)} />;

@@ -29,6 +29,27 @@
       "when": 1786515800000,
       "tag": "0003_waitlist_ms_bigint",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786550000000,
+      "tag": "0004_app_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786800000000,
+      "tag": "0005_casino_eligible_games",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786803600000,
+      "tag": "0006_free_bet_lot_expires_at",
+      "breakpoints": true
     }
   ]
 }

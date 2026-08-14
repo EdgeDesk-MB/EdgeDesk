@@ -34,7 +34,7 @@ import { parseRaceDisplayMeta, parseRacecardRunners } from "@/lib/racing";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 
 export function AlertWatcher() {
-  const { items: doNext, state } = useDoNextItems();
+  const { items: doNext, lots, state } = useDoNextItems();
   const channel = useMemo(() => createLocalAlertChannel(), []);
   const seenRef = useRef<Set<string> | null>(null);
   /** Condition keys firing on the previous poll - used to dismiss cleared prompts. */
@@ -168,12 +168,20 @@ export function AlertWatcher() {
       now,
       prefs: {
         offerExpiring: state.settings.alertsOfferExpiring,
+        freeBetExpiring: state.settings.alertsFreeBetExpiring,
         raceOffSoon: state.settings.alertsRaceOffSoon,
         resultSettled: state.settings.alertsResultSettled,
         nakedExposure: state.settings.alertsNakedExposure,
         twoUpLock: state.settings.alertsTwoUpLock,
       },
       doNext: liveDoNext,
+      freeBetLots: lots.map((lot) => ({
+        id: lot.id,
+        accountName: lot.accountName,
+        remaining: lot.remaining,
+        note: lot.note,
+        expiresAt: lot.expiresAt ?? null,
+      })),
       offers: (state.offers ?? []).map((o) => ({
         id: o.id,
         title: o.title,
@@ -281,7 +289,7 @@ export function AlertWatcher() {
         }),
       }).catch(() => {});
     }
-  }, [state, doNext, channel]);
+  }, [state, doNext, lots, channel]);
 
   return null;
 }

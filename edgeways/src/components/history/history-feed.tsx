@@ -14,6 +14,8 @@ import {
   historyEntryLinkLabel,
   historyEntrySubtitle,
   historyEntryTitle,
+  historyEntryTitleParts,
+  historyGoalScoreline,
   historyKindLabel,
   historySettledNote,
   isFreeBetPlacedHistoryEntry,
@@ -56,17 +58,70 @@ function useBalanceCorrectionNote(entry: HistoryRow) {
 const freeBetIconClass = "text-violet-600 dark:text-violet-400";
 const freeBetTextClass = "text-violet-700 dark:text-violet-300";
 
+function HistoryGoalScorelineDisplay({
+  entry,
+  ctx,
+  className,
+}: {
+  entry: HistoryRow;
+  ctx: HistoryContext;
+  className?: string;
+}) {
+  const scoreline = historyGoalScoreline(entry, ctx);
+  if (!scoreline) return null;
+  const hit = "font-semibold text-foreground";
+  return (
+    <span className={className}>
+      {scoreline.flags ? `${scoreline.flags} - ` : null}
+      {scoreline.scoringSide === "home" ? (
+        <>
+          <span className={hit}>
+            {scoreline.homeTeam} {scoreline.homeScore}
+          </span>
+          {`-${scoreline.awayScore} ${scoreline.awayTeam}`}
+        </>
+      ) : scoreline.scoringSide === "away" ? (
+        <>
+          {`${scoreline.homeTeam} ${scoreline.homeScore}-`}
+          <span className={hit}>
+            {scoreline.awayScore} {scoreline.awayTeam}
+          </span>
+        </>
+      ) : (
+        `${scoreline.homeTeam} ${scoreline.homeScore}-${scoreline.awayScore} ${scoreline.awayTeam}`
+      )}
+    </span>
+  );
+}
+
 function HistoryEntryTitleDisplay({
   title,
+  parts,
   freeBetPlaced,
   freeBetWon,
   className,
 }: {
   title: string;
+  parts?: { text: string; emphasize?: boolean }[] | null;
   freeBetPlaced: boolean;
   freeBetWon: boolean;
   className?: string;
 }) {
+  if (parts && parts.length > 0) {
+    return (
+      <span className={cn("truncate", className)}>
+        {parts.map((part, index) => (
+          <span
+            key={`${index}:${part.text}`}
+            className={part.emphasize ? "font-bold text-foreground" : undefined}
+          >
+            {part.text}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
   if (freeBetPlaced) {
     return (
       <span className={cn("truncate", freeBetTextClass, className)}>{title}</span>
@@ -212,12 +267,14 @@ export function HistoryEntryRow({
   const subtitle = historyEntrySubtitle(entry, bet, promo);
   const { note: correctionNote, displayEntry, setNote } = useBalanceCorrectionNote(entry);
   const isBalanceAdjustment = entry.kind === "balance_adjustment";
+  const goalScoreline = historyGoalScoreline(entry, ctx);
   const compactDescription = compact
     ? isBalanceAdjustment
       ? undefined
       : (subtitle ?? eventLine ?? (entry.kind === "casino_settlement" ? entry.detail : undefined))
     : undefined;
   const title = historyEntryTitle(entry, ctx);
+  const titleParts = historyEntryTitleParts(entry, ctx);
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
   const href = historyEntryHref(entry, ctx);
@@ -269,13 +326,20 @@ export function HistoryEntryRow({
             >
               <HistoryEntryTitleDisplay
                 title={title}
+                parts={titleParts}
                 freeBetPlaced={freeBetPlaced}
                 freeBetWon={freeBetWon}
                 className="block text-[13px] font-medium leading-snug"
               />
             </Link>
             {correctionDetail}
-            {compactDescription ? (
+            {goalScoreline ? (
+              <HistoryGoalScorelineDisplay
+                entry={entry}
+                ctx={ctx}
+                className="mt-0.5 block truncate text-xs text-muted-foreground"
+              />
+            ) : compactDescription ? (
               <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                 {compactDescription}
               </span>
@@ -307,13 +371,20 @@ export function HistoryEntryRow({
           <Link href={href} className="cursor-pointer" aria-label={linkLabel}>
             <HistoryEntryTitleDisplay
               title={title}
+              parts={titleParts}
               freeBetPlaced={freeBetPlaced}
               freeBetWon={freeBetWon}
               className="block text-[13px] font-medium"
             />
           </Link>
           {correctionDetail}
-          {!isBalanceAdjustment && subtitle ? (
+          {goalScoreline ? (
+            <HistoryGoalScorelineDisplay
+              entry={entry}
+              ctx={ctx}
+              className="block truncate text-xs text-muted-foreground"
+            />
+          ) : !isBalanceAdjustment && subtitle ? (
             <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
           ) : null}
           {entry.kind === "casino_settlement" && entry.detail && !subtitle ? (
@@ -380,6 +451,8 @@ export function HistoryEntryCard({
   const { note: correctionNote, displayEntry, setNote } = useBalanceCorrectionNote(entry);
   const isBalanceAdjustment = entry.kind === "balance_adjustment";
   const title = historyEntryTitle(entry, ctx);
+  const titleParts = historyEntryTitleParts(entry, ctx);
+  const goalScoreline = historyGoalScoreline(entry, ctx);
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
   const offerTitle =
@@ -426,12 +499,14 @@ export function HistoryEntryCard({
                 </div>
                 <h3
                   className={cn(
-                    "mt-0.5 font-bold leading-snug",
-                    collapsed ? "text-sm" : "text-base"
+                    "mt-0.5 leading-snug",
+                    collapsed ? "text-sm" : "text-base",
+                    titleParts ? "font-medium" : "font-bold"
                   )}
                 >
                   <HistoryEntryTitleDisplay
                     title={title}
+                    parts={titleParts}
                     freeBetPlaced={freeBetPlaced}
                     freeBetWon={freeBetWon}
                   />
@@ -451,7 +526,13 @@ export function HistoryEntryCard({
                     textClassName={!collapsed ? "text-sm" : undefined}
                   />
                 ) : null}
-                {!isBalanceAdjustment && !collapsed && subtitle ? (
+                {goalScoreline && !collapsed ? (
+                  <HistoryGoalScorelineDisplay
+                    entry={entry}
+                    ctx={ctx}
+                    className="mt-1 block text-sm text-muted-foreground"
+                  />
+                ) : !isBalanceAdjustment && !collapsed && subtitle ? (
                   <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
                 ) : null}
                 {!collapsed &&

@@ -18,6 +18,8 @@ import {
 } from "@/lib/offers/offer-track-bet";
 import { Gift } from "lucide-react";
 import { convertFreeBetButtonClass } from "@/lib/ui/surface-styles";
+import { FreeBetExpiryControl } from "@/components/accounts/free-bet-expiry-control";
+import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
 
 type Lot = {
   id: number;
@@ -28,6 +30,7 @@ type Lot = {
   note: string | null;
   createdAt: number;
   betId: number | null;
+  expiresAt: number | null;
 };
 
 /**
@@ -104,7 +107,7 @@ export function FreeBetDistributionCard({ className }: { className?: string }) {
         {lots.slice(0, 8).map((lot) => (
           <div
             key={lot.id}
-            className="flex items-center justify-between gap-2 rounded-md border border-violet-500/20 bg-violet-500/5 px-2.5 py-2"
+            className="flex items-start justify-between gap-2 rounded-md border border-violet-500/20 bg-violet-500/5 px-2.5 py-2"
           >
             <span className="min-w-0">
               <span className="flex items-center gap-1.5">
@@ -114,8 +117,21 @@ export function FreeBetDistributionCard({ className }: { className?: string }) {
                   className="font-semibold text-violet-700 dark:text-violet-300"
                 />
               </span>
-              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                {lot.note?.replace(/^Free bet promo - /, "").slice(0, 56) || "Free bet credit"}
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                {freeBetLotNoteLabel(lot.note)}
+              </span>
+              <span className="mt-0.5 block">
+                <FreeBetExpiryControl
+                  lotId={lot.id}
+                  expiresAt={lot.expiresAt}
+                  accountName={lot.accountName}
+                  remaining={lot.remaining}
+                  onChanged={(expiresAt) =>
+                    setLots((prev) =>
+                      prev.map((row) => (row.id === lot.id ? { ...row, expiresAt } : row))
+                    )
+                  }
+                />
               </span>
             </span>
             <Button

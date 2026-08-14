@@ -10,7 +10,7 @@ import {
   createLocalAlertChannel,
   dismissStickyAlertToasts,
 } from "@/lib/alerts/local-channel";
-import { offerExpiringAlertKeys } from "@/lib/alerts/rules";
+import { offerExpiringAlertKeys } from "@/lib/alerts/expiring-alert-keys";
 import {
   dismissAlertNotifications,
   suppressAlertKeys,

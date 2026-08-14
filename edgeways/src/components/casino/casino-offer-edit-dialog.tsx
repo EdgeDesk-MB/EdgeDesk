@@ -11,7 +11,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,12 +45,22 @@ function bootExpiry(offer: CasinoOfferSummary): { date: string; time: string } {
 export function CasinoOfferEditDialog({
   offer,
   onSaved,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  showTrigger = true,
+  mobile = "sheet",
 }: {
   offer: CasinoOfferSummary;
   onSaved: (offer: CasinoOfferSummary) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+  mobile?: "sheet" | "center";
 }) {
   const initial = bootExpiry(offer);
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = onOpenChangeProp ?? setUncontrolledOpen;
   const [casino, setCasino] = useState(offer.casino ?? "");
   const [title, setTitle] = useState(offer.title);
   const [offerUrl, setOfferUrl] = useState(offer.offerUrl ?? "");
@@ -106,21 +115,21 @@ export function CasinoOfferEditDialog({
         }
       }}
     >
-      <DialogTrigger asChild>
+      {showTrigger ? (
         <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 text-muted-foreground"
-          aria-label="Edit campaign"
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setOpen(true)}
         >
-          <Pencil className="size-3.5" />
+          <Pencil className="size-3.5" /> Edit
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      ) : null}
+      <DialogContent className="max-w-sm" mobile={mobile}>
         <DialogHeader>
           <DialogTitle>Edit campaign</DialogTitle>
           <DialogDescription>
-            Casino, title, link and notes - steps are edited on their own row.
+            Casino, title, link and notes. Steps are edited on their own row.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
