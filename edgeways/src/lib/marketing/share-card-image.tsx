@@ -4,10 +4,10 @@ import { ImageResponse } from "next/og";
 import { marketingShareCopy, SHARE_IMAGE_ALT } from "@/lib/marketing/share-metadata";
 import { getLandingVariant } from "@/lib/site-surface";
 
-export const alt = SHARE_IMAGE_ALT;
+export const SHARE_CARD_ALT = SHARE_IMAGE_ALT;
 /** 2× the 1200×630 share card so Slack / iMessage stay sharp on retina. */
-export const size = { width: 2400, height: 1260 };
-export const contentType = "image/png";
+export const SHARE_CARD_SIZE = { width: 2400, height: 1260 };
+export const SHARE_CARD_CONTENT_TYPE = "image/png";
 
 const INK = "#111111";
 const FG = "#f5f5f0";
@@ -24,7 +24,7 @@ async function loadLogo() {
 }
 
 /** Share card: ink plate, real lockup, Do Next artefact (the product, not a slogan poster). */
-export default async function OpenGraphImage() {
+export async function renderShareCardImage() {
   const copy = marketingShareCopy(getLandingVariant());
   const logoSrc = await loadLogo();
 
@@ -222,6 +222,6 @@ export default async function OpenGraphImage() {
         </div>
       </div>
     ),
-    { ...size }
+    { ...SHARE_CARD_SIZE }
   );
 }
