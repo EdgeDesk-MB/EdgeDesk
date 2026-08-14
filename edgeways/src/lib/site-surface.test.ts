@@ -31,6 +31,7 @@ describe("site surface", () => {
   it("allows public assets", () => {
     expect(isPublicAssetPath("/_next/static/chunk.js")).toBe(true);
     expect(isPublicAssetPath("/icon-192.png")).toBe(true);
+    expect(isPublicAssetPath("/og")).toBe(true);
     expect(isPublicAssetPath("/opengraph-image")).toBe(true);
     expect(isPublicAssetPath("/opengraph-image-pwu6ef")).toBe(true);
     expect(isPublicAssetPath("/twitter-image-pwu6ef")).toBe(true);

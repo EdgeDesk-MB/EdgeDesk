@@ -11,9 +11,11 @@ import {
 } from "@/lib/billing/public-offer";
 import type { LandingVariant } from "@/lib/site-surface";
 
-export const PUBLIC_SITE_ORIGIN = "https://www.edgeways.app";
+/** Apex is canonical; www redirects here. Do not use the Vercel *.vercel.app host. */
+export const PUBLIC_SITE_ORIGIN = "https://edgeways.app";
 export const SHARE_SITE_NAME = "Edgeways";
 export const SHARE_LOCALE = "en_GB";
+export const SHARE_IMAGE_PATH = "/og";
 
 export const SHARE_IMAGE_ALT =
   "Edgeways desk: know what's next, see what paid, with today's Do Next qualifier";
@@ -57,8 +59,19 @@ export function marketingShareCopy(variant: LandingVariant): ShareCopy {
   };
 }
 
+export function shareImageUrl(): string {
+  return `${PUBLIC_SITE_ORIGIN}${SHARE_IMAGE_PATH}`;
+}
+
 export function marketingShareMetadata(variant: LandingVariant): Metadata {
   const copy = marketingShareCopy(variant);
+  const image = {
+    url: shareImageUrl(),
+    width: 2400,
+    height: 1260,
+    alt: SHARE_IMAGE_ALT,
+    type: "image/png",
+  };
   return {
     title: {
       absolute: `${copy.title} · ${SHARE_SITE_NAME}`,
@@ -70,12 +83,14 @@ export function marketingShareMetadata(variant: LandingVariant): Metadata {
       type: "website",
       siteName: SHARE_SITE_NAME,
       locale: SHARE_LOCALE,
-      url: "/",
+      url: `${PUBLIC_SITE_ORIGIN}/`,
+      images: [image],
     },
     twitter: {
       card: "summary_large_image",
       title: copy.title,
       description: copy.description,
+      images: [image],
     },
   };
 }

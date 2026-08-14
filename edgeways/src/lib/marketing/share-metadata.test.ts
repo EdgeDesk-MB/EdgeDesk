@@ -56,6 +56,14 @@ describe("marketingShareMetadata", () => {
     });
     expect(meta.twitter?.card).toBe("summary_large_image");
     expect(meta.twitter?.title).toBe(copy.title);
+    expect(meta.openGraph?.url).toBe(`${PUBLIC_SITE_ORIGIN}/`);
+    const ogImages = meta.openGraph?.images;
+    const image = Array.isArray(ogImages) ? ogImages[0] : ogImages;
+    expect(image).toMatchObject({
+      url: `${PUBLIC_SITE_ORIGIN}/og`,
+      width: 2400,
+      height: 1260,
+    });
   });
 });
 

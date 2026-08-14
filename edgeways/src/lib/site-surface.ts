@@ -45,6 +45,7 @@ export function isPublicAssetPath(pathname: string): boolean {
   if (pathname === "/apple-icon.png") return true;
   if (/^\/icon-\d+\.png$/.test(pathname)) return true;
   if (pathname === "/badge-192.png") return true;
+  if (pathname === "/og" || pathname.startsWith("/og?")) return true;
   if (pathname === "/opengraph-image" || pathname === "/twitter-image") return true;
   if (pathname.startsWith("/opengraph-image") || pathname.startsWith("/twitter-image")) {
     return true;
