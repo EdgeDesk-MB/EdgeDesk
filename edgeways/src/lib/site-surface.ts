@@ -5,6 +5,13 @@ export function getSiteSurface(): SiteSurface {
   return process.env.SITE_SURFACE === "waitlist" ? "waitlist" : "app";
 }
 
+/** Homepage version. Production stays waitlist until this is set to launch. */
+export type LandingVariant = "waitlist" | "launch";
+
+export function getLandingVariant(): LandingVariant {
+  return process.env.LANDING_VARIANT === "launch" ? "launch" : "waitlist";
+}
+
 export function isWaitlistSurface(): boolean {
   return process.env.SITE_SURFACE === "waitlist";
 }

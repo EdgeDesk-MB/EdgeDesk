@@ -1,12 +1,33 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { marketingShareCopy, SHARE_IMAGE_ALT } from "@/lib/marketing/share-metadata";
+import { getLandingVariant } from "@/lib/site-surface";
 
-export const runtime = "edge";
-export const alt = "Edgeways — matched betting command centre";
-export const size = { width: 1200, height: 630 };
+export const alt = SHARE_IMAGE_ALT;
+/** 2× the 1200×630 share card so Slack / iMessage stay sharp on retina. */
+export const size = { width: 2400, height: 1260 };
 export const contentType = "image/png";
 
-/** Waitlist / share card: ink plate, brand lockup line, hero promise. */
-export default function OpenGraphImage() {
+const INK = "#111111";
+const FG = "#f5f5f0";
+const BRAND = "#FFC71E";
+const MUTED = "rgba(245,245,240,0.58)";
+const PANEL = "#1a1a1a";
+const MONEY = "#34d399";
+
+async function loadLogo() {
+  const logo = await readFile(
+    join(process.cwd(), "public/brand/logo-yellow.png")
+  );
+  return `data:image/png;base64,${logo.toString("base64")}`;
+}
+
+/** Share card: ink plate, real lockup, Do Next artefact (the product, not a slogan poster). */
+export default async function OpenGraphImage() {
+  const copy = marketingShareCopy(getLandingVariant());
+  const logoSrc = await loadLogo();
+
   return new ImageResponse(
     (
       <div
@@ -15,58 +36,188 @@ export default function OpenGraphImage() {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
-          background: "#111111",
-          padding: "72px 80px",
+          background: INK,
           fontFamily: "ui-sans-serif, system-ui, sans-serif",
         }}
       >
+        <div style={{ width: "100%", height: 16, background: BRAND }} />
         <div
           style={{
+            flex: 1,
             display: "flex",
-            alignItems: "center",
-            gap: 16,
-            color: "#FFC71E",
-            fontSize: 36,
-            fontWeight: 700,
-            letterSpacing: "-0.02em",
+            flexDirection: "column",
+            padding: "96px 128px 88px",
+            backgroundImage:
+              "radial-gradient(ellipse 70% 55% at 78% 18%, rgba(255,199,30,0.14), transparent 62%)",
           }}
         >
           <div
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 10,
-              background: "#FFC71E",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              color: "#111111",
-              fontSize: 28,
-              fontWeight: 800,
+              justifyContent: "space-between",
             }}
           >
-            ⚡
+            <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+              <img
+                src={logoSrc}
+                alt=""
+                width={420}
+                height={108}
+                style={{ objectFit: "contain" }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: 8,
+                  background: BRAND,
+                  color: INK,
+                  fontSize: 32,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  padding: "12px 20px",
+                  lineHeight: 1,
+                }}
+              >
+                BETA
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                borderRadius: 999,
+                border: "2px solid rgba(255,199,30,0.45)",
+                color: BRAND,
+                fontSize: 40,
+                fontWeight: 600,
+                letterSpacing: "0.04em",
+                padding: "16px 32px",
+              }}
+            >
+              {copy.eyebrow}
+            </div>
           </div>
-          edgeways
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
           <div
             style={{
+              flex: 1,
               display: "flex",
-              flexDirection: "column",
-              fontSize: 72,
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              lineHeight: 1.05,
-              color: "#f5f5f0",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 80,
             }}
           >
-            <span>Know what's next.</span>
-            <span style={{ color: "#FFC71E" }}>See what paid.</span>
-          </div>
-          <div style={{ fontSize: 28, color: "rgba(245,245,240,0.65)" }}>
-            The matched betting command centre
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                width: 1120,
+                gap: 36,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  fontSize: 116,
+                  fontWeight: 700,
+                  letterSpacing: "-0.035em",
+                  lineHeight: 1.05,
+                  color: FG,
+                }}
+              >
+                <span>Know what&apos;s next.</span>
+                <span style={{ color: BRAND }}>See what paid.</span>
+              </div>
+              <div
+                style={{
+                  fontSize: 48,
+                  color: MUTED,
+                  lineHeight: 1.35,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {copy.imageLine}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                width: 920,
+                borderRadius: 40,
+                background: PANEL,
+                border: "2px solid rgba(255,255,255,0.10)",
+                boxShadow:
+                  "0 48px 96px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.08)",
+                padding: "56px 64px",
+                gap: 44,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                  }}
+                >
+                  Do next
+                </div>
+                <div
+                  style={{
+                    fontSize: 56,
+                    fontWeight: 700,
+                    letterSpacing: "-0.02em",
+                    color: FG,
+                  }}
+                >
+                  Paddy Power · £20 qualifier
+                </div>
+                <div style={{ fontSize: 40, color: MUTED }}>
+                  Free bet if 2nd or 3rd
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  borderTop: "2px solid rgba(255,255,255,0.10)",
+                  paddingTop: 40,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                  }}
+                >
+                  Potential edge
+                </div>
+                <div
+                  style={{
+                    fontSize: 72,
+                    fontWeight: 700,
+                    color: MONEY,
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  +£15.00
+                </div>
+                <div style={{ fontSize: 40, color: MUTED }}>
+                  £20 free bet value
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

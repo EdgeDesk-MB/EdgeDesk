@@ -34,6 +34,12 @@ import {
   HEADER_PATTERN_COOKIE_KEY,
   normalizeHeaderPattern,
 } from "@/lib/header-pattern";
+import {
+  SHARE_LOCALE,
+  SHARE_SITE_NAME,
+  marketingShareCopy,
+  publicSiteUrl,
+} from "@/lib/marketing/share-metadata";
 
 const notoSans = Noto_Sans({
   // Keep the Tailwind v4 pass-through name (`@theme --font-sans: var(--font-sans)`).
@@ -53,17 +59,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const rootShare = marketingShareCopy("waitlist");
+
 export const metadata: Metadata = {
+  metadataBase: publicSiteUrl(),
+  applicationName: SHARE_SITE_NAME,
   title: {
     default: "Edgeways",
     template: "%s · Edgeways",
   },
-  description:
-    "The matched betting command centre. Know what's next, execute cleanly, and see what paid.",
+  description: rootShare.description,
   // Outbound bookie/casino clicks must not send Edgeways as Referer.
   referrer: "no-referrer",
   // Icons: src/app/icon.tsx (accent-tinted favicon from brand cookie) and
   // src/app/apple-icon.png (static iOS home screen).
+  openGraph: {
+    type: "website",
+    locale: SHARE_LOCALE,
+    siteName: SHARE_SITE_NAME,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 /** viewport-fit=cover makes env(safe-area-inset-*) live for the mobile sheets. */

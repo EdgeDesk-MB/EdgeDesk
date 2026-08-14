@@ -1,25 +1,10 @@
 import type { Metadata } from "next";
+import { marketingShareMetadata } from "@/lib/marketing/share-metadata";
+import { getLandingVariant } from "@/lib/site-surface";
 
-export const metadata: Metadata = {
-  title: {
-    absolute: "Edgeways, matched betting made clear",
-  },
-  description:
-    "The matched betting command centre. Know what's next, execute cleanly, and see what paid. Join the waitlist for early access.",
-  openGraph: {
-    title: "Edgeways, matched betting made clear",
-    description:
-      "Know what's next, execute cleanly, and see what paid. Join the waitlist.",
-    type: "website",
-    siteName: "Edgeways",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Edgeways, matched betting made clear",
-    description:
-      "Know what's next, execute cleanly, and see what paid. Join the waitlist.",
-  },
-};
+export function generateMetadata(): Metadata {
+  return marketingShareMetadata(getLandingVariant());
+}
 
 /**
  * Marketing surface: scrollable document, no desk chrome.
