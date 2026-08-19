@@ -6,17 +6,11 @@ import { MarketingSocialLinks } from "@/components/marketing/marketing-social-li
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { LEGAL_NAV } from "@/lib/legal/public";
+import { HOW_IT_HELPS_LEAD, POSITIONING_FAQ } from "@/lib/marketing/landing-faq";
 import { cn } from "@/lib/utils";
 
 const FAQ = [
-  {
-    q: "What is Edgeways?",
-    a: "A matched betting command centre. What to do next, clean execution, and what you kept.",
-  },
-  {
-    q: "Is this an oddsmatcher?",
-    a: "No. Matchers help you find bets. Edgeways runs the day and shows what you kept.",
-  },
+  ...POSITIONING_FAQ,
   {
     q: "Who is it for?",
     a: "UK matched bettors who are done juggling spreadsheets and half-built trackers.",
@@ -179,8 +173,7 @@ export function WaitlistHome() {
               Built to make the day simpler.
             </h2>
             <p className="mt-3 max-w-2xl text-base text-white/55 sm:text-lg">
-              Matchers help you find bets. Edgeways helps you run them, then
-              shows what paid. Less tab-hopping. Fewer missed steps.
+              {HOW_IT_HELPS_LEAD}
             </p>
             <ul className="mt-12 grid gap-8 sm:grid-cols-3 sm:gap-8">
               {[

@@ -7,17 +7,11 @@ import { MarketingPricing } from "@/components/marketing/marketing-pricing";
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { TRIAL_DAYS, betaOfferSummary } from "@/lib/billing/public-offer";
+import { HOW_IT_HELPS_LEAD, POSITIONING_FAQ } from "@/lib/marketing/landing-faq";
 import { cn } from "@/lib/utils";
 
 const FAQ = [
-  {
-    q: "What is Edgeways?",
-    a: "A matched betting command centre. What to do next, clean execution, and what you kept.",
-  },
-  {
-    q: "Is this an oddsmatcher?",
-    a: "No. Matchers help you find bets. Edgeways runs the day and shows what you kept.",
-  },
+  ...POSITIONING_FAQ,
   {
     q: "What does the trial include?",
     a: `${TRIAL_DAYS} days of Edge, the top tier. One trial per person. Cancel before it ends and you are not charged. Then pick Core or Edge at the list price.`,
@@ -191,8 +185,7 @@ export function LaunchHome() {
               Built to make the day simpler.
             </h2>
             <p className="mt-3 max-w-2xl text-base text-white/55 sm:text-lg">
-              Matchers help you find bets. Edgeways helps you run them, then
-              shows what paid. Less tab-hopping. Fewer missed steps.
+              {HOW_IT_HELPS_LEAD}
             </p>
             <ul className="mt-12 grid gap-8 sm:grid-cols-3 sm:gap-8">
               {[
