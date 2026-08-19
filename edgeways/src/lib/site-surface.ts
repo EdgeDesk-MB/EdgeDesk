@@ -46,6 +46,7 @@ export function isWaitlistAllowedPath(pathname: string): boolean {
 export function isPublicAssetPath(pathname: string): boolean {
   if (pathname.startsWith("/_next/")) return true;
   if (pathname === "/favicon.ico") return true;
+  if (pathname === "/robots.txt" || pathname === "/sitemap.xml") return true;
   if (pathname === "/manifest.webmanifest") return true;
   if (pathname === "/sw.js") return true;
   if (pathname === "/icon" || pathname.startsWith("/icon?")) return true;
