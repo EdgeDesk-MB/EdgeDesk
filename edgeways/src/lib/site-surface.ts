@@ -22,6 +22,10 @@ const WAITLIST_PAGES = new Set([
   "/sign-up",
   "/waitlist/confirmed",
   "/waitlist/unsubscribed",
+  "/contact",
+  "/refund",
+  "/terms",
+  "/privacy",
 ]);
 
 const WAITLIST_API_PREFIX = "/api/waitlist";

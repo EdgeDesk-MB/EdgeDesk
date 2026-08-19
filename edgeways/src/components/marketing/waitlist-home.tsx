@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { WaitlistForm } from "@/components/marketing/waitlist-form";
 import { MarketingLogo } from "@/components/marketing/marketing-logo";
 import { MarketingGlimpseRail } from "@/components/marketing/marketing-glimpse-rail";
 import { MarketingSocialLinks } from "@/components/marketing/marketing-social-links";
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
 import { moneyPositiveClass } from "@/components/money-flow";
+import { LEGAL_NAV } from "@/lib/legal/public";
 import { cn } from "@/lib/utils";
 
 const FAQ = [
@@ -307,8 +309,19 @@ export function WaitlistHome() {
             <ResponsibleGamblingNote className="text-white/55 [&_a]:text-[var(--marketing-brand)]" />
             <p className="text-xs text-white/55">
               We keep your email for the waitlist and launch updates.
-              Unsubscribe any time. Full privacy policy before public launch.
+              Unsubscribe any time.
             </p>
+            <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {LEGAL_NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-sm text-white/55 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
           </div>
         </div>
       </footer>

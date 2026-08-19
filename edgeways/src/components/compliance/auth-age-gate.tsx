@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
+import { LEGAL_PATHS } from "@/lib/legal/public";
 
 /**
  * Auth-surface 18+ step (EDGE-13 / EDGE-19+). Same wording as AgeGateDialog;
@@ -17,6 +18,8 @@ export function AuthAgeConfirm({
   onConfirm: () => void;
   onDecline: () => void;
 }) {
+  const [legalAccepted, setLegalAccepted] = useState(false);
+
   return (
     <div className="w-full max-w-[400px] rounded-lg border border-white/10 bg-[#1a1a1a] p-6 text-[#f5f5f0] shadow-none">
       <div className="flex flex-col gap-3 text-center">
@@ -31,10 +34,42 @@ export function AuthAgeConfirm({
           You must be 18 or over to create an account.
         </p>
         <ResponsibleGamblingNote className="text-[rgba(245,245,240,0.55)] [&_a]:text-[#FFC71E]" />
+        <label className="flex cursor-pointer items-start gap-2 text-left text-sm text-[rgba(245,245,240,0.65)]">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 shrink-0 rounded accent-[#FFC71E]"
+            checked={legalAccepted}
+            onChange={(e) => setLegalAccepted(e.target.checked)}
+          />
+          <span>
+            I have read and agree to the{" "}
+            <Link
+              href={LEGAL_PATHS.terms}
+              className="rounded-sm text-[#FFC71E] underline-offset-2 hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Terms of Service
+              <span className="sr-only"> (opens in a new tab)</span>
+            </Link>{" "}
+            and{" "}
+            <Link
+              href={LEGAL_PATHS.privacy}
+              className="rounded-sm text-[#FFC71E] underline-offset-2 hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privacy Policy
+              <span className="sr-only"> (opens in a new tab)</span>
+            </Link>
+            .
+          </span>
+        </label>
       </div>
       <div className="mt-6 flex flex-col gap-2">
         <Button
           className="h-10 w-full bg-[#FFC71E] font-semibold text-[#111111] hover:bg-[#ffd24d]"
+          disabled={!legalAccepted}
           onClick={onConfirm}
         >
           Confirm I&apos;m 18 or over

@@ -18,6 +18,8 @@ export function SignUpForm() {
           unsafeMetadata={{
             ageConfirmed: true,
             ageConfirmedAt,
+            legalAccepted: true,
+            legalAcceptedAt: ageConfirmedAt,
           }}
         />
       )}

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { LEGAL_PATHS } from "@/lib/legal/public";
 
 type FormStatus =
   | { kind: "idle" }
@@ -120,6 +122,17 @@ export function WaitlistForm({
           {status.message}
         </p>
       ) : null}
+      <p className="text-xs leading-relaxed text-white/55">
+        By joining you agree we can email you about the waitlist and launch.
+        Read the{" "}
+        <Link
+          href={LEGAL_PATHS.privacy}
+          className="rounded-sm text-[var(--marketing-brand)] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
+        >
+          Privacy Policy
+        </Link>
+        . Unsubscribe any time.
+      </p>
     </form>
   );
 }

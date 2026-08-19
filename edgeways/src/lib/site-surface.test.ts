@@ -21,6 +21,10 @@ describe("site surface", () => {
     expect(isWaitlistAllowedPath("/api/waitlist/confirm")).toBe(true);
     expect(isWaitlistAllowedPath("/api/waitlist/unsubscribe")).toBe(true);
     expect(isWaitlistAllowedPath("/api/account/sync")).toBe(true);
+    expect(isWaitlistAllowedPath("/contact")).toBe(true);
+    expect(isWaitlistAllowedPath("/refund")).toBe(true);
+    expect(isWaitlistAllowedPath("/terms")).toBe(true);
+    expect(isWaitlistAllowedPath("/privacy")).toBe(true);
   });
 
   it("blocks desk routes", () => {
@@ -28,6 +32,9 @@ describe("site surface", () => {
     expect(isWaitlistAllowedPath("/accounts")).toBe(false);
     expect(isWaitlistAllowedPath("/api/bets")).toBe(false);
     expect(isWaitlistAllowedPath("/api/accounts")).toBe(false);
+    expect(isWaitlistAllowedPath("/demo")).toBe(false);
+    expect(isWaitlistAllowedPath("/setup")).toBe(false);
+    expect(isWaitlistAllowedPath("/subscribe")).toBe(false);
   });
 
   it("allows public assets", () => {

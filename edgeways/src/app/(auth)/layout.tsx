@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingLogo } from "@/components/marketing/marketing-logo";
+import { LEGAL_NAV } from "@/lib/legal/public";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -37,16 +38,29 @@ export default function AuthLayout({
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-16 pt-4">
         {children}
       </main>
-      <footer className="relative z-10 px-5 pb-6 text-center text-xs text-[rgba(245,245,240,0.4)]">
-        18+ only. Betting involves risk.{" "}
-        <a
-          href="https://www.begambleaware.org"
-          className="underline-offset-2 hover:text-[rgba(245,245,240,0.7)] hover:underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          BeGambleAware
-        </a>
+      <footer className="relative z-10 space-y-2 px-5 pb-6 text-center text-xs text-[rgba(245,245,240,0.55)]">
+        <p>
+          18+ only. Betting involves risk.{" "}
+          <a
+            href="https://www.begambleaware.org"
+            className="underline-offset-2 hover:text-[rgba(245,245,240,0.7)] hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            BeGambleAware
+          </a>
+        </p>
+        <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-3">
+          {LEGAL_NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-sm underline-offset-2 hover:text-[rgba(245,245,240,0.7)] hover:underline"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </footer>
     </div>
   );
