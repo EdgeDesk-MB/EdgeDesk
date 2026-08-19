@@ -163,11 +163,11 @@ export function OfferViewDialog({
           />
         </div>
 
-        <div className="flex w-full shrink-0 items-center gap-4 border-t px-6 py-5">
-          <div className="min-w-0 flex-1">
+        <div className="flex w-full shrink-0 flex-col gap-3 border-t px-6 py-5 sm:flex-row sm:items-center sm:gap-4">
+          <div className="min-w-0 sm:flex-1">
             <OfferEffortLine offerId={offer.id} />
           </div>
-          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <Button variant="outline" size="lg" asChild>
               <Link
                 href={`/offers?highlight=${offer.id}`}

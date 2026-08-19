@@ -387,9 +387,11 @@ export const campaignCardPnlLabel =
 export const campaignCardNextAction = "mt-1.5 text-[13px] text-primary-text/90";
 export const campaignCardDetailsLabel =
   "shrink-0 text-[13px] font-semibold tracking-wide text-foreground";
-/** Single-line ellipsis — collapsed Details rows must not mid-crop words. */
+/** Collapsed Details preview: one line, as much as fits, then ellipsis. */
 export const campaignCardDetailsSummary =
   "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-normal text-muted-foreground";
+export const campaignCardDetailsToggle =
+  "flex w-full min-h-9 min-w-0 items-center gap-2 px-(--card-spacing) py-2.5 text-left transition-colors hover:bg-foreground/5";
 export const campaignCardFooterMeta = "text-[13px] text-muted-foreground";
 export const campaignCardStakeLine =
   "mt-2.25 flex flex-wrap items-baseline gap-x-1.5 text-[15px] font-semibold tabular-nums tracking-tight text-foreground";

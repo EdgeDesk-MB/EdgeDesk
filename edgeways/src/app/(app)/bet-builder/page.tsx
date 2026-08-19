@@ -47,6 +47,7 @@ import {
   campaignFbBadge,
   campaignCardDetailsLabel,
   campaignCardDetailsSummary,
+  campaignCardDetailsToggle,
   campaignCardFooterMeta,
   campaignCardHeader,
   campaignCardNextAction,
@@ -366,7 +367,7 @@ function RunCard({
         <button
           type="button"
           onClick={() => setDetailsOpen((v) => !v)}
-          className="flex w-full min-h-9 min-w-0 items-center gap-2 overflow-hidden px-(--card-spacing) py-2.5 text-left transition-colors hover:bg-foreground/5"
+          className={campaignCardDetailsToggle}
           aria-expanded={detailsOpen}
         >
           <span className={campaignCardDetailsLabel}>Details</span>
