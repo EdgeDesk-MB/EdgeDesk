@@ -9,13 +9,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent,
   type ReactNode,
 } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PressButton } from "@/components/ui/button-3d";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -24,7 +22,6 @@ import {
   formatWeightStones,
   spLabelMarksFavourite,
 } from "@/lib/racing/odds";
-import { raceFairOdds, type RunnerFairOdds } from "@/lib/racing/fair-odds";
 import {
   formatHeadgear,
   formatHorseColour,
@@ -63,7 +60,6 @@ import {
   Gift,
   Layers2,
   NotebookPen,
-  RotateCcw,
   TrendingDown,
   Zap,
 } from "lucide-react";
@@ -182,14 +178,7 @@ export interface DeskRacecardProps {
     mode: "win" | "each_way" | "extra_place" | "place_refund" | "lay",
     offerId?: number
   ) => void;
-  /** Paste real bookie odds over proxy estimates (Free tier). */
-  onOddsOverride?: (
-    raceId: string,
-    horseId: string,
-    bookieDecimal: number | null
-  ) => Promise<void>;
   /** Exchange panel colours from Settings default exchange */
-  backColor?: string;
   layColor?: string;
   /** Show movement, spread %, expanded offer intel */
   advancedMode?: boolean;
@@ -249,156 +238,6 @@ function oddsCellStyle(hex?: string): CSSProperties | undefined {
 const oddsCellClass =
   "bg-[var(--odds-cell)] text-black/85 dark:bg-[var(--odds-cell-dark)] dark:text-white/95";
 
-function BookieOddsCell({
-  runner,
-  raceId,
-  onOddsOverride,
-  backColor,
-  fairOdds,
-}: {
-  runner: RacingRunnerDetail;
-  raceId: string;
-  onOddsOverride?: DeskRacecardProps["onOddsOverride"];
-  backColor?: string;
-  fairOdds?: RunnerFairOdds | null;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const isProxy = runner.oddsSource === "proxy";
-  const isManual = runner.oddsSource === "manual" || runner.oddsOverridden;
-  const cellStyle = oddsCellStyle(backColor);
-
-  async function commit() {
-    if (!onOddsOverride) {
-      setEditing(false);
-      return;
-    }
-    const trimmed = draft.trim();
-    setSaving(true);
-    try {
-      if (!trimmed) {
-        await onOddsOverride(raceId, runner.horseId, null);
-      } else {
-        const n = parseFloat(trimmed);
-        if (!Number.isFinite(n) || n <= 1) {
-          setEditing(false);
-          return;
-        }
-        await onOddsOverride(raceId, runner.horseId, n);
-      }
-    } finally {
-      setSaving(false);
-      setEditing(false);
-    }
-  }
-
-  async function clearOverride(e: MouseEvent) {
-    e.stopPropagation();
-    if (!onOddsOverride || !isManual) return;
-    setSaving(true);
-    try {
-      await onOddsOverride(raceId, runner.horseId, null);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (editing && onOddsOverride) {
-    return (
-      <td className={cn("w-[4.5rem] px-1 py-1.5 text-right", cellStyle && oddsCellClass)} style={cellStyle}>
-        <Input
-          autoFocus
-          type="text"
-          inputMode="decimal"
-          className="h-7 w-14 px-1 text-right text-xs tabular-nums"
-          value={draft}
-          disabled={saving}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void commit()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void commit();
-            if (e.key === "Escape") setEditing(false);
-          }}
-          aria-label={`Override bookie odds for ${runner.name}`}
-        />
-      </td>
-    );
-  }
-
-  return (
-    <td
-      className={cn("w-[4.5rem] px-1.5 py-2.5 text-right", cellStyle && oddsCellClass)}
-      style={cellStyle}
-    >
-      <div className="flex items-start justify-end gap-0.5">
-        <button
-          type="button"
-          className={cn(
-            "min-w-0 flex-1 text-right",
-            onOddsOverride && "cursor-text rounded hover:bg-black/5 dark:hover:bg-white/10"
-          )}
-          title={
-            onOddsOverride
-              ? isManual
-                ? "Click to edit · empty or reset clears override"
-                : "Click to paste real bookie odds"
-              : undefined
-          }
-          disabled={!onOddsOverride}
-          onClick={() => {
-            if (!onOddsOverride) return;
-            setDraft(
-              runner.bookieDecimal != null && runner.bookieDecimal > 1
-                ? String(runner.bookieDecimal)
-                : ""
-            );
-            setEditing(true);
-          }}
-        >
-          <div className="flex items-center justify-end gap-0.5 font-bold tabular-nums">
-            <PriceMovementArrow movement={runner.movement} />
-            {formatDecimalOdds(runner.bookieDecimal)}
-          </div>
-          {isManual ? (
-            <div className="text-[11px] font-medium text-sky-700 dark:text-sky-300">manual</div>
-          ) : isProxy ? (
-            <div className="text-[11px] text-amber-700/90 dark:text-amber-300">est.</div>
-          ) : runner.bookieDecimal == null && onOddsOverride ? (
-            <div className="text-[11px] text-muted-foreground">paste</div>
-          ) : null}
-          {fairOdds != null && runner.bookieDecimal != null && !runner.nonRunner && (
-            <div
-              className={cn(
-                "text-[11px] tabular-nums",
-                fairOdds.overPct > 0
-                  ? "font-medium text-emerald-600 dark:text-emerald-400"
-                  : "text-muted-foreground/70"
-              )}
-              title={`Fair odds: ${fairOdds.fair.toFixed(2)} · ${fairOdds.overPct > 0 ? "above" : "below"} fair`}
-            >
-              {fairOdds.overPct > 0 ? "+" : ""}
-              {fairOdds.overPct.toFixed(1)}%
-            </div>
-          )}
-        </button>
-        {isManual && onOddsOverride && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-sky-700 hover:text-sky-900 dark:text-sky-300"
-            title="Reset to API / proxy odds"
-            disabled={saving}
-            onClick={(e) => void clearOverride(e)}
-          >
-            <RotateCcw className="size-3" />
-          </Button>
-        )}
-      </div>
-    </td>
-  );
-}
 
 /** One contiguous free-bet place run (merged when offers overlap/adjoin). */
 type FreeBetPlaceRail = {
@@ -420,11 +259,8 @@ function RunnerRow({
   bookiePlaces,
   exchangePlaces,
   onBet,
-  onOddsOverride,
-  backColor,
   layColor,
   advancedMode = false,
-  fairOdds,
   isRecommended,
   resultMode = false,
   hideOffers = false,
@@ -439,11 +275,8 @@ function RunnerRow({
   bookiePlaces: number;
   exchangePlaces: number;
   onBet: DeskRacecardProps["onBet"];
-  onOddsOverride?: DeskRacecardProps["onOddsOverride"];
-  backColor?: string;
   layColor?: string;
   advancedMode: boolean;
-  fairOdds?: RunnerFairOdds | null;
   /** Offer Edge recommended runner for this race. */
   isRecommended?: boolean;
   /** Finished race with placings — finish-order result columns. */
@@ -657,16 +490,9 @@ function RunnerRow({
         </>
       ) : (
         <>
-          <BookieOddsCell
-            runner={runner}
-            raceId={race.externalId}
-            onOddsOverride={onOddsOverride}
-            backColor={backColor}
-            fairOdds={fairOdds}
-          />
           <td
             className={cn(
-              "hidden w-20 px-2 py-2.5 text-right sm:table-cell",
+              "w-20 px-2 py-2.5 text-right",
               layStyle && oddsCellClass
             )}
             style={layStyle}
@@ -774,8 +600,6 @@ export function DeskRacecard({
   onTrack,
   onUntrack,
   onBet,
-  onOddsOverride,
-  backColor,
   layColor,
   advancedMode = false,
   onAdvancedModeChange,
@@ -953,11 +777,6 @@ export function DeskRacecard({
       window.removeEventListener("resize", measureFreeBetLabels);
     };
   }, [freeBetZone, measureFreeBetLabels, sortedRunners]);
-
-  const fairOddsMap = useMemo(
-    () => (selected ? raceFairOdds(selected.runners) : null),
-    [selected]
-  );
 
   if (!selected) {
     return (
@@ -1156,12 +975,6 @@ export function DeskRacecard({
             <span>
               {selected.fieldSize} runners · {selected.standardPlaces} places
             </span>
-            {selected.oddsSource === "proxy" && (
-              <span className="text-amber-600 dark:text-amber-400">Est. bookie (OFR)</span>
-            )}
-            {selected.oddsSource === "manual" && (
-              <span className="text-sky-600 dark:text-sky-400">Manual bookie odds</span>
-            )}
             {(selected.liveLayCount ?? 0) > 0 ? (
               <span className="text-emerald-600 dark:text-emerald-400">
                 Betfair lays · {selected.liveLayCount}/{selected.runners.filter((r) => !r.nonRunner).length}
@@ -1336,8 +1149,7 @@ export function DeskRacecard({
                       </>
                     ) : (
                       <>
-                        <th className="px-2 py-2 text-right">Bookie</th>
-                        <th className="hidden px-2 py-2 text-right sm:table-cell">Exchange</th>
+                        <th className="px-2 py-2 text-right">Exchange</th>
                         <th className={cn("px-2 py-2 text-right", !advancedMode && "hidden")}>Move</th>
                         <th
                           className={cn(
@@ -1359,11 +1171,8 @@ export function DeskRacecard({
                       bookiePlaces={bookiePlaces}
                       exchangePlaces={exchangePlaces}
                       onBet={onBet}
-                      onOddsOverride={onOddsOverride}
-                      backColor={backColor}
                       layColor={layColor}
                       advancedMode={advancedMode}
-                      fairOdds={fairOddsMap?.get(runner.horseId) ?? null}
                       isRecommended={!hideOffers && recommendedHorseIds.has(runner.horseId)}
                       resultMode={resultMode}
                       hideOffers={hideOffers}

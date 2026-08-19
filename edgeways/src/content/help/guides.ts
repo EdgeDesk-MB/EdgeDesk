@@ -293,7 +293,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         bullets: [
           "Racecards: today and tomorrow only",
           "Auto race settlement needs Racing API Basic (Free = Set winner manually)",
-          "Bookie odds are estimates - click a price on Racing Desk to paste the real odds",
+          "The racecard shows exchange lays, not bookie prices. Take the back price from your finder or the bookie.",
           "No silks images on free racecards",
           "Steamer/drifter indicators use local snapshot polling, not premium odds history",
         ],

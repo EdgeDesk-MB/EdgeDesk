@@ -295,30 +295,6 @@ export function RacingDeskView() {
       }
     }
   }
-  const saveOddsOverride = useCallback(
-    async (raceId: string, horseId: string, bookieDecimal: number | null) => {
-      try {
-        if (bookieDecimal == null) {
-          await api(
-            `/api/racing/overrides?raceId=${encodeURIComponent(raceId)}&horseId=${encodeURIComponent(horseId)}`,
-            { method: "DELETE" }
-          );
-          toast.success("Cleared manual odds");
-        } else {
-          await api("/api/racing/overrides", {
-            method: "POST",
-            json: { raceId, horseId, bookieDecimal },
-          });
-          toast.success("Saved bookie odds");
-        }
-        await load({ soft: true });
-      } catch (e) {
-        toast.error("Could not save odds", { description: String(e) });
-      }
-    },
-    [load]
-  );
-
   useEffect(() => {
     const tick = setInterval(() => setNowTick(Date.now()), 15_000);
     return () => clearInterval(tick);
@@ -1093,8 +1069,6 @@ export function RacingDeskView() {
             onTrack={trackRace}
             onUntrack={untrackRace}
             onBet={openBetForRunner}
-            onOddsOverride={saveOddsOverride}
-            backColor={summary?.backColor ?? deskExchangeRow?.backColor}
             layColor={summary?.layColor ?? deskExchangeRow?.layColor}
             advancedMode={advancedMode}
             onAdvancedModeChange={setAdvancedMode}
