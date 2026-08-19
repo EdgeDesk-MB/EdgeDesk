@@ -55,6 +55,8 @@ describe("site surface", () => {
     expect(isPublicAssetPath("/opengraph-image-pwu6ef")).toBe(true);
     expect(isPublicAssetPath("/twitter-image-pwu6ef")).toBe(true);
     expect(isPublicAssetPath("/sw.js")).toBe(true);
+    expect(isPublicAssetPath("/robots.txt")).toBe(true);
+    expect(isPublicAssetPath("/sitemap.xml")).toBe(true);
   });
 });
 

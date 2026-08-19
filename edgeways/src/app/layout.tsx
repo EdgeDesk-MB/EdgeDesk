@@ -55,8 +55,15 @@ export const metadata: Metadata = {
   description: rootShare.description,
   // Outbound bookie/casino clicks must not send Edgeways as Referer.
   referrer: "no-referrer",
-  // Icons: src/app/icon.tsx (accent-tinted favicon from brand cookie) and
-  // src/app/apple-icon.png (static iOS home screen).
+  // Google Search wants a stable square PNG, multiple of 48px. The 32px SVG
+  // (`icon.tsx`) stays for the browser tab. Do not hash /icon-192.png.
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon", sizes: "32x32", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
     type: "website",
     locale: SHARE_LOCALE,
