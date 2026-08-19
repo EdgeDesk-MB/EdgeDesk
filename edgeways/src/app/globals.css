@@ -451,6 +451,29 @@
   --topbar-accent: oklch(0.178 0 0); /* #111111 — Login / burger */
   --topbar-accent-foreground: oklch(1 0 0); /* white — Login icon + label */
   --topbar-stripe: oklch(0.178 0 0); /* #111111 */
+  /*
+   * Tailwind `@theme` binds `--color-card` etc. on `:root`. Nested `.dark`
+   * (auth / marketing on a light html) updates `--card` but not the alias
+   * `bg-card` / Clerk’s shadcn footer actually read. Re-bind here.
+   */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
 }
 
 @layer base {
@@ -2271,12 +2294,37 @@ html[data-font="figtree"] {
     transparent
   );
   --marketing-panel-inset: #1a1a1a;
+  /*
+   * One ink face for Clerk’s card + footer. Host html stays light (desk
+   * default); Clerk shadcn maps colorBackground / footer to `--card` /
+   * `--color-card`, which otherwise stay the light :root values.
+   */
+  --card: var(--marketing-panel-inset);
+  --muted: var(--marketing-panel-inset);
+  --background: var(--marketing-panel-inset);
+  --card-foreground: var(--marketing-fg);
+  --foreground: var(--marketing-fg);
+  --muted-foreground: color-mix(in srgb, var(--marketing-fg) 65%, transparent);
+  /* Subset of the `.dark` alias re-bind: only the tokens Clerk’s card /
+   * footer read. `.dark` still carries the full set for other islands. */
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-background: var(--background);
+  --color-card-foreground: var(--card-foreground);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
   /* Light silver plate for the billing interval (light-mode button face on ink). */
   --marketing-silver-hi: oklch(0.94 0.004 95);
   --marketing-silver: oklch(0.86 0.006 95);
   --marketing-silver-face: inset 0 -1px 0 0 rgb(0 0 0 / 0.14),
     inset 0 0 0 1px rgb(0 0 0 / 0.1),
     inset 0 0.5px 0 1.5px rgb(255 255 255 / 0.85);
+}
+
+/* Clerk’s shadcn footer is a CardFooter. Pin it to the ink plate. */
+.marketing-root [data-slot="card-footer"] {
+  background-color: var(--card);
+  color: var(--muted-foreground);
 }
 
 /* Quiet wash only — yellow stays on CTA + key words, not the background. */
