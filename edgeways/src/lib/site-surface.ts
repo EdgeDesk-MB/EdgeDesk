@@ -38,6 +38,7 @@ export function isWaitlistAllowedPath(pathname: string): boolean {
   if (pathname === WAITLIST_API_PREFIX || pathname.startsWith(`${WAITLIST_API_PREFIX}/`)) {
     return true;
   }
+  if (pathname === "/api/health") return true;
   return false;
 }
 

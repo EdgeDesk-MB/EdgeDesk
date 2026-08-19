@@ -25,6 +25,7 @@ describe("site surface", () => {
     expect(isWaitlistAllowedPath("/refund")).toBe(true);
     expect(isWaitlistAllowedPath("/terms")).toBe(true);
     expect(isWaitlistAllowedPath("/privacy")).toBe(true);
+    expect(isWaitlistAllowedPath("/api/health")).toBe(true);
   });
 
   it("blocks desk routes", () => {
