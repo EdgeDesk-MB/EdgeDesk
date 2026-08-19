@@ -210,7 +210,7 @@ When bumping micro labels, bump sibling lock-up icons (`size-2.5` → `size-3`) 
 
 ## Stat strips
 
-**`StatStrip`** + **`StatTile`** (`src/components/layout/stat-strip.tsx`) - 2–5 column grid of compact metric tiles. Used on Dashboard, Racing Desk, Tracker.
+**`StatStrip`** + **`StatTile`** (`src/components/layout/stat-strip.tsx`) - 2–5 column grid of compact metric tiles. Used on Dashboard, Racing Desk, Tracker. Racing Desk **Racing P&L today** puts the race breakdown on the left and the day chart on the right from `lg` up (chart stays first on a phone).
 
 **Density.** `px-4 py-4`, fixed three-row stack (label / value / sub — sub slot always reserved). Label and sub: `text-[11px]` uppercase / muted; value: `text-2xl` bold tabular.
 

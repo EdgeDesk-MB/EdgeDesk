@@ -132,8 +132,13 @@ export function RacingPnlTodayView({
   const showChart = rows.length >= CHART_MIN_RACES && chart != null;
 
   return (
-    <div className={sectionStack}>
-      <Card className={deskCardShell}>
+    <div
+      className={cn(
+        sectionStack,
+        "lg:grid lg:grid-cols-2 lg:items-start lg:gap-[var(--layout-stack-gap)]"
+      )}
+    >
+      <Card className={cn(deskCardShell, "order-1 min-w-0 lg:order-2")}>
         <CardHeader className="gap-2 pb-0">
           <CardTitle className="text-base">Day P&L</CardTitle>
           <CardDescription compact>
@@ -194,7 +199,7 @@ export function RacingPnlTodayView({
               compact
               icon={ChartNoAxesCombined}
               title="Chart needs two races"
-              description="One race is on the board, so there is nothing to plot yet. The day chart appears once two races have racing P&L. The breakdown below still shows this race."
+              description="One race is on the board, so there is nothing to plot yet. The day chart appears once two races have racing P&L. The breakdown still shows this race."
               className="shadow-none"
             />
           )}
@@ -209,7 +214,7 @@ export function RacingPnlTodayView({
         </CardContent>
       </Card>
 
-      <div className="flex flex-col gap-3">
+      <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
         <h3 className={sectionTitle}>P&L breakdown</h3>
         <p className={sectionDescription}>
           By race, in off-time order. Same race-day attribution as the summary tile.
