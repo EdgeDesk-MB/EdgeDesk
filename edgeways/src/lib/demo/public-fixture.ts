@@ -1272,7 +1272,7 @@ export function buildPublicDemoState(
     exchangeName: "Betfair",
     exchangeStatus: {
       provider: "betfair",
-      status: view === "edge" ? "ok" : "not_configured",
+      status: view === "edge" ? "connected" : "not_configured",
     },
     exchangeProviders: [],
     racingAutopilot: [],

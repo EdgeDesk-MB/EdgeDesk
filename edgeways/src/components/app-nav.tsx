@@ -258,8 +258,7 @@ const navGroups: NavGroup[] = entries.filter((e): e is NavGroup => e.kind === "g
  * Flat main-nav list for the command palette - derived from the sections so
  * the navigations can never drift apart.
  */
-export const flatNavLinks: Array<{ href: string; label: string; icon: NavIcon }> =
-  flattenNavEntries(entries);
+export const flatNavLinks = flattenNavEntries(entries);
 
 /** Matches quick-action (+) / calculator icons on sibling rows */
 const navTrailingSlot =
