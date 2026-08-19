@@ -37,6 +37,7 @@ describe("site surface", () => {
     expect(isWaitlistAllowedPath("/demo")).toBe(true);
     expect(isWaitlistAllowedPath("/setup")).toBe(true);
     expect(isWaitlistAllowedPath("/api/demo/state")).toBe(true);
+    expect(isWaitlistAllowedPath("/api/health")).toBe(true);
   });
 
   it("blocks desk routes", () => {

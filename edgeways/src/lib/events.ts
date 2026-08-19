@@ -290,6 +290,25 @@ export function formatEventStatus(
 }
 
 /**
+ * Football (and other score sports) only show a score once the match is live
+ * or finished. Upcoming rows keep 0-0 or a stale API score off the desk
+ * (EDGE-56). Racing never uses this path.
+ */
+export function eventShowsScore(
+  ev: {
+    sport?: string;
+    status: string;
+    source?: string | null;
+    startTime?: number;
+  },
+  now = Date.now()
+): boolean {
+  if (ev.sport === "horse_racing" || ev.sport === "greyhounds") return false;
+  const status = effectiveEventStatus(ev, now);
+  return status === "live" || status === "finished";
+}
+
+/**
  * Display status for tracked events. API-fed football matches flip to live once
  * kickoff passes even if the score poll hasn't run yet.
  */

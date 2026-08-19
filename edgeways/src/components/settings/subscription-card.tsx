@@ -17,9 +17,19 @@ import {
   type SubscriptionAccount,
   subscriptionDetail,
 } from "@/lib/billing/subscription-view";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import { sectionDescription } from "@/lib/ui/surface-styles";
 
+const PUBLIC_DEMO_ACCOUNT: SubscriptionAccount = {
+  plan: "free",
+  billingStatus: "none",
+  trialEndsAt: null,
+  founding: false,
+  canManage: false,
+};
+
 export function SubscriptionCard() {
+  const { active: publicDemo } = usePublicDemo();
   const [account, setAccount] = useState<SubscriptionAccount | null>(null);
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -38,8 +48,13 @@ export function SubscriptionCard() {
   }
 
   useEffect(() => {
+    if (publicDemo) {
+      setFailed(false);
+      setAccount(PUBLIC_DEMO_ACCOUNT);
+      return;
+    }
     void load();
-  }, []);
+  }, [publicDemo]);
 
   async function openPortal() {
     setPending(true);
@@ -95,7 +110,11 @@ export function SubscriptionCard() {
               {billingStatusLabel(account.billingStatus)}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">{subscriptionDetail(account)}</p>
+          <p className="text-sm text-muted-foreground">
+            {publicDemo
+              ? "Public demo. Subscribe from a real account to manage billing."
+              : subscriptionDetail(account)}
+          </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {account.canManage ? (

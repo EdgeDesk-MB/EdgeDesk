@@ -76,12 +76,12 @@ Full rules: `docs/repo-layout.md`.
 
 - [x] **[EDGE-1](https://linear.app/samhayter/issue/EDGE-1)** — Cancelled 15 Aug. Not a gambling site; no pre-approval emails. Residual review risk accepted.
 - [x] **Waitlist smoke** — Join on https://edgeways.app works; thanks email delivers. Owner alert delivers to Gmail. Unsubscribe still worth one click when you next join. (Zoho `sam@` is a dead end for Resend.)
-- [ ] **[EDGE-48](https://linear.app/samhayter/issue/EDGE-48)** — Point Better Stack or UptimeRobot at `https://edgeways.app/api/health`.
-- [ ] **Domains** — Add `www.edgeways.app` in Vercel; redirect apex → www (or www → apex — pick one canonical).
-- [ ] **[EDGE-8](https://linear.app/samhayter/issue/EDGE-8)** — Read `docs/legal/gambling-licence-assessment.md`; send GC email or skip consciously; mark Done.
+- [x] **[EDGE-48](https://linear.app/samhayter/issue/EDGE-48)** — Better Stack on `https://edgeways.app/api/health`. Android On-Call push confirmed 19 Aug.
+- [x] **Domains** — Canonical is apex `https://edgeways.app`. `www` already 307s to apex (paths preserved). Do not flip to www.
+- [x] **[EDGE-8](https://linear.app/samhayter/issue/EDGE-8)** — Memo stands. GC email skipped 19 Aug. Solicitor only if a §7 trigger fires.
 - [x] **[EDGE-11](https://linear.app/samhayter/issue/EDGE-11)** — ToS draft read 16 Aug. Placeholders (entity, contact, VAT) fill at publish.
 - [x] **[EDGE-12](https://linear.app/samhayter/issue/EDGE-12)** — Privacy draft read 16 Aug. Published 17 Aug (EDGE-61).
-- [ ] **[EDGE-9](https://linear.app/samhayter/issue/EDGE-9)** — ICO fee: self-assessment 17 Aug said not due until trading starts. Retake then.
+- [ ] **[EDGE-9](https://linear.app/samhayter/issue/EDGE-9)** — ICO fee: not due until trading. Parked in Cycle 6.
 - [ ] **[EDGE-10](https://linear.app/samhayter/issue/EDGE-10)** — UK IPO trademark search (can be later this week).
 
 ### 2. Decisions (~20 min) — unblock agents

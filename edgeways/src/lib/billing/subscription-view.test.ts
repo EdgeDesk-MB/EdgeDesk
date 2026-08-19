@@ -32,6 +32,18 @@ describe("subscriptionAccountFromUser", () => {
     expect(showSubscribeActions(account)).toBe(false);
   });
 
+  it("hides Manage billing until Stripe has a customer", () => {
+    const account = subscriptionAccountFromUser({
+      plan: "edge",
+      billingStatus: "trialing",
+      trialEndsAt: 1_777_000_000_000,
+      founding: false,
+      stripeCustomerId: null,
+    });
+    expect(account.canManage).toBe(false);
+    expect(showSubscribeActions(account)).toBe(false);
+  });
+
   it("keeps Manage billing after cancel when Stripe still has the customer", () => {
     const account = subscriptionAccountFromUser({
       plan: "free",
@@ -78,6 +90,15 @@ describe("subscription copy", () => {
         canManage: true,
       })
     ).toBe("Trial ends 29 Aug 2026");
+    expect(
+      subscriptionDetail({
+        plan: "edge",
+        billingStatus: "trialing",
+        trialEndsAt: Date.UTC(2026, 7, 29, 12),
+        founding: true,
+        canManage: true,
+      })
+    ).toBe("Trial ends 29 Aug 2026. Founding rate after that.");
     expect(
       subscriptionDetail({
         plan: "edge",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countLiveNavEvents,
+  eventShowsScore,
   formatEventStatus,
   formatRacingEventStatus,
   formatRacingOffTime,
@@ -64,6 +65,24 @@ describe("formatRacingEventStatus", () => {
 });
 
 describe("formatEventStatus", () => {
+  it("does not print a football score before kickoff", () => {
+    expect(
+      formatEventStatus(
+        {
+          sport: "football",
+          status: "upcoming",
+          homeScore: 2,
+          awayScore: 1,
+          minute: 0,
+          source: "api",
+          startTime: NOW + 3 * 60 * 60_000,
+        },
+        null,
+        NOW
+      )
+    ).toBe("upcoming");
+  });
+
   it("uses the same Live label for racing in the tracker", () => {
     expect(
       formatEventStatus(
@@ -79,6 +98,47 @@ describe("formatEventStatus", () => {
         NOW
       )
     ).toBe("Live");
+  });
+});
+
+describe("eventShowsScore", () => {
+  it("hides a score on an upcoming football match, even if one is stored", () => {
+    expect(
+      eventShowsScore(
+        {
+          sport: "football",
+          status: "upcoming",
+          source: "api",
+          startTime: NOW + 2 * 60 * 60_000,
+        },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("shows a score once the match is live or finished", () => {
+    expect(
+      eventShowsScore(
+        {
+          sport: "football",
+          status: "live",
+          source: "api",
+          startTime: NOW - 10 * 60_000,
+        },
+        NOW
+      )
+    ).toBe(true);
+    expect(
+      eventShowsScore(
+        {
+          sport: "football",
+          status: "finished",
+          source: "api",
+          startTime: NOW - 2 * 60 * 60_000,
+        },
+        NOW
+      )
+    ).toBe(true);
   });
 });
 

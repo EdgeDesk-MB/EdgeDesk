@@ -30,7 +30,12 @@ import {
   isRaceResultIncomplete,
 } from "@/lib/racing";
 import { betRaceOutcome, type PromoAwardsByBetId } from "@/lib/bet-outcomes";
-import { effectiveEventStatus, formatEventStatus, formatRacingEventTitle } from "@/lib/events";
+import {
+  effectiveEventStatus,
+  eventShowsScore,
+  formatEventStatus,
+  formatRacingEventTitle,
+} from "@/lib/events";
 import { formatClockTime } from "@/lib/time-format";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import { SportEventBlock } from "@/components/sport-icon";
@@ -197,7 +202,7 @@ export function EventRowView({
               "Awaiting result"
             )}
           </span>
-        ) : (
+        ) : eventShowsScore(event) || isManual ? (
           <div>
             <div className="flex items-center gap-2">
               {isManual && event.status !== "finished" && (
@@ -222,6 +227,8 @@ export function EventRowView({
               </div>
             )}
           </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">–</span>
         )}
       </TableCell>
       <TableCell>

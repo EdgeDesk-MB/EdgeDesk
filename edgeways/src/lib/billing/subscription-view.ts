@@ -41,7 +41,7 @@ export function subscriptionAccountFromUser(
     billingStatus: user.billingStatus,
     trialEndsAt: user.trialEndsAt,
     founding: user.founding,
-    canManage: Boolean(user.stripeCustomerId) || user.billingStatus !== "none",
+    canManage: Boolean(user.stripeCustomerId),
   };
 }
 
@@ -73,9 +73,12 @@ export function subscriptionDateLabel(ms: number): string {
 
 export function subscriptionDetail(account: SubscriptionAccount): string {
   if (account.billingStatus === "trialing" && account.trialEndsAt) {
-    return `Trial ends ${subscriptionDateLabel(account.trialEndsAt)}`;
+    const trial = `Trial ends ${subscriptionDateLabel(account.trialEndsAt)}`;
+    return account.founding ? `${trial}. Founding rate after that.` : trial;
   }
-  if (account.billingStatus === "trialing") return "Trial is live.";
+  if (account.billingStatus === "trialing") {
+    return account.founding ? "Trial is live. Founding rate after that." : "Trial is live.";
+  }
   if (account.billingStatus === "past_due") {
     return "Update the card to keep the desk.";
   }

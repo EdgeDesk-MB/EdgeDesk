@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { effectiveEventStatus } from "@/lib/events";
+import { effectiveEventStatus, eventShowsScore } from "@/lib/events";
 import { parseRaceResults, racingEventStatusDetail } from "@/lib/racing";
 import { cn } from "@/lib/utils";
 import { Radio } from "lucide-react";
@@ -83,9 +83,15 @@ export function LiveEventStatusPanel({
           {event.minute}&apos;
         </Badge>
       )}
-      <div className={cn("font-semibold tabular-nums", compact ? "text-sm" : "text-base")}>
-        {event.homeScore ?? 0}–{event.awayScore ?? 0}
-      </div>
+      {eventShowsScore(event) ? (
+        <div className={cn("font-semibold tabular-nums", compact ? "text-sm" : "text-base")}>
+          {event.homeScore ?? 0}–{event.awayScore ?? 0}
+        </div>
+      ) : (
+        <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>
+          Upcoming
+        </span>
+      )}
     </div>
   );
 }
@@ -97,6 +103,7 @@ export function liveEventInlineLabel(event: LiveEventLike): string {
     if (raceResult) return `Result · won by ${raceResult.winner}`;
     return `Off · ${racingEventStatusDetail(event.goals).toLowerCase()}`;
   }
+  if (!eventShowsScore(event)) return "Upcoming";
   const min = event.minute ? ` (${event.minute}')` : "";
   return `Live · ${event.homeScore ?? 0}-${event.awayScore ?? 0}${min}`;
 }

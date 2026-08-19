@@ -9,7 +9,7 @@ export const HERO_LEAD =
 export const HERO_SHARE_LINE = "One desk for the day. No more faff.";
 
 export const HOW_IT_HELPS_LEAD =
-  "Matchers help you find bets. Edgeways helps you run them, then shows what paid. We do not send bookie offers. Use a finder, or your own research. Less tab-hopping. Fewer missed steps.";
+  "Matchers help you find bets. Edgeways helps you run them, then shows what paid. We supplement finders, we do not replace them. We do not send bookie offers. Less tab-hopping. Fewer missed steps.";
 
 export const POSITIONING_FAQ = [
   {
@@ -22,10 +22,10 @@ export const POSITIONING_FAQ = [
   },
   {
     q: "Do you send me bookie offers?",
-    a: "No. We do not supply bookmaker offers or a live offer calendar. Use a finder such as Oddsmonkey or Outplayed, or your own research. Edgeways organises the work once you have it.",
+    a: "No. We organise offers you already have. Use a finder such as Oddsmonkey or Outplayed, or your own research. Edgeways runs the day.",
   },
   {
     q: "I'm new to matched betting. Is this for me?",
-    a: "Only if you already have a source of offers. This is a desk for people who have outgrown spreadsheets, not a training feed of bets to place.",
+    a: "You can use the calculators. The desk is built for people already matching bets who have outgrown spreadsheets. You still need your own source of offers.",
   },
 ] as const;
