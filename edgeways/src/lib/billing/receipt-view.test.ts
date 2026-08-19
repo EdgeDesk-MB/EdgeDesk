@@ -67,6 +67,23 @@ describe("subscribe receipt", () => {
     expect(receipt!.nextCharge).toBe("£24.99/mo");
   });
 
+  it("shows founding next charge after the trial, not Edge list", () => {
+    const trialEnd = Date.UTC(2026, 7, 30) / 1000;
+    const receipt = buildSubscribeReceipt({
+      id: "cs_test_founding",
+      amount_total: 0,
+      created: Date.UTC(2026, 7, 16) / 1000,
+      metadata: { plan: "edge", interval: "month", founding: "true" },
+      subscription: { trial_end: trialEnd, current_period_end: trialEnd },
+    });
+    expect(receipt).not.toBeNull();
+    expect(receipt!.nextCharge).toBe("£9.99/mo");
+    expect(receipt!.nextChargeOn).toBe("30 Aug 2026");
+    expect(receipt!.trialNote).toBe(
+      "14 days of Edge, then founding rate for 3 months"
+    );
+  });
+
   it("prints the Stripe first-charge calendar date when the subscription is expanded", () => {
     const trialEnd = Date.UTC(2026, 7, 30) / 1000;
     const receipt = buildSubscribeReceipt({

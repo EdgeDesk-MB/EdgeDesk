@@ -45,12 +45,14 @@ export function buildSubscriptionCheckoutParams(input: {
   cancelUrl: string;
   customerId?: string;
   customerEmail?: string | null;
+  founding?: boolean;
 }): Stripe.Checkout.SessionCreateParams {
   const trialDays = trialPeriodDaysForCheckout(input.plan);
   const metadata = {
     clerkUserId: input.clerkUserId,
     plan: input.plan,
     interval: input.interval,
+    ...(input.founding ? { founding: "true" } : {}),
   };
 
   const params: Stripe.Checkout.SessionCreateParams = {

@@ -54,6 +54,26 @@ describe("checkout session", () => {
     expect(core.customer_email).toBeUndefined();
   });
 
+  it("marks invite founding on Edge monthly metadata", () => {
+    const session = buildSubscriptionCheckoutParams({
+      priceId: "price_founding",
+      plan: "edge",
+      interval: "month",
+      clerkUserId: "user_1",
+      successUrl: "https://edgeways.app/subscribe/success",
+      cancelUrl: "https://edgeways.app/#pricing",
+      founding: true,
+    });
+    expect(session.metadata).toEqual({
+      clerkUserId: "user_1",
+      plan: "edge",
+      interval: "month",
+      founding: "true",
+    });
+    expect(session.subscription_data?.metadata).toEqual(session.metadata);
+    expect(session.line_items).toEqual([{ price: "price_founding", quantity: 1 }]);
+  });
+
   it("sends paid sign-ups to subscribe, Free to live setup", () => {
     expect(signUpRedirectForPlan("edge", "year")).toBe(
       "/subscribe?plan=edge&interval=year"

@@ -17,7 +17,8 @@ tier. Paying still does **not** lock desk features (EDGE-22).
 [EDGE-4](https://linear.app/samhayter/issue/EDGE-4) user path is in: hosted
 Stripe Checkout, still thermal slip on `/subscribe/success`, Customer Portal
 (cancel, invoices, payment method), **Set up the desk** → `/setup`.
-Leftovers: portal upgrade/downgrade products, Founding schedule after trial.
+Test portal now lets people switch Core↔Edge (list prices only). Waitlist
+emails get Founding on Edge monthly. Live Stripe still has no products.
 
 [EDGE-5](https://linear.app/samhayter/issue/EDGE-5) is **done** locally:
 `/api/billing/webhook` wrote `edge` / `trialing` onto Neon `app_users`.
@@ -102,7 +103,7 @@ Do **not** run A + full Neon cutover + billing in the same day.
 
 ### 4. Later M2 (Sep–Oct)
 
-- Finish EDGE-4 leftovers (portal upgrade/downgrade, Founding schedule)
+- Finish EDGE-4 leftovers (copy live catalogue + portal)
 - Onboarding v2 (EDGE-62 profile + target slider) + empty-desk welcome (EDGE-63)
   + [EDGE-33](https://linear.app/samhayter/issue/EDGE-33) stranger test
 - Landing honesty (EDGE-64), receipt first-charge date (EDGE-65), `/contact` +

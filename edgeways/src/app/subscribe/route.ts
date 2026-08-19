@@ -7,16 +7,22 @@ import {
   parsePaidCheckout,
   subscribeSuccessHref,
 } from "@/lib/billing/checkout-session";
+import {
+  foundingCheckoutPriceId,
+  parseFoundingCheckout,
+} from "@/lib/billing/founding-schedule";
 import { requestOrigin } from "@/lib/billing/request-origin";
 import { getStripe } from "@/lib/billing/stripe-server";
 import { publicCatalogueReady } from "@/lib/billing/stripe-prices";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { isWaitlistFoundingEligible } from "@/lib/services/waitlist";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = parseCheckoutFrom(url.searchParams.get("from"));
+  const queryFounding = parseFoundingCheckout(url.searchParams.get("founding"));
   const paid = parsePaidCheckout(
     url.searchParams.get("plan"),
     url.searchParams.get("interval") ?? "month"
@@ -31,6 +37,7 @@ export async function GET(request: Request) {
     signUp.searchParams.set("plan", paid.plan);
     signUp.searchParams.set("interval", paid.interval);
     if (from) signUp.searchParams.set("from", from);
+    if (queryFounding) signUp.searchParams.set("founding", "1");
     return NextResponse.redirect(signUp);
   }
 
@@ -41,19 +48,33 @@ export async function GET(request: Request) {
     );
   }
 
-  const priceId = checkoutPriceId(paid.plan, paid.interval);
+  const user = await currentUser();
+  const email =
+    user?.primaryEmailAddress?.emailAddress ??
+    user?.emailAddresses[0]?.emailAddress ??
+    null;
+  const onWaitlist = email ? await isWaitlistFoundingEligible(email) : false;
+  const foundingRequested = queryFounding || onWaitlist;
+
+  const foundingPriceId = foundingCheckoutPriceId(
+    paid.plan,
+    paid.interval,
+    foundingRequested
+  );
+  const founding = Boolean(foundingPriceId);
+  if (foundingRequested && !foundingPriceId && paid.plan === "edge" && paid.interval === "month") {
+    return NextResponse.json(
+      { error: "Founding is not priced yet." },
+      { status: 503 }
+    );
+  }
+  const priceId = foundingPriceId ?? checkoutPriceId(paid.plan, paid.interval);
   if (!priceId) {
     return NextResponse.json(
       { error: "That plan is not priced yet." },
       { status: 503 }
     );
   }
-
-  const user = await currentUser();
-  const email =
-    user?.primaryEmailAddress?.emailAddress ??
-    user?.emailAddresses[0]?.emailAddress ??
-    null;
 
   try {
     const origin = requestOrigin(request);
@@ -77,6 +98,7 @@ export async function GET(request: Request) {
         clerkUserId: userId,
         customerId,
         customerEmail: customerId ? null : email,
+        founding,
         successUrl: `${origin}${subscribeSuccessHref(paid.plan, paid.interval, undefined, from)}`,
         cancelUrl: `${origin}/#pricing`,
       })

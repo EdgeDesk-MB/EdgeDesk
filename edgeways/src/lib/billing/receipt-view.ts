@@ -4,13 +4,14 @@ import {
   TRIAL_DAYS,
   type BillingInterval,
 } from "@/lib/billing/public-offer";
+import { STRIPE_PRICE_PENCE } from "@/lib/billing/stripe-prices";
 
 export type CheckoutReceiptSource = {
   id: string;
   amount_total: number | null;
   created: number;
   customer_details?: { email?: string | null } | null;
-  metadata?: { plan?: string; interval?: string } | null;
+  metadata?: { plan?: string; interval?: string; founding?: string } | null;
   subscription?:
     | string
     | {
@@ -90,15 +91,19 @@ export function buildReceiptFromOffer(
     created?: number;
     amountTotal?: number | null;
     nextChargeUnix?: number | null;
+    founding?: boolean;
   }
 ): SubscribeReceiptView {
   const plan = PUBLIC_PLANS.find((row) => row.id === planId);
   const yearly = interval === "year";
-  const nextPence = plan
-    ? yearly
-      ? plan.annualPence
-      : plan.monthlyPence
-    : null;
+  const founding = extras?.founding === true && planId === "edge" && !yearly;
+  const nextPence = founding
+    ? STRIPE_PRICE_PENCE.edge_founding_month
+    : plan
+      ? yearly
+        ? plan.annualPence
+        : plan.monthlyPence
+      : null;
   const paidTodayPence =
     extras?.amountTotal != null
       ? extras.amountTotal
@@ -107,7 +112,9 @@ export function buildReceiptFromOffer(
         : (nextPence ?? 0);
   const trial = planId === "edge" && paidTodayPence === 0;
   const trialNote = trial
-    ? `${TRIAL_DAYS} days of Edge, then list price`
+    ? founding
+      ? `${TRIAL_DAYS} days of Edge, then founding rate for 3 months`
+      : `${TRIAL_DAYS} days of Edge, then list price`
     : null;
 
   return {
@@ -144,5 +151,6 @@ export function buildSubscribeReceipt(
     created: session.created,
     amountTotal: session.amount_total,
     nextChargeUnix: nextChargeUnixSeconds(session.subscription),
+    founding: session.metadata?.founding === "true",
   });
 }

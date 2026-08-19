@@ -5,6 +5,7 @@ import {
   entitlementFromSubscription,
   sourceFromStripeSubscription,
 } from "@/lib/billing/entitlement-from-stripe";
+import { attachFoundingScheduleIfNeeded } from "@/lib/billing/founding-schedule";
 import { getStripe } from "@/lib/billing/stripe-server";
 import {
   applyAppUserEntitlement,
@@ -46,6 +47,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     clerkUserId,
     email: session.customer_details?.email,
   });
+  try {
+    await attachFoundingScheduleIfNeeded(
+      getStripe(),
+      subscription,
+      session.metadata
+    );
+  } catch (error) {
+    console.error("[billing/webhook] founding schedule", error);
+  }
 }
 
 export async function applyStripeSubscription(

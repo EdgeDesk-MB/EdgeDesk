@@ -3,6 +3,7 @@ import {
   buildWaitlistThanksEmail,
   confirmWaitlist,
   isValidWaitlistEmail,
+  isWaitlistFoundingEligible,
   joinWaitlist,
   normaliseWaitlistEmail,
   unsubscribeWaitlist,
@@ -48,6 +49,11 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
     expect(row?.confirmedAt).toBeTypeOf("number");
     expect(row?.unsubscribedAt).toBeNull();
     expect(row?.confirmTokenHash).toBeTruthy();
+    expect(await isWaitlistFoundingEligible(email)).toBe(true);
+    expect(await isWaitlistFoundingEligible(` ${email.toUpperCase()} `)).toBe(
+      true
+    );
+    expect(await isWaitlistFoundingEligible("nobody@example.com")).toBe(false);
 
     expect(await confirmWaitlist("not-a-real-token")).toEqual({
       status: "invalid_token",
@@ -88,6 +94,7 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
       .where(eq(waitlistSignups.email, email))
       .get();
     expect(after?.unsubscribedAt).toBeTypeOf("number");
+    expect(await isWaitlistFoundingEligible(email)).toBe(false);
 
     expect(await unsubscribeWaitlist(token)).toEqual({
       status: "already_unsubscribed",

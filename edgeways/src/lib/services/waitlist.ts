@@ -28,6 +28,16 @@ export function isValidWaitlistEmail(email: string): boolean {
   return email.length <= 200 && EMAIL_RE.test(email);
 }
 
+/** Confirmed waitlist address, still subscribed. That is the Founding cutoff. */
+export async function isWaitlistFoundingEligible(
+  rawEmail: string
+): Promise<boolean> {
+  const email = normaliseWaitlistEmail(rawEmail);
+  if (!isValidWaitlistEmail(email)) return false;
+  const row = await findWaitlistByEmail(email);
+  return row?.confirmedAt != null && row.unsubscribedAt == null;
+}
+
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }

@@ -46,9 +46,10 @@ thanks mail, beta invite, and a small in-app note.
 **Term:** after the 14-day Edge trial, **three months of Edge billed at Core
 price (£9.99/mo)**, then Edge at £24.99/mo.
 
-**Who:** accounts created before a cut-off we set when beta opens (waitlist
-email, invite, or first N). Core-only founders stay on Core at list. We are
-not giving Core away.
+**Who:** confirmed waitlist emails (still subscribed). Match the Clerk account
+email at Checkout. Empty waitlist at launch is fine: Founding simply does not
+apply. `?founding=1` stays as a test/invite override. Core-only founders stay
+on Core at list. We are not giving Core away.
 
 **Do not:** lifetime discount, “free until launch”, or stack this with a
 sitewide £9.99 first month on every plan.
@@ -74,7 +75,7 @@ In-app product feedback (already files to Linear). Not public reviews.
 |--------|-------------------------|
 | EDGE-21 | Launch landing **variant** (waitlist `/` stays default). Login CTA. Comparison table of the **public** offer. Subscribe now hits `/subscribe` (EDGE-4). |
 | EDGE-3 | Catalogue: Free, Core monthly/annual, Edge monthly/annual, 14-day Edge trial, Founding Edge-at-Core for 3 months. **Done 15 Aug 2026** in Stripe test mode (see below). |
-| EDGE-4 | Hosted Checkout + still thermal slip + portal (cancel / invoices / card). User path dogfooded 15 Aug. Leftovers: portal upgrade/downgrade, Founding schedule. |
+| EDGE-4 | Hosted Checkout + still thermal slip + portal (cancel / invoices / card / Core↔Edge). Waitlist email gets Founding on Edge monthly. Live catalogue still empty. |
 | EDGE-5 | Webhooks write tier + trial/founding window onto `app_users`. **Done locally 15 Aug.** |
 | EDGE-58 | Settings → Subscription: plan, trial, **Manage billing** (Stripe portal). Go-live must. Clerk is identity only. |
 | EDGE-22 | Desk reads Neon tier (including trial = Edge, Founding = Edge). Settings preview is not the live gate. |
@@ -108,10 +109,12 @@ Do not look for a Trial product in the Stripe catalogue. Price-level trials are
 deprecated and Checkout ignores them.
 
 Customer Portal (test): `bpc_1U4fynCOWjjJHXGspM7CqwNq` (cancel at period end,
-invoices, payment method, name/email). Upgrade/downgrade products are still off
-(EDGE-4 leftover).
-Founding price exists for EDGE-4/5 to attach after trial; switching to list after
-3 months is a subscription schedule, not a public sale.
+invoices, payment method, name/email). Upgrade/downgrade is on: Core and Edge
+list prices only (month/year). Founding is not in the portal catalogue.
+Downgrades and year→month wait until period end. Quantity is locked.
+Waitlist Founding: if the signed-in email is on the confirmed waitlist,
+`/subscribe?plan=edge&interval=month` uses the founding price, 14-day trial,
+then a 3-month schedule, then Edge list. `?founding=1` is a test override.
 
 | Slot | Product | Lookup key | Amount | Price ID |
 |------|---------|------------|--------|----------|
