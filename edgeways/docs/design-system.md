@@ -251,6 +251,10 @@ From `src/lib/ui/surface-styles.ts`:
 </PageShell>
 ```
 
+## Auth canvas
+
+`/login` and `/sign-up` (`(auth)/layout`) are pinned dark, same idea as marketing: ink plate, brand yellow CTA, Clerk card as one dark face. Do not follow the desk Light/Dark toggle. Clerk’s shadcn theme maps the footer to host `--card` / `--color-card`. Tailwind `@theme` binds those aliases on `:root` (light). Nested `.dark` must re-bind `--color-card` / `--color-muted` (see `.dark` and `.marketing-root` in `globals.css`) or the footer is a white band with light type. `EDGEWAYS_CLERK_APPEARANCE` paints the card and footer on that ink plate.
+
 ## Marketing canvas
 
 Waitlist / launch pages live on `.marketing-root` (`--marketing-brand` yellow, `--marketing-ink`, `--marketing-band` / `--marketing-band-deep`). They pin `--edge` / `--edge-foreground` to the **dark-theme** Offer Edge plate so tags read on ink and do not follow the user’s desk accent. Shared FAQ and How-it-helps copy lives in `src/lib/marketing/landing-faq.ts`: we supplement finders, we do not send bookie offers, and the public offer stays Free / Core / Edge.
