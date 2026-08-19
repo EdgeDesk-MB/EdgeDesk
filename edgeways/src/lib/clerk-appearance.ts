@@ -1,4 +1,4 @@
-import { shadcn } from "@clerk/ui/themes";
+import { dark, shadcn } from "@clerk/ui/themes";
 
 /** Copy overrides so Clerk never falls back to “My Application”. */
 export const EDGEWAYS_CLERK_LOCALIZATION = {
@@ -17,51 +17,58 @@ export const EDGEWAYS_CLERK_LOCALIZATION = {
 };
 
 /**
+ * Marketing plate literals. Clerk applies `variables` against `html`, which
+ * stays desk-light (`defaultTheme="light"`). Do not use `var(--card)` or
+ * `--marketing-*` here: those resolve to the light :root on production.
+ * Same paints as `--marketing-brand` / `--marketing-panel-inset` / `--marketing-fg`.
+ */
+const MARKETING_BRAND = "#FFC71E";
+const MARKETING_INK = "#111111";
+const MARKETING_PANEL = "#1a1a1a";
+const MARKETING_FG = "#f5f5f0";
+
+/**
  * Edgeways ink + brand yellow — shared by ClerkProvider and auth pages.
- * Auth is pinned dark (see `(auth)/layout`). Do not follow the desk theme.
- * Clerk’s shadcn theme maps the footer to host `--card` / `--color-card`.
- * Those aliases are re-bound on `.dark` and `.marketing-root` in globals.css
- * so a light html does not paint a white strip under the ink card.
- * Colours come from the marketing plate (`--card`, `--marketing-brand`),
- * not the desk `--brand` toggle.
+ * `dark` after `shadcn` so Clerk chrome is not the light shadcn host theme.
+ * Auth layout is also `dark` + `scheme-dark` (see `(auth)/layout`).
  */
 export const EDGEWAYS_CLERK_APPEARANCE = {
-  theme: shadcn,
+  theme: [shadcn, dark],
   variables: {
-    colorPrimary: "var(--marketing-brand)",
-    colorPrimaryForeground: "var(--marketing-ink)",
-    colorBackground: "var(--card)",
-    colorForeground: "var(--card-foreground)",
-    colorMuted: "var(--muted)",
-    colorMutedForeground: "var(--muted-foreground)",
-    colorInput: "var(--marketing-ink)",
-    colorInputForeground: "var(--card-foreground)",
-    colorNeutral: "var(--card-foreground)",
+    colorPrimary: MARKETING_BRAND,
+    colorPrimaryForeground: MARKETING_INK,
+    colorBackground: MARKETING_PANEL,
+    colorForeground: MARKETING_FG,
+    colorMuted: MARKETING_PANEL,
+    colorMutedForeground: "rgba(245,245,240,0.65)",
+    colorInput: MARKETING_INK,
+    colorInputForeground: MARKETING_FG,
+    colorNeutral: MARKETING_FG,
     borderRadius: "0.5rem",
     fontFamily: "var(--font-sans), ui-sans-serif, system-ui, sans-serif",
   },
   elements: {
     rootBox: "mx-auto w-full max-w-[400px]",
     cardBox: "shadow-none",
-    card: "border border-white/10 bg-card shadow-none",
+    card: "border border-white/10 bg-[#1a1a1a] text-[#f5f5f0] shadow-none",
     logoBox: "mx-auto mb-3 flex justify-center",
     logoImage: "size-10",
-    headerTitle: "text-card-foreground",
-    headerSubtitle: "text-muted-foreground",
+    headerTitle: "text-[#f5f5f0]",
+    headerSubtitle: "text-[rgba(245,245,240,0.6)]",
     socialButtonsBlockButton:
-      "border border-white/15 bg-[var(--marketing-ink)] text-card-foreground hover:bg-white/5",
+      "border border-white/15 bg-[#111111] text-[#f5f5f0] hover:bg-[#222]",
     formButtonPrimary:
-      "bg-[var(--marketing-brand)] text-[var(--marketing-ink)] hover:opacity-90 font-semibold",
-    footer: "border-t border-white/10 bg-card text-muted-foreground",
-    cardFooter: "border-t border-white/10 bg-card text-muted-foreground",
-    footerActionText: "text-muted-foreground",
-    footerActionLink:
-      "text-[var(--marketing-brand)] hover:underline",
+      "bg-[#FFC71E] text-[#111111] hover:opacity-90 font-semibold",
+    footer: "border-t border-white/10 bg-[#1a1a1a] text-[rgba(245,245,240,0.65)]",
+    cardFooter:
+      "border-t border-white/10 bg-[#1a1a1a] text-[rgba(245,245,240,0.65)]",
+    footerActionText: "text-[rgba(245,245,240,0.65)]",
+    footerActionLink: "text-[#FFC71E] hover:underline",
     footerPages: "text-white/55",
-    footerPagesLink: "text-white/55 hover:text-card-foreground",
-    identityPreviewEditButton: "text-[var(--marketing-brand)]",
+    footerPagesLink: "text-white/55 hover:text-[#f5f5f0]",
+    identityPreviewEditButton: "text-[#FFC71E]",
     formFieldInput:
-      "border-white/15 bg-[var(--marketing-ink)] text-card-foreground placeholder:text-white/40",
+      "border-white/15 bg-[#111111] text-[#f5f5f0] placeholder:text-white/40",
     dividerLine: "bg-white/10",
     dividerText: "text-white/50",
   },
