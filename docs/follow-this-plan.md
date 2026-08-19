@@ -18,7 +18,8 @@ tier. Paying still does **not** lock desk features (EDGE-22).
 Stripe Checkout, still thermal slip on `/subscribe/success`, Customer Portal
 (cancel, invoices, payment method), **Set up the desk** → `/setup`.
 Test portal now lets people switch Core↔Edge (list prices only). Waitlist
-emails get Founding on Edge monthly. Live Stripe still has no products.
+emails get Founding on Edge monthly. Live catalogue exists (19 Aug). Live
+portal and Vercel Production price IDs still need Sam.
 
 [EDGE-5](https://linear.app/samhayter/issue/EDGE-5) is **done** locally:
 `/api/billing/webhook` wrote `edge` / `trialing` onto Neon `app_users`.

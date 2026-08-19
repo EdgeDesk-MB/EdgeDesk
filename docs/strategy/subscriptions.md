@@ -124,7 +124,24 @@ then a 3-month schedule, then Edge list. `?founding=1` is a test override.
 | Edge annual | `edgeways_edge` | `edge_year` | £249.90 | `price_1U4fVjCOWjjJHXGsotdJZ05Q` |
 | Edge founding monthly | `edgeways_edge` | `edge_founding_month` | £9.99 | `price_1U4fVkCOWjjJHXGsXGvcKoqq` |
 
-Env map: `edgeways/.env.example`. Recreate the same products in live mode before
-EDGE-7; do not reuse these test IDs in production.
+Env map: `edgeways/.env.example`. Local and Preview stay on these test IDs.
 
 Local pay how-to (cards, listen, URLs): `docs/stripe-test-rehearsal.md`.
+
+## Stripe live catalogue (19 Aug 2026)
+
+Account `acct_1U4fTBCOWjjJHXGs`, **livemode true**. Same product IDs and lookup
+keys as test. Price IDs are new. Do not put these in `.env.local`.
+
+| Slot | Product | Lookup key | Amount | Price ID |
+|------|---------|------------|--------|----------|
+| Core monthly | `edgeways_core` | `core_month` | £9.99 | `price_1U66r5COWjjJHXGsSS2BEYBI` |
+| Core annual | `edgeways_core` | `core_year` | £99.90 | `price_1U66r6COWjjJHXGsZbrCOCdx` |
+| Edge monthly | `edgeways_edge` | `edge_month` | £24.99 | `price_1U66r7COWjjJHXGsaS2Ni8re` |
+| Edge annual | `edgeways_edge` | `edge_year` | £249.90 | `price_1U66r8COWjjJHXGs7weU17vH` |
+| Edge founding monthly | `edgeways_edge` | `edge_founding_month` | £9.99 | `price_1U66r9COWjjJHXGsPrEen3Rt` |
+
+Live Customer Portal is still empty. Create it in the Dashboard (live mode)
+to match test: cancel at period end, Core↔Edge list prices only, quantity
+locked, downgrades at period end. Then paste `STRIPE_PORTAL_CONFIGURATION_ID`
+into Vercel Production only.
