@@ -406,8 +406,7 @@ export const userReminders = pgTable("user_reminders", {
 });
 
 /**
- * Local feedback / bug reports. Stored on-device; the UI can also open a
- * mailto so a copy can be sent to the maintainer.
+ * Hosted feedback inbox (not desk-scoped). created_at is bigint (ms).
  */
 export const feedbackReports = pgTable("feedback_reports", {
   id: serial("id").primaryKey(),
@@ -418,7 +417,7 @@ export const feedbackReports = pgTable("feedback_reports", {
   replyEmail: text("reply_email"),
   /** JSON FeedbackDiagnostics snapshot */
   diagnosticsJson: text("diagnostics_json").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
   /** Linear issue id once triaged (e.g. "EDGE-12"); null until filed */
   linearIssueId: text("linear_issue_id"),
 });
@@ -440,13 +439,21 @@ export const waitlistSignups = pgTable("waitlist_signups", {
 
 /**
  * Hosted account row keyed by Clerk user id (EDGE-20 / EDGE-47).
- * Entitlement tier lands later via billing webhooks; this table is the join key.
+ * Billing columns written by EDGE-5 webhooks. Desk locks stay EDGE-22.
  */
 export const appUsers = pgTable("app_users", {
   clerkUserId: text("clerk_user_id").primaryKey(),
   email: text("email"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+  plan: text("plan").notNull().default("free"),
+  billingStatus: text("billing_status").notNull().default("none"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  trialEndsAt: bigint("trial_ends_at", { mode: "number" }),
+  founding: integer("founding").notNull().default(0),
+  /** EDGE-62 first-run profile JSON. Not betting records. */
+  onboardingProfile: text("onboarding_profile"),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */

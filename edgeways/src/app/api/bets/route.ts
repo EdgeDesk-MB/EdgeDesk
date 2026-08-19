@@ -7,6 +7,7 @@ import { ledgerBetPlacement, ledgerFromSettledBet } from "@/lib/services/balance
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { resolveOfferForBet, resolveOfferForFreeBetUsage } from "@/lib/services/offers";
 import { linkBoostDiaryBet } from "@/lib/services/boosts";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -54,11 +55,11 @@ const createSchema = z.object({
   boostDiaryId: z.number().int().positive().optional(),
 });
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ bets: db.select().from(bets).all() });
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -157,12 +158,12 @@ export async function POST(req: NextRequest) {
   if (inserted.offerId != null) spawnCourseOfferSiblingsIfNeeded();
 
   return NextResponse.json({ bet: inserted });
-}
+});
 
 /** Remove every bet and settlement rows in the history feed. */
-export async function DELETE() {
+export const DELETE = withDeskScope(async function DELETE() {
   const all = db.select({ id: bets.id }).from(bets).all();
   db.delete(history).where(isNotNull(history.betId)).run();
   db.delete(bets).run();
   return NextResponse.json({ ok: true, deleted: all.length });
-}
+});

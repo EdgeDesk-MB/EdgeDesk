@@ -60,7 +60,7 @@ address, no hours. Messenger shows as a contact by default. That is fine.
 | Task | Do this |
 | --- | --- |
 | **Cover photo** | Still empty. The grey gradient looks unfinished. No designed 1640×624 exists yet. Temporary: ink `#111` plate with `logo-yellow.png`. Or skip until a proper cover. Do not stretch the OG card. |
-| **Feed / boost still** | Ready: `edgeways/brand/social/facebook-feed-4x5.png` (2160×2700, 4:5). Post as a **photo**, not a link share. Then boost that post. Caption: waitlist + `https://edgeways.app` + 18+. Button Sign up, not Follow. |
+| **Feed / boost still** | Ready: `edgeways/brand/social/facebook-feed-4x5.png` (2160×2700, 4:5). Hero + 2×2 homepage glimpses (Daily plan, Edge Report, Racing Desk, Alerts). Post as a **photo**, not a link share. Then boost that post. Caption: waitlist + `https://edgeways.app` + 18+. Button Sign up, not Follow. |
 | **Username / vanity URL** | Desktop, switched into the Page. Settings → Page setup → Name → Edit Username. `edgeways.app` is **not available** (tried 14 Aug 2026; likely reserved as a URL-shaped handle). Try `edgeways`, then `edgewaysapp`. Letters, numbers, and periods only. May ask for your Facebook password. |
 | **Call-to-action button** | **Sign up** → `https://edgeways.app`. Learn more if Sign up is missing. |
 | **Business Manager** | [business.facebook.com](https://business.facebook.com). Name it Edgeways. Add this Page as an asset so it is not glued to one personal login. Then Instagram professional. |
@@ -217,12 +217,58 @@ The waitlist footer already shows **X, Instagram, Facebook** as coming soon
 are the public set. Wire the `href`s once the accounts exist. Do not add
 TikTok or LinkedIn to the footer until you will actually post there.
 
-### Paid ads (later, not this week)
+### Paid ads and targeting
 
-Meta, X, and Google treat gambling-adjacent advertisers strictly. Organic
-software pages are fine. Boosted posts and ads about betting can need
-authorisation, age gates, and a claims review. Do not turn on ads until
-ASA/CAP copy has been checked (`docs/legal/gambling-licence-assessment.md` §5).
+You cannot cleanly target "matched bettors" as a Meta interest the way
+2018 ads could. That checkbox is mostly gone. OddsMonkey being live means
+**they** are an authorised advertiser, not that a new software Page skips
+review. The first paid job is: will Meta approve an ad that says matched
+betting at all.
+
+**How matched bettors actually see the ad**
+
+1. The **creative and landing page** say matched betting. Broad UK 18+
+   traffic still self-selects. This does more than any interest list.
+2. **Geo + age:** United Kingdom only. Minimum **18+**. Prefer **21+** or
+   **25+** if Meta offers it. Never under 18.
+3. **Advantage+ / broad** (Meta's current default). Let the pixel learn
+   from waitlist signups. Do not stack twenty weak interests.
+4. **If manual interests still exist**, use sport, not hustle: Premier
+   League, horse racing, football, Betfair, sports betting. Skip "make
+   money online", side hustle, crypto, payday.
+5. **Custom audiences (the real targeting):** hashed waitlist emails;
+   site visitors once a Meta pixel is on `edgeways.app`; then a lookalike
+   of those lists once you have a few hundred signups.
+6. You **cannot** target OddsMonkey users, Facebook Group members, or
+   "people who do matched betting" as a first-party list you do not own.
+
+**Do not**
+
+- Promise profit, "risk-free", or income. ASA/CAP, and a licence-adjacent
+  trigger (`docs/legal/gambling-licence-assessment.md` §5 and §7.5).
+- Use Follow as the button. Sign up → `https://edgeways.app`.
+- Boost the website OG card. Use `brand/social/facebook-feed-4x5.png`.
+- Run ads from the personal profile.
+
+**Order of spend**
+
+1. Business Manager + ad account. Submit any gambling/gaming
+   authorisation Meta asks for. Honest product line: subscription
+   software that tracks the user's own bets; never takes a wager.
+2. Meta pixel (and later CAPI) on the waitlist form. Conversion =
+   waitlist submit, not Page likes.
+3. A **£15–30/day** approval test for a few days. If rejected, appeal as
+   software, not a bookmaker. Do not rewrite the ad into "make money".
+4. Once approved: retarget visitors who did not join, then lookalikes.
+5. Google Search for "matched betting tracker / spreadsheet" is higher
+   intent than Facebook cold feed. Same claims rules. Do that when the
+   landing is the launch variant, not only a waitlist.
+
+Organic MB Facebook groups are a **post**, not an ad. One useful note
+with a link. Not daily spam.
+
+Not legal advice. A big earnings-claim push is the advertising-law
+trigger, not a Gambling Commission one.
 
 ---
 
@@ -345,6 +391,7 @@ the wrong shape for every social cover **and** for feed ads.
 | **LinkedIn cover** | **1128×191** | Very thin. Lockup left, no body copy. | Ink plate. |
 | **YouTube banner** | **2560×1440** | TV/desktop/mobile all crop differently. Keep content in the centre **1546×423**. | Park this until the channel is real. |
 | **Instagram / Facebook feed post** | **2160×2700** master (2× 1080×1350) | Type and artefact in the 4:5 frame. Footer holds 18+. | `edgeways/brand/social/facebook-feed-4x5.png`. Upload that, or the 1080 sibling. Regenerate: `node scripts/generate-facebook-feed.mjs` from `edgeways/`. |
+| **GIF / motion** | Same 4:5. Meta wants **1440×1800** for feed video. | Treat as a **video ad**, not an image ad. | GIF is allowed in the video upload (or boost a GIF post). Image ads are JPG/PNG only; a GIF there often freezes on frame one. A short silent MP4 loop is sharper than a fat GIF. |
 | **Facebook / Instagram story or Reel** | **1080×1920** (9:16) | Centre 1080×1420. | Not now. |
 | **TikTok** | Profile only. | No cover. | Parked. |
 

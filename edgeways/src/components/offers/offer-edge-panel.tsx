@@ -7,6 +7,8 @@ import {
   OfferConfidenceBadge,
   type EdgeDataSource,
 } from "@/components/offers/offer-confidence-badge";
+import { useAppState } from "@/hooks/use-app-state";
+import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatDecimalOdds } from "@/lib/racing/odds";
@@ -97,10 +99,16 @@ export function OfferEdgePanel({
   offerId: number;
   eventDate: string;
 }) {
+  const { state } = useAppState();
+  const entitled = canUseOfferEdge(state?.settings);
   const [plays, setPlays] = useState<OfferEdgePlay[] | null>(null);
   const [dataSource, setDataSource] = useState<EdgeDataSource | undefined>();
 
   useEffect(() => {
+    if (!entitled) {
+      setPlays(null);
+      return;
+    }
     let cancelled = false;
     fetchOfferEdgePlays(eventDate).then((data) => {
       if (cancelled) return;
@@ -110,7 +118,9 @@ export function OfferEdgePanel({
     return () => {
       cancelled = true;
     };
-  }, [offerId, eventDate]);
+  }, [offerId, eventDate, entitled]);
+
+  if (!entitled) return null;
 
   if (!plays || plays.length === 0) return null;
 

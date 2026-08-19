@@ -6,6 +6,7 @@ import {
   linkBoostDiaryBet,
   settleBoostDiary,
 } from "@/lib/services/boosts";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ const patchSchema = z.union([
   }),
 ]);
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const diaryId = Number(id);
   if (!Number.isFinite(diaryId)) {
@@ -42,11 +43,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
   return NextResponse.json({ entry: result.entry, bet: result.bet });
-}
+});
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const ok = deleteBoostDiary(Number(id));
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
-}
+});

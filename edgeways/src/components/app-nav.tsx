@@ -20,7 +20,9 @@ import { ThemeSelect } from "@/components/theme-select";
 import {
   brandChipCountInverse,
   captionHeading,
+  coreNavTag,
   edgeMarkerPill,
+  edgeNavTag,
   navLinkState,
   proNavTag,
 } from "@/lib/ui/surface-styles";
@@ -37,6 +39,7 @@ import {
   Grid2x2,
   History,
   Layers,
+  Lock,
   NotebookPen,
   Plus,
   Puzzle,
@@ -46,6 +49,9 @@ import {
   Zap,
   Wallet,
 } from "lucide-react";
+import { canWithPreview, requiredPlan } from "@/lib/entitlements/plans";
+import type { FeatureFlag } from "@/lib/entitlements/features";
+import { planLockCopy } from "@/lib/entitlements/nav";
 import { FootballIcon } from "@/components/sport-icon";
 import { appNavColumn } from "@/lib/ui/app-shell-layout";
 import { useAddBalance } from "@/components/add-balance-provider";
@@ -77,6 +83,8 @@ type NavLeaf = {
   href: string;
   label: string;
   icon: NavIcon;
+  /** N0 flag. Locked rows stay visible with a Core/Edge mark. */
+  feature?: FeatureFlag;
   quickAction?: "addBalance" | "addBet" | "matchedCalculator" | "trackFixture" | "boostCheck";
   livePulse?: NavLivePulseScope;
 };
@@ -94,7 +102,9 @@ type NavGroup = {
    * and /bet-builder). Defaults to [baseHref].
    */
   matchPrefixes?: string[];
-  children: Array<{ href: string; label: string; icon: NavIcon }>;
+  children: Array<{ href: string; label: string; icon: NavIcon; feature?: FeatureFlag }>;
+  /** N0 flag for the parent row (children may override). */
+  feature?: FeatureFlag;
   quickAction?: "newOffer" | "casinoLog";
 };
 
@@ -155,10 +165,11 @@ export const NAV_SECTIONS: NavSection[] = [
         /** Always open the first sub-nav item */
         href: "/offers/calendar",
         baseHref: "/offers",
+        feature: "offers_pipeline",
         quickAction: "newOffer",
         children: [
-          { href: "/offers/calendar", label: "Calendar", icon: CalendarDays },
-          { href: "/offers", label: "Campaigns", icon: Gift },
+          { href: "/offers/calendar", label: "Calendar", icon: CalendarDays, feature: "offers_pipeline" },
+          { href: "/offers", label: "Campaigns", icon: Gift, feature: "offers_pipeline" },
         ],
       },
       {
@@ -166,6 +177,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/tracker",
         label: "Profit Tracker",
         icon: NotebookPen,
+        feature: "offers_pipeline",
         quickAction: "addBet",
       },
       { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
@@ -193,7 +205,6 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Live desks",
-    pro: true,
     entries: [
       {
         kind: "link",
@@ -214,20 +225,26 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Layers,
         href: "/acca",
         baseHref: "/acca",
+        feature: "acca_desk",
         matchPrefixes: ["/acca", "/bet-builder", "/systems"],
         children: [
-          { href: "/acca", label: "Accumulator", icon: Layers },
-          { href: "/bet-builder", label: "Bet Builder", icon: Puzzle },
-          { href: "/systems", label: "Systems", icon: Grid2x2 },
+          { href: "/acca", label: "Accumulator", icon: Layers, feature: "acca_desk" },
+          { href: "/bet-builder", label: "Bet Builder", icon: Puzzle, feature: "bet_builder_desk" },
+          { href: "/systems", label: "Systems", icon: Grid2x2, feature: "systems_desk" },
         ],
       },
     ],
   },
   {
     label: "Insights",
-    pro: true,
     entries: [
-      { kind: "link", href: "/report", label: "Edge Report", icon: BarChart3 },
+      {
+        kind: "link",
+        href: "/report",
+        label: "Edge Report",
+        icon: BarChart3,
+        feature: "do_next",
+      },
     ],
   },
 ];
@@ -251,14 +268,15 @@ const navTrailingSlot =
 /** Flatten sections/groups to plain links - shared by palette and drawer. */
 export function flattenNavEntries(
   navEntries: NavEntry[]
-): Array<{ href: string; label: string; icon: NavIcon }> {
+): Array<{ href: string; label: string; icon: NavIcon; feature?: FeatureFlag }> {
   return navEntries.flatMap((entry) =>
     entry.kind === "link"
-      ? [{ href: entry.href, label: entry.label, icon: entry.icon }]
+      ? [{ href: entry.href, label: entry.label, icon: entry.icon, feature: entry.feature }]
       : entry.children.map((child) => ({
           href: child.href,
           label: `${entry.label} · ${child.label}`,
           icon: child.icon,
+          feature: child.feature ?? entry.feature,
         }))
   );
 }
@@ -292,6 +310,30 @@ export function ActionBadge({ count }: { count: number }) {
       {count > 9 ? "9+" : count}
     </span>
   );
+}
+
+export function PlanNavMark({
+  feature,
+  locked,
+}: {
+  feature: FeatureFlag;
+  locked: boolean;
+}) {
+  if (!locked) return null;
+  const plan = requiredPlan(feature);
+  return (
+    <>
+      <Lock className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+      <span className={plan === "edge" ? edgeNavTag : coreNavTag}>
+        {plan === "edge" ? "Edge" : "Core"}
+      </span>
+    </>
+  );
+}
+
+export function toastPlanLock(feature: FeatureFlag) {
+  const copy = planLockCopy(feature);
+  toast.message(copy.title, { description: copy.description });
 }
 
 /** Offer Edge race count beside Racing Desk — Edge-tier chrome (zap + count). */
@@ -564,13 +606,25 @@ export function AppNav() {
             : item.href === "/racing"
               ? racingPendingSettleCount
               : 0;
+    const locked = Boolean(
+      item.feature && !canWithPreview(state?.settings, item.feature)
+    );
 
     return (
       <div key={item.href} className="relative w-full min-w-0">
         <Link
           href={href}
           prefetch
-          className={cn(navLinkState(active), quickAction && "pr-10")}
+          aria-disabled={locked || undefined}
+          onClick={
+            locked && item.feature
+              ? (e) => {
+                  e.preventDefault();
+                  toastPlanLock(item.feature!);
+                }
+              : undefined
+          }
+          className={cn(navLinkState(active), quickAction && !locked && "pr-10")}
         >
           <Icon
             className={cn(
@@ -581,11 +635,14 @@ export function AppNav() {
           />
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate">{item.label}</span>
+            {item.feature ? (
+              <PlanNavMark feature={item.feature} locked={locked} />
+            ) : null}
             {item.href === "/racing" ? <EdgeRaceNavMark count={edgeRaceCount} /> : null}
-            <ActionBadge count={leafBadge} />
+            {!locked ? <ActionBadge count={leafBadge} /> : null}
           </span>
         </Link>
-        {quickAction && onQuickAction && (
+        {quickAction && onQuickAction && !locked ? (
           <button
             type="button"
             className={cn(
@@ -597,7 +654,7 @@ export function AppNav() {
           >
             {quickIcon}
           </button>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -629,8 +686,16 @@ export function AppNav() {
         : entry.quickAction === "casinoLog"
           ? openCasinoLog
           : undefined;
+    const locked = Boolean(
+      entry.feature && !canWithPreview(state?.settings, entry.feature)
+    );
 
     function onParentClick(e: MouseEvent<HTMLAnchorElement>) {
+      if (locked && entry.feature) {
+        e.preventDefault();
+        toastPlanLock(entry.feature);
+        return;
+      }
       if (expanded) {
         e.preventDefault();
         setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: true }));
@@ -651,16 +716,20 @@ export function AppNav() {
             href={firstChildHref}
             prefetch
             onClick={onParentClick}
-            className={cn(navLinkState(parentActive), onQuickAction && "pr-10")}
+            aria-disabled={locked || undefined}
+            className={cn(navLinkState(parentActive), onQuickAction && !locked && "pr-10")}
             aria-expanded={expanded}
           >
             <GroupIcon className="size-4 shrink-0" />
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate">{entry.label}</span>
-              {badgeCount > 0 ? <ActionBadge count={badgeCount} /> : null}
+              {entry.feature ? (
+                <PlanNavMark feature={entry.feature} locked={locked} />
+              ) : null}
+              {!locked && badgeCount > 0 ? <ActionBadge count={badgeCount} /> : null}
             </span>
           </Link>
-          {onQuickAction ? (
+          {onQuickAction && !locked ? (
             <button
               type="button"
               className={cn(
@@ -680,6 +749,10 @@ export function AppNav() {
             {entry.children.map((child) => {
               const active = isLinkActive(pathname, child.href);
               const ChildIcon = child.icon;
+              const childFeature = child.feature ?? entry.feature;
+              const childLocked = Boolean(
+                childFeature && !canWithPreview(state?.settings, childFeature)
+              );
               const childBadge =
                 child.href === "/acca"
                   ? accaLayDueCount
@@ -691,13 +764,25 @@ export function AppNav() {
                   key={child.href}
                   href={child.href}
                   prefetch
+                  aria-disabled={childLocked || undefined}
+                  onClick={
+                    childLocked && childFeature
+                      ? (e) => {
+                          e.preventDefault();
+                          toastPlanLock(childFeature);
+                        }
+                      : undefined
+                  }
                   className={cn(navLinkState(active), "py-1.5 pl-9 text-[13px]")}
                   tabIndex={expanded ? undefined : -1}
                 >
                   <ChildIcon className="size-3.5 shrink-0" />
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate">{child.label}</span>
-                    <ActionBadge count={childBadge} />
+                    {childFeature ? (
+                      <PlanNavMark feature={childFeature} locked={childLocked} />
+                    ) : null}
+                    {!childLocked ? <ActionBadge count={childBadge} /> : null}
                   </span>
                 </Link>
               );

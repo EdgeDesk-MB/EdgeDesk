@@ -9,6 +9,7 @@ import {
   TRIAL_DAYS,
   monthlyLabel,
 } from "@/lib/billing/public-offer";
+import { HERO_SHARE_LINE } from "@/lib/marketing/landing-faq";
 import type { LandingVariant } from "@/lib/site-surface";
 
 /** Apex is canonical; www redirects here. Do not use the Vercel *.vercel.app host. */
@@ -43,19 +44,19 @@ export function marketingShareCopy(variant: LandingVariant): ShareCopy {
     const coreMo = core ? monthlyLabel(core) : "£9.99/mo";
     const edgeMo = edge ? monthlyLabel(edge) : "£24.99/mo";
     return {
-      title: "Start free: matched betting without the spreadsheet pile-up",
+      title: "Start free: matched betting without the faff",
       description: `One desk for what to do next, clean execution, and what you kept. Free, Core ${coreMo}, Edge ${edgeMo}. ${TRIAL_DAYS}-day Edge trial.`,
       eyebrow: `${TRIAL_DAYS}-day Edge trial`,
-      imageLine: "One desk for the day. No spreadsheet pile-up.",
+      imageLine: HERO_SHARE_LINE,
     };
   }
 
   return {
-    title: "Join the waitlist: matched betting without the spreadsheet pile-up",
+    title: "Join the waitlist: matched betting without the faff",
     description:
       "One desk for what to do next, clean execution, and what you kept. Early access for UK matched bettors.",
     eyebrow: "Waitlist open",
-    imageLine: "One desk for the day. No spreadsheet pile-up.",
+    imageLine: HERO_SHARE_LINE,
   };
 }
 

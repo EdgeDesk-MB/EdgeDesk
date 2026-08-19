@@ -6,7 +6,7 @@ import { useNow } from "@/hooks/use-now";
 import { Button } from "@/components/ui/button";
 import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { formatRaceOffClock } from "@/lib/racing-desk/in-play";
-import { emptyStateIconWell } from "@/lib/ui/surface-styles";
+import { emptyStateCopyInset, emptyStateIconWell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export function RacingInPlayEmpty({
@@ -46,11 +46,16 @@ export function RacingInPlayEmpty({
       >
         <X className="size-3.5" />
       </Button>
-      <div className="flex flex-col items-center gap-4 px-[var(--layout-card-x)] py-10 text-center">
+      <div
+        className={cn(
+          "flex flex-col items-center gap-4 py-10 text-center",
+          emptyStateCopyInset
+        )}
+      >
         <div className={emptyStateIconWell}>
           <Timer className="size-5" aria-hidden />
         </div>
-        <div className="space-y-2">
+        <div className="w-full min-w-0 space-y-2">
           <p
             className={cn(
               "font-heading text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl",
@@ -65,7 +70,7 @@ export function RacingInPlayEmpty({
             {phaseAnnounce}
           </p>
           <p className="text-base font-semibold">Race is off</p>
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Awaiting result. If the race is delayed, show the racecard to keep working.
           </p>
         </div>

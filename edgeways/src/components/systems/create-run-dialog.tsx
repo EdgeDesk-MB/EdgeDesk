@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -318,17 +319,30 @@ export function CreateSystemRunForm({
 
   return (
     <>
-      <div className={deskRunDialogBodyClass}>
       <DialogHeader>
         <DialogTitle>{isEdit ? "Edit system bet" : "New system bet"}</DialogTitle>
-        <DialogDescription>
+        <DialogDescription
+          explainer={
+            isEdit && moneyLocked ? (
+              <DialogExplainer title="What you can edit">
+                Label, bookmaker, legs and event links. Stake and odds stay
+                locked.
+              </DialogExplainer>
+            ) : !isEdit ? (
+              <DialogExplainer title="New system bet">
+                Paste a slip to pre-fill structure, stake and selections.
+              </DialogExplainer>
+            ) : undefined
+          }
+        >
           {isEdit
             ? moneyLocked
-              ? "Label, bookmaker, leg names and event links. Unit stake and odds stay locked after results."
-              : "Update the ticket details. Structure stays as created."
-            : "Full-cover ticket for the tracker. Paste a slip to pre-fill, set stake source, link sport on each leg."}
+              ? "Stake and odds stay locked."
+              : "Update the ticket details."
+            : "Log a full-cover ticket."}
         </DialogDescription>
       </DialogHeader>
+      <div className={deskRunDialogBodyClass}>
 
       <div className="flex flex-col gap-3">
         {!isEdit ? (

@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -19,6 +20,7 @@ import {
   OfferSetReminderDialog,
 } from "@/components/offers/offer-set-reminder-dialog";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { offerExpiringAlertDedupePrefix } from "@/lib/alerts/expiring-alert-keys";
 import { quietOfferPromptToasts } from "@/lib/alerts/quiet-offer-toasts";
 import { DEFAULT_TUNING } from "@/lib/services/settings-shared";
@@ -136,12 +138,14 @@ export function OfferCampaignCard({
   } = buildCampaignDetailsContext(offer);
   const racingRules = offer.sport === "horse_racing" ? parseOfferRules(offer) : null;
   const minRunners = racingRules?.minRunners ?? null;
+  const { state: appState } = useAppState();
 
   // Offer Edge answers "which race / horse today". Future series instances stay
   // on the list for planning, but must not carry live picks (or a Today label).
   const today = localCalendarDate();
   const edgeDate = offer.eventDate ?? today;
   const showEdgePanel =
+    canUseOfferEdge(appState?.settings) &&
     racingRules != null &&
     offerHasResultTrigger(racingRules) &&
     (offer.status === "active" || offer.status === "planned") &&
@@ -709,12 +713,17 @@ function DeleteOfferDialog({
       <DialogContent mobile="center" className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Delete offer?</DialogTitle>
-          <DialogDescription>
-            This permanently removes &ldquo;{offer.title}&rdquo;.
-            {offer.betCount > 0
-              ? ` ${offer.betCount} linked bet${offer.betCount === 1 ? "" : "s"} will be unlinked but not deleted.`
-              : ""}{" "}
-            This cannot be undone.
+          <DialogDescription
+            explainer={
+              offer.betCount > 0 ? (
+                <DialogExplainer title="Linked bets">
+                  {offer.betCount} linked bet
+                  {offer.betCount === 1 ? "" : "s"} stay in the tracker.
+                </DialogExplainer>
+              ) : undefined
+            }
+          >
+            Permanently remove “{offer.title}”.
           </DialogDescription>
         </DialogHeader>
         {recurring ? (

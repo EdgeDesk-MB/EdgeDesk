@@ -74,10 +74,13 @@ describe("public offer", () => {
     const free = PUBLIC_PLANS.find((p) => p.id === "free")!;
     expect(planCheckoutHref(free, "year")).toBe("/sign-up");
     expect(planCheckoutHref(core, "month")).toBe(
-      "/sign-up?plan=core&interval=month"
+      "/subscribe?plan=core&interval=month"
     );
     expect(planCheckoutHref(core, "year")).toBe(
-      "/sign-up?plan=core&interval=year"
+      "/subscribe?plan=core&interval=year"
+    );
+    expect(planCheckoutHref(core, "month", "setup")).toBe(
+      "/subscribe?plan=core&interval=month&from=setup"
     );
   });
 

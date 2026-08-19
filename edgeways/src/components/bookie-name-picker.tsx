@@ -11,6 +11,9 @@ export function BookieNamePicker({
   persistCustom = true,
   brandColor,
   omitExistingWallets = false,
+  size = "default",
+  ariaLabel,
+  id,
 }: {
   value: string;
   onChange: (name: string) => void;
@@ -23,6 +26,9 @@ export function BookieNamePicker({
   brandColor?: string | null;
   /** Directory + custom only - hide wallets already on the account. */
   omitExistingWallets?: boolean;
+  size?: "default" | "sm";
+  ariaLabel?: string;
+  id?: string;
 }) {
   return (
     <VenueSelect
@@ -35,6 +41,9 @@ export function BookieNamePicker({
       persistCustom={persistCustom}
       brandColor={brandColor}
       omitExistingWallets={omitExistingWallets}
+      size={size}
+      ariaLabel={ariaLabel}
+      id={id}
     />
   );
 }

@@ -273,6 +273,123 @@ export function applyAccaBoost(rawCombinedOdds: number, boostPct: number | null 
   return 1 + (rawCombinedOdds - 1) * (1 + boostPct / 100);
 }
 
+export type AccaFundingMethod = "sequential" | "insurance_legs";
+
+export interface AccaLadderLeg extends AccaProfitLeg {
+  seq: number;
+  label: string;
+}
+
+export interface LiabilityLadderStep {
+  seq: number;
+  label: string;
+  kind: "cover" | "lock" | "placed";
+  layStake: number;
+  layOdds: number;
+  liability: number;
+  /** True when this lay is already logged (wallet already reserved). */
+  reserved: boolean;
+  /** True when lay odds were filled from the bookie back price. */
+  oddsProxy: boolean;
+}
+
+/**
+ * All-win path of exchange reservations still to come. Won laid legs seed
+ * prior liabilities; each pending non-void leg is sized with the same
+ * cover / final-lock rules as the desk. A busted run returns [].
+ */
+export function sequentialLiabilityLadder(input: {
+  stake: number;
+  commission: number;
+  boostPct?: number | null;
+  method: AccaFundingMethod;
+  legs: AccaLadderLeg[];
+}): LiabilityLadderStep[] {
+  const { stake, commission: c, boostPct, method, legs } = input;
+  if (!(stake > 0) || !(c >= 0 && c < 1)) return [];
+  if (legs.some((l) => l.result === "lost")) return [];
+
+  const live = [...legs].sort((a, b) => a.seq - b.seq);
+  const nonVoid = live.filter((l) => l.result !== "void");
+  const combined = applyAccaBoost(
+    nonVoid.reduce((a, l) => a * l.backOdds, 1),
+    boostPct
+  );
+  let prior = priorLayLiabilities(live);
+  const pending = nonVoid.filter((l) => l.result === "pending");
+  const steps: LiabilityLadderStep[] = [];
+
+  for (let i = 0; i < pending.length; i++) {
+    const leg = pending[i]!;
+    const isFinal = i === pending.length - 1;
+    const reserved =
+      leg.layStake != null &&
+      leg.layStake > 0 &&
+      leg.layOdds != null &&
+      leg.layOdds > 1;
+
+    if (reserved) {
+      const layStake = leg.layStake!;
+      const layOdds = leg.layOdds!;
+      const liability = roundPence(layStake * (layOdds - 1));
+      steps.push({
+        seq: leg.seq,
+        label: leg.label,
+        kind: "placed",
+        layStake,
+        layOdds,
+        liability,
+        reserved: true,
+        oddsProxy: false,
+      });
+      prior = roundPence(prior + liability);
+      continue;
+    }
+
+    const oddsProxy = !(leg.layOdds != null && leg.layOdds > 1);
+    const layOdds = oddsProxy ? leg.backOdds : leg.layOdds!;
+    if (!(layOdds > 1)) continue;
+
+    const useLock = method === "sequential" && isFinal;
+    let layStake: number | null = null;
+    let kind: "cover" | "lock" = "cover";
+    if (useLock) {
+      const lock = finalLegLockLay({
+        accaStake: stake,
+        combinedBackOdds: combined,
+        priorLiabilities: prior,
+        legLayOdds: layOdds,
+        commission: c,
+      });
+      if (!lock) continue;
+      layStake = lock.layStake;
+      kind = "lock";
+    } else {
+      layStake = nextSequentialLay({
+        accaStake: stake,
+        priorLiabilities: prior,
+        commission: c,
+      });
+      if (layStake == null) continue;
+    }
+
+    const liability = roundPence(layStake * (layOdds - 1));
+    steps.push({
+      seq: leg.seq,
+      label: leg.label,
+      kind,
+      layStake,
+      layOdds,
+      liability,
+      reserved: false,
+      oddsProxy,
+    });
+    prior = roundPence(prior + liability);
+  }
+
+  return steps;
+}
+
 const OUTCOME_EQUAL_EPS = 0.02;
 
 export type AccaMethodKind =

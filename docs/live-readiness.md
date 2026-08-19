@@ -11,11 +11,17 @@
 > `docs/hosting-and-environments.md`. Architecture decision brief:
 > `docs/decisions/d6-architecture-route.md` (EDGE-18).
 
-**Status snapshot (2026-08-12):** waitlist site live at https://edgeways.app
-(`SITE_SURFACE=waitlist`). Desk routes redirect to `/` on production. Neon
-scaffold + Vercel project Done for first cut; auth/billing still open. The D1
-gate was opened for launch-path work on 10 Aug 2026 — evidence tracked as
-Linear EDGE-36. Work is in Linear: initiative
+**Status snapshot (2026-08-16):** waitlist site live at https://edgeways.app
+(`SITE_SURFACE=waitlist`). Desk routes redirect to `/` on production. Clerk
+auth, Neon `app_users`, and Stripe test Checkout + slip are in. Webhooks write
+the tier locally (EDGE-5). Settings manage is EDGE-58. Desk locks stay EDGE-22.
+ToS/Privacy drafts exist (EDGE-11/12) but are not public pages; signup has
+18+ only. Customer-facing legal surface is EDGE-61. Oddsmonkey first-run
+research (16 Aug) is in `docs/strategy/oddsmonkey-onboarding-research.md`
+(EDGE-62…68): we take their questions, not their offer-feed funnel.
+Dedicated Oddsmonkey/Outplayed profit import is EDGE-68.
+The D1 gate was opened for launch-path work on
+10 Aug 2026 — evidence tracked as Linear EDGE-36. Work is in Linear: initiative
 **[Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c)**
 (team `Edgeways`, key `EDGE`), six projects, milestones M1 Gate-ready (6 Sep) →
 M2 Beta (4 Oct) → M3 Launch (2 Nov).
@@ -25,10 +31,12 @@ M2 Beta (4 Oct) → M3 Launch (2 Nov).
 1. **Now → M1 (6 Sep):** foundation decisions and cheap legal: N0 matrix, D6 formal
    decision, processor acceptance, solicitor, ICO, trademark search, domain/hosting,
    feedback triage dogfooded. (Cycle 1 issues are in Linear.)
-2. **M1 → M2 (4 Oct):** auth + sign-in, billing in test mode, ToS/Privacy drafted,
-   18+ gate, waitlist + countdown live, E3/G2/onboarding done.
-3. **M2 → M3 (2 Nov):** real entitlement enforcement, live charges, legal sign-off,
-   a11y sweep, full pre-launch checklist pass.
+2. **M1 → M2 (4 Oct):** auth + sign-in, billing in test mode, ToS/Privacy
+   **published** on `/terms` and `/privacy` with signup + waitlist consent
+   (EDGE-61), 18+ gate, waitlist + countdown live, E3/G2/onboarding done.
+3. **M2 → M3 (2 Nov):** real entitlement enforcement, live charges, solicitor
+   sign-off of the published legal pages, a11y sweep, full pre-launch checklist
+   pass.
 4. **Post-launch:** §7.3 oddsmatching bridge stays staged; Elite tier (§7.5) only
    once Edge revenue funds it.
 
@@ -40,9 +48,11 @@ cloud Cursor Automations are available once MCPs are authed.
 
 ### 2.1 Feedback → Linear (first automation to build)
 
-The pipeline already exists in-app: `/feedback` → `src/app/api/feedback/route.ts`
-→ `feedback_reports` table (kind = bug/idea/other, summary, details, diagnostics,
-created_at). What is missing, in order:
+The pipeline is: `/feedback` → `src/app/api/feedback/route.ts` → hosted Neon
+`feedback_reports` (not the user's desk SQLite) plus a Resend owner email
+(`FEEDBACK_NOTIFY_TO`, else `WAITLIST_NOTIFY_TO`). Do not send To Zoho
+`sam@` / `hello@` via Resend (554 ContentRejected). Linear filing is still
+deliberate. What is missing, in order:
 
 - [x] **Linear workspace setup.** Team `Edgeways` (key EDGE) created 10 Aug 2026;
       Live Readiness initiative + six projects + M1–M3 milestones done. Labels:
@@ -59,10 +69,8 @@ created_at). What is missing, in order:
       `linear_issue_id IS NULL`, dedupe against existing Linear issues, draft a
       ticket per new row (kind → label, summary → title, details + diagnostics →
       body), present drafts, create on approval, write back the issue id.
-- [ ] **Promote when boring.** Once draft quality is consistently right, move to a
-      local script on launchd/cron calling the Linear API directly (data is local
-      SQLite — a cloud automation cannot reach it). Cloud webhook automation only
-      becomes possible if feedback gains a hosted endpoint post-D6. → **EDGE-43**
+- [ ] **Promote when boring.** Hosted inbox is in (Neon + Resend notify). Next is
+      auto-drafting Linear issues from those rows once volume exists. → **EDGE-43**
 
 ### 2.2 Other automations (setup cost vs payoff)
 
@@ -135,22 +143,34 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
       and 15+ years of unlicensed matched betting precedent holds. Solicitor
       letter only if a trigger fires (Stripe/bank demand, server-placed bets,
       EDGE-45 pooled feeds, GC guidance, big marketing push).
-- [~] **Terms of Service** — drafted 10 Aug (`docs/legal/terms-of-service.draft.md`,
-      EDGE-11): subscription terms (renewal, cancellation, refund, trial),
-      no-guarantee-of-profit disclaimer, "not gambling advice", user
-      responsible for bookmaker/exchange ToS compliance, limitation of
-      liability. Awaits Sam's read, then solicitor (EDGE-8). Placeholders:
-      entity, contacts, VAT wording (depends on EDGE-2).
-- [~] **Privacy Policy + UK GDPR** — drafted 10 Aug
-      (`docs/legal/privacy-policy.draft.md`, EDGE-12), leading with local-first
-      ("betting records never leave your device"). Lawful bases, retention,
-      subject rights, processor table. Awaits Sam's read, then solicitor
-      (EDGE-8). Placeholders: entity, ICO number (EDGE-9), processor details
-      (EDGE-2/23/35).
-- [ ] **ICO registration** — data-protection fee (~£40/yr) for a UK sole trader
-      processing personal data. Cheap, mandatory, easy to forget.
-- [ ] **Company form** — sole trader is fine to start; Ltd when revenue or
-      liability justifies. Affects contracts, banking, and tax.
+- [x] **Terms of Service (draft)** — drafted 10 Aug
+      (`docs/legal/terms-of-service.draft.md`, EDGE-11). Sam read 16 Aug.
+      Published 17 Aug on `/terms` (EDGE-61). Solicitor only if EDGE-8
+      triggers, and before charging strangers.
+- [x] **Privacy Policy + UK GDPR (draft)** — drafted 10 Aug
+      (`docs/legal/privacy-policy.draft.md`, EDGE-12). Sam read 16 Aug.
+      Published 17 Aug on `/privacy` (EDGE-61). Processors: Clerk, Stripe,
+      Vercel, PostHog EU (cookieless), Resend. ICO number when trading
+      starts (EDGE-9).
+- [x] **Public legal pages + signup consent** — EDGE-61 (M2, High). This is
+      the OddsMonkey-shaped gap: customer-facing `/terms` and `/privacy`,
+      required checkbox on `/sign-up` ("I have read and agree to the Terms
+      of Service and Privacy Policy", both linked), waitlist + marketing
+      footer links (replace "Full privacy policy before public launch"),
+      Settings → Help & about, Stripe Checkout terms URL. Add both paths to
+      `WAITLIST_PAGES` or production bounces them home. Cookie/PECR: no
+      separate banner while PostHog stays cookieless (EDGE-35); fold cookies
+      into Privacy §9. Publishing a dated draft on the waitlist site can
+      happen as soon as Sam reads EDGE-11/12; solicitor sign-off stays
+      before charging strangers. We do **not** copy OddsMonkey's
+      "aggregator licensed by the GC" line: we are software, not an
+      operator aggregator (see `docs/legal/gambling-licence-assessment.md`).
+      Sibling: EDGE-66 public `/contact` and `/refund`. Gibraltar
+      incorporation is **not** required (assessment §9, 16 Aug 2026).
+- [ ] **ICO registration** — self-assessment 17 Aug: no fee until trading
+      starts. Retake then (~£40/yr). Not a launch blocker for the waitlist.
+- [x] **Company form** — sole trader: Sam Hayter trading as Edgeways
+      (EDGE-15, 17 Aug). Ltd later if revenue or liability justifies.
 - [ ] **Trademark** — D7 renamed EdgeDesk → Edgeways after a clash. Before launch:
       UK IPO search + consider registering "Edgeways"; confirm edgeways.app and
       social handles are secured (Sam handles, per D7). Page names, bios, which
@@ -178,8 +198,14 @@ roadmap items that deliver them:
 - [~] **Access & keyboard polish (G4)** — shipped scoped (switch names, reduced
       motion, keyboard guide). Remaining: measured contrast audit in both
       themes → EDGE-32 (M3).
-- [ ] **Support channel** — feedback form exists; decide the public support
-      surface (email / Discord / Linear triage cadence).
+- [x] **Legal surfaces (EDGE-61)** — `/terms` and `/privacy` live on the
+      waitlist surface; waitlist + `/sign-up` collect consent; footer and
+      Settings link the same pages. Solicitor sign-off of those pages before
+      charging strangers (EDGE-8).
+- [ ] **Support channel** — EDGE-34 decided **email** (`support@` / `hello@`).
+      In-app feedback remains for product bugs. Gap: public `/contact` page
+      (EDGE-66). No live-chat widget before launch (cannot staff Oddsmonkey
+      hours).
 - [ ] **Status & comms** — release notes page exists; add an incident/comms norm
       once the feed proxy (§7.2) makes you responsible for other people's data.
 - [x] **Error tracking** — live 10 Aug (EDGE-35): PostHog EU (org `Edgeways`,
@@ -189,8 +215,13 @@ roadmap items that deliver them:
       console capture and autocapture all off; IPs anonymised. MCP connected
       via OAuth. Spiking issues auto-file to Linear (PostHog-native alert);
       new-issue triage via the MCP loop per §2.2.
-- [~] **Onboarding** — G2 setup wizard shipped and verified on a fresh DB.
-      Remaining: validate with first external users during beta → EDGE-33 (M2).
+- [~] **Onboarding** — G2 setup wizard shipped (bank → bookies → defaults →
+      alerts). Oddsmonkey research (16 Aug) adds profile questions + monthly
+      target slider (EDGE-62), empty-desk welcome (EDGE-63), landing honesty
+      (EDGE-64), Oddsmonkey/Outplayed profit import (EDGE-68). Validate with
+      a stranger → EDGE-33 (M2). Plan:
+      `docs/strategy/oddsmonkey-onboarding-research.md`. Import spec:
+      `docs/strategy/platform-import.md`.
 
 ## 6. Linear structure (created 10 Aug 2026)
 
@@ -205,7 +236,7 @@ EDGE-43, deliberately deferred until feedback volume exists):
 |-------|-------|-------|---------|
 | C1 | 17–24 Aug | Sam's foundation week: decisions, accounts, legal emails | EDGE-1, 2, 8, 9, 10, 18, 23, 24, 46 |
 | C2 | 31 Aug–6 Sep | M1 buffer — processor/solicitor replies land | (spillover from C1) |
-| C3 | 14–20 Sep | M2 build 1: Neon+migrations, auth provider, landing build, provider emails, legal drafts finalised | EDGE-11, 12, 15, 19, 25, 45, 47, 48 |
+| C3 | 14–20 Sep | M2 build 1: Neon+migrations, auth provider, landing build, provider emails, legal drafts finalised + public pages | EDGE-11, 12, 15, 19, 25, 45, 47, 48, **61** |
 | C4 | 28 Sep–4 Oct | M2 build 2: sign-in, handoff, billing build, waitlist+countdown+SEO, beta community, gate evidence, nightly sweep | EDGE-3, 4, 5, 20, 21, 26, 27, 28, 29, 33, 36, 41 |
 | C5 | 12–18 Oct | Launch prep: dunning, billing rehearsal, enforcement, contrast audit, support surface, hygiene scrub | EDGE-6, 7, 22, 32, 34, 49 |
 | C6 | 26 Oct–2 Nov | Launch week: full checklist pass | EDGE-37 |
@@ -213,7 +244,7 @@ EDGE-43, deliberately deferred until feedback volume exists):
 | Project | Scope | Issues |
 |---------|-------|--------|
 | Payments & Billing | Acceptance → L1 → checkout/webhooks → live | EDGE-1…7 |
-| Compliance & Legal | Solicitor, ICO, trademark, ToS, privacy, 18+, API ToS, provider permissions | EDGE-8…16, 45 |
+| Compliance & Legal | Solicitor, ICO, trademark, ToS, privacy, 18+, API ToS, provider permissions, public legal pages + signup consent | EDGE-8…16, 45, 61 |
 | Entitlements & Accounts | N0 matrix, D6, auth, sign-in, enforcement, hosted DB | EDGE-17…22, 47 |
 | Marketing Site & Waitlist | Domain/hosting, landing, waitlist, countdown, SEO, beta, Vercel | EDGE-23…29, 46 |
 | Launch QA & Polish | E3, G2, G4, onboarding, support, evidence, checklist, health, hygiene | EDGE-30…37, 48, 49 |
@@ -229,7 +260,7 @@ per-sale, not fixed costs. API feed COGS only starts when the Edge tier ships
 | Item | Cost | Ticket | Notes |
 |------|------|--------|-------|
 | Domain `edgeways.app` (year 1) | **paid ✓** | EDGE-23 | GoDaddy registrar; DNS may use Cloudflare |
-| ICO data protection fee | ~£40/yr | EDGE-9 | Mandatory once processing personal data |
+| ICO data protection fee | ~£40/yr | EDGE-9 | Self-assessment 17 Aug: not due until trading starts |
 | Solicitor (only if triggered) | £0 now · £150–750 if triggered | EDGE-8 | Re-scoped 11 Aug: evidence file drafted; letter only if Stripe/bank or EDGE-45 trigger fires |
 | Trademark "Edgeways" (UK IPO) | £170 (+£50 per extra class) | EDGE-10 | Classes 9 + 42 = £220; optional but cheaper than a second forced rename |
 | **Pre-launch total** | **~£270** | | ICO + trademark + domain, all near-certain; +£150–750 only if a solicitor trigger fires |
@@ -280,10 +311,10 @@ Cycle 1 (17–23 Aug): EDGE-1, 2, 8, 9, 17, 18, 23, 24, 38, 39, 40.
 
 | # | Decision | Options | Due |
 |---|----------|---------|-----|
-| L1 | Processor | Stripe direct / Paddle / Lemon Squeezy / Polar — after written acceptance | Before F4 build (EDGE-1, EDGE-2) |
+| L1 | Processor | **Decided 15 Aug 2026: Stripe direct** (EDGE-2). EDGE-1 emails skipped. VAT not included on homepage until registered. Test catalogue live 15 Aug (EDGE-3). | — |
 | L2 | Architecture route | Route 1 hosted (D6 lean) / Route 2 local-first + paid sync | Formal at F4 (EDGE-18) |
 | L3 | Linear structure | **Decided 10 Aug 2026:** initiative + 6 projects, M1–M3, 1-week cycles | — |
-| L4 | Support surface | Email / Discord / in-app only | Pre-launch (EDGE-34) |
+| L4 | Support surface | **Decided 12 Aug 2026: email** (`support@` / `hello@`, EDGE-34). Public `/contact` page is EDGE-66. No live chat at launch. | — |
 | L5 | Trademark registration | Register "Edgeways" (UK IPO) or rely on use | Pre-launch (EDGE-10) |
 | L6 | D1 gate | **Opened for launch-path work 10 Aug 2026**; criteria tracked as evidence (EDGE-36) | — |
 

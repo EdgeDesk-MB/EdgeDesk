@@ -15,9 +15,15 @@ import {
   historyEntrySubtitle,
   historyEntryTitle,
   historyEntryTitleParts,
+  historyGoalEventLabel,
   historyGoalScoreline,
+  historyGoalScorelineSegments,
+  historyMatchMomentSubline,
+  historyRacingResultCopy,
+  historySportMomentHeadline,
   historyKindLabel,
   historySettledNote,
+  sortHistoryEntries,
   isFreeBetPlacedHistoryEntry,
   isFreeBetWonHistoryEntry,
   resolveHistoryEvent,
@@ -39,7 +45,8 @@ import {
 } from "@/lib/offers/early-free-bet-award";
 import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Gift } from "lucide-react";
+import { Gift, History } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 
 /** Local override so a saved note paints before the parent refresh lands. */
 function useBalanceCorrectionNote(entry: HistoryRow) {
@@ -58,6 +65,42 @@ function useBalanceCorrectionNote(entry: HistoryRow) {
 const freeBetIconClass = "text-violet-600 dark:text-violet-400";
 const freeBetTextClass = "text-violet-700 dark:text-violet-300";
 
+const momentSublineGap = "\u00A0\u00A0\u00A0";
+const momentHit = "font-bold text-foreground";
+
+function HistoryMomentSublineDisplay({
+  ball,
+  label,
+  segments,
+  className,
+}: {
+  ball?: boolean;
+  label?: string | null;
+  segments?: { text: string; emphasize?: boolean }[] | null;
+  className?: string;
+}) {
+  if (!label && !segments?.length) return null;
+  return (
+    <span className={className}>
+      {label ? (
+        <>
+          {ball ? <span aria-hidden>⚽ </span> : null}
+          <span className={momentHit}>{label}</span>
+          {segments?.length ? momentSublineGap : null}
+        </>
+      ) : null}
+      {segments?.map((part, index) => (
+        <span
+          key={`${index}:${part.text}`}
+          className={part.emphasize ? momentHit : undefined}
+        >
+          {part.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function HistoryGoalScorelineDisplay({
   entry,
   ctx,
@@ -67,30 +110,13 @@ function HistoryGoalScorelineDisplay({
   ctx: HistoryContext;
   className?: string;
 }) {
-  const scoreline = historyGoalScoreline(entry, ctx);
-  if (!scoreline) return null;
-  const hit = "font-semibold text-foreground";
   return (
-    <span className={className}>
-      {scoreline.flags ? `${scoreline.flags} - ` : null}
-      {scoreline.scoringSide === "home" ? (
-        <>
-          <span className={hit}>
-            {scoreline.homeTeam} {scoreline.homeScore}
-          </span>
-          {`-${scoreline.awayScore} ${scoreline.awayTeam}`}
-        </>
-      ) : scoreline.scoringSide === "away" ? (
-        <>
-          {`${scoreline.homeTeam} ${scoreline.homeScore}-`}
-          <span className={hit}>
-            {scoreline.awayScore} {scoreline.awayTeam}
-          </span>
-        </>
-      ) : (
-        `${scoreline.homeTeam} ${scoreline.homeScore}-${scoreline.awayScore} ${scoreline.awayTeam}`
-      )}
-    </span>
+    <HistoryMomentSublineDisplay
+      ball
+      label={historyGoalEventLabel(entry, ctx)}
+      segments={historyGoalScorelineSegments(entry, ctx)}
+      className={className}
+    />
   );
 }
 
@@ -268,6 +294,9 @@ export function HistoryEntryRow({
   const { note: correctionNote, displayEntry, setNote } = useBalanceCorrectionNote(entry);
   const isBalanceAdjustment = entry.kind === "balance_adjustment";
   const goalScoreline = historyGoalScoreline(entry, ctx);
+  const matchHeadline = historySportMomentHeadline(entry, ctx);
+  const matchSubline = historyMatchMomentSubline(entry, ctx);
+  const racingCopy = historyRacingResultCopy(entry, ctx);
   const compactDescription = compact
     ? isBalanceAdjustment
       ? undefined
@@ -275,6 +304,8 @@ export function HistoryEntryRow({
     : undefined;
   const title = historyEntryTitle(entry, ctx);
   const titleParts = historyEntryTitleParts(entry, ctx);
+  const rowTitle = matchHeadline ?? title;
+  const rowTitleParts = matchHeadline ? null : titleParts;
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
   const href = historyEntryHref(entry, ctx);
@@ -325,25 +356,35 @@ export function HistoryEntryRow({
               aria-label={linkLabel}
             >
               <HistoryEntryTitleDisplay
-                title={title}
-                parts={titleParts}
+                title={rowTitle}
+                parts={rowTitleParts}
                 freeBetPlaced={freeBetPlaced}
                 freeBetWon={freeBetWon}
                 className="block text-[13px] font-medium leading-snug"
               />
+              {goalScoreline ? (
+                <HistoryGoalScorelineDisplay
+                  entry={entry}
+                  ctx={ctx}
+                  className="mt-0.5 block truncate text-xs text-muted-foreground"
+                />
+              ) : racingCopy ? (
+                <HistoryMomentSublineDisplay
+                  label={racingCopy.label}
+                  segments={racingCopy.parts}
+                  className="mt-0.5 block truncate text-xs text-muted-foreground"
+                />
+              ) : matchSubline ? (
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {matchSubline}
+                </span>
+              ) : compactDescription ? (
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {compactDescription}
+                </span>
+              ) : null}
             </Link>
             {correctionDetail}
-            {goalScoreline ? (
-              <HistoryGoalScorelineDisplay
-                entry={entry}
-                ctx={ctx}
-                className="mt-0.5 block truncate text-xs text-muted-foreground"
-              />
-            ) : compactDescription ? (
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                {compactDescription}
-              </span>
-            ) : null}
             {earlyAwardPrompt}
           </div>
         </div>
@@ -370,27 +411,35 @@ export function HistoryEntryRow({
         <span className="min-w-0 flex-1 text-left">
           <Link href={href} className="cursor-pointer" aria-label={linkLabel}>
             <HistoryEntryTitleDisplay
-              title={title}
-              parts={titleParts}
+              title={rowTitle}
+              parts={rowTitleParts}
               freeBetPlaced={freeBetPlaced}
               freeBetWon={freeBetWon}
               className="block text-[13px] font-medium"
             />
+            {goalScoreline ? (
+              <HistoryGoalScorelineDisplay
+                entry={entry}
+                ctx={ctx}
+                className="block truncate text-xs text-muted-foreground"
+              />
+            ) : racingCopy ? (
+              <HistoryMomentSublineDisplay
+                label={racingCopy.label}
+                segments={racingCopy.parts}
+                className="block truncate text-xs text-muted-foreground"
+              />
+            ) : matchSubline ? (
+              <span className="block truncate text-xs text-muted-foreground">{matchSubline}</span>
+            ) : !isBalanceAdjustment && subtitle ? (
+              <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+            ) : null}
           </Link>
           {correctionDetail}
-          {goalScoreline ? (
-            <HistoryGoalScorelineDisplay
-              entry={entry}
-              ctx={ctx}
-              className="block truncate text-xs text-muted-foreground"
-            />
-          ) : !isBalanceAdjustment && subtitle ? (
-            <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
-          ) : null}
           {entry.kind === "casino_settlement" && entry.detail && !subtitle ? (
             <span className="block truncate text-xs text-muted-foreground">{entry.detail}</span>
           ) : null}
-          {event && eventLine ? (
+          {event && eventLine && !matchHeadline ? (
             <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground/80">
               <SportIcon sport={event.sport} size={11} className="shrink-0 text-muted-foreground/70" />
               <span className="truncate">{eventLine}</span>
@@ -453,6 +502,11 @@ export function HistoryEntryCard({
   const title = historyEntryTitle(entry, ctx);
   const titleParts = historyEntryTitleParts(entry, ctx);
   const goalScoreline = historyGoalScoreline(entry, ctx);
+  const matchHeadline = historySportMomentHeadline(entry, ctx);
+  const matchSubline = historyMatchMomentSubline(entry, ctx);
+  const racingCopy = historyRacingResultCopy(entry, ctx);
+  const rowTitle = matchHeadline ?? title;
+  const rowTitleParts = matchHeadline ? null : titleParts;
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
   const offerTitle =
@@ -461,6 +515,8 @@ export function HistoryEntryCard({
   const earlyAwardAmount = bet
     ? unconditionalFreeBetEffect(bet, offerTitle)?.amount
     : undefined;
+  const href = historyEntryHref(entry, ctx);
+  const linkLabel = historyEntryLinkLabel(entry, ctx);
 
   return (
     <article className={cn(offerCampaignCardShell, "flex-col")}>
@@ -478,7 +534,7 @@ export function HistoryEntryCard({
             )}
           >
             <HistoryEntryIcon entry={entry} ctx={ctx} />
-            {event && !collapsed ? (
+            {event && !collapsed && !matchHeadline ? (
               <SportIcon sport={event.sport} size={16} className="text-muted-foreground" />
             ) : null}
           </div>
@@ -497,20 +553,55 @@ export function HistoryEntryCard({
                     className="text-xs text-muted-foreground"
                   />
                 </div>
-                <h3
-                  className={cn(
-                    "mt-0.5 leading-snug",
-                    collapsed ? "text-sm" : "text-base",
-                    titleParts ? "font-medium" : "font-bold"
-                  )}
-                >
-                  <HistoryEntryTitleDisplay
-                    title={title}
-                    parts={titleParts}
-                    freeBetPlaced={freeBetPlaced}
-                    freeBetWon={freeBetWon}
-                  />
-                </h3>
+                <Link href={href} className="cursor-pointer" aria-label={linkLabel}>
+                  <h3
+                    className={cn(
+                      "mt-0.5 leading-snug",
+                      collapsed ? "text-sm" : "text-base",
+                      rowTitleParts ? "font-medium" : "font-bold"
+                    )}
+                  >
+                    <HistoryEntryTitleDisplay
+                      title={rowTitle}
+                      parts={rowTitleParts}
+                      freeBetPlaced={freeBetPlaced}
+                      freeBetWon={freeBetWon}
+                    />
+                  </h3>
+                  {goalScoreline ? (
+                    <HistoryGoalScorelineDisplay
+                      entry={entry}
+                      ctx={ctx}
+                      className={cn(
+                        collapsed
+                          ? "mt-0.5 block truncate text-xs text-muted-foreground"
+                          : "mt-1 block text-sm text-muted-foreground"
+                      )}
+                    />
+                  ) : racingCopy ? (
+                    <HistoryMomentSublineDisplay
+                      label={racingCopy.label}
+                      segments={racingCopy.parts}
+                      className={cn(
+                        collapsed
+                          ? "mt-0.5 block truncate text-xs text-muted-foreground"
+                          : "mt-1 block text-sm text-muted-foreground"
+                      )}
+                    />
+                  ) : matchSubline ? (
+                    <p
+                      className={cn(
+                        collapsed
+                          ? "mt-0.5 truncate text-xs text-muted-foreground"
+                          : "mt-1 text-sm text-muted-foreground"
+                      )}
+                    >
+                      {matchSubline}
+                    </p>
+                  ) : !isBalanceAdjustment && !collapsed && subtitle ? (
+                    <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+                  ) : null}
+                </Link>
                 {isBalanceAdjustment ? (
                   <BalanceCorrectionDetailLine
                     entry={displayEntry}
@@ -526,25 +617,16 @@ export function HistoryEntryCard({
                     textClassName={!collapsed ? "text-sm" : undefined}
                   />
                 ) : null}
-                {goalScoreline && !collapsed ? (
-                  <HistoryGoalScorelineDisplay
-                    entry={entry}
-                    ctx={ctx}
-                    className="mt-1 block text-sm text-muted-foreground"
-                  />
-                ) : !isBalanceAdjustment && !collapsed && subtitle ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-                ) : null}
                 {!collapsed &&
                 entry.kind === "casino_settlement" &&
                 entry.detail &&
                 !subtitle ? (
                   <p className="mt-1 text-sm text-muted-foreground">{entry.detail}</p>
                 ) : null}
-                {!collapsed && eventLine ? (
+                {!collapsed && eventLine && !matchHeadline ? (
                   <p className="mt-1 text-sm text-foreground/80">{eventLine}</p>
                 ) : null}
-                {collapsed && eventLine ? (
+                {collapsed && eventLine && !matchHeadline ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{eventLine}</p>
                 ) : null}
                 {showEarlyAward && bet ? (
@@ -643,7 +725,7 @@ export function HistoryFeed({
   entries,
   ctx,
   compact = false,
-  emptyMessage = "Nothing yet - key match moments and bet results land here in real time.",
+  emptyMessage = "Key match moments and bet results land here in real time.",
   onFreeBetAwarded,
   onNoteSaved,
 }: {
@@ -654,11 +736,17 @@ export function HistoryFeed({
   onFreeBetAwarded?: () => void;
   onNoteSaved?: () => void;
 }) {
-  if (entries.length === 0) {
+  const ordered = sortHistoryEntries(entries, ctx);
+  if (ordered.length === 0) {
     return (
-      <p className={cn("text-sm text-muted-foreground", compact && "px-[var(--layout-card-x)] pt-2")}>
-        {emptyMessage}
-      </p>
+      <EmptyState
+        bare
+        compact
+        icon={History}
+        title="No history in this feed"
+        description={emptyMessage}
+        className={cn(compact && "mt-2")}
+      />
     );
   }
   return (
@@ -669,7 +757,7 @@ export function HistoryFeed({
         compact ? "mt-2 gap-1.5" : "gap-3"
       )}
     >
-      {entries.map((entry) => (
+      {ordered.map((entry) => (
         <HistoryEntryRow
           key={entry.id}
           entry={entry}

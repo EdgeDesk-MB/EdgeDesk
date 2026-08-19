@@ -5,7 +5,9 @@ import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
+import { getDeskActor, resolveScopedDbPath } from "./desk-scope";
 import { seedDemoData } from "./demo-seed";
+import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import {
   CLASSIC_SEED_GAMES,
   BETFAIR_OFFER_ELIGIBLE_GAMES_2026_07_21,
@@ -15,27 +17,25 @@ import {
 
 type DB = BetterSQLite3Database<typeof schema>;
 
-let instance: DB | null = null;
-let rawSqlite: Database.Database | null = null;
+type OpenDesk = { db: DB; sqlite: Database.Database };
+const opened = new Map<string, OpenDesk>();
 
 /**
  * Resolve the SQLite file path.
- * Production/dev: `data/edgeways.db` under cwd.
- * Tests: set `EDGEWAYS_DB_PATH` (vitest sets a temp file) so unit tests never
- * write into the live profit-history database.
+ * Tests: `EDGEWAYS_DB_PATH` (vitest sets a temp file).
  * Demo mode (G2): a `data/demo-mode` marker switches to `edgeways-demo.db`.
- * The marker is only read at connection time, so toggling requires a server
- * restart - deliberate, because parallel dev module graphs holding
- * connections to DIFFERENT files would split-brain writes.
+ * Otherwise the Clerk login picks the file: owner email → `edgeways.db`,
+ * other signed-in users → `data/desks/{clerkUserId}.db`, unsigned →
+ * `data/desks/unsigned.db`. Request scope comes from `withDeskScope`.
  */
 export function resolveDbPath(): string {
-  const override = process.env.EDGEWAYS_DB_PATH?.trim();
-  if (override) return path.resolve(override);
   const dataDir = path.join(process.cwd(), "data");
-  if (fs.existsSync(path.join(dataDir, "demo-mode"))) {
-    return path.join(dataDir, "edgeways-demo.db");
-  }
-  return path.join(dataDir, "edgeways.db");
+  return resolveScopedDbPath({
+    dataDir,
+    actor: getDeskActor(),
+    override: process.env.EDGEWAYS_DB_PATH,
+    demoMarker: fs.existsSync(path.join(dataDir, "demo-mode")),
+  }).dbPath;
 }
 
 /** True when this process opened the demo database (G2). */
@@ -76,11 +76,12 @@ function adoptLegacyDbFile(dbPath: string): void {
   }
 }
 
-/** Lazy singleton - nothing touches the SQLite file until the first query at request time. */
+/** One connection per SQLite file. Owner and test logins stay isolated. */
 function getDb(): DB {
-  if (instance) return instance;
-
   const dbPath = resolveDbPath();
+  const hit = opened.get(dbPath);
+  if (hit) return hit.db;
+
   const dataDir = path.dirname(dbPath);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   adoptLegacyDbFile(dbPath);
@@ -384,7 +385,14 @@ CREATE TABLE IF NOT EXISTS app_users (
   clerk_user_id TEXT PRIMARY KEY,
   email TEXT,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  plan TEXT NOT NULL DEFAULT 'free',
+  billing_status TEXT NOT NULL DEFAULT 'none',
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  trial_ends_at INTEGER,
+  founding INTEGER NOT NULL DEFAULT 0,
+  onboarding_profile TEXT
 );
 CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -521,6 +529,13 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("user_reminders", "context_venue TEXT");
   addColumn("system_runs", "place_fraction REAL");
   addColumn("feedback_reports", "linear_issue_id TEXT");
+  addColumn("app_users", "plan TEXT NOT NULL DEFAULT 'free'");
+  addColumn("app_users", "billing_status TEXT NOT NULL DEFAULT 'none'");
+  addColumn("app_users", "stripe_customer_id TEXT");
+  addColumn("app_users", "stripe_subscription_id TEXT");
+  addColumn("app_users", "trial_ends_at INTEGER");
+  addColumn("app_users", "founding INTEGER NOT NULL DEFAULT 0");
+  addColumn("app_users", "onboarding_profile TEXT");
   addColumn("waitlist_signups", "unsubscribed_at INTEGER");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS casino_offer_series (
@@ -631,6 +646,11 @@ WHERE casino_offer_id IS NOT NULL
   addColumn("acca_runs", "no_lay INTEGER NOT NULL DEFAULT 0");
   // Desk sport / event linking + denormalised bets.sport for tracker filters
   addColumn("bets", "sport TEXT");
+  addColumn("bets", "import_fingerprint TEXT");
+  addColumn("bets", "import_meta TEXT");
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS idx_bets_import_fingerprint ON bets(import_fingerprint)`
+  );
   addColumn("acca_legs", "sport TEXT");
   addColumn("bet_builder_runs", "event_id INTEGER");
   addColumn("bet_builder_runs", "sport TEXT");
@@ -698,23 +718,42 @@ WHERE category = 'top_up'
     if (acc.n === 0) sqlite.transaction(() => seedDemoData(sqlite))();
   }
 
-  // Seed the well-known exchanges on first run so the pickers aren't empty
-  const count = sqlite.prepare("SELECT COUNT(*) AS n FROM exchanges").get() as { n: number };
-  if (count.n === 0) {
-    const insert = sqlite.prepare(
-      `INSERT INTO exchanges (name, commission_pct, brand_color, back_color, lay_color, is_default, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+  // Seed well-known exchanges. Additive so a new preset (e.g. BetConnect)
+  // lands on existing desks without wiping user rates or the default.
+  const existingExchanges = sqlite
+    .prepare("SELECT name FROM exchanges")
+    .all() as { name: string }[];
+  const haveExchange = new Set(existingExchanges.map((row) => row.name.toLowerCase()));
+  const insertExchange = sqlite.prepare(
+    `INSERT INTO exchanges (name, commission_pct, brand_color, back_color, lay_color, is_default, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  const seededAt = Date.now();
+  const emptyExchanges = existingExchanges.length === 0;
+  for (const preset of EXCHANGE_PRESETS) {
+    if (haveExchange.has(preset.name.toLowerCase())) continue;
+    insertExchange.run(
+      preset.name,
+      preset.commissionPct,
+      preset.brandColor,
+      preset.backColor,
+      preset.layColor,
+      emptyExchanges && preset.name === "Betfair" ? 1 : 0,
+      seededAt
     );
-    const now = Date.now();
-    insert.run("Betfair", 5, "#ffb80c", "#a6d8ff", "#fac9d1", 1, now);
-    insert.run("Betdaq", 2, "#7b2d8b", "#fce38f", "#b5e5c4", 0, now);
-    insert.run("Smarkets", 2, "#0f1b2b", "#bfe8d4", "#c7dcf5", 0, now);
-    insert.run("Matchbook", 4, "#16344f", "#b8dff5", "#f7bac2", 0, now);
   }
 
-  rawSqlite = sqlite;
-  instance = drizzle(sqlite, { schema });
+  const instance = drizzle(sqlite, { schema });
+  opened.set(dbPath, { db: instance, sqlite });
   return instance;
+}
+
+function rawForCurrent(): Database.Database {
+  const dbPath = resolveDbPath();
+  getDb();
+  const hit = opened.get(dbPath);
+  if (!hit) throw new Error("SQLite handle missing after open.");
+  return hit.sqlite;
 }
 
 /**
@@ -786,8 +825,7 @@ function backfillLegacyCasinoOffers(sqlite: Database.Database): number {
  * module-private raw `Database` handle.
  */
 export function runCasinoOfferComponentsBackfill(): number {
-  getDb();
-  return backfillLegacyCasinoOffers(rawSqlite!);
+  return backfillLegacyCasinoOffers(rawForCurrent());
 }
 
 /**
@@ -839,8 +877,7 @@ function backfillCasinoGameLibrary(
  * {@link runCasinoOfferComponentsBackfill}.
  */
 export function runCasinoGameLibraryBackfill(marker: string, games: SeedGame[]): number {
-  getDb();
-  return backfillCasinoGameLibrary(rawSqlite!, marker, games);
+  return backfillCasinoGameLibrary(rawForCurrent(), marker, games);
 }
 
 /**
@@ -848,8 +885,7 @@ export function runCasinoGameLibraryBackfill(marker: string, games: SeedGame[]):
  * file directly - WAL pages would be missing.
  */
 export async function backupDatabaseTo(destPath: string): Promise<void> {
-  getDb();
-  await rawSqlite!.backup(destPath);
+  await rawForCurrent().backup(destPath);
 }
 
 /**
@@ -864,8 +900,7 @@ export async function backupDatabaseTo(destPath: string): Promise<void> {
  * run), missing columns keep their defaults via the common-column insert.
  */
 export function restoreDatabaseFrom(srcPath: string): { tablesRestored: number } {
-  getDb();
-  const sq = rawSqlite!;
+  const sq = rawForCurrent();
   const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
   sq.exec(`ATTACH DATABASE '${srcPath.replace(/'/g, "''")}' AS restore_src`);

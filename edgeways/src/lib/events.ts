@@ -78,10 +78,25 @@ export function formatFixtureKickoff(
   return time;
 }
 
-/** Normalise Racing API off_time ("2:35") to HH:MM for display. */
+/**
+ * Racing API prints UK off times with no am/pm: "3:10" is 15:10.
+ * Same 1–10 → afternoon rule as parseScopeRaceOffTime (offer-expiry).
+ */
+export function normaliseRacingApiOffTime(offTime: string): string {
+  const trimmed = offTime.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return normalizeEventTimeInput(trimmed) || trimmed;
+  const rawHours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(rawHours) || !Number.isFinite(minutes)) return trimmed;
+  if (rawHours < 0 || rawHours > 23 || minutes < 0 || minutes > 59) return trimmed;
+  const hours = rawHours >= 1 && rawHours <= 10 ? rawHours + 12 : rawHours;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+/** Normalise Racing API off_time ("2:35") to canonical 24h HH:mm. */
 export function formatRacingOffTime(offTime: string): string {
-  const normalised = normalizeEventTimeInput(offTime.trim());
-  return normalised || offTime.trim();
+  return normaliseRacingApiOffTime(offTime);
 }
 
 export interface TrackedEventLike {

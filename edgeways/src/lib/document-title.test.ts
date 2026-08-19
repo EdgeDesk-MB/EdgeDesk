@@ -3,6 +3,7 @@ import {
   __resetDocumentTitleStateForTests,
   announceAlertDocumentTitle,
   clearAlertDocumentTitles,
+  dismissAlertDocumentTitle,
   formatDeskDocumentTitle,
   pageLabelFromPathname,
   resolveDocumentTitle,
@@ -17,6 +18,8 @@ describe("pageLabelFromPathname", () => {
     expect(pageLabelFromPathname("/offers/calendar")).toBe("Offer calendar");
     expect(pageLabelFromPathname("/calculators/ep-desk")).toBe("2UP Desk");
     expect(pageLabelFromPathname("/calculators/matched")).toBe("Matched betting");
+    expect(pageLabelFromPathname("/terms")).toBe("Terms of Service");
+    expect(pageLabelFromPathname("/privacy")).toBe("Privacy Policy");
   });
 });
 
@@ -82,6 +85,21 @@ describe("announceAlertDocumentTitle", () => {
 
     clearAlertDocumentTitles();
     expect(doc.title).toBe("Profit Tracker · Edgeways");
+  });
+
+  it("drops one overlay title when that alert is dismissed", () => {
+    setDeskDocumentTitleFromPathname("/tracker");
+    announceAlertDocumentTitle({
+      key: "result_settled:1",
+      title: "You just made £4.10 · Bet won",
+    });
+    announceAlertDocumentTitle({
+      key: "naked_exposure:9",
+      title: "⚠️ Lay missing · full stake exposed",
+    });
+    expect(doc.title).toBe("(2) ⚠️ Lay missing · full stake exposed");
+    dismissAlertDocumentTitle("naked_exposure:9");
+    expect(doc.title).toBe("⚡ You just made £4.10 · Bet won");
   });
 
   it("keeps semantic emoji titles from alert rules", () => {

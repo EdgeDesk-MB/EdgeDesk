@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
 import { Radio, TrendingUp } from "lucide-react";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MoneyFlow } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
 import { dashboardSection } from "@/lib/ui/dashboard-layout";
+import { useLivelineHoverOutline } from "@/lib/ui/liveline-tooltip-outline";
 import { ChartBetMarkersOverlay } from "@/components/dashboard/chart-bet-markers-overlay";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
 import type { BetRow } from "@/lib/db/schema";
@@ -122,6 +123,7 @@ export const LivePnlChart = memo(function LivePnlChart({
   const [mounted, setMounted] = useState(false);
   const [livePoints, setLivePoints] = useState<LivePnlPoint[]>([]);
   const [chartWindowSecs, setChartWindowSecs] = useState<number>(DEFAULT_CHART_WINDOW);
+  const chartHostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -143,6 +145,7 @@ export const LivePnlChart = memo(function LivePnlChart({
   }, [historicSeries, liveTotal]);
 
   const isDark = resolvedTheme === "dark";
+  useLivelineHoverOutline(chartHostRef, mounted && !isDark);
   const chartColor = useMemo(
     () => pnlChartColor(liveTotal, isDark),
     [liveTotal, isDark]
@@ -257,7 +260,10 @@ export const LivePnlChart = memo(function LivePnlChart({
             !panel && !mini && !compact && "h-[min(22rem,40vh)] max-h-[min(22rem,40vh)] min-h-[12rem]"
           )}
         >
-          <div className={cn("relative isolate min-h-0 flex-1", !panel && "h-full")}>
+          <div
+            ref={chartHostRef}
+            className={cn("relative isolate min-h-0 flex-1", !panel && "h-full")}
+          >
             {mounted ? (
               <Liveline
                 key={resolvedTheme}

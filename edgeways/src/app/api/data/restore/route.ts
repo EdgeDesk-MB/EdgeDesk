@@ -3,6 +3,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { NextRequest, NextResponse } from "next/server";
 import { backupDatabaseTo, restoreDatabaseFrom, resolveDbPath } from "@/lib/db";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ function validateBackupFile(filePath: string): ValidationResult {
   }
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get("mode") ?? "preview";
 
   if (mode === "preview") {
@@ -115,4 +116,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ error: "Unknown mode" }, { status: 400 });
-}
+});

@@ -183,9 +183,11 @@ export default function SystemsDeskPage() {
                 ))
               )
             ) : historyFiltered.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                No finished system bets yet.
-              </p>
+              <EmptyState
+                icon={Grid2x2}
+                title="No finished system bets yet"
+                description="Completed tickets move here once every selection has settled."
+              />
             ) : (
               historyFiltered.map((bundle) => (
                 <RunCard
@@ -535,10 +537,9 @@ function DeleteRunButton({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md" mobile="center">
         <DialogHeader>
-          <DialogTitle>Delete system bet?</DialogTitle>
+          <DialogTitle>Delete “{label}”?</DialogTitle>
           <DialogDescription>
-            Removes “{label}” from Systems Desk. Linked tracker bets that are still open will be
-            voided.
+            Linked open bets will be voided.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

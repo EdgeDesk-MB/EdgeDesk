@@ -82,22 +82,22 @@ export function NakedExposureBanner({ className }: { className?: string }) {
   return (
     <div className={cn("shrink-0 p-3 sm:p-4", className)}>
       <div
-        className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-4 text-sm sm:items-center sm:gap-3"
+        className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 text-sm sm:items-center sm:gap-3"
         role="status"
       >
         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning sm:mt-0" />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-amber-900 dark:text-amber-100">
+          <p className="font-semibold text-warning">
             {exposed.length === 1
               ? "Unhedged back bet"
               : `${exposed.length} unhedged back bets`}
           </p>
-          <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-200/90">
-            <span className="font-medium">{primary.label}</span>
-            {primary.bookmaker ? ` at ${primary.bookmaker}` : ""} has no lay logged - your
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{primary.label}</span>
+            {primary.bookmaker ? ` at ${primary.bookmaker}` : ""} has no lay logged, your
             full stake is riding on the result.
             {moreCount > 0 && (
-              <span className="text-amber-700/80 dark:text-amber-300/80">
+              <span>
                 {" "}
                 +{moreCount} more
               </span>

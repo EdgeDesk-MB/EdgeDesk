@@ -6,7 +6,7 @@
  * mistake ledger (B7). Tracking together = edge captured; diverging = a leak.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
 import { BarChart3 } from "lucide-react";
@@ -29,6 +29,7 @@ import type { EdgeReport } from "@/lib/report/edge-report";
 import { mistakeTagLabel } from "@/lib/offers/mistakes";
 import { formatGbp } from "@/lib/format-money";
 import { FilterPill } from "@/components/ui/filter-pill";
+import { useLivelineHoverOutline } from "@/lib/ui/liveline-tooltip-outline";
 
 /** Realised follows the P&L chart greens; expected uses the "estimated" sky. */
 const SERIES_COLORS = {
@@ -79,6 +80,8 @@ export default function EdgeReportPage() {
   }, [month, owner]);
 
   const dark = resolvedTheme === "dark";
+  const chartHostRef = useRef<HTMLDivElement>(null);
+  useLivelineHoverOutline(chartHostRef, !dark);
   const colors = dark ? SERIES_COLORS.dark : SERIES_COLORS.light;
 
   const chart = useMemo(() => {
@@ -197,7 +200,7 @@ export default function EdgeReportPage() {
               </CardHeader>
               <CardContent>
                 {chart ? (
-                  <div className="h-[18rem]">
+                  <div ref={chartHostRef} className="h-[18rem]">
                     <Liveline
                       key={resolvedTheme}
                       data={chart.realized}
@@ -247,10 +250,13 @@ export default function EdgeReportPage() {
               </CardHeader>
               <CardContent>
                 {report.mistakes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No tagged mistakes this month - tag under-captured campaigns from their
-                    post-mortem line to build this up.
-                  </p>
+                  <EmptyState
+                    compact
+                    icon={BarChart3}
+                    title="No tagged mistakes this month"
+                    description="Tag under-captured campaigns from their post-mortem line to build this up."
+                    className="shadow-none"
+                  />
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {report.mistakes.map((m) => (

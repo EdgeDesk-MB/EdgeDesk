@@ -135,10 +135,9 @@ function CasinoCampaignSimContent({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Simulate · {title}</DialogTitle>
+        <DialogTitle>Simulate</DialogTitle>
         <DialogDescription>
-          {RUNS.toLocaleString()} runs across every component on this campaign, summed per run.
-          Stylised volatility model - real games vary.
+          {title} · {RUNS.toLocaleString()} runs. Real games vary.
         </DialogDescription>
       </DialogHeader>
 

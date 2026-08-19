@@ -1,24 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildFeedbackMailto,
-  FEEDBACK_TO_EMAIL,
-  formatFeedbackBody,
-  formatFeedbackSubject,
-  isFeedbackKind,
-} from "./types";
-
-const sample = {
-  kind: "bug" as const,
-  summary: "Lay stake blank after OCR",
-  details: "Imported a Betfair slip and the lay stake stayed empty.",
-  replyEmail: "tester@example.com",
-  diagnostics: {
-    appVersion: "1.1.0-dev",
-    userAgent: "Mozilla/5.0",
-    href: "http://localhost:3000/tracker",
-    timezone: "Europe/London",
-  },
-};
+import { formatFeedbackSubject, isFeedbackKind, parseDiagnostics } from "./types";
 
 describe("feedback types", () => {
   it("accepts known kinds only", () => {
@@ -39,19 +20,20 @@ describe("feedback types", () => {
     );
   });
 
-  it("includes details and diagnostics in the body", () => {
-    const body = formatFeedbackBody(sample);
-    expect(body).toContain("Kind: Bug");
-    expect(body).toContain("Lay stake blank after OCR");
-    expect(body).toContain("Imported a Betfair slip");
-    expect(body).toContain("App: 1.1.0-dev");
-    expect(body).toContain("Reply-to: tester@example.com");
-  });
-
-  it("builds a mailto URL to the feedback inbox", () => {
-    const href = buildFeedbackMailto(sample);
-    expect(href.startsWith(`mailto:${FEEDBACK_TO_EMAIL}?`)).toBe(true);
-    expect(href).toContain("subject=");
-    expect(href).toContain("body=");
+  it("parses diagnostics and optional signed-in email", () => {
+    expect(
+      parseDiagnostics(
+        JSON.stringify({
+          appVersion: "1.1.0-dev",
+          userAgent: "vitest",
+          href: "/feedback",
+          timezone: "Europe/London",
+          signedInEmail: "tester@example.com",
+        })
+      )
+    ).toMatchObject({
+      appVersion: "1.1.0-dev",
+      signedInEmail: "tester@example.com",
+    });
   });
 });

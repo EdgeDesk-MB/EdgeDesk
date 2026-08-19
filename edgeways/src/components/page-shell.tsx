@@ -3,7 +3,7 @@ import { pageShell, pageShellCompact, sectionBar, sectionMeta } from "@/lib/ui/l
 import { sectionDescription, sectionTitle } from "@/lib/ui/surface-styles";
 
 /** Full width inside the centred page panel */
-export const PAGE_SHELL_CLASS = "flex w-full flex-col";
+export const PAGE_SHELL_CLASS = "flex w-full min-w-0 max-w-full flex-col overflow-x-clip";
 
 export function PageShell({
   children,

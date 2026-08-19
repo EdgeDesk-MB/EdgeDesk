@@ -130,7 +130,7 @@ import {
   autoResultLinkedSystemLegs,
   pendingSystemRacingEventIds,
 } from "@/lib/services/systems-desk";
-import { recordAlerts } from "@/lib/services/alerts-inbox";
+import { listInboxDedupes, recordAlerts, unreadCount } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
 import { fireDueUserReminders } from "@/lib/services/user-reminders";
 import {
@@ -150,7 +150,6 @@ import { syncCasinoOfferSeriesInstances } from "@/lib/offers/casino-offer-recurr
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { getRealizedRetention } from "@/lib/services/retention";
 import { medianEffortByKind } from "@/lib/offers/effort";
-import { unreadCount } from "@/lib/services/alerts-inbox";
 import { formatLivePositionTriggerNote } from "@/lib/services/live-position-note";
 
 export type {
@@ -1165,6 +1164,7 @@ export async function getAppState(): Promise<AppState> {
     accaLayDue,
     betBuilderLayDue: betBuilderLayDue(),
     alertsUnread: unreadCount(),
+    deliveredAlertKeys: listInboxDedupes(),
     boostsOpen: countBoostsNeedingAction(),
     casinoNeedsAction: db
       .select()

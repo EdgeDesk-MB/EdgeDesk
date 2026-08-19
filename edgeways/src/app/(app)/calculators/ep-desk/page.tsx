@@ -60,8 +60,13 @@ import {
   type EpOfferEdge,
   type EpThreshold,
 } from "@/lib/calc/ep/strategy";
-import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
+import {
+  applyExchangeOddsInputChange,
+  exchangeOddsStepHandlers,
+  getExchangeOddsStep,
+} from "@/lib/calc/exchange-odds-step";
 import type { ExchangeRow } from "@/lib/db/schema";
+import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Flag, Flame, X } from "lucide-react";
 
@@ -1004,9 +1009,13 @@ function Num({
     <Input
       type="number"
       inputMode="decimal"
-      step={step}
+      step={exchangeOddsStepping ? getExchangeOddsStep(value) : step}
       value={Number.isFinite(value) ? value : ""}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
+      onChange={(e) =>
+        exchangeOddsStepping
+          ? applyExchangeOddsInputChange(value, parseFloat(e.target.value), onChange)
+          : onChange(parseFloat(e.target.value))
+      }
       onKeyDown={exchangeStep?.onKeyDown}
       onWheel={exchangeStep?.onWheel}
       className={cn("h-9 font-mono tabular-nums", wide ? "w-28" : "w-full")}
@@ -1795,17 +1804,12 @@ function PlaybookOverlay({ open, onClose }: { open: boolean; onClose: () => void
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between pr-6">
-            <span className="flex items-center gap-2">
-              <Flag className="size-4 text-primary-text" /> Scouting Playbook
-            </span>
-            <span className="font-mono text-xs text-muted-foreground">
-              {done}/{allItems.length}
-            </span>
+          <DialogTitle className="flex items-center gap-2.5">
+            <Flag className={cn(dialogTitleIcon, "text-primary-text")} />
+            Scouting playbook
           </DialogTitle>
           <DialogDescription>
-            Pre-match checklist for early-payout setups. Tick items off as you scout;
-            reset to reuse on the next fixture.
+            Pre-match checklist · {done}/{allItems.length} done.
           </DialogDescription>
         </DialogHeader>
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed">

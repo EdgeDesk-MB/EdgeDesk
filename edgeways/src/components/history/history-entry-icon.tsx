@@ -3,9 +3,10 @@ import {
   isBoostHistoryEntry,
   isFreeBetPlacedHistoryEntry,
   isFreeBetWonHistoryEntry,
+  isRacingHistoryEntry,
   type HistoryContext,
 } from "@/lib/history-display";
-import { FootballIcon } from "@/components/sport-icon";
+import { FootballIcon, WhistleIcon } from "@/components/sport-icon";
 import { cn } from "@/lib/utils";
 import {
   Banknote,
@@ -56,7 +57,15 @@ export function HistoryEntryIcon({
     return <Play className={cn("size-3.5 text-primary-text", className)} />;
   }
   if (entry.kind === "full_time") {
-    return <Flag className={cn("size-3.5 text-sky-600 dark:text-sky-400", className)} />;
+    if (isRacingHistoryEntry(entry, ctx)) {
+      return <Flag className={cn("size-3.5 text-sky-600 dark:text-sky-400", className)} />;
+    }
+    return (
+      <WhistleIcon
+        size={14}
+        className={cn("text-sky-600 dark:text-sky-400", className)}
+      />
+    );
   }
   if (entry.kind === "two_up") {
     return <Zap className={cn("size-3.5 text-amber-500", className)} />;

@@ -20,12 +20,17 @@ export function ThemeSelect({
   className,
   tone = "default",
   size = "default",
+  value,
+  onValueChange,
 }: {
   className?: string;
   /** `topbar` = ink controls on the yellow app bar */
   tone?: "default" | "topbar";
   /** `compact` = icons only */
   size?: "default" | "compact";
+  /** Controlled pick. When set, does not apply the theme until the parent does. */
+  value?: "light" | "dark";
+  onValueChange?: (theme: "light" | "dark") => void;
 }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -35,15 +40,17 @@ export function ThemeSelect({
   }, []);
 
   // Collapse legacy "system" (or unset) onto the resolved light/dark face.
-  const active: "light" | "dark" = !mounted
+  const live: "light" | "dark" = !mounted
     ? "light"
     : theme === "dark" || theme === "light"
       ? theme
       : resolvedTheme === "dark"
         ? "dark"
         : "light";
+  const active = value ?? live;
   const compact = size === "compact";
   const topbar = tone === "topbar";
+  const applyLive = onValueChange == null;
 
   return (
     <div
@@ -66,7 +73,7 @@ export function ThemeSelect({
             type="button"
             aria-pressed={selected}
             aria-label={`${option.label} appearance`}
-            disabled={!mounted}
+            disabled={applyLive && !mounted}
             className={cn(
               "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[5px] text-xs font-medium transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
@@ -79,7 +86,10 @@ export function ThemeSelect({
                   ? "text-[#111111]/70 hover:bg-[#111111]/10 hover:text-[#111111]"
                   : "text-muted-foreground hover:text-foreground"
             )}
-            onClick={() => setTheme(option.value)}
+            onClick={() => {
+              if (onValueChange) onValueChange(option.value);
+              else setTheme(option.value);
+            }}
           >
             <Icon className="size-3.5 shrink-0" aria-hidden />
             {compact ? null : <span className="truncate">{option.label}</span>}

@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, appUsers } from "@/lib/db";
+import { applyStripeSubscription } from "@/lib/billing/handle-stripe-event";
 import {
+  applyAppUserEntitlement,
   ensureAppUser,
   findAppUserByClerkId,
+  findAppUserByStripeCustomerId,
   normaliseAppUserEmail,
+  saveAppUserOnboardingProfile,
 } from "@/lib/services/app-users";
 
 describe("normaliseAppUserEmail", () => {
@@ -54,5 +58,67 @@ describe("ensureAppUser", () => {
     await ensureAppUser({ clerkUserId, email: "keep@example.com" });
     const again = await ensureAppUser({ clerkUserId, email: null });
     expect(again.email).toBe("keep@example.com");
+  });
+});
+
+describe("applyAppUserEntitlement", () => {
+  it("writes trial Edge onto the Clerk row", async () => {
+    const clerkUserId = `user_test_ent_${Date.now()}`;
+    await ensureAppUser({ clerkUserId, email: "pay@example.com" });
+    const row = await applyAppUserEntitlement({
+      clerkUserId,
+      entitlement: {
+        plan: "edge",
+        billingStatus: "trialing",
+        stripeCustomerId: "cus_test",
+        stripeSubscriptionId: "sub_test",
+        trialEndsAt: 1_800_000_000_000,
+        founding: false,
+      },
+    });
+    expect(row.plan).toBe("edge");
+    expect(row.billingStatus).toBe("trialing");
+    expect(row.stripeCustomerId).toBe("cus_test");
+    expect(row.trialEndsAt).toBe(1_800_000_000_000);
+    expect(row.founding).toBe(false);
+    expect(row.onboardingProfile).toBeNull();
+    const byCustomer = await findAppUserByStripeCustomerId("cus_test");
+    expect(byCustomer?.clerkUserId).toBe(clerkUserId);
+  });
+
+  it("applies a Stripe subscription object via Clerk metadata", async () => {
+    const clerkUserId = `user_test_sub_${Date.now()}`;
+    await applyStripeSubscription({
+      id: "sub_meta",
+      status: "trialing",
+      customer: "cus_meta",
+      trial_end: 1_800_000_000,
+      metadata: { clerkUserId, plan: "edge" },
+      items: { data: [{ price: { id: "price_not_in_env" } }] },
+    } as never);
+    const row = await findAppUserByClerkId(clerkUserId);
+    expect(row?.plan).toBe("edge");
+    expect(row?.billingStatus).toBe("trialing");
+    expect(row?.stripeCustomerId).toBe("cus_meta");
+  });
+});
+
+describe("saveAppUserOnboardingProfile", () => {
+  it("stores the first-run answers on the Clerk row", async () => {
+    const clerkUserId = `user_test_onboard_${Date.now()}`;
+    await ensureAppUser({ clerkUserId, email: "onboard@example.com" });
+    const row = await saveAppUserOnboardingProfile({
+      clerkUserId,
+      profile: {
+        experience: "spreadsheet",
+        whyHere: ["calculators"],
+        whyHereOther: null,
+        attribution: "discord",
+        attributionOther: null,
+        savedAt: 1_700_000_000_000,
+      },
+    });
+    expect(row.onboardingProfile?.experience).toBe("spreadsheet");
+    expect(row.onboardingProfile?.attribution).toBe("discord");
   });
 });

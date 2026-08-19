@@ -123,10 +123,9 @@ export function CasinoSetReminderDialog({
       </Button>
       <DialogContent className="max-w-md" mobile={mobile}>
         <DialogHeader>
-          <DialogTitle>Set your reminder</DialogTitle>
+          <DialogTitle>Set a reminder</DialogTitle>
           <DialogDescription>
-            Remind yourself of any rewards that are paid at a later time - free spins credited
-            tomorrow, a bonus landing overnight, and so on.
+            Nudge yourself when a reward lands later.
           </DialogDescription>
         </DialogHeader>
 

@@ -4,6 +4,16 @@ import type { AppState } from "@/lib/services/state.types";
  * True when the desk has real user activity (bets, offers, history, tracked
  * events, or non-zero P&L). Used before choosing empty CTA vs desk.
  */
+export function hasSetupAccounts(state: AppState): boolean {
+  return state.balances.accounts.some(
+    (row) => row.type === "bank" || row.type === "bookie"
+  );
+}
+
+export function needsSetup(state: AppState): boolean {
+  return !hasSetupAccounts(state);
+}
+
 export function hasDeskActivity(state: AppState): boolean {
   if (state.bets.length > 0) return true;
   if (state.offers.length > 0) return true;

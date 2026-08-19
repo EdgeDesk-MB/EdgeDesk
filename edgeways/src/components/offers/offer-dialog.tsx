@@ -53,12 +53,10 @@ export function OfferDialog({
           if (blockDismiss) e.preventDefault();
         }}
       >
-        <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-7">
-          <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            {editing ? "Edit offer" : "New offer"}
-          </DialogTitle>
+        <DialogHeader className="mx-0 mt-0 shrink-0">
+          <DialogTitle>{editing ? "Edit offer" : "New offer"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Update details - bets stay linked." : "Paste from MBB or fill."}
+            {editing ? "Update the details. Linked bets stay put." : "Paste a promo or fill the form."}
           </DialogDescription>
         </DialogHeader>
         <OfferEditorForm

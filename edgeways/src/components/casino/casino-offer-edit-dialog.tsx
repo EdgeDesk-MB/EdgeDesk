@@ -129,7 +129,7 @@ export function CasinoOfferEditDialog({
         <DialogHeader>
           <DialogTitle>Edit campaign</DialogTitle>
           <DialogDescription>
-            Casino, title, link and notes. Steps are edited on their own row.
+            Casino, title, link and notes.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">

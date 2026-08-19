@@ -1,6 +1,6 @@
 /**
  * Client-safe feedback kinds, labels, and report formatting.
- * Submissions are stored locally and optionally emailed via mailto.
+ * Submissions go to the hosted inbox (Neon) and email notify, then Linear later.
  */
 
 export const FEEDBACK_KINDS = ["bug", "idea", "other"] as const;
@@ -12,22 +12,31 @@ export const FEEDBACK_KIND_LABELS: Record<FeedbackKind, string> = {
   other: "Other",
 };
 
-/** Inbox that receives "Send via email" reports. */
-export const FEEDBACK_TO_EMAIL = "samhayter.design@gmail.com";
-
 export type FeedbackDiagnostics = {
   appVersion: string;
   userAgent: string;
   href: string;
   timezone: string;
+  signedInEmail?: string | null;
 };
 
-export type FeedbackDraft = {
+export type CreateFeedbackInput = {
   kind: FeedbackKind;
   summary: string;
   details: string;
   replyEmail?: string | null;
   diagnostics: FeedbackDiagnostics;
+};
+
+export type FeedbackListItem = {
+  id: number;
+  kind: FeedbackKind;
+  summary: string;
+  details: string;
+  replyEmail: string | null;
+  diagnostics: FeedbackDiagnostics;
+  createdAt: number;
+  linearIssueId: string | null;
 };
 
 export function isFeedbackKind(value: unknown): value is FeedbackKind {
@@ -41,31 +50,48 @@ export function formatFeedbackSubject(kind: FeedbackKind, summary: string): stri
   return `[Edgeways] ${label}: ${short}`;
 }
 
-/** Plain-text body for mailto / clipboard. */
-export function formatFeedbackBody(draft: FeedbackDraft): string {
-  const lines = [
-    `Kind: ${FEEDBACK_KIND_LABELS[draft.kind]}`,
-    `Summary: ${draft.summary.trim()}`,
-    "",
-    "Details:",
-    draft.details.trim() || "(none)",
-    "",
-    "Diagnostics:",
-    `App: ${draft.diagnostics.appVersion}`,
-    `Page: ${draft.diagnostics.href}`,
-    `Timezone: ${draft.diagnostics.timezone}`,
-    `User agent: ${draft.diagnostics.userAgent}`,
-  ];
-  const reply = draft.replyEmail?.trim();
-  if (reply) {
-    lines.push(`Reply-to: ${reply}`);
+export function parseDiagnostics(raw: string): FeedbackDiagnostics {
+  try {
+    const parsed = JSON.parse(raw) as Partial<FeedbackDiagnostics>;
+    return {
+      appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion : "unknown",
+      userAgent: typeof parsed.userAgent === "string" ? parsed.userAgent : "unknown",
+      href: typeof parsed.href === "string" ? parsed.href : "",
+      timezone: typeof parsed.timezone === "string" ? parsed.timezone : "unknown",
+      signedInEmail:
+        typeof parsed.signedInEmail === "string" && parsed.signedInEmail.trim()
+          ? parsed.signedInEmail.trim()
+          : null,
+    };
+  } catch {
+    return {
+      appVersion: "unknown",
+      userAgent: "unknown",
+      href: "",
+      timezone: "unknown",
+      signedInEmail: null,
+    };
   }
-  return lines.join("\n");
 }
 
-export function buildFeedbackMailto(draft: FeedbackDraft): string {
-  const subject = formatFeedbackSubject(draft.kind, draft.summary);
-  const body = formatFeedbackBody(draft);
-  const params = new URLSearchParams({ subject, body });
-  return `mailto:${FEEDBACK_TO_EMAIL}?${params.toString()}`;
+export function toFeedbackListItem(row: {
+  id: number;
+  kind: string;
+  summary: string;
+  details: string;
+  replyEmail: string | null;
+  diagnosticsJson: string;
+  createdAt: number;
+  linearIssueId: string | null;
+}): FeedbackListItem {
+  return {
+    id: row.id,
+    kind: isFeedbackKind(row.kind) ? row.kind : "other",
+    summary: row.summary,
+    details: row.details,
+    replyEmail: row.replyEmail,
+    diagnostics: parseDiagnostics(row.diagnosticsJson),
+    createdAt: Number(row.createdAt),
+    linearIssueId: row.linearIssueId,
+  };
 }

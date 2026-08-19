@@ -83,6 +83,11 @@ export interface AppState {
   }>;
   /** Unread alerts in the inbox (F2) - drives the nav badge */
   alertsUnread: number;
+  /**
+   * Inbox dedupe keys already delivered on this desk (read or unread).
+   * AlertWatcher treats these as seen so a new session cannot re-toast them.
+   */
+  deliveredAlertKeys: string[];
   /** Open boost diary rows (outcome unset) - drives the Boosts nav badge */
   boostsOpen: number;
   /** Planned/active casino campaigns still in the main feed - Casino nav badge */

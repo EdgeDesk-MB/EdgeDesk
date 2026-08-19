@@ -24,7 +24,6 @@ import {
   notifyOfferStepDone,
   quietOfferPromptToasts,
 } from "@/lib/alerts/quiet-offer-toasts";
-import { buildCampaignDialogDescription } from "@/lib/offers/offer-campaign-details";
 import {
   deriveTrackBetAction,
   resolveTrackBetDestination,
@@ -146,13 +145,10 @@ export function OfferViewDialog({
         onPointerDownOutside={preventDialogDismissOnPortaledContent}
         onInteractOutside={preventDialogDismissOnPortaledContent}
       >
-        <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-7">
-          <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            Campaign details
-          </DialogTitle>
-          {/* Screen readers only — no visible subtitle (duplicated the card title). */}
-          <DialogDescription className="sr-only">
-            {buildCampaignDialogDescription(offer.title, nextActionLabel)}
+        <DialogHeader className="mx-0 mt-0 shrink-0">
+          <DialogTitle>Campaign details</DialogTitle>
+          <DialogDescription>
+            {nextActionLabel ? `Next: ${nextActionLabel}` : "Review this campaign."}
           </DialogDescription>
         </DialogHeader>
 

@@ -16,10 +16,25 @@ export function isWaitlistSurface(): boolean {
   return process.env.SITE_SURFACE === "waitlist";
 }
 
+/** After subscribe: desk when this deploy is the app, home when waitlist still owns /. */
+export function postSubscribeNextHref(from?: "setup" | null): string | null {
+  if (from === "setup") return null;
+  return isWaitlistSurface() ? "/" : "/setup";
+}
+
+export function postSubscribeNextLabel(from?: "setup" | null): string {
+  if (from === "setup") return "Now close the tab";
+  return isWaitlistSurface() ? "Back to Edgeways" : "Set up the desk";
+}
+
 const WAITLIST_PAGES = new Set([
   "/",
   "/login",
   "/sign-up",
+  "/subscribe",
+  "/subscribe/success",
+  "/demo",
+  "/setup",
   "/waitlist/confirmed",
   "/waitlist/unsubscribed",
   "/contact",
@@ -34,7 +49,15 @@ const WAITLIST_ACCOUNT_SYNC = "/api/account/sync";
 /** Paths reachable when SITE_SURFACE=waitlist. */
 export function isWaitlistAllowedPath(pathname: string): boolean {
   if (WAITLIST_PAGES.has(pathname)) return true;
-  if (pathname === WAITLIST_ACCOUNT_SYNC) return true;
+  if (pathname === WAITLIST_ACCOUNT_SYNC || pathname.startsWith("/api/account/")) {
+    return true;
+  }
+  if (pathname === "/api/billing/portal" || pathname.startsWith("/api/billing/")) {
+    return true;
+  }
+  if (pathname === "/api/demo/state" || pathname.startsWith("/api/demo/")) {
+    return true;
+  }
   if (pathname === WAITLIST_API_PREFIX || pathname.startsWith(`${WAITLIST_API_PREFIX}/`)) {
     return true;
   }

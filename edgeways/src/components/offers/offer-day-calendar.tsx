@@ -33,6 +33,7 @@ import {
 import { moneyPositiveClass } from "@/components/money-flow";
 import { formatEvGbp } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/help/empty-state";
 import { CalendarDays, Columns3, List } from "lucide-react";
 
 type CalendarView = "board" | "agenda";
@@ -563,10 +564,25 @@ export function OfferDayCalendar({
     </div>
   );
 
-  const emptyFilterMessage = (
-    <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-      No offers match the selected priority filter.
-    </p>
+  const emptyClass = standalone ? undefined : "shadow-none";
+  const emptyFilter = (
+    <EmptyState
+      compact={!standalone}
+      icon={CalendarDays}
+      title="No offers match this filter"
+      description="Try another priority, or switch to All to see the full board."
+      className={emptyClass}
+    />
+  );
+
+  const emptyHorizon = (
+    <EmptyState
+      compact={!standalone}
+      icon={CalendarDays}
+      title="Nothing in the next 14 days"
+      description="Offer actions and expiries will appear here once you have open campaigns."
+      className={emptyClass}
+    />
   );
 
   if (standalone) {
@@ -574,11 +590,9 @@ export function OfferDayCalendar({
       <div className={cn("flex flex-col gap-3", className)}>
         {toolbar}
         {!hasItems ? (
-          <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-            No offer actions or expiries in the next 14 days.
-          </p>
+          emptyHorizon
         ) : !filteredHasItems ? (
-          emptyFilterMessage
+          emptyFilter
         ) : view === "board" ? (
           <BoardView
             offers={offers}
@@ -614,11 +628,9 @@ export function OfferDayCalendar({
       </CardHeader>
       <CardContent>
         {!hasItems ? (
-          <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            No offer actions or expiries in the next 14 days.
-          </p>
+          emptyHorizon
         ) : !filteredHasItems ? (
-          emptyFilterMessage
+          emptyFilter
         ) : view === "board" ? (
           <BoardView
             offers={offers}

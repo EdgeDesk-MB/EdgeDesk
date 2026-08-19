@@ -164,6 +164,9 @@
 }
 
 :root {
+  /* Overlays must stay on-screen. Use for tooltip / popover / toast caps. */
+  --overlay-gutter: 1rem;
+  --overlay-max: min(20rem, calc(100vw - var(--overlay-gutter)));
   /* Three-layer hierarchy: canvas (app shell) → page (main panel) → card (lifted blocks) */
   --canvas: oklch(0.915 0.002 250);
   /* Same lightness as before; chroma 0 so it reads white-neutral, not cool grey */
@@ -258,7 +261,9 @@
    * (was 0.245 and read neon on page white, especially large Racing Desk type). */
   --negative: oklch(0.5 0.14 25);
   --success: oklch(0.45 0.12 150);
-  --warning: oklch(0.55 0.14 75);
+  /* Mid-L so text and white-on-warning plates stay AA. Hue 68 / chroma 0.18
+   * so light washes read amber, not khaki (0.55 / 0.14 / 75 browned out). */
+  --warning: oklch(0.54 0.18 68);
   /* Offer Edge / Race picks / pro-tier signature (violet family, not caution amber) */
   --edge: oklch(0.5 0.2 295);
   /* Type on solid `bg-edge` plates (`edgeNavTag`) — white on mid-dark edge */
@@ -315,8 +320,12 @@
   /* Viewport content area below sticky header + shell padding.
    * Header row (~4rem) + meta-nav strip (~2.25rem) at all breakpoints. */
   --layout-header-h: 6.25rem;
+  /* Public /demo viewing bar above the top nav. 0 when the bar is off. */
+  --layout-demo-bar-h: 0px;
+  /* Viewport offset to the bottom of the header (alerts / toasts start here). */
+  --layout-below-header: calc(var(--layout-demo-bar-h) + var(--layout-header-h));
   --layout-page-min-h: calc(
-    100dvh - var(--layout-header-h) - 2 * var(--layout-page-x) - 0.5rem
+    100dvh - var(--layout-below-header) - 2 * var(--layout-page-x) - 0.5rem
   );
   /* Chrome-style top-bar tabs — rise (meta) keeps a tighter radius; hang
    * (balance) uses a larger ear so connectors read into the topbar plate.
@@ -342,7 +351,7 @@
 /* Mobile is full-bleed: no shell gutters, so the content area gets them back */
 @media (max-width: 639px) {
   :root {
-    --layout-page-min-h: calc(100dvh - var(--layout-header-h));
+    --layout-page-min-h: calc(100dvh - var(--layout-below-header));
   }
 }
 
@@ -502,6 +511,11 @@
     @apply min-h-full font-sans;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    overflow-x: clip;
+  }
+  body {
+    max-width: 100%;
+    overflow-x: clip;
   }
   h1, h2, h3 {
     @apply font-bold tracking-tight;
@@ -521,6 +535,7 @@ html[data-font="figtree"] {
 @layer utilities {
   /** Page-level scroll - sticky header + full page panel move under it */
   .app-scroll {
+    overflow-x: clip;
     overflow-y: auto;
     overscroll-behavior: none;
     scrollbar-gutter: stable;
@@ -591,6 +606,32 @@ html[data-font="figtree"] {
     background-color: oklch(0.52 0 0 / 0.32);
   }
   .dark .app-scroll-nested:hover::-webkit-scrollbar-thumb {
+    background-color: oklch(0.72 0 0 / 0.3);
+  }
+
+  /** Nested panel with a standing thin scrollbar (more-below cue). */
+  .app-scroll-always {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.52 0 0 / 0.38) transparent;
+  }
+  .dark .app-scroll-always {
+    scrollbar-color: oklch(0.72 0 0 / 0.34) transparent;
+  }
+  .app-scroll-always::-webkit-scrollbar {
+    width: 8px;
+  }
+  .app-scroll-always::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .app-scroll-always::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: oklch(0.52 0 0 / 0.32);
+    background-clip: padding-box;
+  }
+  .dark .app-scroll-always::-webkit-scrollbar-thumb {
     background-color: oklch(0.72 0 0 / 0.3);
   }
 
@@ -1478,11 +1519,17 @@ html[data-font="figtree"] {
 
 /**
  * Stacking: toasts (40) < top bar (45) < modals/overlays (50+).
- * Top offset uses --layout-header-h + 16px via Toaster offset prop.
+ * Top offset is --layout-below-header + 16px (demo bar, then header).
  * Sonner defaults to z-index: 999999999 — unlayered + !important required.
  */
 [data-sonner-toaster] {
   z-index: 40 !important;
+  max-width: calc(100vw - var(--overlay-gutter)) !important;
+}
+
+[data-sonner-toast] {
+  max-width: min(356px, calc(100vw - var(--overlay-gutter))) !important;
+  overflow-wrap: break-word;
 }
 
 /**
@@ -2210,6 +2257,9 @@ html[data-font="figtree"] {
   --marketing-fg: #f5f5f0;
   --marketing-band: #121212;
   --marketing-band-deep: #0c0c0c;
+  /* Public page canvas (contact, terms, home). Ink stays for type on yellow. */
+  --marketing-canvas: var(--marketing-band-deep);
+  --marketing-rule: color-mix(in srgb, var(--marketing-brand) 40%, transparent);
   /* Desk-on-dark Offer Edge plate so tags and plan shine read on ink. */
   --edge: oklch(0.72 0.16 295);
   --edge-foreground: oklch(0.178 0 0);
@@ -2534,6 +2584,54 @@ html[data-font="figtree"] {
   translate: 0 0.25px;
 }
 
+/* Still thermal slip on /subscribe/success. Teeth cut to the page canvas. */
+.marketing-receipt {
+  background: var(--marketing-fg);
+}
+
+.marketing-receipt-tooth {
+  height: 8px;
+  background-color: var(--marketing-fg);
+  background-repeat: repeat-x;
+  background-size: 12px 8px;
+}
+
+.marketing-receipt-tooth-top {
+  background-image: radial-gradient(
+    circle at 6px 0,
+    var(--marketing-canvas) 6px,
+    transparent 6.5px
+  );
+}
+
+.marketing-receipt-tooth-bottom {
+  background-image: radial-gradient(
+    circle at 6px 8px,
+    var(--marketing-canvas) 6px,
+    transparent 6.5px
+  );
+}
+
+.marketing-receipt-total {
+  border-top: 1px dashed color-mix(in srgb, var(--marketing-ink) 35%, transparent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--marketing-ink) 35%, transparent);
+}
+
+.marketing-receipt-enter {
+  animation: marketing-receipt-in 0.32s ease-out both;
+}
+
+@keyframes marketing-receipt-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* One entrance beat for the hero block. */
 .marketing-fade-up {
   animation: marketing-fade-up 0.55s ease-out both;
@@ -2550,6 +2648,46 @@ html[data-font="figtree"] {
   }
 }
 
+/*
+ * Scroll reveals — same 10px settle as the hero. Hidden only after
+ * html.marketing-reveal-armed (client, after hash / on-screen marks),
+ * so no-JS and hash landings stay visible. Play once via .is-in.
+ * Smooth class arrives next frame so a `#section` load still jumps.
+ */
+html.marketing-surface {
+  scroll-padding-top: 1.5rem;
+}
+
+html.marketing-smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+html.marketing-reveal-armed .marketing-root [data-reveal]:not(.is-in),
+html.marketing-reveal-armed .marketing-root [data-reveal-stagger]:not(.is-in) > * {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+html.marketing-reveal-armed .marketing-root [data-reveal].is-in:not(.is-in-static) {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+html.marketing-reveal-armed .marketing-root [data-reveal-stagger].is-in:not(.is-in-static) > * {
+  animation: marketing-fade-up 0.4s ease-out both;
+}
+
+@media (min-width: 640px) {
+  html.marketing-reveal-armed .marketing-root [data-reveal-stagger].is-in:not(.is-in-static) > *:nth-child(2) {
+    animation-delay: 70ms;
+  }
+
+  html.marketing-reveal-armed .marketing-root [data-reveal-stagger].is-in:not(.is-in-static) > *:nth-child(3) {
+    animation-delay: 140ms;
+  }
+}
+
 @keyframes marketing-shine-spin {
   to {
     transform: rotate(360deg);
@@ -2558,6 +2696,7 @@ html[data-font="figtree"] {
 
 @media (prefers-reduced-motion: reduce) {
   .marketing-fade-up,
+  .marketing-receipt-enter,
   .marketing-panel-shine::before {
     animation: none !important;
   }
@@ -2568,5 +2707,13 @@ html[data-font="figtree"] {
 
   .marketing-interval-thumb {
     transition: none;
+  }
+
+  html.marketing-reveal-armed .marketing-root [data-reveal],
+  html.marketing-reveal-armed .marketing-root [data-reveal-stagger] > * {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
   }
 }

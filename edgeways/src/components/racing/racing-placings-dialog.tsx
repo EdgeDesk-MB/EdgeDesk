@@ -260,10 +260,10 @@ export function RacingPlacingsDialog({
     >
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       <DialogContent className="max-w-md overflow-y-auto sm:max-w-md">
-        <DialogHeader className="pr-8">
+        <DialogHeader>
           <DialogTitle>Race result</DialogTitle>
           <DialogDescription>
-            Enter 1st–4th, or paste a result / screenshot. Click a # to mark SP favourite.
+            Enter 1st–4th, or paste a result.
           </DialogDescription>
         </DialogHeader>
 

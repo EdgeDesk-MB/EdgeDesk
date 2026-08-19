@@ -30,12 +30,12 @@ async function loadLogo() {
   return `data:image/png;base64,${logo.toString("base64")}`;
 }
 
-function label(text) {
+function label(text, size = 28) {
   return h(
     "div",
     {
       style: {
-        fontSize: 28,
+        fontSize: size,
         fontWeight: 600,
         letterSpacing: "0.16em",
         textTransform: "uppercase",
@@ -43,6 +43,91 @@ function label(text) {
       },
     },
     text
+  );
+}
+
+function glimpseFrame(title, caption, body) {
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        background: PANEL,
+        border: `1px solid ${LINE}`,
+        borderRadius: 20,
+      },
+    },
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          padding: "22px 32px",
+          borderBottom: `1px solid ${LINE}`,
+        },
+      },
+      label(title, 24)
+    ),
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          padding: "24px 32px",
+        },
+      },
+      ...body
+    ),
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          padding: "20px 32px",
+          borderTop: `1px solid ${LINE}`,
+          fontSize: 24,
+          lineHeight: 1.35,
+          color: MUTED,
+        },
+      },
+      caption
+    )
+  );
+}
+
+function planRow(time, line, last = false) {
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: 20,
+        paddingBottom: last ? 0 : 16,
+        marginBottom: last ? 0 : 16,
+        borderBottom: last ? "none" : `1px solid rgba(255,255,255,0.06)`,
+      },
+    },
+    h(
+      "div",
+      {
+        style: {
+          width: 90,
+          fontSize: 26,
+          fontVariantNumeric: "tabular-nums",
+          color: MUTED,
+        },
+      },
+      time
+    ),
+    h(
+      "div",
+      { style: { fontSize: 30, color: "rgba(245,245,240,0.88)" } },
+      line
+    )
   );
 }
 
@@ -70,7 +155,7 @@ async function main() {
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          padding: "88px 120px 80px",
+          padding: "72px 100px 68px",
         },
       },
       h(
@@ -85,8 +170,8 @@ async function main() {
         h("img", {
           src: logoSrc,
           alt: "edgeways",
-          width: 840,
-          height: 216,
+          width: 720,
+          height: 186,
           style: { objectFit: "contain" },
         }),
         h(
@@ -114,7 +199,7 @@ async function main() {
           style: {
             display: "flex",
             flexDirection: "column",
-            marginTop: 72,
+            marginTop: 48,
           },
         },
         h(
@@ -137,7 +222,7 @@ async function main() {
               display: "flex",
               flexDirection: "column",
               marginTop: 28,
-              fontSize: 108,
+              fontSize: 88,
               fontWeight: 600,
               lineHeight: 1.05,
               letterSpacing: "-0.03em",
@@ -150,14 +235,14 @@ async function main() {
           "div",
           {
             style: {
-              marginTop: 36,
-              fontSize: 40,
+              marginTop: 24,
+              fontSize: 36,
               lineHeight: 1.35,
               color: MUTED,
               maxWidth: 1400,
             },
           },
-          "One desk for the day. No spreadsheet pile-up."
+          "One desk for the day. No more faff."
         )
       ),
       h(
@@ -165,60 +250,236 @@ async function main() {
         {
           style: {
             display: "flex",
-            marginTop: 64,
-            background: PANEL,
-            border: `1px solid ${LINE}`,
-            borderRadius: 20,
-            padding: "48px 56px",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
+            flexDirection: "column",
+            gap: 24,
+            marginTop: 40,
           },
         },
         h(
           "div",
-          { style: { display: "flex", flexDirection: "column", gap: 10 } },
-          label("Do next"),
-          h(
-            "div",
-            { style: { fontSize: 44, fontWeight: 600, color: FG } },
-            "Paddy Power · £20 qualifier"
-          ),
-          h(
-            "div",
-            { style: { fontSize: 32, color: MUTED } },
-            "Free bet if 2nd or 3rd"
-          )
+          {
+            style: {
+              display: "flex",
+              flexDirection: "row",
+              gap: 24,
+            },
+          },
+          glimpseFrame("Daily plan", "Offers, races, fixtures. One day, one list.", [
+            planRow("13:05", "Sky Bet · £10 qualifier"),
+            planRow("14:20", "Newbury · EW lay"),
+            planRow("15:00", "Chelsea v Arsenal track", true),
+          ]),
+          glimpseFrame("Edge Report", "Expected versus realised. After commission.", [
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                },
+              },
+              h("div", { style: { fontSize: 28, color: MUTED } }, "Expected"),
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 36,
+                    fontWeight: 700,
+                    color: MONEY,
+                    fontVariantNumeric: "tabular-nums",
+                  },
+                },
+                "+£14.00"
+              )
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginTop: 20,
+                },
+              },
+              h("div", { style: { fontSize: 28, color: MUTED } }, "Realised"),
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 36,
+                    fontWeight: 700,
+                    color: MONEY,
+                    fontVariantNumeric: "tabular-nums",
+                  },
+                },
+                "+£12.40"
+              )
+            ),
+            h("div", {
+              style: { height: 1, background: LINE, marginTop: 22, marginBottom: 22 },
+            }),
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                },
+              },
+              h("div", { style: { fontSize: 28, color: MUTED } }, "Captured"),
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 36,
+                    fontWeight: 700,
+                    color: FG,
+                    fontVariantNumeric: "tabular-nums",
+                  },
+                },
+                "83%"
+              )
+            )
+          ])
         ),
         h(
           "div",
           {
             style: {
               display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 10,
-              paddingLeft: 48,
-              borderLeft: `1px solid ${LINE}`,
+              flexDirection: "row",
+              gap: 24,
             },
           },
-          label("Potential edge"),
-          h(
-            "div",
-            {
-              style: {
-                fontSize: 44,
-                fontWeight: 700,
-                color: MONEY,
-                fontVariantNumeric: "tabular-nums",
+          glimpseFrame("Racing Desk", "Live, mixed or estimate. Confidence you can act on.", [
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                },
               },
-            },
-            "+£15.00"
-          ),
-          h(
-            "div",
-            { style: { fontSize: 32, color: MUTED } },
-            "£20 free bet value"
-          )
+              h(
+                "div",
+                { style: { fontSize: 32, fontWeight: 600, color: FG } },
+                "Newbury  14:20"
+              ),
+              h(
+                "div",
+                {
+                  style: {
+                    display: "flex",
+                    background: "rgba(52,211,153,0.16)",
+                    color: MONEY,
+                    fontSize: 22,
+                    fontWeight: 600,
+                    padding: "6px 14px",
+                    borderRadius: 999,
+                  },
+                },
+                "Live"
+              )
+            ),
+            h(
+              "div",
+              { style: { marginTop: 18, fontSize: 30, color: "rgba(245,245,240,0.82)" } },
+              "Thunder Path"
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 18,
+                },
+              },
+              h("div", { style: { fontSize: 26, color: MUTED } }, "Lay stake"),
+              h(
+                "div",
+                {
+                  style: {
+                    fontSize: 28,
+                    color: FG,
+                    fontVariantNumeric: "tabular-nums",
+                  },
+                },
+                "£18.40"
+              )
+            ),
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 10,
+                },
+              },
+              h("div", { style: { fontSize: 26, color: MUTED } }, "Confidence"),
+              h("div", { style: { fontSize: 26, fontWeight: 600, color: BRAND } }, "High")
+            )
+          ]),
+          glimpseFrame("Alerts", "Exposure, 2UP, expiry. Push lands with the desk closed.", [
+            h(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 20,
+                  background: "rgba(255,255,255,0.04)",
+                  border: `1px solid ${LINE}`,
+                  borderRadius: 16,
+                  padding: "22px 24px",
+                },
+              },
+              h(
+                "div",
+                {
+                  style: {
+                    display: "flex",
+                    width: 56,
+                    height: 56,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: BRAND,
+                    borderRadius: 12,
+                    color: INK,
+                    fontSize: 28,
+                    fontWeight: 700,
+                  },
+                },
+                "⚡"
+              ),
+              h(
+                "div",
+                { style: { display: "flex", flexDirection: "column", flex: 1 } },
+                h(
+                  "div",
+                  { style: { fontSize: 30, fontWeight: 600, color: FG } },
+                  "Naked exposure"
+                ),
+                h(
+                  "div",
+                  {
+                    style: {
+                      marginTop: 8,
+                      fontSize: 24,
+                      lineHeight: 1.35,
+                      color: MUTED,
+                    },
+                  },
+                  "Sky Bet back is open. Lay still missing on Betfair."
+                )
+              )
+            )
+          ])
         )
       ),
       h(
@@ -229,7 +490,7 @@ async function main() {
             justifyContent: "space-between",
             alignItems: "center",
             marginTop: "auto",
-            paddingTop: 36,
+            paddingTop: 28,
             borderTop: `1px solid ${LINE}`,
           },
         },

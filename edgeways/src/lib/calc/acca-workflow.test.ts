@@ -7,6 +7,7 @@ import {
   finalLegLockLay,
   nextSequentialLay,
   priorLayLiabilities,
+  sequentialLiabilityLadder,
   wholeAccaLay,
 } from "./acca-workflow";
 
@@ -390,5 +391,106 @@ describe("applyAccaBoost - winnings-only convention (Sam's call, 2026-07-22)", (
     // £20 stake → unboosted win £115, boosted win £143.50
     expect(applyAccaBoost(5.75, 30)).toBeCloseTo(7.175, 10);
     expect(20 * applyAccaBoost(5.75, 30)).toBeCloseTo(143.5, 10);
+  });
+});
+
+describe("sequentialLiabilityLadder - all-win exchange reservations", () => {
+  // Sam's double: £10 @ 4.00 × 5.50 = 22.00, commission 0. At create, lay
+  // odds are unknown so the bookie price is the proxy:
+  //   leg 1 cover £10, liability 10 × (4.00 − 1) = £30
+  //   prior becomes £30; final lock at 5.50:
+  //     win0 = 10 × 21 − 30 = 180, lose0 = −40, L = 220 / 5.50 = £40
+  //     liability 40 × 4.50 = £180
+  it("create-time 2-fold uses back odds as the lay proxy (this campaign)", () => {
+    const steps = sequentialLiabilityLadder({
+      stake: 10,
+      commission: 0,
+      method: "sequential",
+      legs: [
+        { seq: 1, label: "Is She Now", backOdds: 4, result: "pending", layStake: null, layOdds: null },
+        { seq: 2, label: "Sunrush", backOdds: 5.5, result: "pending", layStake: null, layOdds: null },
+      ],
+    });
+    expect(steps).toHaveLength(2);
+    expect(steps[0]).toMatchObject({
+      label: "Is She Now",
+      kind: "cover",
+      layStake: 10,
+      layOdds: 4,
+      liability: 30,
+      reserved: false,
+      oddsProxy: true,
+    });
+    expect(steps[1]).toMatchObject({
+      label: "Sunrush",
+      kind: "lock",
+      layStake: 40,
+      layOdds: 5.5,
+      liability: 180,
+      reserved: false,
+      oddsProxy: true,
+    });
+  });
+
+  it("after a winning first lay, the final lock uses live 5.90 (this campaign)", () => {
+    // Logged £10 @ 4.20, won: prior £32. Lock at 5.90:
+    //   win0 = 210 − 32 = 178, lose0 = −42, L = 220 / 5.90 = 37.288… → £37.29
+    //   liability 37.29 × 4.90 = £182.721 → £182.72
+    const steps = sequentialLiabilityLadder({
+      stake: 10,
+      commission: 0,
+      method: "sequential",
+      legs: [
+        { seq: 1, label: "Is She Now", backOdds: 4, result: "won", layStake: 10, layOdds: 4.2 },
+        { seq: 2, label: "Sunrush", backOdds: 5.5, result: "pending", layStake: null, layOdds: 5.9 },
+      ],
+    });
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.kind).toBe("lock");
+    expect(steps[0]!.layStake).toBeCloseTo(37.29, 10);
+    expect(steps[0]!.liability).toBeCloseTo(182.72, 10);
+    expect(steps[0]!.reserved).toBe(false);
+    expect(steps[0]!.oddsProxy).toBe(false);
+  });
+
+  it("a logged but still-pending first lay is reserved; insurance_legs keeps cover on the last", () => {
+    // Square on leg 1 at the real 4.20: reserved liability £32.
+    // insurance_legs does not lock: cover2 = 10 + 32 = £42, L = 42 × 4.90 = £205.80
+    const steps = sequentialLiabilityLadder({
+      stake: 10,
+      commission: 0,
+      method: "insurance_legs",
+      legs: [
+        { seq: 1, label: "Is She Now", backOdds: 4, result: "pending", layStake: 10, layOdds: 4.2 },
+        { seq: 2, label: "Sunrush", backOdds: 5.5, result: "pending", layStake: null, layOdds: 5.9 },
+      ],
+    });
+    expect(steps[0]).toMatchObject({
+      kind: "placed",
+      liability: 32,
+      reserved: true,
+      oddsProxy: false,
+    });
+    expect(steps[1]).toMatchObject({
+      kind: "cover",
+      layStake: 42,
+      liability: 205.8,
+      reserved: false,
+      oddsProxy: false,
+    });
+  });
+
+  it("a busted run needs no further reservations", () => {
+    expect(
+      sequentialLiabilityLadder({
+        stake: 10,
+        commission: 0,
+        method: "sequential",
+        legs: [
+          { seq: 1, label: "A", backOdds: 4, result: "won", layStake: 10, layOdds: 4.2 },
+          { seq: 2, label: "B", backOdds: 5.5, result: "lost", layStake: 23.18, layOdds: 5.9 },
+        ],
+      })
+    ).toEqual([]);
   });
 });

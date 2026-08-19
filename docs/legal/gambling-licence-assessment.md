@@ -64,8 +64,8 @@ target **operators**, not tools.
 |---|---|---|
 | Payment processor acceptance | Stripe restricted-business policy | EDGE-1 |
 | Marketing claims ("risk-free profit") | ASA / CAP advertising codes | Marketing review before launch push |
-| Subscription auto-renewal, refunds, cooling-off | Consumer Contracts Regs / CRA 2015 | Terms of Service draft (EDGE-11) |
-| Data protection | UK GDPR | ICO registration (EDGE-9), Privacy Policy (EDGE-12) |
+| Subscription auto-renewal, refunds, cooling-off | Consumer Contracts Regs / CRA 2015 | Terms of Service draft (EDGE-11); public `/terms` + signup checkbox (EDGE-61) |
+| Data protection | UK GDPR | ICO registration (EDGE-9), Privacy Policy draft (EDGE-12); public `/privacy` + waitlist notice (EDGE-61) |
 | Pooled odds redistribution | Provider contracts / IP | EDGE-45 |
 
 ## 6. Conclusion
@@ -114,5 +114,21 @@ due diligence. Draft:
 
 ---
 
+## 9. Gibraltar / Oddsmonkey (checked 16 Aug 2026)
+
+Oddsmonkey’s Terms of Use: site operated by Liquidity Trading Limited,
+Gibraltar company 122680, Madison Building, Midtown, Queensway GX11 1AA.
+Their footer describes them as an aggregator of operator sites licensed by
+the Gambling Commission.
+
+That is an affiliate / discovery business in the Gibraltar e-gaming cluster.
+It is **not** evidence that Edgeways needs a Gibraltar company, and it is
+**not** a blocker. UK consumer law still applies to UK customers. Stay UK.
+Company form is EDGE-15 (sole trader vs Ltd). Do **not** copy their
+aggregator line onto Edgeways legal pages.
+
+---
+
 *Filed per EDGE-8 re-scope (11 Aug 2026): evidence file first, solicitor on
-trigger. Review whenever a trigger fires, and in any case before EDGE-45.*
+trigger. Review whenever a trigger fires, and in any case before EDGE-45.
+Gibraltar note added 16 Aug 2026 after Oddsmonkey ToS review.*

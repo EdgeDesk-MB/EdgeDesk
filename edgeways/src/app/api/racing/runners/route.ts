@@ -7,6 +7,7 @@ import { titleCaseHorse } from "@/lib/racing/parse-race-result-text";
 import { sortRunnerNamesByOdds } from "@/lib/racing/odds";
 import { getDeskOrderedRunnerNames } from "@/lib/services/racing-desk";
 import { demoRacecards, hasRacingApiKey, racecardsFree } from "@/lib/services/theracingapi";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ function formatNames(names: string[]): string[] {
   return names.map((r) => titleCaseHorse(r)).filter(Boolean);
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const eventIdRaw = req.nextUrl.searchParams.get("eventId");
   const externalIdParam = req.nextUrl.searchParams.get("externalId")?.trim() || null;
   const dateParam = req.nextUrl.searchParams.get("date")?.trim() || null;
@@ -79,4 +80,4 @@ export async function GET(req: NextRequest) {
     externalId,
     runners,
   });
-}
+});

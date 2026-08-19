@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -14,6 +15,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { APP_VERSION_LABEL } from "@/lib/app-version";
+import { dialogTitleIcon } from "@/lib/ui/surface-styles";
+import { cn } from "@/lib/utils";
 import {
   Calculator,
   Gift,
@@ -27,22 +30,26 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Welcome to Edgeways",
-    body: "A local-first matched betting command centre. Calculators, live events, offer tracking and a real-time P&L dashboard - your edge surfaced on every screen.",
+    body: "Calculators, offers, and live P&L.",
+    help: "We do not send bookie offers.",
   },
   {
     icon: Key,
-    title: "Demo mode or API keys",
-    body: "Everything works without keys: calculators, tracker, offers and the football simulator. Add optional API keys in .env.local for live fixtures, real lay odds and auto settlement. See Settings → Data & API for status.",
+    title: "Demo or live keys",
+    body: "Works without keys.",
+    help: "Add API keys in Settings when you want live data.",
   },
   {
     icon: LayoutDashboard,
-    title: "The 60-second demo loop",
-    body: "Tracked Events → Simulate match → “2UP drama”. Calculators → Dutching → 2UP dutch → Add to tracker. Link the bet, then watch the Live Dashboard move as goals go in.",
+    title: "The 60-second loop",
+    body: "Simulate, dutch, add, watch.",
+    help: "The same loop you will run every day.",
   },
   {
     icon: Trophy,
-    title: "Racing Desk for offers",
-    body: "Add a place-refund offer, open Racing Desk, and use Intelligence to find qualifying races. Lay button opens the matched calculator; proxy odds are estimates - verify on the bookie before placing.",
+    title: "Racing Desk",
+    body: "Find a qualifier from an offer.",
+    help: "Add a place-refund offer, then use Race picks to find a qualifier.",
   },
 ] as const;
 
@@ -83,19 +90,21 @@ function WelcomeBody({
   return (
     <>
       <DialogHeader>
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary-text">
-            <Icon className="size-5" />
-          </div>
-          <div>
-            <DialogTitle>{current.title}</DialogTitle>
-            <DialogDescription className="text-xs">
-              {APP_VERSION_LABEL} · Step {step + 1} of {STEPS.length}
-            </DialogDescription>
-          </div>
-        </div>
+        <DialogTitle className="flex items-center gap-2.5">
+          <Icon className={cn(dialogTitleIcon, "text-primary-text")} />
+          {current.title}
+        </DialogTitle>
+        <DialogDescription
+          explainer={
+            <DialogExplainer label="More about this step">{current.help}</DialogExplainer>
+          }
+        >
+          {current.body}
+        </DialogDescription>
       </DialogHeader>
-      <p className="text-sm leading-relaxed text-muted-foreground">{current.body}</p>
+      <p className="text-xs text-muted-foreground">
+        {APP_VERSION_LABEL} · Step {step + 1} of {STEPS.length}
+      </p>
       <div className="flex justify-center gap-1.5">
         {STEPS.map((_, i) => (
           <span

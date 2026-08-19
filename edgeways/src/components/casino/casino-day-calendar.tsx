@@ -21,6 +21,8 @@ import {
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
+import { EmptyState } from "@/components/help/empty-state";
+import { CalendarDays } from "lucide-react";
 
 function headerTint(offer: CasinoOfferSummary): string | null {
   if (offer.expectedEv > 0.005) return "offer-header-tint-win";
@@ -92,9 +94,11 @@ export function CasinoDayCalendar({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {!hasItems ? (
-        <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          No casino offer expiries in the next 14 days.
-        </p>
+        <EmptyState
+          icon={CalendarDays}
+          title="No casino expiries in the next 14 days"
+          description="Logged casino campaigns show here as their wagering window closes."
+        />
       ) : (
         days.map((day) => (
           <section

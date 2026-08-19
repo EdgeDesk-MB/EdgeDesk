@@ -191,8 +191,8 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
                   <span className="chart-bet-marker__inner" />
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[14rem] text-xs">
-                <p className="truncate font-medium">{marker.label}</p>
+              <TooltipContent side="top" className="max-w-[min(14rem,calc(100vw-var(--overlay-gutter)))] text-xs">
+                <p className="font-medium text-pretty break-words">{marker.label}</p>
                 <p className="text-background/80">
                   {statusLabel}
                   {" · "}

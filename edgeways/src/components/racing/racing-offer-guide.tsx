@@ -19,6 +19,7 @@ import { VenueBadge } from "@/components/venue-badge";
 import { MoneyFlow } from "@/components/money-flow";
 import { OfferConfidenceBadge } from "@/components/offers/offer-confidence-badge";
 import { useAppState } from "@/hooks/use-app-state";
+import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import {
   AlertTriangle,
   Calculator,
@@ -156,6 +157,8 @@ function PlayGuidance({
   heuristicName?: string;
   dataSource?: RacingOfferGuideProps["dataSource"];
 }) {
+  const { state } = useAppState();
+  const mentionRacePicks = canUseOfferEdge(state?.settings);
   if (edge) {
     return (
       <div className={cn(edgePanel, "p-1")}>
@@ -217,8 +220,8 @@ function PlayGuidance({
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Qualifies, but no modelled Edge play yet. Heuristic pick:{" "}
-            <span className="font-medium text-foreground">{heuristicName}</span>. Prefer Race picks
-            when available.
+            <span className="font-medium text-foreground">{heuristicName}</span>
+            {mentionRacePicks ? ". Prefer Race picks when available." : "."}
           </p>
         </div>
       </div>

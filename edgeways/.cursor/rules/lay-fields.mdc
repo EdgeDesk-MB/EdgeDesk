@@ -1,0 +1,33 @@
+---
+description: Exchange-aligned lay odds and lay stake fields
+globs: src/app/**/*.tsx,src/components/**/*.tsx
+alwaysApply: false
+---
+
+# Lay fields (odds and stake)
+
+Never add a lay-odds or lay-stake input with a raw `step={0.01}` number field.
+The increment and the idle decimal places must match the exchange.
+
+## Lay odds
+
+Use `exchangeOddsStepping` on `NumField` / `PanelInput`, or
+`exchangeOddsStepHandlers` from `src/lib/calc/exchange-odds-step.ts`.
+
+- UK exchange tick ladder (Betfair / Betdaq / Matchbook / Smarkets).
+- Up / down arrows and the wheel move one tick. Typed prices stay as
+  entered (6.97 is valid until the user steps). Do not snap on blur.
+- Match Add bet `PanelInput`: arrows = ladder, typing = precise odds.
+
+## Lay stake
+
+Use `layStakeStepping` on `NumField`, or `LayStakeBanner` /
+`formatLayStake` + `layStakeStepHandlers` from
+`src/lib/calc/exchange-stake-step.ts`.
+
+- Increment is £0.01 (pence). Idle display is always two decimal places
+  (`31.56`, `32.00`).
+- Arrow / wheel steps one penny. Do not drop trailing zeros.
+- Calculated stakes stay on `roundPence` / `executableLayStake`.
+
+Full note: `docs/design-system.md` → “Lay fields (odds and stake)”.

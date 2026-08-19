@@ -30,21 +30,31 @@ function slotDotClass(slot: DailyPlanSlot): string {
   return "bg-muted-foreground/60";
 }
 
-function SlotRow({ slot }: { slot: DailyPlanSlot }) {
+function SlotRow({
+  slot,
+  reserveTime,
+}: {
+  slot: DailyPlanSlot;
+  /** Keep a time gutter so anytime dots line up with timed rows. */
+  reserveTime: boolean;
+}) {
   const timeLabel = slot.at != null ? formatClockTime(new Date(slot.at)) : "";
   const urgent = slot.priority === "critical" && !slot.done;
+  const showTime = reserveTime || slot.at != null;
 
   const body = (
     <>
-      <span
-        className={cn(
-          "w-14 shrink-0 text-right text-sm font-semibold tabular-nums sm:w-12 sm:text-xs",
-          urgent ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground",
-          slot.done && "line-through opacity-70"
-        )}
-      >
-        {timeLabel}
-      </span>
+      {showTime ? (
+        <span
+          className={cn(
+            "w-14 shrink-0 text-right text-sm font-semibold tabular-nums sm:w-12 sm:text-xs",
+            urgent ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground",
+            slot.done && "line-through opacity-70"
+          )}
+        >
+          {timeLabel}
+        </span>
+      ) : null}
       <span
         className={cn("size-2 shrink-0 rounded-full sm:size-1.5", slotDotClass(slot))}
         aria-hidden
@@ -76,7 +86,7 @@ function SlotRow({ slot }: { slot: DailyPlanSlot }) {
   );
 
   const rowClass = cn(
-    "flex items-center gap-2.5 rounded-md px-2 py-3 sm:py-1.5",
+    "flex items-center gap-2.5 rounded-md py-3 sm:py-1.5",
     slot.done && "opacity-60",
     slot.href && "transition-colors hover:bg-selection-subtle"
   );
@@ -146,7 +156,7 @@ export function DailyPlan({ className }: { className?: string }) {
           <ol className="flex flex-col">
             {timed.map((slot) => (
               <li key={slot.id}>
-                <SlotRow slot={slot} />
+                <SlotRow slot={slot} reserveTime />
               </li>
             ))}
           </ol>
@@ -157,7 +167,7 @@ export function DailyPlan({ className }: { className?: string }) {
               role="heading"
               aria-level={3}
               className={cn(
-                "px-2 pb-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+                "pb-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
                 timed.length > 0 && "mt-1.5 border-t border-border/60 pt-2"
               )}
             >
@@ -166,14 +176,14 @@ export function DailyPlan({ className }: { className?: string }) {
             <ol className="flex flex-col">
               {anytime.map((slot) => (
                 <li key={slot.id}>
-                  <SlotRow slot={slot} />
+                  <SlotRow slot={slot} reserveTime={timed.length > 0} />
                 </li>
               ))}
             </ol>
           </>
         ) : null}
         {doneCount > 0 ? (
-          <p className="px-2 pb-1 pt-1.5 text-[11px] text-muted-foreground">
+          <p className="pb-1 pt-1.5 text-[11px] text-muted-foreground">
             {doneCount} of {slots.length} done
           </p>
         ) : null}

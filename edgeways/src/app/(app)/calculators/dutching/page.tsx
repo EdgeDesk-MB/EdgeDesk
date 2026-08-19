@@ -9,7 +9,7 @@ import { DutchOutcomesBuilder, inferMatchOddsSelection } from "@/components/calc
 import { MoneyFlow } from "@/components/money-flow";
 import { CalculatorShell } from "@/components/page-shell";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { twoUpDutchScenarios, type DutchLeg, type DutchResult } from "@/lib/calc";
+import { twoUpDutchScenarios, type DutchLeg, type DutchResult } from "@/lib/calc/dutching";
 import { cn } from "@/lib/utils";
 
 export default function DutchingCalculatorPage() {

@@ -40,19 +40,50 @@ export function BrandAccentSelect({
 
   useEffect(() => {
     return () => {
-      if (persistTimer.current) clearTimeout(persistTimer.current);
+      flushPersist();
     };
+    // Flush the last typed custom hex if Settings unmounts mid-debounce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function schedulePersist(id: BrandAccentPresetId, nextHex: string) {
+  const pendingPersist = useRef<{
+    id: BrandAccentPresetId;
+    hex: string;
+  } | null>(null);
+
+  function flushPersist() {
+    const pending = pendingPersist.current;
+    pendingPersist.current = null;
+    if (persistTimer.current) {
+      clearTimeout(persistTimer.current);
+      persistTimer.current = null;
+    }
+    if (pending && onPersist) onPersist(pending.id, pending.hex);
+  }
+
+  function schedulePersist(
+    id: BrandAccentPresetId,
+    nextHex: string,
+    immediate = false
+  ) {
     if (!onPersist) return;
+    pendingPersist.current = { id, hex: nextHex };
     if (persistTimer.current) clearTimeout(persistTimer.current);
-    persistTimer.current = setTimeout(() => onPersist(id, nextHex), 300);
+    if (immediate) {
+      persistTimer.current = null;
+      pendingPersist.current = null;
+      onPersist(id, nextHex);
+      return;
+    }
+    persistTimer.current = setTimeout(() => {
+      persistTimer.current = null;
+      flushPersist();
+    }, 300);
   }
 
   async function pickPreset(id: Exclude<BrandAccentPresetId, "custom">) {
     const resolved = await setPreset(id);
-    schedulePersist(resolved.presetId, resolved.hex);
+    schedulePersist(resolved.presetId, resolved.hex, true);
   }
 
   async function pickCustom(nextHex: string) {
@@ -156,7 +187,7 @@ export function BrandAccentSelect({
           onClick={() => {
             void (async () => {
               const resolved = await setPreset("custom");
-              schedulePersist(resolved.presetId, resolved.hex);
+              schedulePersist(resolved.presetId, resolved.hex, true);
             })();
           }}
           className={cn(

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, accounts, exchanges } from "@/lib/db";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { getBalanceSummary } from "@/lib/services/balances";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +17,11 @@ const createSchema = z.object({
   fundedByAccountId: z.number().nullable().optional(),
 });
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json(getBalanceSummary());
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -91,4 +92,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ account: inserted });
-}
+});

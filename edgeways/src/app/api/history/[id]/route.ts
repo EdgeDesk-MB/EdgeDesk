@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { updateHistoryNote } from "@/lib/services/history-feed";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ const patchSchema = z.object({
   note: z.string().nullable(),
 });
 
-export async function PATCH(
+export const PATCH = withDeskScope(async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -32,4 +33,4 @@ export async function PATCH(
   }
 
   return NextResponse.json({ entry });
-}
+});

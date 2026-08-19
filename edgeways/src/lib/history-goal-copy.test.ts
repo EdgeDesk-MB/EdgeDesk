@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { EventRow, HistoryRow } from "@/lib/db/schema";
 import {
   formatGoalHistoryCopy,
+  formatGoalScorelineSegments,
+  formatGoalScorelineText,
   goalHistoryCopyFromEntry,
   inferGoalScoringSidesFromEntries,
   inferScoringSide,
@@ -191,6 +193,74 @@ describe("goalHistoryCopyFromEntry", () => {
         event
       ).title
     ).toBe("Goal: K. Mbappé!");
+  });
+
+  it("does not repeat Goal when the stored title is Goal · team", () => {
+    const copy = goalHistoryCopyFromEntry(
+      entry({
+        title: "Goal · Paris Saint Germain",
+        detail: "Paris Saint Germain 2-0 Aston Villa",
+        dedupe: "demo-goal-1",
+        minute: 41,
+      }),
+      { ...event, goals: JSON.stringify([{ minute: 41, side: "home" }]) }
+    );
+    expect(copy.title).toBe("Goal!");
+    expect(copy.scoringSide).toBe("home");
+  });
+});
+
+describe("formatGoalScorelineText", () => {
+  it("brackets the home tally when home scored", () => {
+    expect(
+      formatGoalScorelineText({
+        homeTeam: "Wolves",
+        awayTeam: "Blackburn",
+        homeScore: 2,
+        awayScore: 1,
+        scoringSide: "home",
+      })
+    ).toBe("Wolves [2] - 1 Blackburn");
+  });
+
+  it("brackets the away tally when away scored", () => {
+    expect(
+      formatGoalScorelineText({
+        homeTeam: "Wolves",
+        awayTeam: "Blackburn",
+        homeScore: 1,
+        awayScore: 1,
+        scoringSide: "away",
+      })
+    ).toBe("Wolves 1 - [1] Blackburn");
+  });
+
+  it("emphasises only the bracketed tally, not the team name", () => {
+    expect(
+      formatGoalScorelineSegments({
+        homeTeam: "Wolves",
+        awayTeam: "Blackburn",
+        homeScore: 2,
+        awayScore: 1,
+        scoringSide: "home",
+      })
+    ).toEqual([
+      { text: "Wolves " },
+      { text: "[2]", emphasize: true },
+      { text: " - 1 Blackburn" },
+    ]);
+  });
+
+  it("omits brackets when the scorer is unknown", () => {
+    expect(
+      formatGoalScorelineText({
+        homeTeam: "Wolves",
+        awayTeam: "Blackburn",
+        homeScore: 2,
+        awayScore: 2,
+        scoringSide: null,
+      })
+    ).toBe("Wolves 2 - 2 Blackburn");
   });
 });
 

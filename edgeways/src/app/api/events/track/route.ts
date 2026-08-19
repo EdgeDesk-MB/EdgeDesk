@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, events } from "@/lib/db";
 import { searchFixtureByTeams } from "@/lib/services/apifootball";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ function teamsMatch(a: string, b: string): boolean {
  * Resolution order: existing tracked event → real API-Football fixture → manual event.
  * Returns { event, mode } where mode ∈ "existing" | "api" | "manual".
  */
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = trackSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -92,4 +93,4 @@ export async function POST(req: NextRequest) {
     .returning()
     .get();
   return NextResponse.json({ event: inserted, mode: "manual" });
-}
+});

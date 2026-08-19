@@ -314,9 +314,18 @@ export function brandAccentStyle(hex: string): Record<string, string> {
   };
 }
 
+function expireBrandAccentCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${BRAND_ACCENT_COOKIE_KEY}=;path=/;max-age=0;SameSite=Lax`;
+}
+
 function writeBrandAccentCookie(hex: string): void {
   if (typeof document === "undefined") return;
   const normalized = normalizeHex(hex) ?? DEFAULT_BRAND_ACCENT_HEX;
+  if (normalized === DEFAULT_BRAND_ACCENT_HEX) {
+    expireBrandAccentCookie();
+    return;
+  }
   document.cookie = `${BRAND_ACCENT_COOKIE_KEY}=${encodeURIComponent(normalized)};path=/;max-age=31536000;SameSite=Lax`;
 }
 
@@ -386,9 +395,22 @@ export function writeStoredBrandAccent(state: BrandAccentState): void {
   const presetId = isBrandAccentPresetId(state.presetId)
     ? state.presetId
     : DEFAULT_BRAND_ACCENT_PRESET;
-  window.localStorage.setItem(
-    BRAND_ACCENT_STORAGE_KEY,
-    JSON.stringify({ presetId, hex })
-  );
+  if (presetId === DEFAULT_BRAND_ACCENT_PRESET && hex === DEFAULT_BRAND_ACCENT_HEX) {
+    try {
+      window.localStorage.removeItem(BRAND_ACCENT_STORAGE_KEY);
+    } catch {
+      /* private mode / quota */
+    }
+    expireBrandAccentCookie();
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      BRAND_ACCENT_STORAGE_KEY,
+      JSON.stringify({ presetId, hex })
+    );
+  } catch {
+    /* private mode / quota */
+  }
   writeBrandAccentCookie(hex);
 }

@@ -22,6 +22,7 @@ import {
   type DoNextItem,
   type FreeBetLotInput,
 } from "@/lib/offers/do-next";
+import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 
@@ -99,9 +100,10 @@ export function useDoNextItems(pollMs?: number): {
   // Offer Edge: the best race and horse per racing offer, so "place qualifying
   // bet" can name the play instead of just the bookmaker. Refreshed on the same
   // minute clock as the rest of this hook, and cached across callers.
+  const canOfferEdge = canUseOfferEdge(state?.settings);
   const hasRacingOffer = useMemo(
-    () => scopedOffers.some((o) => o.sport === "horse_racing"),
-    [scopedOffers]
+    () => canOfferEdge && scopedOffers.some((o) => o.sport === "horse_racing"),
+    [canOfferEdge, scopedOffers]
   );
   const [edgePlays, setEdgePlays] = useState<Map<number, OfferEdgePlay>>(new Map());
 

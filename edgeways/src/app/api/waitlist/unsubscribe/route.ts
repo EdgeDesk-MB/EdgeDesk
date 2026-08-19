@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { unsubscribeWaitlist } from "@/lib/services/waitlist";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +18,13 @@ async function redirectFor(req: Request, token: string) {
   return NextResponse.redirect(dest);
 }
 
-export async function GET(req: Request) {
+export const GET = withDeskScope(async function GET(req: Request) {
   const url = new URL(req.url);
   return redirectFor(req, url.searchParams.get("token") ?? "");
-}
+});
 
 /** Mail-client one-click unsubscribe (RFC 8058). */
-export async function POST(req: Request) {
+export const POST = withDeskScope(async function POST(req: Request) {
   const url = new URL(req.url);
   let token = url.searchParams.get("token") ?? "";
   if (!token) {
@@ -36,4 +37,4 @@ export async function POST(req: Request) {
     }
   }
   return redirectFor(req, token);
-}
+});

@@ -11,12 +11,13 @@ import {
   recordAlerts,
 } from "@/lib/services/alerts-inbox";
 import { dismissPush, sendPush } from "@/lib/services/push";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ alerts: listInbox() });
-}
+});
 
 const recordSchema = z.object({
   alerts: z
@@ -33,7 +34,7 @@ const recordSchema = z.object({
     .max(100),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = recordSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     void sendPush(alert).catch(() => {});
   }
   return NextResponse.json({ recorded });
-}
+});
 
 const patchSchema = z.union([
   z.object({ id: z.number().int().positive(), read: z.literal(true) }),
@@ -54,7 +55,7 @@ const patchSchema = z.union([
   z.object({ all: z.literal(true), read: z.literal(true) }),
 ]);
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -95,4 +96,4 @@ export async function PATCH(req: NextRequest) {
   markRead(parsed.data.id);
   if (row?.dedupe) void dismissPush([row.dedupe]).catch(() => {});
   return NextResponse.json({ updated: 1 });
-}
+});

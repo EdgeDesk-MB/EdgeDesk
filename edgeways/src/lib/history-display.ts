@@ -13,13 +13,17 @@ import {
 import { formatClockTime } from "@/lib/time-format";
 import { MARKET_LABELS } from "@/lib/markets";
 import {
+  formatGoalScorelineSegments,
+  formatGoalScorelineText,
   goalHistoryCopyFromEntry,
   goalHistoryScorelineParts,
   inferGoalScoringSidesFromEntries,
+  parseGoalHistoryScoreline,
   type GoalScorelineParts,
   type HistoryTitlePart,
 } from "@/lib/history-goal-copy";
 import type { Side } from "@/lib/calc/trigger";
+import { racingResultCopyFromGoals, type RacingResultCopy } from "@/lib/history-racing-copy";
 
 export type HistoryFilter =
   | "all"
@@ -303,6 +307,127 @@ export function historyGoalScoreline(
   return goalHistoryScorelineParts(entry, event, scoringSide);
 }
 
+const FOOTBALL_MATCH_MOMENT_KINDS = new Set<HistoryRow["kind"]>([
+  "kickoff",
+  "goal",
+  "two_up",
+  "full_time",
+]);
+
+/** Kick-off, goal, 2UP and full time on a football fixture — not a bet row. */
+export function isFootballMatchMoment(entry: HistoryRow, ctx: HistoryContext): boolean {
+  if (!FOOTBALL_MATCH_MOMENT_KINDS.has(entry.kind)) return false;
+  const event = resolveHistoryEvent(entry, ctx);
+  if (!event) return false;
+  return event.sport === "football" || !event.sport;
+}
+
+/** Top-row fixture for match-only football updates. */
+export function historyMatchMomentHeadline(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): string | null {
+  if (!isFootballMatchMoment(entry, ctx)) return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  if (!event) return null;
+  return formatEventTitle(event);
+}
+
+/** Race-only result row — not a bet settlement. */
+export function isRacingResultMoment(entry: HistoryRow, ctx: HistoryContext): boolean {
+  return entry.kind === "full_time" && isRacingHistoryEntry(entry, ctx);
+}
+
+/** Top-row meeting for race-only results. Time stays in the badge. */
+export function historyRacingResultHeadline(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): string | null {
+  if (!isRacingResultMoment(entry, ctx)) return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  if (!event) return null;
+  return racingVenueLabel(event.competition);
+}
+
+/** Fixture or meeting on the top row for sport-only feed moments. */
+export function historySportMomentHeadline(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): string | null {
+  return historyMatchMomentHeadline(entry, ctx) ?? historyRacingResultHeadline(entry, ctx);
+}
+
+export function historyRacingResultCopy(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): RacingResultCopy | null {
+  if (!isRacingResultMoment(entry, ctx)) return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  return (
+    racingResultCopyFromGoals(event?.goals, entry.detail) ?? {
+      label: historyEntryTitle(entry, ctx),
+      parts: [],
+    }
+  );
+}
+
+/** Spoken goal prefix for the subline. The ball mark is visual-only in the feed. */
+export function historyGoalEventLabel(entry: HistoryRow, ctx: HistoryContext): string | null {
+  if (entry.kind !== "goal") return null;
+  return goalHistoryCopyFromEntry(entry, resolveHistoryEvent(entry, ctx)).title;
+}
+
+/** Bracketed scoreline segments for the goal subline. */
+export function historyGoalScorelineSegments(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): HistoryTitlePart[] | null {
+  const scoreline = historyGoalScoreline(entry, ctx);
+  if (!scoreline) return null;
+  return formatGoalScorelineSegments(scoreline);
+}
+
+function footballFullTimeScoreSuffix(
+  entry: HistoryRow,
+  event: EventRow
+): string | null {
+  const detail = entry.detail?.trim();
+  if (detail) {
+    const parsed = parseGoalHistoryScoreline(detail, event);
+    if (parsed) {
+      const extra = detail.match(/\s+(\((?:FT:|Pens)[^)]*\))\s*$/);
+      return extra
+        ? `${parsed.homeScore}-${parsed.awayScore} ${extra[1]}`
+        : `${parsed.homeScore}-${parsed.awayScore}`;
+    }
+  }
+  if (event.homeScore != null && event.awayScore != null) {
+    return `${event.homeScore}-${event.awayScore}`;
+  }
+  return detail || null;
+}
+
+/**
+ * Second-row copy for match-only football updates that are not goals.
+ * Goals render `⚽ Goal!` + the bracketed scoreline separately.
+ */
+export function historyMatchMomentSubline(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): string | null {
+  if (!isFootballMatchMoment(entry, ctx) || entry.kind === "goal") return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  if (entry.kind === "full_time" && event) {
+    const title = historyEntryTitle(entry, ctx);
+    const score = footballFullTimeScoreSuffix(entry, event);
+    return score ? `${title} · ${score}` : title;
+  }
+  if (entry.kind === "two_up") {
+    return entry.detail?.trim() || historyEntryTitle(entry, ctx);
+  }
+  return historyEntryTitle(entry, ctx);
+}
+
 /** Where a feed row should navigate when clicked. */
 export function historyEntryHref(entry: HistoryRow, ctx: HistoryContext): string {
   const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
@@ -333,16 +458,42 @@ export function historyEntryHref(entry: HistoryRow, ctx: HistoryContext): string
   return "/history";
 }
 
+function sportMomentLinkPhrase(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): string | null {
+  if (isFootballMatchMoment(entry, ctx)) {
+    const fixture = historyMatchMomentHeadline(entry, ctx);
+    const kind = historyKindLabel(entry.kind);
+    if (entry.kind === "goal") {
+      const scoreline = historyGoalScoreline(entry, ctx);
+      const score = scoreline ? formatGoalScorelineText(scoreline) : null;
+      return [kind, fixture, score].filter(Boolean).join(", ");
+    }
+    return [kind, fixture].filter(Boolean).join(", ");
+  }
+  if (isRacingResultMoment(entry, ctx)) {
+    const meeting = historyRacingResultHeadline(entry, ctx);
+    const copy = historyRacingResultCopy(entry, ctx);
+    const places = copy?.parts.map((part) => part.text).join("") ?? null;
+    return ["Result", meeting, places].filter(Boolean).join(", ");
+  }
+  return null;
+}
+
 /** Screen-reader label for a clickable feed row. */
 export function historyEntryLinkLabel(entry: HistoryRow, ctx: HistoryContext): string {
   const href = historyEntryHref(entry, ctx);
   const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
   const event = resolveHistoryEvent(entry, ctx);
+  const matchPhrase = sportMomentLinkPhrase(entry, ctx);
 
   if (href.startsWith("/tracker")) {
+    if (matchPhrase) return `Open ${matchPhrase} in tracker`;
     return bet ? `Open ${bet.label} in tracker` : "Open profit tracker";
   }
   if (href.startsWith("/tracked-events")) {
+    if (matchPhrase) return `Open ${matchPhrase} in tracked events`;
     return event ? `Open ${formatEventTitle(event)} in tracked events` : "Open tracked events";
   }
   if (href.startsWith("/casino")) {

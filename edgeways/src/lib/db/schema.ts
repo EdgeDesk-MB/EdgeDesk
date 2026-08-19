@@ -91,6 +91,10 @@ export const bets = sqliteTable("bets", {
    * Prefer events.sport when eventId is set.
    */
   sport: text("sport"),
+  /** EDGE-68 platform import idempotency key */
+  importFingerprint: text("import_fingerprint"),
+  /** EDGE-68 origin metadata JSON (platform, original type, kickoff) */
+  importMeta: text("import_meta"),
 });
 
 /** Mug-bet cadence plan per bookie account (J5) - camouflage budgeting. */
@@ -394,8 +398,7 @@ export const userReminders = sqliteTable("user_reminders", {
 });
 
 /**
- * Local feedback / bug reports. Stored on-device; the UI can also open a
- * mailto so a copy can be sent to the maintainer.
+ * Local / test feedback rows. Live submits use the hosted Neon inbox.
  */
 export const feedbackReports = sqliteTable("feedback_reports", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -427,13 +430,21 @@ export const waitlistSignups = sqliteTable("waitlist_signups", {
 
 /**
  * Hosted account row keyed by Clerk user id (EDGE-20 / EDGE-47).
- * Entitlement tier lands later via billing webhooks; this table is the join key.
+ * Billing columns written by EDGE-5 webhooks. Desk locks stay EDGE-22.
  */
 export const appUsers = sqliteTable("app_users", {
   clerkUserId: text("clerk_user_id").primaryKey(),
   email: text("email"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+  plan: text("plan").notNull().default("free"),
+  billingStatus: text("billing_status").notNull().default("none"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  trialEndsAt: integer("trial_ends_at"),
+  founding: integer("founding").notNull().default(0),
+  /** EDGE-62 first-run profile JSON. Not betting records. */
+  onboardingProfile: text("onboarding_profile"),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */

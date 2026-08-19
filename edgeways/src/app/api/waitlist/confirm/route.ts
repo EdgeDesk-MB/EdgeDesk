@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { confirmWaitlist } from "@/lib/services/waitlist";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withDeskScope(async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token") ?? "";
   const result = await confirmWaitlist(token);
@@ -18,4 +19,4 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.redirect(dest);
-}
+});

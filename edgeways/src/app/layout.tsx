@@ -34,6 +34,7 @@ import {
   HEADER_PATTERN_COOKIE_KEY,
   normalizeHeaderPattern,
 } from "@/lib/header-pattern";
+import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { figtree, geistMono, notoSans } from "@/fonts";
 import {
   SHARE_LOCALE,
@@ -83,15 +84,20 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const jar = await cookies();
-  const cookieHex = normalizeHex(jar.get(BRAND_ACCENT_COOKIE_KEY)?.value);
+  const demoActive = jar.get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  const cookieHex = demoActive
+    ? null
+    : normalizeHex(jar.get(BRAND_ACCENT_COOKIE_KEY)?.value);
   const accentDerived = cookieHex ? deriveBrandAccent(cookieHex) : null;
   const accentStyle = accentDerived
     ? (brandAccentStyle(cookieHex!) as CSSProperties)
     : undefined;
-  const cookieFont = normalizeUiFont(jar.get(UI_FONT_COOKIE_KEY)?.value);
-  const cookiePattern = normalizeHeaderPattern(
-    jar.get(HEADER_PATTERN_COOKIE_KEY)?.value
-  );
+  const cookieFont = demoActive
+    ? DEFAULT_UI_FONT
+    : normalizeUiFont(jar.get(UI_FONT_COOKIE_KEY)?.value);
+  const cookiePattern = demoActive
+    ? DEFAULT_HEADER_PATTERN
+    : normalizeHeaderPattern(jar.get(HEADER_PATTERN_COOKIE_KEY)?.value);
 
   return (
     <html
@@ -123,7 +129,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: HEADER_PATTERN_FOUC_SCRIPT }}
         />
       </head>
-      <body className="min-h-full bg-canvas">
+      <body className="min-h-full max-w-full overflow-x-clip bg-canvas">
         <ClerkProvider
           appearance={EDGEWAYS_CLERK_APPEARANCE}
           localization={EDGEWAYS_CLERK_LOCALIZATION}

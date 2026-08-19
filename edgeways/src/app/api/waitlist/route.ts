@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { joinWaitlist } from "@/lib/services/waitlist";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ const bodySchema = z.object({
   email: z.string().trim().min(3).max(200),
 });
 
-export async function POST(req: Request) {
+export const POST = withDeskScope(async function POST(req: Request) {
   let json: unknown;
   try {
     json = await req.json();
@@ -38,4 +39,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
+});

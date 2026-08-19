@@ -3,6 +3,7 @@ import { db, bets, balanceTransactions, accounts, casinoOffers, events, offers }
 import { formatEventTitle } from "@/lib/events";
 import { MARKET_LABELS } from "@/lib/markets";
 import { computeMonthlyBreakdown, computeAccountBreakdown } from "@/lib/pnl/monthly-breakdown";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ function csvResponse(filename: string, body: string) {
   });
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const type = new URL(req.url).searchParams.get("type") ?? "bets";
 
   if (type === "balances") {
@@ -151,4 +152,4 @@ export async function GET(req: NextRequest) {
   ];
 
   return csvResponse("edgeways-bets.csv", lines.join("\n"));
-}
+});

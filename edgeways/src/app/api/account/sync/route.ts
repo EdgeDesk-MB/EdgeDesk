@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { ensureAppUser } from "@/lib/services/app-users";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ function primaryEmail(
 }
 
 /** Idempotent: create or refresh the Neon/SQLite row for the signed-in Clerk user. */
-export async function POST() {
+export const POST = withDeskScope(async function POST() {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
@@ -41,4 +42,4 @@ export async function POST() {
       { status: 500 }
     );
   }
-}
+});

@@ -176,14 +176,8 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Lock in · {bet.label}</DialogTitle>
-        <DialogDescription>
-          Back £{bet.backStake.toFixed(2)} @ {gbpOdds(bet.backOdds)}
-          {bet.layStake > 0
-            ? ` · laid £${bet.layStake.toFixed(2)} @ ${gbpOdds(bet.layOdds)}`
-            : " · no lay yet"}
-          . Enter today&apos;s exchange prices to see the closing trade.
-        </DialogDescription>
+        <DialogTitle>Lock in</DialogTitle>
+        <DialogDescription>Enter today&apos;s exchange prices.</DialogDescription>
       </DialogHeader>
 
       <div className="grid grid-cols-2 gap-3">
@@ -192,16 +186,16 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
           value={currentLayOdds}
           onChange={setCurrentLayOdds}
           min={1.01}
-          step={0.01}
           placeholder={gbpOdds(prefillOdds)}
+          exchangeOddsStepping
         />
         <NumField
           label="Exchange back (now)"
           value={currentBackOdds}
           onChange={setCurrentBackOdds}
           min={1.01}
-          step={0.01}
           placeholder={gbpOdds(prefillOdds)}
+          exchangeOddsStepping
         />
       </div>
 

@@ -12,7 +12,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { markUserSettledBetIds } from "@/lib/alerts/user-originated";
-import { Check, ChevronDown, CircleHelp, Layers, Trash2 } from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Hourglass, Layers, Link2, Radio, Timer, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,14 +36,20 @@ import { NumField } from "@/components/calc/num-field";
 import { AccaLegsTimeline } from "@/components/acca/acca-legs-timeline";
 import { AccaMethodHelpDialog } from "@/components/acca/method-help-dialog";
 import { CreateRunDialog, EditAccaRunDialog } from "@/components/acca/create-run-dialog";
+import { ExchangeFundingNotice } from "@/components/acca/exchange-funding-notice";
+import { accaExchangeFundingModel } from "@/lib/acca/exchange-funding-model";
 import { MoneyFlow } from "@/components/money-flow";
 import { VenueBadge } from "@/components/venue-badge";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { useNow } from "@/hooks/use-now";
-import type { ExchangeRow } from "@/lib/db/schema";
+import type { AccaLegRow, AccaRunRow, EventRow, ExchangeRow } from "@/lib/db/schema";
 import { deskLegTitleParts } from "@/lib/desk/desk-leg-title";
+import {
+  deskLegAutoResultNote,
+  type DeskAutoResultNote,
+} from "@/lib/desk/leg-auto-result-copy";
 import {
   DEFAULT_LAY_LEAD_MINUTES,
   LAY_DUE_EXPIRY_MS,
@@ -56,7 +62,6 @@ import {
   priorLayLiabilities,
   wholeAccaLay,
 } from "@/lib/calc/acca-workflow";
-import type { AccaLegRow, AccaRunRow } from "@/lib/db/schema";
 import { formatClockTime } from "@/lib/time-format";
 import {
   campaignCardBadge,
@@ -80,6 +85,34 @@ import { FillSlipButton } from "@/components/fill-slip-button";
 import { ComboKindMark } from "@/components/combo-kind-mark";
 import { accaFoldNameFromResults } from "@/lib/bets/acca-fold-name";
 import { ACCA_METHOD_HELP, isWholeComboAccaMethod } from "@/content/help/acca-methods";
+
+function LegAutoResultNote({ note }: { note: DeskAutoResultNote }) {
+  const Icon =
+    note.tone === "live" ? Radio : note.tone === "armed" ? Link2 : note.tone === "due" ? Hourglass : Timer;
+  const emphasize = note.tone !== "armed";
+  return (
+    <span
+      className={cn(
+        "mt-1 flex items-start gap-1.5 text-xs",
+        emphasize ? "text-primary-text" : "text-muted-foreground"
+      )}
+      aria-live={emphasize ? "polite" : undefined}
+      aria-atomic={emphasize ? true : undefined}
+    >
+      <Icon
+        className={cn("mt-px size-3 shrink-0", note.tone === "live" && "animate-pulse")}
+        aria-hidden
+      />
+      <span>
+        <span className="font-medium">{note.title}</span>
+        <span className={emphasize ? "text-muted-foreground" : undefined}>
+          {" "}
+          · {note.detail}
+        </span>
+      </span>
+    </span>
+  );
+}
 
 function FieldHelp({ label, children }: { label: string; children: string }) {
   return (
@@ -219,9 +252,11 @@ function AccaDeskContent() {
                 activeRuns.map((rv) => <RunCard key={rv.run.id} view={rv} onChanged={load} />)
               )
             ) : historyRuns.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                No finished runs yet.
-              </p>
+              <EmptyState
+                icon={Layers}
+                title="No finished runs yet"
+                description="Completed acca runs move here once every leg has settled."
+              />
             ) : (
               historyRuns.map((rv) => (
                 <RunCard key={rv.run.id} view={rv} onChanged={load} collapsedByDefault />
@@ -250,8 +285,12 @@ function RunCard({
   const [detailsOpen, setDetailsOpen] = useState(!collapsedByDefault);
   const now = useNow(30_000);
   const { state } = useAppState(0);
+  const { defaultExchange } = useExchanges();
   const eventById = useMemo(() => {
-    const map = new Map<number, { sport: string | null; homeTeam: string; awayTeam: string }>();
+    const map = new Map<
+      number,
+      Pick<EventRow, "sport" | "homeTeam" | "awayTeam" | "status">
+    >();
     for (const e of state?.events ?? []) {
       map.set(e.id, e);
     }
@@ -344,6 +383,28 @@ function RunCard({
     .filter(Boolean)
     .join(" · ");
   const foldName = accaFoldNameFromResults(legs);
+  const funding =
+    active && !anyLost
+      ? accaExchangeFundingModel({
+          method: run.method,
+          stake: run.stake,
+          commission: run.commission,
+          boostPct: run.boostPct,
+          legs: legs.map((l) => ({
+            seq: l.seq,
+            label: deskLegTitleParts(
+              l,
+              l.eventId != null ? eventById.get(l.eventId) ?? null : null
+            ).primary,
+            backOdds: l.backOdds,
+            result: l.result,
+            layStake: l.layStake,
+            layOdds: l.layOdds,
+          })),
+          accounts: state?.balances?.accounts,
+          exchangeId: defaultExchange?.id ?? null,
+        })
+      : null;
 
   // Mid-run: tint from square provisional when known; otherwise wait for
   // finished / busted Campaign P&L.
@@ -477,6 +538,13 @@ function RunCard({
           mode={active ? "live" : "at_start"}
           className={campaignCardHeaderBlock}
         />
+        {funding ? (
+          <ExchangeFundingNotice
+            model={funding}
+            compact
+            className={campaignCardHeaderBlock}
+          />
+        ) : null}
       </CardHeader>
 
       <div className="offer-card-details border-t border-border/50">
@@ -642,9 +710,9 @@ function DeleteRunButton({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md" mobile="center">
         <DialogHeader>
-          <DialogTitle>Delete acca run?</DialogTitle>
+          <DialogTitle>Delete “{label}”?</DialogTitle>
           <DialogDescription>
-            Removes “{label}” from Acca Desk. Linked tracker bets that are still open will be voided.
+            Linked open bets will be voided.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -674,7 +742,7 @@ function LegRow({
   leg: AccaLegRow;
   now: number;
   stillOpen: boolean;
-  event?: { sport: string | null; homeTeam: string; awayTeam: string } | null;
+  event?: Pick<EventRow, "sport" | "homeTeam" | "awayTeam" | "status"> | null;
   onChanged: () => void;
 }) {
   const title = deskLegTitleParts(leg, event);
@@ -713,6 +781,17 @@ function LegRow({
   // awaited (insurance methods keep waiting - the other legs still decide
   // whether exactly one loss qualifies for the refund).
   const moot = run.method === "sequential" && anyLost && leg.result === "pending";
+  const wholeComboCovered =
+    isWholeComboAccaMethod(run.method) && (run.wholeLayBetId != null || run.noLay === 1);
+  const autoResultNote = deskLegAutoResultNote({
+    linked: leg.eventId != null,
+    result: leg.result,
+    moot,
+    actionDone: laid || wholeComboCovered,
+    isCurrent: isWholeComboAccaMethod(run.method) || !earlierPending,
+    eventStatus: event?.status ?? null,
+    sport: event?.sport ?? leg.sport,
+  });
   // Per-leg £ contribution once its lay has actually settled - liability
   // paid when the back leg won (lay lost), or the lay's win kept when the
   // back leg lost - null while unlaid, void or still pending. £0 no-lay
@@ -868,8 +947,8 @@ function LegRow({
                 ? " · no lay"
                 : ` · £${leg.layStake.toFixed(2)} @ ${leg.layOdds?.toFixed(2)}`
               : ""}
-            {leg.eventId != null ? " · auto-result" : ""}
           </span>
+          {autoResultNote ? <LegAutoResultNote note={autoResultNote} /> : null}
         </span>
         {legContribution != null ? (
           stillOpen && leg.result === "won" ? (
@@ -918,8 +997,8 @@ function LegRow({
             value={layOdds}
             onChange={setLayOdds}
             min={1.01}
-            step={0.01}
             placeholder="Exchange"
+            exchangeOddsStepping
             labelExtra={<FieldHelp label="Lay odds help">{oddsHelp}</FieldHelp>}
             className="w-[7.5rem]"
           />
@@ -931,8 +1010,8 @@ function LegRow({
               setLayStake(v);
             }}
             min={0}
-            step={0.01}
             prefix="£"
+            layStakeStepping
             placeholder={suggestion != null ? suggestion.toFixed(2) : "–"}
             labelExtra={
               <FieldHelp label="Lay stake help">
@@ -1115,8 +1194,8 @@ function WholeLayRow({
           value={layOdds}
           onChange={setLayOdds}
           min={1.01}
-          step={0.01}
           placeholder="Exchange"
+          exchangeOddsStepping
           labelExtra={
             <FieldHelp label="Combined lay odds help">
               Live combined exchange price for the whole acca. Stake updates with the odds you enter.
@@ -1132,8 +1211,8 @@ function WholeLayRow({
             setLayStake(v);
           }}
           min={0}
-          step={0.01}
           prefix="£"
+          layStakeStepping
           placeholder={suggestion != null ? suggestion.layStake.toFixed(2) : "–"}
           labelExtra={
             <FieldHelp label="Lay stake help">

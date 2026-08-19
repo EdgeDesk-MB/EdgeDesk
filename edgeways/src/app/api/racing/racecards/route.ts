@@ -9,6 +9,7 @@ import {
   resultsToday,
   type RacingRacecard,
 } from "@/lib/services/theracingapi";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ async function loadRacecardsForDate(date: string): Promise<{
   return { racecards: [], oddsTier: "free" };
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
     req.nextUrl.searchParams.get("date") ?? localCalendarDate();
 
@@ -61,4 +62,4 @@ export async function GET(req: NextRequest) {
       { status: 502 }
     );
   }
-}
+});

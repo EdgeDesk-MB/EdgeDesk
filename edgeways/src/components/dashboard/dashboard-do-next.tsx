@@ -27,6 +27,7 @@ import {
 import type { OfferSummary } from "@/lib/services/offers.types";
 import {
   convertFreeBetButtonClass,
+  doNextCarouselCardWidth,
   offerCampaignCardInteractive,
   offerCampaignCardShell,
 } from "@/lib/ui/surface-styles";
@@ -99,7 +100,7 @@ function DoNextCard({
     "do-next-card min-h-[148px] rounded-[20px]",
     layout === "stack"
       ? "w-full"
-      : "w-[min(100%,300px)] shrink-0 snap-start"
+      : cn(doNextCarouselCardWidth, "shrink-0 snap-start")
   );
 
   const body = (

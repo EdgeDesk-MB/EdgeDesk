@@ -203,6 +203,15 @@ function parseStoredGoalTitle(
     return { side: null, player: null, og };
   }
 
+  // Leftover "Goal · Arsenal" / "Goal - Arsenal" (team, no player) used to
+  // become player "Goal · Arsenal" and render as "Goal: Goal · Arsenal!".
+  const teamOnly = title.match(/^(?:Goal!?|Own goal)\s*[·\-–:]\s*(.+)$/);
+  if (teamOnly) {
+    const name = teamOnly[1].replace(/!$/, "").trim();
+    if (name === homeTeam) return { side: "home", player: null, og };
+    if (name === awayTeam) return { side: "away", player: null, og };
+  }
+
   const prefixed = title.match(/^(?:Goal!?|Own goal):\s*(.*)$/);
   const rest = prefixed ? prefixed[1].replace(/!$/, "") : title;
   if (!rest) return { side: null, player: null, og };
@@ -285,6 +294,38 @@ export function goalHistoryScorelineParts(
   const parsed = parseGoalHistoryScoreline(entry.detail, event);
   if (!parsed) return null;
   return { ...parsed, scoringSide };
+}
+
+/**
+ * Goal scoreline with the scorer's new tally in brackets:
+ * `Wolves [2] - 1 Blackburn` when home just made it 2-1.
+ */
+export function formatGoalScorelineSegments(parts: GoalScorelineParts): HistoryTitlePart[] {
+  if (parts.scoringSide === "home") {
+    return [
+      { text: `${parts.homeTeam} ` },
+      { text: `[${parts.homeScore}]`, emphasize: true },
+      { text: ` - ${parts.awayScore} ${parts.awayTeam}` },
+    ];
+  }
+  if (parts.scoringSide === "away") {
+    return [
+      { text: `${parts.homeTeam} ${parts.homeScore} - ` },
+      { text: `[${parts.awayScore}]`, emphasize: true },
+      { text: ` ${parts.awayTeam}` },
+    ];
+  }
+  return [
+    {
+      text: `${parts.homeTeam} ${parts.homeScore} - ${parts.awayScore} ${parts.awayTeam}`,
+    },
+  ];
+}
+
+export function formatGoalScorelineText(parts: GoalScorelineParts): string {
+  return formatGoalScorelineSegments(parts)
+    .map((part) => part.text)
+    .join("");
 }
 
 /**

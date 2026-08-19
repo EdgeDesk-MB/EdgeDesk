@@ -6,7 +6,8 @@
  */
 
 import { useState } from "react";
-import { ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, ListPlus, Pencil, Trash2 } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -175,7 +176,7 @@ function DeleteCampaignDialog({
         <DialogHeader>
           <DialogTitle>Delete campaign?</DialogTitle>
           <DialogDescription>
-            This permanently removes &ldquo;{offer.title}&rdquo;. This cannot be undone.
+            Permanently remove &ldquo;{offer.title}&rdquo;.
           </DialogDescription>
         </DialogHeader>
         <fieldset className="space-y-2 text-sm">
@@ -310,8 +311,8 @@ function CompleteDialogForm({
         <DialogTitle>Complete campaign</DialogTitle>
         <DialogDescription>
           {mode === "new_balance"
-            ? "Set the wallet after cashing out. The change from the current balance is recorded as Casino P&L."
-            : "Net result of the whole campaign, covering stake, bonus and cash out together."}
+            ? "Set the wallet after cashing out."
+            : "Net result of the whole campaign."}
         </DialogDescription>
       </DialogHeader>
 
@@ -591,9 +592,14 @@ export function CasinoCampaignCard({
             dialogMobile={nestedDialogMobile}
           />
         ) : (
-          <p className="rounded border border-dashed border-border/60 px-2.5 py-2 text-xs text-muted-foreground">
-            Nothing logged yet, add a step to get an EV verdict.
-          </p>
+          <EmptyState
+            compact
+            oneLine
+            icon={ListPlus}
+            title="Nothing logged yet"
+            description="Add a step to get an EV verdict."
+            className="shadow-none"
+          />
         )}
         <div className="mt-2">
           <CasinoComponentDialog

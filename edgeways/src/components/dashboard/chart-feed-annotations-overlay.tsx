@@ -114,10 +114,10 @@ export const ChartFeedAnnotationsOverlay = memo(function ChartFeedAnnotationsOve
                 <HistoryEntryIcon entry={annotation.entry} ctx={ctx} />
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[14rem] text-xs">
-              <p className="truncate font-medium">{annotation.title}</p>
+            <TooltipContent side="top" className="max-w-[min(14rem,calc(100vw-var(--overlay-gutter)))] text-xs">
+              <p className="font-medium text-pretty break-words">{annotation.title}</p>
               {annotation.subtitle ? (
-                <p className="truncate text-background/80">{annotation.subtitle}</p>
+                <p className="text-pretty break-words text-background/80">{annotation.subtitle}</p>
               ) : null}
               {annotation.amount != null ? (
                 <p className="text-background/80">

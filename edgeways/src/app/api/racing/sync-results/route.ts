@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
  * - `?force=1` - overwrite existing / incomplete results (manual Fetch results)
  * - `?skipCache=1` - bypass 90s results cache
  */
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const eventId = req.nextUrl.searchParams.get("eventId");
   const force =
     req.nextUrl.searchParams.get("force") === "1" ||
@@ -21,4 +22,4 @@ export async function POST(req: NextRequest) {
   const ids = eventId ? [Number(eventId)].filter(Number.isFinite) : undefined;
   const result = await syncRacingResultsForEvents(ids, { force, skipCache });
   return NextResponse.json(result);
-}
+});

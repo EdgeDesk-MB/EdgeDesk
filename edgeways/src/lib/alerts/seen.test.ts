@@ -59,4 +59,19 @@ describe("alert seen keys", () => {
       dismiss: ["offer_expiring:offer-5-place_qualifying:2026-08-03"],
     });
   });
+
+  it("dismisses push tags in chunks of 50", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("navigator", { serviceWorker: undefined });
+
+    const tags = Array.from({ length: 51 }, (_, i) => `result_settled:${i + 1}`);
+    await dismissAlertNotifications(tags);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[0]![1]?.body as string).dismiss).toHaveLength(50);
+    expect(JSON.parse(fetchMock.mock.calls[1]![1]?.body as string).dismiss).toEqual([
+      "result_settled:51",
+    ]);
+  });
 });

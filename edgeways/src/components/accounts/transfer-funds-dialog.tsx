@@ -23,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { api } from "@/hooks/use-app-state";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import { formatGbp, roundMoney } from "@/lib/format-money";
+import { EmptyState } from "@/components/help/empty-state";
+import { Landmark } from "lucide-react";
 
 export function TransferFundsDialog({
   open,
@@ -53,10 +55,16 @@ export function TransferFundsDialog({
           <DialogHeader>
             <DialogTitle>Transfer funds</DialogTitle>
             <DialogDescription>
-              Add a bank account first (Accounts → Add bank), then transfer between bank and
-              bookies.
+              Move cash from a bank to a bookie or exchange.
             </DialogDescription>
           </DialogHeader>
+          <EmptyState
+            compact
+            oneLine
+            icon={Landmark}
+            title="No bank yet"
+            description="Add a bank first, then move cash to bookies."
+          />
           <div className="flex justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
@@ -151,8 +159,7 @@ function TransferFundsForm({
       <DialogHeader>
         <DialogTitle>Transfer funds</DialogTitle>
         <DialogDescription>
-          Move cash between a bank and a bookie/exchange. Withdrawals can stay pending until
-          they hit your statement.
+          Move cash between a bank and a bookie.
         </DialogDescription>
       </DialogHeader>
 

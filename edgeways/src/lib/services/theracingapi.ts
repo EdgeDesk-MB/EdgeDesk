@@ -3,6 +3,8 @@
  *
  * Free plan: `/v1/racecards/free` (today + tomorrow racecards).
  * Basic plan: `/v1/results/today` (live results for auto-settlement).
+ * Standard plan: `/v1/results?start_date=` (historic days, needed for overnight
+ * open bets once `/v1/results/today` has rolled over).
  *
  * Auth: HTTP Basic - username + password from your dashboard.
  */
@@ -16,7 +18,7 @@ import {
 import type { RacingRunnerDetail } from "@/lib/racing-desk/types";
 import { spLabelMarksFavourite } from "@/lib/racing/odds";
 import { parseJockeyName } from "@/lib/racing/runner-display";
-import { localCalendarDate, londonWallToUtcMs } from "@/lib/events";
+import { localCalendarDate, londonWallToUtcMs, normaliseRacingApiOffTime } from "@/lib/events";
 
 const BASE = "https://api.theracingapi.com";
 
@@ -71,9 +73,11 @@ export type ResultsTodayOptions = {
   maxStaleMs?: number;
 };
 
-/** Drop cached `/v1/results/today` so a manual Fetch results hits the API. */
+/** Drop cached results payloads so a manual Fetch results hits the API. */
 export function clearRacingResultsCache(): void {
-  cache.delete("results:today");
+  for (const key of [...cache.keys()]) {
+    if (String(key).startsWith("results:")) cache.delete(key);
+  }
 }
 
 // The Racing API's real constraint is a per-second rate limit (5 req/s on
@@ -117,7 +121,7 @@ function parseOffTime(offDt: string | undefined, offTime: string | undefined, da
     const ms = Date.parse(offDt);
     if (!Number.isNaN(ms)) return ms;
   }
-  const time = (offTime ?? "12:00").trim();
+  const time = normaliseRacingApiOffTime((offTime ?? "12:00").trim());
   const londonMs = londonWallToUtcMs(date, time);
   if (londonMs != null) return londonMs;
   const ms = Date.parse(`${date}T${time}:00`);
@@ -358,12 +362,15 @@ export interface ResultsTodayPayload {
   results: Map<string, RaceResult>;
   /** True when credentials exist but the plan cannot call results (Free tier). */
   tierBlocked: boolean;
+  /** True when a previous day's `/v1/results` needs Standard. */
+  historicBlocked?: boolean;
   tier: RacingResultsTier;
 }
 
 interface ResultsCacheData {
   results: Map<string, RaceResult>;
   tierBlocked: boolean;
+  historicBlocked?: boolean;
   tier: RacingResultsTier;
 }
 
@@ -393,6 +400,28 @@ export async function resolveRacingResultsTier(): Promise<RacingResultsTier> {
   return payload.tier;
 }
 
+async function fetchPagedResults(basePath: string): Promise<Map<string, RaceResult>> {
+  const pageSize = 100;
+  const map = new Map<string, RaceResult>();
+  let skip = 0;
+  let total = Number.POSITIVE_INFINITY;
+  const joiner = basePath.includes("?") ? "&" : "?";
+  while (skip < total) {
+    const json = await apiGet(`${basePath}${joiner}limit=${pageSize}&skip=${skip}`);
+    const page = json.results ?? [];
+    total = Number(json.total);
+    if (!Number.isFinite(total) || total < 0) total = skip + page.length;
+    for (const item of page) {
+      const mapped = mapResult(item);
+      if (mapped) map.set(mapped.raceId, mapped.result);
+    }
+    if (page.length === 0) break;
+    skip += page.length;
+    if (page.length < pageSize) break;
+  }
+  return map;
+}
+
 /** Basic tier - today's results with finishing positions. */
 export async function resultsToday(
   options: ResultsTodayOptions = {}
@@ -415,26 +444,7 @@ export async function resultsToday(
   }
 
   try {
-    // API validates limit ≤ 100; page with skip so a full GB/IRE card is covered.
-    const pageSize = 100;
-    const map = new Map<string, RaceResult>();
-    let skip = 0;
-    let total = Number.POSITIVE_INFINITY;
-    while (skip < total) {
-      const json = await apiGet(
-        `/v1/results/today?region=gb&region=ire&limit=${pageSize}&skip=${skip}`
-      );
-      const page = json.results ?? [];
-      total = Number(json.total);
-      if (!Number.isFinite(total) || total < 0) total = skip + page.length;
-      for (const item of page) {
-        const mapped = mapResult(item);
-        if (mapped) map.set(mapped.raceId, mapped.result);
-      }
-      if (page.length === 0) break;
-      skip += page.length;
-      if (page.length < pageSize) break;
-    }
+    const map = await fetchPagedResults("/v1/results/today?region=gb&region=ire");
     const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
     cache.set(cacheKey, { at: Date.now(), data });
     rememberResultsTier("basic");
@@ -449,6 +459,59 @@ export async function resultsToday(
       cache.set(cacheKey, { at: Date.now(), data });
       rememberResultsTier("free");
       return { results: new Map(), tierBlocked: true, tier: "free" };
+    }
+    throw e;
+  }
+}
+
+/**
+ * Results for a UK calendar date. Today uses Basic `/v1/results/today`.
+ * Older days need Standard `/v1/results` and set `historicBlocked` on 401/403.
+ */
+export async function resultsForDate(
+  date: string,
+  options: ResultsTodayOptions = {}
+): Promise<ResultsTodayPayload> {
+  if (date === localCalendarDate()) return resultsToday(options);
+
+  const maxStaleMs = options.maxStaleMs ?? RESULTS_TTL_IDLE;
+  const cacheKey = `results:date:${date}`;
+  const hit = cache.get(cacheKey) as CacheEntry<ResultsCacheData> | undefined;
+  if (hit && Date.now() - hit.at < maxStaleMs) {
+    return {
+      results: hit.data.results,
+      tierBlocked: false,
+      historicBlocked: Boolean(hit.data.historicBlocked),
+      tier: hit.data.tier,
+    };
+  }
+
+  if (!hasRacingApiKey()) {
+    return { results: new Map(), tierBlocked: false, historicBlocked: false, tier: "none" };
+  }
+
+  try {
+    const map = await fetchPagedResults(
+      `/v1/results?start_date=${encodeURIComponent(date)}&end_date=${encodeURIComponent(date)}&region=gb&region=ire`
+    );
+    const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
+    cache.set(cacheKey, { at: Date.now(), data });
+    return { results: map, tierBlocked: false, historicBlocked: false, tier: "basic" };
+  } catch (e) {
+    if (isRacingTierAccessError(e)) {
+      const data: ResultsCacheData = {
+        results: new Map(),
+        tierBlocked: false,
+        historicBlocked: true,
+        tier: getCachedRacingResultsTier(),
+      };
+      cache.set(cacheKey, { at: Date.now(), data });
+      return {
+        results: new Map(),
+        tierBlocked: false,
+        historicBlocked: true,
+        tier: data.tier,
+      };
     }
     throw e;
   }
@@ -488,19 +551,47 @@ export async function racecardsByDate(
 
 export async function resultsForRaceIds(
   raceIds: string[],
-  options: ResultsTodayOptions = {}
-): Promise<{ results: Map<string, RaceResult>; tierBlocked: boolean; tier: RacingResultsTier }> {
+  options: ResultsTodayOptions & { dateByRaceId?: Record<string, string> } = {}
+): Promise<{
+  results: Map<string, RaceResult>;
+  tierBlocked: boolean;
+  historicBlocked: boolean;
+  tier: RacingResultsTier;
+}> {
   if (raceIds.length === 0) {
     const tier = getCachedRacingResultsTier();
-    return { results: new Map(), tierBlocked: tier === "free", tier };
+    return {
+      results: new Map(),
+      tierBlocked: tier === "free",
+      historicBlocked: false,
+      tier,
+    };
   }
-  const today = await resultsToday(options);
-  const out = new Map<string, RaceResult>();
+  const today = localCalendarDate();
+  const groups = new Map<string, string[]>();
   for (const id of raceIds) {
-    const hit = today.results.get(id);
-    if (hit) out.set(id, hit);
+    const date = options.dateByRaceId?.[id] ?? today;
+    const list = groups.get(date) ?? [];
+    list.push(id);
+    groups.set(date, list);
   }
-  return { results: out, tierBlocked: today.tierBlocked, tier: today.tier };
+
+  const out = new Map<string, RaceResult>();
+  let tierBlocked = false;
+  let historicBlocked = false;
+  let tier: RacingResultsTier = getCachedRacingResultsTier();
+
+  for (const [date, ids] of groups) {
+    const payload = await resultsForDate(date, options);
+    if (payload.tierBlocked) tierBlocked = true;
+    if (payload.historicBlocked) historicBlocked = true;
+    if (date === today) tier = payload.tier;
+    for (const id of ids) {
+      const hit = payload.results.get(id);
+      if (hit) out.set(id, hit);
+    }
+  }
+  return { results: out, tierBlocked, historicBlocked, tier };
 }
 
 /** Optional premium odds history from The Racing API. */
@@ -582,9 +673,9 @@ export function demoRacecards(date?: string): RacingRacecard[] {
       course: "Kempton",
       startTime: base.getTime() + 45 * 60 * 1000,
       status: "upcoming",
-      fieldSize: 6,
+      fieldSize: 8,
       offTime: "15:15",
-      runners: ["Edwardstone", "Elixir d'Ainay", "Protektorat", "Fakir d'Oudairies", "L'Homme Presse", "Ga Law"],
+      runners: ["Edwardstone", "Elixir d'Ainay", "Protektorat", "Fakir d'Oudairies", "L'Homme Presse", "Ga Law", "Pic d'Orhy", "Stage Star"],
       distance: "3m",
       going: "Soft",
       raceClass: "Class 3",
@@ -598,6 +689,8 @@ export function demoRacecards(date?: string): RacingRacecard[] {
         { horseId: "k4", name: "Fakir d'Oudairies", number: "4", jockey: "M Walsh", trainer: "W Mullins", form: "1223", spDecimal: 11.0, nonRunner: false },
         { horseId: "k5", name: "L'Homme Presse", number: "5", jockey: "Nico de Boinville", trainer: "N Henderson", form: "2132", spDecimal: 17.0, nonRunner: false },
         { horseId: "k6", name: "Ga Law", number: "6", jockey: "H Cobden", trainer: "P Nicholls", form: "3421", spDecimal: 26.0, nonRunner: false },
+        { horseId: "k7", name: "Pic d'Orhy", number: "7", jockey: "H Cobden", trainer: "P Nicholls", form: "4312", spDecimal: 41.0, nonRunner: false },
+        { horseId: "k8", name: "Stage Star", number: "8", jockey: "H Cobden", trainer: "P Nicholls", form: "5243", spDecimal: 67.0, nonRunner: false },
       ],
     },
   ];

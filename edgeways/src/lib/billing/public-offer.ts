@@ -159,14 +159,16 @@ export type BillingInterval = "month" | "year";
 
 export function planCheckoutHref(
   plan: PublicPlan,
-  interval: BillingInterval
+  interval: BillingInterval,
+  from?: "setup" | null
 ): string {
   if (plan.id === "free") return "/sign-up";
   const params = new URLSearchParams({
     plan: plan.id,
     interval,
   });
-  return `/sign-up?${params.toString()}`;
+  if (from === "setup") params.set("from", "setup");
+  return `/subscribe?${params.toString()}`;
 }
 
 export function yearlyDealLabel(): string {

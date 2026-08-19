@@ -1,0 +1,3 @@
+eventTime,date,bookmaker,details,profit,overallRunningTotal,monthlyRunningTotal,outcome,sport,event,betType,source,expectedProfit,actualProfit
+ 16-08-2026 08:33:00 , 16-08-2026 08:33:00 ,10bet,,9.67,9.67,9.67,Bet,Football,Event,Normal,Manual,10,9.67
+ 20-08-2026 19:00:00 , 16-08-2026 09:10:00 ,partypoker,Note,0.00,9.67,9.67,Benfica,Football,Benfica v AGF Aarhus,Normal,Odds,0,0

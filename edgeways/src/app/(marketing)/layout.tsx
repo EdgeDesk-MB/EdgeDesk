@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MarketingScrollEffects } from "@/components/marketing/marketing-scroll-effects";
 import { marketingShareMetadata } from "@/lib/marketing/share-metadata";
 import { getLandingVariant } from "@/lib/site-surface";
 
@@ -16,7 +17,8 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="marketing-root min-h-dvh overflow-x-clip bg-[var(--marketing-ink)] text-[var(--marketing-fg)] selection:bg-[color-mix(in_srgb,var(--marketing-brand)_35%,transparent)] selection:text-white">
+    <div className="marketing-root min-h-dvh overflow-x-clip bg-[var(--marketing-canvas)] text-[var(--marketing-fg)] selection:bg-[color-mix(in_srgb,var(--marketing-brand)_35%,transparent)] selection:text-white">
+      <MarketingScrollEffects />
       {children}
     </div>
   );

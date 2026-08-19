@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { APP_VERSION } from "@/lib/app-version";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
  * Uptime probe (EDGE-48): db ping + version, no auth, no sensitive data.
  * 200 = app and database up; 503 = app up, database unreachable.
  */
-export function GET() {
+export const GET = withDeskScope(async function GET() {
   const payload = {
     version: APP_VERSION,
     time: new Date().toISOString(),
@@ -23,4 +24,4 @@ export function GET() {
       { status: 503 }
     );
   }
-}
+});

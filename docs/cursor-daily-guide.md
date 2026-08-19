@@ -128,10 +128,10 @@ The harness is already automation-shaped. The mapping:
 
 ### Recipe 1: Feedback → Linear triage
 
-The app already collects feedback locally: `/feedback` page →
-`src/app/api/feedback/route.ts` → `feedback_reports` table (kind, summary,
-details, diagnostics, created\_at). The data lives in local SQLite, so the triage
-loop runs where the data is:
+In-app feedback writes the hosted Neon `feedback_reports` inbox and emails
+the owner via Resend (`FEEDBACK_NOTIFY_TO` or `WAITLIST_NOTIFY_TO`). It does
+not sit in the user's desk SQLite. Triage still drafts Linear issues on
+approval (`scripts/feedback-triage.ts` reads Neon when `DATABASE_URL` is set):
 
 - **Near term (local):** a scheduled in-session triage — \`/loop 1d read new
   feedback\_reports rows, dedupe against existing Linear issues, draft tickets\` —

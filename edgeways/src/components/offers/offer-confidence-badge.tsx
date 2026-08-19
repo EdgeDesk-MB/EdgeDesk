@@ -5,6 +5,7 @@ import {
 } from "@/lib/offers/place-refund-ev";
 import type { OddsSource } from "@/lib/racing/odds";
 import type { ExchangeOddsSource } from "@/lib/services/exchange/types";
+import { demoDataTag } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export type EdgeDataSource = "demo" | "racing-api" | "error";
@@ -48,15 +49,7 @@ export function OfferConfidenceBadge({
 }) {
   if (dataSource === "demo") {
     return (
-      <Badge
-        variant="outline"
-        className={cn(
-          "h-5 shrink-0 border-edge/40 text-[11px] uppercase text-edge",
-          className
-        )}
-      >
-        Demo
-      </Badge>
+      <span className={cn(demoDataTag, "shrink-0", className)}>Demo data</span>
     );
   }
 

@@ -7,6 +7,7 @@ import {
   listPendingRemindersForCasino,
   listPendingRemindersForOffer,
 } from "@/lib/services/user-reminders";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ const cancelSchema = z.object({
   id: z.number().int().positive(),
 });
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const fired = fireDueUserReminders();
   const casinoOfferId = Number(req.nextUrl.searchParams.get("casinoOfferId"));
   const offerId = Number(req.nextUrl.searchParams.get("offerId"));
@@ -34,9 +35,9 @@ export async function GET(req: NextRequest) {
         ? listPendingRemindersForOffer(offerId)
         : [];
   return NextResponse.json({ fired, pending });
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -47,9 +48,9 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }
-}
+});
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
   const parsed = cancelSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -57,4 +58,4 @@ export async function DELETE(req: NextRequest) {
   const ok = cancelUserReminder(parsed.data.id);
   if (!ok) return NextResponse.json({ error: "Reminder not found or already used" }, { status: 404 });
   return NextResponse.json({ ok: true });
-}
+});

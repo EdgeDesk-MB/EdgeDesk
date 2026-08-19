@@ -66,8 +66,8 @@ export function CasinoComponentDialog({
           <DialogTitle>{existing ? "Edit step" : "Add a step"}</DialogTitle>
           <DialogDescription>
             {existing
-              ? "Edit this cost or reward. Campaign EV is the sum of every step."
-              : "Add another qualifying wager to start the next stake tier, or a reward that pairs with the latest one."}
+              ? "Update this cost or reward."
+              : "Add a qualifying wager or a reward."}
           </DialogDescription>
         </DialogHeader>
         {open ? (

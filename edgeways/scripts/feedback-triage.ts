@@ -1,33 +1,25 @@
 /**
  * Feedback triage kernel (EDGE-43) — read-only.
  *
- * Lists feedback_reports rows not yet filed to Linear (linear_issue_id IS
- * NULL) and prints a drafted Linear issue per row, so a triage run is one
- * command. Filing stays deliberate: the agent creates the issue via the
- * Linear MCP on approval, then writes back through markFeedbackReportFiled
- * (src/lib/services/feedback.ts) — this script never writes to the DB.
+ * Lists hosted inbox rows not yet filed to Linear (linear_issue_id IS NULL)
+ * and prints a drafted Linear issue per row. Filing stays deliberate.
+ *
+ * Reads Neon when DATABASE_URL is set. Otherwise SQLite:
+ *   EDGEWAYS_DB_PATH, then data/feedback-inbox.db, then data/edgeways.db
  *
  * Run from edgeways/:
  *   npx tsx scripts/feedback-triage.ts           human-readable drafts
  *   npx tsx scripts/feedback-triage.ts --json    machine-readable for the agent
- *
- * Optional:
- *   EDGEWAYS_DB_PATH=/path/to/edgeways.db npx tsx scripts/feedback-triage.ts
  */
-
-import Database from "better-sqlite3";
+import { config } from "dotenv";
+import { resolve } from "node:path";
 import fs from "node:fs";
 import path from "node:path";
+import Database from "better-sqlite3";
+import { neon } from "@neondatabase/serverless";
 
-function resolveDbPath(): string {
-  const override = process.env.EDGEWAYS_DB_PATH?.trim();
-  if (override) return path.resolve(override);
-  const dataDir = path.join(process.cwd(), "data");
-  if (fs.existsSync(path.join(dataDir, "demo-mode"))) {
-    return path.join(dataDir, "edgeways-demo.db");
-  }
-  return path.join(dataDir, "edgeways.db");
-}
+config({ path: resolve(process.cwd(), ".env.local") });
+config({ path: resolve(process.cwd(), ".env") });
 
 type FeedbackRow = {
   id: number;
@@ -44,6 +36,7 @@ type Diagnostics = {
   href?: string;
   userAgent?: string;
   timezone?: string;
+  signedInEmail?: string | null;
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -67,48 +60,89 @@ function draftIssue(row: FeedbackRow) {
   const title = `[Feedback] ${row.summary}`;
   const bodyLines = [
     `**Kind:** ${row.kind}`,
-    `**Reported:** ${new Date(row.created_at).toISOString()}`,
+    `**Reported:** ${new Date(Number(row.created_at)).toISOString()}`,
     "",
     row.details,
     "",
     "---",
     `**App version:** ${diag.appVersion ?? "unknown"}`,
-    `**Page:** ${diag.href ?? "unknown"}`,
     `**Timezone:** ${diag.timezone ?? "unknown"}`,
     `**UA:** ${diag.userAgent ?? "unknown"}`,
     row.reply_email ? `**Reply to:** ${row.reply_email}` : null,
+    diag.signedInEmail ? `**Signed in:** ${diag.signedInEmail}` : null,
     "",
     `Feedback row #${row.id} (write back with markFeedbackReportFiled once filed).`,
   ].filter((l): l is string => l != null);
   return { feedbackId: row.id, title, labels: ["Feedback", label], body: bodyLines.join("\n") };
 }
 
-const db = new Database(resolveDbPath(), { readonly: true });
-const rows = db
-  .prepare(
-    "SELECT * FROM feedback_reports WHERE linear_issue_id IS NULL ORDER BY created_at"
-  )
-  .all() as FeedbackRow[];
-
-const drafts = rows.map(draftIssue);
-
-if (process.argv.includes("--json")) {
-  process.stdout.write(JSON.stringify({ untriaged: drafts.length, drafts }, null, 2));
-  process.exit(0);
+function resolveSqlitePath(): string | null {
+  const override = process.env.EDGEWAYS_DB_PATH?.trim();
+  if (override) return path.resolve(override);
+  const dataDir = path.join(process.cwd(), "data");
+  const inbox = path.join(dataDir, "feedback-inbox.db");
+  if (fs.existsSync(inbox)) return inbox;
+  if (fs.existsSync(path.join(dataDir, "demo-mode"))) {
+    return path.join(dataDir, "edgeways-demo.db");
+  }
+  const owner = path.join(dataDir, "edgeways.db");
+  return fs.existsSync(owner) ? owner : null;
 }
 
-if (drafts.length === 0) {
-  console.log("No untriaged feedback — every row has a Linear issue id.");
-  process.exit(0);
+async function loadUntriaged(): Promise<FeedbackRow[]> {
+  const url = process.env.DATABASE_URL?.trim();
+  if (url) {
+    const sql = neon(url);
+    const rows = await sql`
+      SELECT id, kind, summary, details, reply_email, diagnostics_json, created_at
+      FROM feedback_reports
+      WHERE linear_issue_id IS NULL
+      ORDER BY created_at
+    `;
+    return rows as FeedbackRow[];
+  }
+
+  const dbPath = resolveSqlitePath();
+  if (!dbPath) return [];
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    return db
+      .prepare(
+        "SELECT id, kind, summary, details, reply_email, diagnostics_json, created_at FROM feedback_reports WHERE linear_issue_id IS NULL ORDER BY created_at"
+      )
+      .all() as FeedbackRow[];
+  } finally {
+    db.close();
+  }
 }
 
-console.log(`${drafts.length} untriaged feedback report${drafts.length === 1 ? "" : "s"}:\n`);
-for (const d of drafts) {
-  console.log(`#${d.feedbackId} → ${d.title}`);
-  console.log(`  labels: ${d.labels.join(", ")}`);
-  console.log(
-    `  ${d.body.split("\n").slice(0, 5).join("\n  ")}${d.body.split("\n").length > 5 ? "\n  …" : ""}`
-  );
-  console.log("");
+async function main() {
+  const rows = await loadUntriaged();
+  const drafts = rows.map(draftIssue);
+
+  if (process.argv.includes("--json")) {
+    process.stdout.write(JSON.stringify({ untriaged: drafts.length, drafts }, null, 2));
+    return;
+  }
+
+  if (drafts.length === 0) {
+    console.log("No untriaged feedback — every row has a Linear issue id.");
+    return;
+  }
+
+  console.log(`${drafts.length} untriaged feedback report${drafts.length === 1 ? "" : "s"}:\n`);
+  for (const d of drafts) {
+    console.log(`#${d.feedbackId} → ${d.title}`);
+    console.log(`  labels: ${d.labels.join(", ")}`);
+    console.log(
+      `  ${d.body.split("\n").slice(0, 5).join("\n  ")}${d.body.split("\n").length > 5 ? "\n  …" : ""}`
+    );
+    console.log("");
+  }
+  console.log("File via Linear MCP on approval, then markFeedbackReportFiled(id, issue).");
 }
-console.log("File via Linear MCP on approval, then markFeedbackReportFiled(id, issue).");
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

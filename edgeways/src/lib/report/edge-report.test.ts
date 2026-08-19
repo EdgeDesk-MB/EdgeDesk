@@ -57,6 +57,8 @@ function bet(over: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     source: null,
     purpose: null,
     sport: null,
+    importFingerprint: null,
+    importMeta: null,
     ...over,
   };
 }

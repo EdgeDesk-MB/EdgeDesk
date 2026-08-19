@@ -136,9 +136,9 @@ describe("acca provisional wiring helpers", () => {
       },
     ];
     const betsById = new Map([
-      [10, { status: "won", actualProfit: 50 }],
-      [11, { status: "lost", actualProfit: -10 }],
-      [12, { status: "lost", actualProfit: -36 }],
+      [10, { status: "won" as const, actualProfit: 50 }],
+      [11, { status: "lost" as const, actualProfit: -10 }],
+      [12, { status: "lost" as const, actualProfit: -36 }],
     ]);
     expect(completedAccaDeskLinkedBetIds(bundles)).toEqual(new Set([10, 11, 12]));
     expect(accaCampaignSettledProfit(bundles[0]!, betsById)).toBe(4);
@@ -165,9 +165,9 @@ describe("acca provisional wiring helpers", () => {
       ],
     };
     const betsById = new Map([
-      [10, { status: "lost", actualProfit: -20 }],
-      [11, { status: "lost", actualProfit: -20.84 }],
-      [12, { status: "won", actualProfit: 0 }],
+      [10, { status: "lost" as const, actualProfit: -20 }],
+      [11, { status: "lost" as const, actualProfit: -20.84 }],
+      [12, { status: "won" as const, actualProfit: 0 }],
     ]);
     expect(accaCampaignSettledProfit(bundle, betsById)).toBeCloseTo(-40.84, 10);
   });
@@ -184,9 +184,9 @@ describe("acca provisional wiring helpers", () => {
       },
     ];
     const betsById = new Map([
-      [10, { status: "open", actualProfit: null }],
-      [11, { status: "lost", actualProfit: -10 }],
-      [12, { status: "open", actualProfit: null }],
+      [10, { status: "open" as const, actualProfit: null }],
+      [11, { status: "lost" as const, actualProfit: -10 }],
+      [12, { status: "open" as const, actualProfit: null }],
     ]);
     expect(completedAccaSeriesPoints(bundles, betsById, () => 0)).toEqual([]);
     expect(completedAccaDeskLinkedBetIds(bundles).size).toBe(0);

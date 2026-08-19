@@ -29,7 +29,7 @@ export function FlowTimelineStep({
   tone: FlowTimelineTone;
   children: React.ReactNode;
   className?: string;
-  /** Breathing room above the first step (8px; last step uses 16px below) */
+  /** Breathing room above the first step (8px) */
   first?: boolean;
   /** Hide the line below the final step */
   last?: boolean;
@@ -58,10 +58,11 @@ export function FlowTimelineStep({
           </span>
         </div>
         {!last ? (
-          <span className="w-[2px] min-h-[0.75rem] flex-1 bg-border" aria-hidden />
+          <span className="w-[2px] min-h-4 flex-1 bg-border" aria-hidden />
         ) : null}
       </div>
-      <div className={cn("min-w-0 flex-1", last ? "pb-4" : "pb-2.5")}>{children}</div>
+      {/* 24px between 3-row legs so the status line does not collide with the next title */}
+      <div className={cn("min-w-0 flex-1", last ? "pb-4" : "pb-6")}>{children}</div>
     </li>
   );
 }

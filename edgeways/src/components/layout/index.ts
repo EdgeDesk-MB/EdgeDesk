@@ -1,4 +1,5 @@
 export { DeskPageHeader } from "./desk-page-header";
+export { ListDaySection } from "./list-day-section";
 export {
   PageHeaderActions,
   PageHeaderStat,

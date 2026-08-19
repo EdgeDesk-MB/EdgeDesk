@@ -531,11 +531,13 @@ function TrackerContent() {
             </div>
           ) : scopedBets.length === 0 ? (
             <EmptyState
+              compact
               icon={NotebookPen}
               title={deskQueueEmptyCopy(deferredDeskQueue).title}
               description={deskQueueEmptyCopy(deferredDeskQueue).description}
               action={{ label: "Open calculators", href: "/calculators" }}
               secondaryAction={{ label: "Offers", href: "/offers" }}
+              className="shadow-none"
             />
           ) : useCampaignView ? (
             <>
@@ -642,8 +644,7 @@ function ClearAllBetsDialog({
         <DialogHeader>
           <DialogTitle>Clear all bets?</DialogTitle>
           <DialogDescription>
-            This permanently deletes all {count} bet{count === 1 ? "" : "s"} in the tracker and
-            removes their settlement entries from the dashboard history. This cannot be undone.
+            Delete all {count} bet{count === 1 ? "" : "s"} and their history.
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-end gap-2">

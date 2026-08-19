@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -41,6 +42,10 @@ import {
   type AccaRunPrefill,
 } from "@/lib/acca/acca-run-prefill";
 import { AccaMethodHelpDialog } from "@/components/acca/method-help-dialog";
+import { ExchangeFundingNotice } from "@/components/acca/exchange-funding-notice";
+import { WarningNotice } from "@/components/ui/warning-notice";
+import { accaExchangeFundingModel } from "@/lib/acca/exchange-funding-model";
+import { formatGbp } from "@/lib/format-money";
 import { ACCA_METHOD_HELP } from "@/content/help/acca-methods";
 import { accaRunMoneyLocked } from "@/lib/acca/acca-run-edit";
 import { contrastText } from "@/lib/brands/exchanges";
@@ -102,8 +107,8 @@ function RequirementsStrip({ prefill }: { prefill: AccaRunPrefill }) {
   if (prefill.purpose === "convert") parts.push("Free-bet convert");
   if (prefill.minSelections != null) parts.push(`Min ${prefill.minSelections} selections`);
   if (prefill.minOdds != null) parts.push(`Min odds ${prefill.minOdds}`);
-  if (prefill.minStake != null) parts.push(`Min stake £${prefill.minStake}`);
-  if (prefill.maxStake != null) parts.push(`Max stake £${prefill.maxStake}`);
+  if (prefill.minStake != null) parts.push(`Min stake ${formatGbp(prefill.minStake)}`);
+  if (prefill.maxStake != null) parts.push(`Max stake ${formatGbp(prefill.maxStake)}`);
   const notes = prefill.importantNotes?.trim();
   if (notes) {
     const short = notes.length > 160 ? `${notes.slice(0, 157)}…` : notes;
@@ -111,12 +116,11 @@ function RequirementsStrip({ prefill }: { prefill: AccaRunPrefill }) {
   }
   if (parts.length === 0) return null;
   return (
-    <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
-      <p className="font-semibold text-warning">
-        {prefill.purpose === "convert" ? "Reward requirements" : "Offer requirements"}
-      </p>
-      <p className="mt-0.5 text-muted-foreground">{parts.join(" · ")}</p>
-    </div>
+    <WarningNotice
+      title={prefill.purpose === "convert" ? "Reward requirements" : "Offer requirements"}
+    >
+      <p>{parts.join(" · ")}</p>
+    </WarningNotice>
   );
 }
 
@@ -218,6 +222,22 @@ export function CreateRunForm({
   const rawCombinedOdds = validLegs.reduce((a, l) => a * l.backOdds, 1);
   const combinedOdds = applyAccaBoost(rawCombinedOdds, boosted && boostPct > 0 ? boostPct : null);
   const canSave = label.trim().length > 0 && stake > 0 && validLegs.length >= 2;
+  const funding = accaExchangeFundingModel({
+    method,
+    stake,
+    commission: Number.isFinite(commissionPct) ? commissionPct / 100 : 0,
+    boostPct: boosted && boostPct > 0 ? boostPct : null,
+    legs: validLegs.map((l, i) => ({
+      seq: i + 1,
+      label: l.label.trim(),
+      backOdds: l.backOdds,
+      result: "pending",
+      layStake: null,
+      layOdds: null,
+    })),
+    accounts: state?.balances?.accounts,
+    exchangeId: defaultExchange?.id ?? null,
+  });
 
   function applyOcr(fields: BetOcrFields) {
     if (isEdit) return;
@@ -338,25 +358,34 @@ export function CreateRunForm({
 
   return (
     <>
-      <div className={deskRunDialogBodyClass}>
       <DialogHeader>
         <DialogTitle>
           {isEdit
-            ? "Edit acca run"
+            ? "Edit acca"
             : prefill?.purpose === "convert"
-              ? "Convert free bet on Acca Desk"
-              : "New acca run"}
+              ? "Convert on Acca Desk"
+              : "New acca"}
         </DialogTitle>
-        <DialogDescription>
+        <DialogDescription
+          explainer={
+            isEdit && moneyLocked ? (
+              <DialogExplainer title="What you can edit">
+                Label, bookmaker, legs and start times. Stake and odds stay
+                locked.
+              </DialogExplainer>
+            ) : undefined
+          }
+        >
           {isEdit
             ? moneyLocked
-              ? "Label, bookmaker, leg names and start times. Stake and odds stay locked after lays or results."
-              : "Update the run details. Method stays as created."
+              ? "Stake and odds stay locked."
+              : "Update the run details."
             : prefill?.purpose === "convert"
-              ? "The free-bet acca is logged as a real tracker bet; the desk then tells you when and how much to lay per leg."
-              : "The acca back is logged as a real tracker bet; the desk then tells you when and how much to lay per leg. Set sport (and optionally link an event) on each leg."}
+              ? "Log the free-bet acca, then lay."
+              : "Log the acca, then lay each leg."}
         </DialogDescription>
       </DialogHeader>
+      <div className={deskRunDialogBodyClass}>
 
       {prefill && !isEdit ? <RequirementsStrip prefill={prefill} /> : null}
 
@@ -640,6 +669,7 @@ export function CreateRunForm({
           ) : null}
         </div>
       </div>
+      {funding ? <ExchangeFundingNotice model={funding} /> : null}
       </div>
 
       <DialogFooter>

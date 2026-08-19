@@ -37,7 +37,7 @@ export default function ReleaseNotesPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Release notes"
-        description={`What's new in Edgeways, newest first. Currently ${ROADMAP_VERSION.currentLabel}.`}
+        description={`Current release ${ROADMAP_VERSION.targetLabel}.`}
         icon={ScrollText}
       />
 

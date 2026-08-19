@@ -33,7 +33,7 @@ export function inferVenueKind(
 ): "bookie" | "exchange" {
   const key = name.trim().toLowerCase();
   const asExchange =
-    /\b(exchange|betfair|betdaq|smarkets|matchbook)\b/i.test(name) ||
+    /\b(exchange|betfair|betdaq|smarkets|matchbook|betconnect)\b/i.test(name) ||
     exchangeDirectory.some((e) => e.name.toLowerCase() === key) ||
     exchangeWallets.some((e) => e.name.toLowerCase() === key);
   return asExchange ? "exchange" : "bookie";
@@ -65,6 +65,8 @@ export function VenueSelect({
   brandColor: brandColorOverride = null,
   /** Hide wallets already on the account - directory + custom only (Add bookie / Add exchange). */
   omitExistingWallets = false,
+  ariaLabel,
+  id,
 }: {
   value: string;
   onChange: (name: string) => void;
@@ -78,6 +80,8 @@ export function VenueSelect({
   allowCustom?: boolean;
   persistCustom?: boolean;
   brandColor?: string | null;
+  ariaLabel?: string;
+  id?: string;
   omitExistingWallets?: boolean;
 }) {
   const {
@@ -515,6 +519,8 @@ export function VenueSelect({
     <button
       ref={triggerRef}
       type="button"
+      id={id}
+      aria-label={ariaLabel}
       aria-expanded={open}
       aria-haspopup="listbox"
       onClick={() => setOpen((o) => !o)}
@@ -544,6 +550,8 @@ export function VenueSelect({
     <button
       ref={triggerRef}
       type="button"
+      id={id}
+      aria-label={ariaLabel}
       aria-expanded={open}
       aria-haspopup="listbox"
       onClick={() => setOpen((o) => !o)}

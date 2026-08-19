@@ -62,11 +62,10 @@ export function CasinoGamePicker({
             {selected.length > 0 ? "Edit games" : "Pick games"}
           </Button>
           <DialogContent className="max-w-sm p-0" mobile="center">
-            <DialogHeader className="px-4 pt-4">
+            <DialogHeader className="mx-0 mt-0">
               <DialogTitle>Eligible games</DialogTitle>
               <DialogDescription>
-                Published base RTPs - operators can run lower variants, so verify in the game
-                info. Missing game? Add it in the library on the Casino page.
+                Published base RTPs. Verify in the game info.
               </DialogDescription>
             </DialogHeader>
             <Command className="border-t">

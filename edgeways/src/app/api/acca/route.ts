@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAccaRun, listAccaRuns } from "@/lib/services/acca-desk";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ runs: listAccaRuns() });
-}
+});
 
 const legSchema = z.object({
   label: z.string().min(1).max(200),
@@ -32,10 +33,10 @@ const createSchema = z.object({
   legs: z.array(legSchema).min(2).max(12),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   return NextResponse.json(createAccaRun(parsed.data));
-}
+});

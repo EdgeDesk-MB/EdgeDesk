@@ -31,6 +31,7 @@ import {
   pagePrimaryButtonProps,
   pageSecondaryButtonProps,
 } from "@/components/layout/page-header-actions";
+import { ListDaySection } from "@/components/layout/list-day-section";
 import { PageShell } from "@/components/page-shell";
 import { apiGet } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
@@ -193,24 +194,16 @@ export default function CasinoPage() {
           />
         ) : (
           grouped.map((group) => (
-            <section key={group.dayMs} className="flex flex-col">
-              <div className="flex items-center gap-3 pt-1">
-                <h2 className="shrink-0 text-xs font-semibold tracking-wide text-foreground">
-                  {group.label}
-                </h2>
-                <div className="h-px min-w-0 flex-1 bg-border" aria-hidden />
-              </div>
-              <div className="mt-3 flex flex-col gap-4.5">
-                {group.offers.map((offer) => (
-                  <CasinoCampaignCard
-                    key={offer.id}
-                    offer={offer}
-                    onChanged={patchOfferInPlace}
-                    onRemoved={load}
-                  />
-                ))}
-              </div>
-            </section>
+            <ListDaySection key={group.dayMs} label={group.label}>
+              {group.offers.map((offer) => (
+                <CasinoCampaignCard
+                  key={offer.id}
+                  offer={offer}
+                  onChanged={patchOfferInPlace}
+                  onRemoved={load}
+                />
+              ))}
+            </ListDaySection>
           ))
         )}
       </div>

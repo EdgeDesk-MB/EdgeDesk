@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, exchanges } from "@/lib/db";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +14,11 @@ const createSchema = z.object({
   isDefault: z.boolean().default(false),
 });
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ exchanges: db.select().from(exchanges).all() });
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -40,4 +41,4 @@ export async function POST(req: NextRequest) {
     .returning()
     .get();
   return NextResponse.json({ exchange: inserted });
-}
+});

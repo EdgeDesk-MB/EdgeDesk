@@ -11,6 +11,7 @@ import {
   type RaceDisplayMeta,
 } from "@/lib/racing";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -57,11 +58,11 @@ function raceMetaFromInput(input: {
   };
 }
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ events: db.select().from(events).all() });
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -151,4 +152,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ event: inserted });
-}
+});

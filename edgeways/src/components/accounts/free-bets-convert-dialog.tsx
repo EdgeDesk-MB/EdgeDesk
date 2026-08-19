@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -31,7 +32,9 @@ import {
   resolveTrackBetDestination,
 } from "@/lib/offers/offer-track-bet";
 import { Gift, Trash2 } from "lucide-react";
-import { convertFreeBetButtonClass } from "@/lib/ui/surface-styles";
+import { EmptyState } from "@/components/help/empty-state";
+import { convertFreeBetButtonClass, dialogTitleIcon } from "@/lib/ui/surface-styles";
+import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { FreeBetExpiryControl } from "@/components/accounts/free-bet-expiry-control";
 import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
@@ -142,14 +145,20 @@ function FreeBetsConvertDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md overflow-y-auto sm:max-w-md">
-        <DialogHeader className="pr-8">
-          <DialogTitle className="flex items-center gap-2">
-            <Gift className="size-4 shrink-0 text-violet-600" />
-            Free bets to convert
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <Gift className={cn(dialogTitleIcon, "text-edge")} />
+            Convert free bets
           </DialogTitle>
-          <DialogDescription className="text-pretty">
-            Open free-bet balance by bookie. Convert opens Add bet, Acca Desk, or a chooser
-            when the linked reward allows more than one scope.
+          <DialogDescription
+            explainer={
+              <DialogExplainer title="Convert free bets">
+                Prioritise converting free bets to grow your bank. When a promo
+                awards one, it lands here by bookie.
+              </DialogExplainer>
+            }
+          >
+            Convert them to grow your bank.
           </DialogDescription>
         </DialogHeader>
 
@@ -199,9 +208,13 @@ function FreeBetsLots({
       {lots == null ? (
         <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
       ) : lots.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          No open free bets right now.
-        </p>
+        <EmptyState
+          compact
+          oneLine
+          icon={Gift}
+          title="No open free bets right now"
+          description="Promo free bets land here by bookie."
+        />
       ) : (
         lots.map((lot) => {
           const note = freeBetLotNoteLabel(lot.note);
@@ -307,10 +320,7 @@ function RemoveFreeBetButton({
         <DialogContent mobile="center" className="max-w-sm" showCloseButton={!busy}>
           <DialogHeader>
             <DialogTitle>Remove free bet?</DialogTitle>
-            <DialogDescription>
-              Are you sure you wish to remove the free bet balance for{" "}
-              <span className="font-medium text-foreground">{lot.accountName}</span>?
-            </DialogDescription>
+            <DialogDescription>Remove this lot from {lot.accountName}.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>

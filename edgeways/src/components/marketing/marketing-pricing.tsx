@@ -238,21 +238,21 @@ export function MarketingPricing() {
   return (
     <section
       id="pricing"
-      className="border-t border-white/10 bg-[var(--marketing-band-deep)] px-5 py-16 sm:px-8 sm:py-20"
+      className="border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20"
     >
       <div className="mx-auto max-w-5xl">
-        <div className="text-center">
+        <div className="text-center" data-reveal="">
           <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             Choose a plan
           </h2>
           <p className="mx-auto mt-3 text-base text-white/55">
-            New accounts get a {TRIAL_DAYS}-day Edge trial. Cancel during the
-            trial and you are not charged.
+            The Edge plan starts with a {TRIAL_DAYS}-day trial. Cancel during
+            the trial and you are not charged.
           </p>
           <IntervalToggle interval={interval} onChange={setInterval} />
         </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-3" data-reveal-stagger="">
           {plans.map((plan) => (
             <PlanCard
               key={plan.id}
@@ -263,13 +263,14 @@ export function MarketingPricing() {
           ))}
         </div>
 
-        <ScrollFadeEdges
-          orientation="horizontal"
-          fadeClassName="from-[var(--marketing-band-deep)]"
-          fadeSize={40}
-          className="mt-12"
-          scrollClassName="overflow-x-auto"
-        >
+        <div data-reveal="">
+          <ScrollFadeEdges
+            orientation="horizontal"
+            fadeClassName="from-[var(--marketing-canvas)]"
+            fadeSize={40}
+            className="mt-12"
+            scrollClassName="overflow-x-auto"
+          >
           <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
             <caption className="sr-only">
               Feature comparison for Free, Core, and Edge
@@ -317,10 +318,11 @@ export function MarketingPricing() {
               ))}
             </tbody>
           </table>
-        </ScrollFadeEdges>
-        <p className="mt-6 text-sm text-white/55">
-          {yearlyBillingSummary()} {betaOfferSummary()}
-        </p>
+          </ScrollFadeEdges>
+          <p className="mt-6 text-sm text-white/55">
+            {yearlyBillingSummary()} {betaOfferSummary()}
+          </p>
+        </div>
       </div>
     </section>
   );

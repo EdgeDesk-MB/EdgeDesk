@@ -12,6 +12,7 @@ import {
   buildHistoryContext,
   formatHistoryDateGroup,
   HISTORY_FILTERS,
+  sortHistoryEntries,
   type HistoryFilter,
 } from "@/lib/history-display";
 import { cn } from "@/lib/utils";
@@ -131,7 +132,7 @@ export default function HistoryPage() {
   const grouped = (() => {
     if (!data?.entries.length) return [] as Array<[string, HistoryRow[]]>;
     const map = new Map<string, HistoryRow[]>();
-    for (const entry of data.entries) {
+    for (const entry of sortHistoryEntries(data.entries, ctx)) {
       const key = formatHistoryDateGroup(entry, ctx, now);
       const list = map.get(key) ?? [];
       list.push(entry);

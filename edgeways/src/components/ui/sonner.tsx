@@ -4,8 +4,9 @@ import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
+/** Sit just under the header. Include the demo bar when it sits above. */
 const toasterOffset = {
-  top: "calc(var(--layout-header-h) + 16px)",
+  top: "calc(var(--layout-below-header) + 16px)",
 } as const
 
 const Toaster = ({ offset, mobileOffset, ...props }: ToasterProps) => {

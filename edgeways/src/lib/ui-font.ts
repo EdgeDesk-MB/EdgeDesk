@@ -59,16 +59,22 @@ export function writeStoredUiFont(id: UiFontId): void {
   if (typeof window === "undefined") return;
   const resolved = normalizeUiFont(id);
   try {
-    localStorage.setItem(UI_FONT_STORAGE_KEY, resolved);
+    if (resolved === DEFAULT_UI_FONT) {
+      localStorage.removeItem(UI_FONT_STORAGE_KEY);
+    } else {
+      localStorage.setItem(UI_FONT_STORAGE_KEY, resolved);
+    }
   } catch {
     /* private mode / quota */
   }
   try {
     document.cookie =
-      UI_FONT_COOKIE_KEY +
-      "=" +
-      encodeURIComponent(resolved) +
-      ";path=/;max-age=31536000;SameSite=Lax";
+      resolved === DEFAULT_UI_FONT
+        ? UI_FONT_COOKIE_KEY + "=;path=/;max-age=0;SameSite=Lax"
+        : UI_FONT_COOKIE_KEY +
+          "=" +
+          encodeURIComponent(resolved) +
+          ";path=/;max-age=31536000;SameSite=Lax";
   } catch {
     /* ignore */
   }

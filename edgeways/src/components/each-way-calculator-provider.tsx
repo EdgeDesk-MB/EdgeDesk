@@ -75,13 +75,10 @@ export function EachWayCalculatorProvider({ children }: { children: React.ReactN
           onPointerDownOutside={preventDialogDismissOnPortaledContent}
           onInteractOutside={preventDialogDismissOnPortaledContent}
         >
-          <DialogHeader className="border-b px-6 pb-4 pt-7">
-            <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-              Each Way Calculator
-            </DialogTitle>
+          <DialogHeader className="mx-0 mt-0">
+            <DialogTitle>Each-way calculator</DialogTitle>
             <DialogDescription>
-              Dual win + place lays for each-way and extra-place tickets. Saves to the Profit
-              Tracker with race linkage for auto-settle.
+              Win and place lays, then save to the tracker.
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto p-6">

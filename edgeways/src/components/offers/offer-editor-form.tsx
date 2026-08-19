@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -2270,14 +2271,20 @@ Expires 12 Aug 2026, 23:59`}
           }}
         >
           <DialogHeader>
-            <DialogTitle>Update repeat occurrences?</DialogTitle>
-            <DialogDescription>
-              This offer repeats
-              {seriesRecurrence?.rule
-                ? ` (${formatRecurrenceLabel(seriesRecurrence.rule).toLowerCase()})`
-                : ""}
-              . There {otherOccurrenceCount === 1 ? "is" : "are"} {otherOccurrenceCount} other
-              occurrence{otherOccurrenceCount === 1 ? "" : "s"}. Choose what to update.
+            <DialogTitle>Update repeats?</DialogTitle>
+            <DialogDescription
+              explainer={
+                <DialogExplainer title="Repeating offer">
+                  This offer repeats
+                  {seriesRecurrence?.rule
+                    ? ` (${formatRecurrenceLabel(seriesRecurrence.rule).toLowerCase()})`
+                    : ""}
+                  . {otherOccurrenceCount} other occurrence
+                  {otherOccurrenceCount === 1 ? "" : "s"}.
+                </DialogExplainer>
+              }
+            >
+              Choose what to update.
             </DialogDescription>
           </DialogHeader>
           <fieldset className="space-y-2 text-sm">

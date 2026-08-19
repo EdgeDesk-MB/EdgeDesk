@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, events, bets, balanceTransactions, history } from "@/lib/db";
 import type { GoalEvent } from "@/lib/calc";
 import { serializeRaceResults, withPreservedRaceDisplayMeta } from "@/lib/racing";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -224,10 +225,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .get();
 
   return NextResponse.json({ event: updated });
-}
+});
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   db.delete(events).where(eq(events.id, Number(id))).run();
   return NextResponse.json({ ok: true });
-}
+});

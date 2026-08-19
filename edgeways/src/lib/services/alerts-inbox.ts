@@ -128,6 +128,16 @@ export function listInbox(limit = 100): AlertsInboxRow[] {
     .all();
 }
 
+/** Every inbox dedupe key, including read rows. Watcher uses this as durable seen. */
+export function listInboxDedupes(): string[] {
+  return db
+    .select({ dedupe: alertsInbox.dedupe })
+    .from(alertsInbox)
+    .all()
+    .map((row) => row.dedupe)
+    .filter(Boolean);
+}
+
 export function unreadCount(): number {
   const row = db
     .select({ n: sql<number>`count(*)` })
@@ -141,16 +151,40 @@ export function markRead(id: number, now = Date.now()): void {
   db.update(alertsInbox).set({ readAt: now }).where(eq(alertsInbox.id, id)).run();
 }
 
-/** Mark the inbox row for a rules dedupe key as read (0 if none / already read). */
+function kindFromDedupe(dedupe: string): string {
+  const kind = dedupe.split(":")[0]?.trim();
+  return kind || "alert";
+}
+
+/**
+ * Mark the inbox row for a rules dedupe key as read.
+ * If the toast was dismissed before POST /api/alerts landed, insert a read
+ * stub so the later upsert keeps it read.
+ */
 export function markReadByDedupe(dedupe: string, now = Date.now()): number {
   const key = dedupe.trim();
   if (!key) return 0;
-  const res = db
+  const updated = db
     .update(alertsInbox)
     .set({ readAt: now })
     .where(eq(alertsInbox.dedupe, key))
     .run();
-  return res.changes;
+  if (updated.changes > 0) return updated.changes;
+  db.insert(alertsInbox)
+    .values({
+      dedupe: key,
+      kind: kindFromDedupe(key),
+      title: "Alert",
+      createdAt: now,
+      updatedAt: now,
+      readAt: now,
+    })
+    .onConflictDoUpdate({
+      target: alertsInbox.dedupe,
+      set: { readAt: now },
+    })
+    .run();
+  return 1;
 }
 
 /**

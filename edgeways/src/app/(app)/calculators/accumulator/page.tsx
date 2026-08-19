@@ -22,7 +22,7 @@ import {
   requiredLegCount,
   type AccaLeg,
   type AccaStructureType,
-} from "@/lib/calc";
+} from "@/lib/calc/accumulator";
 import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 

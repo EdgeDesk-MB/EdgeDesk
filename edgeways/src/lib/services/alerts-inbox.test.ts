@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, bets } from "@/lib/db";
 import {
   listInbox,
+  listInboxDedupes,
   markAllRead,
   markRead,
   markReadByDedupe,
@@ -47,6 +48,9 @@ describe("alerts inbox", () => {
     // Mark all read clears the rest
     markAllRead(T0 + 4000);
     expect(unreadCount()).toBe(0);
+    expect(listInboxDedupes()).toEqual(
+      expect.arrayContaining(["test:offer:1", "test:naked:2"])
+    );
   });
 
   it("skips alerts without a key or title", () => {
@@ -68,6 +72,28 @@ describe("alerts inbox", () => {
     expect(unreadCount()).toBe(before);
     const row = listInbox().find((r) => r.dedupe === "naked_exposure:97");
     expect(row?.readAt).toBe(T0 + 1000);
+  });
+
+  it("keeps a dismiss-before-record row read when the inbox write lands later", () => {
+    const before = unreadCount();
+    expect(markReadByDedupe("result_settled:99", T0)).toBe(1);
+    expect(unreadCount()).toBe(before);
+    recordAlerts(
+      [
+        {
+          key: "result_settled:99",
+          kind: "result_settled",
+          title: "You just made £4.10",
+          body: "Qualifying · Weekend accumulator",
+        },
+      ],
+      T0 + 1000
+    );
+    expect(unreadCount()).toBe(before);
+    const row = listInbox().find((r) => r.dedupe === "result_settled:99");
+    expect(row?.title).toBe("You just made £4.10");
+    expect(row?.body).toBe("Qualifying · Weekend accumulator");
+    expect(row?.readAt).toBe(T0);
   });
 
   it("marks offer_expiring rows read by prefix when an offer is deleted", () => {

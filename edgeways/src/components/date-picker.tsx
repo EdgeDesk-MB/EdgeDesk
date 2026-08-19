@@ -4,7 +4,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { enGB as dayPickerEnGB } from "react-day-picker/locale";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { FilterPill } from "@/components/ui/filter-pill";
@@ -54,6 +54,11 @@ export function DatePicker({
   toYear,
   /** Ending/expiry fields: Tomorrow + 7 days chips under the calendar. */
   shortcuts,
+  isDayDisabled,
+  tone = "field",
+  allowClear = false,
+  hint,
+  "aria-label": ariaLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -67,6 +72,13 @@ export function DatePicker({
   fromYear?: number;
   toYear?: number;
   shortcuts?: "ending";
+  /** Grey out calendar days (e.g. days with no tracked events). */
+  isDayDisabled?: (date: Date) => boolean;
+  /** `toolbar` sits with FilterPills (Campaigns category Select). */
+  tone?: "field" | "toolbar";
+  allowClear?: boolean;
+  hint?: string;
+  "aria-label"?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseYmdLocal(value);
@@ -81,31 +93,51 @@ export function DatePicker({
     setOpen(false);
   }
 
-  return (
+  const selectedLabel = selected
+    ? format(selected, "d MMM yyyy", { locale: enGB })
+    : null;
+  const triggerName = ariaLabel
+    ? selectedLabel
+      ? `${ariaLabel}, ${selectedLabel}`
+      : ariaLabel
+    : undefined;
+
+  const picker = (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
           type="button"
-          variant="outline"
-          size={size}
+          variant={tone === "toolbar" ? "ghost" : "outline"}
+          size={tone === "toolbar" ? "default" : size}
           disabled={disabled}
           data-empty={!selected}
+          aria-label={triggerName}
           className={cn(
             // Form fields stretch; header `lg` stays content-width so it can
             // sit in a PageHeaderActions row without forcing a wrap.
-            size === "lg" ? "w-auto px-3" : "w-full px-2.5",
-            "justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
+            tone === "toolbar"
+              ? "h-8 w-auto rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[empty=false]:bg-muted/60 data-[empty=false]:text-foreground"
+              : size === "lg"
+                ? "w-auto px-3"
+                : "w-full px-2.5",
+            tone !== "toolbar" &&
+              "justify-start font-normal tabular-nums data-[empty=true]:text-muted-foreground",
             className
           )}
         >
           <CalendarIcon
             className={cn(
-              "shrink-0 text-muted-foreground",
-              size === "lg" ? "size-4" : "size-3.5"
+              "shrink-0",
+              tone === "toolbar"
+                ? "size-3 text-current"
+                : cn(
+                    "text-muted-foreground",
+                    size === "lg" ? "size-4" : "size-3.5"
+                  )
             )}
           />
-          {selected ? format(selected, "d MMM yyyy", { locale: enGB }) : placeholder}
+          {selectedLabel ?? placeholder}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
@@ -117,6 +149,7 @@ export function DatePicker({
           endMonth={new Date(endYear, 11)}
           selected={selected}
           defaultMonth={selected ?? now}
+          disabled={isDayDisabled}
           onSelect={(date) => {
             if (!date) {
               onChange("");
@@ -144,7 +177,32 @@ export function DatePicker({
             </FilterPill>
           </div>
         ) : null}
+        {hint ? (
+          <p className="max-w-64 border-t px-3 py-2 text-xs text-pretty text-muted-foreground">
+            {hint}
+          </p>
+        ) : null}
       </PopoverContent>
     </Popover>
+  );
+
+  if (!allowClear || !selected) return picker;
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {picker}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label="Clear date"
+        className={cn(
+          tone === "toolbar" && "rounded-full text-muted-foreground hover:text-foreground"
+        )}
+        onClick={() => onChange("")}
+      >
+        <X className="size-3" />
+      </Button>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localCalendarDate } from "@/lib/events";
+import { formatClockTime } from "@/lib/time-format";
 
 describe("theracingapi tier access", () => {
   beforeEach(() => {
@@ -161,5 +162,56 @@ describe("theracingapi tier access", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("limit=100");
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("skip=0");
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain("skip=100");
+  });
+
+  it("treats 12-hour off_time as afternoon when off_dt is missing", async () => {
+    const today = localCalendarDate();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          racecards: [
+            {
+              race_id: "race-pm",
+              course: "Southwell",
+              race_name: "Novice",
+              off_time: "3:10",
+              date: today,
+              runners: [],
+            },
+          ],
+        }),
+      })
+    );
+
+    const { racecardsFree } = await import("./theracingapi");
+    const cards = await racecardsFree("today");
+    expect(
+      formatClockTime(cards[0]!.startTime, { timeZone: "Europe/London", format: "24h" })
+    ).toBe("15:10");
+  });
+
+  it("marks historicBlocked when dated results need Standard", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 401,
+        ok: false,
+      })
+    );
+
+    const { resultsForDate, resultsForRaceIds } = await import("./theracingapi");
+    const payload = await resultsForDate("2026-01-01");
+    expect(payload.historicBlocked).toBe(true);
+    expect(payload.tierBlocked).toBe(false);
+    expect(payload.results.size).toBe(0);
+
+    const filtered = await resultsForRaceIds(["rac_old"], {
+      dateByRaceId: { rac_old: "2026-01-01" },
+    });
+    expect(filtered.historicBlocked).toBe(true);
+    expect(filtered.tierBlocked).toBe(false);
   });
 });

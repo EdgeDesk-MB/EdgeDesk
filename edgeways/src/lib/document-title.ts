@@ -43,6 +43,9 @@ const ROUTE_TITLES: readonly { prefix: string; title: string }[] = [
   { prefix: "/support", title: "Support" },
   { prefix: "/feedback", title: "Feedback" },
   { prefix: "/contact", title: "Contact" },
+  { prefix: "/refund", title: "Refunds" },
+  { prefix: "/terms", title: "Terms of Service" },
+  { prefix: "/privacy", title: "Privacy Policy" },
   { prefix: "/roadmap", title: "Roadmap" },
   { prefix: "/report", title: "Report" },
   { prefix: "/help", title: "Guides" },
@@ -141,6 +144,14 @@ export function clearAlertDocumentTitles(): void {
     return;
   }
   unreadAlerts = [];
+  applyDocumentTitle();
+}
+
+/** Drop one overlay title when the user dismisses that alert. */
+export function dismissAlertDocumentTitle(key: string): void {
+  const next = unreadAlerts.filter((a) => a.key !== key);
+  if (next.length === unreadAlerts.length) return;
+  unreadAlerts = next;
   applyDocumentTitle();
 }
 

@@ -15,7 +15,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChromeTab } from "@/components/chrome-tab";
-import { TopBarLogoutButton } from "@/components/top-bar-login-button";
+import { TopBarSessionButton } from "@/components/top-bar-login-button";
 import { TOP_SUB_NAV_ITEMS, activeMetaNavId, type MetaNavItem } from "@/content/meta-nav";
 import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
 import { META_TAB_DURATION_S, META_TAB_EASE } from "@/lib/ui/motion";
@@ -280,7 +280,7 @@ export function AppTopBarMetaNav() {
             </nav>
           </div>
           <div className="hidden shrink-0 items-end pr-8 md:flex">
-            <TopBarLogoutButton />
+            <TopBarSessionButton />
           </div>
         </div>
       </div>

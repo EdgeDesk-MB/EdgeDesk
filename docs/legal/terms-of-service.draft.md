@@ -1,13 +1,13 @@
 # Edgeways — Terms of Service
 
-> **DRAFT v0.1 — 10 Aug 2026. For solicitor review (EDGE-8) before any public
-> use. Not legal advice. Placeholders in [SQUARE BRACKETS] must be resolved
-> before publication.**
+> **Published 17 Aug 2026 (EDGE-61).** Customer page: `/terms`. Sam read
+> 16 Aug (EDGE-11). Solicitor (EDGE-8) before charging strangers. Not legal
+> advice.
 
-**Effective date:** [PUBLICATION DATE]
+**Effective date:** 17 August 2026
 **Service:** Edgeways, a subscription web application for tracking and analysing matched betting activity
-**Operator:** [LEGAL ENTITY NAME] ("we", "us", "our"), trading as Edgeways
-**Contact:** [SUPPORT EMAIL]
+**Operator:** Sam Hayter trading as Edgeways ("we", "us", "our")
+**Contact:** support@edgeways.app
 
 ## 1. What Edgeways is (and is not)
 
@@ -47,12 +47,12 @@ described on the pricing page. Features per tier may change between versions;
 changes will not remove core functionality from an active paid term.
 
 4.2 **Billing.** Paid subscriptions renew automatically each month or year (as
-selected at checkout) until cancelled. Prices are in GBP and include VAT where
-applicable [CONFIRM: VAT handling depends on processor decision, EDGE-2].
+selected at checkout) until cancelled. Prices are in GBP. VAT is not included
+until we register.
 
-4.3 **Trial.** New subscribers receive a 14-day trial of the Edge tier. At
-the end of the trial, your chosen paid plan begins unless you cancel before the
-trial ends. One trial per person.
+4.3 **Trial.** The Edge plan starts with a 14-day trial. At the end of the
+trial, Edge billing begins unless you cancel before then. Core is billed from
+the day you subscribe. One trial per person.
 
 4.3a **Founding.** Invited beta / waitlist accounts may receive a Founding
 term: after the trial, three months of the Edge tier billed at the Core
@@ -81,7 +81,7 @@ instead.
 
 4.7 **Failed payments.** If a renewal payment fails, we may retry and then
 suspend paid features until payment succeeds. We will not delete your data for
-at least [90] days after a lapse.
+at least 90 days after a lapse.
 
 ## 5. Your betting activity
 
@@ -115,7 +115,7 @@ for money laundering or any unlawful purpose; or misrepresent your age.
 
 7.1 Edgeways is **local-first**: your betting records are stored on your own
 device by default and never leave it unless you choose a cloud/sync feature or
-contact support with diagnostics. Our Privacy Policy ([URL]) explains what we
+contact support with diagnostics. Our Privacy Policy (/privacy) explains what we
 collect and why.
 
 7.2 **Backups are your responsibility** while the service is local-first. The
@@ -194,12 +194,15 @@ about the service.
 
 ### Open points for the solicitor (EDGE-8)
 
-1. VAT/consumer-law wording in 4.2 and 4.5 depends on the payment processor
-   decision (Stripe direct vs Merchant of Record, EDGE-2). An MoR becomes the
-   seller of record and these sections need re-pointing at their terms.
+1. VAT/consumer-law wording in 4.2 and 4.5: Stripe direct (EDGE-2). We are the
+   seller of record. Confirm exclusive-until-registered vs inclusive later.
 2. Cooling-off drafting for a digital subscription supplied immediately (4.5) —
    confirm the proportionate-refund approach.
 3. Liability cap level (10.4) and whether £100 free-tier floor is appropriate.
 4. Whether any additional wording is needed given the gambling-adjacent nature
    (section 5) — e.g. a stronger "not advice" disclaimer or links to GAMSTOP.
 5. Entity name, registered address, and contact details throughout.
+6. Public `/refund` page (EDGE-66): readable 4.4–4.5. Do not add a second
+   14-day cash-back after first payment on top of the 14-day Edge trial
+   unless Sam explicitly wants that ops load. Oddsmonkey do; they also
+   only give a 7-day trial.

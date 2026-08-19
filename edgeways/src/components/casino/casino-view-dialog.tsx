@@ -39,11 +39,9 @@ export function CasinoViewDialog({
         onPointerDownOutside={preventDialogDismissOnPortaledContent}
         onInteractOutside={preventDialogDismissOnPortaledContent}
       >
-        <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-7">
-          <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            Campaign details
-          </DialogTitle>
-          <DialogDescription className="sr-only">{offer.title}</DialogDescription>
+        <DialogHeader className="mx-0 mt-0 shrink-0">
+          <DialogTitle>Campaign details</DialogTitle>
+          <DialogDescription>Review this campaign.</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

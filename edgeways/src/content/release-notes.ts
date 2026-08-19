@@ -1,6 +1,7 @@
 /**
- * Curated release notes - user-facing highlights, newest first. Sourced from
- * the git history but written for the person using the app, not the diff.
+ * Curated release notes - customer-facing highlights, newest first.
+ * Write for the person using the desk, not the diff. Skip rebrands,
+ * internals, and anything a customer does not need to see.
  * Add a group per release day (or milestone) as work ships.
  */
 
@@ -34,13 +35,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-10",
     title: "Offer completion playbook: deposit codes to clear wagering",
     summary:
-      "Paste or forward a sports promo and Edgeways walks the campaign step by step, with code on Step 1, Mark done for soft gates, and auto-advance from bets, deposits and wagering where the ledger can prove it.",
+      "Paste or forward a sports promo and Edgeways walks the campaign step by step, with the code on Step 1, Mark done for soft gates, and auto-advance from bets, deposits and wagering when the ledger can prove it.",
     entries: [
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Paste offer expands a drop zone on the New offer form (no nested Preview). Fields fill as you paste; green ticks mark paste-filled values until you edit them. Same pattern on Log a casino offer. Sticky Add offer / Continue stays reachable.",
+        text: "Paste offer expands a drop zone on the New offer form. Fields fill as you paste; green ticks mark paste-filled values until you edit them. Same pattern on Log a casino offer. Sticky Add offer / Continue stays reachable.",
       },
       {
         kind: "feature",
@@ -58,7 +59,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Deposit step shows the promo code for one-tap copy. After Mark done (or a matching Accounts transfer/top-up), Do next and Track move on to the qualifying bet — no more opening Place while deposit is still due.",
+        text: "Deposit step shows the promo code for one-tap copy. After Mark done (or a matching Accounts transfer/top-up), Do next and Track move on to the qualifying bet, so you are not offered Place while a deposit is still due.",
       },
       {
         kind: "improvement",
@@ -76,7 +77,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Paste preview calls out deposit + code before you save. Classic bet&get without a deposit gate still starts at qualify; the financial pipeline strip stays as context under the wizard.",
+        text: "Paste preview calls out deposit + code before you save. Classic bet&get without a deposit gate still starts at qualify.",
       },
     ],
   },
@@ -84,7 +85,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-06",
     title: "Combo desks: Bet Builder, Systems, and place tools",
     summary:
-      "Full-cover systems and bet builders sit beside Acca, Racing Desk gains place-aware tools, and Feedback replaces Contact us.",
+      "Full-cover systems and bet builders sit beside Acca, and Racing Desk gains place-aware tools.",
     entries: [
       {
         kind: "feature",
@@ -114,19 +115,19 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Each Way",
         href: "/calculators/each-way",
-        text: "Each Way / Extra Place calculator on the desk: place ladder, dual-lay settle paths, and the maths wired through the same settlement tests as the rest of the calc engine.",
+        text: "Each Way / Extra Place calculator on the desk: place ladder and dual-lay settle paths.",
       },
       {
         kind: "feature",
         area: "Feedback",
         href: "/feedback",
-        text: "Feedback in the top submenu (replacing Contact us): pick Bug, Idea or Other, add a summary and details, then save locally and email or copy a report with diagnostics attached.",
+        text: "Feedback in the top menu: pick Bug, Idea or Other, add a summary and details, then send or copy a report.",
       },
       {
         kind: "improvement",
         area: "Alerts",
         href: "/alerts",
-        text: "Quieter toasts for actions you just took, clearer settle-related copy, and bolt notification art kept working when the home server is offline.",
+        text: "Quieter toasts for actions you just took, and clearer settle-related copy.",
       },
     ],
   },
@@ -134,19 +135,19 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-05",
     title: "Make it yours: appearance, reminders, and Acca from offers",
     summary:
-      "Personalise the chrome, set casino and offer reminders, and route multi-leg campaigns into the right combo desk.",
+      "Personalise the desk, set casino and offer reminders, and route multi-leg campaigns into the right combo desk.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Appearance: choose a brand accent, header pattern and UI font - the desk keeps your choices across reloads without a flash of the defaults.",
+        text: "Appearance: choose a brand accent, header pattern and UI font. The desk keeps your choices across visits.",
       },
       {
         kind: "feature",
         area: "Casino",
         href: "/casino",
-        text: "Set a reminder on a campaign for free spins or bonuses that land later - it fires into the alerts inbox and push when due.",
+        text: "Set a reminder on a campaign for free spins or bonuses that land later. It fires into the alerts inbox and as a push when due.",
       },
       {
         kind: "feature",
@@ -156,46 +157,17 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       },
       {
         kind: "improvement",
-        area: "Navigation",
-        text: "Desk and meta tabs use Chrome-style rise tabs across the top submenu (Settings, Support, Guides, Release notes, Roadmap, Feedback), with the side nav reserved for Desk routes.",
-      },
-      {
-        kind: "improvement",
         area: "Tracker",
         href: "/tracker",
-        text: "Campaign sections, settle flows and P&L breakdown polish so multi-leg and offer-linked positions are easier to scan on desktop.",
-      },
-    ],
-  },
-  {
-    date: "2026-08-04",
-    title: "EdgeDesk is now edgeways",
-    summary:
-      "New name, same desk: everything you tracked carries over untouched, and the bolt now marks the app wherever it reaches you.",
-    entries: [
-      {
-        kind: "improvement",
-        area: "Everywhere",
-        text: "The app is now called Edgeways - the British way to slip an edge through a narrow gap. Your database, offers, bets, balances and settings migrate automatically; there is nothing to redo.",
-      },
-      {
-        kind: "improvement",
-        area: "Alerts",
-        href: "/alerts",
-        text: "A chamfered bolt is the new mark (placeholder pending the final logo): it fronts the app icon, favicon and Android notification badge, and background push titles now lead with ⚡ so an Edgeways alert reads at a glance on the lock screen.",
-      },
-      {
-        kind: "improvement",
-        area: "Everywhere",
-        text: "Brand tokens land properly: yellow primaries in both themes, ink-and-yellow chips, clearer top-bar stacks, and page CTAs that share one primary style.",
+        text: "Campaign sections, settle flows and P&L breakdown polish so multi-leg and offer-linked positions are easier to scan.",
       },
     ],
   },
   {
     date: "2026-07-14",
-    title: "Momentum begins: monthly targets and demo mode",
+    title: "Monthly targets and demo mode",
     summary:
-      "A target to pace the month against, and a safe parallel universe for showing Edgeways off.",
+      "A target to pace the month against, and a safe parallel desk for showing Edgeways off.",
     entries: [
       {
         kind: "feature",
@@ -207,13 +179,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Demo mode: a separate, seeded, clearly-watermarked database for screenshots and walkthroughs - six accounts, a month of settled campaigns, an open qualifier and a tagged leak, so every page looks lived-in. Your real data never mixes with it: the two live in different files, and switching applies on the next server start.",
+        text: "Demo mode: a separate, seeded, clearly watermarked desk for screenshots and walkthroughs - six accounts, a month of settled campaigns, an open qualifier and a tagged leak, so every page looks lived-in. Your real data never mixes with it.",
       },
       {
         kind: "improvement",
         area: "Settings",
         href: "/settings",
-        text: "Demo data can be wiped in one tap - the next demo run reseeds fresh. The wipe can only ever touch the demo file.",
+        text: "Demo data can be wiped in one tap. The next demo run reseeds fresh, and a wipe can only ever touch the demo desk.",
       },
       {
         kind: "feature",
@@ -225,43 +197,43 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Accessibility",
         href: "/help?guide=keyboard",
-        text: "Every switch and icon button now carries a screen-reader name, the OS \"reduce motion\" preference stills pulsing indicators and dialog animations, and a new Keyboard & accessibility guide in Help documents the palette and everyday keys.",
+        text: "Screen readers name every switch and icon button, Reduce motion stills pulsing indicators and dialog animations, and a Keyboard & accessibility guide in Help documents the palette and everyday keys.",
       },
       {
         kind: "fix",
         area: "Mobile",
         href: "/help?guide=mobile",
-        text: "Opening Edgeways from a phone on the same network no longer loads a dead page (empty data, unresponsive menu) - the dev server now allows its own assets across LAN origins. A new \"On your phone\" guide in Help covers reaching the app from your phone and enabling push notifications on Android, step by step.",
+        text: "Opening Edgeways on your phone no longer loads a dead page. A new On your phone guide covers installing the app and enabling notifications on Android.",
       },
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Set up your desk: the welcome tour now hands off to a four-step wizard - bank and bankroll, your bookies with balances, bet defaults, and notifications. A fresh install reaches a working desk in under a minute; re-run it any time from Settings → Help & about.",
+        text: "Set up your desk: a four-step wizard for bank and bankroll, your bookies with balances, bet defaults, and notifications. A fresh install reaches a working desk in under a minute; re-run it any time from Settings → Help & about.",
       },
       {
         kind: "fix",
         area: "Alerts",
-        text: "In-app notifications on Android no longer error (\"Illegal constructor\") - they now show through the service worker, with the same tap-to-open deep links as push.",
+        text: "In-app notifications on Android now show reliably, with the same tap-to-open links as push.",
       },
       {
         kind: "improvement",
         area: "Navigation",
-        text: "Navigation, tidied: the sidebar groups into Betting, Live desks and Insight; on the phone the burger is now a full-height drawer that slides in with the whole sectioned navigation; and the old dark-mode switch is a proper Light / Dark / System appearance control with icons.",
+        text: "The sidebar groups into Betting, Live desks and Insight. On the phone the burger is a full-height drawer with the whole sectioned navigation, and appearance is a Light / Dark / System control.",
       },
       {
         kind: "feature",
         area: "Help",
         href: "/help?guide=site-map",
-        text: "Site map: every page and where it lives, rendered live from the navigation structure - including sub-navigation groups, quick actions and the pages that sit outside the main nav.",
+        text: "Site map: every page and where it lives, including sub-navigation, quick actions and the pages that sit outside the main nav.",
       },
     ],
   },
   {
     date: "2026-07-14",
-    title: "The workbench: Match Checker, alerts inbox, push and the palette",
+    title: "Match Checker, alerts inbox, push and the palette",
     summary:
-      "Found a price? Get a verdict in seconds. Missed a notification? It's waiting for you, or on your phone. And everything is two keystrokes away.",
+      "Found a price? Get a verdict in seconds. Missed a notification? It is waiting for you, or on your phone. And everything is two keystrokes away.",
     entries: [
       {
         kind: "feature",
@@ -273,13 +245,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Match Checker",
         href: "/match-checker",
-        text: "Risk-free offers deliberately live in the full calculator instead - their verdict depends on refund amount and retention, and a silent assumption here would mislead.",
+        text: "Risk-free offers stay in the full calculator. Their verdict depends on refund amount and retention, and a silent assumption here would mislead.",
       },
       {
         kind: "feature",
         area: "Alerts",
         href: "/alerts",
-        text: "Alerts inbox: every alert Edgeways raises is kept, with an unread badge in the navigation. Notifications and toasts deliver in the moment; the inbox is the record - tap an alert to mark it read and jump to the right desk, or clear the lot with one tap.",
+        text: "Alerts inbox: every alert Edgeways raises is kept, with an unread badge in the navigation. Notifications and toasts deliver in the moment; the inbox is the record. Tap an alert to mark it read and jump to the right desk, or clear the lot with one tap.",
       },
       {
         kind: "improvement",
@@ -291,18 +263,18 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Background push: flip \"Push to this device\" in Settings → Alerts and sentinel alerts reach your phone with every Edgeways tab closed. Works anywhere your phone has signal, as long as the Edgeways server is running at home.",
+        text: "Background push: flip Push to this device in Settings → Alerts and sentinel alerts reach your phone with every Edgeways tab closed.",
       },
       {
         kind: "improvement",
         area: "Settings",
         href: "/settings",
-        text: "\"Send test push\" proves the whole pipe from Settings, and devices that stop existing are pruned automatically - push is a delivery channel on top of the inbox, so nothing is ever lost to a flaky connection.",
+        text: "Send test push proves delivery from Settings. Push sits on top of the inbox, so nothing is lost to a flaky connection.",
       },
       {
         kind: "feature",
         area: "Navigation",
-        text: "Command palette: Cmd/Ctrl+K anywhere jumps to any page, open offer or bookie wallet, and runs the quick actions - add a bet, start an offer, open the calculator, adjust a balance. It searches live app state only, so there is no index to go stale.",
+        text: "Command palette: Cmd/Ctrl+K anywhere jumps to any page, open offer or bookie wallet, and runs the quick actions - add a bet, start an offer, open the calculator, adjust a balance.",
       },
     ],
   },
@@ -310,13 +282,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-14",
     title: "Your rules: tuning, Home layout and data custody",
     summary:
-      "Edgeways bends to how you operate - every behaviour-defining threshold is yours to set, Home shows the widgets you choose, and your data has a proper backup, restore and import story.",
+      "Edgeways bends to how you operate. Every behaviour-defining threshold is yours to set, Home shows the widgets you choose, and your data has a proper backup, restore and import story.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "New Tuning card: unhedged-back grace windows, the offer-drought nudge, the retention prior and its weight, the mistake-tag prompt threshold, the Edge Report minimum, and per-action effort minutes behind the £/hr sort. Defaults match how Edgeways has always behaved, each row shows its default and resets in one tap.",
+        text: "New Tuning card: unhedged-back grace windows, the offer-drought nudge, the retention prior and its weight, the mistake-tag prompt threshold, the Edge Report minimum, and per-action effort minutes behind the £/hr sort. Defaults match how Edgeways has always behaved; each row shows its default and resets in one tap.",
       },
       {
         kind: "feature",
@@ -328,7 +300,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Data custody: one-tap backup of your entire database (.db or JSON bundle), and a validated restore flow - the upload is checked, you confirm against its row counts, and a safety copy of your current data is always saved first. A failed restore leaves everything untouched.",
+        text: "Data custody: one-tap backup of your entire desk, and a validated restore flow. The upload is checked, you confirm what it contains, and a safety copy of your current data is always saved first. A failed restore leaves everything untouched.",
       },
       {
         kind: "feature",
@@ -340,15 +312,15 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Settings",
         href: "/settings",
-        text: "Imported history is provenance-marked: it shows in your P&L and bookmaker stats, but it never changes balances, never links itself to campaigns, and never counts towards EV capture - the Edge Report stays honest.",
+        text: "Imported history shows in your P&L and bookmaker stats, but it never changes balances, never links itself to campaigns, and never counts towards EV capture. The Edge Report stays honest.",
       },
     ],
   },
   {
     date: "2026-07-14",
-    title: "The Coach",
+    title: "Edge Report, mistake tags, and the bookmaker league",
     summary:
-      "Edgeways now tells you whether you actually captured your edge - and where the leaks are: a monthly Edge Report, one-tap mistake tags and a bookmaker league table with manual health.",
+      "Edgeways now tells you whether you actually captured your edge, and where the leaks are: a monthly Edge Report, one-tap mistake tags and a bookmaker league table with manual health.",
     entries: [
       {
         kind: "feature",
@@ -372,18 +344,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Home",
         href: "/desk",
-        text: "Gubbed bookies' offers sink to the bottom of Do next (and wear a Gubbed chip) but are never hidden - closed accounts drop out entirely.",
-      },
-      {
-        kind: "fix",
-        area: "Under the hood",
-        text: "The production build is green again - three long-standing type errors cleared - and the test suite now sits at 571 checks across every calculation and settlement path.",
+        text: "Gubbed bookies' offers sink to the bottom of Do next (and wear a Gubbed chip) but are never hidden. Closed accounts drop out entirely.",
       },
     ],
   },
   {
     date: "2026-07-14",
-    title: "Guardian sentinels",
+    title: "Unhedged backs and 2UP lock-in alerts",
     summary:
       "Edgeways now watches your positions: unhedged backs and triggered 2UP payouts raise alerts the moment they matter.",
     entries: [
@@ -403,7 +370,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Settings",
         href: "/settings",
-        text: "Both sentinels have their own alert toggles alongside the existing three.",
+        text: "Each sentinel has its own toggle in Settings → Alerts.",
       },
     ],
   },
@@ -429,17 +396,17 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Mobile",
         href: "/settings",
-        text: "Edgeways installs to your Home Screen as an app, with local notifications for expiring offers, race off-times and settled results (toggleable per type).",
+        text: "Edgeways installs to your Home Screen as an app, with notifications for expiring offers, race off-times and settled results (toggleable per type).",
       },
       {
         kind: "improvement",
         area: "Mobile",
-        text: "Full-page layouts with no desktop gutters; dialogs open as bottom sheets (small confirms stay centred); tracker and accounts tables become card lists; the Racing Desk leads with the offer workflow and tucks the runner grid behind a tap.",
+        text: "Full-page layouts on the phone; dialogs open as bottom sheets (small confirms stay centred); tracker and accounts tables become card lists; the Racing Desk leads with the offer workflow and tucks the runner grid behind a tap.",
       },
       {
         kind: "improvement",
         area: "Navigation",
-        text: "The full main navigation now lives in the burger menu on mobile.",
+        text: "The full main navigation lives in the burger menu on mobile.",
       },
     ],
   },
@@ -477,35 +444,35 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   },
   {
     date: "2026-07-13",
-    title: "EV truth completed",
+    title: "Honest expected vs realised",
     summary:
-      "Every expected-value figure is now locked at the moment it becomes real, so expected vs realised is finally an honest comparison.",
+      "Every expected-value figure is locked at the moment it becomes real, so expected vs realised is an honest comparison.",
     entries: [
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "EV lock + capture rate: expected profit snapshots when a campaign starts and is never silently changed - edits create visible re-locks. Settled campaigns show \"Expected → Realised · % captured\".",
+        text: "EV lock + capture rate: expected profit snapshots when a campaign starts and is never silently changed. Edits create visible re-locks. Settled campaigns show \"Expected → Realised · % captured\".",
       },
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Expired campaigns record their realised-to-date honestly - lost EV is real signal.",
+        text: "Expired campaigns record their realised-to-date honestly. Lost EV is real signal.",
       },
     ],
   },
   {
     date: "2026-07-12",
-    title: "Offer command centre foundations",
+    title: "Measured retention and smarter ranking",
     summary:
-      "The groundwork sprint: measured retention, provenance badges, edge on Home, smarter ranking and paste-to-log.",
+      "Retention from your own conversions, provenance on every £-EV, smarter Do next ranking, and paste-to-log.",
     entries: [
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Free-bet retention is measured from your own conversions (Bayesian-blended for small samples) instead of a hardcoded 80%.",
+        text: "Free-bet retention is measured from your own conversions, blended with a cautious default until you have enough of them, instead of a flat 80% guess.",
       },
       {
         kind: "feature",
@@ -523,7 +490,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Racing Desk",
         href: "/racing",
-        text: "No-vig fair odds per runner, straight from the well-tested calc engine.",
+        text: "No-vig fair odds per runner.",
       },
     ],
   },

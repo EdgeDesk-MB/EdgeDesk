@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { HistoryFilter } from "@/lib/history-display";
 import { getHistoryFeed } from "@/lib/services/history-feed";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 const FILTERS: HistoryFilter[] = [
   "all",
@@ -14,7 +15,7 @@ const FILTERS: HistoryFilter[] = [
   "boosts",
 ];
 
-export async function GET(req: Request) {
+export const GET = withDeskScope(async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const filterParam = searchParams.get("filter") ?? "all";
   const filter = FILTERS.includes(filterParam as HistoryFilter)
@@ -32,4 +33,4 @@ export async function GET(req: Request) {
     offerTitles: feed.offerTitles,
     filter,
   });
-}
+});

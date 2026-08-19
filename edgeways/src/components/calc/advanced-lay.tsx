@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
+import {
+  applyExchangeOddsInputChange,
+  exchangeOddsStepHandlers,
+  getExchangeOddsStep,
+} from "@/lib/calc/exchange-odds-step";
+import { layStakeStepHandlers } from "@/lib/calc/exchange-stake-step";
 import { cn } from "@/lib/utils";
 import type { LayBounds, PartLay } from "@/lib/calc";
 import { Plus, X } from "lucide-react";
@@ -104,6 +109,9 @@ export function AdvancedLaySection({
         const oddsStep = exchangeOddsStepHandlers(part.odds, (odds) =>
           onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
         );
+        const stakeStep = layStakeStepHandlers(part.stake, (stake) =>
+          onPartLays(partLays.map((p, j) => (j === i ? { ...p, stake } : p)))
+        );
         return (
         <div key={i} className="flex items-end gap-2">
           <label className="flex flex-1 flex-col gap-1">
@@ -114,11 +122,11 @@ export function AdvancedLaySection({
               type="number"
               inputMode="decimal"
               min={1.01}
-              step={0.01}
+              step={getExchangeOddsStep(part.odds)}
               value={Number.isFinite(part.odds) ? part.odds : ""}
               onChange={(e) =>
-                onPartLays(
-                  partLays.map((p, j) => (j === i ? { ...p, odds: parseFloat(e.target.value) } : p))
+                applyExchangeOddsInputChange(part.odds, parseFloat(e.target.value), (odds) =>
+                  onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
                 )
               }
               onKeyDown={oddsStep.onKeyDown}
@@ -145,6 +153,8 @@ export function AdvancedLaySection({
                     )
                   )
                 }
+                onKeyDown={stakeStep.onKeyDown}
+                onWheel={stakeStep.onWheel}
                 className="h-9 w-full rounded-md border-0 bg-black/10 pl-7 pr-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
               />
             </span>

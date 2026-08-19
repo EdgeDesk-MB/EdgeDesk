@@ -50,6 +50,20 @@ describe("eventNeedsRaceResult / sync window", () => {
       false
     );
   });
+
+  it("keeps open-bet races in the 36-hour lookback so overnight results still sync", () => {
+    const now = Date.now();
+    const yesterdayAfternoon = now - 22 * 60 * 60_000;
+    expect(eventInRacingSyncWindow(raceEvent({ startTime: yesterdayAfternoon }), now)).toBe(
+      false
+    );
+    expect(
+      eventInRacingSyncWindow(raceEvent({ startTime: yesterdayAfternoon }), now, false, true)
+    ).toBe(true);
+    expect(
+      eventInRacingSyncWindow(raceEvent({ startTime: now - 40 * 60 * 60_000 }), now, false, true)
+    ).toBe(false);
+  });
 });
 
 describe("racingSyncToast", () => {
@@ -62,6 +76,17 @@ describe("racingSyncToast", () => {
   it("explains lag when Basic but results not published", () => {
     const toast = racingSyncToast({ updated: 0, pending: 1, tier: "basic" });
     expect(toast.description).toMatch(/not published yet/i);
+  });
+
+  it("explains Basic cannot fetch yesterday's card", () => {
+    const toast = racingSyncToast({
+      updated: 0,
+      pending: 1,
+      tier: "basic",
+      historicBlocked: true,
+    });
+    expect(toast.title).toMatch(/Set result/i);
+    expect(toast.description).toMatch(/yesterday|older|historic/i);
   });
 
   it("celebrates successful sync", () => {

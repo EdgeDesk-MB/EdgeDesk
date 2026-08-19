@@ -3,11 +3,12 @@ import { eq } from "drizzle-orm";
 import { db, bets, offers } from "@/lib/db";
 import { awardUnconditionalFreeBetEarly, getPromoAwardsByBetId } from "@/lib/services/balances";
 import { syncOfferStatuses } from "@/lib/services/offers";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
 /** Credit an unconditional free bet early (bookie released it on placement). */
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export const POST = withDeskScope(async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const betId = Number(id);
   if (!Number.isFinite(betId) || betId <= 0) {
@@ -38,4 +39,4 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       reason: "Awarded on placement",
     },
   });
-}
+});

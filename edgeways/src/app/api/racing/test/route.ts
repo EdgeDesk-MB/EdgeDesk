@@ -3,11 +3,12 @@ import {
   hasRacingApiKey,
   resultsToday,
 } from "@/lib/services/theracingapi";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
 /** Probe Racing API results access (Basic tier). */
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   if (!hasRacingApiKey()) {
     return NextResponse.json({
       tier: "none" as const,
@@ -43,4 +44,4 @@ export async function GET() {
       { status: 502 }
     );
   }
-}
+});

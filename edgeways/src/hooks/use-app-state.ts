@@ -5,6 +5,13 @@ import {
   noteUserOriginatedSettlesFromResponse,
 } from "@/lib/alerts/note-user-settle";
 import { cachedGet, clearApiGetCache } from "@/lib/api-get-cache";
+import { publicDemoApiGet } from "@/lib/demo/public-desk-api";
+import {
+  hasPublicDemoCookieInDocument,
+  isPublicDemoSetupWrite,
+  publicDemoWriteMessage,
+} from "@/lib/demo/public-demo";
+import { toast } from "sonner";
 
 export { useAppStateContext as useAppState } from "@/components/app-state-provider";
 
@@ -14,6 +21,15 @@ export async function api<T = unknown>(
 ): Promise<T> {
   const { json, ...rest } = init ?? {};
   const method = (rest.method ?? (json !== undefined ? "POST" : "GET")).toUpperCase();
+  if (hasPublicDemoCookieInDocument()) {
+    if (method === "GET" || method === "HEAD") {
+      const canned = publicDemoApiGet(path);
+      if (canned !== undefined) return canned as T;
+    } else if (!isPublicDemoSetupWrite(path)) {
+      toast.error(publicDemoWriteMessage());
+      throw new Error(publicDemoWriteMessage());
+    }
+  }
   // Mark before fetch so a concurrent state poll cannot sticky-toast first.
   if (method !== "GET" && method !== "HEAD") {
     noteUserOriginatedSettlesFromRequest(path, json);

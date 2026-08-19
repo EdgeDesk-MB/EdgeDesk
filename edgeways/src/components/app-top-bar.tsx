@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { EdgewaysLogo } from "@/components/edgeways-logo-icon";
+import { bankrollAriaLabel, bankrollCompanion } from "@/components/app-top-bar-bankroll";
 import { AppTopBarMenu } from "@/components/app-top-bar-menu";
 import { AppTopBarMetaNav } from "@/components/app-top-bar-meta-nav";
 import { ChromeTab } from "@/components/chrome-tab";
-import { MoneyFlow } from "@/components/money-flow";
+import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
 import { isNegativeGbp } from "@/lib/format-money";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
 import { useEffect, useState, useMemo, type CSSProperties, type ReactNode } from "react";
@@ -19,6 +20,7 @@ import {
   appShellGap,
   appShellMaxWidth,
 } from "@/lib/ui/app-shell-layout";
+import { demoDataTag } from "@/lib/ui/surface-styles";
 import { COLLAPSE_EASE, SPRING_DURATION_MS, SPRING_EASE } from "@/lib/ui/motion";
 import { cn } from "@/lib/utils";
 
@@ -58,11 +60,9 @@ function BrandLink({ className }: { className?: string }) {
   );
 }
 
-/** Profit on the balance pill: green when ≥ 0, red when negative after pence round. */
+/** Profit on the balance pill: shared P&L green, `--negative` after pence round. */
 function profitToneClass(value: number): string {
-  return isNegativeGbp(value)
-    ? "text-red-600 dark:text-red-400"
-    : "text-emerald-600 dark:text-emerald-400";
+  return isNegativeGbp(value) ? "text-negative" : moneyPositiveClass;
 }
 
 /** Single metric column inside the canvas balance pill. */
@@ -127,38 +127,47 @@ function TopBarProfitStack({
   );
 }
 
-/** Exchange above Total. Total alone centres vertically when exchange is hidden. */
+function BankrollRows({
+  exchange,
+  inBets,
+  total,
+}: {
+  exchange: number;
+  inBets: number;
+  total: number;
+}) {
+  const companion = bankrollCompanion(inBets);
+  return (
+    <>
+      {companion === "in-bets" ? (
+        <StackRow label="In-bets" value={inBets} />
+      ) : (
+        <StackRow label="Exchange" value={exchange} />
+      )}
+      <StackRow label="Total" value={total} />
+    </>
+  );
+}
+
+/** Exchange (or In-bets) above Total. The right stack is always two rows. */
 function TopBarBankrollStack({
   exchange,
   inBets,
   total,
-  showExchange,
   ownerLines,
 }: {
   exchange: number;
   inBets: number;
   total: number;
-  showExchange: boolean;
   ownerLines: Array<{ owner: string; balance: number }>;
 }) {
-  const showInBets = inBets > 0.005;
-  // Exchange and In-bets share the first row — In-bets wins when present.
-  const showExchangeRow = showExchange && !showInBets;
   const chip = (
     <Link
       href="/accounts"
       className={stackShell}
-      aria-label={
-        showInBets
-          ? `Bankroll: in-bets ${inBets.toFixed(2)}, total ${total.toFixed(2)}`
-          : showExchangeRow
-            ? `Bankroll: exchange ${exchange.toFixed(2)}, total ${total.toFixed(2)}`
-            : `Bankroll total ${total.toFixed(2)}`
-      }
+      aria-label={bankrollAriaLabel(exchange, inBets, total)}
     >
-      {showExchangeRow ? <StackRow label="Exchange" value={exchange} /> : null}
-      {showInBets ? <StackRow label="In-bets" value={inBets} /> : null}
-      <StackRow label="Total" value={total} />
+      <BankrollRows exchange={exchange} inBets={inBets} total={total} />
     </Link>
   );
 
@@ -187,14 +196,14 @@ function MobileStatStacks({
   onFreeBets,
   total,
   exchange,
-  showExchange,
+  inBets,
 }: {
   profit: number;
   freeBets: number;
   onFreeBets: () => void;
   total: number;
   exchange: number;
-  showExchange: boolean;
+  inBets: number;
 }) {
   const freeBetsActive = freeBets > 0.005;
   return (
@@ -220,14 +229,9 @@ function MobileStatStacks({
       <Link
         href="/accounts"
         className={stackShell}
-        aria-label={
-          showExchange
-            ? `Bankroll: exchange ${exchange.toFixed(2)}, total ${total.toFixed(2)}`
-            : `Bankroll total ${total.toFixed(2)}`
-        }
+        aria-label={bankrollAriaLabel(exchange, inBets, total)}
       >
-        {showExchange ? <StackRow label="Exchange" value={exchange} /> : null}
-        <StackRow label="Total" value={total} />
+        <BankrollRows exchange={exchange} inBets={inBets} total={total} />
       </Link>
     </>
   );
@@ -368,7 +372,6 @@ function AppTopBarHeader() {
     balances?.accounts
       ?.filter((a) => a.type === "bookie")
       .reduce((s, a) => s + (a.freeBets ?? 0), 0) ?? 0;
-  const showExchange = exchange > 0.005;
 
   return (
     <div
@@ -387,7 +390,7 @@ function AppTopBarHeader() {
 
       <div className="flex min-w-0 flex-1 items-stretch justify-end gap-1 md:gap-1.5">
         {state?.demoMode ? (
-          <span className="self-center shrink-0 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-warning sm:text-[11px]">
+          <span className={cn(demoDataTag, "self-center shrink-0")}>
             Demo data
           </span>
         ) : null}
@@ -405,7 +408,6 @@ function AppTopBarHeader() {
                   exchange={exchange}
                   inBets={inBets}
                   total={bankroll}
-                  showExchange={showExchange}
                   ownerLines={ownerBalances}
                 />
               </BalancePill>
@@ -418,7 +420,7 @@ function AppTopBarHeader() {
                   onFreeBets={openFreeBets}
                   total={bankroll}
                   exchange={exchange}
-                  showExchange={showExchange}
+                  inBets={inBets}
                 />
               </BalancePill>
             </div>

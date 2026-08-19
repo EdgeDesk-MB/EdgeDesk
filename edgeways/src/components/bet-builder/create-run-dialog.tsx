@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,12 +30,14 @@ import {
 import { DateTimePicker } from "@/components/date-time-picker";
 import { DeskLegEventFields } from "@/components/desk/desk-leg-event-fields";
 import { DeskStakeSource } from "@/components/desk/desk-stake-source";
+import { WarningNotice } from "@/components/ui/warning-notice";
 import { nextDeskLegLabel } from "@/lib/desk/desk-leg-title";
 import { resolveDeskEventIdForSave } from "@/lib/desk/resolve-desk-event-id";
 import { usePauseAppStatePolling } from "@/components/app-state-provider";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { wholeComboLay } from "@/lib/calc/bet-builder-workflow";
+import { formatGbp } from "@/lib/format-money";
 import {
   emptySelectionCountFromPrefill,
   type BetBuilderRunPrefill,
@@ -100,20 +103,19 @@ function RequirementsStrip({ prefill }: { prefill: BetBuilderRunPrefill }) {
   if (prefill.purpose === "convert") parts.push("Free-bet convert");
   if (prefill.minSelections != null) parts.push(`Min ${prefill.minSelections} selections`);
   if (prefill.minOdds != null) parts.push(`Min odds ${prefill.minOdds}`);
-  if (prefill.minStake != null) parts.push(`Min stake £${prefill.minStake}`);
-  if (prefill.maxStake != null) parts.push(`Max stake £${prefill.maxStake}`);
+  if (prefill.minStake != null) parts.push(`Min stake ${formatGbp(prefill.minStake)}`);
+  if (prefill.maxStake != null) parts.push(`Max stake ${formatGbp(prefill.maxStake)}`);
   const notes = prefill.importantNotes?.trim();
   if (notes) {
     parts.push(notes.length > 160 ? `${notes.slice(0, 157)}…` : notes);
   }
   if (parts.length === 0) return null;
   return (
-    <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
-      <p className="font-semibold text-warning">
-        {prefill.purpose === "convert" ? "Reward requirements" : "Offer requirements"}
-      </p>
-      <p className="mt-0.5 text-muted-foreground">{parts.join(" · ")}</p>
-    </div>
+    <WarningNotice
+      title={prefill.purpose === "convert" ? "Reward requirements" : "Offer requirements"}
+    >
+      <p>{parts.join(" · ")}</p>
+    </WarningNotice>
   );
 }
 
@@ -355,23 +357,32 @@ export function BetBuilderCreateRunForm({
 
   return (
     <>
-      <div className={deskRunDialogBodyClass}>
       <DialogHeader>
         <DialogTitle>
           {isEdit
             ? "Edit bet builder"
             : prefill?.purpose === "convert"
-              ? "Convert free bet on Bet Builder Desk"
+              ? "Convert on Bet Builder"
               : "New bet builder"}
         </DialogTitle>
-        <DialogDescription>
+        <DialogDescription
+          explainer={
+            isEdit && moneyLocked ? (
+              <DialogExplainer title="What you can edit">
+                Label, bookmaker, event and selections. Stake and odds stay
+                locked.
+              </DialogExplainer>
+            ) : undefined
+          }
+        >
           {isEdit
             ? moneyLocked
-              ? "Label, bookmaker, event, kick-off and selection names. Stake and odds stay locked after a lay or results."
-              : "Update the builder details. Method stays as created."
-            : "Same-event selections, one kick-off. Link sport and event, set stake source, then add each leg market."}
+              ? "Stake and odds stay locked."
+              : "Update the builder details."
+            : "Same-event selections, one kick-off."}
         </DialogDescription>
       </DialogHeader>
+      <div className={deskRunDialogBodyClass}>
 
       {prefill && !isEdit ? <RequirementsStrip prefill={prefill} /> : null}
 

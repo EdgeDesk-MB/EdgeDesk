@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, offerEffortSamples } from "@/lib/db";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
 const MIN_MINUTES = 0.25;
 const MAX_MINUTES = 120;
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const offerId = Number(req.nextUrl.searchParams.get("offerId"));
   if (!Number.isFinite(offerId)) {
     return NextResponse.json({ error: "offerId required" }, { status: 400 });
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(offerEffortSamples.createdAt))
     .all();
   return NextResponse.json({ samples });
-}
+});
 
 const createSchema = z.object({
   offerId: z.number().int().positive(),
@@ -29,7 +30,7 @@ const createSchema = z.object({
   endedAt: z.number().int().positive(),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -53,14 +54,14 @@ export async function POST(req: NextRequest) {
     .returning()
     .get();
   return NextResponse.json({ sample: row });
-}
+});
 
 const patchSchema = z.object({
   id: z.number().int().positive(),
   durationMin: z.number().min(MIN_MINUTES).max(MAX_MINUTES),
 });
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -73,4 +74,4 @@ export async function PATCH(req: NextRequest) {
     .get();
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ sample: row });
-}
+});

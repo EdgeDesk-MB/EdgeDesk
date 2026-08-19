@@ -66,7 +66,7 @@ Decisions for Sam:
 | `--highlight` | `#FFC71E` | same | Line-tab underlines |
 | `--chip` / `--chip-foreground` | `#111` / `#FFC71E` | same | Active pills, segmented tabs, primary badges |
 | `--success` | `oklch(0.45 0.12 150)` | `oklch(0.62 0.14 150)` | Qualifying / completed / affirmative |
-| `--warning` | `oklch(0.55 0.14 75)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
+| `--warning` | `oklch(0.54 0.18 68)` | `oklch(0.72 0.13 75)` | Caution only (D5) |
 | `--edge` | `oklch(0.5 0.2 295)` | `oklch(0.72 0.16 295)` | Offer Edge / pro signature (D5) |
 | `--negative` | `oklch(0.577 0.245 27)` | `oklch(0.78 0.15 22)` | Losses, destructive |
 | `--topbar` | `#111` | `#FFC71E` | Header + meta-nav plate |

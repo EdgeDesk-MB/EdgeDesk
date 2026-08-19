@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getAppSettings, patchAppSettings, type AppSettingsPatch } from "@/lib/services/settings";
 import {
   normalizeDefaultSport,
@@ -6,12 +7,17 @@ import {
   normalizePlanPreview,
 } from "@/lib/services/settings-shared";
 import { normalizeTimeFormat } from "@/lib/time-format";
+import {
+  PUBLIC_DEMO_COOKIE,
+  stripPublicDemoAppearancePatch,
+} from "@/lib/demo/public-demo";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json(getAppSettings());
-}
+});
 
-export async function PATCH(req: Request) {
+export const PATCH = withDeskScope(async function PATCH(req: Request) {
   const body = (await req.json()) as Record<string, unknown>;
   const patch: AppSettingsPatch = {};
 
@@ -103,5 +109,11 @@ export async function PATCH(req: Request) {
     }
   }
 
-  return NextResponse.json(patchAppSettings(patch));
-}
+  const demoActive = (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  const safePatch = stripPublicDemoAppearancePatch(
+    patch as Record<string, unknown>,
+    demoActive
+  ) as AppSettingsPatch;
+
+  return NextResponse.json(patchAppSettings(safePatch));
+});

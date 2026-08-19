@@ -31,6 +31,7 @@ import {
 } from "@/lib/racing";
 import { betRaceOutcome, type PromoAwardsByBetId } from "@/lib/bet-outcomes";
 import { effectiveEventStatus, formatEventStatus, formatRacingEventTitle } from "@/lib/events";
+import { formatClockTime } from "@/lib/time-format";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import { SportEventBlock } from "@/components/sport-icon";
 import { formatPillLabel } from "@/lib/ui/status-badges";
@@ -98,6 +99,12 @@ export function EventRowView({
             ) : (
               <>
                 {event.competition ?? event.sport}
+                {event.startTime ? (
+                  <>
+                    {" · "}
+                    <span className="tabular-nums">{formatClockTime(event.startTime)}</span>
+                  </>
+                ) : null}
                 {event.source === "sim" && " · simulated"}
                 {event.source === "api" && " · live feed"}
                 {live && liveModel?.marketsLabel ? (
@@ -182,6 +189,8 @@ export function EventRowView({
           <span className="text-sm text-muted-foreground">
             {raceResult ? (
               <>Won by {raceResult.winner}</>
+            ) : event.startTime > Date.now() ? (
+              "-"
             ) : event.status === "finished" ? (
               "-"
             ) : (
@@ -307,7 +316,7 @@ function GoalDialog({
         <DialogHeader>
           <DialogTitle>Record a goal</DialogTitle>
           <DialogDescription>
-            Naming the scorer lets &quot;wins IF&quot; goalscorer triggers settle automatically.
+            Name the scorer so goalscorer bets settle.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -392,10 +401,9 @@ function CorrectResultDialog({
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Correct match result</DialogTitle>
+          <DialogTitle>Correct result</DialogTitle>
           <DialogDescription>
-            Update how the match ended and the 90-minute score. Settled bets will be
-            re-opened and re-settled at the corrected full-time result.
+            Update the full-time score. Settled bets will re-settle.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">

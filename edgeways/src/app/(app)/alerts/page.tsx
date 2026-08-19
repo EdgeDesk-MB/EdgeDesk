@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
+import { ALERT_INBOX_READ_EVENT } from "@/lib/alerts/inbox-read-event";
 import type { AlertsInboxRow } from "@/lib/db/schema";
 import { formatClockTime } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,12 @@ export default function AlertsPage() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const onInboxRead = () => load();
+    window.addEventListener(ALERT_INBOX_READ_EVENT, onInboxRead);
+    return () => window.removeEventListener(ALERT_INBOX_READ_EVENT, onInboxRead);
   }, [load]);
 
   const unread = (alerts ?? []).filter((a) => a.readAt == null).length;

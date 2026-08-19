@@ -31,10 +31,10 @@ export function ScopePlaceChooserDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md sm:max-w-md">
-        <DialogHeader className="pr-8">
-          <DialogTitle>How do you want to place this?</DialogTitle>
-          <DialogDescription className="text-pretty">
-            This offer allows more than one bet type. Pick the path you are placing now.
+        <DialogHeader>
+          <DialogTitle>Place this how?</DialogTitle>
+          <DialogDescription>
+            Pick the path you are placing now.
           </DialogDescription>
         </DialogHeader>
 

@@ -11,7 +11,7 @@ import {
   decimalToAmerican,
   decimalToFractional,
   fractionalToDecimal,
-} from "@/lib/calc";
+} from "@/lib/calc/odds";
 
 export default function OddsConverterPage() {
   const [decimal, setDecimal] = useState(3);

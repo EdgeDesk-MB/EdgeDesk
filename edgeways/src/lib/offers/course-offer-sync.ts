@@ -8,8 +8,10 @@
  * Recurring series instances (`seriesId`) are always one use per `eventDate` —
  * tomorrow is a separate series row; they never spawn twins.
  *
- * `reconcileSameDayOfferSiblings` retires leftover unused twins for one-shot /
- * series groups so Race picks stops.
+ * `reconcileSameDayOfferSiblings` retires leftover unused *auto-spawned* twins
+ * for one-shot / series groups so Race picks stops. Each user-created card is
+ * its own lineage: adding the same promo again inserts a new record that is
+ * never completed, merged, or used as another campaign's spare twin.
  *
  * Also: course expiry sync — when we have live racecard data, set expiresAt
  * to 30 min after the last race at that course starts (null expires only).
@@ -39,7 +41,36 @@ export function isSpecificCourseOffer(
   );
 }
 
+/** Prefix on twins inserted by `ensureSameDayOfferSiblings`. Value is `same_day_twin` or `same_day_twin:<parentId>`. */
+export const SAME_DAY_TWIN_SOURCE = "same_day_twin";
+
 type GroupKey = string;
+
+export function isAutoSpawnedSameDayTwin(offer: Pick<OfferRow, "source">): boolean {
+  const source = offer.source?.trim() ?? "";
+  return source === SAME_DAY_TWIN_SOURCE || source.startsWith(`${SAME_DAY_TWIN_SOURCE}:`);
+}
+
+export function sameDayTwinParentId(offer: Pick<OfferRow, "source">): number | null {
+  const source = offer.source?.trim() ?? "";
+  const prefix = `${SAME_DAY_TWIN_SOURCE}:`;
+  if (!source.startsWith(prefix)) return null;
+  const id = Number(source.slice(prefix.length));
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function sameDayTwinSourceFor(parentId: number): string {
+  return `${SAME_DAY_TWIN_SOURCE}:${parentId}`;
+}
+
+/** User-created cards are one lineage each; auto-twins stay on their parent's lineage. */
+function lineageKey(offer: OfferRow): GroupKey {
+  const parentId = sameDayTwinParentId(offer);
+  if (parentId != null) return `lineage:${parentId}`;
+  // Legacy twins (no parent id) still cluster by spec so leftover rows can retire.
+  if (offer.source === SAME_DAY_TWIN_SOURCE) return `spec:${groupKey(offer)}`;
+  return `lineage:${offer.id}`;
+}
 
 /**
  * Same-day place-refund cards: dated offers with a result trigger that are not
@@ -114,12 +145,12 @@ export function retireUnusedSameDayOfferSiblings(completedOfferId: number): void
   if (!completed || !isSameDayMultiRaceOffer(completed)) return;
   if (completed.status !== "completed" && completed.status !== "expired") return;
 
-  const key = groupKey(completed);
+  const key = lineageKey(completed);
   const group = db
     .select()
     .from(offers)
     .all()
-    .filter((o) => isSameDayMultiRaceOffer(o) && groupKey(o) === key);
+    .filter((o) => isSameDayMultiRaceOffer(o) && lineageKey(o) === key);
 
   // Opt-in multi-use: leave the fresh desk card for the next race.
   if (groupAllowsSameDayRepeat(group)) return;
@@ -131,6 +162,7 @@ export function retireUnusedSameDayOfferSiblings(completedOfferId: number): void
 
   for (const offer of group) {
     if (offer.id === completedOfferId) continue;
+    if (!isAutoSpawnedSameDayTwin(offer)) continue;
     if (offer.status !== "active" && offer.status !== "planned") continue;
     if ((betCounts.get(offer.id) ?? 0) > 0) continue;
     completeUnusedOffer(offer.id, now);
@@ -153,7 +185,7 @@ export function reconcileSameDayOfferSiblings(): void {
   const groups = new Map<GroupKey, OfferRow[]>();
   for (const offer of allOffers) {
     if (!isSameDayMultiRaceOffer(offer)) continue;
-    const key = groupKey(offer);
+    const key = lineageKey(offer);
     const group = groups.get(key) ?? [];
     group.push(offer);
     groups.set(key, group);
@@ -169,6 +201,7 @@ export function reconcileSameDayOfferSiblings(): void {
     if (!groupUsed && !groupFinished) continue;
 
     for (const offer of group) {
+      if (!isAutoSpawnedSameDayTwin(offer)) continue;
       if (offer.status !== "active" && offer.status !== "planned") continue;
       if ((betCounts.get(offer.id) ?? 0) > 0) continue;
       completeUnusedOffer(offer.id, now);
@@ -197,7 +230,7 @@ export function ensureSameDayOfferSiblings(
     if (offer.seriesId != null) continue;
     if (!offerRepeatsSameDay(parseOfferRules(offer))) continue;
 
-    const key = groupKey(offer);
+    const key = lineageKey(offer);
     const group = groups.get(key) ?? [];
     group.push(offer);
     groups.set(key, group);
@@ -215,6 +248,7 @@ export function ensureSameDayOfferSiblings(
     if (source.seriesId != null) continue;
     if (!offerRepeatsSameDay(parseOfferRules(source))) continue;
 
+    const parentId = sameDayTwinParentId(source) ?? source.id;
     db.insert(offers)
       .values({
         bookmaker: source.bookmaker,
@@ -232,6 +266,7 @@ export function ensureSameDayOfferSiblings(
         offerUrl: source.offerUrl,
         startsOn: source.startsOn,
         expiresAt: source.expiresAt,
+        source: sameDayTwinSourceFor(parentId),
         createdAt: now,
       })
       .run();

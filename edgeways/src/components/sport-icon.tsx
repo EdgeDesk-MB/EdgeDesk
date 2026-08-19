@@ -59,6 +59,19 @@ export function FootballIcon(props: SvgIconProps) {
 }
 
 /**
+ * Referee whistle — official Lucide artwork (not in lucide-react 1.23 yet).
+ * https://github.com/lucide-icons/lucide/pull/3006
+ */
+export function WhistleIcon(props: SvgIconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M10 6v4" />
+      <path d="M21 6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-5.675A7 7 0 1 1 9 6z" />
+    </svg>
+  );
+}
+
+/**
  * Horse racing - Lucide Lab `horse-head` (main Lucide has no horse icon).
  * https://lucide.dev/icons/lab/horse-head
  */

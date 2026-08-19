@@ -2,25 +2,22 @@ import Link from "next/link";
 import { WaitlistForm } from "@/components/marketing/waitlist-form";
 import { MarketingLogo } from "@/components/marketing/marketing-logo";
 import { MarketingGlimpseRail } from "@/components/marketing/marketing-glimpse-rail";
-import { MarketingSocialLinks } from "@/components/marketing/marketing-social-links";
 import { MarketingPricing } from "@/components/marketing/marketing-pricing";
-import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
+import { MarketingSiteFooter } from "@/components/marketing/marketing-site-footer";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { TRIAL_DAYS, betaOfferSummary } from "@/lib/billing/public-offer";
+import {
+  HERO_LEAD,
+  HOW_IT_HELPS_LEAD,
+  POSITIONING_FAQ,
+} from "@/lib/marketing/landing-faq";
 import { cn } from "@/lib/utils";
 
 const FAQ = [
-  {
-    q: "What is Edgeways?",
-    a: "A matched betting command centre. What to do next, clean execution, and what you kept.",
-  },
-  {
-    q: "Is this an oddsmatcher?",
-    a: "No. Matchers help you find bets. Edgeways runs the day and shows what you kept.",
-  },
+  ...POSITIONING_FAQ,
   {
     q: "What does the trial include?",
-    a: `${TRIAL_DAYS} days of Edge, the top tier. One trial per person. Cancel before it ends and you are not charged. Then pick Core or Edge at the list price.`,
+    a: `${TRIAL_DAYS} days of Edge, the top tier. One trial per person. Cancel before it ends and you are not charged. After that, Edge billing starts unless you cancel.`,
   },
   {
     q: "What do beta testers get?",
@@ -61,14 +58,8 @@ const ALSO_ON_DESK = [
 
 function LaunchNav() {
   return (
-    <header className="relative z-20 mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-5 py-4 sm:gap-4 sm:px-8 sm:py-5">
+    <header className="relative z-20 mx-auto flex w-full max-w-5xl items-center justify-center px-5 py-4 sm:justify-between sm:gap-4 sm:px-8 sm:py-5">
       <MarketingLogo />
-      <Link
-        href="/login"
-        className="rounded-md px-2 py-1.5 text-sm text-white/70 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)] sm:hidden"
-      >
-        Log in
-      </Link>
       <nav
         aria-label="Marketing"
         className="hidden shrink-0 items-center gap-1 text-sm text-white/70 sm:flex sm:gap-3 md:gap-4"
@@ -85,6 +76,12 @@ function LaunchNav() {
         >
           Plans
         </a>
+        <Link
+          href="/demo"
+          className="rounded-md px-2 py-1.5 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
+        >
+          Try the desk
+        </Link>
         <Link
           href="/login"
           className="rounded-md px-2 py-1.5 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
@@ -162,8 +159,7 @@ export function LaunchHome() {
             </span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-white/65 sm:mt-5 sm:text-lg">
-            Edgeways is the matched betting command centre. One desk for the
-            day. No spreadsheet pile-up.
+            {HERO_LEAD}
           </p>
           <div className="mx-auto mt-7 flex w-full max-w-md flex-col gap-3 sm:mt-8 sm:flex-row sm:justify-center">
             <a
@@ -173,8 +169,14 @@ export function LaunchHome() {
               See plans
             </a>
             <Link
+              href="/demo"
+              className="hidden justify-center rounded-[var(--radius-button)] border border-white/20 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)] sm:inline-flex"
+            >
+              Try the desk
+            </Link>
+            <Link
               href="/login"
-              className="inline-flex justify-center rounded-[var(--radius-button)] border border-white/20 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
+              className="inline-flex justify-center rounded-[var(--radius-button)] px-4 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)] sm:hidden"
             >
               Log in
             </Link>
@@ -184,17 +186,21 @@ export function LaunchHome() {
 
         <section
           id="how-it-helps"
-          className="border-t border-white/10 bg-[var(--marketing-band-deep)] px-5 py-16 sm:px-8 sm:py-20"
+          className="border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20"
         >
           <div className="mx-auto max-w-5xl">
-            <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Built to make the day simpler.
-            </h2>
-            <p className="mt-3 max-w-2xl text-base text-white/55 sm:text-lg">
-              Matchers help you find bets. Edgeways helps you run them, then
-              shows what paid. Less tab-hopping. Fewer missed steps.
-            </p>
-            <ul className="mt-12 grid gap-8 sm:grid-cols-3 sm:gap-8">
+            <div data-reveal="">
+              <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                Built to make the day simpler.
+              </h2>
+              <p className="mt-3 max-w-2xl text-base text-white/55 sm:text-lg">
+                {HOW_IT_HELPS_LEAD}
+              </p>
+            </div>
+            <ul
+              data-reveal-stagger=""
+              className="mt-12 grid gap-8 sm:grid-cols-3 sm:gap-8"
+            >
               {[
                 {
                   title: "Know what to do next",
@@ -211,7 +217,7 @@ export function LaunchHome() {
               ].map((item) => (
                 <li
                   key={item.title}
-                  className="border-t border-[color-mix(in_srgb,var(--marketing-brand)_40%,transparent)] pt-4 text-left"
+                  className="border-t border-[var(--marketing-rule)] pt-4 text-left"
                 >
                   <h3 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
                     {item.title}
@@ -230,27 +236,34 @@ export function LaunchHome() {
           className="marketing-band border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20"
         >
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Key features
-            </h2>
-            <p className="mt-3 max-w-xl text-base text-white/55 sm:text-lg">
-              The tools that run the day. Daily Plan, pipelines, P&amp;L.
-            </p>
-            <div className="mt-10">
+            <div data-reveal="">
+              <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                Key features
+              </h2>
+              <p className="mt-3 max-w-xl text-base text-white/55 sm:text-lg">
+                The tools that run the day. Daily Plan, pipelines, P&amp;L.
+              </p>
+            </div>
+            <div className="mt-10" data-reveal="">
               <MarketingGlimpseRail />
             </div>
           </div>
         </section>
 
-        <section className="border-t border-white/10 bg-[var(--marketing-band-deep)] px-5 py-16 sm:px-8 sm:py-20">
+        <section className="border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Also on the desk
-            </h2>
-            <p className="mt-3 max-w-xl text-base text-white/55 sm:text-lg">
-              Supporting tools that keep the main queue clear.
-            </p>
-            <ul className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2">
+            <div data-reveal="">
+              <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                Also on the desk
+              </h2>
+              <p className="mt-3 max-w-xl text-base text-white/55 sm:text-lg">
+                Supporting tools that keep the main queue clear.
+              </p>
+            </div>
+            <ul
+              data-reveal=""
+              className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2"
+            >
               {ALSO_ON_DESK.map((item) => (
                 <li
                   key={item.title}
@@ -275,16 +288,22 @@ export function LaunchHome() {
           className="marketing-band border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20"
         >
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            <h2
+              data-reveal=""
+              className="text-2xl font-semibold tracking-tight text-white sm:text-3xl"
+            >
               Straight answers
             </h2>
-            <dl className="mt-10 divide-y divide-white/10 border-y border-white/10">
+            <dl
+              data-reveal=""
+              className="mt-10 divide-y divide-white/10 border-y border-white/10"
+            >
               {FAQ.map((item) => (
                 <div key={item.q} className="py-5">
                   <dt className="text-lg font-semibold tracking-tight text-white">
                     {item.q}
                   </dt>
-                  <dd className="mt-2 max-w-3xl text-sm leading-relaxed text-white/60 sm:text-base">
+                  <dd className="mt-2 text-sm leading-relaxed text-white/60 sm:text-base">
                     {item.a}
                   </dd>
                 </div>
@@ -293,8 +312,8 @@ export function LaunchHome() {
           </div>
         </section>
 
-        <section className="border-t border-white/10 bg-[var(--marketing-band-deep)] px-5 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-5xl text-center">
+        <section className="border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-5xl text-center" data-reveal="">
             <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
               Join the beta waitlist
             </h2>
@@ -308,24 +327,12 @@ export function LaunchHome() {
         </section>
       </main>
 
-      <footer className="border-t border-white/10 px-5 py-10 sm:px-8">
-        <div className="mx-auto flex max-w-5xl flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <MarketingLogo className="opacity-90" />
-            <MarketingSocialLinks className="mt-4" />
-            <p className="mt-3 text-xs text-white/55">
-              © {new Date().getFullYear()} Edgeways. All rights reserved.
-            </p>
-          </div>
-          <div className="max-w-md space-y-3">
-            <ResponsibleGamblingNote className="text-white/55 [&_a]:text-[var(--marketing-brand)]" />
-            <p className="text-xs text-white/55">
-              We keep your email for the waitlist and launch updates.
-              Unsubscribe any time. Full privacy policy before public launch.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <MarketingSiteFooter>
+        <p className="text-xs text-white/55">
+          We keep your email for the waitlist and launch updates.
+          Unsubscribe any time.
+        </p>
+      </MarketingSiteFooter>
     </>
   );
 }

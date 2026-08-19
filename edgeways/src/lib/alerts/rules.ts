@@ -27,6 +27,7 @@ import {
   resolveOfferImpact,
   type OfferImpactOffer,
 } from "./offer-impact";
+import { resultSettledAlertKey } from "./settled-since-poll";
 import { formatAlertHours, formatAlertMinutes } from "./toast-age";
 import type { AlertPrefs, EdgeAlert } from "./types";
 
@@ -268,7 +269,7 @@ export function settledResultAlert(settled: SettledBetNotice): EdgeAlert {
         ? "negative"
         : null;
   return {
-    key: `result_settled:${settled.betId}`,
+    key: resultSettledAlertKey(settled.betId),
     kind: "result_settled",
     title: copy.title,
     body: copy.body,

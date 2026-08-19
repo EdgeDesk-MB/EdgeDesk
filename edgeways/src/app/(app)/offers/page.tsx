@@ -46,6 +46,7 @@ import {
   offerCategoryFromSport,
   type OfferCategoryId,
 } from "@/lib/offers/offer-categories";
+import { ListDaySection } from "@/components/layout/list-day-section";
 import { Gift, Plus, Tag } from "lucide-react";
 
 export default function OffersPage() {
@@ -327,31 +328,23 @@ function OffersContent() {
         )}
 
         {grouped.map((group) => (
-          <section key={group.dayMs} className="flex flex-col">
-            <div className="flex items-center gap-3 pt-1">
-              <h2 className="shrink-0 text-xs font-semibold tracking-wide text-foreground">
-                {group.label}
-              </h2>
-              <div className="h-px min-w-0 flex-1 bg-border" aria-hidden />
-            </div>
-            <div className="mt-3 flex flex-col gap-4.5">
-              {group.offers.map((offer) => {
-                const action = nextActions.find((a) => a.offerId === offer.id);
-                return (
-                  <OfferCampaignCard
-                    key={offer.id}
-                    offer={offer}
-                    highlighted={highlightId === offer.id}
-                    nextActionLabel={action ? offerNextActionLabel(action.kind) : null}
-                    nextActionDetail={action?.detail ?? null}
-                    onRefresh={refresh}
-                    onView={viewOffer}
-                    onEdit={(o) => openOffer({ editOffer: o })}
-                  />
-                );
-              })}
-            </div>
-          </section>
+          <ListDaySection key={group.dayMs} label={group.label}>
+            {group.offers.map((offer) => {
+              const action = nextActions.find((a) => a.offerId === offer.id);
+              return (
+                <OfferCampaignCard
+                  key={offer.id}
+                  offer={offer}
+                  highlighted={highlightId === offer.id}
+                  nextActionLabel={action ? offerNextActionLabel(action.kind) : null}
+                  nextActionDetail={action?.detail ?? null}
+                  onRefresh={refresh}
+                  onView={viewOffer}
+                  onEdit={(o) => openOffer({ editOffer: o })}
+                />
+              );
+            })}
+          </ListDaySection>
         ))}
       </div>
     </PageShell>

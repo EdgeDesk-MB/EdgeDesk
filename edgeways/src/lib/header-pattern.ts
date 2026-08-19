@@ -80,16 +80,22 @@ export function writeStoredHeaderPattern(id: HeaderPatternId): void {
   if (typeof window === "undefined") return;
   const resolved = normalizeHeaderPattern(id);
   try {
-    localStorage.setItem(HEADER_PATTERN_STORAGE_KEY, resolved);
+    if (resolved === DEFAULT_HEADER_PATTERN) {
+      localStorage.removeItem(HEADER_PATTERN_STORAGE_KEY);
+    } else {
+      localStorage.setItem(HEADER_PATTERN_STORAGE_KEY, resolved);
+    }
   } catch {
     /* private mode / quota */
   }
   try {
     document.cookie =
-      HEADER_PATTERN_COOKIE_KEY +
-      "=" +
-      encodeURIComponent(resolved) +
-      ";path=/;max-age=31536000;SameSite=Lax";
+      resolved === DEFAULT_HEADER_PATTERN
+        ? HEADER_PATTERN_COOKIE_KEY + "=;path=/;max-age=0;SameSite=Lax"
+        : HEADER_PATTERN_COOKIE_KEY +
+          "=" +
+          encodeURIComponent(resolved) +
+          ";path=/;max-age=31536000;SameSite=Lax";
   } catch {
     /* ignore */
   }

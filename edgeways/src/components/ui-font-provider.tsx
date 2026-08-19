@@ -16,6 +16,7 @@ import {
   writeStoredUiFont,
   type UiFontId,
 } from "@/lib/ui-font";
+import { hasPublicDemoCookieInDocument } from "@/lib/demo/public-demo";
 
 type UiFontContextValue = {
   fontId: UiFontId;
@@ -26,18 +27,29 @@ type UiFontContextValue = {
 
 const UiFontContext = createContext<UiFontContextValue | null>(null);
 
+function initialUiFont(): UiFontId {
+  if (typeof window === "undefined" || hasPublicDemoCookieInDocument()) {
+    return DEFAULT_UI_FONT;
+  }
+  return readStoredUiFont();
+}
+
 export function UiFontProvider({ children }: { children: React.ReactNode }) {
-  const [fontId, setFontIdState] = useState<UiFontId>(DEFAULT_UI_FONT);
+  const [fontId, setFontIdState] = useState<UiFontId>(initialUiFont);
 
   useEffect(() => {
-    const stored = readStoredUiFont();
-    setFontIdState(stored);
-    applyUiFont(stored);
+    const demo = hasPublicDemoCookieInDocument();
+    const next = demo ? DEFAULT_UI_FONT : readStoredUiFont();
+    setFontIdState(next);
+    applyUiFont(next);
+    if (!demo) writeStoredUiFont(next);
   }, []);
 
   const setFontId = useCallback((id: UiFontId) => {
     const resolved = normalizeUiFont(id);
-    writeStoredUiFont(resolved);
+    if (!hasPublicDemoCookieInDocument()) {
+      writeStoredUiFont(resolved);
+    }
     applyUiFont(resolved);
     setFontIdState(resolved);
   }, []);
@@ -45,12 +57,11 @@ export function UiFontProvider({ children }: { children: React.ReactNode }) {
   const syncFromSettings = useCallback((raw: string | undefined) => {
     if (raw == null || raw === "") return;
     const resolved = normalizeUiFont(raw);
-    setFontIdState((prev) => {
-      if (prev === resolved) return prev;
-      applyUiFont(resolved);
+    applyUiFont(resolved);
+    if (!hasPublicDemoCookieInDocument()) {
       writeStoredUiFont(resolved);
-      return resolved;
-    });
+    }
+    setFontIdState(resolved);
   }, []);
 
   const value = useMemo(

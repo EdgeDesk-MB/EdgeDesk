@@ -112,6 +112,41 @@ export function bookieNeedsCashFunding(
   return available + 0.001 < backStake;
 }
 
+export type BookieCashTopUpBreakdown = {
+  /** Total credit to post so the wallet can cover this stake. */
+  total: number;
+  /** How much of the total is this bet's stake (selected offer). */
+  stakePart: number;
+  /** How much clears an existing negative cash balance. */
+  deficitPart: number;
+};
+
+/**
+ * Extra top-up after wallet + any edit reserved credit.
+ * A negative bookie balance is a real hole: £10 stake on −£10 cash needs £20,
+ * not two offer stakes added together.
+ */
+export function bookieCashTopUpBreakdown(
+  accounts: AccountBalance[] | undefined,
+  bookmaker: string,
+  backStake: number,
+  reservedCredit = 0
+): BookieCashTopUpBreakdown {
+  if (!bookmaker.trim() || !(backStake > 0)) {
+    return { total: 0, stakePart: 0, deficitPart: 0 };
+  }
+  const account = findBookieBalanceAccount(accounts, bookmaker);
+  const available = (account?.balance ?? 0) + Math.max(0, reservedCredit);
+  const deficitPart = available < 0 ? -available : 0;
+  const usable = Math.max(0, available);
+  const stakePart = Math.max(0, backStake - usable);
+  return {
+    total: Math.max(0, backStake - available),
+    stakePart,
+    deficitPart,
+  };
+}
+
 /** Extra top-up needed after wallet + any edit reserved credit. */
 export function bookieCashTopUpNeeded(
   accounts: AccountBalance[] | undefined,
@@ -119,10 +154,8 @@ export function bookieCashTopUpNeeded(
   backStake: number,
   reservedCredit = 0
 ): number {
-  if (!bookmaker.trim() || !(backStake > 0)) return 0;
-  const account = findBookieBalanceAccount(accounts, bookmaker);
-  const available = (account?.balance ?? 0) + Math.max(0, reservedCredit);
-  return Math.max(0, backStake - available);
+  return bookieCashTopUpBreakdown(accounts, bookmaker, backStake, reservedCredit)
+    .total;
 }
 
 /** Cash + free-bet balance for the selected bookie in Add bet / Back panel. */
@@ -169,7 +202,8 @@ export function BackBookieBalanceStrip({
   const needsFunding =
     !usesFreeBet && bookieNeedsCashFunding(accounts, bookmaker, backStake, credit);
   const showAddBalance = needsFunding && onAddBalanceChange != null;
-  const topUpNeeded = bookieCashTopUpNeeded(accounts, bookmaker, backStake, credit);
+  const topUp = bookieCashTopUpBreakdown(accounts, bookmaker, backStake, credit);
+  const topUpNeeded = topUp.total;
 
   if (!bookmaker.trim()) {
     return (
@@ -294,20 +328,28 @@ export function BackBookieBalanceStrip({
         </p>
       )}
       {showAddBalance ? (
-        <label className="flex cursor-pointer items-center gap-2 px-0.5 pt-0.5 text-xs font-semibold text-black/75 dark:text-white/80">
-          <input
-            type="checkbox"
-            className="size-3.5 rounded border-border accent-primary"
-            checked={addBalance === true}
-            onChange={(e) => onAddBalanceChange?.(e.target.checked)}
-          />
-          Add balance
-          {topUpNeeded > 0.001 ? (
-            <span className="font-medium text-black/50 dark:text-white/50">
-              (£{topUpNeeded.toFixed(2)})
-            </span>
+        <div className="flex flex-col gap-0.5">
+          <label className="flex cursor-pointer items-center gap-2 px-0.5 pt-0.5 text-xs font-semibold text-black/75 dark:text-white/80">
+            <input
+              type="checkbox"
+              className="size-3.5 rounded border-border accent-primary"
+              checked={addBalance === true}
+              onChange={(e) => onAddBalanceChange?.(e.target.checked)}
+            />
+            Add balance
+            {topUpNeeded > 0.001 ? (
+              <span className="font-medium text-black/50 dark:text-white/50">
+                (£{topUpNeeded.toFixed(2)})
+              </span>
+            ) : null}
+          </label>
+          {topUp.deficitPart > 0.001 ? (
+            <p className="px-0.5 text-[11px] font-medium leading-snug text-black/50 dark:text-white/50">
+              £{topUp.stakePart.toFixed(2)} for this stake, plus £
+              {topUp.deficitPart.toFixed(2)} to clear the cash shortfall
+            </p>
           ) : null}
-        </label>
+        </div>
       ) : null}
     </div>
   );

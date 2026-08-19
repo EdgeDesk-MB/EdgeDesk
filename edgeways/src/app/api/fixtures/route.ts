@@ -5,6 +5,7 @@ import {
   hasApiKey,
   localCalendarDate,
 } from "@/lib/services/apifootball";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ function isRateLimitError(error: unknown): boolean {
   );
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
     req.nextUrl.searchParams.get("date") ?? localCalendarDate();
 
@@ -50,4 +51,4 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   }
-}
+});

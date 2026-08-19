@@ -20,10 +20,11 @@ describe("marketingShareCopy", () => {
     const copy = marketingShareCopy("waitlist");
     expect(copy.title.startsWith("Join the waitlist:")).toBe(true);
     expect(copy.title.toLowerCase()).not.toContain("edgeways");
-    expect(copy.title).toContain("spreadsheet");
+    expect(copy.title).toContain("faff");
     expect(copy.title.length).toBeLessThanOrEqual(TITLE_MAX);
     expect(copy.description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
-    expect(copy.description.toLowerCase()).not.toContain("spreadsheet");
+    expect(copy.description.toLowerCase()).not.toContain("faff");
+    expect(copy.imageLine).toBe("One desk for the day. No more faff.");
     expect(copy.description).toContain("UK matched bettors");
     expect(copy.eyebrow).toBe("Waitlist open");
   });

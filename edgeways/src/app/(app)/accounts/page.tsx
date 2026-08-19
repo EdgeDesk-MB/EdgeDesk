@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -45,6 +46,7 @@ import { ALL_OWNERS, OwnerFilter } from "@/components/accounts/owner-filter";
 import { accountOwner, ownerByBookmakerName, splitPnlByOwner } from "@/lib/accounts/owners";
 import { useNow } from "@/hooks/use-now";
 import { bookieBrandColor } from "@/lib/brands/bookies";
+import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import {
@@ -60,6 +62,7 @@ import {
   type BookmakerStatsBet,
   type BookmakerStatsOffer,
 } from "@/lib/accounts/bookmaker-stats";
+import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ArrowLeftRight, Building2, Check, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
@@ -301,7 +304,8 @@ function AccountsContent() {
                 onSelect={setSelectedId}
                 onArchived={refresh}
                 inlineTypeBadge
-                empty="No bookie or exchange wallets yet - place a bet or use Adjust balance."
+                emptyTitle="No bookie or exchange wallets yet"
+                emptyDescription="Place a bet or use Adjust balance to add a wallet."
               />
             </CardContent>
           </Card>
@@ -681,9 +685,15 @@ function MugPlanForm({
     <>
       <DialogHeader>
         <DialogTitle>Mug plan · {account.name}</DialogTitle>
-        <DialogDescription>
-          Camouflage cadence: a deliberate, budgeted cost that keeps the account looking
-          human. Mug money stays in real P&L but never touches edge metrics.
+        <DialogDescription
+          explainer={
+            <DialogExplainer title="Mug plan">
+              A budgeted cost that keeps the account looking human. Due plans
+              show as low-priority Do next items.
+            </DialogExplainer>
+          }
+        >
+          Camouflage cadence for this bookie.
         </DialogDescription>
       </DialogHeader>
       <div className="grid grid-cols-2 gap-3">
@@ -732,7 +742,8 @@ function AccountTable({
   onSelect,
   onArchived,
   inlineTypeBadge = false,
-  empty = "No accounts yet.",
+  emptyTitle = "No accounts yet",
+  emptyDescription = "Add a bookie, exchange, or bank wallet to start tracking balances.",
 }: {
   rows: AccountBalance[];
   bankNameById: Map<number, string>;
@@ -741,17 +752,25 @@ function AccountTable({
   onArchived: () => void;
   /** Bookies & exchanges: type pill inline with name, no Type column */
   inlineTypeBadge?: boolean;
-  empty?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }) {
-  const colCount = inlineTypeBadge ? 6 : 7;
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        compact
+        icon={Wallet}
+        title={emptyTitle}
+        description={emptyDescription}
+        className="shadow-none"
+      />
+    );
+  }
 
   return (
     <>
       {/* Mobile: card list (C2 - tables become cards < sm) */}
       <div className="sm:hidden">
-        {rows.length === 0 && (
-          <p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>
-        )}
         {rows.map((a) => {
           const profit = a.type === "bookie" ? profitForAccount(a.name) : null;
           return (
@@ -858,13 +877,6 @@ function AccountTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={colCount} className="py-8 text-center text-sm text-muted-foreground">
-              {empty}
-            </TableCell>
-          </TableRow>
-        )}
         {rows.map((a) => {
           const profit = a.type === "bookie" ? profitForAccount(a.name) : null;
           return (
@@ -1046,7 +1058,7 @@ function AddBankBody({
         <DialogHeader>
           <DialogTitle>Add bank</DialogTitle>
           <DialogDescription>
-            Your real-world funding account - use Transfer to move money to bookies.
+            Your funding account. Transfer from here to bookies.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -1261,23 +1273,27 @@ function AccountDetailBody({
 
   return (
     <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b px-5 pb-3 pt-5">
-          <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="mx-0 mt-0">
+          <DialogTitle className="flex items-center gap-2.5">
             {account.type === "bookie" ? (
               <span
-                className="inline-block size-3 shrink-0 rounded-full"
+                className={cn(dialogTitleIcon, "rounded-full")}
                 style={{
                   backgroundColor: bookieBrandColor(account.name, account.brandColor),
                 }}
               />
             ) : account.type === "bank" ? (
-              <Building2 className="size-4 text-muted-foreground" />
+              <Building2 className={cn(dialogTitleIcon, "text-muted-foreground")} />
             ) : (
-              <Wallet className="size-4 text-muted-foreground" />
+              <Wallet className={cn(dialogTitleIcon, "text-muted-foreground")} />
             )}
             {account.name}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription>Edit this wallet.</DialogDescription>
+        </DialogHeader>
+
+        <div className="app-scroll-nested min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-5 py-4">
+          <p className="text-sm text-muted-foreground">
             Cash <MoneyFlow value={account.balance} className="inline font-semibold" />
             {account.type === "bookie" ? (
               <>
@@ -1285,14 +1301,12 @@ function AccountDetailBody({
                 Free bets{" "}
                 <MoneyFlow
                   value={freeBetsShown}
-                  className="inline font-semibold text-violet-600 dark:text-violet-400"
+                  className="inline font-semibold text-edge"
                 />
                 {(account.wrRemaining ?? 0) > 0 ? (
                   <>
                     {" · "}
-                    <span className="text-sky-700 dark:text-sky-400">
-                      WR £{account.wrRemaining.toFixed(2)} left
-                    </span>
+                    WR £{account.wrRemaining.toFixed(2)} left
                   </>
                 ) : null}
               </>
@@ -1300,15 +1314,10 @@ function AccountDetailBody({
             {(account.pendingIn ?? 0) > 0 ? (
               <>
                 {" · "}
-                <span className="text-amber-700 dark:text-amber-400">
-                  £{account.pendingIn.toFixed(2)} pending
-                </span>
+                £{account.pendingIn.toFixed(2)} pending
               </>
             ) : null}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="app-scroll-nested min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-5 py-4">
+          </p>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -1480,7 +1489,13 @@ function AccountDetailBody({
             {loadingTx ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : txs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No transactions yet.</p>
+              <EmptyState
+                compact
+                oneLine
+                icon={ArrowLeftRight}
+                title="No transactions yet"
+                description="Top-ups, withdrawals, and settlements list here."
+              />
             ) : (
               <ul className="space-y-1.5 text-sm">
                 {txs.slice(0, 25).map((tx) => (
@@ -1559,10 +1574,14 @@ function ArchiveAccountButton({
         <DialogContent mobile="center" className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Archive account?</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to archive{" "}
-              <span className="font-medium text-foreground">{accountName}</span>? It will be hidden
-              from active accounts but ledger history is kept.
+            <DialogDescription
+              explainer={
+                <DialogExplainer title="Archive account">
+                  The wallet leaves the active list. Ledger history is kept.
+                </DialogExplainer>
+              }
+            >
+              Hide {accountName} from active accounts.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">

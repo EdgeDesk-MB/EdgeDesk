@@ -53,8 +53,8 @@ export function ExchangeSelect({
         )}
       </span>
       {exchanges.length === 0 ? (
-        <Link href="/settings" className="text-xs text-primary-text underline-offset-2 hover:underline">
-          Add your exchanges in Settings →
+        <Link href="/accounts" className="text-xs text-primary-text underline-offset-2 hover:underline">
+          Add your exchanges on Accounts →
         </Link>
       ) : (
         <Select

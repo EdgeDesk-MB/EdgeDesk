@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -86,10 +87,15 @@ export function EarlyFreeBetAwardButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent mobile="center" className="max-w-sm" showCloseButton={!saving}>
           <DialogHeader>
-            <DialogTitle>Confirm the free bet has been awarded?</DialogTitle>
-            <DialogDescription>
-              This credits the {amountLabel}free bet to your bookie balance now. Settlement will
-              not award it again.
+            <DialogTitle>Credit the free bet?</DialogTitle>
+            <DialogDescription
+              explainer={
+                <DialogExplainer title="Credit now">
+                  Settlement will not award this free bet again.
+                </DialogExplainer>
+              }
+            >
+              Credits the {amountLabel}free bet now.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">

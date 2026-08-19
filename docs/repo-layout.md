@@ -11,6 +11,7 @@ MB app build/                          ← git root (private GitHub)
 ├── docs/                              ← ops, legal, launch, AI harness, strategy
 │   ├── follow-this-plan.md            ← START HERE each day
 │   ├── live-readiness.md
+│   ├── stripe-test-rehearsal.md       ← localhost Checkout cards + listen
 │   ├── hosting-and-environments.md
 │   ├── legal/                         ← drafts, GC assessment (not customer HTML)
 │   ├── decisions/
@@ -39,6 +40,7 @@ So: moving strategy out of `edgeways/` does **not** hide it from GitHub. It keep
 ### Repo root `docs/` — Sam, ops, legal, strategy
 
 - Launch checklists (`follow-this-plan.md`, `live-readiness.md`)
+- Stripe localhost rehearsal (`stripe-test-rehearsal.md`)
 - Hosting / env design
 - Legal drafts and self-assessments
 - Architecture decision records

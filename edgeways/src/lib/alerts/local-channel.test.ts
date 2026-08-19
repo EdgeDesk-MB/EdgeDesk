@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { isValidElement } from "react";
 import {
   createLocalAlertChannel,
+  dismissEveryVisibleAlertToast,
   dismissStaleStickyAlertToasts,
   edgeAlertToastOptions,
   EPHEMERAL_ALERT_TOAST_MS,
+  persistAlertDismissed,
   resetAlertToastChannelForTests,
 } from "./local-channel";
 import { ALERT_TOAST_STALE_DISMISS_MS } from "./toast-age";
@@ -212,5 +214,61 @@ describe("createLocalAlertChannel", () => {
     channel.notify(sampleAlert);
     dismissStaleStickyAlertToasts(Date.now() + ALERT_TOAST_STALE_DISMISS_MS);
     expect(toastDismiss).toHaveBeenCalledWith(sampleAlert.key);
+  });
+
+  it("persists a sticky dismiss as inbox read", () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    persistAlertDismissed("result_settled:20");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/alerts");
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual({
+      dedupe: "result_settled:20",
+      read: true,
+    });
+  });
+
+  it("does not persist ephemeral auto-close as inbox read", () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const opts = edgeAlertToastOptions({ ...sampleAlert, delivery: "ephemeral" });
+    opts.onDismiss?.();
+    opts.onAutoClose?.();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("marks the inbox read when the user closes a sticky toast", () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const opts = edgeAlertToastOptions(sampleAlert);
+    opts.onDismiss?.();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual({
+      dedupe: sampleAlert.key,
+      read: true,
+    });
+  });
+
+  it("does not mark the inbox read when a toast is dismissed programmatically", () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("Notification", undefined);
+    const channel = createLocalAlertChannel();
+    channel.notify(sampleAlert);
+    const opts = toastFn.mock.calls[0]?.[1] as { onDismiss?: () => void };
+    dismissStaleStickyAlertToasts(Date.now() + ALERT_TOAST_STALE_DISMISS_MS);
+    opts.onDismiss?.();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("wipes every visible toast, including untracked Sonner leftovers", () => {
+    vi.stubGlobal("Notification", undefined);
+    const channel = createLocalAlertChannel();
+    channel.notify(sampleAlert);
+    toastDismiss.mockClear();
+    dismissEveryVisibleAlertToast();
+    expect(toastDismiss).toHaveBeenCalledWith();
+    channel.refresh?.(sampleAlert);
+    expect(toastFn).toHaveBeenCalledTimes(1);
   });
 });

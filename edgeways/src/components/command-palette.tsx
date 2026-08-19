@@ -16,7 +16,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { flatNavLinks } from "@/components/app-nav";
+import { flatNavLinks, toastPlanLock } from "@/components/app-nav";
+import { canWithPreview } from "@/lib/entitlements/plans";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
@@ -75,7 +76,17 @@ export function CommandPalette() {
           <CommandItem onSelect={() => run(() => openAddBet())}>
             <Plus /> Add bet
           </CommandItem>
-          <CommandItem onSelect={() => run(() => openOffer())}>
+          <CommandItem
+            onSelect={() =>
+              run(() => {
+                if (!canWithPreview(state?.settings, "offers_pipeline")) {
+                  toastPlanLock("offers_pipeline");
+                  return;
+                }
+                openOffer();
+              })
+            }
+          >
             <Gift /> New offer
           </CommandItem>
           <CommandItem onSelect={() => run(() => openMatchedCalculator())}>
@@ -96,7 +107,15 @@ export function CommandPalette() {
             <CommandItem
               key={link.href}
               value={`page ${link.label}`}
-              onSelect={() => run(() => router.push(link.href))}
+              onSelect={() =>
+                run(() => {
+                  if (link.feature && !canWithPreview(state?.settings, link.feature)) {
+                    toastPlanLock(link.feature);
+                    return;
+                  }
+                  router.push(link.href);
+                })
+              }
             >
               <link.icon /> {link.label}
             </CommandItem>
@@ -108,7 +127,15 @@ export function CommandPalette() {
               <CommandItem
                 key={offer.id}
                 value={`offer ${offer.title} ${offer.bookmaker ?? ""}`}
-                onSelect={() => run(() => viewOffer(offer))}
+                onSelect={() =>
+                  run(() => {
+                    if (!canWithPreview(state?.settings, "offers_pipeline")) {
+                      toastPlanLock("offers_pipeline");
+                      return;
+                    }
+                    viewOffer(offer);
+                  })
+                }
               >
                 <Gift />
                 <span className="truncate">{offer.title}</span>

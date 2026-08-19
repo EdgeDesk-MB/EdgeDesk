@@ -4,6 +4,7 @@ import { db, accounts } from "@/lib/db";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { getSettingsBookies, recordManualTransaction } from "@/lib/services/balances";
 import { eq } from "drizzle-orm";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +14,11 @@ const createSchema = z.object({
   openingBalance: z.number().default(0),
 });
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ bookies: getSettingsBookies() });
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -74,4 +75,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ bookie: inserted, created: true });
-}
+});

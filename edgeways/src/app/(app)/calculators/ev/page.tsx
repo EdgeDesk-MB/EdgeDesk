@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { NumField } from "@/components/calc/num-field";
 import { MoneyFlow, NumFlow, PercentFlow } from "@/components/money-flow";
 import { CalculatorShell } from "@/components/page-shell";
-import { expectedValue, noVig } from "@/lib/calc";
+import { expectedValue, noVig } from "@/lib/calc/ev";
 import { Plus, Trash2 } from "lucide-react";
 
 export default function EvCalculatorPage() {

@@ -4,6 +4,16 @@ import { useId, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { darken } from "@/lib/brands/exchanges";
+import {
+  applyExchangeOddsInputChange,
+  exchangeOddsStepHandlers,
+  getExchangeOddsStep,
+} from "@/lib/calc/exchange-odds-step";
+import {
+  commitLayStake,
+  formatLayStake,
+  layStakeStepHandlers,
+} from "@/lib/calc/exchange-stake-step";
 import { formatMoneyAmount, roundMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +37,15 @@ interface NumFieldProps {
   /** Applied to the prefix (defaults to muted) */
   prefixClassName?: string;
   disabled?: boolean;
+  /** Exchange tick ladder on arrows / spinner. Typed prices stay as entered. */
+  exchangeOddsStepping?: boolean;
+  /** Exchange penny grid + always 2 dp. Use on every lay-stake field. */
+  layStakeStepping?: boolean;
 }
 
 /**
- * Numeric field. When `prefix` is £, the idle display is always two decimal
- * places (pounds and pence) - HTML number inputs drop trailing zeros.
+ * Numeric field. Money (`prefix` £) and lay-stake fields idle at two decimal
+ * places. Lay-odds fields keep typed prices; arrows follow the exchange ladder.
  */
 export function NumField({
   label,
@@ -48,16 +62,29 @@ export function NumField({
   inputClassName,
   prefixClassName,
   disabled,
+  exchangeOddsStepping,
+  layStakeStepping,
 }: NumFieldProps) {
   const id = useId();
-  const isMoney = prefix === "£";
+  const isMoney = prefix === "£" || layStakeStepping;
   const [focused, setFocused] = useState(false);
   const [text, setText] = useState("");
+
+  const oddsStep =
+    !disabled && exchangeOddsStepping
+      ? exchangeOddsStepHandlers(value, onChange)
+      : null;
+  const stakeStep =
+    !disabled && layStakeStepping
+      ? layStakeStepHandlers(value, onChange)
+      : null;
 
   const moneyDisplay = focused
     ? text
     : Number.isFinite(value)
-      ? formatMoneyAmount(value)
+      ? layStakeStepping
+        ? formatLayStake(value)
+        : formatMoneyAmount(value)
       : "";
 
   function commitMoneyText(raw: string) {
@@ -71,8 +98,18 @@ export function NumField({
       onChange(NaN);
       return;
     }
-    onChange(roundMoney(n));
+    onChange(layStakeStepping ? commitLayStake(n) : roundMoney(n));
   }
+
+  const tintStyle = tint
+    ? ({ "--nf": tint, "--nf-dark": darken(tint, 0.55) } as React.CSSProperties)
+    : undefined;
+  const fieldClass = cn(
+    "tabular-nums",
+    prefix && "pl-7",
+    tint && "border-0 bg-[var(--nf)] font-semibold dark:bg-[var(--nf-dark)]",
+    inputClassName
+  );
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
@@ -93,7 +130,25 @@ export function NumField({
             {prefix}
           </span>
         )}
-        {isMoney ? (
+        {exchangeOddsStepping ? (
+          <Input
+            id={id}
+            type="number"
+            inputMode="decimal"
+            step={getExchangeOddsStep(value)}
+            min={min ?? 1.01}
+            value={Number.isFinite(value) ? value : ""}
+            placeholder={placeholder}
+            disabled={disabled}
+            onKeyDown={oddsStep?.onKeyDown}
+            onWheel={oddsStep?.onWheel}
+            onChange={(e) =>
+              applyExchangeOddsInputChange(value, parseFloat(e.target.value), onChange)
+            }
+            className={fieldClass}
+            style={tintStyle}
+          />
+        ) : isMoney ? (
           <Input
             id={id}
             type="text"
@@ -103,12 +158,20 @@ export function NumField({
             disabled={disabled}
             onFocus={() => {
               setFocused(true);
-              setText(Number.isFinite(value) ? formatMoneyAmount(value) : "");
+              setText(
+                Number.isFinite(value)
+                  ? layStakeStepping
+                    ? formatLayStake(value)
+                    : formatMoneyAmount(value)
+                  : ""
+              );
             }}
             onBlur={() => {
               setFocused(false);
               commitMoneyText(text);
             }}
+            onKeyDown={stakeStep?.onKeyDown}
+            onWheel={stakeStep?.onWheel}
             onChange={(e) => {
               const next = e.target.value;
               setText(next);
@@ -116,17 +179,8 @@ export function NumField({
               if (Number.isFinite(n)) onChange(n);
               else if (next.trim() === "") onChange(NaN);
             }}
-            className={cn(
-              "tabular-nums",
-              prefix && "pl-7",
-              tint && "border-0 bg-[var(--nf)] font-semibold dark:bg-[var(--nf-dark)]",
-              inputClassName
-            )}
-            style={
-              tint
-                ? ({ "--nf": tint, "--nf-dark": darken(tint, 0.55) } as React.CSSProperties)
-                : undefined
-            }
+            className={fieldClass}
+            style={tintStyle}
           />
         ) : (
           <Input
@@ -139,17 +193,8 @@ export function NumField({
             min={min}
             disabled={disabled}
             onChange={(e) => onChange(parseFloat(e.target.value))}
-            className={cn(
-              "tabular-nums",
-              prefix && "pl-7",
-              tint && "border-0 bg-[var(--nf)] font-semibold dark:bg-[var(--nf-dark)]",
-              inputClassName
-            )}
-            style={
-              tint
-                ? ({ "--nf": tint, "--nf-dark": darken(tint, 0.55) } as React.CSSProperties)
-                : undefined
-            }
+            className={fieldClass}
+            style={tintStyle}
           />
         )}
       </div>

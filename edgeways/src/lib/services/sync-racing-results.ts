@@ -3,7 +3,7 @@
  */
 import { eq } from "drizzle-orm";
 import { db, bets, events, type EventRow } from "@/lib/db";
-import { formatRacingEventTitle } from "@/lib/events";
+import { formatRacingEventTitle, localCalendarDate } from "@/lib/events";
 import {
   isRaceResultIncomplete,
   parseRaceResults,
@@ -25,6 +25,8 @@ export interface RacingSyncResult {
   settledLabels: string[];
   /** True when credentials exist but Free tier blocks `/v1/results/today`. */
   tierBlocked: boolean;
+  /** True when a previous day's `/v1/results` needs Standard. */
+  historicBlocked: boolean;
   tier: RacingResultsTier;
 }
 
@@ -36,6 +38,8 @@ export interface SyncRacingOptions {
   force?: boolean;
   /** Bypass the results cache (manual Fetch results). */
   skipCache?: boolean;
+  /** Open bets keep polling for 36 hours so overnight results still land. */
+  includeOpenBets?: boolean;
 }
 
 function emptySync(tier: RacingResultsTier = getCachedRacingResultsTier()): RacingSyncResult {
@@ -44,6 +48,7 @@ function emptySync(tier: RacingResultsTier = getCachedRacingResultsTier()): Raci
     pending: 0,
     settledLabels: [],
     tierBlocked: tier === "free",
+    historicBlocked: false,
     tier,
   };
 }
@@ -61,15 +66,13 @@ export function eventNeedsRaceResult(event: EventRow, force = false): boolean {
 export function eventInRacingSyncWindow(
   event: EventRow,
   now = Date.now(),
-  force = false
+  force = false,
+  includeOpenBets = false
 ): boolean {
   if (!eventNeedsRaceResult(event, force)) return false;
-  if (force) {
-    // Manual fetch: allow races from today-ish (up to 36h after off)
-    return event.startTime <= now + 2 * 60 * 1000 && event.startTime > now - 36 * 60 * 60 * 1000;
-  }
-  // Poll from 2 min before off until 6 hours after (results can lag)
-  return event.startTime <= now + 2 * 60 * 1000 && event.startTime > now - 6 * 60 * 60 * 1000;
+  const lookbackMs =
+    force || includeOpenBets ? 36 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000;
+  return event.startTime <= now + 2 * 60 * 1000 && event.startTime > now - lookbackMs;
 }
 
 /** Fetch API results for the given events (or all pending if omitted). */
@@ -79,7 +82,7 @@ export async function syncRacingResultsForEvents(
 ): Promise<RacingSyncResult> {
   if (!hasRacingApiKey()) return emptySync("none");
 
-  const { force = false, skipCache = false } = options;
+  const { force = false, skipCache = false, includeOpenBets = false } = options;
   if (skipCache || force) clearRacingResultsCache();
 
   const now = Date.now();
@@ -92,7 +95,7 @@ export async function syncRacingResultsForEvents(
     .filter((e) => {
       if (!eventNeedsRaceResult(e, force)) return false;
       if (idSet && !idSet.has(e.id)) return false;
-      if (!eventInRacingSyncWindow(e, now, force)) return false;
+      if (!eventInRacingSyncWindow(e, now, force, includeOpenBets)) return false;
       return true;
     });
 
@@ -103,10 +106,16 @@ export async function syncRacingResultsForEvents(
   const settledLabels: string[] = [];
 
   try {
+    const dateByRaceId: Record<string, string> = {};
+    for (const event of candidates) {
+      if (event.externalId) {
+        dateByRaceId[event.externalId] = localCalendarDate(new Date(event.startTime));
+      }
+    }
     // Prefer a fresher cache when settling open / incomplete races (fast results).
-    const { results, tierBlocked, tier } = await resultsForRaceIds(
+    const { results, tierBlocked, tier, historicBlocked } = await resultsForRaceIds(
       candidates.map((e) => e.externalId!),
-      { maxStaleMs: RESULTS_TTL_ACTIVE }
+      { maxStaleMs: RESULTS_TTL_ACTIVE, dateByRaceId }
     );
 
     if (tierBlocked) {
@@ -115,6 +124,7 @@ export async function syncRacingResultsForEvents(
         pending: candidates.length,
         settledLabels: [],
         tierBlocked: true,
+        historicBlocked: false,
         tier,
       };
     }
@@ -153,13 +163,21 @@ export async function syncRacingResultsForEvents(
       settledLabels.push(formatRacingEventTitle(event));
     }
 
-    return { updated, pending, settledLabels, tierBlocked: false, tier };
+    return {
+      updated,
+      pending,
+      settledLabels,
+      tierBlocked: false,
+      historicBlocked: Boolean(historicBlocked),
+      tier,
+    };
   } catch {
     return {
       updated: 0,
       pending: candidates.length,
       settledLabels: [],
       tierBlocked: false,
+      historicBlocked: false,
       tier: getCachedRacingResultsTier(),
     };
   }
@@ -182,7 +200,7 @@ export async function syncRacingResultsForOpenBets(
     ]),
   ];
   if (eventIds.length === 0) return emptySync();
-  return syncRacingResultsForEvents(eventIds);
+  return syncRacingResultsForEvents(eventIds, { includeOpenBets: true });
 }
 
 /** Sync recently-started tracked races (Events page / settlement backfill). */

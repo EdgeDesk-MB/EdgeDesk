@@ -14,18 +14,23 @@ import { SetupWizard } from "@/components/help/setup-wizard";
 import { WelcomeDialog } from "@/components/help/welcome-dialog";
 import { AgeGateDialog } from "@/components/compliance/age-gate-dialog";
 import { SyncClerkAgeConfirmation } from "@/components/compliance/sync-clerk-age";
+import { DemoNoticeDialog } from "@/components/demo/demo-notice-dialog";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import { useAppState } from "@/hooks/use-app-state";
-import { hasDeskActivity } from "@/lib/dashboard-empty";
+import { hasDeskActivity, needsSetup } from "@/lib/dashboard-empty";
 import {
+  decideOnboardingOpen,
   isOnboardingComplete,
   markOnboardingComplete,
   resetOnboarding,
+  type OnboardingOpen,
 } from "@/lib/onboarding";
+import type { AppState } from "@/lib/services/state.types";
 
 interface OnboardingContextValue {
   openWelcome: () => void;
   resetAndOpenWelcome: () => void;
-  /** G2b - the first-run setup wizard (bank → bookies → defaults → alerts) */
+  /** G2b - the first-run setup wizard (profile on /setup; bank → bookies in the modal) */
   openSetup: () => void;
 }
 
@@ -44,8 +49,30 @@ function clerkAgeConfirmed(
   return meta.ageConfirmed === true || typeof meta.ageConfirmedAt === "number";
 }
 
+function decideForState(
+  state: AppState | null,
+  input: {
+    forceOnboard: boolean;
+    ageConfirmed: boolean;
+    publicDemo: boolean;
+    forceDemoSetup: boolean;
+    userId?: string | null;
+  }
+): OnboardingOpen {
+  return decideOnboardingOpen({
+    forceOnboard: input.forceOnboard,
+    ageConfirmed: input.ageConfirmed,
+    hasDeskActivity: state ? hasDeskActivity(state) : false,
+    needsSetup: state ? needsSetup(state) : false,
+    onboardingComplete: isOnboardingComplete(input.userId),
+    publicDemo: input.publicDemo,
+    forceDemoSetup: input.forceDemoSetup,
+  });
+}
+
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const { state, refresh } = useAppState();
+  const publicDemo = usePublicDemo();
   const { user, isLoaded: clerkLoaded } = useUser();
   const [ageOpen, setAgeOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
@@ -54,6 +81,31 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   // Decide once after the first /api/state snapshot so later polls do not
   // close an intentionally re-opened welcome tour.
   const decidedRef = useRef(false);
+  const forceOnboardRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("onboard") !== "1") return;
+    forceOnboardRef.current = true;
+    url.searchParams.delete("onboard");
+    const query = url.searchParams.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${query ? `?${query}` : ""}${url.hash}`
+    );
+  }, []);
+
+  const applyDecision = useCallback((next: OnboardingOpen) => {
+    if (next === "setup-page") {
+      window.location.assign("/setup");
+      return;
+    }
+    if (next === "age") setAgeOpen(true);
+    if (next === "welcome") setWelcomeOpen(true);
+    if (next === "setup") setSetupOpen(true);
+  }, []);
 
   useEffect(() => {
     if (state == null || decidedRef.current) return;
@@ -62,52 +114,62 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     decidedRef.current = true;
 
     queueMicrotask(() => {
-      // The 18+ gate (EDGE-13) precedes everything, welcome tour included.
-      // Skip opening it when Clerk already holds a sign-up confirmation; sync
-      // will write ageConfirmedAt and refresh.
-      if (state.settings?.ageConfirmedAt == null) {
-        if (clerkAgeConfirmed(user?.unsafeMetadata as Record<string, unknown>)) {
-          setChecked(true);
-          return;
-        }
-        setAgeOpen(true);
-        setChecked(true);
-        return;
-      }
-      if (hasDeskActivity(state)) {
-        markOnboardingComplete();
-        setChecked(true);
-        return;
-      }
+      const clerkConfirmed = clerkAgeConfirmed(
+        user?.unsafeMetadata as Record<string, unknown>
+      );
+      const ageConfirmed =
+        state.settings?.ageConfirmedAt != null || clerkConfirmed;
 
-      if (!isOnboardingComplete()) setWelcomeOpen(true);
+      const forceDemoSetup =
+        publicDemo.forceSetup ||
+        new URLSearchParams(window.location.search).get("setup") === "1";
+      const next = decideForState(state, {
+        forceOnboard: forceOnboardRef.current,
+        ageConfirmed,
+        publicDemo: publicDemo.active,
+        forceDemoSetup,
+        userId: user?.id,
+      });
+      if (next === "none" && hasDeskActivity(state) && !needsSetup(state)) {
+        markOnboardingComplete(user?.id);
+      }
+      applyDecision(next);
       setChecked(true);
     });
-  }, [state, clerkLoaded, user]);
+  }, [state, clerkLoaded, user, publicDemo.active, publicDemo.forceSetup, applyDecision]);
 
   const handleAgeConfirmed = useCallback(() => {
     setAgeOpen(false);
     refresh();
-    // Run the welcome decision the gate deferred.
-    if (state && !hasDeskActivity(state) && !isOnboardingComplete()) {
-      setWelcomeOpen(true);
-    }
-  }, [refresh, state]);
+    const next = decideForState(state, {
+      forceOnboard: forceOnboardRef.current,
+      ageConfirmed: true,
+      publicDemo: publicDemo.active,
+      forceDemoSetup: publicDemo.forceSetup,
+      userId: user?.id,
+    });
+    applyDecision(next);
+  }, [refresh, state, publicDemo.active, publicDemo.forceSetup, applyDecision, user?.id]);
 
   const handleClerkAgeSynced = useCallback(() => {
     refresh().then(() => {
-      if (state && !hasDeskActivity(state) && !isOnboardingComplete()) {
-        setWelcomeOpen(true);
-      }
+      const next = decideForState(state, {
+        forceOnboard: forceOnboardRef.current,
+        ageConfirmed: true,
+        publicDemo: publicDemo.active,
+        forceDemoSetup: publicDemo.forceSetup,
+        userId: user?.id,
+      });
+      applyDecision(next);
     });
-  }, [refresh, state]);
+  }, [refresh, state, publicDemo.active, publicDemo.forceSetup, applyDecision, user?.id]);
 
   const openWelcome = useCallback(() => setWelcomeOpen(true), []);
 
   const resetAndOpenWelcome = useCallback(() => {
-    resetOnboarding();
+    resetOnboarding(user?.id);
     setWelcomeOpen(true);
-  }, []);
+  }, [user?.id]);
 
   const openSetup = useCallback(() => setSetupOpen(true), []);
 
@@ -129,13 +191,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           <WelcomeDialog
             open={welcomeOpen}
             onOpenChange={setWelcomeOpen}
-            onComplete={markOnboardingComplete}
+            onComplete={() => markOnboardingComplete(user?.id)}
             onSetup={() => {
               setWelcomeOpen(false);
               setSetupOpen(true);
             }}
           />
           <SetupWizard open={setupOpen} onOpenChange={setSetupOpen} />
+          <DemoNoticeDialog
+            suppressed={ageOpen || setupOpen || welcomeOpen}
+          />
         </>
       )}
     </OnboardingContext.Provider>

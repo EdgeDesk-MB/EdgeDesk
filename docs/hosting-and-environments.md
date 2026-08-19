@@ -92,7 +92,7 @@ already Drizzle.
 | Vercel | Hosting, previews (staging), env vars, cron — team `edgeways` (Pro trial) | **Done** (EDGE-46 — prod live at edgeways.app) |
 | Neon | Managed Postgres + branches + PITR | **In progress** (EDGE-47; scaffold + migrations; app cutover open) |
 | PostHog EU | Analytics + error tracking, cookieless, `/ingest` proxy | **Done** (EDGE-35) |
-| Stripe *or* MoR (Paddle/Lemon Squeezy/Polar) | Payments | Awaiting EDGE-1 replies → EDGE-2 |
+| Stripe | Payments (direct, L1 15 Aug). Test catalogue EDGE-3. Checkout + slip + portal + webhook tier write on localhost | **In progress** — next is EDGE-58 Settings manage |
 | Transactional email (Resend) | Waitlist + auth emails; domain Verified Ireland | **Done** for waitlist (EDGE-26); auth emails later |
 | Uptime monitor (Better Stack / UptimeRobot free) | Hits `/api/health`, alerts to email | Sam: point at `https://edgeways.app/api/health` (EDGE-48) |
 | Linear | Planning | Done |

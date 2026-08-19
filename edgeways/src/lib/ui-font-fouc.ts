@@ -3,6 +3,7 @@
  * so a stored Figtree choice does not flash Default (Noto).
  */
 
+import { SKIP_STORED_APPEARANCE_FOUC } from "@/lib/appearance-fouc-skip";
 import {
   DEFAULT_UI_FONT,
   UI_FONT_ATTR,
@@ -13,6 +14,7 @@ import {
 
 export const UI_FONT_FOUC_SCRIPT = `(function () {
   try {
+    ${SKIP_STORED_APPEARANCE_FOUC}
     var sk = ${JSON.stringify(UI_FONT_STORAGE_KEY)};
     var ck = ${JSON.stringify(UI_FONT_COOKIE_KEY)};
     var attr = ${JSON.stringify(UI_FONT_ATTR)};

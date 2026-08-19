@@ -26,9 +26,12 @@ import {
   ALERT_TOAST_HIDDEN_DISMISS_MS,
   ALERT_TOAST_STALE_DISMISS_MS,
 } from "@/lib/alerts/toast-age";
-import { announceAlertDocumentTitle } from "@/lib/document-title";
-import type { AlertChannel, EdgeAlert } from "./types";
+import { emitAlertInboxRead } from "@/lib/alerts/inbox-read-event";
+import { dismissBrowserNotifications } from "@/lib/alerts/seen";
+import { clearApiGetCache } from "@/lib/api-get-cache";
+import { announceAlertDocumentTitle, dismissAlertDocumentTitle } from "@/lib/document-title";
 import { cn } from "@/lib/utils";
+import type { AlertChannel, EdgeAlert } from "./types";
 
 /** Sonner default; keep user-action feedback brief. */
 export const EPHEMERAL_ALERT_TOAST_MS = 4000;
@@ -40,6 +43,8 @@ type StickyToastMeta = {
 };
 
 const stickyToastMeta = new Map<string, StickyToastMeta>();
+/** Programmatic toast.dismiss must not mark the inbox read (idle / hidden / cleared). */
+const skipInboxReadOnDismiss = new Set<string>();
 
 let lifecycleStarted = false;
 let hiddenAt: number | null = null;
@@ -81,9 +86,11 @@ export function edgeAlertToastOptions(
     },
     onDismiss: () => {
       stickyToastMeta.delete(alert.key);
+      if (!ephemeral) persistUserDismissIfNeeded(alert.key);
     },
     onAutoClose: () => {
       stickyToastMeta.delete(alert.key);
+      if (!ephemeral) persistUserDismissIfNeeded(alert.key);
     },
   };
 }
@@ -102,10 +109,22 @@ function showEdgeAlertToast(alert: EdgeAlert, raisedAt: number): void {
   );
 }
 
+function skipInboxRead(keys: Iterable<string>): void {
+  for (const key of keys) {
+    if (key) skipInboxReadOnDismiss.add(key);
+  }
+}
+
+function persistUserDismissIfNeeded(key: string): void {
+  if (skipInboxReadOnDismiss.delete(key)) return;
+  persistAlertDismissed(key);
+}
+
 /** Drop sticky EdgeAlert toasts that have been on-screen too long. */
 export function dismissStaleStickyAlertToasts(now: number = Date.now()): void {
   for (const [key, meta] of stickyToastMeta) {
     if (now - meta.raisedAt < ALERT_TOAST_STALE_DISMISS_MS) continue;
+    skipInboxRead([key]);
     toast.dismiss(key);
     stickyToastMeta.delete(key);
   }
@@ -113,14 +132,43 @@ export function dismissStaleStickyAlertToasts(now: number = Date.now()): void {
 
 /** Dismiss every tracked sticky EdgeAlert toast (e.g. long tab-hidden return). */
 export function dismissAllStickyAlertToasts(): void {
-  for (const key of [...stickyToastMeta.keys()]) {
+  const keys = [...stickyToastMeta.keys()];
+  skipInboxRead(keys);
+  for (const key of keys) {
     toast.dismiss(key);
   }
   stickyToastMeta.clear();
 }
 
+/** Wipe every Sonner toast, including ones whose meta was lost on HMR. */
+export function dismissEveryVisibleAlertToast(): void {
+  skipInboxRead(stickyToastMeta.keys());
+  toast.dismiss();
+  stickyToastMeta.clear();
+}
+
+/** Mark a user-dismissed sticky toast read in the desk inbox. */
+export function persistAlertDismissed(key: string): void {
+  const dedupe = key.trim();
+  if (!dedupe) return;
+  dismissAlertDocumentTitle(dedupe);
+  void dismissBrowserNotifications([dedupe]);
+  void fetch("/api/alerts", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dedupe, read: true }),
+  })
+    .then((res) => {
+      if (!res.ok) return;
+      clearApiGetCache();
+      emitAlertInboxRead(dedupe);
+    })
+    .catch(() => {});
+}
+
 /** Dismiss specific sticky toasts (condition cleared). */
 export function dismissStickyAlertToasts(keys: string[]): void {
+  skipInboxRead(keys);
   for (const key of keys) {
     if (!key) continue;
     toast.dismiss(key);
@@ -159,6 +207,7 @@ export function ensureAlertToastLifecycle(): void {
 /** Test helper - reset module state between vitest cases. */
 export function resetAlertToastChannelForTests(): void {
   stickyToastMeta.clear();
+  skipInboxReadOnDismiss.clear();
   hiddenAt = null;
   lifecycleStarted = false;
   if (staleTimer != null) {

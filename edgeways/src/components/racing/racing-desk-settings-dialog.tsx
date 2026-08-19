@@ -68,10 +68,10 @@ export function RacingDeskSettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md gap-0 overflow-hidden p-0 sm:max-w-md">
-        <DialogHeader className="border-b bg-selection-subtle px-5 py-4 pr-14">
-          <DialogTitle>Racing Desk settings</DialogTitle>
+        <DialogHeader className="mx-0 mt-0">
+          <DialogTitle>Racing settings</DialogTitle>
           <DialogDescription>
-            Defaults for bets from the racecard. Advanced view stays on the table.
+            Defaults for bets opened from a racecard.
           </DialogDescription>
         </DialogHeader>
 

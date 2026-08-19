@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, bets } from "@/lib/db";
 import { roundPence } from "@/lib/calc/money";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ const draftSchema = z.object({
 
 const bodySchema = z.object({ drafts: z.array(draftSchema).min(1).max(5000) });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -55,4 +56,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ inserted });
-}
+});

@@ -18,6 +18,9 @@ export const pageShellCompact = cn(
 /** Card internal horizontal inset - keep in sync with Card --card-spacing */
 export const cardInsetX = "px-[var(--layout-card-x)]";
 
+/** Cancel CardContent inset so a hairline list can bleed to the plate edge. */
+export const cardBleedX = "-mx-[var(--layout-card-x)]";
+
 /**
  * Racing Desk horizontal inset — +4px vs the old `px-3` so Courses, race
  * chrome and the table share one right edge with filter pills / Add offer.

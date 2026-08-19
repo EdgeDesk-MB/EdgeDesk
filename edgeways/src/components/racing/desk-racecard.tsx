@@ -50,6 +50,7 @@ import {
 } from "@/lib/racing-desk/in-play";
 import { isDeskRacePast } from "@/lib/racing-desk/past";
 import { PriceMovementArrow, PriceMovementBadge } from "@/components/racing/price-movement-badge";
+import { EmptyState } from "@/components/help/empty-state";
 import { RacingInPlayEmpty } from "@/components/racing/racing-in-play-empty";
 import { RacingOfferGuide } from "@/components/racing/racing-offer-guide";
 import { RunnerCloth } from "@/components/racing/runner-cloth";
@@ -960,14 +961,13 @@ export function DeskRacecard({
 
   if (!selected) {
     return (
-      <div
-        className={cn(
-          "border-dashed py-16 text-center text-sm text-muted-foreground",
-          embedded ? "border-t border-border/60" : panelSurface
-        )}
-      >
-        Select a race to view the full racecard.
-      </div>
+      <EmptyState
+        compact={embedded}
+        icon={Layers2}
+        title="Select a race"
+        description="Pick a meeting from the board to open the full racecard."
+        className={embedded ? "rounded-none border-x-0 border-b-0 shadow-none" : undefined}
+      />
     );
   }
 

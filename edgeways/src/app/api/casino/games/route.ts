@@ -3,6 +3,7 @@ import { desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, casinoGames } from "@/lib/db";
 import { SEED_GAMES } from "@/lib/casino/game-library";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +21,14 @@ function seedIfEmpty(): void {
   }
 }
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   seedIfEmpty();
   // RTP order, highest first - the whole point of the library is "which
   // eligible game should I play", so lead with the answer everywhere it's
   // consumed, not alphabetically.
   const games = db.select().from(casinoGames).orderBy(desc(casinoGames.rtp)).all();
   return NextResponse.json({ games });
-}
+});
 
 const upsertSchema = z.object({
   name: z.string().min(1).max(120),
@@ -36,7 +37,7 @@ const upsertSchema = z.object({
   rtp: z.number().min(0.5).max(1),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = upsertSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -63,4 +64,4 @@ export async function POST(req: NextRequest) {
     .returning()
     .get();
   return NextResponse.json({ game: row });
-}
+});

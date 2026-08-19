@@ -10,8 +10,18 @@ import {
   historyEntrySubtitle,
   historyEntryTitle,
   historyEntryTitleParts,
+  historyGoalEventLabel,
   historyGoalScoreline,
+  historyGoalScorelineSegments,
+  historyMatchMomentHeadline,
+  historyMatchMomentSubline,
+  historyRacingResultCopy,
+  historyRacingResultHeadline,
+  historySportMomentHeadline,
+  isFootballMatchMoment,
+  isRacingResultMoment,
   historyEntryHref,
+  historyEntryLinkLabel,
   isFreeBetWonHistoryEntry,
   historyKindLabel,
   historyOccurredAt,
@@ -74,6 +84,8 @@ describe("isDeskCampaignLayHistoryEntry", () => {
     quickLogged: null,
     sport: null,
     purpose: null,
+    importFingerprint: null,
+    importMeta: null,
   };
 
   it("flags Acca desk lay settlements for History exclusion", () => {
@@ -172,6 +184,8 @@ describe("isFreeBetPlacedHistoryEntry", () => {
     quickLogged: null,
     sport: null,
     purpose: null,
+    importFingerprint: null,
+    importMeta: null,
   };
 
   const ctx = buildHistoryContext([], [freeBet], {});
@@ -279,6 +293,177 @@ describe("historyEntryTitle for goals", () => {
     const sequenced = buildHistoryContext([{ ...event, goals: null }], [], {}, [], [g1, g2]);
     expect(historyEntryTitle(g2, sequenced)).toBe("Goal!");
     expect(historyGoalScoreline(g2, sequenced)?.scoringSide).toBe("away");
+  });
+});
+
+describe("football match-moment feed copy", () => {
+  const event: EventRow = {
+    id: 8,
+    sport: "football",
+    externalId: null,
+    competition: "Championship",
+    homeTeam: "Wolves",
+    awayTeam: "Blackburn",
+    startTime: Date.now(),
+    status: "finished",
+    homeScore: 2,
+    awayScore: 2,
+    minute: 90,
+    homeLed2: 0,
+    awayLed2: 0,
+    source: "api",
+    goals: null,
+    ftHomeScore: null,
+    ftAwayScore: null,
+    matchEnding: null,
+    simScript: null,
+    simStartedAt: null,
+    createdAt: Date.now(),
+  };
+
+  it("puts the fixture on the top row for match-only updates", () => {
+    const ctx = buildHistoryContext([event], [], {});
+    const kickoff = row({
+      kind: "kickoff",
+      title: "Kick-off",
+      eventId: 8,
+      betId: undefined,
+      detail: "Wolves v Blackburn",
+    });
+    const goal = row({
+      kind: "goal",
+      title: "Goal",
+      eventId: 8,
+      betId: undefined,
+      minute: 90,
+      detail: "Wolves 2-2 Blackburn",
+    });
+    const fullTime = row({
+      kind: "full_time",
+      title: "Full time",
+      eventId: 8,
+      betId: undefined,
+      minute: 90,
+      detail: "Wolves 2-2 Blackburn",
+    });
+
+    expect(isFootballMatchMoment(kickoff, ctx)).toBe(true);
+    expect(historyMatchMomentHeadline(kickoff, ctx)).toBe("Wolves v Blackburn");
+    expect(historyMatchMomentSubline(kickoff, ctx)).toBe("Kick-off");
+    expect(historyMatchMomentHeadline(goal, ctx)).toBe("Wolves v Blackburn");
+    expect(historyGoalEventLabel(goal, ctx)).toBe("Goal!");
+    expect(historyMatchMomentHeadline(fullTime, ctx)).toBe("Wolves v Blackburn");
+    expect(historyMatchMomentSubline(fullTime, ctx)).toBe("Full time · 2-2");
+    expect(historyEntryLinkLabel(kickoff, ctx)).toBe(
+      "Open Kick-off, Wolves v Blackburn in tracked events"
+    );
+    expect(historyEntryLinkLabel(fullTime, ctx)).toBe(
+      "Open Full time, Wolves v Blackburn in tracked events"
+    );
+  });
+
+  it("brackets the scoring side on a 1-1 equaliser", () => {
+    const g1 = row({
+      id: 21,
+      kind: "goal",
+      title: "Goal",
+      eventId: 8,
+      betId: undefined,
+      minute: 20,
+      detail: "Wolves 1-0 Blackburn",
+    });
+    const g2 = row({
+      id: 22,
+      kind: "goal",
+      title: "Goal",
+      eventId: 8,
+      betId: undefined,
+      minute: 28,
+      detail: "Wolves 1-1 Blackburn",
+    });
+    const g3 = row({
+      id: 23,
+      kind: "goal",
+      title: "Goal",
+      eventId: 8,
+      betId: undefined,
+      minute: 50,
+      detail: "Wolves 1-2 Blackburn",
+    });
+    const g4 = row({
+      id: 24,
+      kind: "goal",
+      title: "Goal",
+      eventId: 8,
+      betId: undefined,
+      minute: 90,
+      detail: "Wolves 2-2 Blackburn",
+    });
+    const ctx = buildHistoryContext([event], [], {}, [], [g1, g2, g3, g4]);
+
+    expect(historyGoalScorelineSegments(g1, ctx)).toEqual([
+      { text: "Wolves " },
+      { text: "[1]", emphasize: true },
+      { text: " - 0 Blackburn" },
+    ]);
+    expect(historyGoalScorelineSegments(g2, ctx)).toEqual([
+      { text: "Wolves 1 - " },
+      { text: "[1]", emphasize: true },
+      { text: " Blackburn" },
+    ]);
+    expect(historyGoalScorelineSegments(g4, ctx)).toEqual([
+      { text: "Wolves " },
+      { text: "[2]", emphasize: true },
+      { text: " - 2 Blackburn" },
+    ]);
+    expect(historyEntryLinkLabel(g4, ctx)).toBe(
+      "Open Goal, Wolves v Blackburn, Wolves [2] - 2 Blackburn in tracked events"
+    );
+  });
+
+  it("puts the meeting on top for race-only results", () => {
+    const race: EventRow = {
+      ...event,
+      id: 9,
+      sport: "horse_racing",
+      homeTeam: "Race",
+      awayTeam: "",
+      competition: "York",
+      goals: JSON.stringify({
+        kind: "horse_racing",
+        winner: "Dark Moon Rising",
+        fieldSize: 8,
+        runners: [
+          { horse: "Dark Moon Rising", position: 1 },
+          { horse: "Kahin", position: 2 },
+        ],
+      }),
+    };
+    const ctx = buildHistoryContext([race], [], {});
+    const result = row({
+      kind: "full_time",
+      title: "Result",
+      eventId: 9,
+      betId: undefined,
+      detail: "York · 16:30 - won by Dark Moon Rising",
+    });
+    expect(isFootballMatchMoment(result, ctx)).toBe(false);
+    expect(isRacingResultMoment(result, ctx)).toBe(true);
+    expect(historyMatchMomentHeadline(result, ctx)).toBeNull();
+    expect(historyRacingResultHeadline(result, ctx)).toBe("York");
+    expect(historySportMomentHeadline(result, ctx)).toBe("York");
+    expect(historyEntryTitle(result, ctx)).toBe("Result");
+    expect(historyRacingResultCopy(result, ctx)).toEqual({
+      label: "Result",
+      parts: [
+        { text: "[1st] Dark Moon Rising" },
+        { text: " · " },
+        { text: "[2nd] Kahin" },
+      ],
+    });
+    expect(historyEntryLinkLabel(result, ctx)).toBe(
+      "Open Result, York, [1st] Dark Moon Rising · [2nd] Kahin in tracked events"
+    );
   });
 });
 
@@ -492,6 +677,8 @@ describe("sortHistoryEntries", () => {
     quickLogged: null,
     sport: null,
     purpose: null,
+    importFingerprint: null,
+    importMeta: null,
   };
   const ctx = buildHistoryContext([event], [bet], {
     32: { amount: 50, reason: "Finished 2nd" },
@@ -561,6 +748,28 @@ describe("sortHistoryEntries", () => {
     const sorted = sortHistoryEntries([placed, settlement, result], lateCtx).map((e) => e.kind);
     expect(sorted).toEqual(["settlement", "full_time", "bet_placed"]);
   });
+
+  it("puts the latest moment at the top", () => {
+    const older = row({
+      id: 10,
+      kind: "settlement",
+      title: "Older settlement",
+      createdAt: raceTime - 2 * 24 * 60 * 60 * 1000,
+      amount: -1.8,
+    });
+    const newer = row({
+      id: 11,
+      kind: "goal",
+      title: "Goal!",
+      eventId: 9,
+      minute: 41,
+      createdAt: raceTime + 41 * 60 * 1000,
+    });
+    const emptyCtx = buildHistoryContext([], [], {});
+    expect(sortHistoryEntries([older, newer], emptyCtx).map((e) => e.id)).toEqual([
+      11, 10,
+    ]);
+  });
 });
 
 describe("historyEntryHref", () => {
@@ -621,6 +830,8 @@ describe("historyEntryHref", () => {
     quickLogged: null,
     sport: null,
     purpose: null,
+    importFingerprint: null,
+    importMeta: null,
   };
   const ctx = buildHistoryContext([event], [bet]);
 
@@ -748,6 +959,8 @@ describe("Acca History copy", () => {
       source: null,
       sport: null,
       purpose: null,
+      importFingerprint: null,
+      importMeta: null,
     };
     const entry = row({
       kind: "settlement",
@@ -810,6 +1023,8 @@ describe("boosts history filter (J2b)", () => {
     quickLogged: null,
     sport: null,
     purpose: null,
+    importFingerprint: null,
+    importMeta: null,
   };
   const ctx = buildHistoryContext([], [boostBet], {});
   const placed = row({

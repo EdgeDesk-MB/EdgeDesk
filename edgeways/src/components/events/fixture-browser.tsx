@@ -57,8 +57,8 @@ export function FixtureBrowserContent({
   const { state, refresh } = useAppState(5000);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [racingFixtures, setRacingFixtures] = useState<RacingFixture[]>([]);
-  const [fixtureSource, setFixtureSource] = useState<string>("");
-  const [fixtureWarning, setFixtureWarning] = useState<string>("");
+  const [footballError, setFootballError] = useState<string | null>(null);
+  const [racingError, setRacingError] = useState<string | null>(null);
   const [loadingFixtures, setLoadingFixtures] = useState(true);
   const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">("football");
   const [syncingRacing, setSyncingRacing] = useState(false);
@@ -75,31 +75,33 @@ export function FixtureBrowserContent({
 
     if (footballResult.status === "fulfilled") {
       setFixtures(footballResult.value.fixtures);
-      setFixtureWarning(footballResult.value.warning ?? "");
-      if (fixtureSport === "football") setFixtureSource(footballResult.value.source);
+      setFootballError(null);
       if (footballResult.value.warning) {
         toast.message("Using demo football fixtures", {
           description: footballResult.value.warning,
         });
       }
     } else {
-      setFixtureWarning("");
+      const message = friendlyFixtureError(footballResult.reason, "football");
+      setFootballError(message);
       toast.error("Could not load football fixtures", {
-        description: friendlyFixtureError(footballResult.reason, "football"),
+        description: message,
       });
     }
 
     if (racingResult.status === "fulfilled") {
       setRacingFixtures(racingResult.value.racecards);
-      if (fixtureSport === "horse_racing") setFixtureSource(racingResult.value.source);
+      setRacingError(null);
     } else {
+      const message = friendlyFixtureError(racingResult.reason, "horse_racing");
+      setRacingError(message);
       toast.error("Could not load horse racing fixtures", {
-        description: friendlyFixtureError(racingResult.reason, "horse_racing"),
+        description: message,
       });
     }
 
     setLoadingFixtures(false);
-  }, [fixtureSport]);
+  }, []);
 
   useEffect(() => {
     queueMicrotask(loadFixtures);
@@ -267,47 +269,39 @@ export function FixtureBrowserContent({
 
   const sourceHint =
     fixtureSport === "horse_racing"
-      ? fixtureSource === "racing-api"
-        ? "UK & IRE racecards."
-        : "Demo racecards."
-      : fixtureSource === "api-football"
-        ? "Live and upcoming fixtures."
-        : fixtureWarning
-          ? "Demo fixtures (API limit or missing key)."
-          : "Demo fixtures.";
+      ? "UK & IRE racecards."
+      : "Live and upcoming football.";
 
   const header = (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         {variant === "page" ? (
           <CardTitle section>Fixture browser</CardTitle>
-        ) : (
-          <h2 className="text-base font-semibold">Browse fixtures</h2>
-        )}
+        ) : null}
         <p
           className={cn(
             "text-sm text-muted-foreground",
-            variant === "page" ? "" : "mt-0.5"
+            variant === "page" ? "" : "mt-0"
           )}
         >
-          {sourceHint} Use + to add to Tracked Events.
+          {sourceHint} Use + to track.{" "}
           {variant === "page" ? (
             <>
-              {" "}
-              Already tracking?{" "}
+              Open{" "}
               <Link
                 href="/tracked-events"
                 className="text-primary-text underline-offset-2 hover:underline"
               >
                 Tracked Events
-              </Link>
+              </Link>{" "}
+              for the ones you have added.
             </>
           ) : (
             <>
-              {" "}
               <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
                 Open Fixtures page
-              </Link>
+              </Link>{" "}
+              for the full list.
             </>
           )}
         </p>
@@ -325,10 +319,17 @@ export function FixtureBrowserContent({
           aria-hidden={fixtureSport !== "horse_racing"}
           tabIndex={fixtureSport !== "horse_racing" ? -1 : undefined}
         >
-          <RefreshCw className={syncingRacing ? "size-3.5 animate-spin" : "size-3.5"} />
+          <RefreshCw className={syncingRacing ? "size-3.5 motion-safe:animate-spin" : "size-3.5"} />
           Sync
         </Button>
-        <Button variant="outline" size="sm" onClick={loadFixtures} disabled={loadingFixtures}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadFixtures}
+          disabled={loadingFixtures}
+          className="gap-1.5"
+        >
+          <RefreshCw className={loadingFixtures ? "size-3.5 motion-safe:animate-spin" : "size-3.5"} />
           Refresh
         </Button>
       </div>
@@ -344,7 +345,11 @@ export function FixtureBrowserContent({
         onValueChange={(v) => setFixtureSport(v as "football" | "horse_racing")}
         className="gap-0"
       >
-        <TabsList variant="line" fadeClassName={tabBleed === "dialog" ? "from-popover" : "from-card"}>
+        <TabsList
+          variant="line"
+          className="justify-start"
+          fadeClassName={tabBleed === "dialog" ? "from-popover" : "from-card"}
+        >
           {FIXTURE_SPORTS.map((sport) => (
             <TabsTrigger key={sport.id} value={sport.id} className="gap-1.5">
               <SportIcon sport={sport.id} size={14} />
@@ -356,12 +361,27 @@ export function FixtureBrowserContent({
     </TabsLineBar>
   );
 
-  const emptyMessage =
-    fixtureSport === "horse_racing"
-      ? "No live or upcoming races - finished races are hidden. Try Refresh or another filter."
+  const sportError = fixtureSport === "horse_racing" ? racingError : footballError;
+  const emptyTitle = sportError
+    ? fixtureSport === "horse_racing"
+      ? "Could not load racecards"
+      : "Could not load fixtures"
+    : fixtureSport === "horse_racing"
+      ? "No live or upcoming races"
       : competitionFilter === "world_cup"
-        ? "No World Cup fixtures in today's feed - try All comps or Refresh."
-        : "No live or upcoming fixtures - finished matches are hidden. Try Refresh or another filter.";
+        ? "No World Cup fixtures"
+        : "No live or upcoming fixtures";
+  const emptyDescription = sportError
+    ? "Use Refresh to try again."
+    : fixtureSport === "horse_racing"
+      ? "Finished races stay on Tracked Events. Try another filter if you expected a card."
+      : competitionFilter === "world_cup"
+        ? "None in today's feed. Try All comps."
+        : "Finished matches stay on Tracked Events. Try another filter if you expected a match.";
+
+  const hasSportData =
+    fixtureSport === "horse_racing" ? racingFixtures.length > 0 : fixtures.length > 0;
+  const showLoadingEmpty = loadingFixtures && !hasSportData;
 
   const board = (
     <DeskFixtureBoard
@@ -374,7 +394,10 @@ export function FixtureBrowserContent({
       onEpDesk={openEpDesk}
       onTrackRace={trackRace}
       onTrackAndBetRace={trackAndBetRace}
-      emptyMessage={emptyMessage}
+      emptyTitle={emptyTitle}
+      emptyDescription={emptyDescription}
+      loading={showLoadingEmpty}
+      loadFailed={Boolean(sportError) && !hasSportData}
       competitionFilter={competitionFilter}
       onCompetitionFilterChange={setCompetitionFilter}
       worldCupCount={worldCupCount}
@@ -385,7 +408,7 @@ export function FixtureBrowserContent({
   if (variant === "dialog") {
     return (
       <div className={cn("flex min-h-0 flex-col", className)}>
-        <div className="shrink-0 border-b px-6 py-4">{header}</div>
+        <div className="shrink-0 px-6 pt-4">{header}</div>
         <div className="shrink-0 px-6 pb-2">{tabs}</div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">{board}</div>
       </div>

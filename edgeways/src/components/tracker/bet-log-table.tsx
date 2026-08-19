@@ -748,12 +748,12 @@ function LinkEventSelect({
         onPointerDownOutside={preventDialogDismissOnPortaledContent}
         onInteractOutside={preventDialogDismissOnPortaledContent}
       >
-        <DialogHeader className="px-4 pt-4 pb-2">
+        <DialogHeader className="mx-0 mt-0">
           <DialogTitle>Link event</DialogTitle>
           <DialogDescription>
             {isRacing
-              ? "Search tracked races, or add a past meeting that was never tracked."
-              : `Search tracked ${sportLabel} events, including past results on file.`}
+              ? "Search tracked races, or add a past meeting."
+              : `Search tracked ${sportLabel} events.`}
           </DialogDescription>
         </DialogHeader>
         {eventCount > 0 ? (

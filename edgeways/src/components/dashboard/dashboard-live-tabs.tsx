@@ -178,10 +178,11 @@ function PositionList({
     return (
       <EmptyState
         compact
+        icon={Target}
         title="No live positions"
         description="Attach bets to in-play events in the tracker, or start a simulated match."
         action={{ label: "Open tracker", href: "/tracker" }}
-        className="rounded-none border-0 bg-transparent py-4 shadow-none ring-0"
+        className="shadow-none"
       />
     );
   }
@@ -440,10 +441,11 @@ function EventsList({
     return (
       <EmptyState
         compact
+        icon={Radio}
         title="Nothing in play"
         description="Browse fixtures or run a simulation to see live scores here."
         action={{ label: "Browse fixtures", href: "/fixtures" }}
-        className="rounded-none border-0 bg-transparent py-4 shadow-none ring-0"
+        className="shadow-none"
       />
     );
   }

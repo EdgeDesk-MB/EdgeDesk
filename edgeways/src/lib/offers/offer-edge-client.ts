@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/hooks/use-app-state";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 
 export interface OfferEdgeResponse {
@@ -35,9 +36,10 @@ export function fetchOfferEdgePlays(
   const existing = inFlight.get(date);
   if (existing) return existing;
 
-  const request = fetch(`/api/offers/edge?date=${encodeURIComponent(date)}`)
-    .then((res) => (res.ok ? res.json() : { date, plays: [] }))
-    .then((data: OfferEdgeResponse) => {
+  const request = api<OfferEdgeResponse>(
+    `/api/offers/edge?date=${encodeURIComponent(date)}`
+  )
+    .then((data) => {
       const value: OfferEdgeResponse = { date, plays: data.plays ?? [], source: data.source };
       settled.set(date, { at: Date.now(), value });
       return value;

@@ -83,7 +83,7 @@ export const META_NAV_ITEMS: readonly MetaNavItem[] = [
     label: "Feedback",
     href: "/feedback",
     icon: MessageSquarePlus,
-    matchPrefixes: ["/feedback", "/contact"],
+    matchPrefixes: ["/feedback"],
   },
 ] as const;
 

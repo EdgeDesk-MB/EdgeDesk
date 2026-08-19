@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, mugPlans } from "@/lib/db";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ plans: db.select().from(mugPlans).all() });
-}
+});
 
 const upsertSchema = z.object({
   accountId: z.number(),
@@ -17,7 +18,7 @@ const upsertSchema = z.object({
 });
 
 /** Upsert by accountId - one cadence plan per bookie. */
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = upsertSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -51,4 +52,4 @@ export async function POST(req: NextRequest) {
         .returning()
         .get();
   return NextResponse.json({ plan: row });
-}
+});

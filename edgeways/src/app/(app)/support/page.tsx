@@ -5,6 +5,7 @@ import { PageShell } from "@/components/page-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
+import { LEGAL_PATHS } from "@/lib/legal/public";
 
 export default function SupportPage() {
   return (
@@ -19,7 +20,9 @@ export default function SupportPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">While this page fills out</CardTitle>
           <CardDescription>
-            Guides cover day-to-day how-tos. Feedback is for bugs, ideas, and direct notes.
+            Guides cover day-to-day how-tos. Feedback is for bugs, ideas, and
+            direct notes. Email is for account and billing, and we aim to reply
+            within two working days.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
@@ -28,6 +31,15 @@ export default function SupportPage() {
           </Button>
           <Button asChild variant="outline" {...pageSecondaryButtonProps}>
             <Link href="/help">Open guides</Link>
+          </Button>
+          <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+            <Link href={LEGAL_PATHS.contact}>Contact</Link>
+          </Button>
+          <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+            <Link href={LEGAL_PATHS.terms}>Terms</Link>
+          </Button>
+          <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+            <Link href={LEGAL_PATHS.privacy}>Privacy</Link>
           </Button>
         </CardContent>
       </Card>

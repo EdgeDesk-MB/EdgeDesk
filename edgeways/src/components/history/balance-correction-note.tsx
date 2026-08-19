@@ -90,8 +90,7 @@ export function BalanceCorrectionNoteButton({
           <DialogHeader>
             <DialogTitle>{hasNote ? "Edit note" : "Add note"}</DialogTitle>
             <DialogDescription>
-              Explain what this balance correction was for. It shows after the
-              bookie on the History row.
+              What this balance correction was for.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-1.5">

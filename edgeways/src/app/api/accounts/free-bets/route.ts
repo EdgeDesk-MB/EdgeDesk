@@ -6,19 +6,20 @@ import {
   setFreeBetLotExpiry,
 } from "@/lib/accounts/free-bet-lots";
 import { quietFreeBetAlerts } from "@/lib/services/quiet-alerts";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ lots: listAllOpenFreeBetLots() });
-}
+});
 
 const removeSchema = z.object({
   lotId: z.number().int().positive(),
 });
 
 /** Remove (write off) remaining balance on a free-bet lot. */
-export async function DELETE(req: NextRequest) {
+export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
   const parsed = removeSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -30,7 +31,7 @@ export async function DELETE(req: NextRequest) {
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }
-}
+});
 
 const expirySchema = z.object({
   lotId: z.number().int().positive(),
@@ -38,7 +39,7 @@ const expirySchema = z.object({
 });
 
 /** Set or clear the conversion deadline on an open free-bet lot. */
-export async function PATCH(req: NextRequest) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
   const parsed = expirySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -49,4 +50,4 @@ export async function PATCH(req: NextRequest) {
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }
-}
+});

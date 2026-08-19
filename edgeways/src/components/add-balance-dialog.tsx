@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,7 +29,8 @@ import { bookieBrandColor } from "@/lib/brands/bookies";
 import { BookieNamePicker, EXCHANGE_CUSTOM } from "@/components/bookie-name-picker";
 import { formatGbp, isNegativeGbp, roundMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Wallet } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 
 type FundKind = "cash" | "free_bet";
 
@@ -93,6 +95,19 @@ export function AddBalanceDialog({
       ) : null}
     </Dialog>
   );
+}
+
+/**
+ * Controlled value for a balance amount field.
+ * `amount || ""` treats 0 as empty, so Adjust cannot show or keep a £0 target
+ * (the current-balance placeholder then looks like the typed 0 did nothing).
+ */
+export function balanceAmountInputValue(
+  amount: number,
+  mode: "top_up" | "withdrawal" | "adjustment"
+): number | "" {
+  if (mode !== "adjustment" && amount === 0) return "";
+  return Number.isFinite(amount) ? amount : "";
 }
 
 function seedRow(
@@ -308,13 +323,17 @@ function AddBalanceForm({
 
   return (
     <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[780px]">
-        <DialogHeader className="border-b px-6 pb-4 pt-7">
-          <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            Adjust balance
-          </DialogTitle>
-          <DialogDescription>
-            Top up cash balance or free bets, withdraw, or adjust across your bookie and exchange
-            accounts. Free bets from AI triggers are credited automatically.
+        <DialogHeader className="mx-0 mt-0">
+          <DialogTitle>Adjust balance</DialogTitle>
+          <DialogDescription
+            explainer={
+              <DialogExplainer title="Adjust balance">
+                Top up or withdraw from a bookie or exchange, or set the wallet
+                to a known balance.
+              </DialogExplainer>
+            }
+          >
+            Top up, withdraw, or set a balance.
           </DialogDescription>
         </DialogHeader>
 
@@ -328,9 +347,13 @@ function AddBalanceForm({
           </Tabs>
 
           {accounts.length === 0 && !showAddAccount && (
-            <p className="text-sm text-muted-foreground">
-              No accounts yet - add a bookie or exchange wallet first.
-            </p>
+            <EmptyState
+              compact
+              oneLine
+              icon={Wallet}
+              title="No accounts yet"
+              description="Add a bookie or exchange wallet first."
+            />
           )}
 
           {effectiveRows.map((row, i) => {
@@ -427,7 +450,7 @@ function AddBalanceForm({
                     step={0.01}
                     min={mode === "adjustment" ? undefined : 0}
                     prefix=""
-                    value={row.amount || ""}
+                    value={balanceAmountInputValue(row.amount, mode)}
                     onChange={(e) =>
                       setRows(
                         effectiveRows.map((r, j) =>

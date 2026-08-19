@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hasDeskActivity,
+  needsSetup,
   shouldShowDashboardEmptyCta,
 } from "@/lib/dashboard-empty";
 import type { AppState } from "@/lib/services/state.types";
@@ -19,6 +20,7 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     betBuilderLayDue: [],
     mugPlans: [],
     alertsUnread: 0,
+    deliveredAlertKeys: [],
     boostsOpen: 0,
     casinoNeedsAction: 0,
     demoMode: false,
@@ -90,6 +92,37 @@ describe("shouldShowDashboardEmptyCta", () => {
     expect(shouldShowDashboardEmptyCta(baseState({ settledProfit: 12.5 }))).toBe(
       false
     );
+  });
+});
+
+describe("needsSetup", () => {
+  it("is true when there is no bank or bookie", () => {
+    expect(needsSetup(baseState())).toBe(true);
+  });
+
+  it("is false once a bank exists, even with no bets", () => {
+    expect(
+      needsSetup(
+        baseState({
+          balances: {
+            total: 100,
+            bookies: 0,
+            exchanges: 0,
+            banks: 100,
+            pendingBankCredits: 0,
+            inBets: 0,
+            bankroll: 100,
+            accounts: [
+              {
+                id: 1,
+                name: "Bank",
+                type: "bank",
+              } as AppState["balances"]["accounts"][number],
+            ],
+          },
+        })
+      )
+    ).toBe(false);
   });
 });
 

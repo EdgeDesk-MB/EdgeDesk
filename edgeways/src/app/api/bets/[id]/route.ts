@@ -16,6 +16,7 @@ import {
   syncOfferStatuses,
 } from "@/lib/services/offers";
 import { syncBoostDiaryFromBet, unlinkBoostDiaryForBet } from "@/lib/services/boosts";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ const patchSchema = z.object({
   offerId: z.number().nullable().optional(),
 });
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -180,9 +181,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     spawnCourseOfferSiblingsIfNeeded();
   }
   return NextResponse.json({ bet: updated });
-}
+});
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const betId = Number(id);
   unlinkBoostDiaryForBet(betId);
@@ -190,4 +191,4 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   purgeLedgerForDeletedBet(betId);
   db.delete(bets).where(eq(bets.id, betId)).run();
   return NextResponse.json({ ok: true });
-}
+});

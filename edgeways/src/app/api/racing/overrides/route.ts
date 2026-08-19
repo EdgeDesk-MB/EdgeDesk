@@ -3,6 +3,7 @@ import {
   clearOddsOverride,
   upsertOddsOverride,
 } from "@/lib/services/racing-odds-overrides";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ function parseDecimal(value: unknown): number | null | undefined {
 }
 
 /** Upsert manual bookie/exchange odds for a runner (Free-tier paste override). */
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
       raceId?: string;
@@ -42,10 +43,10 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 /** Clear manual override for a runner. */
-export async function DELETE(req: NextRequest) {
+export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
   const raceId = req.nextUrl.searchParams.get("raceId")?.trim();
   const horseId = req.nextUrl.searchParams.get("horseId")?.trim();
   if (!raceId || !horseId) {
@@ -53,4 +54,4 @@ export async function DELETE(req: NextRequest) {
   }
   clearOddsOverride(raceId, horseId);
   return NextResponse.json({ ok: true });
-}
+});

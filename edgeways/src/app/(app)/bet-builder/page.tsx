@@ -168,9 +168,11 @@ export default function BetBuilderDeskPage() {
                 activeRuns.map((rv) => <RunCard key={rv.run.id} view={rv} onChanged={load} />)
               )
             ) : historyRuns.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                No finished bet builders yet.
-              </p>
+              <EmptyState
+                icon={Puzzle}
+                title="No finished bet builders yet"
+                description="Completed builders move here once the event has settled."
+              />
             ) : (
               historyRuns.map((rv) => (
                 <RunCard key={rv.run.id} view={rv} onChanged={load} collapsedByDefault />
@@ -585,8 +587,8 @@ function WholeLayRow({ run, onChanged }: { run: BetBuilderRunRow; onChanged: () 
           value={layOdds}
           onChange={setLayOdds}
           min={1.01}
-          step={0.01}
           placeholder="Exchange"
+          exchangeOddsStepping
           labelExtra={
             <FieldHelp label="Combined lay odds help">
               Live exchange price for the whole builder. Stake updates with the odds you enter.
@@ -602,8 +604,8 @@ function WholeLayRow({ run, onChanged }: { run: BetBuilderRunRow; onChanged: () 
             setLayStake(v);
           }}
           min={0.01}
-          step={0.01}
           prefix="£"
+          layStakeStepping
           placeholder={suggestion != null ? suggestion.layStake.toFixed(2) : "–"}
           labelExtra={
             <FieldHelp label="Lay stake help">
@@ -678,10 +680,9 @@ function DeleteRunButton({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md" mobile="center">
         <DialogHeader>
-          <DialogTitle>Delete bet builder?</DialogTitle>
+          <DialogTitle>Delete “{label}”?</DialogTitle>
           <DialogDescription>
-            Removes “{label}” from Bet Builder Desk. Linked tracker bets that are still open will
-            be voided.
+            Linked open bets will be voided.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

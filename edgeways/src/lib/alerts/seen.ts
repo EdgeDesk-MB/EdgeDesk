@@ -71,12 +71,15 @@ export async function dismissAlertNotifications(tags: string[]): Promise<void> {
   const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
   if (clean.length === 0) return;
   void dismissBrowserNotifications(clean);
+  const chunkSize = 50;
   try {
-    await fetch("/api/push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dismiss: clean }),
-    });
+    for (let i = 0; i < clean.length; i += chunkSize) {
+      await fetch("/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dismiss: clean.slice(i, i + chunkSize) }),
+      });
+    }
   } catch {
     /* offline / server down - local close still happened */
   }

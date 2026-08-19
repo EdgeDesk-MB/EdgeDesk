@@ -5,6 +5,7 @@ import { deriveComponentEv } from "@/lib/calc/casino-reward-ev";
 import { syncCasinoSeriesTemplateFromOffer } from "@/lib/offers/casino-offer-recurrence";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { componentFieldsSchema, toComponentRowValues } from "../schema";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
  * EV from a partial merge risks stale fields from a since-changed
  * componentType. sortOrder is untouched.
  */
-export async function PATCH(
+export const PATCH = withDeskScope(async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; componentId: string }> }
 ) {
@@ -45,9 +46,9 @@ export async function PATCH(
   syncCasinoSeriesTemplateFromOffer(offerId);
 
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
-}
+});
 
-export async function DELETE(
+export const DELETE = withDeskScope(async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; componentId: string }> }
 ) {
@@ -66,4 +67,4 @@ export async function DELETE(
   db.delete(casinoOfferComponents).where(eq(casinoOfferComponents.id, compId)).run();
   syncCasinoSeriesTemplateFromOffer(offerId);
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
-}
+});

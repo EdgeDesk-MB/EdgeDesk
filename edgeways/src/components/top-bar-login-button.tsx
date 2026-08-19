@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { LogIn, LogOut } from "lucide-react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { drawerUtilityRow } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,30 @@ function signedInEmail(user: ReturnType<typeof useUser>["user"]): string | null 
   );
 }
 
-/** Desktop meta-nav Log out. The desk is a signed-in surface; login is on .app. */
+/** Desktop meta-nav Log in. Same slot as Log out when the session is empty. */
+export function TopBarLoginButton({ className }: { className?: string }) {
+  return (
+    <Link
+      href="/login"
+      data-meta-nav="login"
+      className={cn(logoutControl, className)}
+      aria-label="Log in"
+    >
+      <span>Log in</span>
+      <LogIn className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+    </Link>
+  );
+}
+
+/** Desktop meta-nav session control: Log out when signed in, Log in when not. */
+export function TopBarSessionButton({ className }: { className?: string }) {
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded) return null;
+  if (isSignedIn) return <TopBarLogoutButton className={className} />;
+  return <TopBarLoginButton className={className} />;
+}
+
+/** Desktop meta-nav Log out. */
 export function TopBarLogoutButton({ className }: { className?: string }) {
   const { pending, logOut } = useSignOut();
   const { user } = useUser();
@@ -72,6 +96,27 @@ export function TopBarLogoutButton({ className }: { className?: string }) {
         aria-hidden
       />
     </button>
+  );
+}
+
+/** Burger drawer footer: Log out when signed in, Log in when not. */
+export function MobileDrawerSessionButton({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded) return null;
+  if (isSignedIn) return <MobileDrawerLogoutButton onLoggedOut={onNavigate} />;
+  return (
+    <Link
+      href="/login"
+      className={cn(drawerUtilityRow, "border-t border-border/80")}
+      onClick={onNavigate}
+    >
+      <LogIn className="size-5 shrink-0 text-muted-foreground" strokeWidth={2} />
+      <span className="flex-1 text-left">Log in</span>
+    </Link>
   );
 }
 

@@ -3,6 +3,7 @@
  * first paint so a stored choice does not flash Diagonal lines.
  */
 
+import { SKIP_STORED_APPEARANCE_FOUC } from "@/lib/appearance-fouc-skip";
 import {
   DEFAULT_HEADER_PATTERN,
   HEADER_PATTERN_ATTR,
@@ -13,6 +14,7 @@ import {
 
 export const HEADER_PATTERN_FOUC_SCRIPT = `(function () {
   try {
+    ${SKIP_STORED_APPEARANCE_FOUC}
     var sk = ${JSON.stringify(HEADER_PATTERN_STORAGE_KEY)};
     var ck = ${JSON.stringify(HEADER_PATTERN_COOKIE_KEY)};
     var attr = ${JSON.stringify(HEADER_PATTERN_ATTR)};

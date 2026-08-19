@@ -1,5 +1,9 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { publicDemoOfferEdge } from "@/lib/demo/public-racing-desk";
+import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { getRacingDesk } from "@/lib/services/racing-desk";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +13,12 @@ export const dynamic = "force-dynamic";
  * A thin projection of the Racing Desk payload: the offer surfaces only need the
  * ranked plays, not the full racecards.
  */
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
     req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+  if ((await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1") {
+    return NextResponse.json(publicDemoOfferEdge(date));
+  }
   const { edgePlays, summary } = await getRacingDesk(date);
   return NextResponse.json({ date, plays: edgePlays, source: summary.source });
-}
+});

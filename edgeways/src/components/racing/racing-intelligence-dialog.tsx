@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
-import { Switch } from "@/components/ui/switch";
 import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
 import { OfferConfidenceBadge } from "@/components/offers/offer-confidence-badge";
 import { VenueBadge } from "@/components/venue-badge";
@@ -30,10 +28,13 @@ import { formatDecimalOdds } from "@/lib/racing/odds";
 import { formatClockTime } from "@/lib/time-format";
 import type { SuggestedRace, SuggestedRunner } from "@/lib/racing-desk/types";
 import { RegionFlag } from "@/components/region-flag";
+import { EmptyState } from "@/components/help/empty-state";
 import { FilterPill } from "@/components/ui/filter-pill";
 import {
   captionHeading,
-  edgeNavTag,
+  demoDataTag,
+  dialogTicketSurface,
+  dialogTitleIcon,
   filterPillCountState,
   filterPillGroup,
   listRowInteractive,
@@ -90,6 +91,15 @@ function EvFigure({ value, strong }: { value: number; strong?: boolean }) {
   );
 }
 
+function MetaFigure({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="uppercase tracking-wide text-muted-foreground">{label}</span>
+      <MoneyFlow value={value} signColor signDisplay estimate />
+    </span>
+  );
+}
+
 function WarningLines({ warnings }: { warnings: string[] }) {
   if (warnings.length === 0) return null;
   return (
@@ -107,7 +117,6 @@ function WarningLines({ warnings }: { warnings: string[] }) {
 function SuggestionRow({
   suggestion,
   rank,
-  advanced,
   expanded,
   dataSource,
   onToggle,
@@ -116,7 +125,6 @@ function SuggestionRow({
 }: {
   suggestion: SuggestedRace;
   rank: number;
-  advanced: boolean;
   expanded: boolean;
   dataSource?: RacingIntelligenceDialogProps["dataSource"];
   onToggle: () => void;
@@ -128,20 +136,26 @@ function SuggestionRow({
   const runnerName = edge?.runner.name ?? top?.name;
   const runnerPrice = edge?.runner.backDecimal ?? top?.bookieDecimal;
   const reasons = edge?.reasons ?? [];
+  const leadHorseId = edge?.runner.horseId ?? top?.horseId;
+  const altTargets = (suggestion.suggestedRunners ?? []).filter(
+    (runner) => runner.horseId !== leadHorseId
+  );
+  const targetsId = `${suggestion.externalId}-${suggestion.offerId}-targets`;
 
   return (
     <li>
-      <div className="rounded-lg border border-border/60 bg-card">
+      <div className={dialogTicketSurface}>
         <button
           type="button"
           onClick={() => onSelectRace(suggestion.externalId)}
           className={cn(
-            "group w-full rounded-lg px-4 py-3 text-left",
-            listRowInteractive
+            "group w-full px-4 py-3 text-left",
+            listRowInteractive,
+            "rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           )}
         >
           <div className="flex items-start gap-3">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-bold tabular-nums text-muted-foreground">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-page text-xs font-bold tabular-nums text-muted-foreground">
               {rank}
             </span>
 
@@ -199,19 +213,25 @@ function SuggestionRow({
 
               {edge && <WarningLines warnings={edge.warnings} />}
 
-              {advanced && (
-                <div className="mt-2 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
-                  <p className="truncate">{suggestion.raceName}</p>
-                  {edge ? (
-                    <p className="tabular-nums">
-                      Lay {formatDecimalOdds(edge.runner.layDecimal)} · {edge.fieldSize} runners ·
-                      qual £{edge.qualLoss.toFixed(2)} · FB EV £{edge.freeBetEv.toFixed(2)}
-                    </p>
-                  ) : (
-                    <p>{suggestion.summary}</p>
-                  )}
+              {edge ? (
+                <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-border/50 pt-2 text-xs">
+                  <span className="tabular-nums text-muted-foreground">
+                    Lay{" "}
+                    <span className="text-foreground">
+                      {formatDecimalOdds(edge.runner.layDecimal)}
+                    </span>
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {edge.fieldSize} runners
+                  </span>
+                  <MetaFigure label="Qual" value={edge.qualLoss} />
+                  <MetaFigure label="FB EV" value={edge.freeBetEv} />
                 </div>
-              )}
+              ) : suggestion.raceName ? (
+                <p className="mt-1.5 min-w-0 text-pretty break-words text-xs text-muted-foreground">
+                  {suggestion.raceName}
+                </p>
+              ) : null}
             </div>
 
             <ChevronRight
@@ -243,63 +263,77 @@ function SuggestionRow({
           >
             Open race
           </Button>
-          {advanced && (suggestion.suggestedRunners?.length ?? 0) > 0 && (
-            <button
+          {altTargets.length > 0 && (
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={onToggle}
-              className="ml-auto flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+              aria-expanded={expanded}
+              aria-controls={targetsId}
+              className="ml-auto h-8 gap-1 text-xs text-muted-foreground"
             >
               <ChevronDown
-                className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
+                className={cn(
+                  "size-3.5 motion-safe:transition-transform",
+                  expanded && "rotate-180"
+                )}
+                aria-hidden
               />
-              {expanded ? "Hide" : "Show"} targets ({suggestion.suggestedRunners!.length})
-            </button>
+              {expanded ? "Hide" : "Show"} targets ({altTargets.length})
+            </Button>
           )}
         </div>
 
-        {advanced &&
-          expanded &&
-          suggestion.suggestedRunners?.map((runner) => (
-            <div
-              key={runner.horseId}
-              className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 bg-selection-subtle/40 px-4 py-2.5"
-            >
-              <div className="min-w-0 text-xs">
-                <span className="font-semibold">{runner.name}</span>
-                <span className="ml-2 text-muted-foreground">#{runner.marketRank}</span>
-                <span className="ml-2 inline-flex align-middle">
-                  <OfferConfidenceBadge
-                    confidence={runner.confidence}
-                    oddsSource={runner.oddsSource}
-                    exchangeSource={runner.exchangeSource}
-                    dataSource={dataSource}
-                  />
-                </span>
-                <p className="mt-0.5 text-xs text-muted-foreground">{runner.summary}</p>
-                {runner.qualLoss != null && (
-                  <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                    Qual £{runner.qualLoss.toFixed(2)}
-                    {runner.freeBetEv != null && ` · FB EV £${runner.freeBetEv.toFixed(2)}`}
+        {expanded && altTargets.length > 0 ? (
+          <div id={targetsId}>
+            {altTargets.map((runner) => (
+              <div
+                key={runner.horseId}
+                className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 bg-selection-subtle/40 px-4 py-2.5"
+              >
+                <div className="min-w-0 text-xs">
+                  <span className="font-semibold">{runner.name}</span>
+                  <span className="ml-2 text-muted-foreground">#{runner.marketRank}</span>
+                  <span className="ml-2 inline-flex align-middle">
+                    <OfferConfidenceBadge
+                      confidence={runner.confidence}
+                      oddsSource={runner.oddsSource}
+                      exchangeSource={runner.exchangeSource}
+                      dataSource={dataSource}
+                    />
+                  </span>
+                  <p className="mt-0.5 min-w-0 text-pretty break-words text-xs text-muted-foreground">
+                    {runner.summary}
                   </p>
-                )}
+                  {runner.qualLoss != null && (
+                    <p className="mt-1 inline-flex flex-wrap items-baseline gap-x-3 text-xs">
+                      <MetaFigure label="Qual" value={runner.qualLoss} />
+                      {runner.freeBetEv != null && (
+                        <MetaFigure label="FB EV" value={runner.freeBetEv} />
+                      )}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <EvLine runner={runner} />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 px-2"
+                    onClick={() =>
+                      onBackRunner(suggestion.externalId, runner.name, suggestion.offerId)
+                    }
+                  >
+                    <Gift className="size-3 text-emerald-600" />
+                    Back
+                  </Button>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <EvLine runner={runner} />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 gap-1 px-2"
-                  onClick={() =>
-                    onBackRunner(suggestion.externalId, runner.name, suggestion.offerId)
-                  }
-                >
-                  <Gift className="size-3 text-emerald-600" />
-                  Back
-                </Button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        ) : null}
       </div>
     </li>
   );
@@ -361,7 +395,6 @@ export function RacingIntelligenceDialog({
   dateLabel,
   dataSource,
 }: RacingIntelligenceDialogProps) {
-  const [advanced, setAdvanced] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
@@ -476,101 +509,94 @@ export function RacingIntelligenceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,840px)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-4xl">
-        <DialogHeader className="shrink-0 gap-0 rounded-t-xl border-b bg-selection-subtle p-0">
-          <div className="px-5 py-4 pr-14">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <DialogTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
-                  <Zap className="size-4 text-edge" aria-hidden />
-                  Race picks
-                  <span className={edgeNavTag}>Edge</span>
-                </DialogTitle>
-                <DialogDescription className="mt-1 text-xs">
-                  Edge race and horse for this offer on {dateLabel}
-                  {dataSource === "demo" && (
-                    <span className="ml-1 text-edge"> (demo data)</span>
-                  )}
-                </DialogDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="intel-advanced" className={captionHeading}>
-                  Details
-                </Label>
-                <Switch
-                  id="intel-advanced"
-                  size="sm"
-                  checked={advanced}
-                  onCheckedChange={setAdvanced}
-                />
-              </div>
-            </div>
+      <DialogContent
+        data-dialog-tone="page"
+        className="flex max-h-[min(90vh,840px)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-4xl dark:bg-page"
+      >
+        <DialogHeader className="mx-0 mt-0 shrink-0">
+          <DialogTitle className="flex items-center gap-2.5">
+            <Zap className={cn(dialogTitleIcon, "text-edge")} aria-hidden />
+            Race picks
+            {dataSource === "demo" ? (
+              <span className={demoDataTag}>Demo data</span>
+            ) : null}
+          </DialogTitle>
+          <DialogDescription>
+            Ranked picks for {dateLabel}.
+          </DialogDescription>
+        </DialogHeader>
 
-            {offerOptions.length > 1 && (
-              <div className="mt-3">
-                {useDropdown ? (
-                  <Select
-                    value={activeOfferId != null ? String(activeOfferId) : undefined}
-                    onValueChange={(value) => selectOffer(Number(value))}
-                  >
-                    <SelectTrigger className="h-9 w-full bg-card text-left text-xs">
-                      <SelectValue placeholder="Choose a bookie" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {offerOptions.map((offer) => {
-                        const label = offerSwitcherLabel(offer, offerOptions);
-                        return (
-                          <SelectItem
-                            key={offer.id}
-                            value={String(offer.id)}
-                            title={offerSwitcherAriaLabel(offer)}
-                            className="max-w-[min(100vw-2rem,28rem)]"
-                          >
-                            <span className="truncate">
-                              {label}
-                              {` · ${offer.pickCount}`}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className={filterPillGroup}>
+        {(offerOptions.length > 1 || activeOffer || scoped.length > 0) && (
+          <div className="shrink-0 border-b border-border/50">
+          {offerOptions.length > 1 && (
+            <div className="px-6 py-3">
+              {useDropdown ? (
+                <Select
+                  value={activeOfferId != null ? String(activeOfferId) : undefined}
+                  onValueChange={(value) => selectOffer(Number(value))}
+                >
+                  <SelectTrigger className="h-9 w-full bg-card text-left text-xs">
+                    <SelectValue placeholder="Choose a bookie" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {offerOptions.map((offer) => {
-                      const active = activeOfferId === offer.id;
                       const label = offerSwitcherLabel(offer, offerOptions);
-                      const aria = offerSwitcherAriaLabel(offer);
-                      const truncate = offerSwitcherNeedsTruncate(
-                        offer,
-                        offerOptions
-                      );
                       return (
-                        <FilterPill
+                        <SelectItem
                           key={offer.id}
-                          tone="edge"
-                          active={active}
-                          onClick={() => selectOffer(offer.id)}
-                          hasCount
-                          className={cn("text-xs", truncate && "max-w-[14rem]")}
-                          title={aria}
-                          aria-label={`${aria}, ${offer.pickCount} picks`}
+                          value={String(offer.id)}
+                          title={offerSwitcherAriaLabel(offer)}
+                          className="max-w-[min(100vw-2rem,28rem)]"
                         >
-                          <span className="truncate">{label}</span>
-                          <span className={filterPillCountState(active)}>
-                            {offer.pickCount}
+                          <span className="truncate">
+                            {label}
+                            {` · ${offer.pickCount}`}
                           </span>
-                        </FilterPill>
+                        </SelectItem>
                       );
                     })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className={filterPillGroup}>
+                  {offerOptions.map((offer) => {
+                    const active = activeOfferId === offer.id;
+                    const label = offerSwitcherLabel(offer, offerOptions);
+                    const aria = offerSwitcherAriaLabel(offer);
+                    const truncate = offerSwitcherNeedsTruncate(
+                      offer,
+                      offerOptions
+                    );
+                    return (
+                      <FilterPill
+                        key={offer.id}
+                        tone="edge"
+                        active={active}
+                        onClick={() => selectOffer(offer.id)}
+                        hasCount
+                        className={cn("text-xs", truncate && "max-w-[14rem]")}
+                        title={aria}
+                        aria-label={`${aria}, ${offer.pickCount} picks`}
+                      >
+                        <span className="truncate">{label}</span>
+                        <span className={filterPillCountState(active)}>
+                          {offer.pickCount}
+                        </span>
+                      </FilterPill>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {activeOffer && (
-            <div className="flex w-full flex-wrap items-start justify-between gap-3 border-t border-border/50 bg-card px-5 py-3">
+            <div
+              className={cn(
+                "flex flex-wrap items-start justify-between gap-3 px-6 py-3",
+                offerOptions.length > 1 && "border-t border-border/50"
+              )}
+            >
               <div className="min-w-0 flex-1">
                 {activeOffer.bookmaker ? (
                   <VenueBadge name={activeOffer.bookmaker} kind="bookie" size="md" />
@@ -595,7 +621,7 @@ export function RacingIntelligenceDialog({
           )}
 
           {scoped.length > 0 && (
-            <div className={cn(filterPillGroup, "px-5 py-3")}>
+            <div className={cn(filterPillGroup, "px-6 py-3")}>
               {CONFIDENCE_FILTERS.map((f) => {
                 const count = tierCounts[f.id];
                 if (f.id !== "all" && count === 0) return null;
@@ -615,29 +641,29 @@ export function RacingIntelligenceDialog({
               })}
             </div>
           )}
-        </DialogHeader>
+          </div>
+        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
           {sorted.length === 0 ? (
-            <div className="px-2 py-12 text-center text-sm text-muted-foreground">
-              <Zap className="mx-auto mb-2 size-8 text-edge/40" />
-              <p className="font-medium text-foreground">
-                {suggestions.length === 0 ? "No picks yet" : "No picks in this tier"}
-              </p>
-              <p className="mt-1 text-xs">
-                {suggestions.length === 0
-                  ? "Add an active place-refund offer to unlock ranked picks."
-                  : "Try another confidence filter. Estimated prices are still ranked by EV."}
-              </p>
-            </div>
+            <EmptyState
+              compact
+              oneLine
+              icon={Zap}
+              title={suggestions.length === 0 ? "No picks yet" : "No picks in this tier"}
+              description={
+                suggestions.length === 0
+                  ? "Add a place-refund offer to unlock ranked picks."
+                  : "Try another confidence filter."
+              }
+            />
           ) : (
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {sorted.map((s, idx) => (
                 <SuggestionRow
                   key={`${s.externalId}-${s.offerId}`}
                   suggestion={s}
                   rank={idx + 1}
-                  advanced={advanced}
                   expanded={expandedId === `${s.externalId}-${s.offerId}`}
                   dataSource={dataSource}
                   onToggle={() =>
@@ -663,11 +689,13 @@ export function RacingIntelligenceTrigger({
   count,
   topEv,
   onClick,
+  demo = false,
 }: {
   count: number;
   /** Best expected value across the picks, in pounds. */
   topEv?: number;
   onClick: () => void;
+  demo?: boolean;
 }) {
   const showEv = count > 0 && topEv != null && topEv > 0;
   return (
@@ -681,6 +709,7 @@ export function RacingIntelligenceTrigger({
     >
       <Zap className="size-4 text-edge" aria-hidden />
       Race picks
+      {demo ? <span className={demoDataTag}>Demo data</span> : null}
       {showEv && (
         <span
           className={cn(
@@ -705,6 +734,8 @@ export function DeskFilterPills({
   racePicksCount = 0,
   /** Inside a parent card — no own plate; use a light bottom rule. */
   embedded = false,
+  /** Edge-only. Core / Free hide the Race picks pill. */
+  showRacePicks = true,
 }: {
   filter: DeskRaceFilter;
   onFilterChange: (v: DeskRaceFilter) => void;
@@ -714,6 +745,7 @@ export function DeskFilterPills({
   /** Races with at least one Offer Edge play (All-races universe). */
   racePicksCount?: number;
   embedded?: boolean;
+  showRacePicks?: boolean;
 }) {
   return (
     <div
@@ -740,21 +772,23 @@ export function DeskFilterPills({
             {qualifyingCount}
           </span>
         </FilterPill>
-        <FilterPill
-          tone="edge"
-          active={filter === "recommended"}
-          onClick={() => onFilterChange("recommended")}
-          hasCount
-        >
-          <Zap
-            className={cn("size-3", filter !== "recommended" && "text-edge")}
-            aria-hidden
-          />
-          Race picks
-          <span className={filterPillCountState(filter === "recommended")}>
-            {racePicksCount}
-          </span>
-        </FilterPill>
+        {showRacePicks ? (
+          <FilterPill
+            tone="edge"
+            active={filter === "recommended"}
+            onClick={() => onFilterChange("recommended")}
+            hasCount
+          >
+            <Zap
+              className={cn("size-3", filter !== "recommended" && "text-edge")}
+              aria-hidden
+            />
+            Race picks
+            <span className={filterPillCountState(filter === "recommended")}>
+              {racePicksCount}
+            </span>
+          </FilterPill>
+        ) : null}
       </div>
       <Button
         type="button"

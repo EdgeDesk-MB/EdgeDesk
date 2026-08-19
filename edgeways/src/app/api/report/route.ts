@@ -9,10 +9,11 @@ import {
   monthsWithSettledCampaigns,
 } from "@/lib/report/edge-report";
 import { buildSeasonReport, seasonYears } from "@/lib/report/season-report";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   let snapshots = getAllSnapshots() as EvSnapshotRow[];
 
   // J8: ?owner= scopes both inputs through the bookmaker→account mapping.
@@ -64,4 +65,4 @@ export async function GET(req: NextRequest) {
     minCampaigns: getAppSettings().tuning.edgeReportMinCampaigns,
   });
   return NextResponse.json({ months, report });
-}
+});

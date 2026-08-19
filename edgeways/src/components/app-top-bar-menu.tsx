@@ -15,11 +15,14 @@ import {
   EdgeRaceNavMark,
   NAV_SECTIONS,
   NavSectionLabel,
+  PlanNavMark,
   flattenNavEntries,
   isLinkActive,
+  toastPlanLock,
 } from "@/components/app-nav";
+import { canWithPreview } from "@/lib/entitlements/plans";
 import { ThemeSelect } from "@/components/theme-select";
-import { MobileDrawerLogoutButton } from "@/components/top-bar-login-button";
+import { MobileDrawerSessionButton } from "@/components/top-bar-login-button";
 import { useAppState } from "@/hooks/use-app-state";
 import {
   useOfferEdgeRaceCount,
@@ -132,11 +135,22 @@ function MobileNavDrawer() {
                 )}
                 {flattenNavEntries(section.entries).map((item) => {
                   const active = isLinkActive(pathname, item.href);
+                  const locked = Boolean(
+                    item.feature && !canWithPreview(state?.settings, item.feature)
+                  );
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={close}
+                      aria-disabled={locked || undefined}
+                      onClick={(e) => {
+                        if (locked && item.feature) {
+                          e.preventDefault();
+                          toastPlanLock(item.feature);
+                          return;
+                        }
+                        close();
+                      }}
                       className={cn(
                         "flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors",
                         active
@@ -147,14 +161,23 @@ function MobileNavDrawer() {
                       <item.icon className="size-4.5 shrink-0 text-muted-foreground" />
                       <span className="flex min-w-0 flex-1 items-center gap-1.5">
                         <span className="truncate">{item.label}</span>
-                        {item.href === "/tracker" ? <ActionBadge count={openBetCount} /> : null}
-                        {item.href === "/boosts" ? <ActionBadge count={boostsOpen} /> : null}
+                        {item.feature ? (
+                          <PlanNavMark feature={item.feature} locked={locked} />
+                        ) : null}
+                        {!locked && item.href === "/tracker" ? (
+                          <ActionBadge count={openBetCount} />
+                        ) : null}
+                        {!locked && item.href === "/boosts" ? (
+                          <ActionBadge count={boostsOpen} />
+                        ) : null}
                         {item.href === "/alerts" ? <ActionBadge count={alertsUnread} /> : null}
                         {item.href === "/casino" ? (
                           <ActionBadge count={casinoNeedsAction} />
                         ) : null}
-                        {item.href === "/acca" ? <ActionBadge count={accaLayDue} /> : null}
-                        {item.href === "/bet-builder" ? (
+                        {!locked && item.href === "/acca" ? (
+                          <ActionBadge count={accaLayDue} />
+                        ) : null}
+                        {!locked && item.href === "/bet-builder" ? (
                           <ActionBadge count={betBuilderLayDue} />
                         ) : null}
                         {item.href === "/racing" ? (
@@ -173,7 +196,7 @@ function MobileNavDrawer() {
             <div className="mt-4 border-t border-border/80">
               <AppearanceRow />
               <UtilityLinks onNavigate={close} />
-              <MobileDrawerLogoutButton onLoggedOut={close} />
+              <MobileDrawerSessionButton onNavigate={close} />
             </div>
           </nav>
         </DialogPrimitive.Content>

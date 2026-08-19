@@ -8,6 +8,7 @@ import {
   setRunBoost,
   updateAccaRun,
 } from "@/lib/services/acca-desk";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -104,9 +105,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .get();
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ run });
-}
+});
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   // Void any still-open linked bets - deleting the run must not leave
   // tracker rows that nothing will ever settle (auditor F5).
@@ -126,4 +127,4 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   db.delete(accaLegs).where(eq(accaLegs.runId, Number(id))).run();
   db.delete(accaRuns).where(eq(accaRuns.id, Number(id))).run();
   return NextResponse.json({ ok: true });
-}
+});

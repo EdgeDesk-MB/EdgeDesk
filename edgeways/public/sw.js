@@ -134,18 +134,45 @@ self.addEventListener("push", (event) => {
   );
 });
 
+function markAlertRead(tag) {
+  if (!tag || tag === "edgeways-test-push") return Promise.resolve();
+  return fetch("/api/alerts", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ dedupe: tag, read: true }),
+  }).catch(() => {});
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const href = event.notification.data?.href || "/";
+  const tag = event.notification.tag;
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
-      for (const win of wins) {
-        if ("focus" in win) {
-          win.navigate(href);
-          return win.focus();
+    Promise.all([
+      markAlertRead(tag),
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+        for (const win of wins) {
+          if ("focus" in win) {
+            win.navigate(href);
+            return win.focus();
+          }
         }
-      }
-      return self.clients.openWindow(href);
-    })
+        return self.clients.openWindow(href);
+      }),
+    ])
+  );
+});
+
+// User swipe-away (or click-close). Ignore replacements of the same tag.
+self.addEventListener("notificationclose", (event) => {
+  const tag = event.notification.tag;
+  if (!tag || tag === "edgeways-test-push") return;
+  event.waitUntil(
+    (async () => {
+      const stillOpen = await self.registration.getNotifications({ tag });
+      if (stillOpen.length > 0) return;
+      await markAlertRead(tag);
+    })()
   );
 });

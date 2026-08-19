@@ -16,7 +16,16 @@ import { useAppState } from "@/hooks/use-app-state";
 import { bookiePanelTint } from "@/lib/brands/bookies";
 import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
 import type { ExchangeRow } from "@/lib/db/schema";
-import { exchangeOddsStepHandlers } from "@/lib/calc/exchange-odds-step";
+import {
+  applyExchangeOddsInputChange,
+  exchangeOddsStepHandlers,
+  getExchangeOddsStep,
+} from "@/lib/calc/exchange-odds-step";
+import {
+  commitLayStake,
+  formatLayStake,
+  layStakeStepHandlers,
+} from "@/lib/calc/exchange-stake-step";
 import { cn } from "@/lib/utils";
 import { Copy, ChevronDown } from "lucide-react";
 
@@ -158,7 +167,7 @@ export function PanelInput({
   min?: number;
   placeholder?: string;
   inputClassName?: string;
-  /** Exchange lay-odds ladder for ArrowUp/ArrowDown only */
+  /** Exchange lay-odds ladder for arrows / spinner. Typed prices stay. */
   exchangeOddsStepping?: boolean;
   disabled?: boolean;
 }) {
@@ -179,12 +188,16 @@ export function PanelInput({
         <input
           type="number"
           inputMode="decimal"
-          step={step}
+          step={exchangeOddsStepping ? getExchangeOddsStep(value) : step}
           min={min}
           placeholder={placeholder}
           disabled={disabled}
           value={Number.isFinite(value) ? value : ""}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
+          onChange={(e) =>
+            exchangeOddsStepping
+              ? applyExchangeOddsInputChange(value, parseFloat(e.target.value), onChange)
+              : onChange(parseFloat(e.target.value))
+          }
           onKeyDown={exchangeStep?.onKeyDown}
           onWheel={exchangeStep?.onWheel}
           className={cn(
@@ -370,31 +383,46 @@ export function PanelIconSelect({
   );
 }
 
-/** Editable lay stake - always shows 2 dp when not being typed in. */
+/** Editable lay stake — exchange penny grid, always 2 dp when idle. */
 function LayStakeInput({
   label,
   value,
   onChange,
+  pending,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
+  /** Plan is not ready: show empty, and do not commit a £0 override on blur. */
+  pending?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const [text, setText] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const stakeStep = layStakeStepHandlers(value, (next) => {
+    setText(formatLayStake(next));
+    setDirty(true);
+    onChange(next);
+  });
 
   // While unfocused the display derives straight from `value`, and onFocus
   // seeds `text` fresh - no sync effect needed.
-  const display = focused ? text : Number.isFinite(value) ? value.toFixed(2) : "";
+  const display = focused
+    ? text
+    : pending || !Number.isFinite(value)
+      ? ""
+      : formatLayStake(value);
 
-  function stepStake(delta: number) {
-    const base = focused
-      ? parseFloat(text.replace(/,/g, ""))
-      : value;
-    const current = Number.isFinite(base) && base >= 0 ? base : 0;
-    const next = Math.max(0, Math.round((current + delta) * 100) / 100);
-    setText(next.toFixed(2));
-    onChange(next);
+  function commitText(raw: string) {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      onChange(Number.NaN);
+      return;
+    }
+    const n = parseFloat(trimmed.replace(/,/g, ""));
+    if (Number.isFinite(n) && n >= 0) {
+      onChange(commitLayStake(n));
+    }
   }
 
   return (
@@ -402,30 +430,28 @@ function LayStakeInput({
       type="text"
       inputMode="decimal"
       aria-label={label}
+      placeholder="0.00"
       value={display}
       onFocus={() => {
         setFocused(true);
-        setText(Number.isFinite(value) ? value.toFixed(2) : "");
+        setDirty(false);
+        setText(pending || !Number.isFinite(value) || value === 0 ? "" : formatLayStake(value));
       }}
       onBlur={() => {
         setFocused(false);
-        const n = parseFloat(text.replace(/,/g, ""));
-        if (Number.isFinite(n) && n >= 0) {
-          onChange(Math.round(n * 100) / 100);
-        }
+        if (dirty) commitText(text);
+        setDirty(false);
       }}
-      onKeyDown={(e) => {
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          stepStake(0.01);
-        } else if (e.key === "ArrowDown") {
-          e.preventDefault();
-          stepStake(-0.01);
-        }
-      }}
+      onKeyDown={stakeStep.onKeyDown}
+      onWheel={stakeStep.onWheel}
       onChange={(e) => {
         const next = e.target.value;
         setText(next);
+        setDirty(true);
+        if (next.trim() === "") {
+          onChange(Number.NaN);
+          return;
+        }
         const n = parseFloat(next.replace(/,/g, ""));
         if (Number.isFinite(n) && n >= 0) onChange(n);
       }}
@@ -441,6 +467,7 @@ export function LayStakeBanner({
   liability,
   onChange,
   fillSelection,
+  pending,
 }: {
   label?: string;
   value: number;
@@ -450,6 +477,8 @@ export function LayStakeBanner({
   onChange?: (v: number) => void;
   /** J9: when set, a Fill slip action emits the extension intent */
   fillSelection?: string;
+  /** Hide a £0 auto value until back stake and both odds are in */
+  pending?: boolean;
 }) {
   const fillSlip = fillSelection?.trim()
     ? () =>
@@ -471,7 +500,12 @@ export function LayStakeBanner({
             <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base font-semibold text-white/45">
               £
             </span>
-            <LayStakeInput label={label} value={value} onChange={onChange} />
+            <LayStakeInput
+              label={label}
+              value={value}
+              onChange={onChange}
+              pending={pending}
+            />
           </span>
         </label>
         {fillSlip ? (

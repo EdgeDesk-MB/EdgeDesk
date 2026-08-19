@@ -19,8 +19,6 @@ import type { BetRow } from "@/lib/db/schema";
 import { computeMonthlyBreakdown } from "@/lib/pnl/monthly-breakdown";
 import { computeMonthPace, currentMonthAchieved, paceLabel } from "@/lib/pnl/pace";
 import { useAppState } from "@/hooks/use-app-state";
-import { sectionBar } from "@/lib/ui/surface-styles";
-import { cn } from "@/lib/utils";
 import { CalendarRange, Tag } from "lucide-react";
 
 function PnlRow({
@@ -128,14 +126,12 @@ export function DashboardPnlSummaries({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-          <div className={cn(sectionBar, "shrink-0 pr-12")}>
-            <DialogHeader className="gap-1 text-left">
-              <DialogTitle className="text-base font-bold">Profit &amp; Loss breakdown</DialogTitle>
-              <DialogDescription className="text-xs leading-snug">
-                Offer P&amp;L and monthly P&amp;L, side by side.
+            <DialogHeader className="mx-0 mt-0 shrink-0">
+              <DialogTitle>P&amp;L breakdown</DialogTitle>
+              <DialogDescription>
+                Offer and monthly P&amp;L side by side.
               </DialogDescription>
             </DialogHeader>
-          </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-[var(--layout-card-x)] py-[var(--layout-card-x)]">
             <Tabs

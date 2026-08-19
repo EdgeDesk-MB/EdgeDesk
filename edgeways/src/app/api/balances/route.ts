@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { recordManualTransaction, getBalanceSummary } from "@/lib/services/balances";
 import { db, accounts } from "@/lib/db";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,11 @@ const txSchema = z.object({
     .min(1),
 });
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json(getBalanceSummary());
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = txSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -46,4 +47,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(getBalanceSummary());
-}
+});

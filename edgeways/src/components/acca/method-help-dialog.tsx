@@ -63,8 +63,7 @@ export function AccaMethodHelpDialog({
         <DialogHeader>
           <DialogTitle>Acca methods</DialogTitle>
           <DialogDescription>
-            Pick the method that matches your offer. Enter live exchange lay odds and stake on the next
-            ready leg.
+            Pick the method that matches your offer.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">

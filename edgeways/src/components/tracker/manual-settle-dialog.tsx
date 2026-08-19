@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogExplainer,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -129,9 +130,14 @@ export function ManualSettleDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Set result</DialogTitle>
-          <DialogDescription>
-            Pick won or lost to fill expected P&amp;L, then settle. Half, push and void calculate for
-            you.
+          <DialogDescription
+            explainer={
+              <DialogExplainer title="Set result">
+                Half, push and void calculate for you.
+              </DialogExplainer>
+            }
+          >
+            Pick won or lost, then settle.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap gap-2">

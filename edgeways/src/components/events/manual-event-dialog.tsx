@@ -85,10 +85,9 @@ export function ManualEventDialog({
       )}
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add event manually</DialogTitle>
+          <DialogTitle>Add event</DialogTitle>
           <DialogDescription>
-            For racing, TV markets or anything the live feeds don&apos;t cover. You&apos;ll enter
-            the result yourself on Tracked Events.
+            For racing, TV markets, or anything the feeds miss.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">

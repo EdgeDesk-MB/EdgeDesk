@@ -20,9 +20,11 @@ import { DataCustodyCard } from "@/components/settings/data-custody-card";
 import { EmailIntakeCard } from "@/components/settings/email-intake-card";
 import { DemoModeCard } from "@/components/settings/demo-mode-card";
 import { PushDeviceControl } from "@/components/settings/push-device-control";
+import { SubscriptionCard } from "@/components/settings/subscription-card";
 import { Switch } from "@/components/ui/switch";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
+import { LEGAL_PATHS } from "@/lib/legal/public";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
   DEFAULT_TUNING,
@@ -55,31 +57,49 @@ import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 import { SPORTS } from "@/lib/sports";
 import { SportLabel } from "@/components/sport-icon";
+import { sectionDescription } from "@/lib/ui/surface-styles";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
 
-type SettingsTab =
-  | "appearance"
-  | "bet-defaults"
-  | "automation"
-  | "alerts"
-  | "targets"
-  | "home-layout"
-  | "time"
-  | "integrations"
-  | "data";
+const SETTINGS_TABS = [
+  "subscription",
+  "appearance",
+  "bet-defaults",
+  "automation",
+  "alerts",
+  "targets",
+  "home-layout",
+  "time",
+  "integrations",
+  "data",
+] as const;
+
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+function isSettingsTab(value: string): value is SettingsTab {
+  return (SETTINGS_TABS as readonly string[]).includes(value);
+}
 
 export default function SettingsPage() {
   const { resetAndOpenWelcome, openSetup } = useOnboarding();
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
+  const { active: publicDemo } = usePublicDemo();
   const settings = state?.settings;
-  const [tab, setTab] = useState<SettingsTab>("appearance");
+  const [tab, setTab] = useState<SettingsTab>("subscription");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("tab") === "alerts") {
-      setTab("alerts");
-    }
+    const next = new URLSearchParams(window.location.search).get("tab");
+    if (next && isSettingsTab(next)) setTab(next);
   }, []);
+
+  function selectTab(next: string) {
+    if (!isSettingsTab(next)) return;
+    setTab(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   async function setDefaultExchange(id: number) {
     const name = exchanges.find((e) => e.id === id)?.name ?? "Exchange";
@@ -147,15 +167,45 @@ export default function SettingsPage() {
           <p className="w-full text-xs text-muted-foreground pt-1">
             Edgeways {APP_VERSION_LABEL} ({APP_VERSION})
           </p>
+          <p className="w-full text-xs text-muted-foreground">
+            <a
+              href={LEGAL_PATHS.terms}
+              className="text-primary-text underline underline-offset-2"
+            >
+              Terms
+            </a>
+            {" · "}
+            <a
+              href={LEGAL_PATHS.privacy}
+              className="text-primary-text underline underline-offset-2"
+            >
+              Privacy
+            </a>
+            {" · "}
+            <a
+              href={LEGAL_PATHS.contact}
+              className="text-primary-text underline underline-offset-2"
+            >
+              Contact
+            </a>
+            {" · "}
+            <a
+              href={LEGAL_PATHS.refund}
+              className="text-primary-text underline underline-offset-2"
+            >
+              Refunds
+            </a>
+          </p>
           <ResponsibleGamblingNote className="w-full" />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="pb-0">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)} className="gap-0">
+          <Tabs value={tab} onValueChange={selectTab} className="gap-0">
             <TabsLineBar bleed="card">
               <TabsList variant="line" className="justify-start">
+                <TabsTrigger value="subscription">Subscription</TabsTrigger>
                 <TabsTrigger value="appearance">Appearance</TabsTrigger>
                 <TabsTrigger value="bet-defaults">Bet defaults</TabsTrigger>
                 <TabsTrigger value="automation">Automation</TabsTrigger>
@@ -170,52 +220,66 @@ export default function SettingsPage() {
           </Tabs>
         </CardHeader>
         <CardContent className="pt-4">
+          {tab === "subscription" && <SubscriptionCard />}
+
           {tab === "appearance" && (
             <AppearanceCard
               planPreview={settings?.planPreview ?? "unlocked"}
               onPatch={patchSettings}
-              onPersistFont={async (fontId) => {
-                try {
-                  await api("/api/settings", {
-                    method: "PATCH",
-                    json: { uiFont: fontId },
-                  });
-                  await refresh();
-                } catch (e) {
-                  toast.error("Could not save font", {
-                    description: String(e),
-                  });
-                }
-              }}
-              onPersistPattern={async (patternId) => {
-                try {
-                  await api("/api/settings", {
-                    method: "PATCH",
-                    json: { headerPattern: patternId },
-                  });
-                  await refresh();
-                } catch (e) {
-                  toast.error("Could not save header pattern", {
-                    description: String(e),
-                  });
-                }
-              }}
-              onPersistAccent={async (presetId, hex) => {
-                try {
-                  await api("/api/settings", {
-                    method: "PATCH",
-                    json: {
-                      brandAccentPreset: presetId,
-                      brandAccentHex: hex,
-                    },
-                  });
-                  await refresh();
-                } catch (e) {
-                  toast.error("Could not save brand colour", {
-                    description: String(e),
-                  });
-                }
-              }}
+              onPersistFont={
+                publicDemo
+                  ? undefined
+                  : async (fontId) => {
+                      try {
+                        await api("/api/settings", {
+                          method: "PATCH",
+                          json: { uiFont: fontId },
+                        });
+                        await refresh();
+                      } catch (e) {
+                        toast.error("Could not save font", {
+                          description: String(e),
+                        });
+                      }
+                    }
+              }
+              onPersistPattern={
+                publicDemo
+                  ? undefined
+                  : async (patternId) => {
+                      try {
+                        await api("/api/settings", {
+                          method: "PATCH",
+                          json: { headerPattern: patternId },
+                        });
+                        await refresh();
+                      } catch (e) {
+                        toast.error("Could not save header pattern", {
+                          description: String(e),
+                        });
+                      }
+                    }
+              }
+              onPersistAccent={
+                publicDemo
+                  ? undefined
+                  : async (presetId, hex) => {
+                      try {
+                        await api("/api/settings", {
+                          method: "PATCH",
+                          json: {
+                            brandAccentPreset: presetId,
+                            brandAccentHex: hex,
+                          },
+                        });
+                        await refresh();
+                      } catch (e) {
+                        toast.error("Could not save brand colour", {
+                          description: String(e),
+                        });
+                      }
+                    }
+              }
             />
           )}
 
@@ -280,9 +344,9 @@ function AppearanceCard({
 }: {
   planPreview: AppSettings["planPreview"];
   onPatch: (patch: Partial<AppSettings>) => void;
-  onPersistFont: (fontId: UiFontId) => void;
-  onPersistPattern: (patternId: HeaderPatternId) => void;
-  onPersistAccent: (presetId: BrandAccentPresetId, hex: string) => void;
+  onPersistFont?: (fontId: UiFontId) => void;
+  onPersistPattern?: (patternId: HeaderPatternId) => void;
+  onPersistAccent?: (presetId: BrandAccentPresetId, hex: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -291,7 +355,7 @@ function AppearanceCard({
           <Palette className="size-4 text-muted-foreground" aria-hidden />
           <Label className="text-sm font-semibold">Theme</Label>
         </div>
-        <p className="text-xs text-muted-foreground">Light or dark.</p>
+        <p className={sectionDescription}>Light or dark.</p>
         <ThemeSelect className="max-w-xs" />
       </div>
 

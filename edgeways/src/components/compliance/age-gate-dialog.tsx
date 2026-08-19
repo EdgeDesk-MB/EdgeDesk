@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
 import { api } from "@/hooks/use-app-state";
+import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 
 /**
  * First-run 18+ confirmation (EDGE-13). Non-dismissible: the app only opens
@@ -56,19 +57,13 @@ export function AgeGateDialog({
       >
         {declined ? (
           <>
-            <DialogHeader>
-              <DialogTitle>Edgeways is for over-18s only</DialogTitle>
-              <DialogDescription asChild>
-                <div className="flex flex-col gap-2">
-                  <p>
-                    You must be 18 or over to use Edgeways, so we can&apos;t let
-                    you in today. If someone else&apos;s gambling is affecting
-                    you, support is available.
-                  </p>
-                  <ResponsibleGamblingNote />
-                </div>
+            <DialogHeader className="pr-6">
+              <DialogTitle>Over-18s only</DialogTitle>
+              <DialogDescription>
+                You must be 18 or over to use Edgeways.
               </DialogDescription>
             </DialogHeader>
+            <ResponsibleGamblingNote />
             <DialogFooter>
               <Button variant="ghost" onClick={() => setDeclined(false)}>
                 Go back
@@ -77,20 +72,15 @@ export function AgeGateDialog({
           </>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ShieldCheck className="size-4" /> Edgeways is for over-18s only
+            <DialogHeader className="pr-6">
+              <DialogTitle className="flex items-center gap-2.5">
+                <ShieldCheck className={dialogTitleIcon} /> Over-18s only
               </DialogTitle>
-              <DialogDescription asChild>
-                <div className="flex flex-col gap-2">
-                  <p>
-                    Edgeways tracks matched betting, staking against bookmaker
-                    promotions. You must be 18 or over to use it.
-                  </p>
-                  <ResponsibleGamblingNote />
-                </div>
+              <DialogDescription>
+                You must be 18 or over to use Edgeways.
               </DialogDescription>
             </DialogHeader>
+            <ResponsibleGamblingNote />
             <DialogFooter className="flex-col-reverse sm:justify-between">
               <Button
                 variant="ghost"

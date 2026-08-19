@@ -6,6 +6,7 @@ import {
   setSystemLegResult,
   updateSystemRun,
 } from "@/lib/services/systems-desk";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-export async function PATCH(
+export const PATCH = withDeskScope(async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
@@ -80,9 +81,9 @@ export async function PATCH(
     return NextResponse.json({ run });
   }
   return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
-}
+});
 
-export async function DELETE(
+export const DELETE = withDeskScope(async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
@@ -90,4 +91,4 @@ export async function DELETE(
   const ok = deleteSystemRun(Number(id));
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
-}
+});

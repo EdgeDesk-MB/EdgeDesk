@@ -28,7 +28,8 @@ import {
   selectionSubtle,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Download } from "lucide-react";
+import { ChartNoAxesCombined, Download } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 
 export function MonthlyPnlSection({
   compact = false,
@@ -62,13 +63,14 @@ export function MonthlyPnlSection({
   if (monthly.length === 0 && accounts.length === 0 && methods.length === 0) {
     if (compact) return null;
     const emptyBody = (
-      <div className="py-6 text-center text-sm text-muted-foreground">
-        No settled bets yet.{" "}
-        <Link href="/tracker" className="font-medium text-primary-text underline-offset-2 hover:underline">
-          Log your first bet
-        </Link>
-        .
-      </div>
+      <EmptyState
+        compact
+        icon={ChartNoAxesCombined}
+        title="No settled bets yet"
+        description="Settle a bet to see profit by month, account and method."
+        action={{ label: "Log your first bet", href: "/tracker" }}
+        className="shadow-none"
+      />
     );
     if (plain) return emptyBody;
     return (

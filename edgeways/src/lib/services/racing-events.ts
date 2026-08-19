@@ -92,7 +92,7 @@ export async function findOrCreateRacingEvent(opts: {
             sport: "horse_racing",
             competition: card.course,
             homeTeam: opts.raceName?.trim() || card.raceName,
-            awayTeam: card.offTime,
+            awayTeam: formatEventTime(card.startTime),
             startTime: card.startTime,
             source: "api",
             externalId: card.externalId,

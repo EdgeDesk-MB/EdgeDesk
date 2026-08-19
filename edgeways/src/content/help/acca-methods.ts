@@ -87,6 +87,7 @@ export const ACCA_DESK_HELP_BULLETS = [
   "Legs linked to a tracked event auto-result from the football score or race result; anything else uses Won / Lost / Void on the desk.",
   "The acca back and every lay are real Profit Tracker bets. Free-bet converts still size cover like a cash stake at risk.",
   "When the next leg is laid (square), Worst outcome / Locked feeds platform provisional — matching cover ≈ £0 or the final-leg lock. Campaign P&L settles when the run finishes or busts. Mid-run lays stay off History.",
+  "Sequential and insurance leg-by-leg warn if exchange cash cannot cover the next lay, or the larger reservation after earlier legs win. Combined and Systems do not grow a liability ladder.",
 ] as const;
 
 /** Whole-ticket one-lay methods (insurance whole + combined). */

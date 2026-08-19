@@ -11,8 +11,8 @@ export default function LoginPage() {
       routing="path"
       path="/login"
       signUpUrl="/sign-up"
-      fallbackRedirectUrl="/desk"
-      forceRedirectUrl="/desk"
+      fallbackRedirectUrl="/desk?live=1"
+      forceRedirectUrl="/desk?live=1"
       appearance={EDGEWAYS_CLERK_APPEARANCE}
     />
   );

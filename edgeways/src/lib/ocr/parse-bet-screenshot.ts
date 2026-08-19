@@ -11,7 +11,14 @@ import {
 import { parseRacingCourseFromEventName } from "@/lib/events";
 import type { BetOcrFields, ScreenshotSource } from "./types";
 
-const EXCHANGES = ["Betdaq", "Smarkets", "Matchbook", "Betfair Exchange", "Betfair"];
+const EXCHANGES = [
+  "BetConnect",
+  "Betdaq",
+  "Smarkets",
+  "Matchbook",
+  "Betfair Exchange",
+  "Betfair",
+];
 
 const BOOKMAKERS = [
   "Betfair Sportsbook",

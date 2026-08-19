@@ -5,11 +5,12 @@ import { deriveComponentEv } from "@/lib/calc/casino-reward-ev";
 import { syncCasinoSeriesTemplateFromOffer } from "@/lib/offers/casino-offer-recurrence";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { componentFieldsSchema, toComponentRowValues } from "./schema";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
 /** K1: adds one component to an existing campaign, appended after its current components. */
-export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const POST = withDeskScope(async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const offerId = Number(id);
   const offer = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
@@ -43,4 +44,4 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   syncCasinoSeriesTemplateFromOffer(offerId);
 
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
-}
+});

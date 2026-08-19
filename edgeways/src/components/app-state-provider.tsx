@@ -11,7 +11,10 @@ import {
   type ReactNode,
 } from "react";
 import type { AppState } from "@/lib/services/state.types";
+import { ALERT_INBOX_READ_EVENT } from "@/lib/alerts/inbox-read-event";
 import { setDisplayTimeFormat } from "@/lib/time-format";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
+import { buildPublicDemoState } from "@/lib/demo/public-fixture";
 
 const FALLBACK_POLL_MS = 3000;
 
@@ -33,13 +36,31 @@ const STALE_INFLIGHT_MS = 15_000;
 
 /** One poll loop for the whole app - avoids N duplicate /api/state fetches per page. */
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState | null>(null);
+  const publicDemo = usePublicDemo();
+  const [state, setState] = useState<AppState | null>(() =>
+    publicDemo.active ? buildPublicDemoState(publicDemo.view) : null
+  );
   const [error, setError] = useState<string | null>(null);
   const [pauseCount, setPauseCount] = useState(0);
   const inFlight = useRef<Promise<void> | null>(null);
   const inFlightStartedAt = useRef(0);
 
+  useEffect(() => {
+    if (!publicDemo.active) return;
+    const next = buildPublicDemoState(publicDemo.view);
+    setDisplayTimeFormat(next.settings.timeFormat);
+    setState(next);
+    setError(null);
+  }, [publicDemo.active, publicDemo.view]);
+
   const refresh = useCallback(async () => {
+    if (publicDemo.active) {
+      const next = buildPublicDemoState(publicDemo.view);
+      setDisplayTimeFormat(next.settings.timeFormat);
+      setState(next);
+      setError(null);
+      return;
+    }
     // Coalesce duplicate polls, but do not wedge Delete/Expire refresh behind a
     // zombie /api/state that has been hanging for tens of seconds (seen when
     // Racing Desk / Offer Edge saturates the Next process).
@@ -70,7 +91,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     inFlight.current = run;
     inFlightStartedAt.current = Date.now();
     return run;
-  }, []);
+  }, [publicDemo.active, publicDemo.view]);
 
   const pausePolling = useCallback(() => {
     setPauseCount((n) => n + 1);
@@ -86,11 +107,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const pollingPaused = pauseCount > 0;
 
   useEffect(() => {
+    if (publicDemo.active) return;
     if (pollingPaused) return;
     void refresh();
     const timer = setInterval(() => void refresh(), pollMs);
     return () => clearInterval(timer);
-  }, [refresh, pollMs, pollingPaused]);
+  }, [refresh, pollMs, pollingPaused, publicDemo.active]);
+
+  useEffect(() => {
+    if (publicDemo.active) return;
+    const onInboxRead = () => {
+      setState((current) =>
+        current == null
+          ? current
+          : { ...current, alertsUnread: Math.max(0, current.alertsUnread - 1) }
+      );
+      void refresh();
+    };
+    window.addEventListener(ALERT_INBOX_READ_EVENT, onInboxRead);
+    return () => window.removeEventListener(ALERT_INBOX_READ_EVENT, onInboxRead);
+  }, [refresh, publicDemo.active]);
 
   const value = useMemo(
     () => ({ state, error, refresh, pausePolling }),

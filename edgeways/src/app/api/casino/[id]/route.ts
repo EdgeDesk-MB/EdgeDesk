@@ -13,6 +13,7 @@ import {
 import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { cancelPendingRemindersForCasino } from "@/lib/services/user-reminders";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ const patchSchema = z.object({
 
 const deleteScopeSchema = z.enum(["instance", "future"]).default("instance");
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -90,9 +91,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
 
   return NextResponse.json({ offer: getCasinoOfferSummary(offerId) });
-}
+});
 
-export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export const DELETE = withDeskScope(async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const offerId = Number(id);
   const existing = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
@@ -107,4 +108,4 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   cancelPendingRemindersForCasino(offerId);
   deleteCasinoOfferWithScope(existing, scopeParsed.data);
   return NextResponse.json({ ok: true });
-}
+});

@@ -22,7 +22,6 @@ import {
   formatPaceDayCount,
   type PaceIncomePoint,
 } from "@/lib/pnl/pace-stats";
-import { sectionBar } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { CalendarRange } from "lucide-react";
 
@@ -196,15 +195,12 @@ export function DashboardOverviewBar({
       {pace.dayCount > 0 ? (
         <Dialog open={paceOpen} onOpenChange={setPaceOpen}>
           <DialogContent className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
-            <div className={cn(sectionBar, "shrink-0 pr-12")}>
-              <DialogHeader className="gap-1 text-left">
-                <DialogTitle className="text-base font-bold">Pace</DialogTitle>
-                <DialogDescription className="text-xs leading-snug">
-                  Settled profit (bets, boosts, casino and P&L adjustments) averaged over every
-                  calendar day since your first settlement.
+              <DialogHeader className="mx-0 mt-0 shrink-0">
+                <DialogTitle>Pace</DialogTitle>
+                <DialogDescription>
+                  Settled profit averaged since your first settlement.
                 </DialogDescription>
               </DialogHeader>
-            </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-[var(--layout-card-x)] py-[var(--layout-card-x)]">
               <Tabs

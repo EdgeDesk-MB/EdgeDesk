@@ -8,10 +8,11 @@ import {
   saveSubscription,
   sendPush,
 } from "@/lib/services/push";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({
     publicKey: getVapidPublicKey(),
     devices: listSubscriptions().map((s) => ({
@@ -24,7 +25,7 @@ export async function GET() {
       endpointTail: s.endpoint.slice(-16),
     })),
   });
-}
+});
 
 const subscribeSchema = z.object({
   subscription: z.object({
@@ -38,7 +39,7 @@ const dismissSchema = z.object({
   dismiss: z.array(z.string().min(1).max(300)).min(1).max(50),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const body = (await req.json()) as Record<string, unknown>;
 
   // Test-send: prove the pipe end-to-end from Settings.
@@ -74,15 +75,15 @@ export async function POST(req: NextRequest) {
     label: parsed.data.label ?? null,
   });
   return NextResponse.json({ ok: true });
-}
+});
 
 const unsubscribeSchema = z.object({ endpoint: z.string().url() });
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
   const parsed = unsubscribeSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   removeSubscription(parsed.data.endpoint);
   return NextResponse.json({ ok: true });
-}
+});

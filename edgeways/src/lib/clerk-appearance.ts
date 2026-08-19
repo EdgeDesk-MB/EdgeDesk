@@ -16,7 +16,12 @@ export const EDGEWAYS_CLERK_LOCALIZATION = {
   },
 };
 
-/** Edgeways ink + brand yellow — shared by ClerkProvider and auth pages. */
+/**
+ * Edgeways ink + brand yellow — shared by ClerkProvider and auth pages.
+ * Auth is pinned dark (see `(auth)/layout`). Do not follow the desk theme:
+ * Clerk’s shadcn footer reads host `--card` / `--muted`, which in light mode
+ * paints a white strip under a dark card.
+ */
 export const EDGEWAYS_CLERK_APPEARANCE = {
   theme: shadcn,
   variables: {
@@ -24,6 +29,7 @@ export const EDGEWAYS_CLERK_APPEARANCE = {
     colorPrimaryForeground: "#111111",
     colorBackground: "#1a1a1a",
     colorForeground: "#f5f5f0",
+    colorMuted: "#1a1a1a",
     colorMutedForeground: "rgba(245,245,240,0.65)",
     colorInput: "#111111",
     colorInputForeground: "#f5f5f0",
@@ -43,7 +49,11 @@ export const EDGEWAYS_CLERK_APPEARANCE = {
       "border border-white/15 bg-[#111111] text-[#f5f5f0] hover:bg-[#222]",
     formButtonPrimary:
       "bg-[#FFC71E] text-[#111111] hover:bg-[#ffd24d] font-semibold",
+    footer: "border-t border-white/10 bg-[#1a1a1a]",
+    footerActionText: "text-[rgba(245,245,240,0.6)]",
     footerActionLink: "text-[#FFC71E] hover:text-[#ffd24d]",
+    footerPages: "text-[rgba(245,245,240,0.4)]",
+    footerPagesLink: "text-[rgba(245,245,240,0.55)] hover:text-[#f5f5f0]",
     identityPreviewEditButton: "text-[#FFC71E]",
     formFieldInput:
       "border-white/15 bg-[#111111] text-[#f5f5f0] placeholder:text-white/40",

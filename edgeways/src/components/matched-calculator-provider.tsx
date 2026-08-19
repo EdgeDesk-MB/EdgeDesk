@@ -65,12 +65,10 @@ export function MatchedCalculatorProvider({ children }: { children: React.ReactN
           onPointerDownOutside={preventDialogDismissOnPortaledContent}
           onInteractOutside={preventDialogDismissOnPortaledContent}
         >
-          <DialogHeader className="border-b px-6 pb-4 pt-7">
-            <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-              Matched Betting Calculator
-            </DialogTitle>
+          <DialogHeader className="mx-0 mt-0">
+            <DialogTitle>Matched calculator</DialogTitle>
             <DialogDescription>
-              Work out the exact lay stake and locked-in profit for any back/lay pair.
+              Work out the lay stake and locked-in profit.
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto p-6">

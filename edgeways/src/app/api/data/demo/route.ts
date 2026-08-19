@@ -3,12 +3,13 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { demoMarkerPresent, isDemoMode, resolveDbPath, setDemoMarker } from "@/lib/db";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   return NextResponse.json({ active: isDemoMode(), markerPresent: demoMarkerPresent() });
-}
+});
 
 const bodySchema = z.object({
   enabled: z.boolean(),
@@ -16,7 +17,7 @@ const bodySchema = z.object({
   wipe: z.boolean().optional(),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -36,4 +37,4 @@ export async function POST(req: NextRequest) {
     markerPresent: demoMarkerPresent(),
     restartNeeded: isDemoMode() !== demoMarkerPresent(),
   });
-}
+});

@@ -41,10 +41,9 @@ export function SimDialog({
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Start a simulated match</DialogTitle>
+          <DialogTitle>Simulate a match</DialogTitle>
           <DialogDescription>
-            A full 90 minutes plays out in about 3 real minutes - perfect for testing bets and the
-            live dashboard without waiting for a real kick-off.
+            A 90-minute match plays out in about 3 minutes.
           </DialogDescription>
         </DialogHeader>
         <Select value={preset} onValueChange={setPreset}>

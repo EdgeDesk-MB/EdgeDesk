@@ -7,8 +7,8 @@ import {
 } from "./feedback";
 
 describe("feedback service", () => {
-  it("creates and lists a report", () => {
-    const report = createFeedbackReport({
+  it("creates and lists a report", async () => {
+    const report = await createFeedbackReport({
       kind: "idea",
       summary: "Dark mode for Racing Desk",
       details: "Keep the card plates, just invert the chrome.",
@@ -27,12 +27,12 @@ describe("feedback service", () => {
     expect(report.replyEmail).toBe("sam@example.com");
     expect(report.diagnostics.appVersion).toBe("1.1.0-dev");
 
-    const listed = listFeedbackReports(5);
+    const listed = await listFeedbackReports(5);
     expect(listed.some((r) => r.id === report.id)).toBe(true);
   });
 
-  it("rejects empty summary", () => {
-    expect(() =>
+  it("rejects empty summary", async () => {
+    await expect(
       createFeedbackReport({
         kind: "bug",
         summary: "   ",
@@ -44,11 +44,11 @@ describe("feedback service", () => {
           timezone: "UTC",
         },
       })
-    ).toThrow(/summary/i);
+    ).rejects.toThrow(/summary/i);
   });
 
-  it("tracks Linear triage via linear_issue_id", () => {
-    const report = createFeedbackReport({
+  it("tracks Linear triage via linear_issue_id", async () => {
+    const report = await createFeedbackReport({
       kind: "bug",
       summary: "Acca leg stake not saving",
       details: "Enter a stake, navigate away, it resets.",
@@ -61,20 +61,20 @@ describe("feedback service", () => {
     });
 
     expect(report.linearIssueId).toBeNull();
-    expect(listUntriagedFeedbackReports().some((r) => r.id === report.id)).toBe(
+    expect((await listUntriagedFeedbackReports()).some((r) => r.id === report.id)).toBe(
       true
     );
 
-    markFeedbackReportFiled(report.id, "EDGE-44");
+    await markFeedbackReportFiled(report.id, "EDGE-44");
 
-    const filed = listFeedbackReports(100).find((r) => r.id === report.id);
+    const filed = (await listFeedbackReports(100)).find((r) => r.id === report.id);
     expect(filed?.linearIssueId).toBe("EDGE-44");
-    expect(listUntriagedFeedbackReports().some((r) => r.id === report.id)).toBe(
+    expect((await listUntriagedFeedbackReports()).some((r) => r.id === report.id)).toBe(
       false
     );
   });
 
-  it("rejects filing without an issue id", () => {
-    expect(() => markFeedbackReportFiled(1, "   ")).toThrow(/issue id/i);
+  it("rejects filing without an issue id", async () => {
+    await expect(markFeedbackReportFiled(1, "   ")).rejects.toThrow(/issue id/i);
   });
 });

@@ -7,6 +7,7 @@ import {
 } from "@/lib/offers/casino-offer-recurrence";
 import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { getCasinoOfferSummaries, getCasinoOfferSummary } from "@/lib/services/casino-offers";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +37,11 @@ const createSchema = z.object({
   recurrence: recurrenceSchema.optional(),
 });
 
-export async function GET() {
+export const GET = withDeskScope(async function GET() {
   syncCasinoOfferSeriesInstances();
   const offers = getCasinoOfferSummaries();
   return NextResponse.json({ offers });
-}
+});
 
 /**
  * K1: creates the CAMPAIGN only - no reward fields. A campaign starts with
@@ -50,7 +51,7 @@ export async function GET() {
  * K3: when `recurrence` is set, creates a series + first instance instead.
  * Horizon materialisation waits until the first component seals the template.
  */
-export async function POST(req: NextRequest) {
+export const POST = withDeskScope(async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -95,4 +96,4 @@ export async function POST(req: NextRequest) {
     .returning()
     .get();
   return NextResponse.json({ offer: getCasinoOfferSummary(row.id) });
-}
+});

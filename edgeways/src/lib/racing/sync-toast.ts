@@ -4,6 +4,8 @@ export interface RacingSyncToastInput {
   updated: number;
   pending: number;
   tierBlocked?: boolean;
+  /** True when `/v1/results` for a previous day needs Standard. */
+  historicBlocked?: boolean;
   tier?: RacingResultsTier;
 }
 
@@ -28,6 +30,14 @@ export function racingSyncToast(result: RacingSyncToastInput): RacingSyncToast {
       title: "API results unavailable on Free",
       description:
         "Stay on Free - use Set result (1st–4th) on Tracked Events or Profit Tracker for place-refund free bets. Basic (~£28/mo) only if you want auto results.",
+    };
+  }
+  if (result.historicBlocked && result.pending > 0) {
+    return {
+      kind: "info",
+      title: "Yesterday's races need Set result",
+      description:
+        "Basic plan only covers today's card. Use Set result (1st–4th) for older races, or Racing API Standard for historic results.",
     };
   }
   if (result.pending > 0) {

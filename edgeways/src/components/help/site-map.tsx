@@ -19,7 +19,10 @@ const OFF_NAV_PAGES: Array<{ href: string; label: string; note: string }> = [
   { href: "/help", label: "Help", note: "burger menu" },
   { href: "/roadmap", label: "Roadmap", note: "linked from Help and Settings" },
   { href: "/feedback", label: "Feedback", note: "meta submenu (bugs, ideas, notes)" },
-  { href: "/contact", label: "Contact", note: "legacy redirect → Feedback" },
+  { href: "/contact", label: "Contact", note: "public email page" },
+  { href: "/refund", label: "Refunds", note: "public billing page" },
+  { href: "/terms", label: "Terms of Service", note: "public legal page" },
+  { href: "/privacy", label: "Privacy Policy", note: "public legal page" },
   { href: "/balances", label: "Balances", note: "legacy redirect → Accounts" },
   { href: "/events", label: "Events", note: "legacy redirect → Fixtures" },
 ];

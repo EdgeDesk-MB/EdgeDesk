@@ -38,10 +38,10 @@ export function TrackFixtureProvider({ children }: { children: React.ReactNode }
           showCloseButton
           className="flex max-h-[min(90dvh,820px)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
         >
-          <DialogHeader className="sr-only">
+          <DialogHeader className="mx-0 mt-0 shrink-0">
             <DialogTitle>Browse fixtures</DialogTitle>
             <DialogDescription>
-              Pick a football match or horse race to add to Tracked Events.
+              Pick a match or race to track.
             </DialogDescription>
           </DialogHeader>
           {open ? <FixtureBrowserContent variant="dialog" className="min-h-[min(70dvh,640px)]" /> : null}

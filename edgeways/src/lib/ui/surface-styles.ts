@@ -39,6 +39,15 @@ export const panelSurface = cn(
   "surface-glass relative overflow-hidden rounded-xl bg-card"
 );
 
+/**
+ * Ranked ticket inside a dialog (Race picks). Same glassy `--card` plate as
+ * {@link panelSurface}, tighter radius for a stacked list. Pair with a
+ * page-toned dialog (`data-dialog-tone=page` + `dark:bg-page`) so the ticket
+ * lifts. Prefer over `rounded-lg border bg-card` — that fill matches
+ * `dark:bg-card` modals.
+ */
+export const dialogTicketSurface = cn(panelSurface, "rounded-lg");
+
 /** Lighter grey - hover states, secondary bars, section headers on white */
 export const selectionSubtle = "bg-selection-subtle";
 
@@ -60,14 +69,56 @@ export const deskTrackerSummaryBand =
 export const selectionSubdued = "bg-selection-subdued";
 
 /**
- * Circular icon well above empty-state titles.
- * Uses `--muted` so the plate sits darker than the card in light mode and
- * lighter in dark mode (opposite polarity to `--selection-subtle`).
+ * Empty-state plate. Follows the canvas → page → card stack:
+ * on a page, lift to `--card` (lighter than `--page` in both themes);
+ * nested in another card, sink to `--page` so the plate contrasts;
+ * inside a default dialog (`bg-page` / dark `bg-card`), sink one step
+ * (`--canvas` / dark `--page`) so the plate is darker than the modal.
+ * Page-toned dialogs (`data-dialog-tone=page`, e.g. Race picks) already
+ * sit on `--page` in dark, so the plate sinks to `--canvas`.
  */
-export const emptyStateIconWell =
-  "flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground";
+export const emptyStatePlate = cn(
+  "bg-card",
+  "in-data-[slot=card]:bg-page",
+  "in-data-[slot=dialog-content]:bg-canvas in-data-[slot=dialog-content]:dark:bg-page",
+  "in-data-[slot=dialog-content]:in-data-[dialog-tone=page]:dark:bg-canvas"
+);
 
-export const pageTitle = "text-xl font-bold tracking-tight text-foreground";
+/**
+ * Circular icon well above empty-state titles.
+ * On a page: `--muted` (darker than the card in light, lighter in dark).
+ * In a modal: one step darker than the inset plate (`--input` / dark `--canvas`).
+ * On a page-toned dialog empty (`--canvas` plate), lift the well with `--input`.
+ */
+export const emptyStateIconWell = cn(
+  "flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground",
+  "in-data-[slot=dialog-content]:bg-input in-data-[slot=dialog-content]:dark:bg-canvas",
+  "in-data-[slot=dialog-content]:in-data-[dialog-tone=page]:dark:bg-input"
+);
+
+/** Page empty-state copy inset from plate edges: 32px mobile, 64px from sm up. */
+export const emptyStateCopyInset = "px-8 sm:px-16";
+
+export const pageTitle =
+  "min-w-0 text-pretty break-words text-xl font-bold tracking-tight text-foreground";
+
+/**
+ * Modal header band — title, concise description, full-bleed hairline.
+ * DialogHeader / DialogTitle / DialogDescription already apply these.
+ * Use the tokens when a custom header must match (p-0 shells, toolbars).
+ */
+export const dialogHeaderBand =
+  "flex min-w-0 flex-col gap-1.5 border-b px-6 pb-3.5 pt-6 pr-14 text-left";
+
+export const dialogTitle =
+  "min-w-0 break-words font-heading text-xl font-extrabold leading-tight tracking-tight text-foreground";
+
+/** Prefer a short line; wrap when a name or sentence needs it. */
+export const dialogDescription =
+  "min-w-0 text-pretty break-words text-sm leading-snug text-muted-foreground";
+
+/** Inline icon next to a 20px dialog title — matches the type size. */
+export const dialogTitleIcon = "size-5 shrink-0";
 
 /**
  * In-page section titles (P&L breakdown, By month, …).
@@ -75,9 +126,10 @@ export const pageTitle = "text-xl font-bold tracking-tight text-foreground";
  * For small uppercase chrome captions use {@link captionHeading}.
  */
 export const sectionTitle =
-  "text-base font-semibold leading-snug tracking-tight text-foreground";
+  "min-w-0 text-pretty break-words text-base font-semibold leading-snug tracking-tight text-foreground";
 
-export const sectionDescription = "text-xs text-muted-foreground";
+export const sectionDescription =
+  "min-w-0 text-pretty break-words text-xs text-muted-foreground";
 
 /** Vertical gap between stacked page sections / breakdown blocks after a main item */
 export const sectionStack = "flex flex-col gap-[var(--layout-stack-gap)]";
@@ -85,6 +137,13 @@ export const sectionStack = "flex flex-col gap-[var(--layout-stack-gap)]";
 /** Small uppercase caption for nav sections and column headers outside tables */
 export const captionHeading =
   "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+
+/** Campaigns-style day-split heading (`Today` / `Monday 6th July`). Not uppercase. */
+export const listDaySectionLabel =
+  "min-w-0 text-pretty break-words text-xs font-semibold tracking-wide text-foreground";
+
+/** Stack under a day-split heading (campaign cards or a day's table). */
+export const listDaySectionContent = "mt-3 flex flex-col gap-4.5";
 
 /** Burger drawer utility row (meta links, Log out). `w-full` so buttons fill like links. */
 export const drawerUtilityRow =
@@ -196,9 +255,20 @@ export const proNavTag =
   "inline-flex origin-left scale-[0.625] -mr-[37.5%] items-center rounded-[3px] bg-edge px-1.5 py-0.5 text-xs font-bold uppercase leading-none tracking-wide text-edge-foreground";
 
 /**
+ * Core tier mark — brand plate (same language as the demo viewing bar).
+ */
+export const coreNavTag = `${navTag} bg-primary text-primary-foreground`;
+
+/**
  * Edge tier mark — Offer Edge violet plate. Contrast type via `--edge-foreground`.
  */
 export const edgeNavTag = `${navTag} bg-edge text-edge-foreground`;
+
+/**
+ * Demo data mark — solid warning plate, same box as Core / Edge tags.
+ * Header and Race picks share this so invented numbers cannot look live.
+ */
+export const demoDataTag = `${navTag} bg-warning text-white`;
 
 /**
  * Settled/open bet mark on Racing Desk runners — same box as `edgeNavTag`
@@ -301,6 +371,12 @@ export const offerCampaignCardInteractive = cn(
   "cursor-pointer hover:brightness-[0.98] dark:hover:brightness-110"
 );
 
+/**
+ * Home Do next carousel card width. Fixed so a single short card does not
+ * shrink to its content inside the `w-max` snap row. Mobile stack stays `w-full`.
+ */
+export const doNextCarouselCardWidth = "w-[300px]";
+
 /** Shared type scale for Offers / Casino / Acca / Bet builder / Systems cards.
  * Half-step above the previous recipe (not a full Tailwind notch). */
 export const campaignCardTitle =
@@ -366,6 +442,9 @@ export const edgePanel = cn(
   tintCardWash
 );
 
+/** Neutral inset note (setup copy, Core upgrade nudge). Not a warning. */
+export const quietPanel = "rounded-md border border-border/60 bg-muted/30";
+
 /** Qualifying / success tinted outline card (offer workflow, qualifies chrome). */
 export const qualifyPanel = cn(
   "rounded-md border border-success/25 bg-success/5",
@@ -376,6 +455,28 @@ export const qualifyPanel = cn(
 export const warningPanel = cn(
   "rounded-md border border-warning/25 bg-warning/5",
   tintCardWash
+);
+
+/** Blocked / failed tinted outline card — same wash recipe as Qualifying. */
+export const destructivePanel = cn(
+  "rounded-md border border-destructive/25 bg-destructive/5",
+  tintCardWash
+);
+
+/**
+ * In-page execution warning plate (offer requirements, exchange funding).
+ * Stronger than {@link warningPanel}. Use via `<WarningNotice>`.
+ */
+export const warningNotice = cn(
+  "rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
+);
+
+/**
+ * In-page success note (onboarding upgrade confirmation).
+ * Stronger and cleaner than {@link qualifyPanel}: no mix-blend wash.
+ */
+export const successNotice = cn(
+  "rounded-md border border-success/40 bg-success/10"
 );
 
 export const edgePanelStrong = cn(

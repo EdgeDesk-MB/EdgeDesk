@@ -10,7 +10,7 @@ import { DailyPlan } from "@/components/dashboard/daily-plan";
 import { DashboardFeedPanel } from "@/components/dashboard/dashboard-feed-panel";
 import { MobileHomeDeck } from "@/components/dashboard/mobile-home-deck";
 import { NakedExposureBanner } from "@/components/naked-exposure-banner";
-import { EmptyState } from "@/components/help/empty-state";
+import { EmptyDeskWelcome } from "@/components/dashboard/empty-desk-welcome";
 import { useAppState } from "@/hooks/use-app-state";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { effectiveEventStatus } from "@/lib/events";
@@ -23,7 +23,8 @@ import {
 } from "@/lib/ui/dashboard-layout";
 import { DEFAULT_HOME_LAYOUT, applyDeckLayout } from "@/lib/ui/home-layout";
 import { cn } from "@/lib/utils";
-import { Loader2, TrendingUp } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { canWithPreview } from "@/lib/entitlements/plans";
 
 export default function DashboardPage() {
   const { state } = useAppState();
@@ -70,8 +71,10 @@ export default function DashboardPage() {
     Math.abs(liveTotal) > 0.01 ||
     state.series.length > 0;
 
-  const planSignals =
-    state.planRaces.length + state.planFixtures.length + nextActions.length;
+  const canDoNext = canWithPreview(state.settings, "do_next");
+  const planSignals = canDoNext
+    ? state.planRaces.length + state.planFixtures.length + nextActions.length
+    : 0;
 
   const overviewBar = (
     <DashboardOverviewBar
@@ -111,7 +114,7 @@ export default function DashboardPage() {
       ...(planSignals > 0 ? [{ id: "plan", label: "Today's plan", node: <DailyPlan /> }] : []),
       { id: "chart", label: "Chart", node: pnlChart },
       { id: "feed", label: "History feed", node: <DashboardFeedPanel state={state} /> },
-      ...(nextActions.length > 0
+      ...(canDoNext && nextActions.length > 0
         ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
         : []),
     ],
@@ -119,8 +122,17 @@ export default function DashboardPage() {
   );
 
   const showChartPanel = showActivity && !desktopHidden.has("chart");
-  const showPlanPanel = !desktopHidden.has("plan");
+  const showPlanPanel = canDoNext && planSignals > 0 && !desktopHidden.has("plan");
   const showFeedPanel = !desktopHidden.has("feed");
+
+  if (showEmptyCta) {
+    return (
+      <PageShell>
+        <NakedExposureBanner />
+        <EmptyDeskWelcome />
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell fullHeight>
@@ -132,23 +144,13 @@ export default function DashboardPage() {
             {!desktopHidden.has("hero") ? (
               <div className="hidden sm:contents">{overviewBar}</div>
             ) : null}
-            {!desktopHidden.has("do-next") ? (
+            {canDoNext && !desktopHidden.has("do-next") ? (
               <DashboardDoNext className="hidden sm:block" />
             ) : null}
           </>
         ) : null}
 
-        {showEmptyCta ? (
-          <EmptyState
-            icon={TrendingUp}
-            title="No positions yet"
-            description="Try the 60-second demo loop: simulate a 2UP match, add a dutch bet, link it in the tracker, and watch this dashboard move as goals go in."
-            action={{ label: "Start simulated match", href: "/tracked-events" }}
-            secondaryAction={{ label: "Read getting started", href: "/help?guide=getting-started" }}
-            className="mx-auto w-full max-w-lg flex-1 rounded-none border-0 bg-transparent px-[var(--layout-page-x)] py-0 shadow-none ring-0 [&_[data-slot=card-content]]:pt-16 [&_[data-slot=card-content]]:pb-10"
-          />
-        ) : (
-          <>
+        <>
             {isMobile === true ? (
               <MobileHomeDeck
                 cards={deckCards}
@@ -224,8 +226,7 @@ export default function DashboardPage() {
                 ) : null}
               </>
             ) : null}
-          </>
-        )}
+        </>
       </div>
     </PageShell>
   );

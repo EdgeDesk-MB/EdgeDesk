@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { countLiveNavEvents, formatEventStatus, formatRacingEventStatus } from "./events";
+import {
+  countLiveNavEvents,
+  formatEventStatus,
+  formatRacingEventStatus,
+  formatRacingOffTime,
+  normaliseRacingApiOffTime,
+} from "./events";
 
 const NOW = Date.parse("2026-08-01T14:00:00+01:00");
+
+describe("normaliseRacingApiOffTime", () => {
+  it("reads am/pm-less afternoon off-times as afternoon", () => {
+    expect(normaliseRacingApiOffTime("3:10")).toBe("15:10");
+    expect(normaliseRacingApiOffTime("2:15")).toBe("14:15");
+    expect(formatRacingOffTime("1:50")).toBe("13:50");
+  });
+
+  it("keeps late-morning, midday, and explicit 24-hour labels", () => {
+    expect(normaliseRacingApiOffTime("11:30")).toBe("11:30");
+    expect(normaliseRacingApiOffTime("12:20")).toBe("12:20");
+    expect(normaliseRacingApiOffTime("15:10")).toBe("15:10");
+  });
+});
 
 describe("formatRacingEventStatus", () => {
   it("shows Live once the off-time has passed, even if DB status is still upcoming", () => {

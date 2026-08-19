@@ -21,6 +21,7 @@ import {
   type BrandAccentPresetId,
   type BrandAccentState,
 } from "@/lib/brand-accent";
+import { hasPublicDemoCookieInDocument } from "@/lib/demo/public-demo";
 
 type BrandAccentContextValue = BrandAccentState & {
   /** Colour currently applying (loader target). Null when settled. */
@@ -42,11 +43,20 @@ function resolveState(next: BrandAccentState): BrandAccentState {
   };
 }
 
+const DEFAULT_ACCENT_STATE: BrandAccentState = {
+  presetId: DEFAULT_BRAND_ACCENT_PRESET,
+  hex: DEFAULT_BRAND_ACCENT_HEX,
+};
+
+function initialAccentState(): BrandAccentState {
+  if (typeof window === "undefined" || hasPublicDemoCookieInDocument()) {
+    return DEFAULT_ACCENT_STATE;
+  }
+  return readStoredBrandAccent();
+}
+
 export function BrandAccentProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<BrandAccentState>(() => ({
-    presetId: DEFAULT_BRAND_ACCENT_PRESET,
-    hex: DEFAULT_BRAND_ACCENT_HEX,
-  }));
+  const [state, setState] = useState<BrandAccentState>(initialAccentState);
   const [pending, setPending] = useState<BrandAccentState | null>(null);
   const waiterRef = useRef<{
     resolve: (value: BrandAccentState) => void;
@@ -54,9 +64,11 @@ export function BrandAccentProvider({ children }: { children: React.ReactNode })
   } | null>(null);
 
   useEffect(() => {
-    const stored = readStoredBrandAccent();
-    setState(stored);
-    applyBrandAccent(stored.hex);
+    const demo = hasPublicDemoCookieInDocument();
+    const next = demo ? DEFAULT_ACCENT_STATE : readStoredBrandAccent();
+    setState(next);
+    applyBrandAccent(next.hex);
+    if (!demo) writeStoredBrandAccent(next);
     // Enable brand colour transitions only after the initial paint settles,
     // so load never animates Amber → selected.
     const id = window.requestAnimationFrame(() => {
@@ -69,7 +81,9 @@ export function BrandAccentProvider({ children }: { children: React.ReactNode })
 
   const commitAsync = useCallback((next: BrandAccentState) => {
     const resolved = resolveState(next);
-    writeStoredBrandAccent(resolved);
+    if (!hasPublicDemoCookieInDocument()) {
+      writeStoredBrandAccent(resolved);
+    }
     setPending(resolved);
 
     if (waiterRef.current) {
@@ -142,12 +156,12 @@ export function BrandAccentProvider({ children }: { children: React.ReactNode })
           : DEFAULT_BRAND_ACCENT_PRESET
       ) as BrandAccentPresetId;
       const resolvedHex = hexForPreset(id, hex);
-      setState((prev) => {
-        if (prev.presetId === id && prev.hex === resolvedHex) return prev;
-        applyBrandAccent(resolvedHex);
-        writeStoredBrandAccent({ presetId: id, hex: resolvedHex });
-        return { presetId: id, hex: resolvedHex };
-      });
+      const next = { presetId: id, hex: resolvedHex };
+      applyBrandAccent(resolvedHex);
+      if (!hasPublicDemoCookieInDocument()) {
+        writeStoredBrandAccent(next);
+      }
+      setState(next);
       setPending(null);
     },
     []

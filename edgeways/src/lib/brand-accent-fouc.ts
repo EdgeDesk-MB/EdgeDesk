@@ -3,6 +3,7 @@
  * Turbopack never has to parse regex literals inside template soup.
  */
 
+import { SKIP_STORED_APPEARANCE_FOUC } from "@/lib/appearance-fouc-skip";
 import {
   BRAND_ACCENT_COOKIE_KEY,
   BRAND_ACCENT_STORAGE_KEY,
@@ -10,10 +11,12 @@ import {
   BRAND_LOGO_MIN_LUMINANCE,
   BRAND_LUMINANCE_THRESHOLD,
   BRAND_TEXT_MIN_LUMINANCE,
+  DEFAULT_BRAND_ACCENT_HEX,
 } from "@/lib/brand-accent-constants";
 
 export const BRAND_ACCENT_FOUC_SCRIPT = `(function () {
   try {
+    ${SKIP_STORED_APPEARANCE_FOUC}
     var sk = ${JSON.stringify(BRAND_ACCENT_STORAGE_KEY)};
     var ck = ${JSON.stringify(BRAND_ACCENT_COOKIE_KEY)};
     var presets = {
@@ -153,7 +156,11 @@ export const BRAND_ACCENT_FOUC_SCRIPT = `(function () {
       logoDark ? "var(--ew-ink-plate-shadow)" : "var(--ew-btn-shadow)"
     );
     root.dataset.brandPlate = dark ? "dark" : "light";
-    document.cookie =
-      ck + "=" + encodeURIComponent(h) + ";path=/;max-age=31536000;SameSite=Lax";
+    if (h === ${JSON.stringify(DEFAULT_BRAND_ACCENT_HEX)}) {
+      document.cookie = ck + "=;path=/;max-age=0;SameSite=Lax";
+    } else {
+      document.cookie =
+        ck + "=" + encodeURIComponent(h) + ";path=/;max-age=31536000;SameSite=Lax";
+    }
   } catch (e) {}
 })();`;

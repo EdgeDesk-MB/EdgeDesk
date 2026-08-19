@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { BRAND_ACCENT_FOUC_SCRIPT } from "@/lib/brand-accent-fouc";
 import {
   boostBrandForLightLogo,
+  BRAND_ACCENT_STORAGE_KEY,
   BRAND_HIGHLIGHT_MAX_LUMINANCE,
   BRAND_LUMINANCE_THRESHOLD,
   BRAND_TEXT_MIN_LUMINANCE,
@@ -10,8 +12,11 @@ import {
   ensureBrandTextOnDark,
   mutedForegroundOn,
   normalizeHex,
+  readStoredBrandAccent,
   relativeLuminance,
+  writeStoredBrandAccent,
 } from "@/lib/brand-accent";
+import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 
 describe("brand-accent contrast", () => {
   it("normalizes hex", () => {
@@ -101,5 +106,46 @@ describe("brand-accent contrast", () => {
     // Logo lift clears the plate threshold — ink type + raised Login face.
     expect(viridian.brandLogoForeground).toBe("#111111");
     expect(viridian.topbarAccentFaceShadow).toBe("var(--ew-btn-shadow)");
+  });
+});
+
+describe("brand-accent storage", () => {
+  const store = new Map<string, string>();
+  let cookie = "";
+
+  beforeEach(() => {
+    store.clear();
+    cookie = "";
+    const localStorage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+    };
+    vi.stubGlobal("localStorage", localStorage);
+    vi.stubGlobal("window", { localStorage });
+    vi.stubGlobal("document", {});
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      get: () => cookie,
+      set: (value: string) => {
+        cookie = value;
+      },
+    });
+  });
+
+  it("clears storage when writing Amber", () => {
+    writeStoredBrandAccent({ presetId: "coral", hex: "#FF6B4A" });
+    expect(readStoredBrandAccent()).toEqual({
+      presetId: "coral",
+      hex: "#FF6B4A",
+    });
+    writeStoredBrandAccent({ presetId: "amber", hex: "#FFC71E" });
+    expect(store.has(BRAND_ACCENT_STORAGE_KEY)).toBe(false);
+    expect(cookie).toContain("max-age=0");
+  });
+
+  it("skips stored accent in the public-demo FOUC script", () => {
+    expect(BRAND_ACCENT_FOUC_SCRIPT).toContain(PUBLIC_DEMO_COOKIE);
+    expect(BRAND_ACCENT_FOUC_SCRIPT).toContain('_ewDemo + "=1"');
   });
 });

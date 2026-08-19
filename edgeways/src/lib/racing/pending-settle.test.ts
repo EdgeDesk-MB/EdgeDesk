@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  eventToPendingSettle,
   isDeskRacePendingSettle,
   isEventPendingSettle,
 } from "@/lib/racing/pending-settle";
@@ -58,6 +59,22 @@ describe("isEventPendingSettle", () => {
         goals: null,
       })
     ).toBe(false);
+  });
+});
+
+describe("eventToPendingSettle", () => {
+  it("uses startTime so a 12-hour API off_time is not shown as 03:10", () => {
+    const start = new Date();
+    start.setHours(15, 10, 0, 0);
+    const pending = eventToPendingSettle({
+      id: 144,
+      homeTeam: "Novice Stakes",
+      awayTeam: "3:10",
+      competition: "Southwell (AW)",
+      startTime: start.getTime(),
+    });
+    expect(pending.offTime).toBe("15:10");
+    expect(pending.course).toBe("Southwell (AW)");
   });
 });
 

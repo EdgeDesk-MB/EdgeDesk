@@ -45,6 +45,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { estimateLayPlaceOdds } from "@/lib/calc/estimate-lay-place-odds";
+import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
@@ -88,6 +89,17 @@ const EMPTY_EDGE_PLAYS: NonNullable<RacingDeskPayload["edgePlays"]> = [];
 /** Summary strip tabs — Races is the default desk board. */
 type DeskSummaryTab = "races" | "tracked" | "active_bets" | "pnl";
 
+/** Bet count under Racing P&L — methodology lives in the P&L panel. */
+function racingPnlTileSub(settledCount: number, openCount: number): string | undefined {
+  const betCount = settledCount + openCount;
+  if (betCount === 0) return undefined;
+  const bets = betCount === 1 ? "1 bet" : `${betCount} bets`;
+  if (openCount > 0 && openCount < betCount) {
+    return `${bets} · ${openCount} open`;
+  }
+  return bets;
+}
+
 function readDeskPlaceFraction(): number | null {
   if (typeof window === "undefined") return null;
   try {
@@ -121,6 +133,7 @@ export function RacingDeskView() {
   const { openOffer, viewOffer } = useOfferDialog();
   const { defaultExchange, exchanges } = useExchanges();
   const { state } = useAppState();
+  const canOfferEdge = canUseOfferEdge(state?.settings);
   const offerBetPrefs = state?.settings?.offerBetPrefs ?? {};
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payload, setPayload] = useState<RacingDeskPayload | null>(null);
@@ -350,6 +363,7 @@ export function RacingDeskView() {
         }
         if (
           current === "recommended" &&
+          canOfferEdge &&
           (payload.edgePlays ?? []).some((p) => p.raceExternalId === raceParam)
         ) {
           return current;
@@ -358,6 +372,8 @@ export function RacingDeskView() {
       });
     }
   }
+  if (!canOfferEdge && raceFilter === "recommended") setRaceFilter("all");
+  if (!canOfferEdge && intelligenceOpen) setIntelligenceOpen(false);
 
   const selected = useMemo(
     () => payload?.races.find((r) => r.externalId === selectedId) ?? null,
@@ -388,7 +404,9 @@ export function RacingDeskView() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [payload]);
 
-  const edgePlays = payload?.edgePlays ?? EMPTY_EDGE_PLAYS;
+  const edgePlays = canOfferEdge
+    ? (payload?.edgePlays ?? EMPTY_EDGE_PLAYS)
+    : EMPTY_EDGE_PLAYS;
 
   const qualifyingRaceTotal = useMemo(
     () =>
@@ -664,7 +682,7 @@ export function RacingDeskView() {
   }
 
   const summary = payload?.summary;
-  const suggestions = payload?.suggestedRaces ?? [];
+  const suggestions = canOfferEdge ? (payload?.suggestedRaces ?? []) : [];
   const topSuggestion = suggestions.reduce<(typeof suggestions)[number] | undefined>(
     (best, s) => (s.topEv != null && (best?.topEv == null || s.topEv > best.topEv) ? s : best),
     undefined
@@ -717,11 +735,14 @@ export function RacingDeskView() {
         description="UK & IRE racecards with live exchange lays."
         action={
           <>
-            <RacingIntelligenceTrigger
-              count={suggestions.length}
-              topEv={topSuggestion?.topEv}
-              onClick={() => setIntelligenceOpen(true)}
-            />
+            {canOfferEdge ? (
+              <RacingIntelligenceTrigger
+                count={suggestions.length}
+                topEv={topSuggestion?.topEv}
+                onClick={() => setIntelligenceOpen(true)}
+                demo={summary?.source === "demo"}
+              />
+            ) : null}
             {(payload?.activeOffers.length ?? 0) > 0 && (
               <Button
                 variant="outline"
@@ -803,11 +824,10 @@ export function RacingDeskView() {
           <StatTile
             label="Racing P&L today"
             value={<MoneyFlow value={summary.racingPnlToday} signColor />}
-            sub={
-              summary.openPositions > 0
-                ? "By race day · open at worst case"
-                : "By race day"
-            }
+            sub={racingPnlTileSub(
+              payload?.racingPnlDay.settledCount ?? 0,
+              payload?.racingPnlDay.openCount ?? 0
+            )}
             active={deskTab === "pnl"}
             onClick={() => setDeskTab("pnl")}
           />
@@ -909,6 +929,7 @@ export function RacingDeskView() {
             onSettingsClick={() => setSettingsOpen(true)}
             qualifyingCount={qualifyingRaceTotal}
             racePicksCount={racePicksTotal}
+            showRacePicks={canOfferEdge}
           />
           <div className="bg-selection-subtle/50">
           <CardHeader className="gap-0 pt-4 pb-0">
@@ -926,10 +947,12 @@ export function RacingDeskView() {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" align="start" className="gap-2 py-2">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Zap className="size-3.5 shrink-0 text-edge" aria-hidden />
-                        Edge (on course tabs in Qualifying)
-                      </span>
+                      {canOfferEdge ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Zap className="size-3.5 shrink-0 text-edge" aria-hidden />
+                          Edge (on course tabs in Qualifying)
+                        </span>
+                      ) : null}
                       <span className="inline-flex items-center gap-1.5">
                         <span
                           className="size-2.5 shrink-0 rounded-full bg-background/45"
@@ -969,15 +992,31 @@ export function RacingDeskView() {
             </CardHeader>
             <CardContent className="min-w-0 px-0 pb-0 pt-5">
               {boardCourses.length === 0 ? (
-                <p className="px-(--card-spacing) pb-4 text-center text-xs text-muted-foreground">
-                  {deskTab === "tracked"
-                    ? "No tracked races for this date."
-                    : raceFilter === "recommended"
-                      ? "No recommended races today - Offer Edge has no modelled plays."
-                      : raceFilter === "qualifying"
-                        ? "No qualifying races for your offers today."
-                        : "No meetings for this date."}
-                </p>
+                <div className="px-(--card-spacing) pb-4">
+                  <EmptyState
+                    compact
+                    icon={Trophy}
+                    title={
+                      deskTab === "tracked"
+                        ? "No tracked races"
+                        : raceFilter === "recommended"
+                          ? "No recommended races today"
+                          : raceFilter === "qualifying"
+                            ? "No qualifying races today"
+                            : "No meetings for this date"
+                    }
+                    description={
+                      deskTab === "tracked"
+                        ? "Track a race from the board and it will sit here."
+                        : raceFilter === "recommended"
+                          ? "Offer Edge has no modelled plays for this date."
+                          : raceFilter === "qualifying"
+                            ? "None of today's meetings match your open offers."
+                            : "Try another date, or check your Racing API key in Settings."
+                    }
+                    className="shadow-none"
+                  />
+                </div>
               ) : (
                 <Tabs
                   value={selected?.course ?? boardCourses[0]?.[0] ?? ""}

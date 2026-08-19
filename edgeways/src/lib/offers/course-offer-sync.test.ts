@@ -2,10 +2,13 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, offers, bets } from "@/lib/db";
 import {
+  SAME_DAY_TWIN_SOURCE,
   ensureSameDayOfferSiblings,
+  isAutoSpawnedSameDayTwin,
   isSameDayMultiRaceOffer,
   reconcileSameDayOfferSiblings,
   retireUnusedSameDayOfferSiblings,
+  sameDayTwinParentId,
 } from "./course-offer-sync";
 import {
   spawnCourseOfferSiblingsIfNeeded,
@@ -28,6 +31,7 @@ function insertOffer(partial: {
   createdAt?: number;
   rules?: string | null;
   seriesId?: number | null;
+  source?: string | null;
 }): number {
   const row = db
     .insert(offers)
@@ -45,6 +49,7 @@ function insertOffer(partial: {
       scopeRaceLabel: partial.scopeRaceId ? "1:50 · Test" : null,
       rules: partial.rules !== undefined ? partial.rules : placeRules,
       seriesId: partial.seriesId ?? null,
+      source: partial.source ?? null,
       expiresAt: null,
       createdAt: partial.createdAt ?? Date.now(),
     })
@@ -109,6 +114,17 @@ const unconditionalRules = JSON.stringify({
   freeBetAmount: 10,
 });
 
+describe("same-day twin source", () => {
+  it("treats parent-tagged and legacy twin sources as auto-spawned", () => {
+    expect(isAutoSpawnedSameDayTwin({ source: SAME_DAY_TWIN_SOURCE })).toBe(true);
+    expect(isAutoSpawnedSameDayTwin({ source: `${SAME_DAY_TWIN_SOURCE}:12` })).toBe(true);
+    expect(isAutoSpawnedSameDayTwin({ source: null })).toBe(false);
+    expect(isAutoSpawnedSameDayTwin({ source: "email" })).toBe(false);
+    expect(sameDayTwinParentId({ source: `${SAME_DAY_TWIN_SOURCE}:12` })).toBe(12);
+    expect(sameDayTwinParentId({ source: SAME_DAY_TWIN_SOURCE })).toBeNull();
+  });
+});
+
 describe("isSameDayMultiRaceOffer", () => {
   it("accepts regional UK & Ireland place-refund day offers", () => {
     const id = insertOffer({
@@ -164,6 +180,7 @@ describe("ensureSameDayOfferSiblings", () => {
     const fresh = rows.find((o) => o.id !== usedId);
     expect(fresh?.status).toBe("active");
     expect(fresh?.scopeCourse).toBe("Goodwood");
+    expect(fresh?.source).toBe(`${SAME_DAY_TWIN_SOURCE}:${usedId}`);
     expect(JSON.parse(fresh!.rules!).repeatSameDay).toBe(true);
   });
 
@@ -274,6 +291,40 @@ describe("ensureSameDayOfferSiblings", () => {
 
     expect(db.select().from(offers).all()).toHaveLength(1);
   });
+
+  it("does not treat a second user-created same-spec offer as the first campaign's twin", () => {
+    const usedId = insertOffer({
+      bookmaker: "Paddy Power",
+      title: "Bet £10 get £10 free bet (2nd–4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-15",
+      rules: repeatRules,
+      createdAt: 1,
+    });
+    linkBet(usedId);
+    const added = insertOffer({
+      bookmaker: "Paddy Power",
+      title: "Bet £10 get £10 free bet (2nd–4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-15",
+      rules: repeatRules,
+      createdAt: 2,
+    });
+
+    ensureSameDayOfferSiblings(
+      db.select().from(offers).all(),
+      db.select({ offerId: bets.offerId }).from(bets).all()
+    );
+
+    const rows = db.select().from(offers).all();
+    expect(rows).toHaveLength(3);
+    expect(db.select().from(offers).where(eq(offers.id, added)).get()?.status).toBe(
+      "active"
+    );
+    const twin = rows.find((o) => o.id !== usedId && o.id !== added);
+    expect(twin?.source).toBe(`${SAME_DAY_TWIN_SOURCE}:${usedId}`);
+    expect(twin?.status).toBe("active");
+  });
 });
 
 describe("retireUnusedSameDayOfferSiblings", () => {
@@ -289,6 +340,7 @@ describe("retireUnusedSameDayOfferSiblings", () => {
       scopeCourse: "uk_ire",
       rules: regionalRules,
       seriesId: null,
+      source: `${SAME_DAY_TWIN_SOURCE}:${usedId}`,
       createdAt: 2,
     });
 
@@ -339,6 +391,7 @@ describe("retireUnusedSameDayOfferSiblings", () => {
     const freshId = insertOffer({
       scopeCourse: "uk_ire",
       rules: placeRules,
+      source: `${SAME_DAY_TWIN_SOURCE}:${usedId}`,
       createdAt: 2,
     });
 
@@ -351,6 +404,31 @@ describe("retireUnusedSameDayOfferSiblings", () => {
 
     expect(db.select().from(offers).where(eq(offers.id, freshId)).get()?.status).toBe(
       "completed"
+    );
+  });
+
+  it("leaves a user-created unused sibling when the used campaign is marked complete", () => {
+    const usedId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: placeRules,
+      createdAt: 1,
+    });
+    linkBet(usedId);
+    const addedId = insertOffer({
+      scopeCourse: "uk_ire",
+      rules: placeRules,
+      createdAt: 2,
+    });
+
+    db.update(offers)
+      .set({ status: "completed", completedAt: Date.now() })
+      .where(eq(offers.id, usedId))
+      .run();
+
+    retireUnusedSameDayOfferSiblings(usedId);
+
+    expect(db.select().from(offers).where(eq(offers.id, addedId)).get()?.status).toBe(
+      "active"
     );
   });
 });
@@ -374,6 +452,7 @@ describe("reconcileSameDayOfferSiblings", () => {
       eventDate: "2026-08-10",
       rules: regionalRules,
       seriesId: null,
+      source: `${SAME_DAY_TWIN_SOURCE}:${seriesDay}`,
       createdAt: 2,
     });
 
@@ -403,6 +482,7 @@ describe("reconcileSameDayOfferSiblings", () => {
       scopeCourse: "uk_ire",
       eventDate: "2026-08-11",
       rules: placeRules,
+      source: `${SAME_DAY_TWIN_SOURCE}:${usedId}`,
       createdAt: 2,
     });
 
@@ -410,6 +490,35 @@ describe("reconcileSameDayOfferSiblings", () => {
 
     expect(db.select().from(offers).where(eq(offers.id, orphan)).get()?.status).toBe(
       "completed"
+    );
+  });
+
+  it("does not retire a user-created unused sibling after the first linked bet", () => {
+    const usedId = insertOffer({
+      bookmaker: "Paddy Power",
+      title: "Bet £10 get £10 free bet (2nd–4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-15",
+      rules: placeRules,
+      createdAt: 1,
+    });
+    linkBet(usedId);
+    const added = insertOffer({
+      bookmaker: "Paddy Power",
+      title: "Bet £10 get £10 free bet (2nd–4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-15",
+      rules: placeRules,
+      createdAt: 2,
+    });
+
+    reconcileSameDayOfferSiblings();
+
+    expect(db.select().from(offers).where(eq(offers.id, added)).get()?.status).toBe(
+      "active"
+    );
+    expect(db.select().from(offers).where(eq(offers.id, usedId)).get()?.status).toBe(
+      "active"
     );
   });
 
@@ -437,5 +546,35 @@ describe("reconcileSameDayOfferSiblings", () => {
     expect(db.select().from(offers).where(eq(offers.id, fresh)).get()?.status).toBe(
       "active"
     );
+  });
+
+  it("keeps a second user-created same-spec offer independent through status sync", () => {
+    const first = insertOffer({
+      bookmaker: "Paddy Power",
+      title: "Bet £10 get £10 free bet (2nd–4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-15",
+      rules: placeRules,
+      createdAt: 1,
+    });
+    linkBet(first);
+    const second = insertOffer({
+      bookmaker: "Paddy Power",
+      title: "Bet £10 get £10 free bet (2nd–4th)",
+      scopeCourse: "uk_ire",
+      eventDate: "2026-08-15",
+      rules: placeRules,
+      createdAt: 2,
+    });
+
+    syncOfferStatuses();
+
+    expect(db.select().from(offers).where(eq(offers.id, first)).get()?.status).toBe(
+      "active"
+    );
+    expect(db.select().from(offers).where(eq(offers.id, second)).get()?.status).toBe(
+      "active"
+    );
+    expect(db.select().from(offers).all()).toHaveLength(2);
   });
 });

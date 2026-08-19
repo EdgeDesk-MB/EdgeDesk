@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Library, Trash2 } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -78,8 +79,7 @@ export function CasinoGameLibraryDialog({
         <DialogHeader>
           <DialogTitle>Game RTP library</DialogTitle>
           <DialogDescription>
-            Published base RTPs - operators can license lower variants of the same game, so
-            correct any value to what the in-game info shows. Re-adding a name updates it.
+            Published base RTPs. Correct any that differ.
           </DialogDescription>
         </DialogHeader>
         <div className="grid shrink-0 grid-cols-[1fr_7rem_auto] items-end gap-2">
@@ -106,9 +106,14 @@ export function CasinoGameLibraryDialog({
           {games == null ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : games.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Library is empty - add the games your casinos list.
-            </p>
+            <EmptyState
+              compact
+              oneLine
+              icon={Library}
+              title="Library is empty"
+              description="Add the games your casinos list."
+              className="shadow-none"
+            />
           ) : (
             <ul className="divide-y">
               {[...games]

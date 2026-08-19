@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
 import { ChartNoAxesCombined } from "lucide-react";
@@ -35,6 +35,7 @@ import {
   tableEdgeEnd,
   tableEdgeStart,
 } from "@/lib/ui/surface-styles";
+import { useLivelineHoverOutline } from "@/lib/ui/liveline-tooltip-outline";
 import { cn } from "@/lib/utils";
 
 /** Liveline needs at least two race steps to read as a day chart. */
@@ -83,6 +84,7 @@ export function RacingPnlTodayView({
 }) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const chartHostRef = useRef<HTMLDivElement>(null);
   /** Refresh window + live tip so the line stays pinned to wall-clock now. */
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
@@ -94,6 +96,7 @@ export function RacingPnlTodayView({
   }, []);
 
   const dark = resolvedTheme === "dark";
+  useLivelineHoverOutline(chartHostRef, mounted && !dark);
   const total = report?.total ?? 0;
   const chartColor = pnlChartColor(total, dark);
 
@@ -148,7 +151,7 @@ export function RacingPnlTodayView({
               className="shadow-none"
             />
           ) : showChart ? (
-            <div className="relative isolate h-[18rem]">
+            <div ref={chartHostRef} className="relative isolate h-[18rem]">
               {mounted ? (
                 <>
                   <Liveline
@@ -212,9 +215,12 @@ export function RacingPnlTodayView({
           By race, in off-time order. Same race-day attribution as the summary tile.
         </p>
         {empty ? (
-          <div className="rounded-lg border border-border/80 px-4 py-6 text-center text-sm text-muted-foreground">
-            Nothing to break down for this day.
-          </div>
+          <EmptyState
+            compact
+            icon={ChartNoAxesCombined}
+            title="Nothing to break down"
+            description="Log a racing bet or settle a race for this day to fill this table."
+          />
         ) : (
           <div className="overflow-hidden rounded-lg border border-border/80">
             <Table className="border-collapse text-sm">

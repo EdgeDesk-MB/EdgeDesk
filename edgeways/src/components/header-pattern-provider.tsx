@@ -16,6 +16,7 @@ import {
   writeStoredHeaderPattern,
   type HeaderPatternId,
 } from "@/lib/header-pattern";
+import { hasPublicDemoCookieInDocument } from "@/lib/demo/public-demo";
 
 type HeaderPatternContextValue = {
   patternId: HeaderPatternId;
@@ -28,23 +29,34 @@ const HeaderPatternContext = createContext<HeaderPatternContextValue | null>(
   null
 );
 
+function initialHeaderPattern(): HeaderPatternId {
+  if (typeof window === "undefined" || hasPublicDemoCookieInDocument()) {
+    return DEFAULT_HEADER_PATTERN;
+  }
+  return readStoredHeaderPattern();
+}
+
 export function HeaderPatternProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [patternId, setPatternIdState] =
-    useState<HeaderPatternId>(DEFAULT_HEADER_PATTERN);
+    useState<HeaderPatternId>(initialHeaderPattern);
 
   useEffect(() => {
-    const stored = readStoredHeaderPattern();
-    setPatternIdState(stored);
-    applyHeaderPattern(stored);
+    const demo = hasPublicDemoCookieInDocument();
+    const next = demo ? DEFAULT_HEADER_PATTERN : readStoredHeaderPattern();
+    setPatternIdState(next);
+    applyHeaderPattern(next);
+    if (!demo) writeStoredHeaderPattern(next);
   }, []);
 
   const setPatternId = useCallback((id: HeaderPatternId) => {
     const resolved = normalizeHeaderPattern(id);
-    writeStoredHeaderPattern(resolved);
+    if (!hasPublicDemoCookieInDocument()) {
+      writeStoredHeaderPattern(resolved);
+    }
     applyHeaderPattern(resolved);
     setPatternIdState(resolved);
   }, []);
@@ -52,12 +64,11 @@ export function HeaderPatternProvider({
   const syncFromSettings = useCallback((raw: string | undefined) => {
     if (raw == null || raw === "") return;
     const resolved = normalizeHeaderPattern(raw);
-    setPatternIdState((prev) => {
-      if (prev === resolved) return prev;
-      applyHeaderPattern(resolved);
+    applyHeaderPattern(resolved);
+    if (!hasPublicDemoCookieInDocument()) {
       writeStoredHeaderPattern(resolved);
-      return resolved;
-    });
+    }
+    setPatternIdState(resolved);
   }, []);
 
   const value = useMemo(

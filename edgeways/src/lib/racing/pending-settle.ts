@@ -1,6 +1,6 @@
 import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
 import type { RacingDeskRace } from "@/lib/racing-desk/types";
-import { formatEventTime } from "@/lib/events";
+import { formatEventTime, formatRacingOffTime } from "@/lib/events";
 
 export interface PendingSettleRace {
   id: string;
@@ -46,12 +46,17 @@ export function eventToPendingSettle(event: {
   homeTeam: string;
   awayTeam: string;
   competition?: string | null;
+  startTime?: number;
 }): PendingSettleRace {
+  const offTime =
+    event.startTime != null
+      ? formatEventTime(event.startTime)
+      : formatRacingOffTime(event.awayTeam);
   return {
     id: String(event.id),
     label: `${event.competition ?? "Race"} · ${event.homeTeam}`,
     course: event.competition ?? "Race",
-    offTime: event.awayTeam,
+    offTime,
     trackedEventId: event.id,
   };
 }

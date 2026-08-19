@@ -48,6 +48,14 @@ export const EXCHANGE_PRESETS: ExchangePreset[] = [
     backColor: "#b8dff5",
     layColor: "#f7bac2",
   },
+  {
+    // Navy plate, cyan brand mark, lime second chevron
+    name: "BetConnect",
+    commissionPct: 2,
+    brandColor: "#00A3FF",
+    backColor: "#9ad8ff",
+    layColor: "#9af0b8",
+  },
 ];
 
 /** Best-effort text colour for a chip on the given background. */

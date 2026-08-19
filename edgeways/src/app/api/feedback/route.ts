@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createFeedbackReport, listFeedbackReports } from "@/lib/services/feedback";
+import { listFeedbackReports, submitFeedback } from "@/lib/services/feedback";
 import { FEEDBACK_KINDS } from "@/lib/feedback/types";
+import { getDeskActor, isDeskOwner } from "@/lib/db/desk-scope";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +20,14 @@ const createSchema = z.object({
   }),
 });
 
-export async function GET() {
-  return NextResponse.json({ reports: listFeedbackReports(20) });
-}
+export const GET = withDeskScope(async function GET() {
+  if (!isDeskOwner(getDeskActor())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return NextResponse.json({ reports: await listFeedbackReports(20) });
+});
 
-export async function POST(req: Request) {
+export const POST = withDeskScope(async function POST(req: Request) {
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -34,15 +39,16 @@ export async function POST(req: Request) {
       : null;
 
   try {
-    const report = createFeedbackReport({
+    const result = await submitFeedback({
       kind: parsed.data.kind,
       summary: parsed.data.summary,
       details: parsed.data.details,
       replyEmail,
       diagnostics: parsed.data.diagnostics,
+      signedInEmail: getDeskActor().email,
     });
-    return NextResponse.json({ report });
+    return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 400 });
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
-}
+});

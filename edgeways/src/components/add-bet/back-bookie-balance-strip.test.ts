@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   betTypeCanStakeFreeBet,
+  bookieCashTopUpBreakdown,
   bookieCashTopUpNeeded,
   bookieFreeBetBalance,
   bookieNeedsCashFunding,
@@ -95,6 +96,27 @@ describe("bookieNeedsCashFunding with reserved credit", () => {
       50.85,
       2
     );
+  });
+});
+
+describe("bookieCashTopUpBreakdown", () => {
+  it("is just the selected stake when the wallet is empty", () => {
+    const accounts = [bookie({ name: "Paddy Power", balance: 0 })];
+    expect(bookieCashTopUpBreakdown(accounts, "Paddy Power", 10)).toEqual({
+      total: 10,
+      stakePart: 10,
+      deficitPart: 0,
+    });
+  });
+
+  it("adds the cash hole to this stake, not a second offer", () => {
+    // Screenshot: PP already −£10, selected qualifier is £10 → £20 total.
+    const accounts = [bookie({ name: "Paddy Power", balance: -10 })];
+    expect(bookieCashTopUpBreakdown(accounts, "Paddy Power", 10)).toEqual({
+      total: 20,
+      stakePart: 10,
+      deficitPart: 10,
+    });
   });
 });
 

@@ -6,8 +6,9 @@ import * as schema from "./schema.pg";
 
 /**
  * Thin Neon client for hosted Postgres (EDGE-47).
- * Waitlist and app_users use this when DATABASE_URL is set (Vercel). Desk
- * getDb() stays SQLite on the Mac until the full async cutover.
+ * Waitlist, app_users, and the feedback inbox use this when DATABASE_URL
+ * is set (Vercel). Desk getDb() stays SQLite on the Mac until the full
+ * async cutover.
  * Set DATABASE_URL to the Neon pooled connection string.
  */
 export function getNeonSql() {

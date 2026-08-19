@@ -7,7 +7,7 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
 import { useSlidingIndicator } from "@/hooks/use-sliding-indicator"
-import { springTransition } from "@/lib/ui/motion"
+import { COLLAPSE_EASE, SPRING_DURATION_MS, springTransition } from "@/lib/ui/motion"
 
 function Tabs({
   className,
@@ -36,10 +36,10 @@ const tabsListVariants = cva(
         line: "h-auto gap-6 rounded-none border-0 bg-transparent p-0",
         segmented: cn(
           // Override base `group-data-horizontal/tabs:h-8` or py is crushed to 0.
-          "box-border h-auto w-fit gap-0.5 group-data-horizontal/tabs:h-auto bg-muted/60",
+          "box-border h-auto w-fit gap-0.5 group-data-horizontal/tabs:h-auto bg-foreground/8",
           "rounded-[var(--segmented-radius)]",
           "px-[var(--segmented-track-pad-x)] py-[var(--segmented-track-pad)]",
-          "ring-1 ring-border/35",
+          "ring-1 ring-border/40",
           "dark:bg-input/30 dark:ring-border/50"
         ),
       },
@@ -57,11 +57,15 @@ const tabsListVariants = cva(
 function TabsScrollList({
   className,
   variant = "default",
+  size = "default",
   fadeClassName = "from-card",
   children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
-  VariantProps<typeof tabsListVariants> & { fadeClassName?: string }) {
+  VariantProps<typeof tabsListVariants> & {
+    fadeClassName?: string
+    size?: "default" | "sm"
+  }) {
   const listRef = React.useRef<HTMLDivElement>(null)
   const isLine = variant === "line"
   const indicator = useSlidingIndicator(
@@ -92,6 +96,7 @@ function TabsScrollList({
         ref={listRef}
         data-slot="tabs-list"
         data-variant={variant ?? "default"}
+        data-size={size}
         className={cn(
           tabsListVariants({ variant }),
           // w-max grows with tabs; min-w-full keeps few segmented tabs stretched.
@@ -101,6 +106,7 @@ function TabsScrollList({
           className
         )}
         {...props}
+        data-sliding={isSegmented && indicator.ready ? "true" : undefined}
       >
         {isLine && indicator.ready ? (
           <span
@@ -113,6 +119,26 @@ function TabsScrollList({
             }}
           />
         ) : null}
+        {isSegmented && indicator.ready ? (
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute z-0 rounded-full shadow-[var(--ew-chip-shadow)] motion-reduce:transition-none",
+              indicator.plate === "edge"
+                ? "bg-edge"
+                : indicator.plate === "ink"
+                  ? "bg-foreground"
+                  : "bg-brand"
+            )}
+            style={{
+              left: indicator.left,
+              width: indicator.width,
+              top: "var(--segmented-track-pad)",
+              bottom: "var(--segmented-track-pad)",
+              transition: `left ${springTransition}, width ${springTransition}, background-color ${SPRING_DURATION_MS}ms ${COLLAPSE_EASE}`,
+            }}
+          />
+        ) : null}
         {children}
       </TabsPrimitive.List>
     </ScrollFadeEdges>
@@ -122,6 +148,7 @@ function TabsScrollList({
 function TabsList({
   className,
   variant = "default",
+  size = "default",
   /** Scroll-fade gradient source — match the surface the tab strip sits on. */
   fadeClassName = "from-card",
   orientation,
@@ -131,6 +158,7 @@ function TabsList({
   VariantProps<typeof tabsListVariants> & {
     fadeClassName?: string
     orientation?: "horizontal" | "vertical"
+    size?: "default" | "sm"
   }) {
   // Vertical lists never overflow horizontally — keep the plain Radix list.
   if (orientation === "vertical") {
@@ -138,6 +166,7 @@ function TabsList({
       <TabsPrimitive.List
         data-slot="tabs-list"
         data-variant={variant ?? "default"}
+        data-size={size}
         className={cn(tabsListVariants({ variant }), className)}
         {...props}
       >
@@ -150,6 +179,7 @@ function TabsList({
     <TabsScrollList
       className={className}
       variant={variant}
+      size={size}
       fadeClassName={fadeClassName}
       {...props}
     >
@@ -159,9 +189,12 @@ function TabsList({
 }
 
 const segmentedTrigger = cn(
-  "group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-200 group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5",
-  /* Active solid brand plate — same filled-accent recipe as FilterPill */
+  "group-data-[variant=segmented]/tabs-list:relative group-data-[variant=segmented]/tabs-list:z-[1] group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-200 group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5",
+  "group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:h-7 group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:min-h-7 group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:px-2.5 group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:text-[11px]",
+  /* Active solid brand plate — same filled-accent recipe as FilterPill.
+   * Once the sliding plate is ready, fill/shadow live on the indicator. */
   "group-data-[variant=segmented]/tabs-list:data-active:bg-brand group-data-[variant=segmented]/tabs-list:data-active:font-semibold group-data-[variant=segmented]/tabs-list:data-active:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:shadow-[var(--ew-chip-shadow)] group-data-[variant=segmented]/tabs-list:data-active:hover:bg-brand group-data-[variant=segmented]/tabs-list:data-active:hover:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:active:bg-brand group-data-[variant=segmented]/tabs-list:data-active:active:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:focus-visible:text-brand-foreground group-data-[variant=segmented]/tabs-list:data-active:[&_svg]:text-brand-foreground",
+  "group-data-[sliding]/tabs-list:group-data-[variant=segmented]/tabs-list:data-active:bg-transparent group-data-[sliding]/tabs-list:group-data-[variant=segmented]/tabs-list:data-active:shadow-none group-data-[sliding]/tabs-list:group-data-[variant=segmented]/tabs-list:data-active:hover:bg-transparent group-data-[sliding]/tabs-list:group-data-[variant=segmented]/tabs-list:data-active:active:bg-transparent",
   /* Inset focus ring — offset rings balloon the active pill inside the track */
   "group-data-[variant=segmented]/tabs-list:focus-visible:border-transparent group-data-[variant=segmented]/tabs-list:focus-visible:outline-none group-data-[variant=segmented]/tabs-list:focus-visible:ring-2 group-data-[variant=segmented]/tabs-list:focus-visible:ring-inset group-data-[variant=segmented]/tabs-list:focus-visible:ring-brand/60 group-data-[variant=segmented]/tabs-list:focus-visible:ring-offset-0"
 )

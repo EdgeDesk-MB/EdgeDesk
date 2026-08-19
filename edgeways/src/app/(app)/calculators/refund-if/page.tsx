@@ -16,7 +16,7 @@ import { PercentFlow } from "@/components/money-flow";
 import { CalculatorShell } from "@/components/page-shell";
 import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { matchedBet } from "@/lib/calc";
+import { matchedBet } from "@/lib/calc/matched";
 import type { ExchangeRow } from "@/lib/db/schema";
 
 const RETENTION_PRESETS = [

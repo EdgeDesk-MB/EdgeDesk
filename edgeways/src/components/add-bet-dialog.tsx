@@ -70,9 +70,16 @@ import { usePauseAppStatePolling } from "@/components/app-state-provider";
 import { DeferredTextInput } from "@/components/add-bet/deferred-text-input";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
+  addBetLayCalcKey,
+  addBetMatchedSaveEnabled,
+  addBetPlanMode,
+  commitLayStakeOverride,
+  resolveAddBetLayStake,
+  type KeyedLayOverride,
+} from "@/lib/add-bet-lay-stake";
+import {
   layBounds,
   layPlanOutcome,
-  executableLayStake,
   matchedBackReturns,
   offerTriggerDetectedInLabel,
   offerTriggerFromLabel,
@@ -501,7 +508,7 @@ export function AddBetDialog({
   const [earlyPayout, setEarlyPayout] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [partLays, setPartLays] = useState<PartLay[]>([]);
-  const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
+  const [layStakeOverride, setLayStakeOverride] = useState<KeyedLayOverride | null>(null);
   const [triggerText, setTriggerText] = useState("");
   const [triggerLinkedFromLabel, setTriggerLinkedFromLabel] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
@@ -693,7 +700,18 @@ export function AddBetDialog({
       );
       setAdvanced(false);
       setPartLays([]);
-      setLayStakeOverride(editBet.layStake);
+      setLayStakeOverride(
+        commitLayStakeOverride(
+          editBet.layStake,
+          addBetLayCalcKey({
+            backStake: editBet.backStake,
+            backOdds: editBet.backOdds,
+            layOdds: editBet.layOdds,
+            commission: editBet.commission,
+            mode: addBetPlanMode(editBet.betType),
+          })
+        )
+      );
       setSelectedOfferId(editBet.offerId ?? null);
       setAddBalance(false);
 
@@ -759,7 +777,27 @@ export function AddBetDialog({
       if (prefill.layOdds !== undefined) setLayOdds(prefill.layOdds);
       if (prefill.advanced !== undefined) setAdvanced(prefill.advanced);
       if (prefill.partLays) setPartLays(prefill.partLays);
-      if (prefill.layStakeOverride !== undefined) setLayStakeOverride(prefill.layStakeOverride);
+      const prefillCommissionPct =
+        (prefill.exchangeId !== undefined
+          ? exchanges.find((e) => e.id === prefill.exchangeId)?.commissionPct
+          : undefined) ??
+        exchanges.find((e) => e.isDefault)?.commissionPct ??
+        exchanges[0]?.commissionPct ??
+        2;
+      const prefillLayKey = addBetLayCalcKey({
+        backStake: prefill.backStake ?? appSettings?.defaultBackStake ?? NaN,
+        backOdds: prefill.backOdds ?? NaN,
+        layOdds: prefill.layOdds ?? NaN,
+        commission: prefillCommissionPct / 100,
+        mode: addBetPlanMode(prefill.betType ?? "qualifying"),
+      });
+      if (prefill.layStakeOverride !== undefined) {
+        setLayStakeOverride(
+          prefill.layStakeOverride == null
+            ? null
+            : commitLayStakeOverride(prefill.layStakeOverride, prefillLayKey)
+        );
+      }
       if (prefill.sport && isKnownSport(prefill.sport)) setSport(prefill.sport);
       if (prefill.market) {
         setMarket(prefill.market);
@@ -769,7 +807,9 @@ export function AddBetDialog({
       }
       if (prefill.earlyPayout !== undefined) setEarlyPayout(prefill.earlyPayout);
       if (prefill.dutchLegs) setDutchLegs(prefill.dutchLegs);
-      if (prefill.layStake !== undefined) setLayStakeOverride(prefill.layStake);
+      if (prefill.layStake !== undefined) {
+        setLayStakeOverride(commitLayStakeOverride(prefill.layStake, prefillLayKey));
+      }
       if (prefill.homeTeam) setHomeTeam(prefill.homeTeam);
       if (prefill.awayTeam) setAwayTeam(prefill.awayTeam);
       if (prefill.bookmaker) setBookmaker(prefill.bookmaker);
@@ -881,10 +921,18 @@ export function AddBetDialog({
     };
   }, [betType, noLay, isDutch, calcBetType, backStake, effectiveBackOdds, layOdds, commission, advanced, partLays]);
 
+  const layCalcKey = addBetLayCalcKey({
+    backStake,
+    backOdds: effectiveBackOdds,
+    layOdds,
+    commission: commission / 100,
+    mode: calcBetType,
+  });
+
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
   const layStake = useMemo(
-    () => (planInput ? executableLayStake(planInput, layStakeOverride) : 0),
-    [planInput, layStakeOverride]
+    () => resolveAddBetLayStake(planInput, layStakeOverride, layCalcKey),
+    [planInput, layStakeOverride, layCalcKey]
   );
   const preview = useMemo(
     () => (planInput ? layPlanOutcome({ ...planInput, layStake }) : null),
@@ -1493,7 +1541,18 @@ export function AddBetDialog({
         setLayOdds(fields.layOdds);
       }
       if (fields.layStake != null && fields.layStake > 0 && source === "exchange") {
-        setLayStakeOverride(fields.layStake);
+        setLayStakeOverride(
+          commitLayStakeOverride(
+            fields.layStake,
+            addBetLayCalcKey({
+              backStake: fields.backStake ?? backStake,
+              backOdds: fields.backOdds ?? backOdds,
+              layOdds: fields.layOdds ?? layOdds,
+              commission: commission / 100,
+              mode: calcBetType,
+            })
+          )
+        );
         setAdvanced(true);
       }
       if (fields.bookmaker?.trim() && source === "bookie") {
@@ -1847,6 +1906,10 @@ export function AddBetDialog({
       toast.error("Enter back stake, back odds and lay odds first");
       return;
     }
+    if (!noLay && preview && preview.totalLayStake <= 0) {
+      toast.error("Lay stake is £0. Enter lay odds, or switch to No lay.");
+      return;
+    }
     if (noLay && !(backStake > 0 && backOdds > 1)) {
       toast.error("Enter back stake and back odds first");
       return;
@@ -1970,14 +2033,12 @@ export function AddBetDialog({
         onPointerDownOutside={preventDialogDismissOnPortaledContent}
         onInteractOutside={preventDialogDismissOnPortaledContent}
       >
-        <DialogHeader className="border-b px-6 pb-4 pt-7">
-          <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            {editBet ? "Edit bet" : "Add bet"}
-          </DialogTitle>
+        <DialogHeader className="mx-0 mt-0">
+          <DialogTitle>{editBet ? "Edit bet" : "Add bet"}</DialogTitle>
           <DialogDescription>
             {editBet
-              ? "Update the bet details or delete it from your log."
-              : "Link it to an event and the result engine settles it for you."}
+              ? "Update the details, or delete it from your log."
+              : "Link an event and the result settles it."}
           </DialogDescription>
         </DialogHeader>
 
@@ -2687,7 +2748,9 @@ export function AddBetDialog({
                   <AdvancedLaySection
                     bounds={bounds}
                     layStake={layStake}
-                    onLayStake={setLayStakeOverride}
+                    onLayStake={(v) =>
+                      setLayStakeOverride(commitLayStakeOverride(v, layCalcKey))
+                    }
                     partLays={partLays}
                     onPartLays={setPartLays}
                     accent={exchange?.brandColor ?? "#1e293b"}
@@ -2701,8 +2764,9 @@ export function AddBetDialog({
               <LayStakeBanner
                 value={layStake}
                 fillSelection={selection || label}
+                pending={!planInput}
                 onChange={(v) =>
-                  setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+                  setLayStakeOverride(commitLayStakeOverride(v, layCalcKey))
                 }
               />
             </LayPanel>
@@ -2813,7 +2877,24 @@ export function AddBetDialog({
               <Trash2 className="size-4" />
             </Button>
           )}
-          <Button onClick={save} disabled={saving || (!dutchLegs?.length && !preview && !(noLay && backStake > 0 && backOdds > 1))} className={cn("min-w-36", !dutchLegs?.length && !noLay && ring(!preview))}>
+          <Button
+            onClick={save}
+            disabled={
+              !addBetMatchedSaveEnabled({
+                saving,
+                isDutch,
+                dutchLegsCount: dutchLegs?.length ?? 0,
+                noLay,
+                backStake,
+                backOdds,
+                preview,
+              })
+            }
+            className={cn(
+              "min-w-36",
+              !dutchLegs?.length && !noLay && ring(!preview || preview.totalLayStake <= 0)
+            )}
+          >
             {editBet ? "Save changes" : "Save bet"}
           </Button>
           </div>

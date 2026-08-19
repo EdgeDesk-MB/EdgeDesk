@@ -276,9 +276,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
               <DialogHeader className="shrink-0">
                 <DialogTitle>Log a casino offer</DialogTitle>
                 <DialogDescription>
-                  Name the campaign, then add its steps - a qualifying wager first when
-                  the promo is wager-to-get, then the bonus, free spins, golden chips or
-                  cashback.
+                  Name the campaign, then add its steps.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
@@ -415,10 +413,10 @@ Stake £10 get a £20 casino bonus
                 </DialogTitle>
                 <DialogDescription>
                   {onQualifyPhase
-                    ? `Stake required to unlock ${title.trim() || "this offer"}. Next you will add the bonus or spins.`
+                    ? `Stake required to unlock ${title.trim() || "this offer"}.`
                     : twoStep
-                      ? `Reward for ${title.trim() || "this campaign"} after the qualifying wager.`
-                      : `${title.trim() || "This campaign"} needs at least one step to show an EV.`}
+                      ? `Reward after the qualifying wager.`
+                      : `Add a step so this campaign can show an EV.`}
                 </DialogDescription>
               </DialogHeader>
               {onQualifyPhase ? (

@@ -72,26 +72,26 @@ export function RacingSettlePrompt({
   const moreCount = visible.length - 1;
   const tierHint =
     resultsTier === "basic"
-      ? "Results sync automatically while the app is open - or "
+      ? "Results sync automatically while the app is open, or "
       : resultsTier === "free"
-        ? "Free tier - upgrade Racing API Basic for auto results, or "
+        ? "Free tier, upgrade Racing API Basic for auto results, or "
         : "Set Racing API credentials for auto results, or ";
 
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm",
+        "flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm",
         className
       )}
       role="status"
     >
-      <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-amber-900 dark:text-amber-100">
+        <p className="font-semibold text-warning">
           {visible.length === 1 ? "Race awaiting result" : `${visible.length} races awaiting results`}
         </p>
-        <p className="mt-0.5 text-xs text-amber-800/90 dark:text-amber-200/90">
-          <span className="font-medium">{primary.course}</span> ({formatClockString(primary.offTime)}) passed off without a
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{primary.course}</span> ({formatClockString(primary.offTime)}) passed off without a
           winner. {tierHint}
           set the winner on{" "}
           <Link href="/tracked-events" className="font-medium underline underline-offset-2">
@@ -99,7 +99,7 @@ export function RacingSettlePrompt({
           </Link>
           .
           {moreCount > 0 && (
-            <span className="text-amber-700/80 dark:text-amber-300/80">
+            <span>
               {" "}
               +{moreCount} more
             </span>
@@ -114,7 +114,7 @@ export function RacingSettlePrompt({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-amber-700 hover:text-amber-900 dark:text-amber-300"
+          className="size-7 text-warning hover:text-warning/80"
           aria-label="Dismiss settle reminder"
           onClick={() => (visible.length === 1 ? dismiss(primary.id) : dismissAll())}
         >

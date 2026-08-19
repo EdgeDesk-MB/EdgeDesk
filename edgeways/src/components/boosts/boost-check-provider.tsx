@@ -41,8 +41,7 @@ export function BoostCheckProvider({ children }: { children: React.ReactNode }) 
           <DialogHeader>
             <DialogTitle>Check a boost</DialogTitle>
             <DialogDescription>
-              Found a boosted price or built a bet? Enter it with fair odds - Edgeways gives
-              the verdict and keeps score on the Boosts page.
+              Enter a boosted price and fair odds.
             </DialogDescription>
           </DialogHeader>
           <BoostCheckerForm onLogged={() => setOpen(false)} />

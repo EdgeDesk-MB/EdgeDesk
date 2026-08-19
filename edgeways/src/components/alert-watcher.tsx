@@ -2,8 +2,8 @@
 
 /**
  * Alert watcher (C4): evaluates the pure alert rules against every state
- * poll and delivers new alerts through the local channel. Dedupe keys are
- * kept in sessionStorage so a reload doesn't replay the day's alerts.
+ * poll and delivers new alerts through the local channel. Inbox dedupe keys
+ * are the durable seen set (per desk). sessionStorage is only a same-tab cache.
  */
 
 import { useEffect, useMemo, useRef } from "react";
@@ -15,6 +15,12 @@ import {
   createLocalAlertChannel,
   ensureAlertToastLifecycle,
 } from "@/lib/alerts/local-channel";
+import {
+  mergeSettledStatusMap,
+  resultSettledAlertKey,
+  resultSettledAlertKeys,
+  settledBetIdsToAnnounce,
+} from "@/lib/alerts/settled-since-poll";
 import { plainAlertBody } from "@/lib/alerts/plain-body";
 import {
   evaluateAlertRules,
@@ -26,6 +32,7 @@ import {
   dismissAlertNotifications,
   readSeenAlertKeys,
   storeSeenAlertKeys,
+  suppressAlertKeys,
 } from "@/lib/alerts/seen";
 import { consumeUserOriginatedAlertKey } from "@/lib/alerts/user-originated";
 import { detectNakedExposure } from "@/lib/bets/naked-exposure";
@@ -51,49 +58,54 @@ export function AlertWatcher() {
   useEffect(() => {
     if (!state) return;
     if (seenRef.current == null) seenRef.current = readSeenAlertKeys();
+    // Desk inbox is the source of truth: a new browser must not re-toast
+    // anything already delivered (read or unread).
+    suppressAlertKeys(state.deliveredAlertKeys ?? []);
 
     // Newly settled bets: transitions since the previous poll. The first poll
     // seeds silently so a page load doesn't announce history.
-    const settledNow = (state.bets ?? []).filter(
-      (b) => b.status !== "open" && b.settledAt != null
-    );
+    const bets = state.bets ?? [];
+    const settledNow = bets.filter((b) => b.status !== "open" && b.settledAt != null);
     const previous = settledStatusRef.current;
-    settledStatusRef.current = new Map(settledNow.map((b) => [b.id, b.status]));
+    const now = Date.now();
+    settledStatusRef.current = mergeSettledStatusMap(
+      previous,
+      settledNow.map((b) => ({ id: b.id, status: b.status, settledAt: b.settledAt })),
+      bets.filter((b) => b.status === "open" || b.settledAt == null).map((b) => b.id)
+    );
+    const announceIds = new Set(
+      settledBetIdsToAnnounce(
+        previous,
+        settledNow.map((b) => ({ id: b.id, status: b.status, settledAt: b.settledAt })),
+        now
+      )
+    );
     const offersById = new Map((state.offers ?? []).map((o) => [o.id, o]));
     const eventsById = new Map((state.events ?? []).map((e) => [e.id, e]));
     const settledSinceLastPoll: SettledBetNotice[] = [];
-    if (previous != null) {
-      for (const b of settledNow) {
-        const prev = previous.get(b.id);
-        const offer = b.offerId != null ? offersById.get(b.offerId) : undefined;
-        const event = b.eventId != null ? eventsById.get(b.eventId) : undefined;
-        const notice: SettledBetNotice = {
-          betId: b.id,
-          label: b.label,
-          profit: b.status === "void" || b.status === "push" ? 0 : (b.actualProfit ?? 0),
-          status: b.status,
-          betType: b.betType,
-          offerTitle: offer?.title ?? null,
-          bookmaker: b.bookmaker ?? offer?.bookmaker ?? null,
-          resultSummary: settlementEventResultLabel({
-            selection: b.selection,
-            sport: b.sport ?? event?.sport ?? null,
-            event: event ?? null,
-          }),
-        };
-        if (prev == null) {
-          // First settle: skip pure void/push (no toast); won/lost etc. announce.
-          if (b.status !== "void" && b.status !== "push") {
-            settledSinceLastPoll.push(notice);
-          }
-        } else if (prev !== b.status && (b.status === "void" || b.status === "push")) {
-          // Settled then voided (or pushed): revise the existing result alert.
-          settledSinceLastPoll.push(notice);
-        }
-      }
+    for (const b of settledNow) {
+      if (!announceIds.has(b.id)) continue;
+      const offer = b.offerId != null ? offersById.get(b.offerId) : undefined;
+      const event = b.eventId != null ? eventsById.get(b.eventId) : undefined;
+      settledSinceLastPoll.push({
+        betId: b.id,
+        label: b.label,
+        profit: b.status === "void" || b.status === "push" ? 0 : (b.actualProfit ?? 0),
+        status: b.status,
+        betType: b.betType,
+        offerTitle: offer?.title ?? null,
+        bookmaker: b.bookmaker ?? offer?.bookmaker ?? null,
+        resultSummary: settlementEventResultLabel({
+          selection: b.selection,
+          sport: b.sport ?? event?.sport ?? null,
+          event: event ?? null,
+        }),
+      });
     }
-
-    const now = Date.now();
+    if (previous == null) {
+      // History with no inbox row (imports, pre-alert desks) stays quiet.
+      suppressAlertKeys(resultSettledAlertKeys(settledNow.map((b) => b.id)));
+    }
 
     // B5: unhedged backs past their threshold (windows tunable via E1).
     // Intentional-nohedge notes are excluded inside detectNakedExposure.
@@ -220,7 +232,7 @@ export function AlertWatcher() {
     // Void/push revisions reuse result_settled:{id}; clear seen so inbox + toast update.
     for (const notice of settledSinceLastPoll) {
       if (notice.status === "void" || notice.status === "push") {
-        seen.delete(`result_settled:${notice.betId}`);
+        seen.delete(resultSettledAlertKey(notice.betId));
       }
     }
 

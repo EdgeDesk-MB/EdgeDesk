@@ -42,6 +42,8 @@ function bet(partial: Partial<BetRow> & Pick<BetRow, "id">): BetRow {
     source: partial.source ?? null,
     purpose: partial.purpose ?? null,
     sport: partial.sport ?? null,
+    importFingerprint: partial.importFingerprint ?? null,
+    importMeta: partial.importMeta ?? null,
   };
 }
 

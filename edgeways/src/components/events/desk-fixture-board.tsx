@@ -32,7 +32,8 @@ import {
   sectionTitle,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Flame, ChevronDown, NotebookPen, Plus } from "lucide-react";
+import { CalendarDays, Flame, ChevronDown, NotebookPen, Plus } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 
 export type FixtureStatusFilter = "all" | "live" | "scheduled";
 
@@ -43,6 +44,29 @@ function matchesStatusFilter(
   if (filter === "all") return true;
   if (filter === "live") return status === "live";
   return status === "upcoming";
+}
+
+function fixtureBoardEmptyCopy(
+  sport: "football" | "horse_racing",
+  statusFilter: FixtureStatusFilter,
+  emptyTitle: string,
+  emptyDescription: string,
+  loadFailed?: boolean,
+) {
+  if (loadFailed) return { title: emptyTitle, description: emptyDescription };
+  if (statusFilter === "live") {
+    return {
+      title: sport === "horse_racing" ? "No live races" : "No live fixtures",
+      description: "Nothing is live in this feed right now. Try All or Scheduled.",
+    };
+  }
+  if (statusFilter === "scheduled") {
+    return {
+      title: sport === "horse_racing" ? "No scheduled races" : "No scheduled fixtures",
+      description: "Nothing upcoming in this feed. Try All or Live.",
+    };
+  }
+  return { title: emptyTitle, description: emptyDescription };
 }
 
 function groupFootballByCompetition(fixtures: Fixture[]) {
@@ -425,7 +449,10 @@ export function DeskFixtureBoard({
   onEpDesk,
   onTrackRace,
   onTrackAndBetRace,
-  emptyMessage,
+  emptyTitle,
+  emptyDescription,
+  loading = false,
+  loadFailed = false,
   competitionFilter = "all",
   onCompetitionFilterChange,
   worldCupCount = 0,
@@ -440,7 +467,10 @@ export function DeskFixtureBoard({
   onEpDesk: (fixture: Fixture) => void;
   onTrackRace: (race: RacingFixture) => void;
   onTrackAndBetRace: (race: RacingFixture) => void;
-  emptyMessage: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  loading?: boolean;
+  loadFailed?: boolean;
   competitionFilter?: "all" | "world_cup";
   onCompetitionFilterChange?: (value: "all" | "world_cup") => void;
   worldCupCount?: number;
@@ -487,6 +517,13 @@ export function DeskFixtureBoard({
     { id: "scheduled", label: "Scheduled", count: scheduledCount },
     { id: "live", label: "Live", count: liveCount },
   ];
+  const emptyCopy = fixtureBoardEmptyCopy(
+    sport,
+    statusFilter,
+    emptyTitle,
+    emptyDescription,
+    loadFailed,
+  );
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -537,10 +574,24 @@ export function DeskFixtureBoard({
           </div>
         </div>
 
-        {visibleCount === 0 ? (
-          <div className="rounded-lg border border-dashed py-14 text-center text-sm text-muted-foreground">
-            {emptyMessage}
-          </div>
+        {loading ? (
+          <EmptyState
+            compact
+            busy
+            title={sport === "horse_racing" ? "Loading racecards…" : "Loading fixtures…"}
+            description={
+              sport === "horse_racing"
+                ? "Today's cards will appear here."
+                : "Today's list will appear here."
+            }
+          />
+        ) : visibleCount === 0 ? (
+          <EmptyState
+            compact
+            icon={CalendarDays}
+            title={emptyCopy.title}
+            description={emptyCopy.description}
+          />
         ) : sport === "football" ? (
           <div className="space-y-4">
             {footballGroups.map((group) => (

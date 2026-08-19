@@ -37,7 +37,8 @@ import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import type { ExchangeRow } from "@/lib/db/schema";
-import { Plus, Trash2 } from "lucide-react";
+import { Landmark, Plus, Trash2, Wallet } from "lucide-react";
+import { EmptyState } from "@/components/help/empty-state";
 
 type BookieAccessStatus = "available" | "gubbed" | "closed";
 
@@ -116,13 +117,10 @@ export function ManageVenuesDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b px-6 pb-4 pt-7">
-          <DialogTitle className="text-[25px] font-extrabold tracking-tight">
-            Manage venues
-          </DialogTitle>
+        <DialogHeader className="mx-0 mt-0">
+          <DialogTitle>Manage venues</DialogTitle>
           <DialogDescription>
-            Exchanges for lay commission and colours. Bookies for brand colour, gubbed/closed
-            status, and notes. Default bookie and exchange are set in Settings → Preferences.
+            Set colours, commission, and bookie status.
           </DialogDescription>
         </DialogHeader>
         <div className="app-scroll-nested flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
@@ -138,26 +136,44 @@ export function ManageVenuesDialog({
           </Tabs>
           <div className="mt-4">
             {accountsTab === "exchanges" ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Exchange</TableHead>
-                    <TableHead className="w-40">Commission %</TableHead>
-                    <TableHead>Colours</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {exchanges.map((exchange) => (
-                    <ExchangeEditRow
-                      key={exchange.id}
-                      exchange={exchange}
-                      onPatch={patchExchange}
-                      onDelete={deleteExchange}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              exchanges.length === 0 ? (
+                <EmptyState
+                  compact
+                  oneLine
+                  icon={Landmark}
+                  title="No exchanges yet"
+                  description="Add an exchange so lays have a default venue."
+                />
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Exchange</TableHead>
+                      <TableHead className="w-40">Commission %</TableHead>
+                      <TableHead>Colours</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {exchanges.map((exchange) => (
+                      <ExchangeEditRow
+                        key={exchange.id}
+                        exchange={exchange}
+                        onPatch={patchExchange}
+                        onDelete={deleteExchange}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              )
+            ) : bookies.length === 0 ? (
+              <EmptyState
+                compact
+                oneLine
+                icon={Wallet}
+                title="No bookie wallets yet"
+                description="Add one here, or via Adjust balance."
+              />
             ) : (
               <Table>
                 <TableHeader>
@@ -171,16 +187,6 @@ export function ManageVenuesDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {bookies.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="py-8 text-center text-sm text-muted-foreground"
-                      >
-                        No bookie wallets yet - add one here or via Adjust balance when topping up.
-                      </TableCell>
-                    </TableRow>
-                  )}
                   {bookies.map((bookie) => (
                     <BookieEditRow
                       key={bookie.id}
@@ -456,7 +462,7 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
           <DialogHeader>
             <DialogTitle>Add bookie</DialogTitle>
             <DialogDescription>
-              Pick from the list or enter a custom name. Brand colour defaults to the known palette.
+              Pick a bookie or type a custom name.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
@@ -535,7 +541,7 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
           <DialogHeader>
             <DialogTitle>Add exchange</DialogTitle>
             <DialogDescription>
-              Pick a preset (colours included) and set the commission you actually pay.
+              Pick a preset and set the commission you pay.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">

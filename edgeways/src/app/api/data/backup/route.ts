@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, backupDatabaseTo } from "@/lib/db";
 import { APP_VERSION } from "@/lib/app-version";
 import { sql } from "drizzle-orm";
+import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ function stamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withDeskScope(async function GET(req: NextRequest) {
   const format = req.nextUrl.searchParams.get("format") ?? "sqlite";
 
   if (format === "json") {
@@ -47,4 +48,4 @@ export async function GET(req: NextRequest) {
   } finally {
     fs.rmSync(tmp, { force: true });
   }
-}
+});

@@ -209,9 +209,11 @@ export function QuickLogSheet() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Quick actions</DialogTitle>
+            <DialogTitle>{path === "manual" ? "Log manually" : "Quick actions"}</DialogTitle>
             <DialogDescription>
-              Capture the bet now, tidy the details on desktop later.
+              {path === "manual"
+                ? "Capture the stake and odds, tidy the rest later."
+                : "Log now, tidy the details later."}
             </DialogDescription>
           </DialogHeader>
 

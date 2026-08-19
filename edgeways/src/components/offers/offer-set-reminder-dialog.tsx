@@ -123,10 +123,9 @@ export function OfferSetReminderDialog({
       </Button>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Set your reminder</DialogTitle>
+          <DialogTitle>Set a reminder</DialogTitle>
           <DialogDescription>
-            Nudge yourself when a free bet lands, a qualifier is due, or the promo
-            window is about to close.
+            Nudge when a free bet lands or a qualifier is due.
           </DialogDescription>
         </DialogHeader>
 

@@ -8,7 +8,7 @@ export default function FeedbackPage() {
     <PageShell>
       <PageHeader
         title="Feedback"
-        description="Report a bug, share an idea, or send a general note. Reports are saved on this device and can be emailed to the Edgeways inbox."
+        description="Report a bug, share an idea, or send a general note. We'll review every report."
         icon={MessageSquarePlus}
       />
 

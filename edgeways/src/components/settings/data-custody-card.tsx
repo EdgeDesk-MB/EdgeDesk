@@ -43,7 +43,10 @@ import {
   type ImportParseResult,
 } from "@/lib/import/bets-import";
 import { formatGbp } from "@/lib/format-money";
+import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { DatabaseBackup, FileUp, HardDriveDownload, ShieldCheck } from "lucide-react";
+import { PlatformImportDialog } from "@/components/import/platform-import-dialog";
+import { detectProfitCsvFormat } from "@/lib/import/oddsmonkey-profits";
 
 type RestorePreview = { token: string; counts: Record<string, number> };
 
@@ -57,6 +60,8 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<ImportMapping | null>(null);
   const [importing, setImporting] = useState(false);
+  const [oddsmonkeyOpen, setOddsmonkeyOpen] = useState(false);
+  const [oddsmonkeySeed, setOddsmonkeySeed] = useState<string | null>(null);
 
   async function onRestoreFile(file: File) {
     setValidating(true);
@@ -103,6 +108,11 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
       toast.error("Nothing to import", { description: "Need a header row plus data rows." });
       return;
     }
+    if (detectProfitCsvFormat(rows[0] ?? []) === "oddsmonkey") {
+      setOddsmonkeySeed(text);
+      setOddsmonkeyOpen(true);
+      return;
+    }
     setCsvRows(rows);
     setMapping(guessMapping(rows[0]!));
     setImportOpen(true);
@@ -138,14 +148,15 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="size-4" /> Data custody
         </CardTitle>
         <CardDescription>
-          Your data lives in one local file. Back it up, restore it, or bring bet history in
-          from a spreadsheet.
+          Your data lives in one local file. Back it up, restore it, or bring
+          bet history in from Oddsmonkey or a spreadsheet.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
@@ -171,13 +182,24 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
         <Button
           variant="outline"
           className="justify-start gap-2"
+          onClick={() => {
+            setOddsmonkeySeed(null);
+            setOddsmonkeyOpen(true);
+          }}
+        >
+          <FileUp className="size-4" /> Import from Oddsmonkey…
+        </Button>
+        <Button
+          variant="outline"
+          className="justify-start gap-2"
           onClick={() => importInputRef.current?.click()}
         >
           <FileUp className="size-4" /> Import bets from CSV…
         </Button>
         <p className="text-xs text-muted-foreground">
           Restores always save a pre-restore copy first. Imported bets are history only - they
-          never change balances and never count towards EV capture.
+          never change balances and never count towards EV capture. Oddsmonkey import is not
+          affiliated with Oddsmonkey.
         </p>
 
         <input
@@ -214,8 +236,7 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
             <DialogHeader>
               <DialogTitle>Replace your database?</DialogTitle>
               <DialogDescription>
-                The backup checks out. Restoring replaces everything in Edgeways with its
-                contents - a safety copy of your current data is saved first.
+                Restore this backup. A safety copy is saved first.
               </DialogDescription>
             </DialogHeader>
             {restorePreview ? (
@@ -245,8 +266,7 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
             <DialogHeader>
               <DialogTitle>Import bets from CSV</DialogTitle>
               <DialogDescription>
-                Match your spreadsheet columns. Date and profit are required; everything else
-                is optional.
+                Match your columns. Date and profit are required.
               </DialogDescription>
             </DialogHeader>
 
@@ -312,10 +332,15 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
             ) : null}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setImportOpen(false)}>
+              <Button
+                variant="outline"
+                {...pageSecondaryButtonProps}
+                onClick={() => setImportOpen(false)}
+              >
                 Cancel
               </Button>
               <Button
+                {...pagePrimaryButtonProps}
                 disabled={!mappingReady || importing || (parsed?.drafts.length ?? 0) === 0}
                 onClick={runImport}
               >
@@ -328,5 +353,15 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
         </Dialog>
       </CardContent>
     </Card>
+    <PlatformImportDialog
+      open={oddsmonkeyOpen}
+      onOpenChange={(next) => {
+        setOddsmonkeyOpen(next);
+        if (!next) setOddsmonkeySeed(null);
+      }}
+      seedText={oddsmonkeySeed}
+      onImported={onRestored}
+    />
+    </>
   );
 }

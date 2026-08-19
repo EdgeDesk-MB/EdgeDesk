@@ -20,7 +20,7 @@ import { CalculatorPageHeader } from "@/components/layout/calculator-page-header
 import { CalculatorShell } from "@/components/page-shell";
 import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { twoUp, twoUpEV } from "@/lib/calc";
+import { twoUp, twoUpEV } from "@/lib/calc/twoup";
 import type { ExchangeRow } from "@/lib/db/schema";
 import { panelSurface } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";

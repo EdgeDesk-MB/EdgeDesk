@@ -26,9 +26,8 @@ export interface PageHelpContent {
 
 export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   dashboard: {
-    title: "Live Dashboard",
-    summary:
-      "Your command centre for running P&L. Settled profit plus provisional value of open bets, updated as results land.",
+    title: "Dashboard",
+    summary: "Settled profit plus the provisional value of open bets.",
     bullets: [
       "Live P&L = settled profit + provisional open value (worst-case guaranteed until settle; live revaluation in-play).",
       "Matched free bets and lays count their known worst outcome immediately - the figure updates when the result settles.",
@@ -39,7 +38,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   fixtures: {
     title: "Fixtures",
-    summary: "Browse today's football fixtures and horse racecards, then track what you care about.",
+    summary: "Browse today, then track what you care about.",
     bullets: [
       "Hit + on any row to add it to Tracked Events.",
       "Without API keys you get demo fixtures and sample racecards.",
@@ -50,8 +49,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   racing: {
     title: "Racing Desk",
-    summary:
-      "Racecards, offer-aware Intelligence, and one-click lay workflow for UK & IRE place-refund offers.",
+    summary: "Racecards and one-click lays for place-refund offers.",
     bullets: [
       "Proxy odds are ORF estimates - labelled clearly. Use Lay to open the matched calculator with your real odds.",
       "Intelligence scores races by offer fit, field size, and estimated EV - higher is better, not a guarantee.",
@@ -62,7 +60,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   tracker: {
     title: "Profit Tracker",
-    summary: "Every position linked to real events. Results settle bets automatically.",
+    summary: "Positions linked to events. Results settle automatically.",
     bullets: [
       "Add bets manually, from calculators, or via OCR screenshot import.",
       "Placing a deliberate back-only bet (e.g. a mug bet)? Pick the No lay bet type - the lay panel disappears and the outcomes show the bookie side only.",
@@ -76,15 +74,13 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   acca: {
     title: "Acca Desk",
-    summary:
-      "Run acca offers as guided multi-day workflows. Pick a method, then enter live exchange lay odds and stake whenever a leg is due.",
+    summary: "Multi-day accas. Lay each leg when it is due.",
     bullets: [...ACCA_DESK_HELP_BULLETS],
     guideSlug: "desk-how-tos",
   },
   "bet-builder": {
     title: "Bet Builder Desk",
-    summary:
-      "Same-event builders with one kick-off. Match with one combined lay, or choose No lay when the exchange has no clean market.",
+    summary: "Same-event builders with one kick-off and one combined lay.",
     bullets: [
       "Selections share one event — unlike Acca Desk, which spans multiple kick-offs.",
       "Combined lay: one equalising stake/odds (correct-score collapse, or any single exchange market you found).",
@@ -96,8 +92,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   systems: {
     title: "Systems Desk",
-    summary:
-      "Full-cover tickets (Lucky 15, Yankee, Trixie…). Log what you placed elsewhere, settle selections, track P&L. Not a Lucky Finder.",
+    summary: "Log full-cover tickets, settle selections, track P&L.",
     bullets: [
       "Paste a bookie or Lucky Finder slip to pre-fill structure, unit stake, each-way and selections.",
       "No Acca-style lay workflow: these tickets are for organisation, mug cover, and value-play tracking.",
@@ -109,8 +104,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   boosts: {
     title: "Boosts",
-    summary:
-      "Fair-price verdicts for price boosts and bet builders - log for later, or place as a real Tracker bet.",
+    summary: "Fair-price verdicts for boosts and builders.",
     bullets: [
       "Price boost: fill the Back Bet and Lay Bet panels - fair price is the exchange back/lay no-vig midpoint, and the verdict shows the edge at the boosted odds.",
       "Advanced (on the Lay Bet panel) unlocks part lays and the underlay/standard/overlay slider - Underlay is the boost play: £0 back if it loses, the full edge if it wins.",
@@ -122,8 +116,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   casino: {
     title: "Casino",
-    summary:
-      "Wagering campaigns with honest EV - each step (qualifying wager, bonus, spins, chips, cashback) has its own verdict, summed to a campaign total.",
+    summary: "Wagering campaigns with an honest EV per step.",
     bullets: [
       "Log offer: name the campaign, then add steps - qualifying wager, cash, bonus, free spins, golden chips or cashback. Paste the promo to prefill.",
       "Repeats: tick Repeats on create for daily/weekly/monthly reloads - each occurrence is its own campaign with the same steps and freshly derived EV. Stop from any card when the promo ends.",
@@ -136,8 +129,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   offers: {
     title: "Offers",
-    summary:
-      "Campaigns and calendar - track promos, next actions, and what to do today. Settled profit lives in the top bar.",
+    summary: "Track promos, next actions, and what to do today.",
     bullets: [
       "Campaigns: pipeline stages, filters, and edit/complete. Calendar: Today / This week / Later.",
       "Got a promo email? Drop the .eml straight into Paste offer (or paste its text) - it parses locally into the same preview, subject line included.",
@@ -149,7 +141,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   calculators: {
     title: "Calculators",
-    summary: "The matched betting toolkit. Core calculators push straight to the profit tracker.",
+    summary: "Matched betting toolkit. Core calcs go to the tracker.",
     bullets: [
       "Matched Betting - qualifiers, free bets (SNR/SR) and risk-free offers.",
       "Dutching - equal-profit splits; 2UP dutch mode for early-payout windfalls.",
@@ -160,8 +152,10 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   "tracked-events": {
     title: "Tracked Events",
-    summary: "Matches and races you're following. Live scores refresh automatically.",
+    summary: "Matches and races you follow. Scores refresh live.",
     bullets: [
+      "Events are grouped by kick-off day, same Today / Yesterday split as Campaigns.",
+      "All, Today, Upcoming, Past, or Jump to day to open a past date.",
       "Simulate a 2UP match for the 60-second demo loop - no API keys needed.",
       "Goal timelines fetch only when you have an open trigger bet on the match.",
       "Racing: Basic tier auto-settles while the app is open; Free tier uses Set winner.",
@@ -171,8 +165,9 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   settings: {
     title: "Settings",
-    summary: "Defaults, API connections and data export.",
+    summary: "Defaults, API connections, and data export.",
     bullets: [
+      "Subscription: plan, trial and Manage billing. Card, invoices and cancel open in Stripe.",
       "Default bookie and exchange are set in Preferences - saved as you pick them.",
       "Exchanges and bookie status: Accounts → Manage venues.",
       "Data & API shows connection status for API-Football, Racing API and Betfair.",
@@ -186,7 +181,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   history: {
     title: "History",
-    summary: "Full timeline of bets, casino settlements, promos and live match moments.",
+    summary: "Bets, casino, promos, and live match moments.",
     bullets: [
       "Filter by bets, settlements, casino, promos or match events.",
       "Times align to when things happened - kick-off, goals, full time, casino complete.",
@@ -197,8 +192,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   accounts: {
     title: "Accounts",
-    summary:
-      "Bookie and exchange wallets - balances, free bets, status and ledger. Top bar shows Exchange · In-bets · Total (Ultimatcher-style).",
+    summary: "Bookie and exchange wallets, free bets, and the ledger.",
     bullets: [
       "Banks fund deposits; Transfer moves cash to bookies (withdrawals can stay pending).",
       "Manage venues: exchange commission, colours, bookie status and notes.",

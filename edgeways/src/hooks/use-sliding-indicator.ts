@@ -11,6 +11,8 @@ export type SlidingIndicatorBox = {
   left: number;
   width: number;
   ready: boolean;
+  /** Optional `data-plate` on the active child (segmented tab colours). */
+  plate: string | null;
 };
 
 /**
@@ -27,6 +29,7 @@ export function useSlidingIndicator(
     left: 0,
     width: 0,
     ready: false,
+    plate: null,
   });
 
   const measure = useCallback(() => {
@@ -44,11 +47,13 @@ export function useSlidingIndicator(
       left: Math.round(activeRect.left - rootRect.left + root.scrollLeft),
       width: Math.round(activeRect.width),
       ready: activeRect.width > 0,
+      plate: active.dataset.plate ?? null,
     };
     setBox((prev) =>
       prev.left === next.left &&
       prev.width === next.width &&
-      prev.ready === next.ready
+      prev.ready === next.ready &&
+      prev.plate === next.plate
         ? prev
         : next
     );
@@ -71,7 +76,7 @@ export function useSlidingIndicator(
       subtree: true,
       // Don’t watch `class` — colour fades on the meta-nav were remeasuring
       // every frame of the fade and fighting the pill transition.
-      attributeFilter: ["data-state", "data-active", "aria-current"],
+      attributeFilter: ["data-state", "data-active", "data-plate", "aria-current"],
       childList: true,
     });
 

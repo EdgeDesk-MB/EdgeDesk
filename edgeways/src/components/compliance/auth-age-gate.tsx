@@ -8,8 +8,9 @@ import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gam
 import { LEGAL_PATHS } from "@/lib/legal/public";
 
 /**
- * Auth-surface 18+ step (EDGE-13 / EDGE-19+). Same wording as AgeGateDialog;
- * shown before Clerk SignUp so Google and email both require confirmation.
+ * Auth-surface 18+ step (EDGE-13 / EDGE-19+). Shown before Clerk SignUp so
+ * Google and email both require confirmation. Shares ResponsibleGamblingNote
+ * with AgeGateDialog; auth copy is longer because this is account creation.
  */
 export function AuthAgeConfirm({
   onConfirm,
@@ -21,23 +22,23 @@ export function AuthAgeConfirm({
   const [legalAccepted, setLegalAccepted] = useState(false);
 
   return (
-    <div className="w-full max-w-[400px] rounded-lg border border-white/10 bg-[#1a1a1a] p-6 text-[#f5f5f0] shadow-none">
+    <div className="w-full max-w-[400px] rounded-lg border border-white/10 bg-[var(--marketing-panel-inset)] p-6 text-[var(--marketing-fg)] shadow-none">
       <div className="flex flex-col gap-3 text-center">
-        <div className="mx-auto flex size-10 items-center justify-center rounded-md bg-[#FFC71E]">
-          <ShieldCheck className="size-5 text-[#111111]" aria-hidden />
+        <div className="mx-auto flex size-10 items-center justify-center rounded-md bg-[var(--marketing-brand)]">
+          <ShieldCheck className="size-5 text-[var(--marketing-ink)]" aria-hidden />
         </div>
         <h1 className="text-xl font-semibold tracking-tight">
           Edgeways is for over-18s only
         </h1>
-        <p className="text-sm text-[rgba(245,245,240,0.65)]">
+        <p className="text-sm text-[color-mix(in_srgb,var(--marketing-fg)_65%,transparent)]">
           Edgeways tracks matched betting, staking against bookmaker promotions.
           You must be 18 or over to create an account.
         </p>
-        <ResponsibleGamblingNote className="text-[rgba(245,245,240,0.55)] [&_a]:text-[#FFC71E]" />
-        <label className="flex cursor-pointer items-start gap-2 text-left text-sm text-[rgba(245,245,240,0.65)]">
+        <ResponsibleGamblingNote className="text-[color-mix(in_srgb,var(--marketing-fg)_55%,transparent)] [&_a]:text-[var(--marketing-brand)]" />
+        <label className="flex cursor-pointer items-start gap-2 text-left text-sm text-[color-mix(in_srgb,var(--marketing-fg)_65%,transparent)]">
           <input
             type="checkbox"
-            className="mt-0.5 size-4 shrink-0 rounded accent-[#FFC71E]"
+            className="mt-0.5 size-4 shrink-0 rounded accent-[var(--marketing-brand)]"
             checked={legalAccepted}
             onChange={(e) => setLegalAccepted(e.target.checked)}
           />
@@ -45,7 +46,7 @@ export function AuthAgeConfirm({
             I have read and agree to the{" "}
             <Link
               href={LEGAL_PATHS.terms}
-              className="rounded-sm text-[#FFC71E] underline-offset-2 hover:underline"
+              className="rounded-sm text-[var(--marketing-brand)] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
               target="_blank"
               rel="noreferrer"
             >
@@ -55,7 +56,7 @@ export function AuthAgeConfirm({
             and{" "}
             <Link
               href={LEGAL_PATHS.privacy}
-              className="rounded-sm text-[#FFC71E] underline-offset-2 hover:underline"
+              className="rounded-sm text-[var(--marketing-brand)] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
               target="_blank"
               rel="noreferrer"
             >
@@ -68,7 +69,8 @@ export function AuthAgeConfirm({
       </div>
       <div className="mt-6 flex flex-col gap-2">
         <Button
-          className="h-10 w-full bg-[#FFC71E] font-semibold text-[#111111] hover:bg-[#ffd24d]"
+          size="lg"
+          className="h-10 w-full bg-[var(--marketing-brand)] font-semibold text-[var(--marketing-ink)] hover:opacity-90"
           disabled={!legalAccepted}
           onClick={onConfirm}
         >
@@ -76,7 +78,8 @@ export function AuthAgeConfirm({
         </Button>
         <Button
           variant="ghost"
-          className="h-10 w-full text-[rgba(245,245,240,0.65)] hover:bg-white/5 hover:text-[#f5f5f0]"
+          size="lg"
+          className="h-10 w-full text-[color-mix(in_srgb,var(--marketing-fg)_65%,transparent)] hover:bg-white/5 hover:text-[var(--marketing-fg)]"
           onClick={onDecline}
         >
           I&apos;m under 18
@@ -88,19 +91,19 @@ export function AuthAgeConfirm({
 
 export function AuthUnder18Blocked() {
   return (
-    <div className="w-full max-w-[400px] rounded-lg border border-white/10 bg-[#1a1a1a] p-6 text-center text-[#f5f5f0]">
+    <div className="w-full max-w-[400px] rounded-lg border border-white/10 bg-[var(--marketing-panel-inset)] p-6 text-center text-[var(--marketing-fg)]">
       <h1 className="text-xl font-semibold tracking-tight">
         Edgeways is for over-18s only
       </h1>
-      <p className="mt-3 text-sm text-[rgba(245,245,240,0.65)]">
+      <p className="mt-3 text-sm text-[color-mix(in_srgb,var(--marketing-fg)_65%,transparent)]">
         You must be 18 or over to use Edgeways, so we can&apos;t create an
         account today. If someone else&apos;s gambling is affecting you, support
         is available.
       </p>
-      <ResponsibleGamblingNote className="mt-3 text-[rgba(245,245,240,0.55)] [&_a]:text-[#FFC71E]" />
+      <ResponsibleGamblingNote className="mt-3 text-[color-mix(in_srgb,var(--marketing-fg)_55%,transparent)] [&_a]:text-[var(--marketing-brand)]" />
       <Link
         href="/"
-        className="mt-6 inline-flex text-sm text-[#FFC71E] hover:text-[#ffd24d]"
+        className="mt-6 inline-flex rounded-sm text-sm text-[var(--marketing-brand)] hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
       >
         Back to home
       </Link>

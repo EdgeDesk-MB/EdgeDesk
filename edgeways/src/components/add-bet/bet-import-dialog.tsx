@@ -61,7 +61,7 @@ export function BetImportDialog({
         <DialogHeader>
           <DialogTitle>Paste slip</DialogTitle>
           <DialogDescription>
-            Paste a screenshot or confirmation text to pre-fill bet details. Always check before saving.
+            Paste a screenshot or confirmation to pre-fill.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">

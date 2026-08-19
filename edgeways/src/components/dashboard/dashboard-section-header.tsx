@@ -66,7 +66,7 @@ function SectionTitle({
   titleHref?: string;
 }) {
   const titleClass = cn(
-    "m-0 font-bold leading-snug text-foreground",
+    "m-0 min-w-0 text-pretty break-words font-bold leading-snug text-foreground",
     prominent ? "text-lg" : "text-sm"
   );
 
@@ -135,8 +135,8 @@ export function DashboardSectionHeader({
           prominent ? "items-center" : "items-start"
         )}
       >
-        <div className="min-w-0 shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             {Icon ? (
               <Icon
                 className={cn(
@@ -148,10 +148,10 @@ export function DashboardSectionHeader({
               />
             ) : null}
             <SectionTitle title={title} prominent={prominent} titleHref={titleHref} />
-            {titleBadge ? <div className="ml-4 flex items-center">{titleBadge}</div> : null}
+            {titleBadge ? <div className="ml-4 flex shrink-0 items-center">{titleBadge}</div> : null}
           </div>
           {!prominent ? (
-            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{description}</p>
+            <p className="mt-0.5 min-w-0 text-pretty break-words text-xs leading-snug text-muted-foreground">{description}</p>
           ) : null}
         </div>
         {(action || (prominent && description)) && (
