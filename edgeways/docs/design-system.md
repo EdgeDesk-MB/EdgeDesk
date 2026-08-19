@@ -410,7 +410,7 @@ Agent rule: `edgeways/.cursor/rules/lay-fields.mdc`.
 
 ## Auth canvas
 
-`/login` and `/sign-up` (`(auth)/layout`) are pinned dark, same idea as marketing: ink plate, brand yellow CTA, Clerk card as one dark face. Do not follow the desk Light/Dark toggle. Clerk’s shadcn theme maps the footer to host `--card` / `--color-card`. Tailwind `@theme` binds those aliases on `:root` (light). Nested `.dark` must re-bind `--color-card` / `--color-muted` (see `.dark` and `.marketing-root` in `globals.css`) or the footer is a white band with light type. `EDGEWAYS_CLERK_APPEARANCE` paints the card and footer on that ink plate.
+`/login` and `/sign-up` (`(auth)/layout`) are pinned dark, same idea as marketing: ink plate, brand yellow CTA, Clerk card as one dark face. Do not follow the desk Light/Dark toggle. Clerk applies `appearance.variables` against `html`, which is desk-light by default. Do not point those variables at `var(--card)` or `--marketing-*` (undefined / light on `:root`). Use the marketing plate literals in `EDGEWAYS_CLERK_APPEARANCE` (`#FFC71E`, `#1a1a1a`, `#f5f5f0`) and Clerk’s `dark` theme after `shadcn`. Nested `.dark` still re-binds `--color-card` for anything that reads host Tailwind tokens (see `globals.css`).
 
 ## Marketing canvas
 
