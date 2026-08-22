@@ -5,6 +5,7 @@ import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
+import { isNeonDesk } from "./desk-backend";
 import { getDeskActor, resolveScopedDbPath } from "./desk-scope";
 import { seedDemoData } from "./demo-seed";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
@@ -78,13 +79,20 @@ function adoptLegacyDbFile(dbPath: string): void {
 
 /** One connection per SQLite file. Owner and test logins stay isolated. */
 function getDb(): DB {
-  const dbPath = resolveDbPath();
+  // Hosted (Neon) desk: the deployment filesystem is read-only, so opening
+  // the file would ENOENT on mkdir - and any module that touches `db` at
+  // import time (e.g. top-level prepare) takes the whole route down with it.
+  // Dual-pathed routes never query SQLite, so a throwaway in-memory handle
+  // keeps those imports harmless until they are cut over.
+  const dbPath = isNeonDesk() ? ":memory:" : resolveDbPath();
   const hit = opened.get(dbPath);
   if (hit) return hit.db;
 
-  const dataDir = path.dirname(dbPath);
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  adoptLegacyDbFile(dbPath);
+  if (dbPath !== ":memory:") {
+    const dataDir = path.dirname(dbPath);
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    adoptLegacyDbFile(dbPath);
+  }
 
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
@@ -749,7 +757,7 @@ WHERE category = 'top_up'
 }
 
 function rawForCurrent(): Database.Database {
-  const dbPath = resolveDbPath();
+  const dbPath = isNeonDesk() ? ":memory:" : resolveDbPath();
   getDb();
   const hit = opened.get(dbPath);
   if (!hit) throw new Error("SQLite handle missing after open.");
