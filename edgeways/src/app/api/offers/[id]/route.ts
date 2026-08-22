@@ -22,6 +22,12 @@ import {
   withPlaybookOnRules,
 } from "@/lib/offers/offer-playbook";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonDeskOffer,
+  getNeonDeskOffer,
+  patchNeonDeskOffer,
+} from "@/lib/db/neon-desk-offers";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +74,54 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   }
   const p = parsed.data;
   const offerId = Number(id);
+
+  if (isNeonDesk()) {
+    // Hosted desk: series recurrence, EV snapshots and playbooks are still
+    // SQLite-only; edit the campaign row directly.
+    if (p.stopRecurrence || p.updateSeries || p.mistakeTag !== undefined || p.playbookStepDone) {
+      return NextResponse.json(
+        { error: "That offer feature is not available on the hosted desk yet." },
+        { status: 400 }
+      );
+    }
+    const hostedExisting = await getNeonDeskOffer(offerId);
+    if (!hostedExisting) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const hostedExpireStamp =
+      p.status === "expired" && p.expiresAt === undefined
+        ? { expiresAt: Date.now(), completedAt: null as number | null }
+        : {};
+    try {
+      const updated = await patchNeonDeskOffer(offerId, {
+        ...(p.bookmaker !== undefined ? { bookmaker: p.bookmaker || null } : {}),
+        ...(p.title !== undefined ? { title: p.title } : {}),
+        ...(p.description !== undefined ? { description: p.description || null } : {}),
+        ...(p.expectedProfit !== undefined ? { expectedProfit: p.expectedProfit } : {}),
+        ...(p.status !== undefined ? { status: p.status } : {}),
+        ...(p.expiresAt !== undefined ? { expiresAt: p.expiresAt } : {}),
+        ...(p.startsOn !== undefined ? { startsOn: p.startsOn } : {}),
+        ...(p.sport !== undefined ? { sport: p.sport } : {}),
+        ...(p.offerType !== undefined ? { offerType: p.offerType } : {}),
+        ...(p.scopeCourse !== undefined ? { scopeCourse: p.scopeCourse } : {}),
+        ...(p.eventDate !== undefined ? { eventDate: p.eventDate } : {}),
+        ...(p.scopeRaceId !== undefined ? { scopeRaceId: p.scopeRaceId } : {}),
+        ...(p.scopeRaceLabel !== undefined ? { scopeRaceLabel: p.scopeRaceLabel } : {}),
+        ...(p.rules !== undefined ? { rules: p.rules } : {}),
+        ...(p.offerUrl !== undefined ? { offerUrl: normalizeOfferUrl(p.offerUrl) } : {}),
+        ...(p.status === "completed" ? { completedAt: Date.now() } : {}),
+        ...hostedExpireStamp,
+      });
+      if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ offer: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the offer.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
+
   const existing = db.select().from(offers).where(eq(offers.id, offerId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -179,6 +233,14 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const offerId = Number(id);
+
+  if (isNeonDesk()) {
+    // No recurring series on the hosted desk yet - scope is always "instance".
+    const deleted = await deleteNeonDeskOffer(offerId);
+    if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+
   const existing = db.select().from(offers).where(eq(offers.id, offerId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 

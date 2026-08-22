@@ -8,6 +8,8 @@ import {
   insertNeonDeskBet,
   listNeonDeskBets,
 } from "@/lib/db/neon-desk";
+import { getNeonDeskOffer } from "@/lib/db/neon-desk-offers";
+import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import { ledgerBetPlacement, ledgerFromSettledBet } from "@/lib/services/balances";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
@@ -86,6 +88,8 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   });
 
   // Camouflage bets never attach to offers - they must not touch EV capture.
+  // Hosted desk: no auto-matching yet, but an explicit offerId is honoured
+  // (validated against this login's Neon offers below).
   const isMug = input.purpose === "mug";
   const resolvedOfferId =
     isMug || hostedDesk
@@ -107,9 +111,18 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
           backStake: input.backStake,
         }) ?? resolvedOfferId;
 
+  if (hostedDesk && input.offerId != null && !isMug) {
+    const linked = await getNeonDeskOffer(input.offerId);
+    if (!linked) {
+      return NextResponse.json({ error: "Offer not found" }, { status: 400 });
+    }
+  }
+  const hostedOfferId =
+    hostedDesk && !isMug ? (input.offerId ?? undefined) : undefined;
+
   const values = {
     eventId: input.eventId,
-    offerId,
+    offerId: hostedDesk ? hostedOfferId : offerId,
     label: input.label,
     market: input.market,
     selection: input.selection,
@@ -137,6 +150,20 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   if (hostedDesk) {
     try {
       const inserted = await insertNeonDeskBet(values);
+      // History write is best-effort: the bet is the source of truth, and the
+      // feed row must never block a placement.
+      await insertNeonDeskHistory({
+        dedupe: `bet-placed:${inserted.id}`,
+        kind: "bet_placed",
+        betId: inserted.id,
+        eventId: inserted.eventId,
+        title:
+          inserted.betType === "free_snr" || inserted.betType === "free_sr"
+            ? "Free bet placed"
+            : "Bet placed",
+        detail: inserted.label,
+        createdAt: inserted.createdAt,
+      }).catch(() => {});
       return NextResponse.json({ bet: inserted });
     } catch (error) {
       const message =

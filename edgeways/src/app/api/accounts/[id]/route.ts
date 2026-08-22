@@ -5,6 +5,13 @@ import { db, accounts } from "@/lib/db";
 import { getAccountTransactions } from "@/lib/services/balances";
 import { renameVenueAccount } from "@/lib/accounts/rename-venue";
 import { listFreeBetLots } from "@/lib/accounts/free-bet-lots";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  listNeonDeskAccounts,
+  listNeonDeskBalanceTransactions,
+  patchNeonDeskAccount,
+  renameNeonDeskAccount,
+} from "@/lib/db/neon-desk-accounts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +54,25 @@ function patchFields(p: z.infer<typeof patchSchema>) {
 
 export const GET = withDeskScope(async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+
+  if (isNeonDesk()) {
+    const accountId = Number(id);
+    const [accountRows, transactionRows] = await Promise.all([
+      listNeonDeskAccounts(),
+      listNeonDeskBalanceTransactions(),
+    ]);
+    const account = accountRows.find((a) => a.id === accountId);
+    if (!account) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({
+      account,
+      transactions: transactionRows
+        .filter((t) => t.accountId === accountId)
+        .sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
+        .slice(0, 50),
+      freeBetLots: [],
+    });
+  }
+
   const account = db.select().from(accounts).where(eq(accounts.id, Number(id))).get();
   if (!account) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({
@@ -64,6 +90,44 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   }
   const p = parsed.data;
   const accountId = Number(id);
+
+  if (isNeonDesk()) {
+    try {
+      if (p.fundedByAccountId != null) {
+        const accountRows = await listNeonDeskAccounts();
+        const bank = accountRows.find((a) => a.id === p.fundedByAccountId);
+        if (!bank || bank.type !== "bank") {
+          return NextResponse.json({ error: "fundedBy must be a bank account" }, { status: 400 });
+        }
+      }
+      if (p.name !== undefined) {
+        const renamed = await renameNeonDeskAccount(accountId, p.name);
+        if (!renamed.account) {
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+        const extra = patchFields(p);
+        if (Object.keys(extra).length > 0) {
+          const updated = await patchNeonDeskAccount(accountId, extra);
+          return NextResponse.json({
+            account: updated ?? renamed.account,
+            rename: { betsUpdated: renamed.betsUpdated, offersUpdated: renamed.offersUpdated },
+          });
+        }
+        return NextResponse.json({
+          account: renamed.account,
+          rename: { betsUpdated: renamed.betsUpdated, offersUpdated: renamed.offersUpdated },
+        });
+      }
+      const updated = await patchNeonDeskAccount(accountId, patchFields(p));
+      if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ account: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the account.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
 
   if (p.fundedByAccountId != null) {
     const bank = db
@@ -121,6 +185,11 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  if (isNeonDesk()) {
+    const updated = await patchNeonDeskAccount(Number(id), { isActive: 0 });
+    if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
   db.update(accounts).set({ isActive: 0 }).where(eq(accounts.id, Number(id))).run();
   return NextResponse.json({ ok: true });
 });

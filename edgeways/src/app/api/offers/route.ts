@@ -2,6 +2,13 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, offers } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import {
+  insertNeonDeskOffer,
+  listNeonDeskOffers,
+} from "@/lib/db/neon-desk-offers";
+import { summariseOffer as summariseOfferPure } from "@/lib/offers/offer-profit";
 import {
   createOfferSeriesWithInstance,
   localYmd,
@@ -55,6 +62,20 @@ const createSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    // Hosted desk: no series sync / backfill (SQLite-only machinery). Plain
+    // campaign list with profit summaries computed from Neon rows.
+    const [offerRows, betRows] = await Promise.all([
+      listNeonDeskOffers(),
+      listNeonDeskBets(),
+    ]);
+    const hosted = offerRows
+      .map((o) =>
+        summariseOfferPure(o, betRows.filter((b) => b.offerId === o.id), {})
+      )
+      .sort((a, b) => b.createdAt - a.createdAt);
+    return NextResponse.json({ offers: hosted });
+  }
   backfillOffersFromBets();
   syncOfferSeriesInstances();
   syncOfferStatuses();
@@ -68,6 +89,44 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   }
   const input = parsed.data;
   const offerUrl = normalizeOfferUrl(input.offerUrl ?? null);
+
+  if (isNeonDesk()) {
+    if (input.recurrence) {
+      return NextResponse.json(
+        { error: "Recurring offers are not available on the hosted desk yet." },
+        { status: 400 }
+      );
+    }
+    const hostedStartsOn = input.startsOn?.trim() || null;
+    const hostedScheduled =
+      hostedStartsOn != null && hostedStartsOn > localYmd(new Date());
+    try {
+      const row = await insertNeonDeskOffer({
+        bookmaker: input.bookmaker?.trim() || null,
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        expectedProfit: input.expectedProfit ?? null,
+        status: hostedScheduled ? "planned" : (input.status ?? "active"),
+        expiresAt: input.expiresAt ?? null,
+        startsOn: hostedStartsOn,
+        sport: input.sport ?? null,
+        offerType: input.offerType ?? null,
+        scopeCourse: input.scopeCourse ?? null,
+        eventDate: input.eventDate ?? null,
+        scopeRaceId: input.scopeRaceId ?? null,
+        scopeRaceLabel: input.scopeRaceLabel ?? null,
+        rules: input.rules ?? null,
+        offerUrl,
+        createdAt: Date.now(),
+      });
+      return NextResponse.json({ offer: row });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the offer.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
 
   if (input.recurrence) {
     const rule: OfferRecurrenceRule = {

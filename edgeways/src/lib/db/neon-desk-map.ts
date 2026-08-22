@@ -1,5 +1,17 @@
-import type { BetRow } from "@/lib/db/schema";
-import type { BetRow as PgBetRow } from "@/lib/db/schema.pg";
+import type {
+  AccountRow,
+  BalanceTransactionRow,
+  BetRow,
+  HistoryRow,
+  OfferRow,
+} from "@/lib/db/schema";
+import type {
+  AccountRow as PgAccountRow,
+  BalanceTransactionRow as PgBalanceTransactionRow,
+  BetRow as PgBetRow,
+  HistoryRow as PgHistoryRow,
+  OfferRow as PgOfferRow,
+} from "@/lib/db/schema.pg";
 
 export function toSqliteBetRow(row: PgBetRow): BetRow {
   return {
@@ -37,5 +49,88 @@ export function toSqliteBetRow(row: PgBetRow): BetRow {
     sport: row.sport,
     importFingerprint: null,
     importMeta: null,
+  };
+}
+
+export function toSqliteOfferRow(row: PgOfferRow): OfferRow {
+  return {
+    id: row.id,
+    bookmaker: row.bookmaker,
+    title: row.title,
+    description: row.description,
+    expectedProfit: row.expectedProfit,
+    status: row.status,
+    expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
+    completedAt: row.completedAt,
+    startsOn: row.startsOn,
+    sport: row.sport,
+    offerType: row.offerType,
+    scopeCourse: row.scopeCourse,
+    eventDate: row.eventDate,
+    scopeRaceId: row.scopeRaceId,
+    scopeRaceLabel: row.scopeRaceLabel,
+    rules: row.rules,
+    seriesId: row.seriesId,
+    instanceDate: row.instanceDate,
+    source: row.source,
+    offerUrl: row.offerUrl,
+  };
+}
+
+export function toSqliteAccountRow(row: PgAccountRow): AccountRow {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    exchangeId: row.exchangeId,
+    fundedByAccountId: row.fundedByAccountId,
+    brandColor: row.brandColor,
+    owner: row.owner,
+    isActive: row.isActive,
+    accessStatus: row.accessStatus,
+    notes: row.notes,
+    wrRemaining: row.wrRemaining,
+    wrMinOdds: row.wrMinOdds,
+    wrType: row.wrType,
+    health: row.health,
+    healthUpdatedAt: row.healthUpdatedAt,
+    createdAt: row.createdAt,
+  };
+}
+
+export function toSqliteBalanceTransactionRow(
+  row: PgBalanceTransactionRow
+): BalanceTransactionRow {
+  return {
+    id: row.id,
+    accountId: row.accountId,
+    amount: row.amount,
+    category: row.category,
+    betId: row.betId,
+    casinoOfferId: row.casinoOfferId,
+    transferGroupId: row.transferGroupId,
+    pending: row.pending,
+    note: row.note,
+    createdAt: row.createdAt,
+    confirmedAt: row.confirmedAt,
+    affectPnl: row.affectPnl,
+    expiresAt: row.expiresAt,
+  };
+}
+
+export function toSqliteHistoryRow(row: PgHistoryRow): HistoryRow {
+  return {
+    id: row.id,
+    dedupe: row.dedupe,
+    kind: row.kind,
+    eventId: row.eventId,
+    betId: row.betId,
+    minute: row.minute,
+    title: row.title,
+    detail: row.detail,
+    note: row.note,
+    amount: row.amount,
+    createdAt: row.createdAt,
   };
 }

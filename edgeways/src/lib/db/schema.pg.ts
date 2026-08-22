@@ -315,6 +315,8 @@ export const offers = pgTable("offers", {
   source: text("source"),
   /** External bookmaker/casino promo page URL ("Link to offer") */
   offerUrl: text("offer_url"),
+  /** Hosted owner (EDGE-47); null on rows written before the cutover */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Immutable EV baseline written when a campaign goes active; versioned on re-lock. */
@@ -504,6 +506,8 @@ export const accounts = pgTable("accounts", {
   health: text("health"),
   healthUpdatedAt: integer("health_updated_at"),
   createdAt: integer("created_at").notNull(),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Ledger of top-ups, withdrawals, bet stakes, settlements, transfers and fees */
@@ -538,6 +542,8 @@ export const balanceTransactions = pgTable("balance_transactions", {
   affectPnl: integer("affect_pnl").notNull().default(0),
   /** Free-bet credit deadline (epoch ms). Ignored on non-credit / non-free_bet rows. */
   expiresAt: integer("expires_at"),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /**
@@ -571,6 +577,8 @@ export const history = pgTable("history", {
   /** Settlements (bet + casino) and P&L adjustments: realised profit (+) or loss (−) */
   amount: doublePrecision("amount"),
   createdAt: integer("created_at").notNull(),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Key-value app preferences (defaults, reminders, OCR behaviour). */

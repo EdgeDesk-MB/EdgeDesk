@@ -1,29 +1,39 @@
 /**
- * Pure hosted Home snapshot from Neon bet rows. No SQLite, no Neon client.
+ * Pure hosted Home snapshot from Neon rows. No SQLite, no Neon client.
  */
-import type { BetRow } from "@/lib/db/schema";
+import type {
+  AccountRow,
+  BalanceTransactionRow,
+  BetRow,
+  HistoryRow,
+  OfferRow,
+} from "@/lib/db/schema";
 import { computePnlBuckets } from "@/lib/pnl/pnl-buckets";
-import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
+import { sumOpenWorstCaseProfit } from "@/lib/pnl/open-bet-worst-case";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/services/settings-shared";
 import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
 import { hasRacingApiKey, racingApiUsageToday } from "@/lib/services/theracingapi";
+import { summariseOffer } from "@/lib/offers/offer-profit";
+import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
 import type { AppState } from "@/lib/services/state.types";
 
-const EMPTY_BALANCES: AppState["balances"] = {
-  total: 0,
-  bookies: 0,
-  exchanges: 0,
-  banks: 0,
-  pendingBankCredits: 0,
-  inBets: 0,
-  bankroll: 0,
-  accounts: [],
+export type NeonDeskSnapshot = {
+  bets: BetRow[];
+  offers?: OfferRow[];
+  accounts?: AccountRow[];
+  transactions?: BalanceTransactionRow[];
+  history?: HistoryRow[];
+  settings?: AppSettings;
 };
 
-export function appStateFromNeonBets(
-  allBets: BetRow[],
-  settings: AppSettings = DEFAULT_SETTINGS
-): AppState {
+export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
+  const settings = input.settings ?? DEFAULT_SETTINGS;
+  const allBets = input.bets;
+  const allOffers = input.offers ?? [];
+  const accounts = input.accounts ?? [];
+  const transactions = input.transactions ?? [];
+  const historyRows = input.history ?? [];
+
   const bets = [...allBets].sort((a, b) => b.createdAt - a.createdAt);
   const pnl = computePnlBuckets({
     bets,
@@ -41,11 +51,18 @@ export function appStateFromNeonBets(
     return { time: b.settledAt ?? b.createdAt, value: running, commissionPaid: 0 };
   });
 
-  let provisional = 0;
-  for (const bet of bets.filter((b) => b.status === "open")) {
-    const expected = openBetExpectedProfit(bet);
-    if (expected != null) provisional += expected;
-  }
+  const provisional = sumOpenWorstCaseProfit(bets);
+
+  // No promo ledger on Neon yet: pass {} so the pure summary never touches SQLite.
+  const offers = allOffers
+    .map((o) => summariseOffer(o, allBets.filter((b) => b.offerId === o.id), {}))
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  const balances = balanceSummaryFromRows(accounts, transactions, allBets);
+
+  const history = [...historyRows].sort(
+    (a, b) => b.createdAt - a.createdAt || b.id - a.id
+  );
 
   return {
     events: [],
@@ -71,7 +88,7 @@ export function appStateFromNeonBets(
     livePositions: [],
     liveEventModels: [],
     series,
-    history: [],
+    history,
     chartHistory: [],
     promoAwards: {},
     apiConfigured: hasApiKey(),
@@ -85,7 +102,15 @@ export function appStateFromNeonBets(
     exchangeProviders: [{ provider: "betfair", status: "not_configured" }],
     racingAutopilot: [],
     settings,
-    balances: EMPTY_BALANCES,
-    offers: [],
+    balances,
+    offers,
   };
+}
+
+/** Bets-only snapshot (first cutover slice); kept for existing tests. */
+export function appStateFromNeonBets(
+  allBets: BetRow[],
+  settings: AppSettings = DEFAULT_SETTINGS
+): AppState {
+  return appStateFromNeonDesk({ bets: allBets, settings });
 }
