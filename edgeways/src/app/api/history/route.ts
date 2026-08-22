@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { EventRow } from "@/lib/db/schema";
 import {
   buildHistoryContext,
-  isHiddenHistoryFeedEntry,
+  isDeskCampaignLayHistoryEntry,
   matchesHistoryFilter,
   sortHistoryEntries,
   type HistoryFilter,
@@ -65,7 +65,7 @@ async function getHostedHistoryFeed(limit: number, filter: HistoryFilter) {
   const raw = dedupeHistoryForDisplay(rows, events);
   const context = buildHistoryContext(events, betRows, promoAwards, offerTitles, raw);
   let entries = sortHistoryEntries(raw, context).filter(
-    (e) => !isHiddenHistoryFeedEntry(e, context)
+    (e) => !isDeskCampaignLayHistoryEntry(e, context)
   );
   if (filter !== "all") {
     entries = entries.filter((e) => matchesHistoryFilter(e, filter, context));

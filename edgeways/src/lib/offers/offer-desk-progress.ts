@@ -53,7 +53,8 @@ export type SystemDeskSnapshot = {
   legs: Array<{
     seq: number;
     label: string;
-    result: "pending" | "won" | "lost" | "void";
+    /** "placed" (place terms) counts as settled, not won or lost. */
+    result: "pending" | "won" | "placed" | "lost" | "void";
   }>;
 };
 
