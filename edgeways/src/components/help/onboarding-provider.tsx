@@ -22,6 +22,7 @@ import {
   decideOnboardingOpen,
   isOnboardingComplete,
   markOnboardingComplete,
+  readAgeConfirmedAt,
   resetOnboarding,
   type OnboardingOpen,
 } from "@/lib/onboarding";
@@ -118,7 +119,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         user?.unsafeMetadata as Record<string, unknown>
       );
       const ageConfirmed =
-        state.settings?.ageConfirmedAt != null || clerkConfirmed;
+        state.settings?.ageConfirmedAt != null ||
+        clerkConfirmed ||
+        readAgeConfirmedAt(user?.id) != null;
 
       const forceDemoSetup =
         publicDemo.forceSetup ||

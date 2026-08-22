@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { ResponsibleGamblingNote } from "@/components/compliance/responsible-gambling-note";
 import { api } from "@/hooks/use-app-state";
+import { markAgeConfirmedAt } from "@/lib/onboarding";
 import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 
 /**
@@ -35,32 +35,30 @@ export function AgeGateDialog({
   const [busy, setBusy] = useState(false);
   const [declined, setDeclined] = useState(false);
 
-  const confirm = async () => {
+  const confirm = () => {
     setBusy(true);
     const ageConfirmedAt = Date.now();
-    try {
-      await api("/api/settings", {
-        method: "PATCH",
-        json: { ageConfirmedAt },
-      });
-      if (user) {
-        try {
-          await user.update({
-            unsafeMetadata: {
-              ...user.unsafeMetadata,
-              ageConfirmed: true,
-              ageConfirmedAt,
-            },
-          });
-        } catch {
-          /* Desk settings already saved. */
-        }
-      }
-      onConfirmed();
-    } catch (e) {
-      toast.error("Could not save confirmation", { description: String(e) });
-      setBusy(false);
+    markAgeConfirmedAt(ageConfirmedAt, user?.id);
+    if (user) {
+      void user
+        .update({
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            ageConfirmed: true,
+            ageConfirmedAt,
+          },
+        })
+        .catch(() => {
+          /* Device mark already closed the gate. */
+        });
     }
+    void api("/api/compliance/age", {
+      method: "POST",
+      json: { ageConfirmedAt },
+    }).catch(() => {
+      /* Device mark already closed the gate. */
+    });
+    onConfirmed();
   };
 
   return (

@@ -1,9 +1,12 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
+  ageConfirmedStorageKey,
   decideOnboardingOpen,
   isOnboardingComplete,
+  markAgeConfirmedAt,
   markOnboardingComplete,
   onboardingStorageKey,
+  readAgeConfirmedAt,
   resetOnboarding,
 } from "@/lib/onboarding";
 
@@ -45,6 +48,18 @@ describe("onboarding", () => {
     );
     resetOnboarding("user_owner");
     expect(isOnboardingComplete("user_owner")).toBe(false);
+  });
+
+  it("stores a local 18+ confirmation per Clerk user", () => {
+    expect(readAgeConfirmedAt("user_owner")).toBeNull();
+    expect(markAgeConfirmedAt(1_754_870_400_000, "user_owner")).toBe(
+      1_754_870_400_000
+    );
+    expect(readAgeConfirmedAt("user_owner")).toBe(1_754_870_400_000);
+    expect(readAgeConfirmedAt("user_other")).toBeNull();
+    expect(ageConfirmedStorageKey("user_owner")).toBe(
+      "edgeways:age-confirmed-at:user_owner"
+    );
   });
 
   it("opens setup after subscribe even when the desk already has activity", () => {

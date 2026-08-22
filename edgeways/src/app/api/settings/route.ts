@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getAppSettings, patchAppSettings, type AppSettingsPatch } from "@/lib/services/settings";
+import type { AppSettingsPatch } from "@/lib/services/settings-merge";
 import {
   normalizeDefaultSport,
   normalizeMobileDeckPin,
@@ -22,6 +22,7 @@ export const GET = withDeskScope(async function GET() {
   if (isNeonDesk()) {
     return NextResponse.json(await getNeonDeskSettings());
   }
+  const { getAppSettings } = await import("@/lib/services/settings");
   return NextResponse.json(getAppSettings());
 });
 
@@ -134,5 +135,6 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
       throw err;
     }
   }
+  const { patchAppSettings } = await import("@/lib/services/settings");
   return NextResponse.json(patchAppSettings(safePatch));
 });
