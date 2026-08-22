@@ -1,6 +1,7 @@
+import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
 import { localCalendarDate, londonWallToUtcMs } from "@/lib/events";
 import { parseScopeRaceOffTime } from "@/lib/offers/offer-expiry";
-import { formatClockString } from "@/lib/time-format";
+import { formatClockString, formatClockTime } from "@/lib/time-format";
 import type { OfferSummary } from "@/lib/services/offers.types";
 
 export type OfferPipelineStage =
@@ -96,14 +97,48 @@ function relativeEventDayPhrase(
   return null;
 }
 
+export type AwaitingBetLike = {
+  status: string;
+  eventId?: number | null;
+  purpose?: string | null;
+};
+
+/** Soonest open (non-mug) bet event — the result we are actually waiting on. */
+export function earliestOpenBetEventAt(
+  bets: readonly AwaitingBetLike[],
+  eventsById: ReadonlyMap<number, { startTime: number }>
+): number | null {
+  let earliest: number | null = null;
+  for (const bet of bets) {
+    if (bet.status !== "open" || bet.purpose === "mug" || bet.eventId == null) continue;
+    const start = eventsById.get(bet.eventId)?.startTime;
+    if (start == null || !Number.isFinite(start)) continue;
+    if (earliest == null || start < earliest) earliest = start;
+  }
+  return earliest;
+}
+
+function formatAwaitingAt(atMs: number, eventDate: string | null | undefined, now: number): string {
+  const time = formatClockTime(atMs, { timeZone: DEFAULT_DISPLAY_TIMEZONE });
+  const ymd = localCalendarDate(new Date(atMs));
+  const day = relativeEventDayPhrase(ymd || eventDate, now);
+  return day ? `Awaiting result at ${time} ${day}` : `Awaiting result at ${time}`;
+}
+
 /**
  * User-facing copy for the awaiting pipeline stage.
- * Prefer "Awaiting result at 13:50 today" when the campaign is race-scoped.
+ * Prefer the open bet's off-time, then a race-scoped label
+ * ("Awaiting result at 13:50 today").
  */
 export function formatAwaitingResultLabel(
-  offer: Pick<OfferSummary, "scopeRaceLabel" | "eventDate">,
+  offer: Pick<OfferSummary, "scopeRaceLabel" | "eventDate"> & {
+    awaitingEventAt?: number | null;
+  },
   now = Date.now()
 ): string {
+  if (offer.awaitingEventAt != null && Number.isFinite(offer.awaitingEventAt)) {
+    return formatAwaitingAt(offer.awaitingEventAt, offer.eventDate, now);
+  }
   const off = parseScopeRaceOffTime(offer.scopeRaceLabel);
   if (!off) return "Awaiting result";
   const hhmm = `${String(off.hours).padStart(2, "0")}:${String(off.minutes).padStart(2, "0")}`;

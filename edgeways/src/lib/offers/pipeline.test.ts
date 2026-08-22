@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveOfferPipelineStage,
+  earliestOpenBetEventAt,
   formatAwaitingResultLabel,
   formatOfferPipelineStageLabel,
   OFFER_PIPELINE_PROGRESS_STAGES,
@@ -179,6 +180,36 @@ describe("formatAwaitingResultLabel", () => {
     ).toBe("Awaiting result");
   });
 
+  it("uses the open bet off-time when the offer is only course-scoped", () => {
+    setDisplayTimeFormat("24h");
+    const now = Date.parse("2026-08-21T12:00:00+01:00");
+    expect(
+      formatAwaitingResultLabel(
+        {
+          scopeRaceLabel: null,
+          eventDate: "2026-08-21",
+          awaitingEventAt: Date.parse("2026-08-21T14:25:00+01:00"),
+        },
+        now
+      )
+    ).toBe("Awaiting result at 14:25 today");
+  });
+
+  it("prefers the open bet off-time over a race-scoped label", () => {
+    setDisplayTimeFormat("24h");
+    const now = Date.parse("2026-08-21T12:00:00+01:00");
+    expect(
+      formatAwaitingResultLabel(
+        {
+          scopeRaceLabel: "3:00 · Gimcrack Stakes",
+          eventDate: "2026-08-21",
+          awaitingEventAt: Date.parse("2026-08-21T14:25:00+01:00"),
+        },
+        now
+      )
+    ).toBe("Awaiting result at 14:25 today");
+  });
+
   it("uses the enriched label on the awaiting pipeline stage", () => {
     setDisplayTimeFormat("24h");
     const now = Date.parse("2026-08-01T12:00:00+01:00");
@@ -195,5 +226,43 @@ describe("formatAwaitingResultLabel", () => {
         now
       )
     ).toBe("Awaiting result at 13:50 today");
+  });
+});
+
+describe("earliestOpenBetEventAt", () => {
+  const events = new Map([
+    [10, { startTime: 100 }],
+    [11, { startTime: 50 }],
+    [12, { startTime: 200 }],
+  ]);
+
+  it("returns the soonest open non-mug bet event", () => {
+    expect(
+      earliestOpenBetEventAt(
+        [
+          { status: "open", eventId: 10 },
+          { status: "open", eventId: 11 },
+          { status: "lost", eventId: 12 },
+        ],
+        events
+      )
+    ).toBe(50);
+  });
+
+  it("ignores mug bets and bets without an event", () => {
+    expect(
+      earliestOpenBetEventAt(
+        [
+          { status: "open", eventId: 11, purpose: "mug" },
+          { status: "open", eventId: null },
+          { status: "open", eventId: 10 },
+        ],
+        events
+      )
+    ).toBe(100);
+  });
+
+  it("returns null when no open event is known", () => {
+    expect(earliestOpenBetEventAt([{ status: "lost", eventId: 10 }], events)).toBeNull();
   });
 });

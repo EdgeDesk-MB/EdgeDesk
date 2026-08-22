@@ -2,8 +2,9 @@
  * Open-bet valuation for platform P&L.
  *
  * Matched bets store worst-case guaranteed profit as `expectedProfit` at placement.
- * Until settlement (or a live in-play revaluation), that worst case is the
- * provisional contribution to running profit.
+ * Until settlement, that worst case is the headline Prov contribution.
+ * Live football "if ended now" is a Home Events reading only — it does not
+ * replace this floor.
  *
  * Labelling: when both matched outcomes are equal (within a penny), the figure is
  * locked — not an estimate. When they diverge, show the worse side as

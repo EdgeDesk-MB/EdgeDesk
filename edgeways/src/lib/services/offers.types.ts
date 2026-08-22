@@ -3,6 +3,7 @@
  */
 import type { OfferRow, UserReminderRow } from "@/lib/db/schema";
 import type { EvBasis } from "@/lib/offers/advantage";
+import type { OfferDeskProgress } from "@/lib/offers/offer-desk-progress";
 
 export type FreeBetStage =
   | "none"
@@ -71,4 +72,8 @@ export interface OfferSummary extends OfferRow {
   evLock?: EvLockSummary | null;
   /** Pending user reminders linked to this campaign (not yet fired/cancelled) */
   reminders?: UserReminderRow[];
+  /** Earliest startTime of an open linked bet, when the event is known. */
+  awaitingEventAt?: number | null;
+  /** Linked Acca / Bet Builder / Systems run still in play, when one exists. */
+  deskProgress?: OfferDeskProgress | null;
 }
