@@ -48,10 +48,23 @@ import { DatabaseBackup, FileUp, HardDriveDownload, ShieldCheck } from "lucide-r
 import { PlatformImportDialog } from "@/components/import/platform-import-dialog";
 import { detectProfitCsvFormat } from "@/lib/import/oddsmonkey-profits";
 
-type RestorePreview = { token: string; counts: Record<string, number> };
+type RestorePreview = {
+  token?: string;
+  counts: Record<string, number>;
+  /** Hosted desk: no staged token - apply re-posts the file body. */
+  hosted?: boolean;
+};
 
-export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
+export function DataCustodyCard({
+  onRestored,
+  hosted = false,
+}: {
+  onRestored: () => void;
+  /** Hosted (Neon) desk: JSON backup only, restore re-posts the file. */
+  hosted?: boolean;
+}) {
   const restoreInputRef = useRef<HTMLInputElement>(null);
+  const restoreFileRef = useRef<File | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
   const [validating, setValidating] = useState(false);
@@ -64,6 +77,7 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
   const [oddsmonkeySeed, setOddsmonkeySeed] = useState<string | null>(null);
 
   async function onRestoreFile(file: File) {
+    restoreFileRef.current = file;
     setValidating(true);
     try {
       const res = await fetch("/api/data/restore?mode=preview", {
@@ -84,14 +98,22 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
     if (!restorePreview) return;
     setRestoring(true);
     try {
-      const res = await fetch(`/api/data/restore?mode=apply&token=${restorePreview.token}`, {
-        method: "POST",
-      });
+      const res = restorePreview.hosted
+        ? await fetch("/api/data/restore?mode=apply", {
+            method: "POST",
+            body: restoreFileRef.current,
+          })
+        : await fetch(`/api/data/restore?mode=apply&token=${restorePreview.token}`, {
+            method: "POST",
+          });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Restore failed");
       setRestorePreview(null);
+      restoreFileRef.current = null;
       toast.success("Database restored", {
-        description: "A pre-restore safety copy was saved in data/backups.",
+        description: restorePreview.hosted
+          ? "Your hosted desk now matches the backup."
+          : "A pre-restore safety copy was saved in data/backups.",
       });
       onRestored();
     } catch (e) {
@@ -160,11 +182,13 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        <Button variant="outline" className="justify-start gap-2" asChild>
-          <a href="/api/data/backup" download>
-            <HardDriveDownload className="size-4" /> Download backup (.db)
-          </a>
-        </Button>
+        {hosted ? null : (
+          <Button variant="outline" className="justify-start gap-2" asChild>
+            <a href="/api/data/backup" download>
+              <HardDriveDownload className="size-4" /> Download backup (.db)
+            </a>
+          </Button>
+        )}
         <Button variant="outline" className="justify-start gap-2" asChild>
           <a href="/api/data/backup?format=json" download>
             <HardDriveDownload className="size-4" /> Download backup (JSON)
@@ -197,15 +221,17 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
           <FileUp className="size-4" /> Import bets from CSV…
         </Button>
         <p className="text-xs text-muted-foreground">
-          Restores always save a pre-restore copy first. Imported bets are history only - they
-          never change balances and never count towards EV capture. Oddsmonkey import is not
-          affiliated with Oddsmonkey.
+          {hosted
+            ? "Restore replaces your hosted desk with the backup contents. Download a JSON backup first if you want a way back."
+            : "Restores always save a pre-restore copy first."}{" "}
+          Imported bets are history only - they never change balances and never count
+          towards EV capture. Oddsmonkey import is not affiliated with Oddsmonkey.
         </p>
 
         <input
           ref={restoreInputRef}
           type="file"
-          accept=".db,application/octet-stream"
+          accept={hosted ? ".json,application/json" : ".db,application/octet-stream"}
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -234,9 +260,13 @@ export function DataCustodyCard({ onRestored }: { onRestored: () => void }) {
         >
           <DialogContent mobile="center" className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Replace your database?</DialogTitle>
+              <DialogTitle>
+                {hosted ? "Replace your hosted desk?" : "Replace your database?"}
+              </DialogTitle>
               <DialogDescription>
-                Restore this backup. A safety copy is saved first.
+                {hosted
+                  ? "Restore this backup. Your current hosted offers, wallets, bets and history are replaced by the backup contents."
+                  : "Restore this backup. A safety copy is saved first."}
               </DialogDescription>
             </DialogHeader>
             {restorePreview ? (

@@ -3,6 +3,12 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { NextRequest, NextResponse } from "next/server";
 import { backupDatabaseTo, restoreDatabaseFrom, resolveDbPath } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  hostedBackupCounts,
+  isHostedBackupTables,
+  restoreNeonDeskBackup,
+} from "@/lib/db/neon-desk-backup";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +59,38 @@ function validateBackupFile(filePath: string): ValidationResult {
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get("mode") ?? "preview";
+
+  if (isNeonDesk()) {
+    // Hosted desk: no filesystem staging on Vercel, so the client posts the
+    // JSON bundle again for apply (no token).
+    const body = (await req.json().catch(() => null)) as {
+      tables?: unknown;
+    } | null;
+    if (!body || !isHostedBackupTables(body.tables)) {
+      return NextResponse.json(
+        { error: "Not an Edgeways JSON backup - expected a tables object." },
+        { status: 400 }
+      );
+    }
+    if (mode === "preview") {
+      return NextResponse.json({
+        hosted: true,
+        counts: hostedBackupCounts(body.tables),
+      });
+    }
+    if (mode === "apply") {
+      try {
+        const counts = await restoreNeonDeskBackup(body.tables);
+        return NextResponse.json({ ok: true, hosted: true, counts });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Restore failed.";
+        const status = message.startsWith("Sign in") ? 401 : 500;
+        return NextResponse.json({ error: message }, { status });
+      }
+    }
+    return NextResponse.json({ error: "Unknown mode" }, { status: 400 });
+  }
 
   if (mode === "preview") {
     const body = Buffer.from(await req.arrayBuffer());

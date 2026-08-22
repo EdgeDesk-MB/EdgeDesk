@@ -94,6 +94,8 @@ export interface AppState {
   casinoNeedsAction: number;
   /** True when this process opened the demo database (G2 watermark) */
   demoMode: boolean;
+  /** True when the desk is served from Neon (hosted preview/live), not SQLite */
+  hostedDesk?: boolean;
   livePositions: LivePosition[];
   liveEventModels: LiveEventModel[];
   /** Cumulative retained P&L; commissionPaid is cumulative exchange commission, so gross = value + commissionPaid. */

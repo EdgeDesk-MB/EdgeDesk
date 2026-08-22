@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, backupDatabaseTo } from "@/lib/db";
 import { APP_VERSION } from "@/lib/app-version";
 import { sql } from "drizzle-orm";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { neonDeskBackupBundle } from "@/lib/db/neon-desk-backup";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,30 @@ function stamp(): string {
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const format = req.nextUrl.searchParams.get("format") ?? "sqlite";
+
+  if (isNeonDesk()) {
+    // Hosted desk: there is no .db file to copy - the JSON bundle is the backup.
+    if (format !== "json") {
+      return NextResponse.json(
+        { error: "On the hosted desk, use the JSON backup." },
+        { status: 400 }
+      );
+    }
+    try {
+      const bundle = await neonDeskBackupBundle();
+      return new NextResponse(JSON.stringify(bundle), {
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Disposition": `attachment; filename="edgeways-backup-${stamp()}.json"`,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not build the backup.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
 
   if (format === "json") {
     // Generic dump of every user table - survives schema additions.

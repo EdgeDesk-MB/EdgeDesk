@@ -85,6 +85,7 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     boostsOpen: 0,
     casinoNeedsAction: 0,
     demoMode: false,
+    hostedDesk: true,
     livePositions: [],
     liveEventModels: [],
     series,

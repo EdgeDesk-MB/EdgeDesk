@@ -328,7 +328,9 @@ export default function SettingsPage() {
             />
           )}
 
-          {tab === "data" && <DataBackupPanel onRefresh={refresh} />}
+          {tab === "data" && (
+            <DataBackupPanel onRefresh={refresh} hosted={state?.hostedDesk ?? false} />
+          )}
         </CardContent>
       </Card>
     </PageShell>
@@ -1485,7 +1487,13 @@ function IntegrationsPanel({
   );
 }
 
-function DataBackupPanel({ onRefresh }: { onRefresh: () => void }) {
+function DataBackupPanel({
+  onRefresh,
+  hosted,
+}: {
+  onRefresh: () => void;
+  hosted: boolean;
+}) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
@@ -1511,7 +1519,7 @@ function DataBackupPanel({ onRefresh }: { onRefresh: () => void }) {
         </CardContent>
       </Card>
       <EmailIntakeCard />
-      <DataCustodyCard onRestored={onRefresh} />
+      <DataCustodyCard onRestored={onRefresh} hosted={hosted} />
       <DemoModeCard />
     </div>
   );
