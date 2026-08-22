@@ -74,32 +74,38 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+  const hostedDesk = isNeonDesk();
 
   const { triggerText, triggerRule } = resolveTriggerFields({
     betType: input.betType,
     label: input.label,
     triggerText: input.triggerText,
-    eventId: input.eventId,
+    eventId: hostedDesk ? undefined : input.eventId,
     homeTeam: input.homeTeam,
     awayTeam: input.awayTeam,
   });
 
   // Camouflage bets never attach to offers - they must not touch EV capture.
   const isMug = input.purpose === "mug";
-  const resolvedOfferId = isMug ? undefined : resolveOfferForBet({
-    offerId: input.offerId,
-    label: input.label,
-    triggerText,
-    bookmaker: input.bookmaker,
-    expectedProfit: input.expectedProfit,
-  });
-  const offerId = isMug ? undefined :
-    resolveOfferForFreeBetUsage({
-      offerId: resolvedOfferId ?? input.offerId,
-      betType: input.betType,
-      bookmaker: input.bookmaker,
-      backStake: input.backStake,
-    }) ?? resolvedOfferId;
+  const resolvedOfferId =
+    isMug || hostedDesk
+      ? undefined
+      : resolveOfferForBet({
+          offerId: input.offerId,
+          label: input.label,
+          triggerText,
+          bookmaker: input.bookmaker,
+          expectedProfit: input.expectedProfit,
+        });
+  const offerId =
+    isMug || hostedDesk
+      ? undefined
+      : resolveOfferForFreeBetUsage({
+          offerId: resolvedOfferId ?? input.offerId,
+          betType: input.betType,
+          bookmaker: input.bookmaker,
+          backStake: input.backStake,
+        }) ?? resolvedOfferId;
 
   const values = {
     eventId: input.eventId,
@@ -128,7 +134,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     purpose: input.purpose ?? null,
   };
 
-  if (isNeonDesk()) {
+  if (hostedDesk) {
     try {
       const inserted = await insertNeonDeskBet(values);
       return NextResponse.json({ bet: inserted });
