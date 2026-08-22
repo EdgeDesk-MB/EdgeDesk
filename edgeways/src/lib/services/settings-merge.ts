@@ -112,8 +112,10 @@ function parseBrand(raw: Record<string, unknown>): Pick<
   AppSettings,
   "brandAccentPreset" | "brandAccentHex"
 > {
-  const presetId = isBrandAccentPresetId(raw.brandAccentPreset)
-    ? raw.brandAccentPreset
+  const presetRaw =
+    typeof raw.brandAccentPreset === "string" ? raw.brandAccentPreset : undefined;
+  const presetId = isBrandAccentPresetId(presetRaw)
+    ? presetRaw
     : DEFAULT_BRAND_ACCENT_PRESET;
   const hex =
     normalizeHex(typeof raw.brandAccentHex === "string" ? raw.brandAccentHex : null) ??
