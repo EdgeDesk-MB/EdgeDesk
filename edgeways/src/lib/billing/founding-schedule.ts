@@ -46,7 +46,7 @@ export function buildFoundingSchedulePhases(input: {
   const first: Stripe.SubscriptionScheduleUpdateParams.Phase = {
     items: [{ price: input.foundingPriceId, quantity: 1 }],
     start_date: input.startDate,
-    iterations: FOUNDING_PAID_MONTHS,
+    duration: { interval: "month", interval_count: FOUNDING_PAID_MONTHS },
   };
   if (input.trialEnd != null && input.trialEnd > input.startDate) {
     first.trial_end = input.trialEnd;

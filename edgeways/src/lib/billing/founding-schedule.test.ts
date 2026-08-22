@@ -42,7 +42,7 @@ describe("founding schedule", () => {
     expect(phases[0]).toMatchObject({
       items: [{ price: "price_founding", quantity: 1 }],
       start_date: 1_700_000_000,
-      iterations: 3,
+      duration: { interval: "month", interval_count: 3 },
       trial_end: 1_700_000_000 + 14 * 24 * 60 * 60,
     });
     expect(phases[1]).toEqual({
