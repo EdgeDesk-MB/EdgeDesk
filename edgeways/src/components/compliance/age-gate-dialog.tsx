@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,16 +31,31 @@ export function AgeGateDialog({
   open: boolean;
   onConfirmed: () => void;
 }) {
+  const { user } = useUser();
   const [busy, setBusy] = useState(false);
   const [declined, setDeclined] = useState(false);
 
   const confirm = async () => {
     setBusy(true);
+    const ageConfirmedAt = Date.now();
     try {
       await api("/api/settings", {
         method: "PATCH",
-        json: { ageConfirmedAt: Date.now() },
+        json: { ageConfirmedAt },
       });
+      if (user) {
+        try {
+          await user.update({
+            unsafeMetadata: {
+              ...user.unsafeMetadata,
+              ageConfirmed: true,
+              ageConfirmedAt,
+            },
+          });
+        } catch {
+          /* Desk settings already saved. */
+        }
+      }
       onConfirmed();
     } catch (e) {
       toast.error("Could not save confirmation", { description: String(e) });

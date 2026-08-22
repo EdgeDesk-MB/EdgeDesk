@@ -42,12 +42,20 @@ function usesHostedPostgres(): boolean {
 }
 
 let neonOnboardingColumnReady = false;
+let neonDeskSettingsColumnReady = false;
 
 async function ensureNeonOnboardingColumn(): Promise<void> {
   if (neonOnboardingColumnReady) return;
   const sql = getNeonSql();
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS onboarding_profile text`;
   neonOnboardingColumnReady = true;
+}
+
+export async function ensureNeonDeskSettingsColumn(): Promise<void> {
+  if (neonDeskSettingsColumnReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS desk_settings text`;
+  neonDeskSettingsColumnReady = true;
 }
 
 function asPlan(value: string | null | undefined): PlanId {

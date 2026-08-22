@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { appStateFromNeonBets } from "@/lib/db/neon-desk-state-map";
 import type { BetRow } from "@/lib/db/schema";
+import { DEFAULT_SETTINGS } from "@/lib/services/settings-shared";
 
 function bet(partial: Partial<BetRow> & Pick<BetRow, "id" | "label" | "status">): BetRow {
   return {
@@ -47,6 +48,15 @@ describe("appStateFromNeonBets", () => {
     expect(state.offers).toEqual([]);
     expect(state.balances.accounts).toEqual([]);
     expect(state.demoMode).toBe(false);
+    expect(state.settings.ageConfirmedAt).toBeNull();
+  });
+
+  it("keeps a hosted age confirmation on the snapshot", () => {
+    const state = appStateFromNeonBets([], {
+      ...DEFAULT_SETTINGS,
+      ageConfirmedAt: 1_754_870_400_000,
+    });
+    expect(state.settings.ageConfirmedAt).toBe(1_754_870_400_000);
   });
 
   it("shows a hosted bet and settled P&L", () => {

@@ -4,7 +4,7 @@
 import type { BetRow } from "@/lib/db/schema";
 import { computePnlBuckets } from "@/lib/pnl/pnl-buckets";
 import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
-import { DEFAULT_SETTINGS } from "@/lib/services/settings-shared";
+import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/services/settings-shared";
 import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
 import { hasRacingApiKey, racingApiUsageToday } from "@/lib/services/theracingapi";
 import type { AppState } from "@/lib/services/state.types";
@@ -20,7 +20,10 @@ const EMPTY_BALANCES: AppState["balances"] = {
   accounts: [],
 };
 
-export function appStateFromNeonBets(allBets: BetRow[]): AppState {
+export function appStateFromNeonBets(
+  allBets: BetRow[],
+  settings: AppSettings = DEFAULT_SETTINGS
+): AppState {
   const bets = [...allBets].sort((a, b) => b.createdAt - a.createdAt);
   const pnl = computePnlBuckets({
     bets,
@@ -81,7 +84,7 @@ export function appStateFromNeonBets(allBets: BetRow[]): AppState {
     exchangeStatus: { provider: "betfair", status: "not_configured" },
     exchangeProviders: [{ provider: "betfair", status: "not_configured" }],
     racingAutopilot: [],
-    settings: DEFAULT_SETTINGS,
+    settings,
     balances: EMPTY_BALANCES,
     offers: [],
   };

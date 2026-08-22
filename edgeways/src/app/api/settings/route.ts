@@ -11,9 +11,17 @@ import {
   PUBLIC_DEMO_COOKIE,
   stripPublicDemoAppearancePatch,
 } from "@/lib/demo/public-demo";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  getNeonDeskSettings,
+  patchNeonDeskSettings,
+} from "@/lib/db/neon-desk-settings";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    return NextResponse.json(await getNeonDeskSettings());
+  }
   return NextResponse.json(getAppSettings());
 });
 
@@ -115,5 +123,16 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
     demoActive
   ) as AppSettingsPatch;
 
+  if (isNeonDesk()) {
+    try {
+      return NextResponse.json(await patchNeonDeskSettings(safePatch));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not save settings.";
+      if (message.includes("Sign in")) {
+        return NextResponse.json({ error: message }, { status: 401 });
+      }
+      throw err;
+    }
+  }
   return NextResponse.json(patchAppSettings(safePatch));
 });

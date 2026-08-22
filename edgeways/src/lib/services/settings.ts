@@ -30,8 +30,10 @@ import { normalizeDisplayTimezone } from "@/lib/display-timezone";
 import { normalizeTimeFormat, setDisplayTimeFormat } from "@/lib/time-format";
 import { normalizeUiFont } from "@/lib/ui-font";
 import { normalizeHeaderPattern } from "@/lib/header-pattern";
+import type { AppSettingsPatch } from "./settings-merge";
 
 export type { AppSettings, OfferBetPref };
+export type { AppSettingsPatch } from "./settings-merge";
 export {
   DEFAULT_SETTINGS,
   bookmakerFromOfferPrefs,
@@ -207,15 +209,6 @@ export function resolveOfferBookmaker(
     fallback
   );
 }
-
-export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning" | "homeLayout">> & {
-  /** Merge a single offer pref without replacing the whole map. */
-  offerBetPref?: { offerId: number; stake: number; bookmaker?: string };
-  /** Partial merge into the tuning object; each field clamped on write. */
-  tuning?: Partial<TuningSettings>;
-  /** Partial merge into the Home layout; normalised on write. */
-  homeLayout?: Partial<HomeLayoutSettings>;
-};
 
 export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   if (patch.defaultBackStake != null) writeRaw("defaultBackStake", String(patch.defaultBackStake));

@@ -9,7 +9,8 @@ Desk bets use Neon only when `EDGEWAYS_DESK_BACKEND=neon` **and**
 `DATABASE_URL` is set (Vercel Preview first). Localhost stays on the Mac file
 even if `DATABASE_URL` is present for the waitlist.
 
-Next: offers, wallets, history on Neon; restore drill.
+Desk settings (including 18+ confirmation) live on `app_users.desk_settings`
+when the hosted desk flag is on. Next: offers, wallets, history; restore drill.
 
 Commands:
   npm run db:migrate      — apply drizzle/ to DATABASE_URL

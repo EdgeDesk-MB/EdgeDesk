@@ -459,6 +459,8 @@ export const appUsers = pgTable("app_users", {
   founding: integer("founding").notNull().default(0),
   /** EDGE-62 first-run profile JSON. Not betting records. */
   onboardingProfile: text("onboarding_profile"),
+  /** Hosted desk preferences JSON (EDGE-47). Includes ageConfirmedAt. */
+  deskSettings: text("desk_settings"),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */
