@@ -1,5 +1,7 @@
 /**
- * Local stand-in for per-login desks (until EDGE-47 keys every row in Neon).
+ * Local stand-in for per-login desks. Hosted Neon keys bets by clerk user
+ * when EDGEWAYS_DESK_BACKEND=neon (EDGE-47). This file stays Clerk-free so
+ * `@/lib/db` stays importable in Vitest.
  * One Mac, one Next process, several Clerk accounts: each login opens its
  * own SQLite file. The filled dogfood desk stays on data/edgeways.db for
  * EDGEWAYS_DESK_OWNER_EMAIL (default samhayter.design@gmail.com).

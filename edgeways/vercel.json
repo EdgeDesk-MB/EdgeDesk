@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run db:migrate && next build",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.edgeways.app" }],
+      "destination": "https://edgeways.app/",
+      "permanent": true
+    },
+    {
+      "source": "/((?!favicon\\.ico$|icon$|icon-\\d+\\.png$|apple-icon\\.png$).*)",
+      "has": [{ "type": "host", "value": "www.edgeways.app" }],
+      "destination": "https://edgeways.app/$1",
+      "permanent": true
+    }
+  ]
+}

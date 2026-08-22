@@ -103,6 +103,11 @@ export const bets = pgTable("bets", {
    * Prefer events.sport when eventId is set.
    */
   sport: text("sport"),
+  /**
+   * Hosted tenancy (EDGE-47). SQLite files are already per-login.
+   * Neon rows share one table; this column is the lock.
+   */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Mug-bet cadence plan per bookie account (J5) - camouflage budgeting. */

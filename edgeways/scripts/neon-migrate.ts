@@ -19,8 +19,8 @@ neonConfig.webSocketConstructor = ws;
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) {
-    console.error("DATABASE_URL missing in .env.local");
-    process.exit(1);
+    console.log("DATABASE_URL missing; skip migrate");
+    process.exit(0);
   }
 
   const pool = new Pool({ connectionString: url });

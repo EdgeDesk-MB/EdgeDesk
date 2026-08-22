@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db, accounts, bets, events, history, mugPlans } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonDeskBets,
+  insertNeonDeskBet,
+  listNeonDeskBets,
+} from "@/lib/db/neon-desk";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import { ledgerBetPlacement, ledgerFromSettledBet } from "@/lib/services/balances";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
@@ -56,6 +62,9 @@ const createSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    return NextResponse.json({ bets: await listNeonDeskBets() });
+  }
   return NextResponse.json({ bets: db.select().from(bets).all() });
 });
 
@@ -92,36 +101,46 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       backStake: input.backStake,
     }) ?? resolvedOfferId;
 
-  const inserted = db
-    .insert(bets)
-    .values({
-      eventId: input.eventId,
-      offerId,
-      label: input.label,
-      market: input.market,
-      selection: input.selection,
-      betType: input.betType,
-      bookmaker: input.bookmaker,
-      exchangeId: input.exchangeId,
-      backStake: input.backStake,
-      backOdds: input.backOdds,
-      layStake: input.layStake,
-      layOdds: input.layOdds,
-      commission: input.commission,
-      earlyPayout: input.earlyPayout ? 1 : 0,
-      refundAmount: input.refundAmount,
-      refundRetention: input.refundRetention,
-      legs: input.legs ? JSON.stringify(input.legs) : null,
-      triggerText,
-      triggerRule,
-      expectedProfit: input.expectedProfit,
-      notes: input.notes,
-      createdAt: Date.now(),
-      quickLogged: input.quickLogged ? Date.now() : null,
-      purpose: input.purpose ?? null,
-    })
-    .returning()
-    .get();
+  const values = {
+    eventId: input.eventId,
+    offerId,
+    label: input.label,
+    market: input.market,
+    selection: input.selection,
+    betType: input.betType,
+    bookmaker: input.bookmaker,
+    exchangeId: input.exchangeId,
+    backStake: input.backStake,
+    backOdds: input.backOdds,
+    layStake: input.layStake,
+    layOdds: input.layOdds,
+    commission: input.commission,
+    earlyPayout: input.earlyPayout ? 1 : 0,
+    refundAmount: input.refundAmount,
+    refundRetention: input.refundRetention,
+    legs: input.legs ? JSON.stringify(input.legs) : null,
+    triggerText,
+    triggerRule,
+    expectedProfit: input.expectedProfit,
+    notes: input.notes,
+    createdAt: Date.now(),
+    quickLogged: input.quickLogged ? Date.now() : null,
+    purpose: input.purpose ?? null,
+  };
+
+  if (isNeonDesk()) {
+    try {
+      const inserted = await insertNeonDeskBet(values);
+      return NextResponse.json({ bet: inserted });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the bet.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
+
+  const inserted = db.insert(bets).values(values).returning().get();
 
   ledgerBetPlacement(inserted);
 
@@ -162,6 +181,13 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
 
 /** Remove every bet and settlement rows in the history feed. */
 export const DELETE = withDeskScope(async function DELETE() {
+  if (isNeonDesk()) {
+    const deleted = await deleteNeonDeskBets();
+    if (deleted == null) {
+      return NextResponse.json({ error: "Sign in to clear bets." }, { status: 401 });
+    }
+    return NextResponse.json({ ok: true, deleted });
+  }
   const all = db.select({ id: bets.id }).from(bets).all();
   db.delete(history).where(isNotNull(history.betId)).run();
   db.delete(bets).run();

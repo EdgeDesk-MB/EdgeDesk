@@ -1,0 +1,41 @@
+import type { BetRow } from "@/lib/db/schema";
+import type { BetRow as PgBetRow } from "@/lib/db/schema.pg";
+
+export function toSqliteBetRow(row: PgBetRow): BetRow {
+  return {
+    id: row.id,
+    eventId: row.eventId,
+    label: row.label,
+    market: row.market,
+    selection: row.selection,
+    betType: row.betType,
+    bookmaker: row.bookmaker,
+    exchangeId: row.exchangeId,
+    backStake: row.backStake,
+    backOdds: row.backOdds,
+    layStake: row.layStake,
+    layOdds: row.layOdds,
+    commission: row.commission,
+    earlyPayout: row.earlyPayout,
+    refundAmount: row.refundAmount,
+    refundRetention: row.refundRetention,
+    legs: row.legs,
+    triggerText: row.triggerText,
+    triggerRule: row.triggerRule,
+    status: row.status,
+    expectedProfit: row.expectedProfit,
+    actualProfit: row.actualProfit,
+    notes: row.notes,
+    balanceLedgered: row.balanceLedgered,
+    balanceSettled: row.balanceSettled,
+    createdAt: row.createdAt,
+    settledAt: row.settledAt,
+    offerId: row.offerId,
+    quickLogged: row.quickLogged,
+    source: row.source,
+    purpose: row.purpose,
+    sport: row.sport,
+    importFingerprint: null,
+    importMeta: null,
+  };
+}

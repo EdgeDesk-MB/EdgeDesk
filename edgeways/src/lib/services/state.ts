@@ -19,6 +19,8 @@ import {
   type EventRow,
   type HistoryRow,
 } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonDeskBets } from "@/lib/db/neon-desk";
 import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
 import {
@@ -873,7 +875,9 @@ export async function getAppState(): Promise<AppState> {
   fireDueUserReminders(now);
 
   const allEvents = db.select().from(events).all();
-  const allBets = db.select().from(bets).all();
+  const allBets = isNeonDesk()
+    ? await listNeonDeskBets()
+    : db.select().from(bets).all();
   const eventById = new Map(allEvents.map((e) => [e.id, e]));
 
   syncHistory(allEvents, allBets);
