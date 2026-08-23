@@ -5,6 +5,7 @@ import type {
   AccountRow,
   BalanceTransactionRow,
   BetRow,
+  CasinoOfferRow,
   EventRow,
   HistoryRow,
   OfferRow,
@@ -27,6 +28,8 @@ export type NeonDeskSnapshot = {
   accounts?: AccountRow[];
   transactions?: BalanceTransactionRow[];
   history?: HistoryRow[];
+  /** Casino campaigns (casino cutover); drives casinoProfit + settlements. */
+  casinoOffers?: CasinoOfferRow[];
   settings?: AppSettings;
   /** Durable Neon usage (EDGE-81c); falls back to this instance's counter. */
   apiUsage?: { used: number; budget: number };
@@ -41,20 +44,49 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
   const historyRows = input.history ?? [];
 
   const bets = [...allBets].sort((a, b) => b.createdAt - a.createdAt);
+  const allCasinoOffers = input.casinoOffers ?? [];
+  // P&L-affecting manual adjustments live in the restored history feed.
+  const balanceAdjustments = historyRows.filter(
+    (h) => h.kind === "balance_adjustment"
+  );
   const pnl = computePnlBuckets({
     bets,
-    casinoOffers: [],
-    adjustments: [],
+    casinoOffers: allCasinoOffers,
+    adjustments: balanceAdjustments,
   });
 
   const settled = bets
     .filter((b) => b.status !== "open" && b.status !== "void" && b.actualProfit != null)
     .sort((a, b) => (a.settledAt ?? a.createdAt) - (b.settledAt ?? b.createdAt));
 
+  const casinoSettlements = allCasinoOffers
+    .filter((o) => o.status === "completed" && o.actualProfit != null)
+    .map((o) => ({
+      id: o.id,
+      time: o.completedAt ?? o.createdAt,
+      amount: o.actualProfit!,
+      title: o.title,
+      casino: o.casino,
+    }))
+    .sort((a, b) => a.time - b.time);
+
+  const pnlAdjustments = balanceAdjustments
+    .filter((h) => h.amount != null && h.amount !== 0)
+    .map((h) => ({ id: h.id, time: h.createdAt, amount: h.amount!, detail: h.detail }));
+
+  // Cumulative P&L: settled bets + casino settlements + manual adjustments,
+  // same blend as the local snapshot (commission tracking stays local-only).
+  const pnlPoints = [
+    ...settled.map((b) => ({ time: b.settledAt ?? b.createdAt, profit: b.actualProfit ?? 0 })),
+    ...casinoSettlements.map((c) => ({ time: c.time, profit: c.amount })),
+    ...balanceAdjustments
+      .filter((h) => h.amount != null)
+      .map((h) => ({ time: h.createdAt, profit: h.amount! })),
+  ].sort((a, b) => a.time - b.time);
   let running = 0;
-  const series = settled.map((b) => {
-    running += b.actualProfit ?? 0;
-    return { time: b.settledAt ?? b.createdAt, value: running, commissionPaid: 0 };
+  const series = pnlPoints.map((p) => {
+    running += p.profit;
+    return { time: p.time, value: running, commissionPaid: 0 };
   });
 
   const provisional = sumOpenWorstCaseProfit(bets);
@@ -77,10 +109,10 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     bets,
     settledProfit: pnl.settledProfit,
     bettingProfit: pnl.bettingProfit,
-    casinoProfit: 0,
+    casinoProfit: pnl.casinoProfit,
     provisionalProfit: Math.round(provisional * 100) / 100,
-    pnlAdjustments: [],
-    casinoSettlements: [],
+    pnlAdjustments,
+    casinoSettlements,
     planRaces: derived.planRaces,
     planFixtures: derived.planFixtures,
     retention: { rate: DEFAULT_SETTINGS.tuning.retentionPrior, sampleSize: 0 },

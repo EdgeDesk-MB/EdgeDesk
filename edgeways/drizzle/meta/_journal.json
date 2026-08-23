@@ -85,6 +85,13 @@
       "when": 1787492605609,
       "tag": "0011_military_shadowcat",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787508600000,
+      "tag": "0012_casino_clerk_user_id",
+      "breakpoints": true
     }
   ]
 }

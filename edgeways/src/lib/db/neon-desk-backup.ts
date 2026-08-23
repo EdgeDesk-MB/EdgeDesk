@@ -16,6 +16,11 @@ import {
   accounts as pgAccounts,
   balanceTransactions as pgBalanceTransactions,
   bets as pgBets,
+  casinoGames as pgCasinoGames,
+  casinoOfferComponents as pgCasinoOfferComponents,
+  casinoOfferSeries as pgCasinoOfferSeries,
+  casinoOfferSeriesComponents as pgCasinoOfferSeriesComponents,
+  casinoOffers as pgCasinoOffers,
   history as pgHistory,
   offers as pgOffers,
 } from "@/lib/db/schema.pg";
@@ -27,6 +32,11 @@ export const HOSTED_BACKUP_TABLES = [
   "bets",
   "balance_transactions",
   "history",
+  "casino_offers",
+  "casino_offer_series",
+  "casino_offer_components",
+  "casino_offer_series_components",
+  "casino_games",
 ] as const;
 
 type Row = Record<string, unknown>;
@@ -101,6 +111,57 @@ const HISTORY_KEYS: Array<[string, string]> = [
   ["createdAt", "created_at"],
 ];
 
+const CASINO_OFFER_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["casino", "casino"], ["title", "title"],
+  ["bonusAmount", "bonus_amount"], ["wageringMultiplier", "wagering_multiplier"],
+  ["rtp", "rtp"], ["contributionPct", "contribution_pct"], ["status", "status"],
+  ["expectedEv", "expected_ev"], ["actualProfit", "actual_profit"],
+  ["notes", "notes"], ["game", "game"], ["expiresAt", "expires_at"],
+  ["seriesId", "series_id"], ["instanceDate", "instance_date"],
+  ["offerUrl", "offer_url"], ["createdAt", "created_at"],
+  ["completedAt", "completed_at"],
+];
+
+const CASINO_SERIES_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["recurrenceEnabled", "recurrence_enabled"],
+  ["recurrenceStoppedFrom", "recurrence_stopped_from"],
+  ["skippedDatesJson", "skipped_dates_json"], ["ruleJson", "rule_json"],
+  ["templateExpiresAt", "template_expires_at"], ["horizonDays", "horizon_days"],
+  ["casino", "casino"], ["title", "title"], ["notes", "notes"],
+  ["offerUrl", "offer_url"], ["createdAt", "created_at"],
+  ["updatedAt", "updated_at"],
+];
+
+const CASINO_COMPONENT_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["casinoOfferId", "casino_offer_id"],
+  ["componentType", "component_type"], ["amount", "amount"],
+  ["wageringMultiplier", "wagering_multiplier"], ["rtp", "rtp"],
+  ["contributionPct", "contribution_pct"], ["spins", "spins"],
+  ["spinValue", "spin_value"], ["chipCount", "chip_count"],
+  ["chipValue", "chip_value"], ["houseEdgePreset", "house_edge_preset"],
+  ["cashbackPct", "cashback_pct"], ["cashbackCap", "cashback_cap"],
+  ["game", "game"], ["eligibleGamesJson", "eligible_games_json"],
+  ["expectedEv", "expected_ev"], ["sortOrder", "sort_order"],
+  ["createdAt", "created_at"],
+];
+
+const CASINO_SERIES_COMPONENT_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["seriesId", "series_id"],
+  ["componentType", "component_type"], ["amount", "amount"],
+  ["wageringMultiplier", "wagering_multiplier"], ["rtp", "rtp"],
+  ["contributionPct", "contribution_pct"], ["spins", "spins"],
+  ["spinValue", "spin_value"], ["chipCount", "chip_count"],
+  ["chipValue", "chip_value"], ["houseEdgePreset", "house_edge_preset"],
+  ["cashbackPct", "cashback_pct"], ["cashbackCap", "cashback_cap"],
+  ["game", "game"], ["eligibleGamesJson", "eligible_games_json"],
+  ["sortOrder", "sort_order"], ["createdAt", "created_at"],
+];
+
+const CASINO_GAME_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["name", "name"], ["provider", "provider"], ["rtp", "rtp"],
+  ["source", "source"], ["updatedAt", "updated_at"],
+];
+
 export async function neonDeskBackupBundle(): Promise<{
   app: string;
   exportedAt: string;
@@ -111,16 +172,22 @@ export async function neonDeskBackupBundle(): Promise<{
     throw new Error("Sign in to download a backup.");
   }
   const db = getNeonDb();
-  const [offers, accounts, bets, txs, history] = await Promise.all([
-    db.select().from(pgOffers).where(eq(pgOffers.clerkUserId, clerkUserId)),
-    db.select().from(pgAccounts).where(eq(pgAccounts.clerkUserId, clerkUserId)),
-    db.select().from(pgBets).where(eq(pgBets.clerkUserId, clerkUserId)),
-    db
-      .select()
-      .from(pgBalanceTransactions)
-      .where(eq(pgBalanceTransactions.clerkUserId, clerkUserId)),
-    db.select().from(pgHistory).where(eq(pgHistory.clerkUserId, clerkUserId)),
-  ]);
+  const [offers, accounts, bets, txs, history, cOffers, cSeries, cComponents, cSeriesComponents, cGames] =
+    await Promise.all([
+      db.select().from(pgOffers).where(eq(pgOffers.clerkUserId, clerkUserId)),
+      db.select().from(pgAccounts).where(eq(pgAccounts.clerkUserId, clerkUserId)),
+      db.select().from(pgBets).where(eq(pgBets.clerkUserId, clerkUserId)),
+      db
+        .select()
+        .from(pgBalanceTransactions)
+        .where(eq(pgBalanceTransactions.clerkUserId, clerkUserId)),
+      db.select().from(pgHistory).where(eq(pgHistory.clerkUserId, clerkUserId)),
+      db.select().from(pgCasinoOffers).where(eq(pgCasinoOffers.clerkUserId, clerkUserId)),
+      db.select().from(pgCasinoOfferSeries).where(eq(pgCasinoOfferSeries.clerkUserId, clerkUserId)),
+      db.select().from(pgCasinoOfferComponents).where(eq(pgCasinoOfferComponents.clerkUserId, clerkUserId)),
+      db.select().from(pgCasinoOfferSeriesComponents).where(eq(pgCasinoOfferSeriesComponents.clerkUserId, clerkUserId)),
+      db.select().from(pgCasinoGames).where(eq(pgCasinoGames.clerkUserId, clerkUserId)),
+    ]);
   return {
     app: APP_VERSION,
     exportedAt: new Date().toISOString(),
@@ -130,6 +197,11 @@ export async function neonDeskBackupBundle(): Promise<{
       bets: bets.map((r) => snake(r as unknown as Row, BET_KEYS)),
       balance_transactions: txs.map((r) => snake(r as unknown as Row, TX_KEYS)),
       history: history.map((r) => snake(r as unknown as Row, HISTORY_KEYS)),
+      casino_offers: cOffers.map((r) => snake(r as unknown as Row, CASINO_OFFER_KEYS)),
+      casino_offer_series: cSeries.map((r) => snake(r as unknown as Row, CASINO_SERIES_KEYS)),
+      casino_offer_components: cComponents.map((r) => snake(r as unknown as Row, CASINO_COMPONENT_KEYS)),
+      casino_offer_series_components: cSeriesComponents.map((r) => snake(r as unknown as Row, CASINO_SERIES_COMPONENT_KEYS)),
+      casino_games: cGames.map((r) => snake(r as unknown as Row, CASINO_GAME_KEYS)),
     },
   };
 }
@@ -153,9 +225,9 @@ export function isHostedBackupTables(tables: unknown): tables is BackupTables {
 
 /**
  * Replace this login's hosted desk with the bundle contents. Ids are
- * reassigned by Neon; offer/account/bet references are remapped. Feed-scoped
- * ids that do not exist on the hosted desk (events, casino offers, offer
- * series) are nulled.
+ * reassigned by Neon; offer/account/bet/casino references are remapped.
+ * Feed-scoped ids that do not exist on the hosted desk (events, racing
+ * scope ids, sports-offer series) are nulled.
  */
 export async function restoreNeonDeskBackup(
   tables: BackupTables
@@ -171,6 +243,11 @@ export async function restoreNeonDeskBackup(
   const betRows = tables.bets ?? [];
   const txRows = tables.balance_transactions ?? [];
   const historyRows = tables.history ?? [];
+  const casinoOfferRows = tables.casino_offers ?? [];
+  const casinoSeriesRows = tables.casino_offer_series ?? [];
+  const casinoComponentRows = tables.casino_offer_components ?? [];
+  const casinoSeriesComponentRows = tables.casino_offer_series_components ?? [];
+  const casinoGameRows = tables.casino_games ?? [];
 
   // 1. Offers
   const offerIdMap = new Map<number, number>();
@@ -301,6 +378,171 @@ export async function restoreNeonDeskBackup(
     if (oldId != null && inserted[0]) betIdMap.set(oldId, inserted[0].id);
   }
 
+  // 3b. Casino: games, then series, then offers (series_id remap), then the
+  // two component tables (offer/series remap). Before the ledger so
+  // balance_transactions.casino_offer_id can point at the new offer ids.
+  const casinoGameIdMap = new Map<number, number>();
+  const keepCasinoGameIds: number[] = [];
+  for (const r of casinoGameRows) {
+    const name = str(r.name);
+    const rtp = num(r.rtp);
+    if (!name || rtp == null) continue;
+    const inserted = await db
+      .insert(pgCasinoGames)
+      .values({
+        clerkUserId,
+        name,
+        provider: str(r.provider),
+        rtp,
+        source: str(r.source) ?? "user",
+        updatedAt: num(r.updated_at) ?? Date.now(),
+      })
+      .onConflictDoNothing()
+      .returning({ id: pgCasinoGames.id });
+    const oldId = num(r.id);
+    if (inserted[0]) {
+      if (oldId != null) casinoGameIdMap.set(oldId, inserted[0].id);
+      keepCasinoGameIds.push(inserted[0].id);
+    } else {
+      // (clerk_user_id, name) conflict: adopt the existing row into the keep set
+      const existing = await db
+        .select({ id: pgCasinoGames.id })
+        .from(pgCasinoGames)
+        .where(and(eq(pgCasinoGames.clerkUserId, clerkUserId), eq(pgCasinoGames.name, name)))
+        .limit(1);
+      if (existing[0]) {
+        if (oldId != null) casinoGameIdMap.set(oldId, existing[0].id);
+        keepCasinoGameIds.push(existing[0].id);
+      }
+    }
+  }
+
+  const casinoSeriesIdMap = new Map<number, number>();
+  for (const r of casinoSeriesRows) {
+    const title = str(r.title);
+    const ruleJson = str(r.rule_json);
+    if (!title || !ruleJson) continue;
+    const inserted = await db
+      .insert(pgCasinoOfferSeries)
+      .values({
+        clerkUserId,
+        recurrenceEnabled: num(r.recurrence_enabled) ?? 1,
+        recurrenceStoppedFrom: str(r.recurrence_stopped_from),
+        skippedDatesJson: str(r.skipped_dates_json),
+        ruleJson,
+        templateExpiresAt: num(r.template_expires_at),
+        horizonDays: num(r.horizon_days) ?? 14,
+        casino: str(r.casino),
+        title,
+        notes: str(r.notes),
+        offerUrl: str(r.offer_url),
+        createdAt: num(r.created_at) ?? Date.now(),
+        updatedAt: num(r.updated_at) ?? Date.now(),
+      })
+      .returning({ id: pgCasinoOfferSeries.id });
+    const oldId = num(r.id);
+    if (oldId != null && inserted[0]) casinoSeriesIdMap.set(oldId, inserted[0].id);
+  }
+
+  const casinoOfferIdMap = new Map<number, number>();
+  for (const r of casinoOfferRows) {
+    const title = str(r.title);
+    if (!title) continue;
+    const oldSeriesId = num(r.series_id);
+    const inserted = await db
+      .insert(pgCasinoOffers)
+      .values({
+        clerkUserId,
+        casino: str(r.casino),
+        title,
+        bonusAmount: num(r.bonus_amount) ?? 0,
+        wageringMultiplier: num(r.wagering_multiplier) ?? 0,
+        rtp: num(r.rtp),
+        contributionPct: num(r.contribution_pct),
+        status: (str(r.status) as "planned" | "active" | "completed" | "expired") ?? "planned",
+        expectedEv: num(r.expected_ev) ?? 0,
+        actualProfit: num(r.actual_profit),
+        notes: str(r.notes),
+        game: str(r.game),
+        expiresAt: num(r.expires_at),
+        seriesId: oldSeriesId != null ? (casinoSeriesIdMap.get(oldSeriesId) ?? null) : null,
+        instanceDate: str(r.instance_date),
+        offerUrl: str(r.offer_url),
+        createdAt: num(r.created_at) ?? Date.now(),
+        completedAt: num(r.completed_at),
+      })
+      .returning({ id: pgCasinoOffers.id });
+    const oldId = num(r.id);
+    if (oldId != null && inserted[0]) casinoOfferIdMap.set(oldId, inserted[0].id);
+  }
+
+  const keepCasinoComponentIds: number[] = [];
+  for (const r of casinoComponentRows) {
+    const oldOfferId = num(r.casino_offer_id);
+    const casinoOfferId = oldOfferId != null ? casinoOfferIdMap.get(oldOfferId) : undefined;
+    const componentType = str(r.component_type) as
+      | "qualifying_wager" | "cash" | "bonus" | "free_spins" | "golden_chips" | "cashback" | null;
+    if (casinoOfferId == null || !componentType) continue;
+    const inserted = await db
+      .insert(pgCasinoOfferComponents)
+      .values({
+        clerkUserId,
+        casinoOfferId,
+        componentType,
+        amount: num(r.amount),
+        wageringMultiplier: num(r.wagering_multiplier),
+        rtp: num(r.rtp),
+        contributionPct: num(r.contribution_pct),
+        spins: num(r.spins),
+        spinValue: num(r.spin_value),
+        chipCount: num(r.chip_count),
+        chipValue: num(r.chip_value),
+        houseEdgePreset: str(r.house_edge_preset) as "european" | "american" | "custom" | null,
+        cashbackPct: num(r.cashback_pct),
+        cashbackCap: num(r.cashback_cap),
+        game: str(r.game),
+        eligibleGamesJson: str(r.eligible_games_json),
+        expectedEv: num(r.expected_ev) ?? 0,
+        sortOrder: num(r.sort_order) ?? 0,
+        createdAt: num(r.created_at) ?? Date.now(),
+      })
+      .returning({ id: pgCasinoOfferComponents.id });
+    if (inserted[0]) keepCasinoComponentIds.push(inserted[0].id);
+  }
+
+  const keepCasinoSeriesComponentIds: number[] = [];
+  for (const r of casinoSeriesComponentRows) {
+    const oldSeriesId = num(r.series_id);
+    const seriesId = oldSeriesId != null ? casinoSeriesIdMap.get(oldSeriesId) : undefined;
+    const componentType = str(r.component_type) as
+      | "qualifying_wager" | "cash" | "bonus" | "free_spins" | "golden_chips" | "cashback" | null;
+    if (seriesId == null || !componentType) continue;
+    const inserted = await db
+      .insert(pgCasinoOfferSeriesComponents)
+      .values({
+        clerkUserId,
+        seriesId,
+        componentType,
+        amount: num(r.amount),
+        wageringMultiplier: num(r.wagering_multiplier),
+        rtp: num(r.rtp),
+        contributionPct: num(r.contribution_pct),
+        spins: num(r.spins),
+        spinValue: num(r.spin_value),
+        chipCount: num(r.chip_count),
+        chipValue: num(r.chip_value),
+        houseEdgePreset: str(r.house_edge_preset) as "european" | "american" | "custom" | null,
+        cashbackPct: num(r.cashback_pct),
+        cashbackCap: num(r.cashback_cap),
+        game: str(r.game),
+        eligibleGamesJson: str(r.eligible_games_json),
+        sortOrder: num(r.sort_order) ?? 0,
+        createdAt: num(r.created_at) ?? Date.now(),
+      })
+      .returning({ id: pgCasinoOfferSeriesComponents.id });
+    if (inserted[0]) keepCasinoSeriesComponentIds.push(inserted[0].id);
+  }
+
   // 4. Balance ledger
   const keepTxIds: number[] = [];
   for (const r of txRows) {
@@ -312,6 +554,7 @@ export async function restoreNeonDeskBackup(
       | "casino_settlement" | "free_bet" | "transfer" | "fee" | null;
     if (accountId == null || amount == null || !category) continue;
     const oldBetId = num(r.bet_id);
+    const oldCasinoOfferId = num(r.casino_offer_id);
     const inserted = await db
       .insert(pgBalanceTransactions)
       .values({
@@ -320,7 +563,8 @@ export async function restoreNeonDeskBackup(
         amount,
         category,
         betId: oldBetId != null ? (betIdMap.get(oldBetId) ?? null) : null,
-        casinoOfferId: null, // casino ledger stays SQLite-only
+        casinoOfferId:
+          oldCasinoOfferId != null ? (casinoOfferIdMap.get(oldCasinoOfferId) ?? null) : null,
         transferGroupId: str(r.transfer_group_id),
         pending: num(r.pending) ?? 0,
         note: str(r.note),
@@ -376,6 +620,44 @@ export async function restoreNeonDeskBackup(
   const keepOffers = [...offerIdMap.values()];
   const keepAccounts = [...accountIdMap.values()];
   const keepBets = [...betIdMap.values()];
+  const keepCasinoOffers = [...casinoOfferIdMap.values()];
+  const keepCasinoSeries = [...casinoSeriesIdMap.values()];
+  // Casino children first, then parents.
+  await db
+    .delete(pgCasinoOfferComponents)
+    .where(
+      keepCasinoComponentIds.length > 0
+        ? and(eq(pgCasinoOfferComponents.clerkUserId, clerkUserId), notInArray(pgCasinoOfferComponents.id, keepCasinoComponentIds))
+        : eq(pgCasinoOfferComponents.clerkUserId, clerkUserId)
+    );
+  await db
+    .delete(pgCasinoOfferSeriesComponents)
+    .where(
+      keepCasinoSeriesComponentIds.length > 0
+        ? and(eq(pgCasinoOfferSeriesComponents.clerkUserId, clerkUserId), notInArray(pgCasinoOfferSeriesComponents.id, keepCasinoSeriesComponentIds))
+        : eq(pgCasinoOfferSeriesComponents.clerkUserId, clerkUserId)
+    );
+  await db
+    .delete(pgCasinoOffers)
+    .where(
+      keepCasinoOffers.length > 0
+        ? and(eq(pgCasinoOffers.clerkUserId, clerkUserId), notInArray(pgCasinoOffers.id, keepCasinoOffers))
+        : eq(pgCasinoOffers.clerkUserId, clerkUserId)
+    );
+  await db
+    .delete(pgCasinoOfferSeries)
+    .where(
+      keepCasinoSeries.length > 0
+        ? and(eq(pgCasinoOfferSeries.clerkUserId, clerkUserId), notInArray(pgCasinoOfferSeries.id, keepCasinoSeries))
+        : eq(pgCasinoOfferSeries.clerkUserId, clerkUserId)
+    );
+  await db
+    .delete(pgCasinoGames)
+    .where(
+      keepCasinoGameIds.length > 0
+        ? and(eq(pgCasinoGames.clerkUserId, clerkUserId), notInArray(pgCasinoGames.id, keepCasinoGameIds))
+        : eq(pgCasinoGames.clerkUserId, clerkUserId)
+    );
   await db
     .delete(pgHistory)
     .where(
@@ -418,5 +700,10 @@ export async function restoreNeonDeskBackup(
     bets: betIdMap.size,
     balance_transactions: keepTxIds.length,
     history: keepHistoryIds.length,
+    casino_offers: casinoOfferIdMap.size,
+    casino_offer_series: casinoSeriesIdMap.size,
+    casino_offer_components: keepCasinoComponentIds.length,
+    casino_offer_series_components: keepCasinoSeriesComponentIds.length,
+    casino_games: keepCasinoGameIds.length,
   };
 }

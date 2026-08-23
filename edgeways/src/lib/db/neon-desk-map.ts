@@ -2,6 +2,7 @@ import type {
   AccountRow,
   BalanceTransactionRow,
   BetRow,
+  CasinoOfferRow,
   EventRow,
   HistoryRow,
   OfferRow,
@@ -10,6 +11,7 @@ import type {
   AccountRow as PgAccountRow,
   BalanceTransactionRow as PgBalanceTransactionRow,
   BetRow as PgBetRow,
+  CasinoOfferRow as PgCasinoOfferRow,
   EventRow as PgEventRow,
   HistoryRow as PgHistoryRow,
   OfferRow as PgOfferRow,
@@ -166,5 +168,28 @@ export function toSqliteHistoryRow(row: PgHistoryRow): HistoryRow {
     note: row.note,
     amount: row.amount,
     createdAt: row.createdAt,
+  };
+}
+
+export function toSqliteCasinoOfferRow(row: PgCasinoOfferRow): CasinoOfferRow {
+  return {
+    id: row.id,
+    casino: row.casino,
+    title: row.title,
+    bonusAmount: row.bonusAmount,
+    wageringMultiplier: row.wageringMultiplier,
+    rtp: row.rtp,
+    contributionPct: row.contributionPct,
+    status: row.status,
+    expectedEv: row.expectedEv,
+    actualProfit: row.actualProfit,
+    notes: row.notes,
+    game: row.game,
+    expiresAt: row.expiresAt,
+    seriesId: row.seriesId,
+    instanceDate: row.instanceDate,
+    offerUrl: row.offerUrl,
+    createdAt: row.createdAt,
+    completedAt: row.completedAt,
   };
 }

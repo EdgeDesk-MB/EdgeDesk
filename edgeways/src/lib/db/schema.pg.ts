@@ -10,6 +10,7 @@ import {
   pgTable,
   serial,
   text,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -718,6 +719,8 @@ export const casinoOffers = pgTable("casino_offers", {
   offerUrl: text("offer_url"),
   createdAt: epochMs("created_at").notNull(),
   completedAt: epochMs("completed_at"),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Recurring casino offer template - instances are materialised as separate casino_offers rows (K3). */
@@ -739,6 +742,8 @@ export const casinoOfferSeries = pgTable("casino_offer_series", {
   offerUrl: text("offer_url"),
   createdAt: epochMs("created_at").notNull(),
   updatedAt: epochMs("updated_at").notNull(),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /**
@@ -768,6 +773,8 @@ export const casinoOfferSeriesComponents = pgTable("casino_offer_series_componen
   eligibleGamesJson: text("eligible_games_json"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: epochMs("created_at").notNull(),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /**
@@ -814,18 +821,28 @@ export const casinoOfferComponents = pgTable("casino_offer_components", {
   expectedEv: doublePrecision("expected_ev").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: epochMs("created_at").notNull(),
+  /** Hosted owner (EDGE-47) */
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Game RTP reference library (H2) - seeded with published values, user-editable. */
-export const casinoGames = pgTable("casino_games", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  provider: text("provider"),
-  /** Fraction 0-1 */
-  rtp: doublePrecision("rtp").notNull(),
-  source: text("source").notNull().default("user"),
-  updatedAt: epochMs("updated_at").notNull(),
-});
+export const casinoGames = pgTable(
+  "casino_games",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    provider: text("provider"),
+    /** Fraction 0-1 */
+    rtp: doublePrecision("rtp").notNull(),
+    source: text("source").notNull().default("user"),
+    updatedAt: epochMs("updated_at").notNull(),
+    /** Hosted owner (EDGE-47) */
+    clerkUserId: text("clerk_user_id"),
+  },
+  // Game names are unique per desk, not globally - two customers can both
+  // have "Starburst" in their library.
+  (t) => [unique("casino_games_user_name").on(t.clerkUserId, t.name)]
+);
 
 export const racingOddsOverrides = pgTable("racing_odds_overrides", {
   id: serial("id").primaryKey(),

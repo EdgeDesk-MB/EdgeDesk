@@ -7,6 +7,7 @@ import type {
   AccountRow,
   BalanceTransactionRow,
   BetRow,
+  CasinoOfferRow,
   HistoryRow,
   OfferRow,
 } from "@/lib/db/schema";
@@ -218,5 +219,68 @@ describe("appStateFromNeonDesk", () => {
       ],
     });
     expect(state.history.map((h) => h.id)).toEqual([2, 1]);
+  });
+});
+
+function casinoOffer(
+  partial: Partial<CasinoOfferRow> & Pick<CasinoOfferRow, "id" | "title">
+): CasinoOfferRow {
+  return {
+    casino: "Dynobet",
+    bonusAmount: 0,
+    wageringMultiplier: 0,
+    rtp: null,
+    contributionPct: null,
+    status: "completed",
+    expectedEv: 5,
+    actualProfit: null,
+    notes: null,
+    game: null,
+    expiresAt: null,
+    seriesId: null,
+    instanceDate: null,
+    offerUrl: null,
+    createdAt: 1_700_000_000_000,
+    completedAt: null,
+    ...partial,
+  };
+}
+
+describe("appStateFromNeonDesk casino + adjustments", () => {
+  it("blends casino profit and P&L adjustments into settled profit", () => {
+    const state = appStateFromNeonDesk({
+      bets: [
+        bet({ id: 1, label: "Won", status: "won", actualProfit: 10, settledAt: 1_700_000_100_000 }),
+      ],
+      casinoOffers: [
+        casinoOffer({ id: 1, title: "Wager £20 get 50 spins", actualProfit: 12.5, completedAt: 1_700_000_200_000 }),
+        casinoOffer({ id: 2, title: "Planned", status: "planned", actualProfit: null }),
+        casinoOffer({ id: 3, title: "Expired", status: "expired", actualProfit: 99 }),
+      ],
+      history: [
+        historyRow({ id: 1, dedupe: "adj-1", kind: "balance_adjustment", title: "Correction", amount: 2, createdAt: 1_700_000_300_000 }),
+        historyRow({ id: 2, dedupe: "adj-0", kind: "balance_adjustment", title: "Zero", amount: 0 }),
+        historyRow({ id: 3, dedupe: "g", kind: "goal", title: "Goal" }),
+      ],
+    });
+    expect(state.bettingProfit).toBe(10);
+    expect(state.casinoProfit).toBe(12.5);
+    expect(state.settledProfit).toBe(24.5);
+    expect(state.casinoSettlements).toEqual([
+      { id: 1, time: 1_700_000_200_000, amount: 12.5, title: "Wager £20 get 50 spins", casino: "Dynobet" },
+    ]);
+    expect(state.pnlAdjustments).toEqual([
+      { id: 1, time: 1_700_000_300_000, amount: 2, detail: null },
+    ]);
+    // Series blends bet + casino + adjustment in time order with a running
+    // total. The zero-amount adjustment still plots a point (local parity).
+    expect(state.series.map((p) => p.value)).toEqual([0, 10, 22.5, 24.5]);
+  });
+
+  it("keeps casino and adjustments at zero when no rows are passed", () => {
+    const state = appStateFromNeonDesk({ bets: [] });
+    expect(state.casinoProfit).toBe(0);
+    expect(state.casinoSettlements).toEqual([]);
+    expect(state.pnlAdjustments).toEqual([]);
   });
 });

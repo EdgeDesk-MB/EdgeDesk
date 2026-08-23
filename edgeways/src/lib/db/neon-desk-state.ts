@@ -1,11 +1,12 @@
 /**
- * Hosted Home snapshot (EDGE-47). Neon bets, offers, wallets, history and the
- * global feed events (EDGE-81b). Never opens SQLite: Vercel cannot mkdir the
- * Mac `data/` folder.
+ * Hosted Home snapshot (EDGE-47). Neon bets, offers, wallets, history, casino
+ * and the global feed events (EDGE-81b). Never opens SQLite: Vercel cannot
+ * mkdir the Mac `data/` folder.
  */
 import "server-only";
 
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskCasinoOffers } from "@/lib/db/neon-desk-casino";
 import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
 import {
   listNeonDeskAccounts,
@@ -25,7 +26,7 @@ export {
 } from "@/lib/db/neon-desk-state-map";
 
 export async function buildNeonDeskAppState(): Promise<AppState> {
-  const [bets, events, offers, accounts, transactions, history, settings, apiUsage] =
+  const [bets, events, offers, accounts, transactions, history, casinoOffers, settings, apiUsage] =
     await Promise.all([
       listNeonDeskBets(),
       listNeonEvents().catch(() => []),
@@ -33,6 +34,7 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
       listNeonDeskAccounts(),
       listNeonDeskBalanceTransactions(),
       listNeonDeskHistory(),
+      listNeonDeskCasinoOffers(),
       getNeonDeskSettings(),
       apiUsageTodayAsync(),
       // Every hosted dashboard poll is a chance to advance the shared feed.
@@ -47,6 +49,7 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     accounts,
     transactions,
     history,
+    casinoOffers,
     settings,
     apiUsage,
   });
