@@ -823,8 +823,8 @@ export async function getRacingDesk(
   let exchangeNote: string | undefined;
   if (liveFeed.status.status === "not_configured") {
     exchangeNote = deskOverride
-      ? `${liveFeed.name} is selected on Racing Desk but not connected. Configure keys in Settings → Data & API, or pick another exchange.`
-      : `Connect Betfair delayed key in Settings → Data & API for live lay odds (free). App default exchange is ${settingsName}.`;
+      ? `${liveFeed.name} is selected on Racing Desk but its feed is not connected. Check Settings → Data & API, or pick another exchange.`
+      : `The exchange feed is not connected on this desk - live lay odds unavailable. App default exchange is ${settingsName}.`;
   } else if (liveFeed.status.status === "unsupported") {
     exchangeNote = liveFeed.status.message;
   } else if (!hasLiveExchange) {
@@ -834,7 +834,7 @@ export async function getRacingDesk(
     liveFeed.provider !== settingsProvider &&
     settingsStatus.status !== "connected"
   ) {
-    exchangeNote = `Using ${liveFeed.name} for live lays (Settings default ${settingsName} has no API). Override on Racing Desk or set default to Betfair in Settings.`;
+    exchangeNote = `Using ${liveFeed.name} for live lays (Settings default ${settingsName} has no connected feed). Override on Racing Desk or set the default to a connected exchange in Settings.`;
   }
 
   const summary: RacingDeskSummary = {
@@ -854,9 +854,9 @@ export async function getRacingDesk(
     resultsTier: hasRacingApiKey() ? getCachedRacingResultsTier() : "none",
     oddsNote:
       effectiveOddsTier === "free" || effectiveOddsTier === "proxy"
-        ? "Free Racing API - no live bookie feed. Bookie column stays blank until you paste odds (click a cell). Betfair lays are live when connected."
+        ? "Racing feed: racecards only - no live bookie odds. Bookie column stays blank until you paste odds (click a cell). Exchange lays are live when connected."
         : effectiveOddsTier === "standard"
-          ? "Live bookmaker odds from Racing API Standard."
+          ? "Live bookmaker odds from the racing feed."
           : undefined,
     exchangeProvider: liveFeed.provider,
     exchangeName: liveFeed.name,

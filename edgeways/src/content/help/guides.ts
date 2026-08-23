@@ -47,7 +47,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Demo mode vs API keys",
         paragraphs: [
-          "Without any keys, Edgeways runs fully in demo mode: all calculators, tracker, offers, settlement logic and the football simulator work offline.",
+          "Calculators, tracker, offers, settlement and the football simulator work without live feeds. When the racing, football or exchange feeds are not connected, the desk uses demo fixtures and sample racecards.",
         ],
         bullets: [
           "Demo fixtures and sample racecards when no keys are set",
@@ -59,9 +59,10 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Recommended free stack (£0/month)",
         bullets: [
-          "The Racing API (free) - today + tomorrow racecards, proxy odds",
-          "Betfair delayed app key (free at developer.betfair.com) - real lay prices",
-          "API-Football free (optional) - ~one live football track per day",
+          "Racing cards for today and tomorrow, with paste-in bookie odds",
+          "Delayed exchange prices for pre-race lays",
+          "Football scores when a match is tracked",
+          "Settings → Data & API shows what is connected. You do not add provider keys.",
         ],
       },
       {
@@ -111,7 +112,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Every £-EV figure carries a basis badge because not all estimates deserve equal trust. This is the single most important convention on the platform.",
         ],
         bullets: [
-          "LIVE (green) - derived from real exchange odds fetched moments ago (Racing Desk with a Betfair key).",
+          "LIVE (green) - derived from real exchange odds fetched moments ago (Racing Desk with the exchange feed connected).",
           "EST. (blue) - built from numbers you entered or from your own measured history (a boost check, a locked EV, measured retention).",
           "~EST. (amber) - a heuristic stands in for something unknown (default 96% slot RTP, builder legs assumed independent, casino volatility presets). The tooltip always says which assumption.",
           "Aggregates inherit the WEAKEST basis of their parts - one heuristic row makes the total heuristic.",
@@ -124,7 +125,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
         bullets: [
           "Live football scores refresh at most once per 60s per tracked match; goal timelines only re-fetch when the score changes (the API allows ~95 requests/day, and the budget guard alerts once daily if it runs dry).",
-          "Racing cards cache ~15 minutes; Betfair delayed prices run 1-3 minutes behind live.",
+          "Racing cards cache ~15 minutes; delayed exchange prices run 1-3 minutes behind live.",
           "Compute-on-poll jobs: the Monday weekly digest (week-key latch so it sends once), email intake (checks your IMAP folder every ~5 minutes when enabled), acca auto-results and lay-due alerts.",
           "Alerts write to the inbox with a dedupe key, so a re-firing condition updates the existing alert instead of stacking copies; web push mirrors them to your phone.",
         ],
@@ -262,9 +263,9 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Proxy vs live odds",
         bullets: [
-          "Proxy bookie odds - estimated from ORF ratings on the free Racing API tier. Labelled “proxy” in the UI. Good for ranking runners, not for final stake decisions.",
-          "Exchange lay odds - real from Betfair when connected (delayed key is fine). Otherwise +3% spread estimates.",
-          "Live bookie odds - require Racing API Standard tier. Until then, check the bookie site and enter odds in the Lay calculator.",
+          "Proxy bookie odds - estimated from ORF ratings when the racing feed has no live bookie prices. Labelled “proxy” in the UI. Good for ranking runners, not for final stake decisions.",
+          "Exchange lay odds - real prices when the exchange feed is connected (delayed is fine). Otherwise +3% spread estimates.",
+          "Live bookie odds - require the full racing feed. Until then, check the bookie site and enter odds in the Lay calculator.",
         ],
       },
       {
@@ -292,7 +293,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Free tier limitations",
         bullets: [
           "Racecards: today and tomorrow only",
-          "Auto race settlement needs Racing API Basic (Free = Set winner manually)",
+          "Auto race settlement needs the full racing feed (base feed = Set winner manually)",
           "The racecard shows exchange lays, not bookie prices. Take the back price from your finder or the bookie.",
           "No silks images on free racecards",
           "Steamer/drifter indicators use local snapshot polling, not premium odds history",
@@ -527,23 +528,23 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Do I need API keys?",
         paragraphs: [
-          "No. Calculators, tracker, offers, settlement and demo data all work without keys. Keys unlock live fixtures, real lay odds and auto settlement.",
+          "No. You do not add provider keys. Calculators, tracker, offers, settlement and demo data all work without live feeds. Settings → Data & API shows whether the racing, football and exchange feeds are connected.",
         ],
       },
       {
         heading: "Why proxy odds?",
         paragraphs: [
-          "The free Racing API tier doesn't include live bookie prices. Edgeways estimates from ORF ratings so you can rank runners and filter qualifying races. Always verify final odds on the bookie before placing.",
+          "The base racing feed doesn't include live bookie prices. Edgeways estimates from ORF ratings so you can rank runners and filter qualifying races. Always verify final odds on the bookie before placing.",
         ],
       },
       {
-        heading: "Betfair delayed key - is it enough?",
+        heading: "Are delayed exchange prices enough?",
         paragraphs: [
           "Yes for pre-race matched betting. Prices are 1–3 minutes behind live but fine for place-refund workflows. A live app key (~£499) is only needed for in-play tight spreads.",
         ],
       },
       {
-        heading: "API-Football free tier limits",
+        heading: "Football feed limits",
         bullets: [
           "100 requests/day with built-in budget guard at 95",
           "Fixture lists cache 10 minutes",
@@ -566,8 +567,8 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "What triggers auto-settlement?",
         bullets: [
-          "Football: live score from API-Football or simulator drives derived markets",
-          "Racing: Racing API Basic auto-settles while the app is open; Free tier uses Set winner",
+          "Football: live score from the football feed or simulator drives derived markets",
+          "Racing: the full racing feed auto-settles while the app is open; the base feed uses Set winner",
           "Goalscorer triggers: settle at the decisive goal, not full time",
         ],
       },

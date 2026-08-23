@@ -400,7 +400,7 @@ function EpDeskContent() {
       refresh();
       const modeMessage = {
         existing: "linked to the event you're already tracking",
-        api: "match imported from API-Football - live scores will settle it automatically",
+        api: "match imported from the football feed - live scores will settle it automatically",
         manual:
           "manual event created - update the score on Tracked Events (or add an API key for live tracking)",
       }[tracked.mode];

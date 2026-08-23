@@ -62,20 +62,24 @@ requires a commercial agreement. **Betfair is the strictest of the three.**
 
 ## Conclusions
 
-1. **Nothing blocks the current local-first app or free tier.** All three
-   providers are fine with personal, own-key use — which is all Edgeways does
-   today and all a free tier needs.
-2. **BYOK hosted (B) is viable for Racing API and API-Football** but Betfair
-   exchange integration in distributed software points at the Software Vendor
-   Licence (£1,499 + certification). Decide whether exchange integration ships
-   in v1 of hosted, or lands after vendor licensing.
-3. **Pooled feeds (C) require written permission from all three providers
-   before the feed proxy is built** (§7.2). Same shape as the processor
-   question (EDGE-1): ask first, build second.
-4. **The app's design already mitigates:** ORF-estimated odds, manual odds
-   paste, and manual settlement mean no core feature *requires* redistributed
-   provider data. Edge-tier live feeds are the only capability at risk, which
-   matches the N0 matrix (feeds are Edge-only).
+1. **Nothing blocks Sam's personal desk or the Free tier.** All three
+   providers are fine with personal, own-key use on his machine.
+2. **Hosted product is C, not B (D7, 22 Aug 2026).** Subscribers never enter
+   provider keys. Sam holds the accounts; Edgeways proxies and caches.
+3. **Pooled feeds launch without written permission (D8, 23 Aug 2026).**
+   Supersedes the earlier ask-first framing: no permission emails are sent
+   in advance. If a provider makes contact, we comply within days, degrade
+   that feed (demo / paste / manual settle), and open the licence
+   conversation from reserved revenue — reply templates in
+   `docs/legal/provider-permission-emails.md`. Do not ask the customer for
+   a key.
+4. **Betfair is the hard one.** A personal live key must not be fanned out.
+   Hosted exchange prices need a Flutter commercial path (Vendor and/or
+   Company Exchange Data). Until that is signed, no customer-facing Betfair
+   key field, and no live lays from Sam's personal key.
+5. **The app already mitigates a refusal:** ORF-estimated odds, manual odds
+   paste, and manual settlement mean Core features do not *require*
+   redistributed provider data. Live feeds stay Edge-gated (N0).
 
 ## Betfair licence paths in detail (EDGE-14)
 

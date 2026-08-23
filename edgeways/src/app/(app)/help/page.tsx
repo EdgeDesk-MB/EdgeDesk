@@ -114,8 +114,8 @@ function HelpPageContent() {
           <Card className="mt-4 border-dashed">
             <CardContent className="py-4 text-sm text-muted-foreground">
               <p>
-                For live connection status, open Settings → Data &amp; API. Optional provider keys
-                power fixtures, racecards and exchange prices when configured.
+                For live connection status, open Settings → Data &amp; API. Feeds power fixtures,
+                racecards and exchange prices when connected — you do not add keys.
               </p>
               <p className="mt-2">
                 Support channel coming in v1.0. For now, use the Roadmap page to see what&apos;s

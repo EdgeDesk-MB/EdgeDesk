@@ -54,12 +54,12 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
     items: [
       { id: "race-desk", title: "Racing Desk with racecards", status: "done" },
       { id: "race-intel", title: "Intelligence modal & offer targeting", status: "done" },
-      { id: "race-proxy", title: "Betfair lay integration (no invented bookie prices)", status: "done" },
+      { id: "race-proxy", title: "Exchange lay integration (no invented bookie prices)", status: "done" },
       { id: "race-workflow", title: "Guided offer workflow (pick → back → lay → log)", status: "done" },
       { id: "race-settle", title: "Settle prompts for finished races", status: "done" },
       { id: "race-steamer", title: "Local steamer/drifter from snapshot polling", status: "done" },
       { id: "race-intel-v3", title: "Intelligence confidence tiers (live / proxy / demo)", status: "done" },
-      { id: "race-results", title: "Auto race settlement (Racing API Basic)", status: "done" },
+      { id: "race-results", title: "Auto race settlement (full racing feed)", status: "done" },
       {
         id: "race-odds-override",
         title: "Manual odds override on Racing Desk",
@@ -86,8 +86,8 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       },
       {
         id: "race-live-odds",
-        title: "Live bookie odds (Racing API Standard)",
-        description: "Paid upgrade path - not required for personal free stack",
+        title: "Live bookie odds (standard racing feed)",
+        description: "Higher racing feed tier. Not required for racecards.",
         status: "planned",
       },
       {
@@ -103,7 +103,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
     id: "football",
     title: "Football / Live",
     items: [
-      { id: "fb-fixtures", title: "Fixture browser + API-Football integration", status: "done" },
+      { id: "fb-fixtures", title: "Fixture browser + football feed integration", status: "done" },
       { id: "fb-sim", title: "Built-in match simulator (2UP drama)", status: "done" },
       { id: "fb-dashboard", title: "Live dashboard with Liveline P&L chart", status: "done" },
       { id: "fb-triggers", title: "Goalscorer & combo trigger engine", status: "done" },
@@ -228,9 +228,9 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
     id: "integrations",
     title: "Integrations",
     items: [
-      { id: "int-racing-api", title: "The Racing API (free + paid tiers)", status: "done" },
-      { id: "int-betfair", title: "Betfair Exchange (delayed + live keys)", status: "done" },
-      { id: "int-football", title: "API-Football with budget guard", status: "done" },
+      { id: "int-racing-api", title: "Racing feed (racecards + results)", status: "done" },
+      { id: "int-betfair", title: "Exchange feed (delayed prices)", status: "done" },
+      { id: "int-football", title: "Football feed with budget guard", status: "done" },
       { id: "int-betdaq", title: "Betdaq partner API", description: "Candidate for a future Elite tier - exchange connections land once Edge-tier revenue funds them", status: "future" },
       { id: "int-matchbook", title: "Matchbook / Smarkets APIs", status: "future" },
       { id: "int-tauri", title: "Tauri macOS .app packaging", description: "After 1.0 - not before product is settled", status: "future" },

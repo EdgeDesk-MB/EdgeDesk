@@ -11,31 +11,35 @@
 
 ## 👇 You are here
 
-**Thread D — Billing.** Checkout works on localhost. Webhooks write the
-tier. Paying still does **not** lock desk features (EDGE-22).
+The billing and first-run path is in. [EDGE-4](https://linear.app/samhayter/issue/EDGE-4),
+[EDGE-5](https://linear.app/samhayter/issue/EDGE-5),
+[EDGE-58](https://linear.app/samhayter/issue/EDGE-58),
+[EDGE-20](https://linear.app/samhayter/issue/EDGE-20),
+[EDGE-21](https://linear.app/samhayter/issue/EDGE-21),
+[EDGE-61](https://linear.app/samhayter/issue/EDGE-61) are **Done**.
+Paying still does **not** lock desk features ([EDGE-22](https://linear.app/samhayter/issue/EDGE-22)).
 
-[EDGE-4](https://linear.app/samhayter/issue/EDGE-4) user path is in: hosted
-Stripe Checkout, still thermal slip on `/subscribe/success`, Customer Portal
-(cancel, invoices, payment method), **Set up the desk** → `/setup`.
-Test portal now lets people switch Core↔Edge (list prices only). Waitlist
-emails get Founding on Edge monthly. Live catalogue exists (19 Aug). Live
-portal and Vercel Production price IDs still need Sam.
+**Done 23 Aug:** [EDGE-47](https://linear.app/samhayter/issue/EDGE-47)
+Neon desk cutover — offers, wallets, history and bets all read/write Neon on
+the preview, user-scoped by Clerk id; hosted JSON backup/restore drill works;
+Sam proved onboarding → offer → bet → refresh on the preview.
 
-[EDGE-5](https://linear.app/samhayter/issue/EDGE-5) is **done** locally:
-`/api/billing/webhook` wrote `edge` / `trialing` onto Neon `app_users`.
-Keep `stripe listen` running when you pay on localhost.
+**Done 23 Aug:** [EDGE-45](https://linear.app/samhayter/issue/EDGE-45)
+reframed by [D8](decisions/d8-staged-licensing.md) — staged licensing:
+launch quietly on operator-held feeds, no permission emails sent; reply
+templates on file (`docs/legal/provider-permission-emails.md`) for
+comply-fast-and-licence if a provider ever makes contact. Customer-facing
+copy no longer names data providers (Settings, Racing Desk, EP Desk, Help,
+roadmap all say "racing/football/exchange feed"). Betfair stays delayed-only.
 
-**Next on this thread:** [EDGE-58](https://linear.app/samhayter/issue/EDGE-58)
-Settings → Subscription (plan, trial, **Manage billing**). This is a go-live
-must. Clerk is identity; Stripe portal is billing. Then EDGE-21 landing or
-EDGE-22 feature locks.
+**Next session (pick one, do not mix in the same day):**
+- [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) Sam clicks the billing
+  rehearsal in test mode
+- Flip `SITE_SURFACE=app` only when Neon desk + checklist + Sam says so
 
-**Auth / first-run:** Clerk + `/login` + `/sign-up` + Neon `app_users` upsert
-are done. [EDGE-21](https://linear.app/samhayter/issue/EDGE-21) launch landing
-(Try the desk, Login, prices) is in. Public read-only
-[`/demo`](https://linear.app/samhayter/issue/EDGE-59) (EDGE-59) and full-page
-[`/setup`](https://linear.app/samhayter/issue/EDGE-60) (EDGE-60) are in.
-Do not flip production `/` until you promote `LANDING_VARIANT=launch`.
+[EDGE-37](https://linear.app/samhayter/issue/EDGE-37) interim pass done 22 Aug:
+every §5 box ticked or consciously deferred with a dated note in
+`docs/live-readiness.md`. Final full pass stays in C6 (launch week).
 
 Production is still waitlist-only: signed-in users hit `/desk` then bounce
 home until `SITE_SURFACE=app`.

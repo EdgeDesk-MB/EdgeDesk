@@ -1214,22 +1214,22 @@ function IntegrationsPanel({
         message?: string;
       }>("/api/racing/test");
       if (res.tier === "basic") {
-        toast.success("Racing API Basic", {
+        toast.success("Racing feed connected", {
           description: res.message ?? `${res.resultCount} results available today`,
         });
       } else if (res.tier === "free") {
-        toast.info("Racing API Free", {
+        toast.info("Racing feed: racecards only", {
           description:
             res.message ??
-            "Racecards work - upgrade to Basic for auto race settlement.",
+            "Racecards work; auto race settlement is not active on this desk.",
         });
       } else {
-        toast.error("Racing API not configured", {
-          description: "Set RACING_API_USERNAME / RACING_API_PASSWORD in .env.local",
+        toast.error("Racing feed not connected", {
+          description: "Racing cards are not connected on this desk.",
         });
       }
     } catch (e) {
-      toast.error("Racing API test failed", { description: String(e) });
+      toast.error("Racing feed test failed", { description: String(e) });
     } finally {
       setTestingRacing(false);
     }
@@ -1243,10 +1243,10 @@ function IntegrationsPanel({
       }>("/api/exchange/test");
       const betfair = res.providers.find((p) => p.provider === "betfair");
       if (betfair?.ok) {
-        toast.success("Betfair connected", { description: betfair.message });
+        toast.success("Exchange feed connected", { description: betfair.message });
       } else {
-        toast.error("Betfair connection failed", {
-          description: betfair?.message ?? "Check your credentials in .env.local",
+        toast.error("Exchange feed connection failed", {
+          description: betfair?.message ?? "The exchange feed is not connected on this desk.",
         });
       }
     } catch (e) {
@@ -1269,7 +1269,7 @@ function IntegrationsPanel({
     if (status.status === "connected") {
       return status.feedType === "delayed" ? "Connected (delayed)" : "Connected";
     }
-    if (status.status === "not_configured") return "Not configured";
+    if (status.status === "not_configured") return "Not connected";
     if (status.status === "unsupported") return "Partner API required";
     return "Disconnected";
   }
@@ -1278,88 +1278,80 @@ function IntegrationsPanel({
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Your free stack (£0/mo)</CardTitle>
+          <CardTitle className="text-base">Live feeds</CardTitle>
           <CardDescription>
-            Edgeways is built to run on free API tiers for personal use. Paid upgrades are optional -
-            only buy them when the time saved is worth more than the subscription.
+            Edgeways connects live racing, football and exchange feeds. You do not add
+            provider keys. Status for each feed is below.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
             <li>
-              <span className="text-foreground">Racing API Free</span> - today/tomorrow racecards;
+              <span className="text-foreground">Racing</span> - today/tomorrow racecards;
               paste real bookie odds on Racing Desk (click a price)
             </li>
             <li>
-              <span className="text-foreground">Betfair delayed key</span> - free at
-              developer.betfair.com; real lay prices (~1–3 min delay)
+              <span className="text-foreground">Exchange (delayed)</span> - real lay prices
+              (~1–3 min delay), fine pre-race
             </li>
             <li>
-              <span className="text-foreground">API-Football Free</span> - optional; ~100 req/day
-              (~1 live match)
+              <span className="text-foreground">Football</span> - live scores when a match is
+              tracked
             </li>
             <li>
               <span className="text-foreground">Everything else</span> - calculators, offers,
-              tracker, OCR, simulator - fully local
+              tracker, OCR and the simulator work without feeds
             </li>
           </ul>
           <div className="rounded-md border px-3 py-2 space-y-1.5 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">How often free data updates</p>
+            <p className="font-medium text-foreground">How often feeds update</p>
             <p>
               Racing cards: provider ~3 min (today) / ~15 min (tomorrow); Edgeways caches{" "}
               <span className="text-foreground">15 min</span>. Desk UI reloads every 60s from cache.
             </p>
             <p>
-              Betfair delayed: prices{" "}
+              Exchange prices:{" "}
               <span className="text-foreground">~1–3 min behind</span> live (fine pre-race).
             </p>
             <p>
               Football: live scores ~<span className="text-foreground">60s</span>; fixtures list ~
-              <span className="text-foreground">10 min</span>; ~1 live match/day on free budget.
+              <span className="text-foreground">10 min</span>.
             </p>
-            <p>Leave the app open during sessions - closing the tab pauses auto sync.</p>
+            <p>Leave the desk open during sessions. Closing the tab pauses auto sync.</p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            If you later open Edgeways to subscribers, API costs should be covered by plan pricing -
-            never by personal free-tier keys. Connection status for each provider is shown below.
-          </p>
           <div className="rounded-md border px-3 py-2 space-y-2">
-            <p className="text-xs font-medium text-foreground">Setup checklist</p>
+            <p className="text-xs font-medium text-foreground">On this desk</p>
             <ul className="space-y-1.5 text-xs text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
                 <span>
-                  Racing API Free in{" "}
-                  <code className="rounded bg-muted px-1">.env.local</code>
+                  Racing
                   {racingApiConfigured ? (
-                    <span className="text-emerald-600 dark:text-emerald-400"> - done</span>
+                    <span className="text-profit"> - connected</span>
                   ) : (
-                    <span> - set RACING_API_USERNAME / PASSWORD</span>
+                    <span> - not connected</span>
                   )}
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
                 <span>
-                  API-Football Free (optional)
+                  Football
                   {apiConfigured ? (
-                    <span className="text-emerald-600 dark:text-emerald-400"> - done</span>
+                    <span className="text-profit"> - connected</span>
                   ) : (
-                    <span> - set API_FOOTBALL_KEY or use simulator</span>
+                    <span> - not connected (simulator still works)</span>
                   )}
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
                 <span>
-                  Betfair delayed key (free) - largest remaining free win
+                  Exchange
                   {exchangeStatus?.status === "connected" ? (
-                    <span className="text-emerald-600 dark:text-emerald-400"> - connected</span>
+                    <span className="text-profit"> - connected</span>
                   ) : (
-                    <span>
-                      {" "}
-                      - add BETFAIR_APP_KEY / USERNAME / PASSWORD, restart server, Test below
-                    </span>
+                    <span> - not connected</span>
                   )}
                 </span>
               </li>
@@ -1377,13 +1369,15 @@ function IntegrationsPanel({
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">API keys</CardTitle>
-          <CardDescription>Set in <code className="text-xs">.env.local</code> - restart the dev server after changes.</CardDescription>
+          <CardTitle className="text-base">Connection status</CardTitle>
+          <CardDescription>
+            Racing, football and exchange feeds. Test a connection if something looks off.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div className="rounded-md border px-3 py-2 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span>API-Football</span>
+              <span>Football feed</span>
               <Badge variant={apiConfigured ? "default" : "outline"}>
                 {apiConfigured ? "Configured" : "Demo mode"}
               </Badge>
@@ -1397,7 +1391,7 @@ function IntegrationsPanel({
           </div>
           <div className="rounded-md border px-3 py-2 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span>The Racing API</span>
+              <span>Racing feed</span>
               <Badge
                 variant={
                   racingResultsTier === "basic"
@@ -1408,9 +1402,9 @@ function IntegrationsPanel({
                 }
               >
                 {racingResultsTier === "basic"
-                  ? "Basic (auto settle)"
+                  ? "Connected (auto settle)"
                   : racingResultsTier === "free" || racingApiConfigured
-                    ? "Free (racecards)"
+                    ? "Connected (racecards)"
                     : "Not set"}
               </Badge>
             </div>
@@ -1420,8 +1414,8 @@ function IntegrationsPanel({
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Stay on Free for personal use. Paid Basic (~£25/mo ballpark) = auto settle; Standard
-              (higher) = live bookie odds - only if you outgrow paste-overrides.
+              Racecards on the standard feed; auto race settlement and live bookie odds on
+              higher feed tiers. Paste-overrides always work.
             </p>
             <Button
               type="button"
@@ -1431,7 +1425,7 @@ function IntegrationsPanel({
               disabled={testingRacing || !racingApiConfigured}
               onClick={testRacingApi}
             >
-              {testingRacing ? "Testing…" : "Test Racing API"}
+              {testingRacing ? "Testing…" : "Test racing feed"}
             </Button>
           </div>
           <div className="rounded-md border px-3 py-2 space-y-2">
@@ -1468,18 +1462,11 @@ function IntegrationsPanel({
             onClick={() => void testExchangeConnection()}
             disabled={testingExchange}
           >
-            {testingExchange ? "Testing…" : "Test Betfair connection"}
+            {testingExchange ? "Testing…" : "Test exchange connection"}
           </Button>
           <p className="text-xs text-muted-foreground pt-1">
-            <strong>Betfair:</strong> free delayed app key at developer.betfair.com - set{" "}
-            <code className="rounded bg-muted px-1">BETFAIR_APP_KEY</code>,{" "}
-            <code className="rounded bg-muted px-1">BETFAIR_USERNAME</code>,{" "}
-            <code className="rounded bg-muted px-1">BETFAIR_PASSWORD</code>. If login says 2FA
-            required, also set{" "}
-            <code className="rounded bg-muted px-1">BETFAIR_TOTP_SECRET</code> (Authenticator
-            base32 secret). Restart after changes, then Test. Set your default exchange in
-            Bet defaults - Racing Desk can still override for that page only.{" "}
-            <strong>Betdaq:</strong> partner API only - placeholder until credentials available.
+            Delayed exchange prices when connected. Set your default exchange in Bet defaults.
+            Racing Desk can still override for that page only. Betdaq is not available yet.
           </p>
         </CardContent>
       </Card>
