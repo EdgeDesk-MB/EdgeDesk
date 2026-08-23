@@ -38,6 +38,8 @@ export interface ExchangeRaceOdds {
   quotes: ExchangeLayQuote[];
   source: ExchangeOddsSource;
   error?: string;
+  /** Prices came from a cache entry past its TTL because the exchange was unreachable. */
+  stale?: boolean;
 }
 
 export interface ExchangeOddsResult {

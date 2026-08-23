@@ -17,13 +17,25 @@ import type {
 } from "./types";
 import { chunkMarketIds } from "./format-exchange-error";
 import { matchHorsesByName } from "./horse-match";
+import { cachedFetch, readFresh, writeEntry, type PriceCache } from "./price-cache";
 
 const IDENTITY_URL = "https://identitysso.betfair.com/api/login";
 const BETTING_URL = "https://api.betfair.com/exchange/betting/rest/v1.0";
 
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
+/** Market catalogues change slowly: a race is added or abandoned, not repriced. */
+const CATALOGUE_TTL_MS = 5 * 60 * 1000;
+/** Prices. The delayed app key is already 1-3 minutes behind, so 30s costs no freshness. */
+const MARKET_BOOK_TTL_MS = 30 * 1000;
+
+/** Countries in the day WIN catalogue - part of the catalogue cache key. */
+const RACING_MARKET_COUNTRIES = ["GB", "IE"];
+
 let cachedToken: { token: string; at: number } | null = null;
+
+const dayCatalogueCache: PriceCache<MarketCatalogueRow[]> = new Map();
+const marketBookCache: PriceCache<MarketBookRow> = new Map();
 
 function credentials(): {
   appKey: string;
@@ -216,10 +228,94 @@ interface MarketBookRow {
   }>;
 }
 
+export async function betfairListMarketCatalogue(
+  filter: Record<string, unknown>,
+  options?: { maxResults?: number; sort?: string }
+): Promise<MarketCatalogueRow[]> {
+  return betfairPost<MarketCatalogueRow[]>("listMarketCatalogue", {
+    filter,
+    marketProjection: ["RUNNER_DESCRIPTION", "EVENT", "MARKET_START_TIME", "MARKET_DESCRIPTION"],
+    maxResults: options?.maxResults ?? 200,
+    sort: options?.sort ?? "FIRST_TO_START",
+  });
+}
+
+export async function betfairListMarketBook(marketIds: string[]): Promise<MarketBookRow[]> {
+  if (marketIds.length === 0) return [];
+  const books: MarketBookRow[] = [];
+  for (const batch of chunkMarketIds(marketIds)) {
+    const batchBooks = await betfairPost<MarketBookRow[]>("listMarketBook", {
+      marketIds: batch,
+      priceProjection: { priceData: ["EX_BEST_OFFERS"] },
+    });
+    books.push(...batchBooks);
+  }
+  return books;
+}
+
+/**
+ * Market books through the 30s price cache, one entry per market id. The market
+ * id is the whole request (the price projection is fixed), so entries can never
+ * be shared between two markets. Ids still inside the TTL are never re-requested;
+ * when upstream fails, expired entries are served rather than dropping a market.
+ */
+export async function betfairListMarketBookCached(
+  marketIds: string[]
+): Promise<{ books: MarketBookRow[]; stale: boolean }> {
+  const unique = [...new Set(marketIds.filter(Boolean))];
+  if (unique.length === 0) return { books: [], stale: false };
+
+  const books: MarketBookRow[] = [];
+  const missing: string[] = [];
+  for (const marketId of unique) {
+    const fresh = readFresh(marketBookCache, marketId, MARKET_BOOK_TTL_MS);
+    if (fresh) books.push(fresh);
+    else missing.push(marketId);
+  }
+  if (missing.length === 0) return { books, stale: false };
+
+  try {
+    const fetched = await betfairListMarketBook(missing);
+    for (const book of fetched) writeEntry(marketBookCache, book.marketId, book);
+    return { books: [...books, ...fetched], stale: false };
+  } catch (error) {
+    const expired = missing
+      .map((marketId) => marketBookCache.get(marketId)?.data)
+      .filter((book): book is MarketBookRow => !!book);
+    if (expired.length === 0) throw error;
+    return { books: [...books, ...expired], stale: true };
+  }
+}
+
 function dayWindowMs(dateIso: string): { from: string; to: string } {
   const start = new Date(`${dateIso}T00:00:00Z`);
   const end = new Date(start.getTime() + 86400000);
   return { from: start.toISOString(), to: end.toISOString() };
+}
+
+/**
+ * The day's WIN catalogue for every open Racing Desk, cached for 5 minutes.
+ * Keyed on the only two inputs that change the response: the day window and the
+ * countries requested. Race matching downstream is pure, so it is not cached.
+ */
+async function dayWinCatalogue(
+  dateIso: string
+): Promise<{ markets: MarketCatalogueRow[]; stale: boolean }> {
+  const key = `win:${dateIso}:${RACING_MARKET_COUNTRIES.join(",")}`;
+  const read = await cachedFetch(dayCatalogueCache, key, CATALOGUE_TTL_MS, () =>
+    betfairPost<MarketCatalogueRow[]>("listMarketCatalogue", {
+      filter: {
+        eventTypeIds: ["7"],
+        marketCountries: RACING_MARKET_COUNTRIES,
+        marketTypeCodes: ["WIN"],
+        marketStartTime: dayWindowMs(dateIso),
+      },
+      marketProjection: ["RUNNER_DESCRIPTION", "EVENT", "MARKET_START_TIME"],
+      maxResults: 400,
+      sort: "FIRST_TO_START",
+    })
+  );
+  return { markets: read.data, stale: read.stale };
 }
 
 function matchMarket(
@@ -282,21 +378,13 @@ export async function fetchBetfairLayOdds(
     }));
   }
 
-  const window = dayWindowMs(dateIso);
   let markets: MarketCatalogueRow[];
+  let stale = false;
 
   try {
-    markets = await betfairPost<MarketCatalogueRow[]>("listMarketCatalogue", {
-      filter: {
-        eventTypeIds: ["7"],
-        marketCountries: ["GB", "IE"],
-        marketTypeCodes: ["WIN"],
-        marketStartTime: window,
-      },
-      marketProjection: ["RUNNER_DESCRIPTION", "EVENT", "MARKET_START_TIME"],
-      maxResults: 400,
-      sort: "FIRST_TO_START",
-    });
+    const catalogue = await dayWinCatalogue(dateIso);
+    markets = catalogue.markets;
+    stale = catalogue.stale;
   } catch (e) {
     return races.map((r) => ({
       externalId: r.externalId,
@@ -316,13 +404,9 @@ export async function fetchBetfairLayOdds(
 
   if (marketIds.length > 0) {
     try {
-      for (const batch of chunkMarketIds(marketIds)) {
-        const batchBooks = await betfairPost<MarketBookRow[]>("listMarketBook", {
-          marketIds: batch,
-          priceProjection: { priceData: ["EX_BEST_OFFERS"] },
-        });
-        books.push(...batchBooks);
-      }
+      const read = await betfairListMarketBookCached(marketIds);
+      books.push(...read.books);
+      if (read.stale) stale = true;
     } catch (e) {
       return races.map((r) => ({
         externalId: r.externalId,
@@ -399,6 +483,7 @@ export async function fetchBetfairLayOdds(
       quotes,
       source: quotes.length > 0 ? ("live" as const) : ("estimated" as const),
       error: quotes.length === 0 ? "No lay prices returned" : undefined,
+      stale: stale || undefined,
     };
   });
 }
