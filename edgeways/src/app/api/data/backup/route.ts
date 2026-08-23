@@ -6,7 +6,10 @@ import { db, backupDatabaseTo } from "@/lib/db";
 import { APP_VERSION } from "@/lib/app-version";
 import { sql } from "drizzle-orm";
 import { isNeonDesk } from "@/lib/db/desk-backend";
-import { neonDeskBackupBundle } from "@/lib/db/neon-desk-backup";
+import {
+  HOSTED_BACKUP_TABLES,
+  neonDeskBackupBundle,
+} from "@/lib/db/neon-desk-backup";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -43,12 +46,13 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   }
 
   if (format === "json") {
-    // Generic dump of every user table - survives schema additions.
-    const tables = db.all<{ name: string }>(
-      sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
-    );
+    // Desk-portable bundle: only the tables the hosted restore accepts
+    // (HOSTED_BACKUP_TABLES). A full sqlite_master dump used to include feed
+    // caches like racing_odds_snapshots - 150MB+ of re-derivable rows that
+    // blow past Vercel's request body limit when posted to a hosted restore.
+    // Local disaster recovery uses the .db snapshot, so nothing is lost.
     const dump: Record<string, unknown[]> = {};
-    for (const { name } of tables) {
+    for (const name of HOSTED_BACKUP_TABLES) {
       dump[name] = db.all(sql.raw(`SELECT * FROM "${name.replace(/"/g, '""')}"`));
     }
     const bundle = { app: APP_VERSION, exportedAt: new Date().toISOString(), tables: dump };

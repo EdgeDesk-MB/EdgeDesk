@@ -66,7 +66,19 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as {
       tables?: unknown;
     } | null;
-    if (!body || !isHostedBackupTables(body.tables)) {
+    if (!body) {
+      // Unparseable body on Vercel almost always means the upload exceeded
+      // the platform request-size limit (full SQLite JSON dumps include feed
+      // caches and are far too big - the desk JSON is the portable one).
+      return NextResponse.json(
+        {
+          error:
+            "That file could not be read - use the JSON backup from Settings → Data & API (desk data only, not the .db file).",
+        },
+        { status: 400 }
+      );
+    }
+    if (!isHostedBackupTables(body.tables)) {
       return NextResponse.json(
         { error: "Not an Edgeways JSON backup - expected a tables object." },
         { status: 400 }

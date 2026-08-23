@@ -607,7 +607,8 @@ backup, validated restore with an automatic safety copy, and a CSV import wizard
 **Backup.** `GET /api/data/backup` streams a WAL-safe snapshot via better-sqlite3's online
 `backup()` API (never `fs.copyFile` on a live WAL db) as
 `edgeways-backup-YYYY-MM-DD.db`; `?format=json` returns a versioned JSON bundle (app version,
-exportedAt, every user table dumped generically via `sqlite_master`).
+exportedAt, desk tables only - `HOSTED_BACKUP_TABLES` - so the file stays small enough to post
+to the hosted restore; feed caches are re-derivable and excluded).
 
 **Restore.** Two-step staged flow: `POST /api/data/restore?mode=preview` writes the upload to
 `data/restore-staged-<ts>.db`, validates (integrity_check, core tables present) and returns row
@@ -2267,7 +2268,7 @@ and optionally preview the locked UX. Auth + Stripe wait for the business gate (
 | Settings "preview as Free/Core/Edge" | ❌ Missing | Useful pre-gate for Sam |
 | Auth / accounts / multi-tenant data | ❌ Deferred (D1) | Local-first single user |
 | Billing (Stripe) | ❌ Deferred (D1) | No customer identity yet |
-| Per-subscriber API keys / pooled feeds | ❌ Deferred | See `../../docs/strategy/api-dependencies-and-tiers.md` |
+| Operator-held pooled feeds (D7) | ❌ Go-live | Customers never bring keys. EDGE-45 permissions + feed proxy. See `../../docs/decisions/d7-operator-held-feeds.md` |
 
 **Proposed entitlement matrix (v1 draft — confirm with Sam before coding)**
 
@@ -2319,8 +2320,8 @@ vaults, oddsmatcher. Those are post-gate (§7.2–7.6).
 **Follow-up L4b (same day):** separate `rewardScope` / `rewardMinSelections` for free-bet
 convert (renamed from “shape” → “scope”). Convert Acca opens global Acca New run with
 `backBetType: "free_snr"`, `ledgerBetPlacement` on create, lose P&L £0 for free bets, and
-`ledgerFromSettledBet` on Acca settles. Settings → Appearance → Plan preview stubs Free vs
-Unlocked. Paste only suggests reward Acca from free-bet T&Cs, not from qualifier titles.
+`ledgerFromSettledBet` on Acca settles. Settings → Subscription → Preview Edge stubs Free vs
+Edge. Paste only suggests reward Acca from free-bet T&Cs, not from qualifier titles.
 
 **Follow-up L4c (multi-scope):** `qualifierScopes` / `rewardScopes` arrays (any combination of
 Single / Acca / Bet builder). Place/Convert with 2+ paths opens a scope chooser modal.
