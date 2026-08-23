@@ -1,13 +1,17 @@
 # Keep CLI deploys small — local DB and build artifacts stay off Vercel uploads.
-data
+# Patterns MUST stay anchored: Vercel applies this file to git-connected
+# deploys too (repo-wide), so a bare `data` also matched src/app/api/data/
+# and the backup/restore API routes 404'd on every deployment.
+/data
+edgeways/data
 .next
 node_modules
-coverage
+/coverage
 *.db
 *.db-*
 .env*
 !.env.example
 # Engineering/strategy markdown is not needed on the builder for CLI uploads.
 # (Git-connected deploys still clone the monorepo; Root Directory is edgeways/.)
-docs
-PLAN.md
+/docs
+/PLAN.md

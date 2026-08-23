@@ -45,6 +45,7 @@ import {
 import { formatGbp } from "@/lib/format-money";
 import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { DatabaseBackup, FileUp, HardDriveDownload, ShieldCheck } from "lucide-react";
+import { OddsmonkeyMark } from "@/components/import/oddsmonkey-mark";
 import { PlatformImportDialog } from "@/components/import/platform-import-dialog";
 import { detectProfitCsvFormat } from "@/lib/import/oddsmonkey-profits";
 
@@ -55,17 +56,32 @@ type RestorePreview = {
   hosted?: boolean;
 };
 
+/**
+ * Parse a JSON API response, but fail loudly when the body is not JSON.
+ * A missing route on Vercel returns the 404 HTML page with HTTP 200, and a
+ * raw res.json() SyntaxError tells the user nothing.
+ */
+async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(
+      `Unexpected response from the server (HTTP ${res.status}). Reload the page and try again.`
+    );
+  }
+}
+
 export function DataCustodyCard({
   onRestored,
   hosted = false,
 }: {
   onRestored: () => void;
-  /** Hosted (Neon) desk: JSON backup only, restore re-posts the file. */
   hosted?: boolean;
 }) {
   const restoreInputRef = useRef<HTMLInputElement>(null);
-  const restoreFileRef = useRef<File | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const restoreFileRef = useRef<File | null>(null);
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
   const [validating, setValidating] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -77,17 +93,18 @@ export function DataCustodyCard({
   const [oddsmonkeySeed, setOddsmonkeySeed] = useState<string | null>(null);
 
   async function onRestoreFile(file: File) {
-    restoreFileRef.current = file;
     setValidating(true);
+    restoreFileRef.current = file;
     try {
       const res = await fetch("/api/data/restore?mode=preview", {
         method: "POST",
         body: file,
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Validation failed");
-      setRestorePreview(json as RestorePreview);
+      const json = await readJsonResponse(res);
+      if (!res.ok) throw new Error((json.error as string) ?? "Validation failed");
+      setRestorePreview(json as unknown as RestorePreview);
     } catch (e) {
+      restoreFileRef.current = null;
       toast.error("Backup rejected", { description: String(e) });
     } finally {
       setValidating(false);
@@ -98,6 +115,7 @@ export function DataCustodyCard({
     if (!restorePreview) return;
     setRestoring(true);
     try {
+      // Hosted: Vercel cannot stage the upload, so send the file again.
       const res = restorePreview.hosted
         ? await fetch("/api/data/restore?mode=apply", {
             method: "POST",
@@ -106,8 +124,8 @@ export function DataCustodyCard({
         : await fetch(`/api/data/restore?mode=apply&token=${restorePreview.token}`, {
             method: "POST",
           });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Restore failed");
+      const json = await readJsonResponse(res);
+      if (!res.ok) throw new Error((json.error as string) ?? "Restore failed");
       setRestorePreview(null);
       restoreFileRef.current = null;
       toast.success("Database restored", {
@@ -177,8 +195,8 @@ export function DataCustodyCard({
           <ShieldCheck className="size-4" /> Data custody
         </CardTitle>
         <CardDescription>
-          Your data lives in one local file. Back it up, restore it, or bring
-          bet history in from Oddsmonkey or a spreadsheet.
+          Back up your desk, restore a copy, or bring bet history in from
+          Oddsmonkey or a spreadsheet.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
@@ -211,7 +229,7 @@ export function DataCustodyCard({
             setOddsmonkeyOpen(true);
           }}
         >
-          <FileUp className="size-4" /> Import from Oddsmonkey…
+          <OddsmonkeyMark className="size-4" /> Import from Oddsmonkey…
         </Button>
         <Button
           variant="outline"
