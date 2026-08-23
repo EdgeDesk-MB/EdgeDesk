@@ -23,6 +23,7 @@ function raceEvent(overrides: Partial<EventRow> = {}): EventRow {
     ftHomeScore: null,
     ftAwayScore: null,
     matchEnding: null,
+    period: null,
     simScript: null,
     simStartedAt: null,
     source: "api",

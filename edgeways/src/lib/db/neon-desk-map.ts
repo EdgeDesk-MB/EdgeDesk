@@ -2,6 +2,7 @@ import type {
   AccountRow,
   BalanceTransactionRow,
   BetRow,
+  EventRow,
   HistoryRow,
   OfferRow,
 } from "@/lib/db/schema";
@@ -9,9 +10,42 @@ import type {
   AccountRow as PgAccountRow,
   BalanceTransactionRow as PgBalanceTransactionRow,
   BetRow as PgBetRow,
+  EventRow as PgEventRow,
   HistoryRow as PgHistoryRow,
   OfferRow as PgOfferRow,
 } from "@/lib/db/schema.pg";
+
+/**
+ * Events are GLOBAL feed data, not desk data — there is no clerk column to
+ * drop. Listed explicitly anyway so a future divergence between the SQLite and
+ * Postgres event columns is a compile error rather than a silent hole.
+ */
+export function toSqliteEventRow(row: PgEventRow): EventRow {
+  return {
+    id: row.id,
+    sport: row.sport,
+    externalId: row.externalId,
+    competition: row.competition,
+    homeTeam: row.homeTeam,
+    awayTeam: row.awayTeam,
+    startTime: row.startTime,
+    status: row.status,
+    homeScore: row.homeScore,
+    awayScore: row.awayScore,
+    minute: row.minute,
+    homeLed2: row.homeLed2,
+    awayLed2: row.awayLed2,
+    source: row.source,
+    goals: row.goals,
+    ftHomeScore: row.ftHomeScore,
+    ftAwayScore: row.ftAwayScore,
+    matchEnding: row.matchEnding,
+    period: row.period,
+    simScript: row.simScript,
+    simStartedAt: row.simStartedAt,
+    createdAt: row.createdAt,
+  };
+}
 
 export function toSqliteBetRow(row: PgBetRow): BetRow {
   return {

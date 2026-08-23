@@ -45,11 +45,37 @@ export const events = pgTable("events", {
   ftAwayScore: integer("ft_away_score"),
   /** How the match ended: "ft" | "aet" | "pen" | null (null = unknown / not yet finished) */
   matchEnding: text("match_ending"),
+  /** API-Football `status.short` while live: 1H, HT, 2H, ET, BT, P, LIVE, INT */
+  period: text("period"),
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
   simStartedAt: epochMs("sim_started_at"),
   createdAt: epochMs("created_at").notNull(),
+});
+
+/**
+ * Global feed poller coordination (EDGE-81b). One row per feed key.
+ * Vercel runs many serverless instances; the lease in `locked_until` is what
+ * stops each of them polling API-Football independently. Not desk data, so no
+ * clerk scoping.
+ */
+export const feedSyncState = pgTable("feed_sync_state", {
+  key: text("key").primaryKey(),
+  /** Epoch ms of the last acquisition (drives the 20s throttle) */
+  lastRunAt: epochMs("last_run_at").notNull().default(0),
+  /** Epoch ms the current lease expires; <= now means free to acquire */
+  lockedUntil: epochMs("locked_until").notNull().default(0),
+});
+
+/**
+ * Durable API-Football daily spend (EDGE-81c). In-memory counters are
+ * per-instance, so the real cap was previously instance-count x DAILY_BUDGET.
+ * `day` is the UTC calendar date (YYYY-MM-DD) so a new day resets by key.
+ */
+export const feedBudget = pgTable("feed_budget", {
+  day: text("day").primaryKey(),
+  used: integer("used").notNull().default(0),
 });
 
 export const exchanges = pgTable("exchanges", {
@@ -812,6 +838,8 @@ export const racingOddsOverrides = pgTable("racing_odds_overrides", {
 
 export type EventRow = typeof events.$inferSelect;
 export type NewEventRow = typeof events.$inferInsert;
+export type FeedSyncStateRow = typeof feedSyncState.$inferSelect;
+export type FeedBudgetRow = typeof feedBudget.$inferSelect;
 export type BetRow = typeof bets.$inferSelect;
 export type NewBetRow = typeof bets.$inferInsert;
 export type ExchangeRow = typeof exchanges.$inferSelect;

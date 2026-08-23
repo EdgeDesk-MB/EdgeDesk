@@ -4,6 +4,7 @@
  * when no key is configured.
  */
 
+import { isNeonDesk } from "@/lib/db/desk-backend";
 import { localCalendarDate, wallClockKickoffMs } from "@/lib/events";
 
 const BASE = "https://v3.football.api-sports.io";
@@ -24,6 +25,8 @@ export interface Fixture {
   ftAwayScore?: number | null;
   /** How the match ended; null while live or unknown */
   matchEnding?: "ft" | "aet" | "pen" | null;
+  /** API-Football `fixture.status.short` — HT, 1H, 2H, ET, P, … */
+  period?: string | null;
   /** Club crest or national team badge URL from API-Football */
   homeLogo?: string | null;
   awayLogo?: string | null;
@@ -46,11 +49,11 @@ const FIXTURES_TTL = 10 * 60 * 1000; // fixtures list: 10 min
 const LIVE_TTL = 60 * 1000;
 
 /** Daily request budget: the free tier allows 100/day. Leave headroom for fixture browsing. */
-const DAILY_BUDGET = 95;
+export const DAILY_BUDGET = 95;
 let budgetDay = "";
 let requestsToday = 0;
 
-function spendBudget(): boolean {
+function spendLocalBudget(): boolean {
   const today = new Date().toISOString().slice(0, 10);
   if (today !== budgetDay) {
     budgetDay = today;
@@ -61,9 +64,49 @@ function spendBudget(): boolean {
   return true;
 }
 
+/**
+ * Hosted (Neon) desks share one durable counter (EDGE-81c) so the cap holds
+ * across serverless instances and cold starts; local keeps module state. The
+ * in-memory counter is still advanced on the hosted path so `apiUsageToday()`
+ * (sync, used by the state snapshot) reflects at least this instance's spend.
+ */
+async function spendBudget(): Promise<boolean> {
+  if (!isNeonDesk()) return spendLocalBudget();
+  try {
+    const { spendNeonFeedBudget } = await import("@/lib/db/neon-feed-budget");
+    const used = await spendNeonFeedBudget(DAILY_BUDGET);
+    if (used == null) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    if (today !== budgetDay) {
+      budgetDay = today;
+      requestsToday = 0;
+    }
+    requestsToday = Math.max(requestsToday + 1, used);
+    return true;
+  } catch {
+    // Neon unreachable: fall back to the per-instance guard rather than
+    // letting the cap fail open.
+    return spendLocalBudget();
+  }
+}
+
 export function apiUsageToday(): { used: number; budget: number } {
   const today = new Date().toISOString().slice(0, 10);
   return { used: today === budgetDay ? requestsToday : 0, budget: DAILY_BUDGET };
+}
+
+/** Hosted usage straight from Neon; falls back to this instance's counter. */
+export async function apiUsageTodayAsync(): Promise<{
+  used: number;
+  budget: number;
+}> {
+  if (!isNeonDesk()) return apiUsageToday();
+  try {
+    const { neonFeedBudgetUsed } = await import("@/lib/db/neon-feed-budget");
+    return { used: await neonFeedBudgetUsed(), budget: DAILY_BUDGET };
+  } catch {
+    return apiUsageToday();
+  }
 }
 
 function apiKey(): string | undefined {
@@ -102,6 +145,7 @@ function mapFixture(item: any): Fixture {
     ftHomeScore: (isAet || isPen) ? (ftScore?.home ?? null) : null,
     ftAwayScore: (isAet || isPen) ? (ftScore?.away ?? null) : null,
     matchEnding: isAet ? "aet" : isPen ? "pen" : shortStatus === "FT" ? "ft" : null,
+    period: liveStatuses.includes(shortStatus) ? shortStatus : null,
     homeLogo: item.teams?.home?.logo ? String(item.teams.home.logo) : null,
     awayLogo: item.teams?.away?.logo ? String(item.teams.away.logo) : null,
     leagueCountry: item.league?.country ? String(item.league.country) : null,
@@ -112,7 +156,9 @@ function mapFixture(item: any): Fixture {
 async function apiGet(pathAndQuery: string): Promise<any> {
   const key = apiKey();
   if (!key) throw new Error("API_FOOTBALL_KEY not configured");
-  if (!spendBudget()) throw new Error("API-Football daily request budget exhausted");
+  if (!(await spendBudget())) {
+    throw new Error("API-Football daily request budget exhausted");
+  }
   const res = await fetch(`${BASE}${pathAndQuery}`, {
     headers: { "x-apisports-key": key },
     cache: "no-store",

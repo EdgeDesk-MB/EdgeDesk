@@ -5,6 +5,7 @@ import type {
   AccountRow,
   BalanceTransactionRow,
   BetRow,
+  EventRow,
   HistoryRow,
   OfferRow,
 } from "@/lib/db/schema";
@@ -15,15 +16,20 @@ import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
 import { hasRacingApiKey, racingApiUsageToday } from "@/lib/services/theracingapi";
 import { summariseOffer } from "@/lib/offers/offer-profit";
 import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
+import { hostedEventDerivations } from "@/lib/db/neon-desk-state-events";
 import type { AppState } from "@/lib/services/state.types";
 
 export type NeonDeskSnapshot = {
   bets: BetRow[];
+  /** Global feed events (EDGE-81b). Not clerk-scoped; shared by every desk. */
+  events?: EventRow[];
   offers?: OfferRow[];
   accounts?: AccountRow[];
   transactions?: BalanceTransactionRow[];
   history?: HistoryRow[];
   settings?: AppSettings;
+  /** Durable Neon usage (EDGE-81c); falls back to this instance's counter. */
+  apiUsage?: { used: number; budget: number };
 };
 
 export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
@@ -64,8 +70,10 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     (a, b) => b.createdAt - a.createdAt || b.id - a.id
   );
 
+  const derived = hostedEventDerivations(input.events ?? [], bets, offers);
+
   return {
-    events: [],
+    events: derived.events,
     bets,
     settledProfit: pnl.settledProfit,
     bettingProfit: pnl.bettingProfit,
@@ -73,8 +81,8 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     provisionalProfit: Math.round(provisional * 100) / 100,
     pnlAdjustments: [],
     casinoSettlements: [],
-    planRaces: [],
-    planFixtures: [],
+    planRaces: derived.planRaces,
+    planFixtures: derived.planFixtures,
     retention: { rate: DEFAULT_SETTINGS.tuning.retentionPrior, sampleSize: 0 },
     effortMeasured: {},
     mugPlans: [],
@@ -86,8 +94,8 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     casinoNeedsAction: 0,
     demoMode: false,
     hostedDesk: true,
-    livePositions: [],
-    liveEventModels: [],
+    livePositions: derived.livePositions,
+    liveEventModels: derived.liveEventModels,
     series,
     history,
     chartHistory: [],
@@ -95,7 +103,7 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     apiConfigured: hasApiKey(),
     racingApiConfigured: hasRacingApiKey(),
     racingResultsTier: hasRacingApiKey() ? "free" : "none",
-    apiUsage: apiUsageToday(),
+    apiUsage: input.apiUsage ?? apiUsageToday(),
     racingApiUsage: racingApiUsageToday(),
     exchangeProvider: "betfair",
     exchangeName: "Betfair",

@@ -26,6 +26,8 @@ export const events = sqliteTable("events", {
   ftAwayScore: integer("ft_away_score"),
   /** How the match ended: "ft" | "aet" | "pen" | null (null = unknown / not yet finished) */
   matchEnding: text("match_ending"),
+  /** API-Football `status.short` while live: 1H, HT, 2H, ET, BT, P, LIVE, INT */
+  period: text("period"),
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */

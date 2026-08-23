@@ -10,8 +10,16 @@ import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 
 export type RacingResultsTier = "basic" | "free" | "none";
 
+export type LivePositionKind = "bet" | "acca" | "bet_builder" | "systems";
+
 export interface LivePosition {
   betId: number;
+  /** Event this position is attached to — used to sum "if ended now" on Home Events. */
+  eventId?: number;
+  /** Desk campaign row. Default is a normal tracker bet. */
+  kind?: LivePositionKind;
+  /** Positions row target. Default `/tracker`. */
+  href?: string;
   label: string;
   eventName: string;
   eventSport?: string;

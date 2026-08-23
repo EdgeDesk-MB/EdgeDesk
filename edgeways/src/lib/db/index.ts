@@ -525,6 +525,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("events", "ft_home_score INTEGER");
   addColumn("events", "ft_away_score INTEGER");
   addColumn("events", "match_ending TEXT");
+  addColumn("events", "period TEXT");
   addColumn("bets", "trigger_text TEXT");
   addColumn("bets", "trigger_rule TEXT");
   addColumn("bets", "exchange_id INTEGER");
