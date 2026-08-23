@@ -48,6 +48,7 @@ import { DatabaseBackup, FileUp, HardDriveDownload, ShieldCheck } from "lucide-r
 import { OddsmonkeyMark } from "@/components/import/oddsmonkey-mark";
 import { PlatformImportDialog } from "@/components/import/platform-import-dialog";
 import { detectProfitCsvFormat } from "@/lib/import/oddsmonkey-profits";
+import { clearApiGetCache } from "@/lib/api-get-cache";
 
 type RestorePreview = {
   token?: string;
@@ -126,6 +127,10 @@ export function DataCustodyCard({
           });
       const json = await readJsonResponse(res);
       if (!res.ok) throw new Error((json.error as string) ?? "Restore failed");
+      // The restore posts via raw fetch (file body), so the module-level GET
+      // cache is never invalidated - without this, History/Accounts keep
+      // serving the warm pre-restore responses after the desk is replaced.
+      clearApiGetCache();
       setRestorePreview(null);
       restoreFileRef.current = null;
       toast.success("Database restored", {
