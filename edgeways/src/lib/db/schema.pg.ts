@@ -12,6 +12,13 @@ import {
   text,
 } from "drizzle-orm/pg-core";
 
+/**
+ * Epoch-millis timestamps. SQLite ints are 64-bit so schema.ts gets away with
+ * integer; Postgres int4 overflows at ~2.1bn (Date.now() is ~1.78e12), so
+ * every ms timestamp here must be int8.
+ */
+const epochMs = (name: string) => bigint(name, { mode: "number" });
+
 export const events = pgTable("events", {
   id: serial("id").primaryKey(),
   sport: text("sport").notNull().default("football"),
@@ -19,7 +26,7 @@ export const events = pgTable("events", {
   competition: text("competition"),
   homeTeam: text("home_team").notNull(),
   awayTeam: text("away_team").notNull(),
-  startTime: integer("start_time").notNull(), // epoch ms
+  startTime: epochMs("start_time").notNull(), // epoch ms
   status: text("status", { enum: ["upcoming", "live", "finished"] })
     .notNull()
     .default("upcoming"),
@@ -41,8 +48,8 @@ export const events = pgTable("events", {
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
-  simStartedAt: integer("sim_started_at"),
-  createdAt: integer("created_at").notNull(),
+  simStartedAt: epochMs("sim_started_at"),
+  createdAt: epochMs("created_at").notNull(),
 });
 
 export const exchanges = pgTable("exchanges", {
@@ -53,7 +60,7 @@ export const exchanges = pgTable("exchanges", {
   backColor: text("back_color").notNull().default("#a6d8ff"),
   layColor: text("lay_color").notNull().default("#fac9d1"),
   isDefault: integer("is_default").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
 export const bets = pgTable("bets", {
@@ -89,8 +96,8 @@ export const bets = pgTable("bets", {
   notes: text("notes"),
   balanceLedgered: integer("balance_ledgered").notNull().default(0),
   balanceSettled: integer("balance_settled").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
-  settledAt: integer("settled_at"),
+  createdAt: epochMs("created_at").notNull(),
+  settledAt: epochMs("settled_at"),
   offerId: integer("offer_id"),
   /** Epoch ms when the bet was captured via mobile quick-log (C3); null = full entry */
   quickLogged: integer("quick_logged"),
@@ -117,9 +124,9 @@ export const mugPlans = pgTable("mug_plans", {
   /** Place a mug bet at least every N days */
   cadenceDays: integer("cadence_days").notNull(),
   monthlyBudget: doublePrecision("monthly_budget"),
-  lastMugAt: integer("last_mug_at"),
+  lastMugAt: epochMs("last_mug_at"),
   notes: text("notes"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
 /** Acca desk run (J7) - a guided multi-day acca workflow. */
@@ -150,8 +157,8 @@ export const accaRuns = pgTable("acca_runs", {
   status: text("status", { enum: ["active", "completed", "abandoned"] })
     .notNull()
     .default("active"),
-  createdAt: integer("created_at").notNull(),
-  settledAt: integer("settled_at"),
+  createdAt: epochMs("created_at").notNull(),
+  settledAt: epochMs("settled_at"),
 });
 
 /** One leg of an acca run; placed lays are REAL bets rows via layBetId. */
@@ -173,7 +180,7 @@ export const accaLegs = pgTable("acca_legs", {
   result: text("result", { enum: ["pending", "won", "lost", "void"] })
     .notNull()
     .default("pending"),
-  scheduledAt: integer("scheduled_at"),
+  scheduledAt: epochMs("scheduled_at"),
 });
 
 /** Bet Builder desk run — same-event combo, one kick-off, combined lay or no lay. */
@@ -196,13 +203,13 @@ export const betBuilderRuns = pgTable("bet_builder_runs", {
   eventId: integer("event_id"),
   /** Sport when no event linked. */
   sport: text("sport"),
-  scheduledAt: integer("scheduled_at"),
+  scheduledAt: epochMs("scheduled_at"),
   muteAlerts: integer("mute_alerts").notNull().default(0),
   status: text("status", { enum: ["active", "completed", "abandoned"] })
     .notNull()
     .default("active"),
-  createdAt: integer("created_at").notNull(),
-  settledAt: integer("settled_at"),
+  createdAt: epochMs("created_at").notNull(),
+  settledAt: epochMs("settled_at"),
 });
 
 /** One selection inside a bet builder (checklist; no per-selection lay). */
@@ -254,8 +261,8 @@ export const systemRuns = pgTable("system_runs", {
   status: text("status", { enum: ["active", "completed", "abandoned"] })
     .notNull()
     .default("active"),
-  createdAt: integer("created_at").notNull(),
-  settledAt: integer("settled_at"),
+  createdAt: epochMs("created_at").notNull(),
+  settledAt: epochMs("settled_at"),
 });
 
 export const systemLegs = pgTable("system_legs", {
@@ -275,7 +282,7 @@ export const systemLegs = pgTable("system_legs", {
   })
     .notNull()
     .default("pending"),
-  scheduledAt: integer("scheduled_at"),
+  scheduledAt: epochMs("scheduled_at"),
 });
 
 /** Matched betting offer / promo pipeline (sign-up, reload, racing refund, etc.) */
@@ -288,9 +295,9 @@ export const offers = pgTable("offers", {
   status: text("status", { enum: ["planned", "active", "completed", "expired"] })
     .notNull()
     .default("active"),
-  expiresAt: integer("expires_at"),
-  createdAt: integer("created_at").notNull(),
-  completedAt: integer("completed_at"),
+  expiresAt: epochMs("expires_at"),
+  createdAt: epochMs("created_at").notNull(),
+  completedAt: epochMs("completed_at"),
   /** YYYY-MM-DD; a "planned" offer auto-activates once this date arrives. Null = live now. */
   startsOn: text("starts_on"),
   /** horse_racing | football | sports | casino; null = general */
@@ -324,7 +331,7 @@ export const offerEvSnapshots = pgTable("offer_ev_snapshots", {
   id: serial("id").primaryKey(),
   offerId: integer("offer_id").notNull(),
   version: integer("version").notNull().default(1),
-  lockedAt: integer("locked_at").notNull(),
+  lockedAt: epochMs("locked_at").notNull(),
   expectedProfit: doublePrecision("expected_profit").notNull(),
   basis: text("basis").notNull(), // "live" | "estimated" | "heuristic"
   inputsJson: text("inputs_json"), // { autoLocked, retentionUsed?, freeBetAmount?, stake? }
@@ -332,7 +339,7 @@ export const offerEvSnapshots = pgTable("offer_ev_snapshots", {
   realizedProfit: doublePrecision("realized_profit"),
   capturePct: doublePrecision("capture_pct"),
   commissionDrag: doublePrecision("commission_drag"),
-  settledAt: integer("settled_at"),
+  settledAt: epochMs("settled_at"),
   /** B7 mistake ledger: laid_late | wrong_market | odds_moved | bookie_voided | other */
   mistakeTag: text("mistake_tag"),
 });
@@ -347,7 +354,7 @@ export const offerSeries = pgTable("offer_series", {
   skippedDatesJson: text("skipped_dates_json"),
   ruleJson: text("rule_json").notNull(),
   /** Reference expiry used to derive each instance deadline (time-of-day) */
-  templateExpiresAt: integer("template_expires_at"),
+  templateExpiresAt: epochMs("template_expires_at"),
   horizonDays: integer("horizon_days").notNull().default(14),
   bookmaker: text("bookmaker"),
   title: text("title").notNull(),
@@ -361,8 +368,8 @@ export const offerSeries = pgTable("offer_series", {
   rules: text("rules"),
   /** External bookmaker promo page URL ("Link to offer") */
   offerUrl: text("offer_url"),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
 /** Web-push subscriptions (F3) - one row per device/browser */
@@ -373,8 +380,8 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   auth: text("auth").notNull(),
   /** Coarse device label from the subscribing user agent */
   label: text("label"),
-  createdAt: integer("created_at").notNull(),
-  lastOkAt: integer("last_ok_at"),
+  createdAt: epochMs("created_at").notNull(),
+  lastOkAt: epochMs("last_ok_at"),
 });
 
 /** Persistent alert history (F2) - toasts/notifications deliver, this is the record */
@@ -386,9 +393,9 @@ export const alertsInbox = pgTable("alerts_inbox", {
   title: text("title").notNull(),
   body: text("body"),
   href: text("href"),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-  readAt: integer("read_at"),
+  createdAt: epochMs("created_at").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
+  readAt: epochMs("read_at"),
 });
 
 /**
@@ -398,7 +405,7 @@ export const alertsInbox = pgTable("alerts_inbox", {
 export const userReminders = pgTable("user_reminders", {
   id: serial("id").primaryKey(),
   note: text("note").notNull(),
-  remindAt: integer("remind_at").notNull(),
+  remindAt: epochMs("remind_at").notNull(),
   /** Optional link to a casino campaign */
   casinoOfferId: integer("casino_offer_id"),
   /** Optional link to a sports offer campaign */
@@ -407,9 +414,9 @@ export const userReminders = pgTable("user_reminders", {
   contextTitle: text("context_title"),
   /** Snapshot bookie/casino name for the alert when the linked row is gone */
   contextVenue: text("context_venue"),
-  createdAt: integer("created_at").notNull(),
-  firedAt: integer("fired_at"),
-  cancelledAt: integer("cancelled_at"),
+  createdAt: epochMs("created_at").notNull(),
+  firedAt: epochMs("fired_at"),
+  cancelledAt: epochMs("cancelled_at"),
 });
 
 /**
@@ -504,8 +511,8 @@ export const accounts = pgTable("accounts", {
    * closed live in accessStatus (single source of truth). Null = healthy.
    */
   health: text("health"),
-  healthUpdatedAt: integer("health_updated_at"),
-  createdAt: integer("created_at").notNull(),
+  healthUpdatedAt: epochMs("health_updated_at"),
+  createdAt: epochMs("created_at").notNull(),
   /** Hosted owner (EDGE-47) */
   clerkUserId: text("clerk_user_id"),
 });
@@ -536,12 +543,12 @@ export const balanceTransactions = pgTable("balance_transactions", {
   /** 1 = awaiting statement confirmation (Ultimatcher pending bank credit) */
   pending: integer("pending").notNull().default(0),
   note: text("note"),
-  createdAt: integer("created_at").notNull(),
-  confirmedAt: integer("confirmed_at"),
+  createdAt: epochMs("created_at").notNull(),
+  confirmedAt: epochMs("confirmed_at"),
   /** 1 = this adjustment should be included in the P&L chart and settledProfit total */
   affectPnl: integer("affect_pnl").notNull().default(0),
   /** Free-bet credit deadline (epoch ms). Ignored on non-credit / non-free_bet rows. */
-  expiresAt: integer("expires_at"),
+  expiresAt: epochMs("expires_at"),
   /** Hosted owner (EDGE-47) */
   clerkUserId: text("clerk_user_id"),
 });
@@ -576,7 +583,7 @@ export const history = pgTable("history", {
   note: text("note"),
   /** Settlements (bet + casino) and P&L adjustments: realised profit (+) or loss (−) */
   amount: doublePrecision("amount"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
   /** Hosted owner (EDGE-47) */
   clerkUserId: text("clerk_user_id"),
 });
@@ -596,7 +603,7 @@ export const racingOddsSnapshots = pgTable("racing_odds_snapshots", {
   spDecimal: doublePrecision("sp_decimal").notNull(),
   /** bookie = back/SP movement; exchange = live lay movement */
   kind: text("kind").notNull().default("bookie"),
-  capturedAt: integer("captured_at").notNull(),
+  capturedAt: epochMs("captured_at").notNull(),
 });
 
 /**
@@ -625,8 +632,8 @@ export const boostDiary = pgTable("boost_diary", {
   exchangeBack: doublePrecision("exchange_back"),
   outcome: text("outcome", { enum: ["won", "lost", "void"] }),
   actualProfit: doublePrecision("actual_profit"),
-  createdAt: integer("created_at").notNull(),
-  settledAt: integer("settled_at"),
+  createdAt: epochMs("created_at").notNull(),
+  settledAt: epochMs("settled_at"),
 });
 
 /** Measured execution effort per offer action (J1) - powers real £/hr. */
@@ -634,11 +641,11 @@ export const offerEffortSamples = pgTable("offer_effort_samples", {
   id: serial("id").primaryKey(),
   offerId: integer("offer_id").notNull(),
   actionKind: text("action_kind").notNull(),
-  startedAt: integer("started_at").notNull(),
-  endedAt: integer("ended_at").notNull(),
+  startedAt: epochMs("started_at").notNull(),
+  endedAt: epochMs("ended_at").notNull(),
   durationMin: doublePrecision("duration_min").notNull(),
   edited: integer("edited").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
 /**
@@ -676,15 +683,15 @@ export const casinoOffers = pgTable("casino_offers", {
   /** @deprecated legacy pre-K1 field, migration-only */
   game: text("game"),
   /** When the offer/wagering window closes (epoch ms); null = no known expiry. Drives the Casino calendar. */
-  expiresAt: integer("expires_at"),
+  expiresAt: epochMs("expires_at"),
   /** FK when this row is one occurrence of a recurring casino series (K3) */
   seriesId: integer("series_id"),
   /** YYYY-MM-DD occurrence date for recurring instances */
   instanceDate: text("instance_date"),
   /** External casino promo page URL ("Link to offer") */
   offerUrl: text("offer_url"),
-  createdAt: integer("created_at").notNull(),
-  completedAt: integer("completed_at"),
+  createdAt: epochMs("created_at").notNull(),
+  completedAt: epochMs("completed_at"),
 });
 
 /** Recurring casino offer template - instances are materialised as separate casino_offers rows (K3). */
@@ -697,15 +704,15 @@ export const casinoOfferSeries = pgTable("casino_offer_series", {
   skippedDatesJson: text("skipped_dates_json"),
   ruleJson: text("rule_json").notNull(),
   /** Reference expiry used to derive each instance deadline (time-of-day) */
-  templateExpiresAt: integer("template_expires_at"),
+  templateExpiresAt: epochMs("template_expires_at"),
   horizonDays: integer("horizon_days").notNull().default(14),
   casino: text("casino"),
   title: text("title").notNull(),
   notes: text("notes"),
   /** External casino promo page URL ("Link to offer") */
   offerUrl: text("offer_url"),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
 /**
@@ -734,7 +741,7 @@ export const casinoOfferSeriesComponents = pgTable("casino_offer_series_componen
   /** JSON string[] of eligible game names selected in the picker */
   eligibleGamesJson: text("eligible_games_json"),
   sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
 /**
@@ -780,7 +787,7 @@ export const casinoOfferComponents = pgTable("casino_offer_components", {
   /** This component's own EV, locked at save time - negative for qualifying_wager */
   expectedEv: doublePrecision("expected_ev").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
 /** Game RTP reference library (H2) - seeded with published values, user-editable. */
@@ -791,7 +798,7 @@ export const casinoGames = pgTable("casino_games", {
   /** Fraction 0-1 */
   rtp: doublePrecision("rtp").notNull(),
   source: text("source").notNull().default("user"),
-  updatedAt: integer("updated_at").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
 export const racingOddsOverrides = pgTable("racing_odds_overrides", {
@@ -800,7 +807,7 @@ export const racingOddsOverrides = pgTable("racing_odds_overrides", {
   horseId: text("horse_id").notNull(),
   bookieDecimal: doublePrecision("bookie_decimal"),
   exchangeDecimal: doublePrecision("exchange_decimal"),
-  updatedAt: integer("updated_at").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
 export type EventRow = typeof events.$inferSelect;
