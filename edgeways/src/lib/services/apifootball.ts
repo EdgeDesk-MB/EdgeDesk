@@ -117,6 +117,42 @@ export function hasApiKey(): boolean {
   return !!apiKey();
 }
 
+/**
+ * Budget-free health check for the admin panel: the /status endpoint does
+ * not count against API-Football's daily quota, so this never touches
+ * spendBudget(). Returns the raw status payload (account, subscription,
+ * provider-side request counters).
+ */
+export async function pingApiFootball(): Promise<{
+  plan: string | null;
+  requestsUsed: number | null;
+  requestsLimit: number | null;
+}> {
+  const key = apiKey();
+  if (!key) throw new Error("API_FOOTBALL_KEY not configured");
+  const res = await fetch(`${BASE}/status`, {
+    headers: { "x-apisports-key": key },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`API-Football ${res.status}`);
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const json: any = await res.json();
+  const err = formatApiErrors(json?.errors);
+  if (err) throw new Error(err);
+  const response = json?.response;
+  return {
+    plan: response?.subscription?.plan ? String(response.subscription.plan) : null,
+    requestsUsed:
+      typeof response?.requests?.current === "number"
+        ? response.requests.current
+        : null,
+    requestsLimit:
+      typeof response?.requests?.limit_day === "number"
+        ? response.requests.limit_day
+        : null,
+  };
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapFixture(item: any): Fixture {
   const shortStatus: string = item.fixture?.status?.short ?? "NS";

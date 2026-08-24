@@ -4,7 +4,7 @@
  * Billing columns: EDGE-5. Desk locks stay EDGE-22.
  */
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   db as sqliteDb,
   appUsers as sqliteUsers,
@@ -12,6 +12,14 @@ import {
 } from "@/lib/db";
 import { getNeonDb, getNeonSql } from "@/lib/db/neon";
 import { appUsers as pgUsers } from "@/lib/db/schema.pg";
+import {
+  bootstrapAdminEmails,
+  isBootstrapAdminEmail,
+  isOperatorAdmin,
+  parseAppUserRole,
+  type AppUserRole,
+} from "@/lib/admin/emails";
+import { adminRoleChangeBlock } from "@/lib/admin/roles";
 import type { PlanId } from "@/lib/entitlements/plans";
 import type {
   AppUserEntitlement,
@@ -35,6 +43,7 @@ export type AppUser = {
   trialEndsAt: number | null;
   founding: boolean;
   onboardingProfile: OnboardingProfile | null;
+  role: AppUserRole;
 };
 
 function usesHostedPostgres(): boolean {
@@ -43,6 +52,8 @@ function usesHostedPostgres(): boolean {
 
 let neonOnboardingColumnReady = false;
 let neonDeskSettingsColumnReady = false;
+let neonRoleColumnReady = false;
+let neonOperatorSettingsReady = false;
 
 async function ensureNeonOnboardingColumn(): Promise<void> {
   if (neonOnboardingColumnReady) return;
@@ -56,6 +67,26 @@ export async function ensureNeonDeskSettingsColumn(): Promise<void> {
   const sql = getNeonSql();
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS desk_settings text`;
   neonDeskSettingsColumnReady = true;
+}
+
+export async function ensureNeonRoleColumn(): Promise<void> {
+  if (neonRoleColumnReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'`;
+  neonRoleColumnReady = true;
+}
+
+export async function ensureNeonOperatorSettingsTable(): Promise<void> {
+  if (neonOperatorSettingsReady) return;
+  const sql = getNeonSql();
+  await sql`
+    CREATE TABLE IF NOT EXISTS operator_settings (
+      key text PRIMARY KEY,
+      value text NOT NULL,
+      updated_at bigint NOT NULL
+    )
+  `;
+  neonOperatorSettingsReady = true;
 }
 
 function asPlan(value: string | null | undefined): PlanId {
@@ -88,6 +119,7 @@ function fromRow(row: {
   trialEndsAt?: number | null;
   founding?: number | null;
   onboardingProfile?: string | null;
+  role?: string | null;
 }): AppUser {
   return {
     clerkUserId: row.clerkUserId,
@@ -101,6 +133,7 @@ function fromRow(row: {
     trialEndsAt: row.trialEndsAt ?? null,
     founding: row.founding === 1,
     onboardingProfile: parseOnboardingProfile(row.onboardingProfile),
+    role: parseAppUserRole(row.role),
   };
 }
 
@@ -116,6 +149,7 @@ export async function findAppUserByClerkId(
 ): Promise<AppUser | undefined> {
   if (usesHostedPostgres()) {
     await ensureNeonOnboardingColumn();
+    await ensureNeonRoleColumn();
     const rows = await getNeonDb()
       .select()
       .from(pgUsers)
@@ -212,6 +246,7 @@ export async function ensureAppUser(input: {
     trialEndsAt: null,
     founding: false,
     onboardingProfile: null,
+    role: "user",
   };
 }
 
@@ -282,4 +317,98 @@ export async function saveAppUserOnboardingProfile(input: {
   const row = await findAppUserByClerkId(input.clerkUserId);
   if (!row) throw new Error("app_users row missing after onboarding write.");
   return row;
+}
+
+export type AdminUserRow = AppUser & {
+  admin: boolean;
+  bootstrap: boolean;
+};
+
+export async function listAppUsers(): Promise<AdminUserRow[]> {
+  if (usesHostedPostgres()) {
+    await ensureNeonOnboardingColumn();
+    await ensureNeonRoleColumn();
+    const rows = await getNeonDb()
+      .select()
+      .from(pgUsers)
+      .orderBy(desc(pgUsers.createdAt));
+    return rows.map((row) => toAdminUserRow(fromRow(row)));
+  }
+  const rows = sqliteDb
+    .select()
+    .from(sqliteUsers)
+    .orderBy(desc(sqliteUsers.createdAt))
+    .all() as SqliteAppUserRow[];
+  return rows.map((row) => toAdminUserRow(fromRow(row)));
+}
+
+function toAdminUserRow(user: AppUser): AdminUserRow {
+  return {
+    ...user,
+    admin: isOperatorAdmin({ email: user.email, role: user.role }),
+    bootstrap: isBootstrapAdminEmail(user.email),
+  };
+}
+
+export async function countOperatorAdmins(): Promise<number> {
+  const users = await listAppUsers();
+  return users.filter((user) => user.admin).length;
+}
+
+export async function setAppUserRole(input: {
+  clerkUserId: string;
+  role: AppUserRole;
+}): Promise<AdminUserRow> {
+  const clerkUserId = input.clerkUserId.trim();
+  const current = await findAppUserByClerkId(clerkUserId);
+  if (!current) {
+    throw new Error("not-found");
+  }
+  const block = adminRoleChangeBlock({
+    email: current.email,
+    currentRole: current.role,
+    nextRole: input.role,
+    adminCount: await countOperatorAdmins(),
+  });
+  if (block === "bootstrap") throw new Error("bootstrap");
+  if (block === "last-admin") throw new Error("last-admin");
+
+  const now = Date.now();
+  if (usesHostedPostgres()) {
+    await ensureNeonRoleColumn();
+    if (input.role === "user") {
+      // Atomic last-admin guard: the count is re-checked inside the UPDATE so
+      // two concurrent demotions cannot both pass the read-then-write check.
+      const bootstrap = bootstrapAdminEmails();
+      const updated = await getNeonDb()
+        .update(pgUsers)
+        .set({ role: "user", updatedAt: now })
+        .where(
+          and(
+            eq(pgUsers.clerkUserId, clerkUserId),
+            sql`(
+              SELECT COUNT(*) FROM app_users
+              WHERE role = 'admin' OR lower(email) = ANY(${bootstrap})
+            ) > 1`
+          )
+        )
+        .returning({ clerkUserId: pgUsers.clerkUserId });
+      if (updated.length === 0) throw new Error("last-admin");
+    } else {
+      await getNeonDb()
+        .update(pgUsers)
+        .set({ role: input.role, updatedAt: now })
+        .where(eq(pgUsers.clerkUserId, clerkUserId));
+    }
+  } else {
+    sqliteDb
+      .update(sqliteUsers)
+      .set({ role: input.role, updatedAt: now })
+      .where(eq(sqliteUsers.clerkUserId, clerkUserId))
+      .run();
+  }
+
+  const row = await findAppUserByClerkId(clerkUserId);
+  if (!row) throw new Error("app_users row missing after role write.");
+  return toAdminUserRow(row);
 }

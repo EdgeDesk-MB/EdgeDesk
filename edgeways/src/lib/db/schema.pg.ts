@@ -497,6 +497,15 @@ export const appUsers = pgTable("app_users", {
   onboardingProfile: text("onboarding_profile"),
   /** Hosted desk preferences JSON (EDGE-47). Includes ageConfirmedAt. */
   deskSettings: text("desk_settings"),
+  /** Operator role. `admin` opens /admin. Bootstrap email is always admin. */
+  role: text("role").notNull().default("user"),
+});
+
+/** Operator key-value (maintenance banner). Not customer desk data. */
+export const operatorSettings = pgTable("operator_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */

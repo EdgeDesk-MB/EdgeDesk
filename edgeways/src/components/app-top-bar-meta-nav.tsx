@@ -11,12 +11,14 @@
  * Routes are prefetched; Links use the App Router normally (no hijacked push).
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChromeTab } from "@/components/chrome-tab";
 import { TopBarSessionButton } from "@/components/top-bar-login-button";
 import { TOP_SUB_NAV_ITEMS, activeMetaNavId, type MetaNavItem } from "@/content/meta-nav";
+import { useAdminSession } from "@/hooks/use-admin-session";
+import { Shield } from "lucide-react";
 import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
 import { META_TAB_DURATION_S, META_TAB_EASE } from "@/lib/ui/motion";
 import { appShellMaxWidth } from "@/lib/ui/app-shell-layout";
@@ -104,10 +106,26 @@ function MetaNavTab({
   );
 }
 
+const ADMIN_META_ITEM: MetaNavItem = {
+  id: "admin",
+  label: "Admin",
+  href: "/admin",
+  icon: Shield,
+};
+
 export function AppTopBarMetaNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const activeId = activeMetaNavId(pathname);
+  const { loaded, admin } = useAdminSession();
+  const items = useMemo(
+    () =>
+      loaded && admin ? [...TOP_SUB_NAV_ITEMS, ADMIN_META_ITEM] : TOP_SUB_NAV_ITEMS,
+    [loaded, admin]
+  );
+  const activeId =
+    pathname === "/admin" || pathname.startsWith("/admin/")
+      ? "admin"
+      : activeMetaNavId(pathname);
   const navRef = useRef<HTMLElement>(null);
   const pillRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef({ left: 0, width: 0 });
@@ -119,10 +137,10 @@ export function AppTopBarMetaNav() {
 
   // Warm meta + desk routes so flip/phone tab switches aren’t cold compiles.
   useEffect(() => {
-    for (const item of TOP_SUB_NAV_ITEMS) {
+    for (const item of items) {
       void router.prefetch(item.href);
     }
-  }, [router]);
+  }, [router, items]);
 
   // Mount the pill once we can measure the route’s active tab.
   useLayoutEffect(() => {
@@ -270,7 +288,7 @@ export function AppTopBarMetaNav() {
                 </div>
               ) : null}
 
-              {TOP_SUB_NAV_ITEMS.map((item) => (
+              {items.map((item) => (
                 <MetaNavTab
                   key={item.id}
                   item={item}

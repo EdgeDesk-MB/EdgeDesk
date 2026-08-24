@@ -62,6 +62,9 @@ export function isWaitlistAllowedPath(pathname: string): boolean {
     return true;
   }
   if (pathname === "/api/health") return true;
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return true;
+  if (pathname === "/api/admin" || pathname.startsWith("/api/admin/")) return true;
+  if (pathname === "/api/maintenance") return true;
   return false;
 }
 

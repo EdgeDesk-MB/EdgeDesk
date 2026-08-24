@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
+import { MaintenanceBannerServer } from "@/components/admin/maintenance-banner-server";
 import { QuickLogSheet } from "@/components/quick-log-sheet";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { AlertWatcher } from "@/components/alert-watcher";
@@ -60,6 +61,7 @@ export default async function AppLayout({
                               <FreeBetsProvider>
                                 <div className="flex h-dvh max-w-full flex-col overflow-hidden">
                                   <DemoPlanBar />
+                                  <MaintenanceBannerServer />
                                   <AppTopBar />
                                   <AppShell>
                                     <PlanRouteGate>{children}</PlanRouteGate>

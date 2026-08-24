@@ -271,6 +271,11 @@ export const edgeNavTag = `${navTag} bg-edge text-edge-foreground`;
 export const demoDataTag = `${navTag} bg-warning text-white`;
 
 /**
+ * Operator /admin mark — same box as Demo data so the mode chip is unmistakable.
+ */
+export const adminModeTag = demoDataTag;
+
+/**
  * Settled/open bet mark on Racing Desk runners — same box as `edgeNavTag`
  * (11px, px-1.5 py-0.5, rounded-[3px]); ink plate + canvas type.
  */

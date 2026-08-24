@@ -447,6 +447,15 @@ export const appUsers = sqliteTable("app_users", {
   founding: integer("founding").notNull().default(0),
   /** EDGE-62 first-run profile JSON. Not betting records. */
   onboardingProfile: text("onboarding_profile"),
+  /** Operator role. `admin` opens /admin. Bootstrap email is always admin. */
+  role: text("role").notNull().default("user"),
+});
+
+/** Operator key-value (maintenance banner). Not customer desk data. */
+export const operatorSettings = sqliteTable("operator_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at").notNull(),
 });
 
 /** Bookie, exchange, or bank wallet for bankroll tracking */

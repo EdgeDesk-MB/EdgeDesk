@@ -29,6 +29,7 @@ export function StatTile({
   value,
   sub,
   className,
+  valueClassName,
   active,
   onClick,
 }: {
@@ -36,6 +37,8 @@ export function StatTile({
   value: React.ReactNode;
   sub?: React.ReactNode;
   className?: string;
+  /** Overrides the default text-2xl / h-7 value row. */
+  valueClassName?: string;
   /** When set with onClick, tile renders as a selectable summary tab. */
   active?: boolean;
   onClick?: () => void;
@@ -65,7 +68,12 @@ export function StatTile({
       <p className="h-3.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="mt-0.5 flex h-7 items-center text-2xl font-bold leading-none tabular-nums tracking-tight text-foreground [&_*]:leading-none">
+      <div
+        className={cn(
+          "mt-0.5 flex h-7 items-center text-2xl font-bold leading-none tabular-nums tracking-tight text-foreground [&_*]:leading-none",
+          valueClassName
+        )}
+      >
         {value}
       </div>
       <p
@@ -94,5 +102,9 @@ export function StatTile({
     );
   }
 
-  return <div className={classNames}>{body}</div>;
+  return (
+    <div data-stat-tile="" className={classNames}>
+      {body}
+    </div>
+  );
 }

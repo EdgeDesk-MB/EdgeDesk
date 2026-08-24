@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ import { SPORTS } from "@/lib/sports";
 import { SportLabel } from "@/components/sport-icon";
 import { sectionDescription } from "@/lib/ui/surface-styles";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
+import { useAdminSession } from "@/hooks/use-admin-session";
 
 const SETTINGS_TABS = [
   "subscription",
@@ -84,17 +86,20 @@ export default function SettingsPage() {
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
   const { active: publicDemo } = usePublicDemo();
+  const { admin, loaded } = useAdminSession();
+  const searchParams = useSearchParams();
   const settings = state?.settings;
-  const [tab, setTab] = useState<SettingsTab>("subscription");
+  const requestedTab = searchParams.get("tab");
+  const [tab, setTab] = useState<SettingsTab>(() =>
+    requestedTab && isSettingsTab(requestedTab) ? requestedTab : "subscription"
+  );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const next = new URLSearchParams(window.location.search).get("tab");
-    if (next && isSettingsTab(next)) setTab(next);
-  }, []);
+  const visibleTab: SettingsTab =
+    tab === "integrations" && loaded && !admin ? "data" : tab;
 
   function selectTab(next: string) {
     if (!isSettingsTab(next)) return;
+    if (next === "integrations" && !admin) return;
     setTab(next);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
@@ -202,7 +207,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader className="pb-0">
-          <Tabs value={tab} onValueChange={selectTab} className="gap-0">
+          <Tabs value={visibleTab} onValueChange={selectTab} className="gap-0">
             <TabsLineBar bleed="card">
               <TabsList variant="line" className="justify-start">
                 <TabsTrigger value="subscription">Subscription</TabsTrigger>
@@ -213,19 +218,24 @@ export default function SettingsPage() {
                 <TabsTrigger value="targets">Targets &amp; tuning</TabsTrigger>
                 <TabsTrigger value="home-layout">Home layout</TabsTrigger>
                 <TabsTrigger value="time">Time &amp; region</TabsTrigger>
-                <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                {loaded && admin ? (
+                  <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                ) : null}
                 <TabsTrigger value="data">Data &amp; backup</TabsTrigger>
               </TabsList>
             </TabsLineBar>
           </Tabs>
         </CardHeader>
         <CardContent className="pt-4">
-          {tab === "subscription" && <SubscriptionCard />}
-
-          {tab === "appearance" && (
-            <AppearanceCard
+          {visibleTab === "subscription" && (
+            <SubscriptionCard
               planPreview={settings?.planPreview ?? "unlocked"}
-              onPatch={patchSettings}
+              onPatch={publicDemo ? undefined : patchSettings}
+            />
+          )}
+
+          {visibleTab === "appearance" && (
+            <AppearanceCard
               onPersistFont={
                 publicDemo
                   ? undefined
@@ -283,7 +293,7 @@ export default function SettingsPage() {
             />
           )}
 
-          {tab === "bet-defaults" && settings && (
+          {visibleTab === "bet-defaults" && settings && (
             <BetDefaultsCard
               settings={settings}
               exchanges={exchanges}
@@ -292,30 +302,30 @@ export default function SettingsPage() {
             />
           )}
 
-          {tab === "automation" && settings && (
+          {visibleTab === "automation" && settings && (
             <AutomationCard settings={settings} onPatch={patchSettings} />
           )}
 
-          {tab === "alerts" && settings && (
+          {visibleTab === "alerts" && settings && (
             <AlertsCard settings={settings} onPatch={patchSettings} />
           )}
 
-          {tab === "targets" && settings && (
+          {visibleTab === "targets" && settings && (
             <div className="flex flex-col gap-4">
               <TargetCard target={settings.monthlyProfitTarget} onPatch={patchSettings} />
               <TuningCard tuning={settings.tuning} onPatch={patchSettings} />
             </div>
           )}
 
-          {tab === "home-layout" && settings && (
+          {visibleTab === "home-layout" && settings && (
             <HomeLayoutCard layout={settings.homeLayout} onPatch={patchSettings} />
           )}
 
-          {tab === "time" && settings && (
+          {visibleTab === "time" && settings && (
             <TimeRegionCard settings={settings} onPatch={patchSettings} />
           )}
 
-          {tab === "integrations" && (
+          {visibleTab === "integrations" && loaded && admin && (
             <IntegrationsPanel
               apiConfigured={state?.apiConfigured}
               racingApiConfigured={state?.racingApiConfigured}
@@ -328,7 +338,7 @@ export default function SettingsPage() {
             />
           )}
 
-          {tab === "data" && (
+          {visibleTab === "data" && (
             <DataBackupPanel onRefresh={refresh} hosted={state?.hostedDesk ?? false} />
           )}
         </CardContent>
@@ -338,14 +348,10 @@ export default function SettingsPage() {
 }
 
 function AppearanceCard({
-  planPreview,
-  onPatch,
   onPersistFont,
   onPersistPattern,
   onPersistAccent,
 }: {
-  planPreview: AppSettings["planPreview"];
-  onPatch: (patch: Partial<AppSettings>) => void;
   onPersistFont?: (fontId: UiFontId) => void;
   onPersistPattern?: (patternId: HeaderPatternId) => void;
   onPersistAccent?: (presetId: BrandAccentPresetId, hex: string) => void;
@@ -372,32 +378,6 @@ function AppearanceCard({
       <div className="h-px bg-border" />
 
       <HeaderPatternSelect onPersist={onPersistPattern} />
-
-      <div className="h-px bg-border" />
-
-      <div className="flex flex-col gap-2">
-        <Label className="text-sm font-semibold">Plan preview</Label>
-        <p className="text-xs text-muted-foreground">
-          Temporary entitlement preview until billing. Free blocks Acca Desk routing from offers
-          (Add bet fallback). Unlocked matches today&apos;s full desk.
-        </p>
-        <Select
-          value={planPreview}
-          onValueChange={(v) =>
-            onPatch({ planPreview: v as AppSettings["planPreview"] })
-          }
-        >
-          <SelectTrigger className="max-w-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="unlocked">Unlocked (default)</SelectItem>
-            <SelectItem value="free">Free</SelectItem>
-            <SelectItem value="core">Core</SelectItem>
-            <SelectItem value="edge">Edge</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
     </div>
   );
 }
@@ -1483,6 +1463,10 @@ function DataBackupPanel({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <p className="text-sm text-muted-foreground lg:col-span-2">
+        Live racing, football and exchange feeds are held by Edgeways. This tab
+        is your backup and restore.
+      </p>
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Export</CardTitle>

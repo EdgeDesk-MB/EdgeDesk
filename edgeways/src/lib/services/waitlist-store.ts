@@ -3,7 +3,7 @@
  * SQLite otherwise (local Mac + Vitest).
  */
 import "server-only";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import {
   db as sqliteDb,
   waitlistSignups as sqliteWaitlist,
@@ -153,4 +153,31 @@ export async function updateWaitlistSignup(
     .set(patch)
     .where(eq(sqliteWaitlist.id, id))
     .run();
+}
+
+export async function listWaitlistSignups(limit = 100): Promise<WaitlistRow[]> {
+  const cap = Math.min(Math.max(limit, 1), 500);
+  if (usesNeonWaitlist()) {
+    const rows = await getNeonDb()
+      .select()
+      .from(pgWaitlist)
+      .orderBy(desc(pgWaitlist.createdAt))
+      .limit(cap);
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      confirmTokenHash: row.confirmTokenHash,
+      createdAt: row.createdAt,
+      confirmedAt: row.confirmedAt ?? null,
+      confirmSentAt: row.confirmSentAt ?? null,
+      unsubscribedAt: row.unsubscribedAt ?? null,
+    }));
+  }
+  const rows = sqliteDb
+    .select()
+    .from(sqliteWaitlist)
+    .orderBy(desc(sqliteWaitlist.createdAt))
+    .limit(cap)
+    .all() as SqliteWaitlistRow[];
+  return rows.map(fromSqlite);
 }

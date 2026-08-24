@@ -400,7 +400,13 @@ CREATE TABLE IF NOT EXISTS app_users (
   stripe_subscription_id TEXT,
   trial_ends_at INTEGER,
   founding INTEGER NOT NULL DEFAULT 0,
-  onboarding_profile TEXT
+  onboarding_profile TEXT,
+  role TEXT NOT NULL DEFAULT 'user'
+);
+CREATE TABLE IF NOT EXISTS operator_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -545,6 +551,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("app_users", "trial_ends_at INTEGER");
   addColumn("app_users", "founding INTEGER NOT NULL DEFAULT 0");
   addColumn("app_users", "onboarding_profile TEXT");
+  addColumn("app_users", "role TEXT NOT NULL DEFAULT 'user'");
   addColumn("waitlist_signups", "unsubscribed_at INTEGER");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS casino_offer_series (
