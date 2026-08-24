@@ -64,12 +64,6 @@ export function AdminTopBar() {
           </div>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-2 pr-3 sm:pr-8">
             <span className={cn(adminModeTag, "shrink-0")}>ADMIN</span>
-            <Link
-              href="/desk"
-              className="text-xs font-medium text-topbar-muted transition-colors hover:text-topbar-foreground"
-            >
-              Back to desk
-            </Link>
             <TopBarSessionButton />
           </div>
         </div>
