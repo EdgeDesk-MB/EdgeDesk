@@ -15,6 +15,7 @@
     "db:neon-smoke": "npx tsx scripts/neon-smoke.ts",
     "db:casino-smoke": "npx tsx --tsconfig scripts/tsconfig.json scripts/neon-casino-smoke.ts",
     "db:feeds-smoke": "npx tsx --tsconfig scripts/tsconfig.json scripts/neon-feeds-smoke.ts",
+    "billing:rehearsal": "npx tsx --tsconfig scripts/tsconfig.json scripts/billing-rehearsal.ts",
     "db:resend-smoke": "npx tsx scripts/resend-smoke.ts"
   },
   "dependencies": {

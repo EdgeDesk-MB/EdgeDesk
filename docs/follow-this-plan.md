@@ -47,14 +47,18 @@ budgets (football live-score polling is the pinch).
 
 **Next session (pick one, do not mix in the same day):**
 - [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) Sam clicks the billing
-  rehearsal in test mode
+  rehearsal in test mode — webhook backbone already automated
+  (`npm run billing:rehearsal`, 11/11 PASS 24 Aug); Sam's 15-min click list
+  is in `docs/stripe-test-rehearsal.md`
 - Flip `SITE_SURFACE=app` only when Neon desk + checklist + Sam says so
 
 **Done 24 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80) admin
 control panel shipped to preview (full review + 10 fixes folded in; migration
 0013 applied). [EDGE-81](https://linear.app/samhayter/issue/EDGE-81) pooled
 feeds verified on live Neon via `npm run db:feeds-smoke` (budget counter,
-sync lease, events) — no manual clicks needed.
+sync lease, events) — no manual clicks needed. EDGE-7 prep: test catalogue
+audited against app config (all 5 prices match), automated webhook drill
+(trial → paid → downgrade → upgrade → cancel → refund) green against Neon.
 
 [EDGE-37](https://linear.app/samhayter/issue/EDGE-37) interim pass done 22 Aug:
 every §5 box ticked or consciously deferred with a dated note in
