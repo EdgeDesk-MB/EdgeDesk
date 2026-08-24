@@ -283,4 +283,17 @@ describe("appStateFromNeonDesk casino + adjustments", () => {
     expect(state.casinoSettlements).toEqual([]);
     expect(state.pnlAdjustments).toEqual([]);
   });
+
+  it("counts casino campaigns needing action like the local snapshot", () => {
+    const state = appStateFromNeonDesk({
+      bets: [],
+      casinoOffers: [
+        casinoOffer({ id: 1, title: "Planned", status: "planned" }),
+        casinoOffer({ id: 2, title: "Active", status: "active" }),
+        casinoOffer({ id: 3, title: "Done", status: "completed", actualProfit: 5 }),
+        casinoOffer({ id: 4, title: "Gone", status: "expired" }),
+      ],
+    });
+    expect(state.casinoNeedsAction).toBe(2);
+  });
 });

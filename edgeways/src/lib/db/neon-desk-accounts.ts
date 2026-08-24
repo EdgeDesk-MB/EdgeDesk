@@ -203,6 +203,8 @@ export type NeonDeskTransactionValues = {  accountId: number;
   amount: number;
   category: BalanceTransactionRow["category"];
   betId?: number | null;
+  casinoOfferId?: number | null;
+  affectPnl?: number;
   note?: string | null;
   createdAt: number;
 };

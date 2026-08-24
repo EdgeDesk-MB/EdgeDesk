@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, casinoOfferComponents } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
 import { deriveComponentEv } from "@/lib/calc/casino-reward-ev";
+import {
+  deleteNeonDeskCasinoComponent,
+  getNeonCasinoOfferSummary,
+  patchNeonDeskCasinoComponent,
+} from "@/lib/db/neon-desk-casino";
 import { syncCasinoSeriesTemplateFromOffer } from "@/lib/offers/casino-offer-recurrence";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { componentFieldsSchema, toComponentRowValues } from "../schema";
@@ -22,6 +28,24 @@ export const PATCH = withDeskScope(async function PATCH(
   const { id, componentId } = await ctx.params;
   const offerId = Number(id);
   const compId = Number(componentId);
+
+  if (isNeonDesk()) {
+    const parsed = componentFieldsSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    const fields = toComponentRowValues(parsed.data);
+    const expectedEv = deriveComponentEv(parsed.data);
+    const updated = await patchNeonDeskCasinoComponent(compId, offerId, {
+      ...fields,
+      expectedEv,
+    });
+    if (!updated) {
+      return NextResponse.json({ error: "Component not found" }, { status: 404 });
+    }
+    return NextResponse.json({ offer: await getNeonCasinoOfferSummary(offerId) });
+  }
+
   const existing = db
     .select()
     .from(casinoOfferComponents)
@@ -55,6 +79,15 @@ export const DELETE = withDeskScope(async function DELETE(
   const { id, componentId } = await ctx.params;
   const offerId = Number(id);
   const compId = Number(componentId);
+
+  if (isNeonDesk()) {
+    const deleted = await deleteNeonDeskCasinoComponent(compId, offerId);
+    if (!deleted) {
+      return NextResponse.json({ error: "Component not found" }, { status: 404 });
+    }
+    return NextResponse.json({ offer: await getNeonCasinoOfferSummary(offerId) });
+  }
+
   const existing = db
     .select()
     .from(casinoOfferComponents)

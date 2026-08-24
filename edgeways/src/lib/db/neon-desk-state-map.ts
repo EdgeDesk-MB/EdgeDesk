@@ -12,6 +12,7 @@ import type {
 } from "@/lib/db/schema";
 import { computePnlBuckets } from "@/lib/pnl/pnl-buckets";
 import { sumOpenWorstCaseProfit } from "@/lib/pnl/open-bet-worst-case";
+import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/services/settings-shared";
 import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
 import { hasRacingApiKey, racingApiUsageToday } from "@/lib/services/theracingapi";
@@ -123,7 +124,7 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     alertsUnread: 0,
     deliveredAlertKeys: [],
     boostsOpen: 0,
-    casinoNeedsAction: 0,
+    casinoNeedsAction: allCasinoOffers.filter((o) => isCasinoInMainFeed(o)).length,
     demoMode: false,
     hostedDesk: true,
     livePositions: derived.livePositions,

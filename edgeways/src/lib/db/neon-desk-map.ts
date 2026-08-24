@@ -2,7 +2,11 @@ import type {
   AccountRow,
   BalanceTransactionRow,
   BetRow,
+  CasinoGameRow,
+  CasinoOfferComponentRow,
   CasinoOfferRow,
+  CasinoOfferSeriesComponentRow,
+  CasinoOfferSeriesRow,
   EventRow,
   HistoryRow,
   OfferRow,
@@ -11,7 +15,11 @@ import type {
   AccountRow as PgAccountRow,
   BalanceTransactionRow as PgBalanceTransactionRow,
   BetRow as PgBetRow,
+  CasinoGameRow as PgCasinoGameRow,
+  CasinoOfferComponentRow as PgCasinoOfferComponentRow,
   CasinoOfferRow as PgCasinoOfferRow,
+  CasinoOfferSeriesComponentRow as PgCasinoOfferSeriesComponentRow,
+  CasinoOfferSeriesRow as PgCasinoOfferSeriesRow,
   EventRow as PgEventRow,
   HistoryRow as PgHistoryRow,
   OfferRow as PgOfferRow,
@@ -191,5 +199,87 @@ export function toSqliteCasinoOfferRow(row: PgCasinoOfferRow): CasinoOfferRow {
     offerUrl: row.offerUrl,
     createdAt: row.createdAt,
     completedAt: row.completedAt,
+  };
+}
+
+export function toSqliteCasinoOfferComponentRow(
+  row: PgCasinoOfferComponentRow
+): CasinoOfferComponentRow {
+  return {
+    id: row.id,
+    casinoOfferId: row.casinoOfferId,
+    componentType: row.componentType,
+    amount: row.amount,
+    wageringMultiplier: row.wageringMultiplier,
+    rtp: row.rtp,
+    contributionPct: row.contributionPct,
+    spins: row.spins,
+    spinValue: row.spinValue,
+    chipCount: row.chipCount,
+    chipValue: row.chipValue,
+    houseEdgePreset: row.houseEdgePreset,
+    cashbackPct: row.cashbackPct,
+    cashbackCap: row.cashbackCap,
+    game: row.game,
+    eligibleGamesJson: row.eligibleGamesJson,
+    expectedEv: row.expectedEv,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+  };
+}
+
+export function toSqliteCasinoOfferSeriesRow(
+  row: PgCasinoOfferSeriesRow
+): CasinoOfferSeriesRow {
+  return {
+    id: row.id,
+    recurrenceEnabled: row.recurrenceEnabled,
+    recurrenceStoppedFrom: row.recurrenceStoppedFrom,
+    skippedDatesJson: row.skippedDatesJson,
+    ruleJson: row.ruleJson,
+    templateExpiresAt: row.templateExpiresAt,
+    horizonDays: row.horizonDays,
+    casino: row.casino,
+    title: row.title,
+    notes: row.notes,
+    offerUrl: row.offerUrl,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toSqliteCasinoOfferSeriesComponentRow(
+  row: PgCasinoOfferSeriesComponentRow
+): CasinoOfferSeriesComponentRow {
+  return {
+    id: row.id,
+    seriesId: row.seriesId,
+    componentType: row.componentType,
+    amount: row.amount,
+    wageringMultiplier: row.wageringMultiplier,
+    rtp: row.rtp,
+    contributionPct: row.contributionPct,
+    spins: row.spins,
+    spinValue: row.spinValue,
+    chipCount: row.chipCount,
+    chipValue: row.chipValue,
+    houseEdgePreset: row.houseEdgePreset,
+    cashbackPct: row.cashbackPct,
+    cashbackCap: row.cashbackCap,
+    game: row.game,
+    eligibleGamesJson: row.eligibleGamesJson,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+  };
+}
+
+export function toSqliteCasinoGameRow(row: PgCasinoGameRow): CasinoGameRow {
+  return {
+    id: row.id,
+    name: row.name,
+    provider: row.provider,
+    rtp: row.rtp,
+    source: row.source,
+    updatedAt: row.updatedAt,
   };
 }

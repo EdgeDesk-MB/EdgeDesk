@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, casinoGames } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  listNeonDeskCasinoGames,
+  seedNeonCasinoGamesIfEmpty,
+  upsertNeonDeskCasinoGame,
+} from "@/lib/db/neon-desk-casino";
 import { SEED_GAMES } from "@/lib/casino/game-library";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
@@ -22,6 +28,10 @@ function seedIfEmpty(): void {
 }
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    await seedNeonCasinoGamesIfEmpty();
+    return NextResponse.json({ games: await listNeonDeskCasinoGames() });
+  }
   seedIfEmpty();
   // RTP order, highest first - the whole point of the library is "which
   // eligible game should I play", so lead with the answer everywhere it's
@@ -43,6 +53,16 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+
+  if (isNeonDesk()) {
+    const row = await upsertNeonDeskCasinoGame({
+      name: input.name.trim(),
+      provider: input.provider?.trim() || null,
+      rtp: input.rtp,
+    });
+    return NextResponse.json({ game: row });
+  }
+
   const row = db
     .insert(casinoGames)
     .values({

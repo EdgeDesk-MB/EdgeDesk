@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, casinoOffers } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonDeskCasinoOffer,
+  getNeonCasinoOfferSummary,
+  getNeonDeskCasinoOffer,
+  patchNeonDeskCasinoOffer,
+  syncNeonCasinoOfferBalance,
+} from "@/lib/db/neon-desk-casino";
 import {
   deleteCasinoOfferWithScope,
   stopRecurrenceForCasinoOffer,
@@ -48,6 +56,39 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   }
   const p = parsed.data;
   const offerId = Number(id);
+
+  if (isNeonDesk()) {
+    const existing = await getNeonDeskCasinoOffer(offerId);
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (p.stopRecurrence) {
+      return NextResponse.json(
+        { error: "Recurrence editing is not available on the hosted desk yet." },
+        { status: 400 }
+      );
+    }
+    const updated = await patchNeonDeskCasinoOffer(offerId, {
+      ...(p.casino !== undefined ? { casino: p.casino?.trim() || null } : {}),
+      ...(p.title !== undefined ? { title: p.title.trim() } : {}),
+      ...(p.status !== undefined ? { status: p.status } : {}),
+      ...(p.actualProfit !== undefined ? { actualProfit: p.actualProfit } : {}),
+      ...(p.notes !== undefined ? { notes: p.notes } : {}),
+      ...(p.offerUrl !== undefined ? { offerUrl: normalizeOfferUrl(p.offerUrl) } : {}),
+      ...(p.expiresAt !== undefined ? { expiresAt: p.expiresAt } : {}),
+      ...(p.status === "completed" ? { completedAt: Date.now() } : {}),
+      ...(p.status !== undefined && p.status !== "completed" ? { completedAt: null } : {}),
+    });
+    const nextStatus = p.status ?? existing.status;
+    const balanceFieldsTouched =
+      p.status !== undefined ||
+      p.actualProfit !== undefined ||
+      p.casino !== undefined ||
+      p.title !== undefined;
+    if (updated && (balanceFieldsTouched || nextStatus === "completed")) {
+      await syncNeonCasinoOfferBalance(updated);
+    }
+    return NextResponse.json({ offer: await getNeonCasinoOfferSummary(offerId) });
+  }
+
   const existing = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -96,13 +137,21 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const offerId = Number(id);
-  const existing = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const scopeParsed = deleteScopeSchema.safeParse(req.nextUrl.searchParams.get("scope") ?? "instance");
   if (!scopeParsed.success) {
     return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
   }
+
+  if (isNeonDesk()) {
+    const existing = await getNeonDeskCasinoOffer(offerId);
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    await deleteNeonDeskCasinoOffer(existing, scopeParsed.data);
+    return NextResponse.json({ ok: true });
+  }
+
+  const existing = db.select().from(casinoOffers).where(eq(casinoOffers.id, offerId)).get();
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   clearCasinoOfferBalance(offerId);
   cancelPendingRemindersForCasino(offerId);
