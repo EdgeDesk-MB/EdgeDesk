@@ -5,7 +5,9 @@
 > [Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c).
 > Repo layout rules: `docs/repo-layout.md`.
 >
-> Last updated: **16 Aug 2026** (Oddsmonkey onboarding research → EDGE-62…67).
+> Last updated: **23 Aug 2026** (EDGE-47 **done** — full Neon desk cutover proven
+on preview: onboarding, wallets, offers, bets, history + restore drill;
+EDGE-37 interim checklist pass done; final pass stays C6).
 
 ---
 
@@ -32,17 +34,38 @@ comply-fast-and-licence if a provider ever makes contact. Customer-facing
 copy no longer names data providers (Settings, Racing Desk, EP Desk, Help,
 roadmap all say "racing/football/exchange feed"). Betfair stays delayed-only.
 
+**Scoped 23 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80)
+admin control panel (`/admin`: payments, subscribers, **user management**,
+activity, feed health, release flags). Same desk styling plus a top-right
+**ADMIN** chip (same tag as demo-mode **DEMO**). Bootstrap admin:
+`samhayter.design@gmail.com`; further admins granted in-app with an access
+prompt. Keep Clerk (do not switch to Better Auth in this ticket). Hide
+customer Settings → Data & API at go-live.
+[EDGE-81](https://linear.app/samhayter/issue/EDGE-81) pooled feeds: Sam's
+operator keys must serve all customer-tracked events within provider
+budgets (football live-score polling is the pinch).
+
 **Next session (pick one, do not mix in the same day):**
 - [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) Sam clicks the billing
   rehearsal in test mode
 - Flip `SITE_SURFACE=app` only when Neon desk + checklist + Sam says so
+
+**Done 24 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80) admin
+control panel shipped to preview (full review + 10 fixes folded in; migration
+0013 applied). [EDGE-81](https://linear.app/samhayter/issue/EDGE-81) pooled
+feeds verified on live Neon via `npm run db:feeds-smoke` (budget counter,
+sync lease, events) — no manual clicks needed.
 
 [EDGE-37](https://linear.app/samhayter/issue/EDGE-37) interim pass done 22 Aug:
 every §5 box ticked or consciously deferred with a dated note in
 `docs/live-readiness.md`. Final full pass stays in C6 (launch week).
 
 Production is still waitlist-only: signed-in users hit `/desk` then bounce
-home until `SITE_SURFACE=app`.
+home until `SITE_SURFACE=app`. Do not promote `LANDING_VARIANT=launch` on
+production until that flip.
+
+[EDGE-78](https://linear.app/samhayter/issue/EDGE-78) keyboard slice is Done.
+Settle-focused-bet leftover is [EDGE-79](https://linear.app/samhayter/issue/EDGE-79).
 
 ---
 
@@ -53,14 +76,14 @@ home until `SITE_SURFACE=app`.
 | Live marketing site | **https://edgeways.app** — waitlist only |
 | Desk app on production | **Blocked** — `proxy.ts` redirects `/desk` etc. → `/` when `SITE_SURFACE=waitlist` |
 | Local desk | Full app on `:3000`; `/login`, `/sign-up`, `/subscribe` live |
-| Neon | Waitlist + `app_users` (Clerk `userId` PK). Desk data still **SQLite locally**; full SQLite→Postgres cutover is later |
+| Neon | Waitlist + `app_users` (Clerk `userId` PK). Preview desk: bets, offers, wallets, history + settings on Neon behind `EDGEWAYS_DESK_BACKEND=neon` (EDGE-47 done 23 Aug). Localhost stays SQLite |
 | Auth / SSO | **Clerk** — EDGE-19 done. `/login` + `/sign-up` live. Neon `app_users` upserts on sign-in. Google consent still says “Clerk” until a custom Google OAuth client |
 | Waitlist owner alert | Resend sends; **Zoho `sam@` bounces** (`554 ContentRejected`). `WAITLIST_NOTIFY_TO` is Gmail (local + Vercel) |
 | In-app feedback | Resend notify + Neon `feedback_reports` (not the user's desk). Same Gmail notify list unless `FEEDBACK_NOTIFY_TO` is set. Linear filing still later (EDGE-43) |
-| Billing | **Stripe** (L1). Test catalogue ✓. Checkout + slip + portal ✓. Webhooks write tier ✓. Next: [EDGE-58](https://linear.app/samhayter/issue/EDGE-58) Settings manage |
+| Billing | **Stripe** (L1). Test catalogue ✓. Checkout + slip + portal ✓. Webhooks write tier ✓. Settings → Subscription ✓ (EDGE-58). Rehearsal is [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) |
 | Legal (customer-facing) | **Published 17 Aug.** `/terms` + `/privacy`, waitlist Privacy notice, signup ToS/Privacy checkbox. ICO fee later (retake when trading). Solicitor before charging strangers. [EDGE-61](https://linear.app/samhayter/issue/EDGE-61) |
 
-Closed recently: EDGE-24, 25, 26, 34, 46, **19**, **2**, **3**, **5**. EDGE-4 leftovers + EDGE-20 / 21 / 47 / **58** still In Progress.
+Closed recently: EDGE-4, 5, 19, 20, 21, **47**, 49, 58, 61–66, **78**. **EDGE-37** interim pass done; final pass in C6.
 
 ---
 
@@ -88,7 +111,7 @@ Full rules: `docs/repo-layout.md`.
 - [x] **[EDGE-11](https://linear.app/samhayter/issue/EDGE-11)** — ToS draft read 16 Aug. Placeholders (entity, contact, VAT) fill at publish.
 - [x] **[EDGE-12](https://linear.app/samhayter/issue/EDGE-12)** — Privacy draft read 16 Aug. Published 17 Aug (EDGE-61).
 - [ ] **[EDGE-9](https://linear.app/samhayter/issue/EDGE-9)** — ICO fee: not due until trading. Parked in Cycle 6.
-- [ ] **[EDGE-10](https://linear.app/samhayter/issue/EDGE-10)** — UK IPO trademark search (can be later this week).
+- [x] **[EDGE-10](https://linear.app/samhayter/issue/EDGE-10)** — UK IPO search 19 Aug. Filing on hold (Flutter EDGEWAYS hit).
 
 ### 2. Decisions (~20 min) — unblock agents
 
@@ -99,32 +122,31 @@ Full rules: `docs/repo-layout.md`.
 
 | Thread | Tickets | Outcome |
 |--------|---------|---------|
-| **D — Billing** | EDGE-3 ✓ → 4 user path ✓ → 5 ✓ → **58** | Tier writes. Settings → Subscription |
-| 👇 **A — Auth / first-run** | EDGE-19 ✓ → 20 mostly ✓ → **21** ✓ + **59** ✓ + **60** ✓ | Try the desk, public `/demo`, full-page `/setup` |
-| **B — Neon slice** | EDGE-47 | Waitlist + `app_users` on Neon. Full SQLite→Postgres cutover is multi-session |
-| **C — QA scrub** | EDGE-49 / EDGE-37 slice | Settings/Help copy: strip `.env.local` / localhost / SQLite developer language for hosted |
+| **D — Billing** | EDGE-3 ✓ → 4 ✓ → 5 ✓ → 58 ✓ | Tier writes. Settings → Subscription |
+| **A — Auth / first-run** | EDGE-19 ✓ → 20 ✓ → 21 ✓ + 59 ✓ + 60 ✓ | Try the desk, public `/demo`, full-page `/setup` |
+| **B — Neon slice** | EDGE-47 ✓ | Waitlist + `app_users` + full desk (bets, offers, wallets, history) on Neon for hosted; localhost stays SQLite |
+| 👇 **C — Checklist** | EDGE-49 ✓ → **37** | §5 boxes ticked or deferred before charging strangers |
 
 Do **not** run A + full Neon cutover + billing in the same day.
 
 ### 4. Later M2 (Sep–Oct)
 
-- Finish EDGE-4 leftovers (copy live catalogue + portal)
-- Onboarding v2 (EDGE-62 profile + target slider) + empty-desk welcome (EDGE-63)
-  + [EDGE-33](https://linear.app/samhayter/issue/EDGE-33) stranger test
-- Landing honesty (EDGE-64), receipt first-charge date (EDGE-65), `/contact` +
-  `/refund` (EDGE-66), referral codes (EDGE-67, confirm the 50% / £9.99 offer)
+- [EDGE-33](https://linear.app/samhayter/issue/EDGE-33) stranger test
+- Referral codes (EDGE-67, confirm the 50% / £9.99 offer)
 - [EDGE-68](https://linear.app/samhayter/issue/EDGE-68) Import from Oddsmonkey
   (then Outplayed). Spec: `docs/strategy/platform-import.md`. Needs Sam’s enum dump.
-- Legal: [EDGE-61](https://linear.app/samhayter/issue/EDGE-61) `/terms` + `/privacy` published 17 Aug. Solicitor (EDGE-8) before charging strangers.
-- Flip `SITE_SURFACE=app` only when auth + EDGE-5 + EDGE-58 + desk **and EDGE-61** are ready for beta invitees
+- Solicitor (EDGE-8) before charging strangers
+- Flip `SITE_SURFACE=app` only when Neon desk (EDGE-47) + EDGE-37 + Sam says so
+
+Shipped 19–22 Aug: EDGE-4 leftovers, 62–66, 78.
 
 ### 5. M3 Launch (Nov)
 
 - EDGE-22 real entitlement enforcement
 - EDGE-7 billing rehearsal (recreate catalogue in **live** mode; you click every path)
 - EDGE-8 solicitor sign-off of the published `/terms` + `/privacy` pages
-- EDGE-37 full pre-launch checklist
-- EDGE-49 go-live hygiene
+- EDGE-37 full pre-launch checklist (in progress 22 Aug)
+- EDGE-49 go-live hygiene ✓
 
 ---
 
