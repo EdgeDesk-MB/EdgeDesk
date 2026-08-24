@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "npx tsx scripts/neon-migrate.ts",
     "db:neon-smoke": "npx tsx scripts/neon-smoke.ts",
+    "db:casino-smoke": "npx tsx --tsconfig scripts/tsconfig.json scripts/neon-casino-smoke.ts",
     "db:resend-smoke": "npx tsx scripts/resend-smoke.ts"
   },
   "dependencies": {
