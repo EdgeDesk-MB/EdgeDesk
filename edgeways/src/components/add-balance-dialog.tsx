@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DialogSaveButton } from "@/components/ui/dialog-save-button";
 import {
   Dialog,
   DialogContent,
@@ -337,7 +338,7 @@ function AddBalanceForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="app-scroll-nested flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-6">
+        <div className="app-scroll-nested flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           <Tabs value={mode} onValueChange={(v) => changeMode(v as typeof mode)}>
             <TabsList>
               <TabsTrigger value="top_up">Top up</TabsTrigger>
@@ -365,9 +366,14 @@ function AddBalanceForm({
                 key={i}
                 className={cn(
                   "grid items-end gap-2",
+                  // Mobile: stacked card per row - account full width, type +
+                  // amount paired, note full width with remove alongside.
+                  // sm:contents dissolves the wrappers back into the flat
+                  // desktop grid.
+                  "grid-cols-1 gap-3 rounded-lg border p-3 sm:rounded-none sm:border-0 sm:p-0",
                   mode === "top_up"
-                    ? "grid-cols-[1fr_100px_120px_1fr_auto]"
-                    : "grid-cols-[1fr_120px_1fr_auto]"
+                    ? "sm:grid-cols-[1fr_100px_120px_1fr_auto]"
+                    : "sm:grid-cols-[1fr_120px_1fr_auto]"
                 )}
               >
                 <div className="flex flex-col gap-1.5">
@@ -415,81 +421,85 @@ function AddBalanceForm({
                     </SelectContent>
                   </Select>
                 </div>
-                {mode === "top_up" && (
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">Type</Label>
-                    <Select
-                      value={row.fundKind}
-                      onValueChange={(v) =>
+                <div className="grid grid-cols-2 items-end gap-2 sm:contents">
+                  {mode === "top_up" && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Type</Label>
+                      <Select
+                        value={row.fundKind}
+                        onValueChange={(v) =>
+                          setRows(
+                            effectiveRows.map((r, j) =>
+                              j === i ? { ...r, fundKind: v as FundKind } : r
+                            )
+                          )
+                        }
+                        disabled={!canFreeBet}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="free_bet" disabled={account?.type !== "bookie"}>
+                            Free bet
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className={cn("flex flex-col gap-1.5", mode !== "top_up" && "col-span-2")}>
+                    <Label className="text-xs text-muted-foreground">
+                      {mode === "adjustment" ? "New balance" : "Amount"}
+                    </Label>
+                    <Input
+                      type="number"
+                      step={0.01}
+                      min={mode === "adjustment" ? undefined : 0}
+                      prefix=""
+                      value={balanceAmountInputValue(row.amount, mode)}
+                      onChange={(e) =>
                         setRows(
                           effectiveRows.map((r, j) =>
-                            j === i ? { ...r, fundKind: v as FundKind } : r
+                            j === i
+                              ? { ...r, amount: roundMoney(parseFloat(e.target.value) || 0) }
+                              : r
                           )
                         )
                       }
-                      disabled={!canFreeBet}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="free_bet" disabled={account?.type !== "bookie"}>
-                          Free bet
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      placeholder={
+                        mode === "adjustment" && account
+                          ? formatGbp(account.balance).slice(1)
+                          : "0.00"
+                      }
+                      className="tabular-nums"
+                    />
                   </div>
-                )}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    {mode === "adjustment" ? "New balance" : "Amount"}
-                  </Label>
-                  <Input
-                    type="number"
-                    step={0.01}
-                    min={mode === "adjustment" ? undefined : 0}
-                    prefix=""
-                    value={balanceAmountInputValue(row.amount, mode)}
-                    onChange={(e) =>
-                      setRows(
-                        effectiveRows.map((r, j) =>
-                          j === i
-                            ? { ...r, amount: roundMoney(parseFloat(e.target.value) || 0) }
-                            : r
+                </div>
+                <div className="grid grid-cols-[1fr_auto] items-end gap-2 sm:contents">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs text-muted-foreground">Note</Label>
+                    <Input
+                      value={row.note}
+                      onChange={(e) =>
+                        setRows(
+                          effectiveRows.map((r, j) => (j === i ? { ...r, note: e.target.value } : r))
                         )
-                      )
-                    }
-                    placeholder={
-                      mode === "adjustment" && account
-                        ? formatGbp(account.balance).slice(1)
-                        : "0.00"
-                    }
-                    className="tabular-nums"
-                  />
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                    disabled={effectiveRows.length <= 1}
+                    onClick={() => setRows(effectiveRows.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs text-muted-foreground">Note</Label>
-                  <Input
-                    value={row.note}
-                    onChange={(e) =>
-                      setRows(
-                        effectiveRows.map((r, j) => (j === i ? { ...r, note: e.target.value } : r))
-                      )
-                    }
-                    placeholder="Optional"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground"
-                  disabled={effectiveRows.length <= 1}
-                  onClick={() => setRows(effectiveRows.filter((_, j) => j !== i))}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
               </div>
             );
           })}
@@ -632,7 +642,7 @@ function AddBalanceForm({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t px-6 py-4">
+        <div className="flex shrink-0 flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span className="text-sm text-muted-foreground">
             {mode === "top_up" && totalFreeBets > 0 ? (
               <>
@@ -642,7 +652,7 @@ function AddBalanceForm({
                     "font-semibold tabular-nums",
                     isNegativeGbp(totalCash)
                       ? "text-negative"
-                      : "text-emerald-600 dark:text-emerald-400"
+                      : "text-profit"
                   )}
                 >
                   {formatGbp(totalCash, { signed: true })}
@@ -668,7 +678,7 @@ function AddBalanceForm({
                     "font-semibold tabular-nums",
                     isNegativeGbp(totalDelta)
                       ? "text-negative"
-                      : "text-emerald-600 dark:text-emerald-400"
+                      : "text-profit"
                   )}
                 >
                   {formatGbp(totalDelta, { signed: true })}
@@ -676,9 +686,13 @@ function AddBalanceForm({
               </>
             )}
           </span>
-          <Button onClick={save} disabled={saving || accounts.length === 0}>
+          <DialogSaveButton
+            onClick={save}
+            disabled={saving || accounts.length === 0}
+            className="max-sm:w-full"
+          >
             Save balances
-          </Button>
+          </DialogSaveButton>
         </div>
     </DialogContent>
   );
