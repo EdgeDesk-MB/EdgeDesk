@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import type { LucideIcon } from "lucide-react";
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { OddsmonkeyMark } from "@/components/import/oddsmonkey-mark";
 import { PlatformImportDialog } from "@/components/import/platform-import-dialog";
 import { outlineButtonGroup } from "@/components/layout/page-header-actions";
 import { useAddBet } from "@/components/add-bet-provider";
@@ -48,7 +49,7 @@ const welcomeRowClass = cn(
   listRow,
   cardInsetX,
   "flex w-full min-w-0 items-start gap-3 py-3.5 text-left outline-none",
-  "active:bg-selection-subdued",
+  "hover:bg-selection-subtle active:bg-selection-subdued",
   "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-inset"
 );
 
@@ -87,24 +88,39 @@ const GET_TO_KNOW = [
 
 function WelcomeTile({
   icon: Icon,
+  mark,
   title,
   body,
   href,
   onClick,
+  disabled,
 }: {
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  mark?: ReactNode;
   title: string;
   body: string;
   href?: string;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
+  const leading = mark ?? (
+    Icon ? <Icon className="size-6 text-primary-text" strokeWidth={1.5} aria-hidden /> : null
+  );
   const inner = (
     <>
-      <Icon className="size-4 text-primary-text" aria-hidden />
+      {leading}
       <span className="mt-2 block text-sm font-semibold">{title}</span>
       <span className={cn(sectionDescription, "mt-1 block")}>{body}</span>
     </>
   );
+
+  if (disabled) {
+    return (
+      <div aria-disabled className={cn(hubTileClass, "cursor-not-allowed opacity-60")}>
+        {inner}
+      </div>
+    );
+  }
 
   if (href) {
     return (
@@ -170,18 +186,6 @@ export function EmptyDeskWelcome() {
           <h3 className={sectionTitle}>Get started</h3>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <WelcomeTile
-              icon={FileUp}
-              title="Import from Oddsmonkey"
-              body="Profits CSV from their tracker. History only. Not affiliated with Oddsmonkey."
-              onClick={() => setImportOpen(true)}
-            />
-            <WelcomeTile
-              icon={FileSpreadsheet}
-              title="Import a spreadsheet"
-              body="Generic CSV from Settings → Data & backup."
-              href="/settings?tab=data"
-            />
-            <WelcomeTile
               icon={Plus}
               title="Log your first bet"
               body="A ticket you already placed."
@@ -193,12 +197,46 @@ export function EmptyDeskWelcome() {
               body="One you already have from a finder or a bookie."
               onClick={() => openOffer()}
             />
+            <WelcomeTile
+              mark={<OddsmonkeyMark className="size-6" />}
+              title="Import from Oddsmonkey"
+              body="Profits CSV from their tracker. History only. Not affiliated with Oddsmonkey."
+              onClick={() => setImportOpen(true)}
+            />
+            <WelcomeTile
+              icon={FileUp}
+              title="Import from Outplayed"
+              body="Coming soon. Profit Tracker CSV import lands once we have a sample file."
+              disabled
+            />
+            <WelcomeTile
+              icon={FileSpreadsheet}
+              title="Import a spreadsheet"
+              body="Generic CSV from Settings → Data & backup."
+              href="/settings?tab=data"
+            />
           </div>
         </section>
 
         <section className="mt-6 min-w-0">
           <h3 className={sectionTitle}>Quick links</h3>
           <div className={cn(outlineButtonGroup, "mt-4")}>
+            <Button asChild variant="outline" size="lg" className={welcomeButtonClass}>
+              <Link href="/calculators">
+                <Calculator className="size-4" />
+                Calculators
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className={welcomeButtonClass}
+              onClick={() => openAddBet()}
+            >
+              <Plus className="size-4" />
+              Add bet
+            </Button>
             <Button asChild variant="outline" size="lg" className={welcomeButtonClass}>
               <Link href="/offers">
                 <Gift className="size-4" />
@@ -209,12 +247,6 @@ export function EmptyDeskWelcome() {
               <Link href="/accounts">
                 <Wallet className="size-4" />
                 Accounts
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className={welcomeButtonClass}>
-              <Link href="/calculators">
-                <Calculator className="size-4" />
-                Calculators
               </Link>
             </Button>
           </div>

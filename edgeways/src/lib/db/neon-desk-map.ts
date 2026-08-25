@@ -91,8 +91,8 @@ export function toSqliteBetRow(row: PgBetRow): BetRow {
     source: row.source,
     purpose: row.purpose,
     sport: row.sport,
-    importFingerprint: null,
-    importMeta: null,
+    importFingerprint: row.importFingerprint ?? null,
+    importMeta: row.importMeta ?? null,
   };
 }
 

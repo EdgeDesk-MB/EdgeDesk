@@ -236,6 +236,9 @@ export function DataCustodyCard({
         >
           <OddsmonkeyMark className="size-4" /> Import from Oddsmonkey…
         </Button>
+        <Button variant="outline" className="justify-start gap-2" disabled>
+          <FileUp className="size-4" /> Import from Outplayed (coming soon)
+        </Button>
         <Button
           variant="outline"
           className="justify-start gap-2"

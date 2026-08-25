@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, bets } from "@/lib/db";
 import { roundPence } from "@/lib/calc/money";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { insertNeonDeskBet } from "@/lib/db/neon-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,34 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   // History import: balance flags pre-set so settlement/ledger logic never
   // touches live balances; no offerId → no EV snapshots → the Edge Report's
   // capture data stays honest.
+  if (isNeonDesk()) {
+    let inserted = 0;
+    for (const d of parsed.data.drafts) {
+      await insertNeonDeskBet({
+        label: d.label,
+        market: "win",
+        selection: "",
+        betType: d.betType,
+        bookmaker: d.bookmaker ?? undefined,
+        backStake: roundPence(d.backStake),
+        backOdds: d.backOdds,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        earlyPayout: 0,
+        status: d.status,
+        actualProfit: roundPence(d.actualProfit),
+        balanceLedgered: 1,
+        balanceSettled: 1,
+        createdAt: d.createdAt,
+        settledAt: d.settledAt,
+        source: "import",
+      });
+      inserted++;
+    }
+    return NextResponse.json({ inserted });
+  }
+
   const rows = parsed.data.drafts.map((d) => ({
     label: d.label,
     market: "win",

@@ -142,6 +142,9 @@ export const bets = pgTable("bets", {
    * Neon rows share one table; this column is the lock.
    */
   clerkUserId: text("clerk_user_id"),
+  /** EDGE-68: idempotent platform import (Oddsmonkey profits CSV). */
+  importFingerprint: text("import_fingerprint"),
+  importMeta: text("import_meta"),
 });
 
 /** Mug-bet cadence plan per bookie account (J5) - camouflage budgeting. */

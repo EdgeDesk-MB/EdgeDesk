@@ -39,6 +39,15 @@ export type NeonDeskBetValues = {
   quickLogged?: number | null;
   purpose?: string | null;
   sport?: string | null;
+  /** Import rows land pre-settled (EDGE-68): status + profit + flags set. */
+  status?: "open" | "won" | "lost" | "void" | "early_payout" | "half_win" | "half_lose" | "push";
+  actualProfit?: number;
+  settledAt?: number | null;
+  source?: string | null;
+  balanceLedgered?: number;
+  balanceSettled?: number;
+  importFingerprint?: string | null;
+  importMeta?: string | null;
 };
 
 export function neonDeskClerkUserId(): string | null {
@@ -86,4 +95,19 @@ export async function deleteNeonDeskBets(): Promise<number | null> {
     .where(eq(pgBets.clerkUserId, clerkUserId))
     .returning({ id: pgBets.id });
   return rows.length;
+}
+
+/** EDGE-68: fingerprints already on the hosted desk, for idempotent import. */
+export async function listNeonDeskImportFingerprints(): Promise<Set<string>> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return new Set();
+  const rows = await getNeonDb()
+    .select({ fingerprint: pgBets.importFingerprint })
+    .from(pgBets)
+    .where(eq(pgBets.clerkUserId, clerkUserId));
+  return new Set(
+    rows
+      .map((row) => row.fingerprint)
+      .filter((value): value is string => Boolean(value))
+  );
 }
