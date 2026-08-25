@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Check, X } from "lucide-react";
 import {
   annualLabel,
@@ -18,6 +17,7 @@ import {
   type PublicPlan,
 } from "@/lib/billing/public-offer";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { PricingCta } from "@/components/marketing/pricing-cta";
 import { cn } from "@/lib/utils";
 
 function CellMark({
@@ -211,7 +211,7 @@ function PlanCard({
       <p className="mt-3 flex-1 text-sm leading-relaxed text-white/60">
         {plan.blurb}
       </p>
-      <Link
+      <PricingCta
         href={planCheckoutHref(plan, interval)}
         className={cn(
           "mt-5 inline-flex justify-center rounded-[var(--radius-button)] px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
@@ -224,7 +224,7 @@ function PlanCard({
         )}
       >
         {plan.cta}
-      </Link>
+      </PricingCta>
     </article>
   );
 }

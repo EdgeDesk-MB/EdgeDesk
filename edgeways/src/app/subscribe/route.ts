@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import {
+  billingStatusIsLive,
   buildSubscriptionCheckoutParams,
   checkoutPriceId,
   parseCheckoutFrom,
   parsePaidCheckout,
+  stripeSubscriptionIsLive,
+  subscribeCancelHref,
   subscribeSuccessHref,
 } from "@/lib/billing/checkout-session";
 import {
@@ -12,9 +15,14 @@ import {
   parseFoundingCheckout,
 } from "@/lib/billing/founding-schedule";
 import { requestOrigin } from "@/lib/billing/request-origin";
-import { getStripe } from "@/lib/billing/stripe-server";
+import {
+  getStripe,
+  stripePortalConfigurationId,
+} from "@/lib/billing/stripe-server";
+import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
 import { publicCatalogueReady } from "@/lib/billing/stripe-prices";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { findAppUserByClerkId } from "@/lib/services/app-users";
 import { isWaitlistFoundingEligible } from "@/lib/services/waitlist";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +98,37 @@ export async function GET(request: Request) {
     }
     const customerId = customer?.id;
 
+    // EDGE-82: never stack a second live subscription. If the app_users row
+    // (or Stripe itself, covering webhook lag right after a checkout) shows a
+    // live subscription, send them to the portal to switch plans instead.
+    const appUser = await findAppUserByClerkId(userId);
+    const portalCustomerId = appUser?.stripeCustomerId ?? customerId ?? null;
+    let hasLiveSub = billingStatusIsLive(appUser?.billingStatus);
+    if (!hasLiveSub && customerId) {
+      const subs = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 10,
+      });
+      hasLiveSub = subs.data.some((sub) => stripeSubscriptionIsLive(sub.status));
+    }
+    if (hasLiveSub && portalCustomerId) {
+      const configuration = stripePortalConfigurationId();
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: portalCustomerId,
+        return_url: `${origin}${SETTINGS_SUBSCRIPTION_HREF}`,
+        ...(configuration ? { configuration } : {}),
+      });
+      const redirect = NextResponse.redirect(portal.url);
+      redirect.cookies.set(PUBLIC_DEMO_COOKIE, "", { path: "/", maxAge: 0 });
+      return redirect;
+    }
+    if (hasLiveSub) {
+      console.warn(
+        "[subscribe] live subscription but no Stripe customer id; allowing checkout"
+      );
+    }
+
     const session = await stripe.checkout.sessions.create(
       buildSubscriptionCheckoutParams({
         priceId,
@@ -100,7 +139,7 @@ export async function GET(request: Request) {
         customerEmail: customerId ? null : email,
         founding,
         successUrl: `${origin}${subscribeSuccessHref(paid.plan, paid.interval, undefined, from)}`,
-        cancelUrl: `${origin}/#pricing`,
+        cancelUrl: `${origin}${subscribeCancelHref(from)}`,
       })
     );
 

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  billingStatusIsLive,
   buildSubscriptionCheckoutParams,
   parseCheckoutFrom,
   parsePaidCheckout,
   signUpRedirectForPlan,
+  stripeSubscriptionIsLive,
+  subscribeCancelHref,
   subscribeSuccessHref,
 } from "@/lib/billing/checkout-session";
 
@@ -93,5 +96,21 @@ describe("checkout session", () => {
     );
     expect(parseCheckoutFrom("setup")).toBe("setup");
     expect(parseCheckoutFrom("desk")).toBeNull();
+    expect(subscribeCancelHref()).toBe("/#pricing");
+    expect(subscribeCancelHref("setup")).toBe("/setup");
+  });
+
+  it("EDGE-82: treats active/trialing/past_due as live subscriptions", () => {
+    for (const status of ["active", "trialing", "past_due"]) {
+      expect(billingStatusIsLive(status)).toBe(true);
+      expect(stripeSubscriptionIsLive(status)).toBe(true);
+    }
+  });
+
+  it("EDGE-82: canceled, lapsed and incomplete subs may re-checkout", () => {
+    for (const status of ["canceled", "none", "incomplete", "incomplete_expired", "unpaid", null, undefined]) {
+      expect(billingStatusIsLive(status)).toBe(false);
+      expect(stripeSubscriptionIsLive(status)).toBe(false);
+    }
   });
 });

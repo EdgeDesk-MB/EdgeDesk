@@ -1,5 +1,9 @@
 import type Stripe from "stripe";
 import {
+  billingStatusIsLive,
+  stripeSubscriptionIsLive,
+} from "@/lib/billing/checkout-session";
+import {
   catalogueFromEnv,
   clerkUserIdFromStripe,
   entitlementFromSubscription,
@@ -76,10 +80,47 @@ export async function applyStripeSubscription(
     );
     return;
   }
-  const entitlement = entitlementFromSubscription(source, catalogueFromEnv());
+
+  // EDGE-82: a canceled/old sub's lifecycle events must not wipe the
+  // entitlement of a second live subscription on the same customer.
+  let effective = subscription;
+  if (!billingStatusIsLive(subscription.status) && source.customerId) {
+    try {
+      const subs = await getStripe().subscriptions.list({
+        customer: source.customerId,
+        status: "all",
+        limit: 10,
+      });
+      effective = preferredLiveSubscription(subscription, subs.data);
+    } catch (error) {
+      console.error("[billing/webhook] live-subscription fallback", error);
+    }
+  }
+
+  const catalogue = catalogueFromEnv();
+  const entitlement = entitlementFromSubscription(
+    effective === subscription ? source : sourceFromStripeSubscription(effective),
+    catalogue
+  );
   await applyAppUserEntitlement({
     clerkUserId,
     email: extras?.email,
     entitlement,
   });
+}
+
+/**
+ * EDGE-82: the subscription that should drive entitlement. A live incoming
+ * sub always wins; otherwise prefer the newest other live sub on the customer
+ * so an old sub's cancel event can't drop a paying user to Free.
+ */
+export function preferredLiveSubscription(
+  incoming: Stripe.Subscription,
+  others: Stripe.Subscription[]
+): Stripe.Subscription {
+  if (billingStatusIsLive(incoming.status)) return incoming;
+  const live = others
+    .filter((s) => s.id !== incoming.id && stripeSubscriptionIsLive(s.status))
+    .sort((a, b) => b.created - a.created);
+  return live[0] ?? incoming;
 }

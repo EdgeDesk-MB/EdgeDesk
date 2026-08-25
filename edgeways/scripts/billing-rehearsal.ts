@@ -12,6 +12,8 @@
  *   resume -> cancel_at cleared
  *   cancel -> free/canceled
  *   refund last charge -> entitlement unchanged (charge.refunded ignored)
+ *   EDGE-82: stack a second sub, cancel the newer one -> entitlement falls
+ *   back to the still-live sub instead of dropping to Free
  *
  * Requires `stripe listen --forward-to localhost:3000/api/billing/webhook`
  * running so events reach the local webhook handler, and DATABASE_URL set.
@@ -238,6 +240,39 @@ async function main() {
     } else {
       console.log("SKIP refund: no charge found");
     }
+
+    // -- 7. EDGE-82: stacked subs — an old sub's death must not wipe the ----
+    // entitlement of a still-live second subscription on the same customer.
+    const subA = await stripe<{ id: string }>([
+      "subscriptions", "create",
+      "--customer", customerId,
+      "-d", `items[0][price]=${CORE_MONTH}`,
+      "-d", `metadata[clerkUserId]=${CLERK_ID}`,
+    ]);
+    await waitFor("stacked: second Core sub lands", {
+      plan: "core",
+      status: "active",
+    });
+    const subB = await stripe<{ id: string }>([
+      "subscriptions", "create",
+      "--customer", customerId,
+      "-d", `items[0][price]=${EDGE_MONTH}`,
+      "-d", `metadata[clerkUserId]=${CLERK_ID}`,
+    ]);
+    await waitFor("stacked: newer Edge sub lands", {
+      plan: "edge",
+      status: "active",
+    });
+    await stripe(["subscriptions", "cancel", subB.id, "--confirm"]);
+    await waitFor("stacked: Edge cancel falls back to live Core", {
+      plan: "core",
+      status: "active",
+    });
+    await stripe(["subscriptions", "cancel", subA.id, "--confirm"]);
+    await waitFor("stacked: last cancel lands Free", {
+      plan: "free",
+      status: "canceled",
+    });
   } finally {
     // -- Cleanup --------------------------------------------------------------
     if (subscriptionId) {

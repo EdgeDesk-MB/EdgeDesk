@@ -82,6 +82,29 @@ export function buildSubscriptionCheckoutParams(input: {
   return params;
 }
 
+export function subscribeCancelHref(from?: CheckoutFrom | null): string {
+  return from === "setup" ? "/setup" : "/#pricing";
+}
+
+/**
+ * EDGE-82: a live subscription means checkout must not run — a second
+ * subscription would stack and the old sub's cancel webhook would later wipe
+ * the new entitlement. Live = active / trialing / past_due (a scheduled
+ * cancel is still live until the period ends).
+ */
+export function billingStatusIsLive(
+  status: string | null | undefined
+): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
+/** Stripe-side mirror of billingStatusIsLive for the webhook-lag fallback. */
+export function stripeSubscriptionIsLive(
+  status: string | null | undefined
+): boolean {
+  return billingStatusIsLive(status);
+}
+
 export function subscribeSuccessHref(
   plan: PaidPlanId,
   interval: BillingInterval,
