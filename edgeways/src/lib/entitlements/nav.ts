@@ -21,7 +21,10 @@ export function planDisplayName(plan: PlanId): "Free" | "Core" | "Edge" {
   return "Edge";
 }
 
-export function planLockCopy(feature: FeatureFlag): {
+export function planLockCopy(
+  feature: FeatureFlag,
+  opts?: { real?: boolean }
+): {
   title: string;
   description: string;
 } {
@@ -30,6 +33,8 @@ export function planLockCopy(feature: FeatureFlag): {
   const also = plan === "core" ? " and Edge" : "";
   return {
     title: `${name} plan`,
-    description: `${FEATURE_LABELS[feature]} sits on ${name}${also}. Switch the viewing bar to open it.`,
+    description: opts?.real
+      ? `${FEATURE_LABELS[feature]} sits on ${name}${also}. Upgrade in Settings → Subscription to open it.`
+      : `${FEATURE_LABELS[feature]} sits on ${name}${also}. Switch the viewing bar to open it.`,
   };
 }

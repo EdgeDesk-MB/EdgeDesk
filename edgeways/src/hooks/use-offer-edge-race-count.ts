@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
-import type { PlanPreview } from "@/lib/entitlements/acca-desk";
+import type { DeskGateSettings } from "@/lib/entitlements/effective-plan";
 import { useNow } from "@/hooks/use-now";
 
 /**
@@ -12,7 +12,7 @@ import { useNow } from "@/hooks/use-now";
  * Re-checks on a minute clock and when the racing-offer set changes.
  */
 export function useOfferEdgeRaceCount(
-  settings?: { planPreview?: PlanPreview | null } | null,
+  settings?: DeskGateSettings,
   /** Stable key of active/planned racing offer ids — forces a fresh read when it changes. */
   racingOfferKey = ""
 ): number {

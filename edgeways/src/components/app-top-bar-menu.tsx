@@ -20,7 +20,7 @@ import {
   isLinkActive,
   toastPlanLock,
 } from "@/components/app-nav";
-import { canWithPreview } from "@/lib/entitlements/plans";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { ThemeSelect } from "@/components/theme-select";
 import { MobileDrawerSessionButton } from "@/components/top-bar-login-button";
 import { useAppState } from "@/hooks/use-app-state";
@@ -136,7 +136,7 @@ function MobileNavDrawer() {
                 {flattenNavEntries(section.entries).map((item) => {
                   const active = isLinkActive(pathname, item.href);
                   const locked = Boolean(
-                    item.feature && !canWithPreview(state?.settings, item.feature)
+                    item.feature && !canDesk(state?.settings, item.feature)
                   );
                   return (
                     <Link

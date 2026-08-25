@@ -49,7 +49,8 @@ import {
   Zap,
   Wallet,
 } from "lucide-react";
-import { canWithPreview, requiredPlan } from "@/lib/entitlements/plans";
+import { requiredPlan } from "@/lib/entitlements/plans";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import type { FeatureFlag } from "@/lib/entitlements/features";
 import { planLockCopy } from "@/lib/entitlements/nav";
 import { FootballIcon } from "@/components/sport-icon";
@@ -330,8 +331,8 @@ export function PlanNavMark({
   );
 }
 
-export function toastPlanLock(feature: FeatureFlag) {
-  const copy = planLockCopy(feature);
+export function toastPlanLock(feature: FeatureFlag, opts?: { real?: boolean }) {
+  const copy = planLockCopy(feature, opts);
   toast.message(copy.title, { description: copy.description });
 }
 
@@ -606,7 +607,7 @@ export function AppNav() {
               ? racingPendingSettleCount
               : 0;
     const locked = Boolean(
-      item.feature && !canWithPreview(state?.settings, item.feature)
+      item.feature && !canDesk(state?.settings, item.feature)
     );
 
     return (
@@ -619,7 +620,9 @@ export function AppNav() {
             locked && item.feature
               ? (e) => {
                   e.preventDefault();
-                  toastPlanLock(item.feature!);
+                  toastPlanLock(item.feature!, {
+                    real: state?.settings?.billing != null,
+                  });
                 }
               : undefined
           }
@@ -628,7 +631,7 @@ export function AppNav() {
           <Icon
             className={cn(
               "size-4 shrink-0",
-              iconLive && !active && "animate-pulse text-emerald-600",
+              iconLive && !active && "animate-pulse text-profit",
               iconLive && active && "animate-pulse"
             )}
           />
@@ -686,13 +689,15 @@ export function AppNav() {
           ? openCasinoLog
           : undefined;
     const locked = Boolean(
-      entry.feature && !canWithPreview(state?.settings, entry.feature)
+      entry.feature && !canDesk(state?.settings, entry.feature)
     );
 
     function onParentClick(e: MouseEvent<HTMLAnchorElement>) {
       if (locked && entry.feature) {
         e.preventDefault();
-        toastPlanLock(entry.feature);
+        toastPlanLock(entry.feature, {
+          real: state?.settings?.billing != null,
+        });
         return;
       }
       if (expanded) {
@@ -750,7 +755,7 @@ export function AppNav() {
               const ChildIcon = child.icon;
               const childFeature = child.feature ?? entry.feature;
               const childLocked = Boolean(
-                childFeature && !canWithPreview(state?.settings, childFeature)
+                childFeature && !canDesk(state?.settings, childFeature)
               );
               const childBadge =
                 child.href === "/acca"
@@ -768,7 +773,9 @@ export function AppNav() {
                     childLocked && childFeature
                       ? (e) => {
                           e.preventDefault();
-                          toastPlanLock(childFeature);
+                          toastPlanLock(childFeature, {
+                            real: state?.settings?.billing != null,
+                          });
                         }
                       : undefined
                   }

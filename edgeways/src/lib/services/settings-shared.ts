@@ -6,6 +6,7 @@
 import { DEFAULT_TIME_FORMAT, type TimeFormatPreference } from "@/lib/time-format";
 import { DEFAULT_HOME_LAYOUT, type HomeLayoutSettings } from "@/lib/ui/home-layout";
 import type { PlanPreview } from "@/lib/entitlements/acca-desk";
+import type { EntitlementBilling } from "@/lib/entitlements/effective-plan";
 import { isKnownSport, type SportValue } from "@/lib/sports";
 
 export { normalizeHomeLayout, type HomeLayoutSettings } from "@/lib/ui/home-layout";
@@ -73,12 +74,19 @@ export interface AppSettings {
   /** Top bar Hero Pattern id (`diagonal-lines`, …). */
   headerPattern: string;
   /**
-   * Preview entitlement tier until N0 billing. Default unlocked = full desk access.
-   * `free` blocks Acca Desk offer routing (falls back to Add bet).
+   * Preview entitlement tier. Default unlocked = full desk access.
+   * Settings → Subscription → Preview Edge writes `edge` (on) or the billed
+   * plan (off). `free` blocks Acca Desk offer routing (falls back to Add bet).
    */
   planPreview: PlanPreview;
   /** ms epoch when the user confirmed they are 18+ (EDGE-13); null = not yet. */
   ageConfirmedAt: number | null;
+  /**
+   * EDGE-22: server-resolved billing row, injected per API response — never
+   * stored (parseStoredSettings whitelists keys, so it cannot round-trip).
+   * Present for signed-in sessions; absent/null in the public demo.
+   */
+  billing?: EntitlementBilling | null;
 }
 
 /**

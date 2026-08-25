@@ -24,7 +24,7 @@ import {
 import { DEFAULT_HOME_LAYOUT, applyDeckLayout } from "@/lib/ui/home-layout";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
-import { canWithPreview } from "@/lib/entitlements/plans";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 
 export default function DashboardPage() {
   const { state } = useAppState();
@@ -71,7 +71,7 @@ export default function DashboardPage() {
     Math.abs(liveTotal) > 0.01 ||
     state.series.length > 0;
 
-  const canDoNext = canWithPreview(state.settings, "do_next");
+  const canDoNext = canDesk(state.settings, "do_next");
   const planSignals = canDoNext
     ? state.planRaces.length + state.planFixtures.length + nextActions.length
     : 0;

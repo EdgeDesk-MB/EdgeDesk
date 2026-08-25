@@ -3,10 +3,8 @@
  * id in the N0 matrix so it can diverge later without a refactor.
  */
 
-import { canWithPreview, type PlanPreview } from "./plans";
+import { canDesk, type DeskGateSettings } from "./effective-plan";
 
-export function canUseSystemsDesk(
-  settings?: { planPreview?: PlanPreview | null } | null
-): boolean {
-  return canWithPreview(settings, "systems_desk");
+export function canUseSystemsDesk(settings?: DeskGateSettings): boolean {
+  return canDesk(settings, "systems_desk");
 }

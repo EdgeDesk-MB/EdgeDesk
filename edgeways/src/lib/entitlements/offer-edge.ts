@@ -3,10 +3,8 @@
  * Free and Core stay locked out. Delegates to the central matrix in plans.ts.
  */
 
-import { canWithPreview, type PlanPreview } from "./plans";
+import { canDesk, type DeskGateSettings } from "./effective-plan";
 
-export function canUseOfferEdge(
-  settings?: { planPreview?: PlanPreview | null } | null
-): boolean {
-  return canWithPreview(settings, "offer_edge");
+export function canUseOfferEdge(settings?: DeskGateSettings): boolean {
+  return canDesk(settings, "offer_edge");
 }

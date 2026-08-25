@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canDesk,
   canWithPlan,
   effectivePlan,
 } from "@/lib/entitlements/effective-plan";
@@ -55,5 +56,54 @@ describe("canWithPlan", () => {
     const canceled = { plan: "edge", billingStatus: "canceled" } as const;
     expect(canWithPlan({ ...canceled, feature: "offer_edge" })).toBe(false);
     expect(canWithPlan({ ...canceled, feature: "calculators" })).toBe(true);
+  });
+});
+
+describe("canDesk", () => {
+  it("falls back to preview behaviour without a billing row (demo)", () => {
+    expect(canDesk(null, "offer_edge")).toBe(true);
+    expect(canDesk({ planPreview: "unlocked" }, "offer_edge")).toBe(true);
+    expect(canDesk({ planPreview: "free" }, "acca_desk")).toBe(false);
+    expect(canDesk({ billing: null, planPreview: "unlocked" }, "offer_edge")).toBe(
+      true
+    );
+  });
+
+  it("gates by the real plan once billing is present", () => {
+    const free = {
+      billing: { plan: "free", billingStatus: "none" },
+      planPreview: "unlocked",
+    } as const;
+    expect(canDesk(free, "calculators")).toBe(true);
+    expect(canDesk(free, "acca_desk")).toBe(false);
+    expect(canDesk(free, "offer_edge")).toBe(false);
+
+    const core = {
+      billing: { plan: "core", billingStatus: "active" },
+      planPreview: "unlocked",
+    } as const;
+    expect(canDesk(core, "acca_desk")).toBe(true);
+    expect(canDesk(core, "offer_edge")).toBe(false);
+
+    const edge = {
+      billing: { plan: "edge", billingStatus: "trialing" },
+      planPreview: "unlocked",
+    } as const;
+    expect(canDesk(edge, "offer_edge")).toBe(true);
+  });
+
+  it("lets a paying user preview down but never up", () => {
+    const edgeDown = {
+      billing: { plan: "edge", billingStatus: "active" },
+      planPreview: "core",
+    } as const;
+    expect(canDesk(edgeDown, "offer_edge")).toBe(false);
+    expect(canDesk(edgeDown, "acca_desk")).toBe(true);
+
+    const freeUp = {
+      billing: { plan: "free", billingStatus: "none" },
+      planPreview: "edge",
+    } as const;
+    expect(canDesk(freeUp, "offer_edge")).toBe(false);
   });
 });

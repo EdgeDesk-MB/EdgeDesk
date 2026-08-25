@@ -3,12 +3,11 @@
  * Add bet. Delegates to the central matrix in plans.ts (EDGE-17).
  */
 
-import { canWithPreview, type PlanPreview } from "./plans";
+import { canDesk, type DeskGateSettings } from "./effective-plan";
+import type { PlanPreview } from "./plans";
 
 export type { PlanPreview };
 
-export function canUseAccaDesk(
-  settings?: { planPreview?: PlanPreview | null } | null
-): boolean {
-  return canWithPreview(settings, "acca_desk");
+export function canUseAccaDesk(settings?: DeskGateSettings): boolean {
+  return canDesk(settings, "acca_desk");
 }

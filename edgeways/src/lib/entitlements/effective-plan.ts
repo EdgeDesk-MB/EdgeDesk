@@ -5,7 +5,12 @@
  * Settings `planPreview` is a preview, never the gate (subscriptions.md §9).
  */
 import type { BillingStatus } from "@/lib/billing/entitlement-from-stripe";
-import { can, type PlanId, type PlanPreview } from "@/lib/entitlements/plans";
+import {
+  can,
+  canWithPreview,
+  type PlanId,
+  type PlanPreview,
+} from "@/lib/entitlements/plans";
 import type { FeatureFlag } from "@/lib/entitlements/features";
 
 const PLAN_HONOURED: ReadonlySet<BillingStatus> = new Set([
@@ -48,4 +53,36 @@ function rank(plan: PlanId): number {
   if (plan === "edge") return 2;
   if (plan === "core") return 1;
   return 0;
+}
+
+/** Server-resolved billing row injected into the settings payload. */
+export type EntitlementBilling = {
+  plan: PlanId;
+  billingStatus: BillingStatus;
+};
+
+/** Structural shape the desk gate needs from settings state. */
+export type DeskGateSettings = {
+  planPreview?: PlanPreview | null;
+  billing?: EntitlementBilling | null;
+} | null | undefined;
+
+/**
+ * The desk gate. When the server injected a billing row (any signed-in
+ * session) the real plan decides; preview may only step down. Without a
+ * billing row (public demo, signed out) keep the legacy preview behaviour so
+ * the demo desk still shows everything.
+ */
+export function canDesk(
+  settings: DeskGateSettings,
+  feature: FeatureFlag
+): boolean {
+  const billing = settings?.billing;
+  if (!billing) return canWithPreview(settings, feature);
+  return canWithPlan({
+    plan: billing.plan,
+    billingStatus: billing.billingStatus,
+    planPreview: settings?.planPreview,
+    feature,
+  });
 }

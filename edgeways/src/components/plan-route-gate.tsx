@@ -5,21 +5,22 @@ import { Lock } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
 import { useAppState } from "@/hooks/use-app-state";
 import { featureForDeskPath, planLockCopy } from "@/lib/entitlements/nav";
-import { canWithPreview } from "@/lib/entitlements/plans";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { PageShell } from "@/components/page-shell";
 
 /**
- * Locks specified N0 surfaces when Settings / demo planPreview is Free or Core.
- * Unlocked (Sam's daily default) is a no-op.
+ * Locks gated surfaces by the signed-in user's real plan (EDGE-22). The
+ * Settings viewing bar may only step down from the paid plan. Public demo /
+ * signed-out sessions keep the legacy preview behaviour.
  */
 export function PlanRouteGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { state } = useAppState();
   const feature = featureForDeskPath(pathname);
-  if (!feature || canWithPreview(state?.settings, feature)) {
+  if (!feature || canDesk(state?.settings, feature)) {
     return children;
   }
-  const copy = planLockCopy(feature);
+  const copy = planLockCopy(feature, { real: state?.settings?.billing != null });
   return (
     <PageShell>
       <EmptyState

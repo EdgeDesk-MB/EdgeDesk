@@ -17,7 +17,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { flatNavLinks, toastPlanLock } from "@/components/app-nav";
-import { canWithPreview } from "@/lib/entitlements/plans";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
@@ -79,8 +79,10 @@ export function CommandPalette() {
           <CommandItem
             onSelect={() =>
               run(() => {
-                if (!canWithPreview(state?.settings, "offers_pipeline")) {
-                  toastPlanLock("offers_pipeline");
+                if (!canDesk(state?.settings, "offers_pipeline")) {
+                  toastPlanLock("offers_pipeline", {
+                    real: state?.settings?.billing != null,
+                  });
                   return;
                 }
                 openOffer();
@@ -109,8 +111,10 @@ export function CommandPalette() {
               value={`page ${link.label}`}
               onSelect={() =>
                 run(() => {
-                  if (link.feature && !canWithPreview(state?.settings, link.feature)) {
-                    toastPlanLock(link.feature);
+                  if (link.feature && !canDesk(state?.settings, link.feature)) {
+                    toastPlanLock(link.feature, {
+                      real: state?.settings?.billing != null,
+                    });
                     return;
                   }
                   router.push(link.href);
@@ -129,8 +133,10 @@ export function CommandPalette() {
                 value={`offer ${offer.title} ${offer.bookmaker ?? ""}`}
                 onSelect={() =>
                   run(() => {
-                    if (!canWithPreview(state?.settings, "offers_pipeline")) {
-                      toastPlanLock("offers_pipeline");
+                    if (!canDesk(state?.settings, "offers_pipeline")) {
+                      toastPlanLock("offers_pipeline", {
+                        real: state?.settings?.billing != null,
+                      });
                       return;
                     }
                     viewOffer(offer);

@@ -96,7 +96,7 @@ export interface TrackBetAction {
 
 export type TrackBetSettings = Pick<
   AppSettings,
-  "offerBetPrefs" | "defaultBackStake" | "planPreview"
+  "offerBetPrefs" | "defaultBackStake" | "planPreview" | "billing"
 >;
 
 function rewardEventNote(important: OfferImportantTerms): string | null {

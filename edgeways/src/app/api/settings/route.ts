@@ -17,13 +17,16 @@ import {
   patchNeonDeskSettings,
 } from "@/lib/db/neon-desk-settings";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { resolveEntitlementBilling } from "@/lib/entitlements/resolve-billing";
 
 export const GET = withDeskScope(async function GET() {
+  const billing = await resolveEntitlementBilling();
   if (isNeonDesk()) {
-    return NextResponse.json(await getNeonDeskSettings());
+    const settings = await getNeonDeskSettings();
+    return NextResponse.json({ ...settings, billing });
   }
   const { getAppSettings } = await import("@/lib/services/settings");
-  return NextResponse.json(getAppSettings());
+  return NextResponse.json({ ...getAppSettings(), billing });
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: Request) {
@@ -126,7 +129,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
 
   if (isNeonDesk()) {
     try {
-      return NextResponse.json(await patchNeonDeskSettings(safePatch));
+      const next = await patchNeonDeskSettings(safePatch);
+      const billing = await resolveEntitlementBilling();
+      return NextResponse.json({ ...next, billing });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not save settings.";
       if (message.includes("Sign in")) {
@@ -136,5 +141,7 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
     }
   }
   const { patchAppSettings } = await import("@/lib/services/settings");
-  return NextResponse.json(patchAppSettings(safePatch));
+  const next = patchAppSettings(safePatch);
+  const billing = await resolveEntitlementBilling();
+  return NextResponse.json({ ...next, billing });
 });
