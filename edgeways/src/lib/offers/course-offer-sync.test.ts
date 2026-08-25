@@ -15,6 +15,7 @@ import {
   spawnSameDayOfferSiblingsIfNeeded,
   syncOfferStatuses,
 } from "@/lib/services/offers";
+import { localYmd } from "@/lib/offers/offer-recurrence-shared";
 
 beforeEach(() => {
   db.delete(bets).run();
@@ -549,11 +550,13 @@ describe("reconcileSameDayOfferSiblings", () => {
   });
 
   it("keeps a second user-created same-spec offer independent through status sync", () => {
+    // Dynamic date: a hardcoded past eventDate expires under syncOfferStatuses.
+    const today = localYmd(new Date());
     const first = insertOffer({
       bookmaker: "Paddy Power",
       title: "Bet £10 get £10 free bet (2nd–4th)",
       scopeCourse: "uk_ire",
-      eventDate: "2026-08-15",
+      eventDate: today,
       rules: placeRules,
       createdAt: 1,
     });
@@ -562,7 +565,7 @@ describe("reconcileSameDayOfferSiblings", () => {
       bookmaker: "Paddy Power",
       title: "Bet £10 get £10 free bet (2nd–4th)",
       scopeCourse: "uk_ire",
-      eventDate: "2026-08-15",
+      eventDate: today,
       rules: placeRules,
       createdAt: 2,
     });
