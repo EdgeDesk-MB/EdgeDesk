@@ -9,17 +9,26 @@
 >
 > Infrastructure (hosting, database, environments, go-live hygiene):
 > `docs/hosting-and-environments.md`. Architecture decision brief:
-> `docs/decisions/d6-architecture-route.md` (EDGE-18).
+> `docs/decisions/d6-architecture-route.md` (EDGE-18). Feeds:
+> `docs/decisions/d7-operator-held-feeds.md` (customers bring money only).
 
-**Status snapshot (2026-08-16):** waitlist site live at https://edgeways.app
+**Status snapshot (2026-08-25):** waitlist site live at https://edgeways.app
 (`SITE_SURFACE=waitlist`). Desk routes redirect to `/` on production. Clerk
-auth, Neon `app_users`, and Stripe test Checkout + slip are in. Webhooks write
-the tier locally (EDGE-5). Settings manage is EDGE-58. Desk locks stay EDGE-22.
-ToS/Privacy drafts exist (EDGE-11/12) but are not public pages; signup has
-18+ only. Customer-facing legal surface is EDGE-61. Oddsmonkey first-run
-research (16 Aug) is in `docs/strategy/oddsmonkey-onboarding-research.md`
-(EDGE-62…68): we take their questions, not their offer-feed funnel.
-Dedicated Oddsmonkey/Outplayed profit import is EDGE-68.
+auth, Neon `app_users`, Stripe Checkout + slip + portal, and Settings →
+Subscription (EDGE-58) are in. Webhooks write the tier (EDGE-5); real
+entitlement enforcement replaced the preview (EDGE-22) with server-side feed
+guards (EDGE-83). `/terms` + `/privacy` published (EDGE-61). Billing rehearsal
+automated and green in test mode (EDGE-7); checkout blocks second
+subscriptions (EDGE-82). Neon desk cutover done (EDGE-47, restore drill
+verified). Operator-held pooled feeds serve customer-tracked events (EDGE-81,
+D7); admin panel live at `/admin` (EDGE-80). Keyboard chords + `?` sheet
+(EDGE-78) and keyboard settle (EDGE-79) shipped; mobile polish round landed
+(EDGE-84/85/86: deck swipe, quick-actions sheet, modal field audit, touch
+targets, compact top bar). **Ahead of the cycle plan by ~4–6 weeks** — the
+C3–C5 build tickets are already Done. Next: the EDGE-45 scope decision
+(launch Core-first vs wait for feed permissions), EDGE-37 checklist pass,
+EDGE-29 → EDGE-33 beta validation, EDGE-67 referral codes, then
+`SITE_SURFACE=app`.
 The D1 gate was opened for launch-path work on
 10 Aug 2026 — evidence tracked as Linear EDGE-36. Work is in Linear: initiative
 **[Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c)**
@@ -171,16 +180,18 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
       starts. Retake then (~£40/yr). Not a launch blocker for the waitlist.
 - [x] **Company form** — sole trader: Sam Hayter trading as Edgeways
       (EDGE-15, 17 Aug). Ltd later if revenue or liability justifies.
-- [ ] **Trademark** — D7 renamed EdgeDesk → Edgeways after a clash. Before launch:
-      UK IPO search + consider registering "Edgeways"; confirm edgeways.app and
-      social handles are secured (Sam handles, per D7). Page names, bios, which
-      networks to claim, and asset sizes: `docs/strategy/social-presence.md`.
+- [ ] **Trademark** — UK IPO search 19 Aug 2026 (EDGE-10, on hold). Hit:
+      UK00004101707 EDGEWAYS, registered, Class 9 betting/gambling software,
+      owner Rational Intellectual Holdings (Flutter). No filing, no rename.
+      Rely on use until a letter or paid-ads / app-store scale. Not legal
+      advice. Social handles: EDGE-70 / `docs/strategy/social-presence.md`.
 - [x] **API ToS re-reads** (§7.6) — done 10 Aug (EDGE-16 + EDGE-14):
-      `docs/legal/api-terms-review.md`. Personal own-key use is clear for all
-      three providers; pooled subscriber feeds need written permission
-      (EDGE-45, post-D6); Betfair exchange integration in hosted software
-      points at the Software Vendor Licence (£1,499 + certification), BYOK
-      recommended.
+      `docs/legal/api-terms-review.md`. Personal own-key use is clear for
+      Sam's desk. **Hosted product is operator-held keys (D7, 22 Aug 2026):**
+      subscribers never bring keys. Pooled feeds need written permission
+      (EDGE-45, now on the go-live path; D6 is done). Betfair live/delayed
+      prices for subscribers need a Flutter commercial path, not a customer
+      app-key field.
 
 *Not legal advice — the assessment file documents our own analysis; a
 solicitor reviews it if a trigger fires.*
@@ -190,24 +201,54 @@ solicitor reviews it if a trigger fires.*
 Product-side items that must be true before charging strangers, mapped to the
 roadmap items that deliver them:
 
+- [x] **Entitlement enforcement (EDGE-22/83)** — real server-side enforcement
+      replaced the "preview as" switch; every feed route guarded server-side
+      (fails closed). Verified 25 Aug.
+- [x] **Billing rehearsal (EDGE-7)** — automated end-to-end test-mode
+      rehearsal (`npm run billing:rehearsal`): catalogue audit, webhook drill,
+      unit tests, manual click-through checklist. Fully tested 25 Aug.
 - [x] **Data custody (E3)** — shipped: WAL-safe backup, staged restore with
       pre-restore safety copy, CSV import (Settings → Data & API). Verified
       against brief E3 during the 10 Aug reconciliation; EDGE-30 closed.
+      22 Aug: dropped the "one local file" claim from the card copy (false on
+      the hosted desk). EDGE-47 remainder **done 22 Aug**: the hosted desk
+      backs up to a user-scoped JSON bundle (offers, accounts, bets, ledger,
+      history — same snake_case shape as the SQLite dump, so a localhost
+      export restores onto the preview and vice versa) and restores it
+      insert-first / delete-old-last (`neon-http` has no interactive
+      transactions; a failed insert leaves the desk untouched, a failed
+      delete leaves duplicates a re-run clears). The Settings card adapts on
+      `hostedDesk`: `.db` download hidden, JSON-only restore, apply re-posts
+      the file body (no staged token on Vercel). Restore drill on the
+      preview: Settings → Data & API → Download backup (JSON), then Restore
+      from backup… with that file — preview shows per-table counts, apply
+      replaces the hosted desk.
 - [x] **Demo mode (G2)** — shipped: separate `edgeways-demo.db` behind a marker
       file, atomic seed, DEMO DATA watermark, Settings card. EDGE-31 closed.
-- [~] **Access & keyboard polish (G4)** — shipped scoped (switch names, reduced
-      motion, keyboard guide). Remaining: measured contrast audit in both
-      themes → EDGE-32 (M3).
+- [x] **Access & keyboard polish (G4)** — switch names, reduced motion,
+      keyboard guide, daily chords + `?` sheet (EDGE-78, 22 Aug), and
+      measured contrast (EDGE-32, 21 Aug): `--profit`, ink focus ring,
+      warning/destructive/success tokens, marketing destructive remap.
+      Custom Appearance accents were not measured. Settle-focused-bet
+      leftover is EDGE-79.
 - [x] **Legal surfaces (EDGE-61)** — `/terms` and `/privacy` live on the
       waitlist surface; waitlist + `/sign-up` collect consent; footer and
       Settings link the same pages. Solicitor sign-off of those pages before
       charging strangers (EDGE-8).
-- [ ] **Support channel** — EDGE-34 decided **email** (`support@` / `hello@`).
-      In-app feedback remains for product bugs. Gap: public `/contact` page
-      (EDGE-66). No live-chat widget before launch (cannot staff Oddsmonkey
-      hours).
-- [ ] **Status & comms** — release notes page exists; add an incident/comms norm
-      once the feed proxy (§7.2) makes you responsible for other people's data.
+- [x] **Support channel** — EDGE-34 decided **email** (`support@` / `hello@`).
+      Public `/contact` and `/refund` shipped (EDGE-66). In-app feedback
+      remains for product bugs. No live-chat widget before launch.
+- [x] **Settings → Data & API tab (EDGE-80)** — done: the split shipped. Feed
+      diagnostics and test buttons live on the **Integrations** tab, gated
+      server-side by `/api/admin/session` (fails closed: non-admins and fetch
+      errors both get `admin: false`, and the tab never renders). Backup/restore
+      is a separate customer-visible **Data & backup** tab. Verified in code
+      25 Aug (`settings/page.tsx`, `use-admin-session.ts`).
+- [~] **Status & comms** — release notes page exists (`/roadmap` in-app:
+      "What's shipped, what's in progress"). Incident/comms norm consciously
+      deferred 22 Aug: it only becomes owed once the feed proxy (§7.2,
+      post-EDGE-45) makes us responsible for other people's data. Revisit at
+      Edge tier build, not before launch.
 - [x] **Error tracking** — live 10 Aug (EDGE-35): PostHog EU (org `Edgeways`,
       project `Edgeways app`), `src/instrumentation-client.ts` with cookieless
       `always`, autocapture off, exception capture on, events proxied through
@@ -217,9 +258,11 @@ roadmap items that deliver them:
       new-issue triage via the MCP loop per §2.2.
 - [~] **Onboarding** — G2 setup wizard shipped (bank → bookies → defaults →
       alerts). Oddsmonkey research (16 Aug) adds profile questions + monthly
-      target slider (EDGE-62), empty-desk welcome (EDGE-63), landing honesty
-      (EDGE-64), Oddsmonkey/Outplayed profit import (EDGE-68). Validate with
-      a stranger → EDGE-33 (M2). Plan:
+      target slider (EDGE-62 ✓), empty-desk welcome (EDGE-63 ✓), landing honesty
+      (EDGE-64 ✓). 22 Aug: hosted first-run path verified end to end on the
+      preview (sign-in → 18+ gate → setup). Remaining, both M2 not launch
+      blockers: Oddsmonkey/Outplayed profit import (EDGE-68, needs a real CSV)
+      and one stranger click-through (EDGE-33). Plan:
       `docs/strategy/oddsmonkey-onboarding-research.md`. Import spec:
       `docs/strategy/platform-import.md`.
 
@@ -231,6 +274,11 @@ Milestones in every project: M1 Gate-ready (6 Sep) · M2 Beta (4 Oct) · M3 Laun
 
 Cycle plan (assigned 10 Aug; every open ticket now sits in a cycle except
 EDGE-43, deliberately deferred until feedback volume exists):
+
+> **Progress note (25 Aug 2026):** the C3–C5 build tickets landed weeks early —
+> EDGE-3, 4, 5, 7, 20, 21, 22, 32, 34, 47, 49, 61 are all Done. Open heading
+> into M1: EDGE-6, 9, 27, 28, 29, 33, 36, 37, 41, 43, 45, 67. The critical
+> path is now decisions and people (EDGE-45 scope, beta strangers), not code.
 
 | Cycle | Dates | Theme | Tickets |
 |-------|-------|-------|---------|
@@ -315,7 +363,7 @@ Cycle 1 (17–23 Aug): EDGE-1, 2, 8, 9, 17, 18, 23, 24, 38, 39, 40.
 | L2 | Architecture route | Route 1 hosted (D6 lean) / Route 2 local-first + paid sync | Formal at F4 (EDGE-18) |
 | L3 | Linear structure | **Decided 10 Aug 2026:** initiative + 6 projects, M1–M3, 1-week cycles | — |
 | L4 | Support surface | **Decided 12 Aug 2026: email** (`support@` / `hello@`, EDGE-34). Public `/contact` page is EDGE-66. No live chat at launch. | — |
-| L5 | Trademark registration | Register "Edgeways" (UK IPO) or rely on use | Pre-launch (EDGE-10) |
+| L5 | Trademark registration | **19 Aug 2026: rely on use for now.** Search found UK00004101707 EDGEWAYS (Flutter IP). No DIY filing. Revisit if a letter arrives or before paid scale (EDGE-10, Backlog). | On hold |
 | L6 | D1 gate | **Opened for launch-path work 10 Aug 2026**; criteria tracked as evidence (EDGE-36) | — |
 
 ---

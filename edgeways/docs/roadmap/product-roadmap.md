@@ -9,8 +9,9 @@
 > Companion docs: `../../docs/strategy/api-dependencies-and-tiers.md` (API cost/tier detail),
 > `docs/offer-command-centre.md` (offer pipeline spec), `docs/design-system.md`.
 
-Last updated: 2026-08-12 (subscription offer locked — `docs/strategy/subscriptions.md`.
-N0 matrix + Clerk/`app_users` exist; processor still EDGE-1/2.)
+Last updated: 2026-08-25 (hosted desk live: Clerk auth + Neon per-user data, Route 1.
+Stripe catalogue, checkout, webhooks, portal and test-mode rehearsal done — EDGE-3/4/5/7;
+entitlements enforced server-side — EDGE-22/83. Edge-tier live feeds still gated on EDGE-45.)
 
 > **Roadmap hygiene.** This document is kept current as work ships: statuses flip in the §6 table
 > the day a phase lands, and *new* feature ideas are never scheduled directly — they land in
@@ -52,7 +53,9 @@ honest about how confident each EV number is.
 
 ### Current architecture snapshot (context for AI agents)
 
-- Next.js 16 App Router, TypeScript, SQLite (better-sqlite3 + Drizzle), local-first single-user.
+- Next.js 16 App Router, TypeScript. Dual-mode data: local SQLite (better-sqlite3 +
+  Drizzle) on the desktop desk; hosted Neon Postgres per-user on Vercel (Route 1, D6;
+  cutover EDGE-47). Clerk auth, Stripe billing (test-mode rehearsed), PostHog EU analytics.
 - Git root is the PARENT directory (`MB app build/`); all npm commands run from `edgeways/`.
 - Key modules:
   - `src/lib/calc/ev.ts` — no-vig fair odds, expected value, edge % (pure, tested).
@@ -63,7 +66,10 @@ honest about how confident each EV number is.
   - `src/lib/services/racing-desk.ts` + `src/lib/racing-desk/types.ts` — Racing Desk with live/estimated exchange lays, `confidence: "live" | "mixed" | "estimate"` and `oddsSource` provenance.
   - `src/lib/offers/parse-offer-text.ts` — free-text offer T&C parser (large, tested).
   - Free-bet lots ledger in balances services (award → convert → retained cash).
-- External feeds: The Racing API (racecards/results, tiered), API-Football (fixtures), Betfair exchange (lay prices). All keyed per-user today.
+- External feeds: The Racing API (racecards/results, tiered), API-Football (fixtures), Betfair
+  exchange (lay prices). D7 (22 Aug 2026): operator-held keys, never BYOK — pooled feeds serve
+  all customer-tracked events (EDGE-81), with server-side entitlement guards on every feed
+  route (EDGE-83).
 
 ---
 
@@ -434,11 +440,15 @@ Two viable routes; the recommendation is the hybrid:
   Privacy is a real differentiator in this niche ("your betting records never leave your device")
   and it matches the existing codebase almost exactly.
 - Either way, the **feed proxy is the first server component**: one Racing API + API-Football +
-  Betfair poller fans out to all subscribers (cache per race/match, not per user). This is what
-  collapses per-user API cost from £50–100/mo (everyone brings keys) to £2–6/mo COGS at even
-  50–100 subscribers. The 2UP goal poller (B6) especially: one match watched = all watchers served.
-- \*\*Betfair commercial data licensing needs a proper legal read before any paid tier ships live
-  exchange prices.\*\* Cache aggressively; gate live-lay polling to the top tier.
+  Betfair poller fans out to all subscribers (cache per race/match, not per user). **D7 (22 Aug
+  2026):** this is the product, not a later optimisation. Customers bring money only; Sam holds
+  every provider account. BYOK is rejected. This is what collapses API cost from "every user
+  buys keys" to £2–6/mo COGS at 50–100 subscribers. The 2UP goal poller (B6) especially: one
+  match watched = all watchers served.
+- **Betfair commercial data licensing needs a proper legal read before any paid tier ships live
+  exchange prices** (EDGE-14). A personal live key must not be fanned out. Until Flutter
+  licenses operator-held data, ship paste/estimates/no live lays, never a customer key field.
+  Cache aggressively; gate live-lay polling to the top tier.
 
 ### 7.3 The oddsmatching conundrum (D2)
 
@@ -481,9 +491,12 @@ Commercial terms (trial, Founding, feedback credit, annual pence): **`docs/strat
 Annual ≈ 2 months free (10× monthly). **Founding** (waitlist/beta, not on public cards):
 three months of Edge at Core price after the trial. Gate by *data cost and edge delivered*.
 
-**Readiness (12 Aug 2026):** N0 matrix + Settings plan preview exist. Clerk + `app_users`
-exist. Processor (EDGE-1/2) still open. Landing shows this table on the **launch variant**
-(EDGE-21); live `/` stays waitlist until `LANDING_VARIANT=launch`.
+**Readiness (25 Aug 2026):** N0 matrix + Settings plan preview exist; real server-side
+enforcement live (EDGE-22, feed guards EDGE-83). Processor decided: Stripe direct (EDGE-2);
+catalogue, checkout, portal, webhooks and an automated test-mode rehearsal all done
+(EDGE-3/4/5/58/7); checkout blocks stacking a second subscription (EDGE-82). Landing shows
+this table on the **launch variant** (EDGE-21); live `/` stays waitlist until the
+`SITE_SURFACE=app` flip.
 
 A fourth tier is under consideration (2026-08-02): an **Elite** level bundling direct exchange
 connections (e.g. Betdaq partner API) once Edge-tier revenue funds the integration and data
@@ -506,7 +519,7 @@ it only makes sense once subscriptions already cover the base tiers.
 
 | Item                                                           | Status                                                                    |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Betfair commercial data licence terms for a paid product       | Unresolved — blocks Edge tier live lays, not personal use                 |
+| Betfair commercial data licence terms for a paid product       | Unresolved — blocks Edge-tier live lays. D7: no customer keys; operator-held only under Flutter licence |
 | iOS PWA push reliability in practice (backgrounded Safari)     | Test during Phase 3; fallback is timeline-visible alerts + email          |
 | Racing API rate limits vs multi-race live polling on race days | Measure during Phase 4; may force snapshot cadence tiers                  |
 | Effort weights for £/hr (B2) — initial values are guesses      | Resolved: user-tunable in Settings → Tuning (E1, 2026-07-14)              |
