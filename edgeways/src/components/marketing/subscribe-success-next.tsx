@@ -11,12 +11,14 @@ const nextClassName =
 
 export function SubscribeSuccessNext({
   from,
+  setupDone = false,
 }: {
   from: "setup" | null;
+  setupDone?: boolean;
 }) {
   const [stuck, setStuck] = useState(false);
-  const label = postSubscribeNextLabel(from);
-  const href = postSubscribeNextHref(from);
+  const label = postSubscribeNextLabel({ from, setupDone });
+  const href = postSubscribeNextHref({ from, setupDone });
 
   if (from === "setup") {
     return (
@@ -31,9 +33,15 @@ export function SubscribeSuccessNext({
         >
           {label}
         </button>
+        <a
+          href="/setup"
+          className="mt-3 text-sm font-medium text-white/70 underline-offset-4 hover:text-white hover:underline"
+        >
+          Continue set-up
+        </a>
         {stuck ? (
           <p className="mt-3 max-w-sm text-center text-sm text-white/55">
-            This window can be closed. Setup is in the other tab.
+            This window can be closed. Set-up is in the other tab.
           </p>
         ) : null}
       </div>

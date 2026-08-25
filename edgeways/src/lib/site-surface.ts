@@ -17,14 +17,22 @@ export function isWaitlistSurface(): boolean {
 }
 
 /** After subscribe: desk when this deploy is the app, home when waitlist still owns /. */
-export function postSubscribeNextHref(from?: "setup" | null): string | null {
-  if (from === "setup") return null;
-  return isWaitlistSurface() ? "/" : "/setup";
+export function postSubscribeNextHref(input?: {
+  from?: "setup" | null;
+  setupDone?: boolean;
+}): string | null {
+  if (input?.from === "setup") return null;
+  if (isWaitlistSurface()) return "/";
+  return input?.setupDone ? "/desk" : "/setup";
 }
 
-export function postSubscribeNextLabel(from?: "setup" | null): string {
-  if (from === "setup") return "Now close the tab";
-  return isWaitlistSurface() ? "Back to Edgeways" : "Set up the desk";
+export function postSubscribeNextLabel(input?: {
+  from?: "setup" | null;
+  setupDone?: boolean;
+}): string {
+  if (input?.from === "setup") return "Now close the tab";
+  if (isWaitlistSurface()) return "Back to Edgeways";
+  return input?.setupDone ? "Open the desk" : "Set up the desk";
 }
 
 const WAITLIST_PAGES = new Set([

@@ -70,15 +70,19 @@ export function receiptHeadline(
   trial = false
 ): string {
   if (planId === "edge" && trial) return `Your ${TRIAL_DAYS} days start now`;
-  if (planId === "edge") return "Edge is live";
-  if (planId === "core") return "Core is live";
+  if (planId === "edge") return "Welcome to Edge";
+  if (planId === "core") return "Welcome to Core";
   return "You're in";
 }
 
-export function receiptNextStep(from?: "setup" | null): string {
+export function receiptNextStep(
+  from?: "setup" | null,
+  setupDone = false
+): string {
   if (from === "setup") {
     return "Close this tab and continue setup in the other one.";
   }
+  if (setupDone) return "Your desk is ready when you are.";
   return "Add your bank and bookies to start";
 }
 

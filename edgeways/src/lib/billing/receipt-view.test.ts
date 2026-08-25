@@ -49,7 +49,7 @@ describe("subscribe receipt", () => {
     expect(receipt!.paidToday).toBe("£99.90");
     expect(receipt!.nextCharge).toBe("£99.90/yr");
     expect(receipt!.trialNote).toBeNull();
-    expect(receipt!.headline).toBe("Core is live");
+    expect(receipt!.headline).toBe("Welcome to Core");
     expect(receipt!.nextStep).toBe("Add your bank and bookies to start");
   });
 
@@ -61,7 +61,7 @@ describe("subscribe receipt", () => {
       metadata: { plan: "edge", interval: "month" },
     });
     expect(receipt).not.toBeNull();
-    expect(receipt!.headline).toBe("Edge is live");
+    expect(receipt!.headline).toBe("Welcome to Edge");
     expect(receipt!.trialNote).toBeNull();
     expect(receipt!.paidToday).toBe("£24.99");
     expect(receipt!.nextCharge).toBe("£24.99/mo");
@@ -116,6 +116,9 @@ describe("subscribe receipt", () => {
 
   it("tells an onboarding checkout to close the extra tab", () => {
     expect(receiptNextStep()).toBe("Add your bank and bookies to start");
+    expect(receiptNextStep(null, true)).toBe(
+      "Your desk is ready when you are."
+    );
     expect(receiptNextStep("setup")).toBe(
       "Close this tab and continue setup in the other one."
     );

@@ -14,11 +14,13 @@ export function SubscribeReceiptHydrate({
   initial,
   from,
   paidPlan,
+  setupDone = false,
 }: {
   sessionId: string | undefined;
   initial: SubscribeReceiptView | null;
   from?: "setup" | null;
   paidPlan?: "core" | "edge" | null;
+  setupDone?: boolean;
 }) {
   const { user } = useUser();
   const [receipt, setReceipt] = useState(initial);
@@ -50,18 +52,20 @@ export function SubscribeReceiptHydrate({
   }, [sessionId]);
 
   useEffect(() => {
-    if (from !== "setup" || !paidPlan) return;
-    writeSetupUpgradeConfirmed(paidPlan, user?.id);
+    if (from !== "setup" || !paidPlan || !user?.id) return;
+    writeSetupUpgradeConfirmed(paidPlan, user.id);
   }, [from, paidPlan, user?.id]);
 
   const headline = receipt?.headline ?? "You're in";
   const nextStep =
     from === "setup"
       ? receiptNextStep("setup")
-      : (receipt?.nextStep ??
-        (sessionId
-          ? receiptNextStep()
-          : "We could not find that order. If you were charged, it will still show in Stripe."));
+      : setupDone
+        ? receiptNextStep(null, true)
+        : (receipt?.nextStep ??
+          (sessionId
+            ? receiptNextStep()
+            : "We could not find that order. If you were charged, it will still show in Stripe."));
 
   return (
     <>

@@ -66,11 +66,14 @@ describe("post-subscribe next step", () => {
     delete process.env.SITE_SURFACE;
     expect(postSubscribeNextHref()).toBe("/setup");
     expect(postSubscribeNextLabel()).toBe("Set up the desk");
+    expect(postSubscribeNextHref({ setupDone: true })).toBe("/desk");
+    expect(postSubscribeNextLabel({ setupDone: true })).toBe("Open the desk");
     process.env.SITE_SURFACE = "waitlist";
     expect(postSubscribeNextHref()).toBe("/");
     expect(postSubscribeNextLabel()).toBe("Back to Edgeways");
-    expect(postSubscribeNextHref("setup")).toBeNull();
-    expect(postSubscribeNextLabel("setup")).toBe("Now close the tab");
+    expect(postSubscribeNextHref({ setupDone: true })).toBe("/");
+    expect(postSubscribeNextHref({ from: "setup" })).toBeNull();
+    expect(postSubscribeNextLabel({ from: "setup" })).toBe("Now close the tab");
     if (prev === undefined) delete process.env.SITE_SURFACE;
     else process.env.SITE_SURFACE = prev;
   });
