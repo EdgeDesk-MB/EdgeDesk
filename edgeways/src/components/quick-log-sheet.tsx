@@ -113,8 +113,10 @@ function CapturePathButton({
       )}
     >
       <Icon className="size-6" aria-hidden />
-      <span className="text-base font-semibold leading-tight">{label}</span>
-      <span className="text-xs leading-tight">{caption}</span>
+      <span className="flex flex-col gap-1">
+        <span className="text-base font-semibold leading-tight">{label}</span>
+        <span className="text-xs leading-tight">{caption}</span>
+      </span>
     </button>
   );
 }
