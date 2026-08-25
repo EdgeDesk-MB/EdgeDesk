@@ -32,10 +32,162 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-08-25",
+    title: "Mobile fit and finish",
+    summary:
+      "A phone pass over the everyday surfaces: the Home deck, quick actions, dialogs, and the top bar.",
+    entries: [
+      {
+        kind: "fix",
+        area: "Mobile",
+        href: "/desk",
+        text: "Swiping the Home deck no longer fights the P&L chart - drag the chart to scrub it, swipe anywhere else to change cards.",
+      },
+      {
+        kind: "improvement",
+        area: "Mobile",
+        href: "/desk",
+        text: "Quick actions is rebuilt for the phone: big brand-coloured tiles for Paste slip and Log manually, with room to tap.",
+      },
+      {
+        kind: "improvement",
+        area: "Mobile",
+        href: "/settings",
+        text: "Dialogs and forms across the app fit small screens properly - no more squashed fields or side-by-side inputs - and buttons are taller everywhere, matching the Support page sizing.",
+      },
+      {
+        kind: "improvement",
+        area: "Mobile",
+        text: "The top bar stays tidy on narrow screens: balances shorten (FB, Exch.) and the wordmark steps aside for the bolt when space runs out.",
+      },
+      {
+        kind: "improvement",
+        area: "Guides",
+        href: "/help",
+        text: "Support now lives inside Guides: feedback, email and the contact and refunds pages in one place.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-22",
+    title: "Your desk, on every device",
+    summary:
+      "Sign in anywhere and your desk is there - and plans now shape what each account can do.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Accounts",
+        href: "/settings",
+        text: "Your desk lives in your Edgeways account: bets, offers, balances and history are the same on phone and desktop, and backup/restore works wherever you sign in.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Plans are real: Free, Core and Edge each unlock their own features, and Settings shows exactly what your plan includes.",
+      },
+      {
+        kind: "improvement",
+        area: "Accessibility",
+        href: "/help?guide=keyboard",
+        text: "A measured contrast pass across both themes, and you can settle the focused open bet from the keyboard.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-20",
+    title: "Sign-in polish and keyboard speed",
+    summary:
+      "A smoother front door, and daily desk actions you can run without touching the mouse.",
+    entries: [
+      {
+        kind: "improvement",
+        area: "Sign-in",
+        text: "Signing in with Google now shows the Edgeways name and branding on the consent screen.",
+      },
+      {
+        kind: "feature",
+        area: "Keyboard",
+        href: "/help?guide=keyboard",
+        text: "Keyboard shortcuts for the daily actions - log a bet, settle, switch desks - with a ? cheat-sheet available anywhere.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-16",
+    title: "Billing, onboarding and bringing your history",
+    summary:
+      "Manage your subscription in Settings, a kinder first run for new accounts, and a proper import for spreadsheet history.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Manage billing from Settings: update your card, download invoices, change or cancel your plan - the receipt shows your first charge date up front.",
+      },
+      {
+        kind: "feature",
+        area: "Onboarding",
+        href: "/setup",
+        text: "New accounts get a full-page setup: your experience level, why you're here, and a monthly target to pace against - then a guided first run to a working desk.",
+      },
+      {
+        kind: "improvement",
+        area: "Home",
+        href: "/desk",
+        text: "An empty desk now opens with a getting-started welcome instead of a blank slate.",
+      },
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Import your profit history from an Oddsmonkey CSV: map the columns, preview, import. Imported rows join your P&L but never touch balances or EV capture.",
+      },
+      {
+        kind: "feature",
+        area: "Legal",
+        href: "/terms",
+        text: "Terms of Service and Privacy Policy are published, with consent collected at sign-up, plus public Contact and Refunds pages.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-12",
+    title: "Racing Desk polish",
+    summary:
+      "The race card reads better, and offers know whether they can be used once or many times.",
+    entries: [
+      {
+        kind: "improvement",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "The price chart sits beside the race card on wide screens, and the desk header stays tidy at any width.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "One-shot vs multi-use offers: the offer form and the terms parser both understand promotions you can use repeatedly.",
+      },
+      {
+        kind: "fix",
+        area: "Offers",
+        href: "/offers",
+        text: "Offer completion now displays correctly on every campaign, and campaign dialogs no longer truncate collapsed fields.",
+      },
+      {
+        kind: "fix",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Upcoming matches no longer show a result before kick-off.",
+      },
+    ],
+  },
+  {
     date: "2026-08-10",
     title: "Offer completion playbook: deposit codes to clear wagering",
     summary:
-      "Paste or forward a sports promo and Edgeways walks the campaign step by step, with the code on Step 1, Mark done for soft gates, and auto-advance from bets, deposits and wagering when the ledger can prove it.",
+      "Paste or drop a sports promo and Edgeways walks the campaign step by step, with the code on Step 1, Mark done for soft gates, and auto-advance from bets, deposits and wagering when the ledger can prove it.",
     entries: [
       {
         kind: "improvement",
