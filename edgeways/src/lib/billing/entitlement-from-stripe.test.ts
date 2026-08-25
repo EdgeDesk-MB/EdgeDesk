@@ -81,6 +81,25 @@ describe("entitlementFromSubscription", () => {
     expect(row.billingStatus).toBe("canceled");
     expect(row.founding).toBe(false);
     expect(row.trialEndsAt).toBeNull();
+    expect(row.cancelAt).toBeNull();
+  });
+
+  it("carries a scheduled cancellation while access continues", () => {
+    const row = entitlementFromSubscription(
+      {
+        status: "trialing",
+        customerId: "cus_1",
+        subscriptionId: "sub_1",
+        trialEnd: 1_800_000_000,
+        cancelAt: 1_800_000_000,
+        metadata: { plan: "edge" },
+        priceId: "price_edge_m",
+      },
+      catalogue
+    );
+    expect(row.plan).toBe("edge");
+    expect(row.billingStatus).toBe("trialing");
+    expect(row.cancelAt).toBe(1_800_000_000_000);
   });
 
   it("keeps the paid plan on past_due", () => {

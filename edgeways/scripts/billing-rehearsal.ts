@@ -8,6 +8,8 @@
  *   attach pm_card_visa + trial_end=now -> active/edge
  *   downgrade to Core monthly -> active/core
  *   upgrade back to Edge monthly -> active/edge
+ *   schedule cancel at period end -> cancel_at set, still active/edge
+ *   resume -> cancel_at cleared
  *   cancel -> free/canceled
  *   refund last charge -> entitlement unchanged (charge.refunded ignored)
  *
@@ -61,6 +63,7 @@ type EntitlementRow = {
   founding: number;
   stripe_subscription_id: string | null;
   trial_ends_at: number | null;
+  cancel_at: number | null;
 };
 
 async function main() {
@@ -74,7 +77,7 @@ async function main() {
 
   async function entitlement(): Promise<EntitlementRow | null> {
     const rows = (await sql`
-      SELECT plan, billing_status, founding, stripe_subscription_id, trial_ends_at
+      SELECT plan, billing_status, founding, stripe_subscription_id, trial_ends_at, cancel_at
       FROM app_users WHERE clerk_user_id = ${CLERK_ID}
     `) as unknown as EntitlementRow[];
     return rows[0] ?? null;
@@ -97,6 +100,28 @@ async function main() {
     }
     failures += 1;
     console.log(`FAIL ${label}`, { actual: last, expected: want });
+    throw new Error(`Drill aborted at: ${label}`);
+  }
+
+  async function waitForCancelAt(
+    label: string,
+    wantNull: boolean,
+    timeoutMs = 60_000,
+  ): Promise<EntitlementRow> {
+    const deadline = Date.now() + timeoutMs;
+    let last: EntitlementRow | null = null;
+    while (Date.now() < deadline) {
+      last = await entitlement();
+      if (last && (last.cancel_at == null) === wantNull) {
+        console.log(
+          `PASS ${label} -> cancel_at ${last.cancel_at == null ? "null" : "set"}`
+        );
+        return last;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    failures += 1;
+    console.log(`FAIL ${label}`, { actual: last, expectedCancelAtNull: wantNull });
     throw new Error(`Drill aborted at: ${label}`);
   }
 
@@ -168,6 +193,24 @@ async function main() {
     ]);
     await waitFor("webhook: upgrade lands Edge", { plan: "edge", status: "active" });
 
+    // -- 4b. Scheduled cancel (portal-style) then resume --------------------
+    await stripe([
+      "subscriptions", "update", subscriptionId,
+      "-d", "cancel_at_period_end=true",
+    ]);
+    const scheduled = await waitForCancelAt(
+      "webhook: scheduled cancel lands cancel_at",
+      false,
+    );
+    check("scheduled cancel keeps plan", scheduled.plan, "edge");
+    check("scheduled cancel keeps status", scheduled.billing_status, "active");
+
+    await stripe([
+      "subscriptions", "update", subscriptionId,
+      "-d", "cancel_at_period_end=false",
+    ]);
+    await waitForCancelAt("webhook: resume clears cancel_at", true);
+
     // -- 5. Cancel -----------------------------------------------------------
     await stripe(["subscriptions", "cancel", subscriptionId, "--confirm"]);
     const canceled = await waitFor("webhook: cancel lands Free", {
@@ -177,6 +220,7 @@ async function main() {
     // By design the subscription id is retained for audit; trial is cleared.
     check("cancel retains subscription link for audit", canceled.stripe_subscription_id, subscriptionId);
     check("cancel clears trial_ends_at", canceled.trial_ends_at, null);
+    check("cancel clears cancel_at", canceled.cancel_at, null);
 
     // -- 6. Refund (handler ignores charge.refunded; state must not change) --
     const charges = await stripe<{ data: { id: string }[] }>([

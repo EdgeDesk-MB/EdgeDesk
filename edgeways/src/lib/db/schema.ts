@@ -444,6 +444,8 @@ export const appUsers = sqliteTable("app_users", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   trialEndsAt: integer("trial_ends_at"),
+  /** Scheduled cancellation (epoch ms) while access continues. */
+  cancelAt: integer("cancel_at"),
   founding: integer("founding").notNull().default(0),
   /** EDGE-62 first-run profile JSON. Not betting records. */
   onboardingProfile: text("onboarding_profile"),

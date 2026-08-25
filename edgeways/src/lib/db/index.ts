@@ -549,6 +549,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("app_users", "stripe_customer_id TEXT");
   addColumn("app_users", "stripe_subscription_id TEXT");
   addColumn("app_users", "trial_ends_at INTEGER");
+  addColumn("app_users", "cancel_at INTEGER");
   addColumn("app_users", "founding INTEGER NOT NULL DEFAULT 0");
   addColumn("app_users", "onboarding_profile TEXT");
   addColumn("app_users", "role TEXT NOT NULL DEFAULT 'user'");

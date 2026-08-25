@@ -13,6 +13,7 @@ import { planCheckoutHref, PUBLIC_PLANS } from "@/lib/billing/public-offer";
 import {
   billingStatusBadgeVariant,
   billingStatusLabel,
+  isCancelling,
   planDisplayName,
   showSubscribeActions,
   type SubscriptionAccount,
@@ -29,6 +30,7 @@ const PUBLIC_DEMO_ACCOUNT: SubscriptionAccount = {
   plan: "free",
   billingStatus: "none",
   trialEndsAt: null,
+  cancelAt: null,
   founding: false,
   canManage: false,
 };
@@ -121,10 +123,16 @@ export function SubscriptionCard({
                 <>
                   {planDisplayName(account.plan)}
                   <Badge
-                    variant={billingStatusBadgeVariant(account.billingStatus)}
+                    variant={
+                      isCancelling(account)
+                        ? "outline"
+                        : billingStatusBadgeVariant(account.billingStatus)
+                    }
                     className="h-5 px-1.5"
                   >
-                    {billingStatusLabel(account.billingStatus)}
+                    {isCancelling(account)
+                      ? "Cancelling"
+                      : billingStatusLabel(account.billingStatus)}
                   </Badge>
                 </>
               }
@@ -256,6 +264,9 @@ function planTileSub(
 }
 
 function billingTileValue(account: SubscriptionAccount): string {
+  if (isCancelling(account) && account.cancelAt) {
+    return subscriptionDateLabel(account.cancelAt);
+  }
   if (account.billingStatus === "trialing" && account.trialEndsAt) {
     return subscriptionDateLabel(account.trialEndsAt);
   }
@@ -263,6 +274,7 @@ function billingTileValue(account: SubscriptionAccount): string {
 }
 
 function billingTileSub(account: SubscriptionAccount): string {
+  if (isCancelling(account)) return "Access ends";
   if (account.billingStatus === "trialing" && account.trialEndsAt) {
     return "Trial ends";
   }

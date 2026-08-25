@@ -492,6 +492,8 @@ export const appUsers = pgTable("app_users", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   trialEndsAt: bigint("trial_ends_at", { mode: "number" }),
+  /** Scheduled cancellation (epoch ms) while access continues. */
+  cancelAt: bigint("cancel_at", { mode: "number" }),
   founding: integer("founding").notNull().default(0),
   /** EDGE-62 first-run profile JSON. Not betting records. */
   onboardingProfile: text("onboarding_profile"),

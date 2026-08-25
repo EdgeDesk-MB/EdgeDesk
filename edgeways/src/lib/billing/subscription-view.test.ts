@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   billingStatusBadgeVariant,
   billingStatusLabel,
+  isCancelling,
   planDisplayName,
   showSubscribeActions,
   subscriptionAccountFromUser,
@@ -15,6 +16,7 @@ describe("subscriptionAccountFromUser", () => {
       plan: "free",
       billingStatus: "none",
       trialEndsAt: null,
+      cancelAt: null,
       founding: false,
       canManage: false,
     });
@@ -25,6 +27,7 @@ describe("subscriptionAccountFromUser", () => {
       plan: "edge",
       billingStatus: "trialing",
       trialEndsAt: 1_777_000_000_000,
+      cancelAt: null,
       founding: false,
       stripeCustomerId: "cus_test",
     });
@@ -37,6 +40,7 @@ describe("subscriptionAccountFromUser", () => {
       plan: "edge",
       billingStatus: "trialing",
       trialEndsAt: 1_777_000_000_000,
+      cancelAt: null,
       founding: false,
       stripeCustomerId: null,
     });
@@ -49,6 +53,7 @@ describe("subscriptionAccountFromUser", () => {
       plan: "free",
       billingStatus: "canceled",
       trialEndsAt: null,
+      cancelAt: null,
       founding: false,
       stripeCustomerId: "cus_test",
     });
@@ -86,6 +91,7 @@ describe("subscription copy", () => {
         plan: "edge",
         billingStatus: "trialing",
         trialEndsAt: Date.UTC(2026, 7, 29, 12),
+        cancelAt: null,
         founding: false,
         canManage: true,
       })
@@ -95,6 +101,7 @@ describe("subscription copy", () => {
         plan: "edge",
         billingStatus: "trialing",
         trialEndsAt: Date.UTC(2026, 7, 29, 12),
+        cancelAt: null,
         founding: true,
         canManage: true,
       })
@@ -104,6 +111,7 @@ describe("subscription copy", () => {
         plan: "edge",
         billingStatus: "past_due",
         trialEndsAt: null,
+        cancelAt: null,
         founding: false,
         canManage: true,
       })
@@ -113,6 +121,7 @@ describe("subscription copy", () => {
         plan: "free",
         billingStatus: "none",
         trialEndsAt: null,
+        cancelAt: null,
         founding: false,
         canManage: false,
       })
@@ -122,9 +131,45 @@ describe("subscription copy", () => {
         plan: "edge",
         billingStatus: "active",
         trialEndsAt: null,
+        cancelAt: null,
         founding: true,
         canManage: true,
       })
     ).toBe("You are on the founding rate.");
+  });
+
+  it("highlights a scheduled cancellation while access continues", () => {
+    const cancellingTrial = {
+      plan: "edge",
+      billingStatus: "trialing",
+      trialEndsAt: Date.UTC(2026, 8, 8, 12),
+      cancelAt: Date.UTC(2026, 8, 8, 12),
+      founding: false,
+      canManage: true,
+    } as const;
+    expect(isCancelling(cancellingTrial)).toBe(true);
+    expect(subscriptionDetail(cancellingTrial)).toBe(
+      "Trial cancelled. You keep Edge until 8 Sept 2026."
+    );
+    expect(
+      subscriptionDetail({
+        plan: "core",
+        billingStatus: "active",
+        trialEndsAt: null,
+        cancelAt: Date.UTC(2026, 8, 8, 12),
+        founding: false,
+        canManage: true,
+      })
+    ).toBe("Cancellation scheduled. You keep Core until 8 Sept 2026.");
+    expect(
+      isCancelling({
+        plan: "free",
+        billingStatus: "canceled",
+        trialEndsAt: null,
+        cancelAt: null,
+        founding: false,
+        canManage: true,
+      })
+    ).toBe(false);
   });
 });

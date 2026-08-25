@@ -18,8 +18,10 @@ right Neon `app_users` entitlement — no clicking:
 2. Attach test card, end trial early → `edge / active`
 3. Downgrade to Core monthly → `core / active`
 4. Upgrade back to Edge monthly → `edge / active`
-5. Cancel → `free / canceled` (subscription id retained for audit, trial cleared)
-6. Refund the charge → entitlement untouched (`charge.refunded` is ignored by design)
+5. Schedule cancel at period end (portal-style) → `cancel_at` set, still `edge / active`
+6. Resume → `cancel_at` cleared
+7. Cancel → `free / canceled` (subscription id retained for audit, trial and cancel_at cleared)
+8. Refund the charge → entitlement untouched (`charge.refunded` is ignored by design)
 
 Cleans up after itself (deletes the Stripe customer and the Neon row).
 **Requires** `stripe listen --forward-to localhost:3000/api/billing/webhook`
@@ -139,7 +141,9 @@ events land (`--> checkout.session.completed … [200]`).
    - Update the card to `4000 0025 0000 3155` (3DS) or just view invoices;
      back out to Settings.
    - Cancel in the portal → Settings shows the cancelled/free state after
-     the webhook lands (a few seconds).
+     the webhook lands (a few seconds). If the portal schedules the cancel
+     for period end instead, Settings shows a **Cancelling** badge and the
+     access-end date until then.
 3. **Core paid path** (3 min)
    - `/subscribe?plan=core&interval=month` with the same account: charged
      **£9.99 today**, slip headline "Core is live", Settings shows Core.

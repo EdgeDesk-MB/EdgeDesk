@@ -41,6 +41,8 @@ export type AppUser = {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   trialEndsAt: number | null;
+  /** Scheduled cancellation (epoch ms) while access continues. */
+  cancelAt: number | null;
   founding: boolean;
   onboardingProfile: OnboardingProfile | null;
   role: AppUserRole;
@@ -53,6 +55,7 @@ function usesHostedPostgres(): boolean {
 let neonOnboardingColumnReady = false;
 let neonDeskSettingsColumnReady = false;
 let neonRoleColumnReady = false;
+let neonCancelAtColumnReady = false;
 let neonOperatorSettingsReady = false;
 
 async function ensureNeonOnboardingColumn(): Promise<void> {
@@ -74,6 +77,13 @@ export async function ensureNeonRoleColumn(): Promise<void> {
   const sql = getNeonSql();
   await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'`;
   neonRoleColumnReady = true;
+}
+
+export async function ensureNeonCancelAtColumn(): Promise<void> {
+  if (neonCancelAtColumnReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cancel_at bigint`;
+  neonCancelAtColumnReady = true;
 }
 
 export async function ensureNeonOperatorSettingsTable(): Promise<void> {
@@ -117,6 +127,7 @@ function fromRow(row: {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   trialEndsAt?: number | null;
+  cancelAt?: number | null;
   founding?: number | null;
   onboardingProfile?: string | null;
   role?: string | null;
@@ -131,6 +142,7 @@ function fromRow(row: {
     stripeCustomerId: row.stripeCustomerId ?? null,
     stripeSubscriptionId: row.stripeSubscriptionId ?? null,
     trialEndsAt: row.trialEndsAt ?? null,
+    cancelAt: row.cancelAt ?? null,
     founding: row.founding === 1,
     onboardingProfile: parseOnboardingProfile(row.onboardingProfile),
     role: parseAppUserRole(row.role),
@@ -150,6 +162,7 @@ export async function findAppUserByClerkId(
   if (usesHostedPostgres()) {
     await ensureNeonOnboardingColumn();
     await ensureNeonRoleColumn();
+    await ensureNeonCancelAtColumn();
     const rows = await getNeonDb()
       .select()
       .from(pgUsers)
@@ -174,6 +187,7 @@ export async function findAppUserByStripeCustomerId(
   if (!id) return undefined;
   if (usesHostedPostgres()) {
     await ensureNeonOnboardingColumn();
+    await ensureNeonCancelAtColumn();
     const rows = await getNeonDb()
       .select()
       .from(pgUsers)
@@ -244,6 +258,7 @@ export async function ensureAppUser(input: {
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     trialEndsAt: null,
+    cancelAt: null,
     founding: false,
     onboardingProfile: null,
     role: "user",
@@ -268,11 +283,13 @@ export async function applyAppUserEntitlement(input: {
     stripeCustomerId: entitlement.stripeCustomerId,
     stripeSubscriptionId: entitlement.stripeSubscriptionId,
     trialEndsAt: entitlement.trialEndsAt,
+    cancelAt: entitlement.cancelAt,
     founding,
     updatedAt: now,
   };
 
   if (usesHostedPostgres()) {
+    await ensureNeonCancelAtColumn();
     await getNeonDb()
       .update(pgUsers)
       .set(set)
@@ -328,6 +345,7 @@ export async function listAppUsers(): Promise<AdminUserRow[]> {
   if (usesHostedPostgres()) {
     await ensureNeonOnboardingColumn();
     await ensureNeonRoleColumn();
+    await ensureNeonCancelAtColumn();
     const rows = await getNeonDb()
       .select()
       .from(pgUsers)

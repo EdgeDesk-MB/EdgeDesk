@@ -99,6 +99,13 @@
       "when": 1787587273150,
       "tag": "0013_admin_role_operator_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787642800000,
+      "tag": "0014_app_users_cancel_at",
+      "breakpoints": true
     }
   ]
 }

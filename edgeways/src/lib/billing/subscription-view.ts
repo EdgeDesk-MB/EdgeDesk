@@ -12,6 +12,8 @@ export type SubscriptionAccount = {
   plan: PlanId;
   billingStatus: BillingStatus;
   trialEndsAt: number | null;
+  /** Scheduled cancellation (epoch ms) while access continues. */
+  cancelAt: number | null;
   founding: boolean;
   canManage: boolean;
 };
@@ -22,6 +24,7 @@ export function subscriptionAccountFromUser(
         plan: PlanId;
         billingStatus: BillingStatus;
         trialEndsAt: number | null;
+        cancelAt: number | null;
         founding: boolean;
         stripeCustomerId: string | null;
       }
@@ -32,6 +35,7 @@ export function subscriptionAccountFromUser(
       plan: "free",
       billingStatus: "none",
       trialEndsAt: null,
+      cancelAt: null,
       founding: false,
       canManage: false,
     };
@@ -40,6 +44,7 @@ export function subscriptionAccountFromUser(
     plan: user.plan,
     billingStatus: user.billingStatus,
     trialEndsAt: user.trialEndsAt,
+    cancelAt: user.cancelAt,
     founding: user.founding,
     canManage: Boolean(user.stripeCustomerId),
   };
@@ -59,6 +64,16 @@ export function billingStatusLabel(status: BillingStatus): string {
   return "No subscription";
 }
 
+/** A cancellation is scheduled but access continues until cancelAt. */
+export function isCancelling(account: SubscriptionAccount): boolean {
+  return (
+    account.cancelAt != null &&
+    (account.billingStatus === "trialing" ||
+      account.billingStatus === "active" ||
+      account.billingStatus === "past_due")
+  );
+}
+
 export function billingStatusBadgeVariant(
   status: BillingStatus
 ): "success" | "destructive" | "outline" {
@@ -72,6 +87,12 @@ export function subscriptionDateLabel(ms: number): string {
 }
 
 export function subscriptionDetail(account: SubscriptionAccount): string {
+  if (isCancelling(account) && account.cancelAt) {
+    const ends = `You keep ${planDisplayName(account.plan)} until ${subscriptionDateLabel(account.cancelAt)}.`;
+    return account.billingStatus === "trialing"
+      ? `Trial cancelled. ${ends}`
+      : `Cancellation scheduled. ${ends}`;
+  }
   if (account.billingStatus === "trialing" && account.trialEndsAt) {
     const trial = `Trial ends ${subscriptionDateLabel(account.trialEndsAt)}`;
     return account.founding ? `${trial}. Founding rate after that.` : trial;

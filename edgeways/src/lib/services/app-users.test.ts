@@ -73,6 +73,7 @@ describe("applyAppUserEntitlement", () => {
         stripeCustomerId: "cus_test",
         stripeSubscriptionId: "sub_test",
         trialEndsAt: 1_800_000_000_000,
+        cancelAt: null,
         founding: false,
       },
     });
@@ -80,6 +81,7 @@ describe("applyAppUserEntitlement", () => {
     expect(row.billingStatus).toBe("trialing");
     expect(row.stripeCustomerId).toBe("cus_test");
     expect(row.trialEndsAt).toBe(1_800_000_000_000);
+    expect(row.cancelAt).toBeNull();
     expect(row.founding).toBe(false);
     expect(row.onboardingProfile).toBeNull();
     const byCustomer = await findAppUserByStripeCustomerId("cus_test");

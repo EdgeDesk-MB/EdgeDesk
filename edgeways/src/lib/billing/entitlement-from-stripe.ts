@@ -18,6 +18,9 @@ export type AppUserEntitlement = {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   trialEndsAt: number | null;
+  /** Scheduled cancellation (epoch ms) while access continues. Null when
+   * the subscription is not pending cancellation. */
+  cancelAt: number | null;
   founding: boolean;
 };
 
@@ -32,6 +35,9 @@ export type StripeEntitlementSource = {
   customerId?: string | null;
   subscriptionId?: string | null;
   trialEnd?: number | null;
+  /** Unix seconds. Set when a cancellation is scheduled (cancel_at, or
+   * cancel_at_period_end resolved to the item's period end). */
+  cancelAt?: number | null;
   metadata?: { plan?: string | null; clerkUserId?: string | null } | null;
   priceId?: string | null;
 };
@@ -93,6 +99,7 @@ export function entitlementFromSubscription(
       stripeCustomerId: source.customerId ?? null,
       stripeSubscriptionId: source.subscriptionId ?? null,
       trialEndsAt: null,
+      cancelAt: null,
       founding: false,
     };
   }
@@ -104,6 +111,7 @@ export function entitlementFromSubscription(
       stripeCustomerId: source.customerId ?? null,
       stripeSubscriptionId: source.subscriptionId ?? null,
       trialEndsAt: unixSecondsToMs(source.trialEnd),
+      cancelAt: unixSecondsToMs(source.cancelAt),
       founding,
     };
   }
@@ -117,6 +125,7 @@ export function entitlementFromSubscription(
     stripeCustomerId: source.customerId ?? null,
     stripeSubscriptionId: source.subscriptionId ?? null,
     trialEndsAt: unixSecondsToMs(source.trialEnd),
+    cancelAt: unixSecondsToMs(source.cancelAt),
     founding,
   };
 }
@@ -131,18 +140,29 @@ export function sourceFromStripeSubscription(sub: {
   status: string;
   customer: string | { id?: string } | null;
   trial_end?: number | null;
+  cancel_at?: number | null;
+  cancel_at_period_end?: boolean | null;
   metadata?: { plan?: string; clerkUserId?: string } | null;
-  items: { data: Array<{ price?: { id?: string } | null }> };
+  items: {
+    data: Array<{
+      price?: { id?: string } | null;
+      current_period_end?: number | null;
+    }>;
+  };
 }): StripeEntitlementSource {
   const customer =
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null;
+  const item = sub.items.data[0];
   return {
     status: sub.status,
     customerId: customer,
     subscriptionId: sub.id,
     trialEnd: sub.trial_end ?? null,
+    cancelAt:
+      sub.cancel_at ??
+      (sub.cancel_at_period_end ? (item?.current_period_end ?? null) : null),
     metadata: sub.metadata ?? null,
-    priceId: sub.items.data[0]?.price?.id ?? null,
+    priceId: item?.price?.id ?? null,
   };
 }
 
