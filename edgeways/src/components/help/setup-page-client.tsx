@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { EmptyState } from "@/components/help/empty-state";
 import { SetupWizardForm } from "@/components/help/setup-wizard-form";
+import { api } from "@/hooks/use-app-state";
+import { isOnboardingComplete } from "@/lib/onboarding";
+import type { BalanceSummary } from "@/lib/services/balances.types";
 
 /**
  * Signed-in first-run page. Guests go to login; Finish writes bank/bookies
- * then lands on /desk.
+ * then lands on /desk. A finished desk that revisits /setup goes home.
  */
 export function SetupPageClient() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
   const [opened, setOpened] = useState(false);
 
@@ -21,8 +24,30 @@ export function SetupPageClient() {
       router.replace("/login");
       return;
     }
-    setOpened(true);
-  }, [isLoaded, isSignedIn, router]);
+    if (!isOnboardingComplete(user?.id)) {
+      setOpened(true);
+      return;
+    }
+    let cancelled = false;
+    void api<BalanceSummary>("/api/accounts")
+      .then((summary) => {
+        if (cancelled) return;
+        const ready = summary.accounts.some(
+          (row) => row.type === "bank" || row.type === "bookie"
+        );
+        if (ready) {
+          router.replace("/desk");
+          return;
+        }
+        setOpened(true);
+      })
+      .catch(() => {
+        if (!cancelled) setOpened(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, router, user?.id]);
 
   if (!opened) {
     return (

@@ -11,6 +11,11 @@ export function parseStoredPlanId(
   return value === "free" || value === "core" || value === "edge" ? value : null;
 }
 
+function scopedKey(base: string, userId?: string | null): string {
+  const id = userId?.trim();
+  return id ? `${base}:${id}` : base;
+}
+
 function readSessionPlan(key: string): PlanId | null {
   try {
     return parseStoredPlanId(sessionStorage.getItem(key));
@@ -27,23 +32,26 @@ function writeSessionPlan(key: string, plan: PlanId) {
   }
 }
 
-export function readSetupPlanBaseline(): PlanId | null {
-  return readSessionPlan(SETUP_PLAN_BASELINE_KEY);
+export function readSetupPlanBaseline(userId?: string | null): PlanId | null {
+  return readSessionPlan(scopedKey(SETUP_PLAN_BASELINE_KEY, userId));
 }
 
-export function writeSetupPlanBaselineIfEmpty(plan: PlanId): PlanId {
-  const stored = readSetupPlanBaseline();
+export function writeSetupPlanBaselineIfEmpty(
+  plan: PlanId,
+  userId?: string | null
+): PlanId {
+  const stored = readSetupPlanBaseline(userId);
   if (stored) return stored;
-  writeSessionPlan(SETUP_PLAN_BASELINE_KEY, plan);
+  writeSessionPlan(scopedKey(SETUP_PLAN_BASELINE_KEY, userId), plan);
   return plan;
 }
 
-export function readSetupUpgradeIntent(): PlanId | null {
-  return readSessionPlan(SETUP_UPGRADE_INTENT_KEY);
+export function readSetupUpgradeIntent(userId?: string | null): PlanId | null {
+  return readSessionPlan(scopedKey(SETUP_UPGRADE_INTENT_KEY, userId));
 }
 
-export function writeSetupUpgradeIntent(plan: PlanId) {
-  writeSessionPlan(SETUP_UPGRADE_INTENT_KEY, plan);
+export function writeSetupUpgradeIntent(plan: PlanId, userId?: string | null) {
+  writeSessionPlan(scopedKey(SETUP_UPGRADE_INTENT_KEY, userId), plan);
 }
 
 export function readSetupUpgradeConfirmed(userId?: string | null): PlanId | null {
@@ -51,17 +59,16 @@ export function readSetupUpgradeConfirmed(userId?: string | null): PlanId | null
     const raw = localStorage.getItem(SETUP_UPGRADE_CONFIRMED_KEY);
     if (!raw) return null;
     const plain = parseStoredPlanId(raw);
-    if (plain) return plain;
+    if (plain) return userId ? null : plain;
     const parsed = JSON.parse(raw) as { plan?: unknown; userId?: unknown };
     const plan = parseStoredPlanId(typeof parsed.plan === "string" ? parsed.plan : null);
     if (!plan) return null;
-    if (
-      typeof parsed.userId === "string" &&
-      userId &&
-      parsed.userId !== userId
-    ) {
-      return null;
-    }
+    const storedUser =
+      typeof parsed.userId === "string" && parsed.userId.trim()
+        ? parsed.userId
+        : null;
+    if (userId && storedUser !== userId) return null;
+    if (userId && !storedUser) return null;
     return plan;
   } catch {
     return null;
@@ -79,10 +86,12 @@ export function writeSetupUpgradeConfirmed(plan: PlanId, userId?: string | null)
   }
 }
 
-export function clearSetupUpgradeSignals() {
+export function clearSetupUpgradeSignals(userId?: string | null) {
   try {
     sessionStorage.removeItem(SETUP_PLAN_BASELINE_KEY);
     sessionStorage.removeItem(SETUP_UPGRADE_INTENT_KEY);
+    sessionStorage.removeItem(scopedKey(SETUP_PLAN_BASELINE_KEY, userId));
+    sessionStorage.removeItem(scopedKey(SETUP_UPGRADE_INTENT_KEY, userId));
     localStorage.removeItem(SETUP_UPGRADE_CONFIRMED_KEY);
   } catch {
     /* ignore */
@@ -95,8 +104,8 @@ export function readSetupUpgradeSignals(userId?: string | null): {
   confirmed: PlanId | null;
 } {
   return {
-    baseline: readSetupPlanBaseline(),
-    intent: readSetupUpgradeIntent(),
+    baseline: readSetupPlanBaseline(userId),
+    intent: readSetupUpgradeIntent(userId),
     confirmed: readSetupUpgradeConfirmed(userId),
   };
 }
@@ -111,37 +120,46 @@ export function resolveSetupDisplayPlan(
   return planMeetsTarget(current, confirmed) ? current : confirmed;
 }
 
+export type SetupUpgradeSuccess = {
+  plan: PlanId;
+  /** True when the upgrade happened inside the setup flow (clicked the
+   * in-page upgrade button or returned from a setup checkout). False when
+   * they arrived already subscribed — celebrate the subscription, not an
+   * upgrade they never made here. */
+  inFlow: boolean;
+};
+
 /**
  * Plan to celebrate on the features step, or null if this visit is not an
- * in-flow upgrade. Checkout confirmation wins so a remount after Stripe
+ * upgrade moment. Checkout confirmation wins so a remount after Stripe
  * still shows the message when billing already returns the new tier.
  */
-export function setupUpgradeSuccessPlan(input: {
+export function setupUpgradeSuccess(input: {
   currentPlan: PlanId | null;
   baseline: PlanId | null;
   confirmed: PlanId | null;
   intent: PlanId | null;
-}): PlanId | null {
+}): SetupUpgradeSuccess | null {
   if (input.confirmed) {
-    if (!input.currentPlan) return input.confirmed;
-    return planMeetsTarget(input.currentPlan, input.confirmed)
-      ? input.currentPlan
-      : input.confirmed;
+    const plan =
+      input.currentPlan && planMeetsTarget(input.currentPlan, input.confirmed)
+        ? input.currentPlan
+        : input.confirmed;
+    return { plan, inFlow: true };
   }
+  const roseAboveBaseline =
+    Boolean(input.baseline) &&
+    Boolean(input.currentPlan) &&
+    input.currentPlan !== input.baseline &&
+    planMeetsTarget(input.currentPlan!, input.baseline!);
   if (
     input.intent &&
     input.currentPlan &&
+    roseAboveBaseline &&
     planMeetsTarget(input.currentPlan, input.intent)
   ) {
-    return input.currentPlan;
+    return { plan: input.currentPlan, inFlow: true };
   }
-  if (
-    input.baseline &&
-    input.currentPlan &&
-    input.currentPlan !== input.baseline &&
-    planMeetsTarget(input.currentPlan, input.baseline)
-  ) {
-    return input.currentPlan;
-  }
+  if (roseAboveBaseline) return { plan: input.currentPlan!, inFlow: false };
   return null;
 }

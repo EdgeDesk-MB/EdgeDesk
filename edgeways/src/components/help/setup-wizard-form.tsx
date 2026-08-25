@@ -9,6 +9,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
   type MouseEvent,
@@ -62,6 +63,7 @@ import {
 } from "@/components/layout/page-header-actions";
 import { api } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { captureOnboardingAnalytics } from "@/lib/analytics/onboarding-profile";
 import {
   clearPublicDemoCookie,
   hasPublicDemoCookieInDocument,
@@ -81,7 +83,9 @@ import {
   ONBOARDING_WHY,
   featurePlan,
   monthlyTargetPace,
+  planMeetsTarget,
   planTierLabel,
+  subscriptionSuccessTitle,
   upgradeNudgeBody,
   upgradeNudgeTitle,
   upgradePlanForFeatures,
@@ -96,10 +100,20 @@ import {
   clearSetupUpgradeSignals,
   readSetupUpgradeSignals,
   resolveSetupDisplayPlan,
-  setupUpgradeSuccessPlan,
+  setupUpgradeSuccess,
   writeSetupPlanBaselineIfEmpty,
   writeSetupUpgradeIntent,
 } from "@/lib/onboarding-setup-upgrade";
+import {
+  clearSetupDraft,
+  findExistingSetupAccount,
+  isSetupConflictError,
+  readSetupDraft,
+  setupDraftIsDirty,
+  setupSaveErrorMessage,
+  writeSetupDraft,
+} from "@/lib/onboarding-setup-draft";
+import type { BalanceSummary } from "@/lib/services/balances.types";
 import {
   dialogTitleIcon,
   dialogTitle,
@@ -282,7 +296,7 @@ function SkillMark({
       </svg>
       <Star
         className={cn(
-          "size-3.5 text-brand",
+          "size-3.5 text-primary-text",
           selected ? "fill-brand" : "fill-brand/80"
         )}
       />
@@ -430,30 +444,14 @@ function CheckMark({
   );
 }
 
-function captureOnboardingAnalytics(payload: {
-  experience: OnboardingExperienceId;
-  whyHere: OnboardingWhyId[];
-  attribution: OnboardingHeardId | "skipped";
-}) {
-  void import("posthog-js")
-    .then(({ default: posthog }) => {
-      posthog.capture("onboarding_profile", {
-        experience: payload.experience,
-        why_here: payload.whyHere.join(","),
-        attribution: payload.attribution,
-      });
-    })
-    .catch(() => {
-      /* analytics optional */
-    });
-}
-
 export function SetupWizardForm({
   variant,
   onDismiss,
+  onDirtyChange,
 }: {
   variant: "dialog" | "page";
   onDismiss?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { user } = useUser();
   const userId = user?.id ?? null;
@@ -488,6 +486,7 @@ export function SetupWizardForm({
   const [planBaseline, setPlanBaseline] = useState<PlanId | null>(null);
   const [upgradeIntent, setUpgradeIntent] = useState<PlanId | null>(null);
   const [upgradeConfirmed, setUpgradeConfirmed] = useState<PlanId | null>(null);
+  const [upgradeArmed, setUpgradeArmed] = useState(false);
   const [attribution, setAttribution] = useState<OnboardingHeardId | "skipped" | null>(
     null
   );
@@ -495,6 +494,8 @@ export function SetupWizardForm({
   const [monthlyTarget, setMonthlyTarget] = useState(0);
   const [showStepErrors, setShowStepErrors] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const finishingRef = useRef(false);
+  const draftReady = useRef(false);
 
   const current = steps[step]!;
   const Icon = current.icon;
@@ -505,12 +506,16 @@ export function SetupWizardForm({
   const upgradePlan =
     displayPlan != null ? upgradePlanForFeatures(whyHere, displayPlan) : null;
   const upgradeHref = upgradePlan ? upgradeCheckoutHref(upgradePlan) : null;
-  const successPlan = setupUpgradeSuccessPlan({
+  const rawSuccess = setupUpgradeSuccess({
     currentPlan: displayPlan,
     baseline: planBaseline,
     confirmed: upgradeConfirmed,
     intent: upgradeIntent,
   });
+  const success =
+    rawSuccess && upgradePlanForFeatures(whyHere, planBaseline ?? "free")
+      ? rawSuccess
+      : null;
 
   useEffect(() => {
     if (!isPage) return;
@@ -531,6 +536,72 @@ export function SetupWizardForm({
   }, [isPage, userId]);
 
   useEffect(() => {
+    const draft = readSetupDraft(userId, isPage ? "page" : "dialog");
+    if (draft) {
+      setBankName(draft.bankName);
+      setBankBalance(draft.bankBalance);
+      setBookies(draft.bookies);
+      setStake(draft.stake);
+      setDefaultBookie(draft.defaultBookie);
+      setDefaultExchangeName(draft.defaultExchangeName);
+      if (draft.defaultSport) setDefaultSport(normalizeDefaultSport(draft.defaultSport));
+      setAppearance(draft.appearance);
+      setExperience(draft.experience);
+      setWhyHere(draft.whyHere);
+      setAttribution(draft.attribution);
+      setAttributionOther(draft.attributionOther);
+      setMonthlyTarget(draft.monthlyTarget);
+      const idx = steps.findIndex((row) => row.id === draft.stepId);
+      if (idx >= 0) setStep(idx);
+    }
+    draftReady.current = true;
+  }, [userId, isPage, steps]);
+
+  useEffect(() => {
+    if (!draftReady.current) return;
+    const draft = {
+      v: 1 as const,
+      stepId: current.id,
+      bankName,
+      bankBalance,
+      bookies,
+      stake,
+      defaultBookie,
+      defaultExchangeName,
+      defaultSport,
+      appearance,
+      experience,
+      whyHere,
+      attribution,
+      attributionOther,
+      monthlyTarget,
+    };
+    onDirtyChange?.(setupDraftIsDirty(draft));
+    const timer = window.setTimeout(() => {
+      writeSetupDraft(draft, userId, isPage ? "page" : "dialog");
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [
+    appearance,
+    attribution,
+    attributionOther,
+    bankBalance,
+    bankName,
+    bookies,
+    current.id,
+    defaultBookie,
+    defaultExchangeName,
+    defaultSport,
+    experience,
+    isPage,
+    monthlyTarget,
+    onDirtyChange,
+    stake,
+    userId,
+    whyHere,
+  ]);
+
+  useEffect(() => {
     if (!isPage) return;
     let cancelled = false;
     async function loadPlan() {
@@ -538,11 +609,11 @@ export function SetupWizardForm({
         const account = await api<SubscriptionAccount>("/api/billing/account");
         if (cancelled) return;
         setCurrentPlan(account.plan);
-        setPlanBaseline((current) => current ?? writeSetupPlanBaselineIfEmpty(account.plan));
+        setPlanBaseline((current) =>
+          current ?? writeSetupPlanBaselineIfEmpty(account.plan, userId)
+        );
       } catch {
-        if (cancelled) return;
-        setCurrentPlan("free");
-        setPlanBaseline((current) => current ?? writeSetupPlanBaselineIfEmpty("free"));
+        /* keep last known plan; do not treat a failed read as Free */
       }
     }
     void loadPlan();
@@ -551,6 +622,7 @@ export function SetupWizardForm({
         const next = readSetupUpgradeSignals(userId);
         setUpgradeIntent((current) => current ?? next.intent);
         setUpgradeConfirmed((current) => current ?? next.confirmed);
+        setUpgradeArmed(false);
         void loadPlan();
       }
     }
@@ -564,7 +636,20 @@ export function SetupWizardForm({
   }, [isPage, userId]);
 
   useEffect(() => {
-    if (!isPage || !upgradePlan) return;
+    if (!isPage) return;
+    const waitingOnBilling =
+      Boolean(upgradePlan) ||
+      Boolean(
+        upgradeConfirmed &&
+          currentPlan &&
+          !planMeetsTarget(currentPlan, upgradeConfirmed)
+      ) ||
+      Boolean(
+        upgradeIntent &&
+          currentPlan &&
+          !planMeetsTarget(currentPlan, upgradeIntent)
+      );
+    if (!waitingOnBilling) return;
     const poll = window.setInterval(async () => {
       try {
         const account = await api<SubscriptionAccount>("/api/billing/account");
@@ -578,7 +663,7 @@ export function SetupWizardForm({
       window.clearInterval(poll);
       window.clearTimeout(stop);
     };
-  }, [isPage, upgradePlan]);
+  }, [isPage, upgradePlan, upgradeConfirmed, upgradeIntent, currentPlan]);
 
   useEffect(() => {
     if (!defaultExchange) return;
@@ -689,11 +774,34 @@ export function SetupWizardForm({
     setStep((s) => Math.min(s + 1, steps.length - 1));
   }
 
+  async function ensureSetupAccount(input: {
+    name: string;
+    type: "bank" | "bookie";
+    openingBalance: number;
+    fundedByAccountId?: number | null;
+  }): Promise<number> {
+    try {
+      const res = await api<{ account: { id: number } }>("/api/accounts", {
+        method: "POST",
+        json: input,
+      });
+      return res.account.id;
+    } catch (error) {
+      if (!isSetupConflictError(error)) throw error;
+      const summary = await api<BalanceSummary>("/api/accounts");
+      const existing = findExistingSetupAccount(summary.accounts, input.type, input.name);
+      if (existing == null) throw error;
+      return existing;
+    }
+  }
+
   async function finish() {
     if (!bankValid() || !bookiesValid() || !defaultsValid()) {
       setShowStepErrors(true);
       return;
     }
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     setSaving(true);
     setSaveError(null);
     const startedAt = Date.now();
@@ -712,7 +820,7 @@ export function SetupWizardForm({
         await api("/api/account/onboarding", {
           method: "POST",
           json: profile,
-        }).catch((e) => problems.push(`Profile: ${String(e)}`));
+        }).catch((e) => problems.push(setupSaveErrorMessage(e)));
         captureOnboardingAnalytics({
           experience,
           whyHere,
@@ -724,17 +832,13 @@ export function SetupWizardForm({
       const bankAmount = parseFloat(bankBalance) || 0;
       const resolvedBankName = bankName.trim();
       try {
-        const res = await api<{ account: { id: number } }>("/api/accounts", {
-          method: "POST",
-          json: {
-            name: resolvedBankName,
-            type: "bank",
-            openingBalance: bankAmount,
-          },
+        bankId = await ensureSetupAccount({
+          name: resolvedBankName,
+          type: "bank",
+          openingBalance: bankAmount,
         });
-        bankId = res.account.id;
       } catch (e) {
-        problems.push(`Bank: ${String(e)}`);
+        problems.push(setupSaveErrorMessage(e));
       }
 
       let created = 0;
@@ -742,18 +846,15 @@ export function SetupWizardForm({
         const name = row.name.trim();
         if (!name) continue;
         try {
-          await api("/api/accounts", {
-            method: "POST",
-            json: {
-              name,
-              type: "bookie",
-              openingBalance: parseFloat(row.balance) || 0,
-              fundedByAccountId: bankId,
-            },
+          await ensureSetupAccount({
+            name,
+            type: "bookie",
+            openingBalance: parseFloat(row.balance) || 0,
+            fundedByAccountId: bankId,
           });
           created++;
         } catch (e) {
-          problems.push(`${name}: ${String(e)}`);
+          problems.push(setupSaveErrorMessage(e));
         }
       }
 
@@ -776,12 +877,12 @@ export function SetupWizardForm({
               }
             : {}),
         },
-      }).catch((e) => problems.push(`Defaults: ${String(e)}`));
+      }).catch((e) => problems.push(setupSaveErrorMessage(e)));
       if (selectedExchange && !selectedExchange.isDefault) {
         await api(`/api/exchanges/${selectedExchange.id}`, {
           method: "PATCH",
           json: { isDefault: true },
-        }).catch((e) => problems.push(`Exchange: ${String(e)}`));
+        }).catch((e) => problems.push(setupSaveErrorMessage(e)));
       }
       setTheme(appearanceChoice);
 
@@ -791,7 +892,8 @@ export function SetupWizardForm({
       }
 
       markOnboardingComplete(user?.id);
-      clearSetupUpgradeSignals();
+      clearSetupUpgradeSignals(userId);
+      clearSetupDraft(userId, isPage ? "page" : "dialog");
       if (isPage || hasPublicDemoCookieInDocument()) {
         const remaining = 4000 - (Date.now() - startedAt);
         if (remaining > 0) {
@@ -803,7 +905,10 @@ export function SetupWizardForm({
       }
       onDismiss?.();
     } finally {
-      if (!leaving) setSaving(false);
+      if (!leaving) {
+        finishingRef.current = false;
+        setSaving(false);
+      }
     }
   }
 
@@ -818,7 +923,7 @@ export function SetupWizardForm({
         aria-live="polite"
       >
         <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
-        <p className="text-base font-semibold">Getting your dashboard ready</p>
+        <p className="text-base font-semibold">Getting your desk ready</p>
         <p className="text-sm text-muted-foreground">
           Saving your preferences.
         </p>
@@ -889,6 +994,13 @@ export function SetupWizardForm({
                     title={option.label}
                     body={option.description}
                     onClick={() => toggleWhy(option.id)}
+                    trailing={
+                      featurePlan(option.id) === "free" ? undefined : (
+                        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                          {featurePlan(option.id) === "edge" ? "Edge" : "Core"}
+                        </span>
+                      )
+                    }
                     leading={
                       <CheckMark
                         selected={selected}
@@ -1007,6 +1119,10 @@ export function SetupWizardForm({
             <p className="text-sm text-muted-foreground text-pretty">
               If a bookie is not listed, type the name to add it.
             </p>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8rem] gap-2 text-xs font-medium text-muted-foreground">
+              <span>Bookie</span>
+              <span>Balance</span>
+            </div>
             {bookies.map((row, i) => (
               <div key={i} className="flex flex-col gap-1.5">
                 <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8rem] gap-2">
@@ -1039,8 +1155,8 @@ export function SetupWizardForm({
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="self-start"
+              size="default"
+              className="min-h-11 self-start"
               onClick={() => setBookies((rows) => [...rows, { name: "", balance: "" }])}
             >
               <Plus className="size-4" />
@@ -1154,7 +1270,8 @@ export function SetupWizardForm({
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="default"
+                    className="min-h-11"
                     onClick={() => void requestNotifications()}
                   >
                     Allow notifications
@@ -1195,10 +1312,14 @@ export function SetupWizardForm({
     </div>
   );
 
-  const primaryProps = isPage ? pagePrimaryButtonProps : { size: "sm" as const };
-  const secondaryProps = isPage ? pageSecondaryButtonProps : { size: "sm" as const };
+  const primaryProps = isPage
+    ? { ...pagePrimaryButtonProps, className: "min-h-11" }
+    : { size: "default" as const, className: "min-h-11" };
+  const secondaryProps = isPage
+    ? { ...pageSecondaryButtonProps, className: "min-h-11" }
+    : { size: "default" as const, className: "min-h-11" };
 
-  const ghostProps = isPage ? { size: "default" as const } : { size: "sm" as const };
+  const ghostProps = { size: "default" as const, className: "min-h-11" };
 
   const leftNav = !isPage ? (
     <Button variant="ghost" {...ghostProps} onClick={() => onDismiss?.()}>
@@ -1276,7 +1397,7 @@ export function SetupWizardForm({
         )}
       >
         <div className="flex min-w-0 shrink-0 items-center gap-2.5">
-          <Icon className={cn(dialogTitleIcon, "shrink-0 text-brand")} />
+          <Icon className={cn(dialogTitleIcon, "shrink-0 text-primary-text")} />
           <h1 className={cn(dialogTitle, "min-w-0")}>{current.title}</h1>
         </div>
         <div className="mt-2 shrink-0">{stepHelp}</div>
@@ -1318,6 +1439,29 @@ export function SetupWizardForm({
               Checking your plan…
             </p>
           ) : null}
+          {current.id === "why" && success ? (
+            <div
+              role="status"
+              className={cn(successNotice, "flex items-start gap-2.5 px-3 py-2.5")}
+            >
+              <span
+                className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm bg-success text-white"
+                aria-hidden
+              >
+                <Check className="size-3" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-foreground">
+                  {success.inFlow
+                    ? upgradeSuccessTitle(success.plan)
+                    : subscriptionSuccessTitle(success.plan)}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-pretty break-words text-muted-foreground">
+                  {upgradeSuccessBody()}
+                </p>
+              </div>
+            </div>
+          ) : null}
           {current.id === "why" && upgradePlan && upgradeHref ? (
             <div
               role="status"
@@ -1337,44 +1481,30 @@ export function SetupWizardForm({
                 . {upgradeNudgeBody()}
               </p>
               <Button
-                asChild
+                asChild={!upgradeArmed}
                 variant={upgradePlan === "edge" ? "edge" : "pagePrimary"}
-                size="sm"
-                className="mt-3 self-start"
+                size="default"
+                className="mt-3 min-h-11 self-start"
+                disabled={upgradeArmed}
               >
-                <a
-                  href={upgradeHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Upgrade now (opens in a new tab)"
-                  onClick={() => {
-                    writeSetupUpgradeIntent(upgradePlan);
-                    setUpgradeIntent(upgradePlan);
-                  }}
-                >
-                  Upgrade now
-                </a>
+                {upgradeArmed ? (
+                  "Opening checkout…"
+                ) : (
+                  <a
+                    href={upgradeHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Upgrade now (opens in a new tab)"
+                    onClick={() => {
+                      writeSetupUpgradeIntent(upgradePlan, userId);
+                      setUpgradeIntent(upgradePlan);
+                      setUpgradeArmed(true);
+                    }}
+                  >
+                    Upgrade now
+                  </a>
+                )}
               </Button>
-            </div>
-          ) : current.id === "why" && successPlan ? (
-            <div
-              role="status"
-              className={cn(successNotice, "flex items-start gap-2.5 px-3 py-2.5")}
-            >
-              <span
-                className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm bg-success text-white"
-                aria-hidden
-              >
-                <Check className="size-3" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-foreground">
-                  {upgradeSuccessTitle(successPlan)}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-pretty break-words text-muted-foreground">
-                  {upgradeSuccessBody()}
-                </p>
-              </div>
             </div>
           ) : null}
           <div className="w-full min-w-0">{nav}</div>
@@ -1387,7 +1517,7 @@ export function SetupWizardForm({
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2.5">
-          <Icon className={cn(dialogTitleIcon, "text-brand")} />
+          <Icon className={cn(dialogTitleIcon, "text-primary-text")} />
           {current.title}
         </DialogTitle>
         <DialogDescription

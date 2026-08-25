@@ -293,6 +293,11 @@ export function upgradeSuccessTitle(plan: PlanId): string {
   return `Successfully upgraded to ${planTierLabel(plan)}`;
 }
 
+/** They arrived already subscribed — celebrate coverage, not an upgrade. */
+export function subscriptionSuccessTitle(plan: PlanId): string {
+  return `Available with your ${planDisplayName(plan)} subscription`;
+}
+
 export function upgradeSuccessBody(): string {
   return "The features you selected will be available when you land on the desk.";
 }

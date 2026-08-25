@@ -35,9 +35,9 @@ const STEPS = [
   },
   {
     icon: Key,
-    title: "Demo or live keys",
-    body: "Works without keys.",
-    help: "Add API keys in Settings when you want live data.",
+    title: "Demo or live feeds",
+    body: "Works without live cards.",
+    help: "Settings → Data & API shows racing, football and Betfair status.",
   },
   {
     icon: LayoutDashboard,

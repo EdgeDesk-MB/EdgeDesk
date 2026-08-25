@@ -30,7 +30,15 @@ function suppressReactScriptTagWarningOnce() {
   };
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+  forcedTheme,
+}: {
+  children: React.ReactNode;
+  /** Force a theme while mounted (e.g. onboarding is always dark). The
+   * stored preference is untouched and reapplies on unmount. */
+  forcedTheme?: string;
+}) {
   // Patch during render so the warning from next-themes’ first mount is caught.
   suppressReactScriptTagWarningOnce();
 
@@ -40,6 +48,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       defaultTheme="light"
       enableSystem={false}
       disableTransitionOnChange
+      forcedTheme={forcedTheme}
     >
       {children}
     </NextThemesProvider>

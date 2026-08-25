@@ -5,6 +5,7 @@ import {
   serializeOnboardingProfile,
   planTierLabel,
   planMeetsTarget,
+  subscriptionSuccessTitle,
   upgradeNudgeBody,
   upgradeNudgeTitle,
   upgradePlanForFeatures,
@@ -111,6 +112,12 @@ describe("upgrade plan for selected features", () => {
     expect(planMeetsTarget("core", "edge")).toBe(false);
     expect(upgradeSuccessTitle("edge")).toBe("Successfully upgraded to Edge tier");
     expect(upgradeSuccessTitle("core")).toBe("Successfully upgraded to Core tier");
+    expect(subscriptionSuccessTitle("edge")).toBe(
+      "Available with your Edge subscription"
+    );
+    expect(subscriptionSuccessTitle("core")).toBe(
+      "Available with your Core subscription"
+    );
     expect(upgradeSuccessBody()).toBe(
       "The features you selected will be available when you land on the desk."
     );

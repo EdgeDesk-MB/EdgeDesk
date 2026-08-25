@@ -29,7 +29,7 @@ export function EmptyState({
   oneLine?: boolean;
   /** First-load / in-flight: spinner in the icon well, live status. */
   busy?: boolean;
-  /** In-feed empties: icon + copy on the page, no plate, dashed rim, or radius. */
+  /** In-feed empties: icon + copy on the page, no plate or radius. */
   bare?: boolean;
 }) {
   const WellIcon = busy ? Loader2 : Icon;
@@ -96,7 +96,7 @@ export function EmptyState({
     <Card
       data-empty-state=""
       {...statusProps}
-      className={cn("border border-dashed ring-0", emptyStatePlate, className)}
+      className={cn(emptyStatePlate, className)}
     >
       <CardContent className={bodyClass}>{body}</CardContent>
     </Card>
