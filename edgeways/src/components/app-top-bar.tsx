@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { EdgewaysLogo } from "@/components/edgeways-logo-icon";
+import { BOLT_PATH } from "@/lib/brand/bolt-mark";
 import { bankrollAriaLabel, bankrollCompanion } from "@/components/app-top-bar-bankroll";
 import { AppTopBarMenu } from "@/components/app-top-bar-menu";
 import { AppTopBarMetaNav } from "@/components/app-top-bar-meta-nav";
@@ -51,7 +52,16 @@ function BrandLink({ className }: { className?: string }) {
         className
       )}
     >
-      <EdgewaysLogo topbar />
+      {/* Narrow viewports: bolt-only mark in the lockup colour so the
+          bankroll stacks never collide with the wordmark. Beta stays. */}
+      <EdgewaysLogo topbar className="max-sm:hidden" />
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden
+        className="size-8 shrink-0 fill-brand-logo sm:hidden dark:fill-brand-on-topbar"
+      >
+        <path d={BOLT_PATH} />
+      </svg>
       {/* Same geometry as racing-desk “Backed”; plate tracks the lockup colour. */}
       <span className="inline-flex origin-left translate-y-[2px] scale-[0.625] -mr-[37.5%] items-center rounded-[3px] bg-brand-logo px-1.5 py-0.5 text-xs font-bold uppercase leading-none tracking-wide text-topbar-accent-foreground dark:bg-brand-on-topbar dark:text-brand">
         Beta
@@ -69,12 +79,22 @@ function profitToneClass(value: number): string {
 const stackShell =
   "flex min-h-0 flex-col items-end justify-center gap-0.5 px-1.5 text-[12px] sm:text-xs";
 
+/** Full label on sm+, terse on narrow viewports where the stacks collide. */
+function StackLabel({ full, short }: { full: string; short: string }) {
+  return (
+    <>
+      <span className="max-sm:hidden">{full}</span>
+      <span className="sm:hidden">{short}</span>
+    </>
+  );
+}
+
 function StackRow({
   label,
   value,
   amountClass,
 }: {
-  label: string;
+  label: ReactNode;
   value: number;
   amountClass?: string;
 }) {
@@ -116,10 +136,10 @@ function TopBarProfitStack({
         aria-label={`Free bets ${freeBets.toFixed(2)}`}
       >
         <StackRow
-          label="Free bets"
+          label={<StackLabel full="Free bets" short="FB" />}
           value={freeBets}
           amountClass={
-            freeBetsActive ? "text-violet-600 dark:text-violet-400" : undefined
+            freeBetsActive ? "text-edge" : undefined
           }
         />
       </button>
@@ -142,7 +162,7 @@ function BankrollRows({
       {companion === "in-bets" ? (
         <StackRow label="In-bets" value={inBets} />
       ) : (
-        <StackRow label="Exchange" value={exchange} />
+        <StackRow label={<StackLabel full="Exchange" short="Exch." />} value={exchange} />
       )}
       <StackRow label="Total" value={total} />
     </>
@@ -218,10 +238,10 @@ function MobileStatStacks({
         </Link>
         <button type="button" onClick={onFreeBets} aria-label={`Free bets ${freeBets.toFixed(2)}`}>
           <StackRow
-            label="Free bets"
+            label={<StackLabel full="Free bets" short="FB" />}
             value={freeBets}
             amountClass={
-              freeBetsActive ? "text-violet-600 dark:text-violet-400" : undefined
+              freeBetsActive ? "text-edge" : undefined
             }
           />
         </button>
