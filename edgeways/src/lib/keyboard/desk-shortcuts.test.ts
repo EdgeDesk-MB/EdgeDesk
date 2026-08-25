@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DESK_GO_PREFIX_MS,
+  focusedOpenBetRow,
   matchDeskShortcut,
+  matchSettleFocusedBetChord,
   overlayAttrsBlockShortcuts,
   resolveDeskKey,
   shouldIgnoreDeskShortcut,
@@ -42,7 +44,36 @@ describe("matchDeskShortcut", () => {
 
   it("does not steal unused letters", () => {
     expect(matchDeskShortcut(key("g"))).toBeNull();
+    expect(matchDeskShortcut(key("s"))).toBeNull();
     expect(matchDeskShortcut(key("Escape"))).toBeNull();
+  });
+});
+
+describe("matchSettleFocusedBetChord (EDGE-79)", () => {
+  it("matches a plain s", () => {
+    expect(matchSettleFocusedBetChord(key("s"))).toBe(true);
+    // A real capital S arrives with shiftKey — rejected below.
+    expect(matchSettleFocusedBetChord(key("S", { shiftKey: true }))).toBe(false);
+  });
+
+  it("rejects modifiers and other keys", () => {
+    expect(matchSettleFocusedBetChord(key("s", { shiftKey: true }))).toBe(false);
+    expect(matchSettleFocusedBetChord(key("s", { metaKey: true }))).toBe(false);
+    expect(matchSettleFocusedBetChord(key("s", { ctrlKey: true }))).toBe(false);
+    expect(matchSettleFocusedBetChord(key("s", { altKey: true }))).toBe(false);
+    expect(matchSettleFocusedBetChord(key("n"))).toBe(false);
+    expect(matchSettleFocusedBetChord(key("Escape"))).toBe(false);
+  });
+});
+
+describe("focusedOpenBetRow (EDGE-79)", () => {
+  it("returns null without a focused element", () => {
+    expect(focusedOpenBetRow(null)).toBeNull();
+  });
+
+  it("returns null outside the browser (no Element global)", () => {
+    // Node test env: the guard must fail safe, never throw.
+    expect(focusedOpenBetRow({} as Element)).toBeNull();
   });
 });
 

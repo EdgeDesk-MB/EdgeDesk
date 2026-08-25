@@ -15,6 +15,9 @@ import { useAppState } from "@/hooks/use-app-state";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import {
   DESK_JUMPS,
+  SETTLE_TRIGGER_SELECTOR,
+  focusedOpenBetRow,
+  matchSettleFocusedBetChord,
   resolveDeskKey,
   shouldIgnoreDeskShortcut,
 } from "@/lib/keyboard/desk-shortcuts";
@@ -31,8 +34,19 @@ export function DeskShortcuts() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (shouldIgnoreDeskShortcut(event, document)) return;
+      const prefixWasArmed = goPrefixAt.current !== null;
       const resolved = resolveDeskKey(event, goPrefixAt.current, Date.now());
       goPrefixAt.current = resolved.nextPrefixArmedAt;
+      if (!resolved.consume && !prefixWasArmed && matchSettleFocusedBetChord(event)) {
+        const trigger = focusedOpenBetRow(document.activeElement)?.querySelector(
+          SETTLE_TRIGGER_SELECTOR
+        );
+        if (trigger instanceof HTMLElement) {
+          event.preventDefault();
+          trigger.click();
+        }
+        return;
+      }
       if (!resolved.consume) return;
       event.preventDefault();
       const id = resolved.action;

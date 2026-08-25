@@ -178,8 +178,17 @@ export function BetLogTable({
             <div
               key={bet.id}
               id={`bet-card-${bet.id}`}
+              {...(canManualSettle
+                ? {
+                    tabIndex: 0,
+                    "data-open-bet-row": bet.id,
+                    "aria-label": `Open bet: ${betLogTitle(bet)}. Press S to set the result.`,
+                  }
+                : {})}
               className={cn(
                 "border-b border-border/60 px-[var(--layout-page-x)] py-3",
+                canManualSettle &&
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-inset",
                 highlightId === bet.id && "bet-row-highlight"
               )}
             >
@@ -382,8 +391,17 @@ export function BetLogTable({
             <TableRow
               key={bet.id}
               id={`bet-row-${bet.id}`}
+              {...(canManualSettle
+                ? {
+                    tabIndex: 0,
+                    "data-open-bet-row": bet.id,
+                    "aria-label": `Open bet: ${betLogTitle(bet)}. Press S to set the result.`,
+                  }
+                : {})}
               className={cn(
                 "hover:bg-transparent",
+                canManualSettle &&
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-inset",
                 highlightId === bet.id && "bet-row-highlight"
               )}
             >

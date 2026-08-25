@@ -118,6 +118,7 @@ export function ManualSettleDialog({
           <Button
             variant="outline"
             size="sm"
+            data-settle-trigger={bet.id}
             className={cn(
               "h-7 px-2 text-[11px] max-sm:h-9 max-sm:px-3 max-sm:text-xs",
               resultActionButtonClass

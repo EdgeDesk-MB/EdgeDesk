@@ -84,6 +84,14 @@ export const SHORTCUT_SHEET_ROWS: ReadonlyArray<ShortcutRow> = [
     haystack: "matched calculator",
   },
   {
+    id: "settle-focused-bet",
+    group: "daily",
+    groupLabel: "Daily",
+    label: "Settle the focused bet",
+    chord: { keys: ["S"], kind: "chord" },
+    haystack: "settle result focused open bet row tracker won lost",
+  },
+  {
     id: "jump-home",
     group: "go-to",
     groupLabel: "Go to",

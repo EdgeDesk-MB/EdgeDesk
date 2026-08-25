@@ -39,6 +39,15 @@ export const DESK_SHORTCUTS: ReadonlyArray<{
 
 export const KEYBOARD_HELP_HREF = "/help?guide=keyboard";
 
+/**
+ * EDGE-79: bare `s` opens Set result on the keyboard-focused open bet row.
+ * The row carries the focus target; the chord never fires while typing or
+ * while a dialog is open (shouldIgnoreDeskShortcut runs first).
+ */
+export const SETTLE_FOCUSED_BET_KEY = "s";
+export const OPEN_BET_ROW_SELECTOR = "[data-open-bet-row]";
+export const SETTLE_TRIGGER_SELECTOR = "[data-settle-trigger]";
+
 const NON_TEXT_INPUT_TYPES = new Set([
   "button",
   "submit",
@@ -127,6 +136,25 @@ type ShortcutKeyEvent = Pick<
   KeyboardEvent,
   "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey"
 >;
+
+/** EDGE-79: plain `s` only — modifiers and shift belong to other chords. */
+export function matchSettleFocusedBetChord(event: ShortcutKeyEvent): boolean {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return false;
+  }
+  return (
+    event.key.length === 1 &&
+    event.key.toLowerCase() === SETTLE_FOCUSED_BET_KEY
+  );
+}
+
+/** The open-bet row owning the current focus, if any. */
+export function focusedOpenBetRow(active: Element | null): Element | null {
+  if (typeof Element === "undefined" || !(active instanceof Element)) {
+    return null;
+  }
+  return active.closest(OPEN_BET_ROW_SELECTOR);
+}
 
 export function matchDeskShortcut(event: ShortcutKeyEvent): DeskShortcutId | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null;

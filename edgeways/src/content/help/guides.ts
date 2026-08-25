@@ -473,9 +473,13 @@ export const HELP_GUIDES: HelpGuide[] = [
           "add-bet",
           "new-offer",
           "matched-calculator",
+          "settle-focused-bet",
           "jump-home",
           "jump-racing",
           "jump-offers",
+        ],
+        bullets: [
+          "Tab to an open bet in the Tracker, then S opens Set result",
         ],
       },
       {
