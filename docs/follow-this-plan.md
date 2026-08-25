@@ -8,7 +8,7 @@
 > Last updated: **25 Aug 2026** (EDGE-7 **done** — test-mode billing rehearsal
 fully passed: automated webhook drill + Sam's click-through; cancellation
 visibility and success-slip fixes shipped from findings. Live-mode rerun
-stays M3).
+stays M3. EDGE-22 **done** — the desk now enforces the real plan.)
 
 ---
 
@@ -20,7 +20,10 @@ The billing and first-run path is in. [EDGE-4](https://linear.app/samhayter/issu
 [EDGE-20](https://linear.app/samhayter/issue/EDGE-20),
 [EDGE-21](https://linear.app/samhayter/issue/EDGE-21),
 [EDGE-61](https://linear.app/samhayter/issue/EDGE-61) are **Done**.
-Paying still does **not** lock desk features ([EDGE-22](https://linear.app/samhayter/issue/EDGE-22)).
+[EDGE-22](https://linear.app/samhayter/issue/EDGE-22) is **Done** (25 Aug) —
+paying now locks desk features: the desk gates on the webhook-fed plan from
+`app_users`, the Settings preview can only step down, and `/api/offers/edge`
+is guarded server-side.
 
 **Done 23 Aug:** [EDGE-47](https://linear.app/samhayter/issue/EDGE-47)
 Neon desk cutover — offers, wallets, history and bets all read/write Neon on
@@ -56,10 +59,10 @@ setup-aware CTA. Follow-up filed:
 a second subscription on existing subscribers. Live-mode rerun stays M3.
 
 **Next session (pick one, do not mix in the same day):**
-- [EDGE-22](https://linear.app/samhayter/issue/EDGE-22) desk features read
-  the Neon tier — paying currently locks nothing
 - [EDGE-82](https://linear.app/samhayter/issue/EDGE-82) checkout
-  second-subscription guard (small; pairs with EDGE-22)
+  second-subscription guard (small; natural follow-on from EDGE-22)
+- Server-side entitlement guards on the remaining gated-data routes (racing
+  feeds, exchange lay) — same 403 pattern as `/api/offers/edge`
 - Flip `SITE_SURFACE=app` only when checklist + Sam says so
 
 **Done 24 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80) admin
