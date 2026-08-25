@@ -25,9 +25,10 @@ D7); admin panel live at `/admin` (EDGE-80). Keyboard chords + `?` sheet
 (EDGE-78) and keyboard settle (EDGE-79) shipped; mobile polish round landed
 (EDGE-84/85/86: deck swipe, quick-actions sheet, modal field audit, touch
 targets, compact top bar). **Ahead of the cycle plan by ~4–6 weeks** — the
-C3–C5 build tickets are already Done. Next: the EDGE-45 scope decision
-(launch Core-first vs wait for feed permissions), EDGE-37 checklist pass,
-EDGE-29 → EDGE-33 beta validation, EDGE-67 referral codes, then
+C3–C5 build tickets are already Done. EDGE-45 resolved 25 Aug: D8 staged
+licensing means full tiers launch with pooled feeds; the ticket is now a
+dormant comply-on-contact protocol, not a blocker. Next: EDGE-37 checklist
+pass, EDGE-29 → EDGE-33 beta validation, EDGE-67 referral codes, then
 `SITE_SURFACE=app`.
 The D1 gate was opened for launch-path work on
 10 Aug 2026 — evidence tracked as Linear EDGE-36. Work is in Linear: initiative
