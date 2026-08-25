@@ -421,7 +421,7 @@ function AddBalanceForm({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 items-end gap-2 sm:contents">
+                <div className="grid grid-cols-1 gap-3 sm:contents">
                   {mode === "top_up" && (
                     <div className="flex flex-col gap-1.5">
                       <Label className="text-xs text-muted-foreground">Type</Label>
@@ -448,7 +448,7 @@ function AddBalanceForm({
                       </Select>
                     </div>
                   )}
-                  <div className={cn("flex flex-col gap-1.5", mode !== "top_up" && "col-span-2")}>
+                  <div className="flex flex-col gap-1.5">
                     <Label className="text-xs text-muted-foreground">
                       {mode === "adjustment" ? "New balance" : "Amount"}
                     </Label>

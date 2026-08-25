@@ -162,7 +162,7 @@ export function ManualSettleDialog({
           onChange={setProfit}
           prefixClassName="text-base"
           inputClassName={cn(
-            "h-11 pl-8 text-lg font-semibold md:text-lg",
+            "h-11 max-sm:h-11 pl-8 text-lg font-semibold md:text-lg",
             profitEntryClass(profit)
           )}
         />

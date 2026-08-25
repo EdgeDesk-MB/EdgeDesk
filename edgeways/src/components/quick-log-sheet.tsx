@@ -267,10 +267,10 @@ export function QuickLogSheet() {
           {path === "menu" ? (
             // min-w-0: DialogContent is a grid, so without it this column sizes
             // to the widest plan row's min-content and overflows the sheet.
-            <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-5">
               {planSlots.length > 0 ? (
-                <div className="mb-1.5">
-                  <p className="flex items-center gap-1.5 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <div>
+                  <p className="flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <ListTodo className="size-3.5" aria-hidden />
                     From today&apos;s plan
                   </p>
@@ -300,8 +300,8 @@ export function QuickLogSheet() {
                 />
               </div>
 
-              <div className="mt-1.5">
-                <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div>
+                <p className="px-1 pb-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quick actions
                 </p>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -368,7 +368,7 @@ export function QuickLogSheet() {
                 <Label htmlFor="quick-log-bookie">Bookie</Label>
                 <Input
                   id="quick-log-bookie"
-                  className="h-11"
+                  className="h-11 max-sm:h-11"
                   value={bookie}
                   onChange={(e) => setBookie(e.target.value)}
                   placeholder="Bet365"
@@ -380,7 +380,7 @@ export function QuickLogSheet() {
                   <Label htmlFor="quick-log-stake">Stake (£)</Label>
                   <Input
                     id="quick-log-stake"
-                    className="h-11"
+                    className="h-11 max-sm:h-11"
                     type="number"
                     inputMode="decimal"
                     min={0}
@@ -393,7 +393,7 @@ export function QuickLogSheet() {
                   <Label htmlFor="quick-log-odds">Odds</Label>
                   <Input
                     id="quick-log-odds"
-                    className="h-11"
+                    className="h-11 max-sm:h-11"
                     type="number"
                     inputMode="decimal"
                     min={1}
@@ -408,13 +408,13 @@ export function QuickLogSheet() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 flex-1"
+                  className="h-11 max-sm:h-11 flex-1"
                   onClick={() => setPath("menu")}
                   disabled={saving}
                 >
                   Back
                 </Button>
-                <Button type="submit" className="h-11 flex-1" disabled={saving}>
+                <Button type="submit" className="h-11 max-sm:h-11 flex-1" disabled={saving}>
                   {saving ? "Saving…" : "Save"}
                 </Button>
               </div>
