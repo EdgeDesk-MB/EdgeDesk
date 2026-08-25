@@ -22,6 +22,9 @@ right Neon `app_users` entitlement — no clicking:
 6. Resume → `cancel_at` cleared
 7. Cancel → `free / canceled` (subscription id retained for audit, trial and cancel_at cleared)
 8. Refund the charge → entitlement untouched (`charge.refunded` is ignored by design)
+9. EDGE-82 stacked subs: add a Core sub then an Edge sub, cancel the Edge →
+   entitlement falls back to `core / active` (not Free); cancel the Core →
+   `free / canceled`
 
 Cleans up after itself (deletes the Stripe customer and the Neon row).
 **Requires** `stripe listen --forward-to localhost:3000/api/billing/webhook`

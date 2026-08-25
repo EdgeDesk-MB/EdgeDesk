@@ -50,17 +50,18 @@ operator keys must serve all customer-tracked events within provider
 budgets (football live-score polling is the pinch).
 
 **Done 25 Aug:** [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) test-mode
-billing rehearsal — automated drill (16 checks: trial → paid → downgrade →
-upgrade → scheduled cancel → resume → cancel → refund) + Sam's click-through
-all green. Findings shipped: scheduled-cancel visibility in Settings
-(`cancel_at` → Cancelling badge + access-end date), success-slip copy +
-setup-aware CTA. Follow-up filed:
-[EDGE-82](https://linear.app/samhayter/issue/EDGE-82) Checkout must not stack
-a second subscription on existing subscribers. Live-mode rerun stays M3.
+billing rehearsal — automated drill (20 checks: trial → paid → downgrade →
+upgrade → scheduled cancel → resume → cancel → refund → stacked-sub fallback)
++ Sam's click-through all green. Findings shipped: scheduled-cancel visibility
+in Settings (`cancel_at` → Cancelling badge + access-end date), success-slip
+copy + setup-aware CTA.
+[EDGE-82](https://linear.app/samhayter/issue/EDGE-82) also **done** 25 Aug —
+checkout can no longer stack a second subscription: `/subscribe` redirects
+existing subscribers to the portal, the webhook falls back to a still-live
+sub when an old one dies, and pricing CTAs read "Manage subscription" for
+subscribers. Live-mode rerun stays M3.
 
 **Next session (pick one, do not mix in the same day):**
-- [EDGE-82](https://linear.app/samhayter/issue/EDGE-82) checkout
-  second-subscription guard (small; natural follow-on from EDGE-22)
 - Server-side entitlement guards on the remaining gated-data routes (racing
   feeds, exchange lay) — same 403 pattern as `/api/offers/edge`
 - Flip `SITE_SURFACE=app` only when checklist + Sam says so
