@@ -481,7 +481,7 @@ export function BetBuilderCreateRunForm({
             }
           }}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelInput
             label="Back stake"
             prefix="£"

@@ -696,7 +696,7 @@ function MugPlanForm({
           Camouflage cadence for this bookie.
         </DialogDescription>
       </DialogHeader>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
         <NumField
           label="Every N days"
           value={cadenceDays}
@@ -1372,7 +1372,7 @@ function AccountDetailBody({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300">
                 Wagering requirement
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
                 <div className="flex flex-col gap-1">
                   <Label className="text-[11px] text-muted-foreground">Remaining (£)</Label>
                   <Input

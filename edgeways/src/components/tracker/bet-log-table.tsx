@@ -827,7 +827,7 @@ function LinkEventSelect({
                     autoFocus
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-xs text-muted-foreground">Date</Label>
                     <DatePicker value={raceDate} onChange={setRaceDate} />

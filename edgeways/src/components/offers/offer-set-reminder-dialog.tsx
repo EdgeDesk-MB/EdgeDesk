@@ -146,7 +146,7 @@ export function OfferSetReminderDialog({
               )}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={dateId} className="text-xs font-normal text-muted-foreground">
                 Date

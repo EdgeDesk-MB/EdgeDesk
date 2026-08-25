@@ -180,7 +180,7 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
         <DialogDescription>Enter today&apos;s exchange prices.</DialogDescription>
       </DialogHeader>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
         <NumField
           label="Exchange lay (now)"
           value={currentLayOdds}

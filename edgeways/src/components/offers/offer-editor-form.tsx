@@ -1191,7 +1191,7 @@ export function OfferEditorForm({
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={saveOffer}>
       <div className="flex-1 space-y-2.5 overflow-y-auto px-6 py-5">
       <div className="flex items-end gap-2">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground">Category</Label>
             <Select value={category} onValueChange={(v) => setCategory(normalizeOfferCategoryId(v))}>
@@ -1286,7 +1286,7 @@ Expires 12 Aug 2026, 23:59`}
           }`}
         >
           {/* Money first — stake/free always; min runners only for desk place-refunds. */}
-          <div className={resultConditional ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
+          <div className={resultConditional ? "grid grid-cols-3 gap-2 max-sm:grid-cols-1" : "grid grid-cols-2 gap-2 max-sm:grid-cols-1"}>
             <div className="flex flex-col gap-1">
               <Label htmlFor="offer-stake" className="text-xs text-muted-foreground">
                 Bet stake (£)
@@ -1486,7 +1486,7 @@ Expires 12 Aug 2026, 23:59`}
           onOpenChange={setSectionScope}
           summary={scopeSummary}
         >
-          <div className={needsRacingDay ? "grid grid-cols-2 gap-2" : undefined}>
+          <div className={needsRacingDay ? "grid grid-cols-2 gap-2 max-sm:grid-cols-1" : undefined}>
             {needsRacingDay ? (
               <div className="flex flex-col gap-1">
                 <Label htmlFor="offer-event-date" className="text-xs text-muted-foreground">
@@ -1780,7 +1780,7 @@ Expires 12 Aug 2026, 23:59`}
             </span>
           </label>
         ) : null}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1">
             <PasteFieldLabel htmlFor="offer-exp" provenance={pasteProvenance.expected}>
               Expected profit (£)
@@ -1815,7 +1815,7 @@ Expires 12 Aug 2026, 23:59`}
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1">
             <PasteFieldLabel
               htmlFor="offer-expires-date"
@@ -1884,7 +1884,7 @@ Expires 12 Aug 2026, 23:59`}
         ) : null}
         {editingId == null && repeatsEnabled ? (
           <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-2.5">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Frequency</Label>
                 <Select
@@ -1996,7 +1996,7 @@ Expires 12 Aug 2026, 23:59`}
         summary={formatImportantTermsSummary(importantFromForm()) || undefined}
         accent
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1">
             <PasteFieldLabel htmlFor="offer-promo-code" provenance={pasteProvenance.promoCode}>
               Promo / deposit code
@@ -2152,7 +2152,7 @@ Expires 12 Aug 2026, 23:59`}
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1">
             <PasteFieldLabel htmlFor="offer-min-odds" provenance={pasteProvenance.minOdds}>
               Min odds

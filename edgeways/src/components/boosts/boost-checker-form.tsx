@@ -223,7 +223,7 @@ export function BoostCheckerForm({
           onChange={setLabel}
           placeholder={mode === "boost" ? "e.g. Salah anytime scorer" : "e.g. Salah + over 2.5"}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelInput
             label="Back stake"
             prefix="£"
@@ -277,7 +277,7 @@ export function BoostCheckerForm({
             </span>
           }
         >
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <ExchangeSelect
               onPanel
               exchanges={exchanges}
@@ -294,7 +294,7 @@ export function BoostCheckerForm({
               exchangeOddsStepping
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <PanelInput
               label="Exchange back (decimal)"
               value={exchangeBack}

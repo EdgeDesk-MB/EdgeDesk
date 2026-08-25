@@ -67,7 +67,7 @@ export function RecurrenceRuleFields({
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-2.5">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Frequency</Label>
           <Select

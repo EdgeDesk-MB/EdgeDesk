@@ -306,7 +306,7 @@ export function EachWayCalculatorForm({
       )}
 
       <BackPanel title="Back Bet (Bookie)" exchange={exchange} venue={bookmaker}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelBookieInput
             value={bookmaker}
             onChange={setBookmaker}
@@ -431,7 +431,7 @@ export function EachWayCalculatorForm({
           ) : null
         }
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <div className="col-span-2 sm:col-span-1">
             <ExchangeSelect
               onPanel
@@ -470,7 +470,7 @@ export function EachWayCalculatorForm({
           Place lay is manual until the desk has live PLACE prices. Confirm against the exchange
           before filling the slip.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <LayStakeBanner
             label="Lay WIN stake"
             value={layWinStake}

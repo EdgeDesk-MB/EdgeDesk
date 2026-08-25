@@ -355,7 +355,7 @@ export function CasinoComponentForm({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
         {componentType === "qualifying_wager" ? (
           <>
             <NumField label="Wager amount" prefix="£" value={amount} onChange={setAmount} min={0} />

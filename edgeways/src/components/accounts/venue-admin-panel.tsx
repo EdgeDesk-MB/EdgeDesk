@@ -581,7 +581,7 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
                 onChange={(e) => setCommission(parseFloat(e.target.value) || 0)}
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
               {(
                 [
                   ["Brand", brandColor, setBrandColor],

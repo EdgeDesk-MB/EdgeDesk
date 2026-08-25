@@ -212,7 +212,7 @@ export function DutchOutcomesBuilder({
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <div className="flex flex-col gap-1">
               <span className="text-xs font-semibold text-muted-foreground">
                 Fix stake on
@@ -349,7 +349,7 @@ export function DutchOutcomesBuilder({
                   className="shrink-0 [--pi:transparent] [--pi-dark:transparent]"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
                 <PanelInput
                   label="Odds"
                   value={leg.odds}

@@ -158,7 +158,7 @@ export function CasinoOfferEditDialog({
             aria-invalid={urlError ? true : undefined}
             error={urlError}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-casino-expires-date" className="text-xs text-muted-foreground">
                 Expires

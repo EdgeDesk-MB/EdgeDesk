@@ -113,7 +113,7 @@ export function AdvancedLaySection({
           onPartLays(partLays.map((p, j) => (j === i ? { ...p, stake } : p)))
         );
         return (
-        <div key={i} className="flex items-end gap-2">
+        <div key={i} className="flex items-end gap-2 max-sm:flex-col max-sm:items-stretch">
           <label className="flex flex-1 flex-col gap-1">
             <span className="text-xs font-medium text-black/60 dark:text-white/60">
               Part lay {i + 1} odds

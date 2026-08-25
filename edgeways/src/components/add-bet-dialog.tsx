@@ -2086,7 +2086,7 @@ export function AddBetDialog({
                 </p>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">Sport</Label>
                 <Select
@@ -2251,7 +2251,7 @@ export function AddBetDialog({
                 className={ring(!!highlightEmpty && !eventName.trim() && eventId === "none")}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">Date</Label>
                 <DatePicker
@@ -2337,7 +2337,7 @@ export function AddBetDialog({
               </div>
             )}
             {sport === "football" && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">Home team</Label>
                   <Input
@@ -2617,7 +2617,7 @@ export function AddBetDialog({
                   ) : null}
                 </div>
               ) : null}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                 <PanelInput
                   label={stakingFreeBet ? "Free bet stake" : "Back stake"}
                   prefix="£"
@@ -2725,7 +2725,7 @@ export function AddBetDialog({
                 </span>
               }
             >
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                 <ExchangeSelect
                   onPanel
                   exchanges={exchanges}

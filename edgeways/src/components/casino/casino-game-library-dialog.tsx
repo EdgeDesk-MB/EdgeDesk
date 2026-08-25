@@ -82,7 +82,7 @@ export function CasinoGameLibraryDialog({
             Published base RTPs. Correct any that differ.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid shrink-0 grid-cols-[1fr_7rem_auto] items-end gap-2">
+        <div className="grid shrink-0 grid-cols-[1fr_7rem_auto] items-end gap-2 max-sm:grid-cols-[1fr_7rem]">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="game-name" className="text-xs text-muted-foreground">
               Game

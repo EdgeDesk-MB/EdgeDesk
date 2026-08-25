@@ -254,7 +254,7 @@ export function MatchedCalculator({
           ) : null}
         </div>
         {showBonus && (bonusKind === "double_winnings" || bonusKind === "double_return") ? (
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <PanelInput
               label="Max stake for offer"
               prefix="£"
@@ -273,7 +273,7 @@ export function MatchedCalculator({
         ) : null}
         {showBonus &&
         (bonusKind === "free_bet_on_win" || bonusKind === "free_bet_on_lose") ? (
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <PanelInput
               label="Free bet value"
               prefix="£"
@@ -320,7 +320,7 @@ export function MatchedCalculator({
       </div>
 
       <BackPanel title="Back Bet" exchange={exchange} venue={bookmaker}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelBookieInput
             value={bookmaker}
             onChange={setBookmaker}
@@ -377,7 +377,7 @@ export function MatchedCalculator({
           </span>
         }
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <div className="col-span-2 sm:col-span-1">
             <ExchangeSelect
               onPanel

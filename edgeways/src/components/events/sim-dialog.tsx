@@ -58,7 +58,7 @@ export function SimDialog({
             ))}
           </SelectContent>
         </Select>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Home star striker</Label>
             <Input
