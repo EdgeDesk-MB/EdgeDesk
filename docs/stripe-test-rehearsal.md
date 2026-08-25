@@ -153,9 +153,31 @@ events land (`--> checkout.session.completed … [200]`).
 5. **3DS path** (1 min, optional)
    - `4000 0025 0000 3155` → complete the fake 3DS challenge → succeeds.
 
-If every step matches, test-mode EDGE-7 is done. What remains for the
-**live** rehearsal at M3 (launch): recreate the 5 prices in live mode, set
-live `STRIPE_*` env vars in Vercel production, register the live webhook
-endpoint (`https://edgeways.app/api/billing/webhook`, events:
-`checkout.session.completed`, `customer.subscription.created/updated/deleted`),
-then re-run this list once with a real card and refund it.
+If every step matches, test-mode EDGE-7 is done.
+
+## Live-mode state (verified 25 Aug)
+
+Already in place on the live account (created 19 Aug, EDGE-3/5 era;
+account activated — charges and payouts enabled):
+
+| What | Live ID |
+|------|---------|
+| Core monthly £9.99 | `price_1U66r5COWjjJHXGsSS2BEYBI` |
+| Core yearly £99.90 | `price_1U66r6COWjjJHXGsZbrCOCdx` |
+| Edge monthly £24.99 | `price_1U66r7COWjjJHXGsaS2Ni8re` |
+| Edge yearly £249.90 | `price_1U66r8COWjjJHXGs7weU17vH` |
+| Edge Founding monthly £9.99 | `price_1U66r9COWjjJHXGsPrEen3Rt` |
+| Webhook endpoint (4 events, enabled) | `we_1U67UYCOWjjJHXGs82FmHE5q` |
+| Portal config (cancel at period end, plan switch, card, invoices) | `bpc_1U67CsCOWjjJHXGsZsTF9sTq` |
+
+Public details (statement descriptor EDGEWAYS, ToS/Privacy URLs) and
+branding: done by Sam 25 Aug.
+
+What remains for the **live** rehearsal at M3 (launch):
+
+1. Set live `STRIPE_*` env vars in Vercel production: `STRIPE_SECRET_KEY`
+   (`sk_live_…`), the five price IDs above, `STRIPE_PORTAL_CONFIGURATION_ID`
+   above, and `STRIPE_WEBHOOK_SECRET` — the signing secret from Developers →
+   Webhooks → the endpoint above (Reveal; it cannot be retrieved via API).
+2. Re-run the click-through list once on https://edgeways.app with a real
+   card, then refund and cancel from the Dashboard.
