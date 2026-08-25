@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MoneyFlow } from "@/components/money-flow";
 import { cn } from "@/lib/utils";
 import { dashboardSection } from "@/lib/ui/dashboard-layout";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useLivelineHoverOutline } from "@/lib/ui/liveline-tooltip-outline";
 import { ChartBetMarkersOverlay } from "@/components/dashboard/chart-bet-markers-overlay";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
@@ -120,6 +121,7 @@ export const LivePnlChart = memo(function LivePnlChart({
   className?: string;
 }) {
   const { resolvedTheme } = useTheme();
+  const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   const [livePoints, setLivePoints] = useState<LivePnlPoint[]>([]);
   const [chartWindowSecs, setChartWindowSecs] = useState<number>(DEFAULT_CHART_WINDOW);
@@ -204,7 +206,7 @@ export const LivePnlChart = memo(function LivePnlChart({
           icon={hasLiveEvent ? Radio : undefined}
           iconClassName={
             hasLiveEvent
-              ? "animate-pulse text-emerald-600 motion-reduce:animate-none"
+              ? "animate-pulse text-profit motion-reduce:animate-none"
               : undefined
           }
           title={hasLiveEvent ? "Live chart" : "Chart"}
@@ -288,6 +290,11 @@ export const LivePnlChart = memo(function LivePnlChart({
                   },
                   windowStyle: "rounded" as const,
                 })}
+                // Mobile: the chart lives in the Home swipe deck. Liveline's
+                // touch scrub preventDefaults touchmove, which would swallow
+                // the deck's horizontal swipe — so touch scrub stays off on
+                // small viewports. Desktop hover scrub is unaffected.
+                scrub={isMobile === true ? false : undefined}
                 referenceLine={{ value: chartReferenceValue }}
                 emptyText="Profit updates appear here as bets settle and events go live."
                 formatValue={(v) => `£${v.toFixed(2)}`}

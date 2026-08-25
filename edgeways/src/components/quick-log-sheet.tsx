@@ -49,7 +49,11 @@ import { beginEffort } from "@/lib/effort-timer";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { buildDailyPlan, type DailyPlanSlot } from "@/lib/plan/daily-plan";
-import { listRowInteractive } from "@/lib/ui/surface-styles";
+import {
+  listRowInteractive,
+  offerCampaignCardInteractive,
+  panelSurface,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 type QuickLogPath = "menu" | "manual";
@@ -67,7 +71,8 @@ function PlanSlotButton({
       onClick={() => onPick(slot)}
       className={cn(
         listRowInteractive,
-        "flex min-h-11 w-full items-center gap-3 px-2 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-selection-subtle"
+        "flex min-h-12 w-full items-center gap-3 px-2 py-3 text-left outline-none active:bg-selection-subtle",
+        "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
       )}
     >
       <span className="min-w-0 flex-1">
@@ -80,6 +85,41 @@ function PlanSlotButton({
   );
 }
 
+/**
+ * The two capture paths are the sheet's reason to exist, so they wear the
+ * FAB's own material (bg-primary + skeuo-solid face) - the one bold spend
+ * on this surface.
+ */
+function CapturePathButton({
+  icon: Icon,
+  label,
+  caption,
+  onPick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  caption: string;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={cn(
+        offerCampaignCardInteractive,
+        "skeuo-solid flex min-h-[5.5rem] flex-col items-start justify-center gap-1 rounded-xl bg-primary px-4 py-3.5 text-left text-primary-foreground outline-none",
+        "active:brightness-95",
+        "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+      )}
+    >
+      <Icon className="size-6" aria-hidden />
+      <span className="text-base font-semibold leading-tight">{label}</span>
+      <span className="text-xs leading-tight">{caption}</span>
+    </button>
+  );
+}
+
+/** Welcome-hub tile language: glassy plate, brand-tinted icon, thumb-sized. */
 function QuickActionButton({
   icon: Icon,
   label,
@@ -90,15 +130,20 @@ function QuickActionButton({
   onPick: () => void;
 }) {
   return (
-    <Button
+    <button
       type="button"
-      variant="outline"
-      className="h-11 justify-start gap-2.5 text-sm"
       onClick={onPick}
+      className={cn(
+        panelSurface,
+        offerCampaignCardInteractive,
+        "flex min-h-[5.5rem] flex-col items-start justify-center gap-1.5 px-3.5 py-3 text-left outline-none",
+        "active:bg-selection-subtle",
+        "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+      )}
     >
-      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <span className="truncate">{label}</span>
-    </Button>
+      <Icon className="size-6 shrink-0 text-primary-text" aria-hidden />
+      <span className="text-base font-medium leading-tight">{label}</span>
+    </button>
   );
 }
 
@@ -207,7 +252,7 @@ export function QuickLogSheet() {
           if (!next) reset();
         }}
       >
-        <DialogContent>
+        <DialogContent data-dialog-tone="page" className="dark:bg-page">
           <DialogHeader>
             <DialogTitle>{path === "manual" ? "Log manually" : "Quick actions"}</DialogTitle>
             <DialogDescription>
@@ -235,18 +280,20 @@ export function QuickLogSheet() {
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-2">
-                <QuickActionButton
+              <div className="grid grid-cols-2 gap-2.5">
+                <CapturePathButton
                   icon={ClipboardPaste}
                   label="Paste slip"
+                  caption="Screenshot in, bet logged"
                   onPick={() => {
                     setOpen(false);
                     openAddBet({ quickLogged: true, autoOpenImport: true });
                   }}
                 />
-                <QuickActionButton
+                <CapturePathButton
                   icon={PencilLine}
                   label="Log manually"
+                  caption="Bookie, stake, odds"
                   onPick={() => setPath("manual")}
                 />
               </div>
@@ -255,7 +302,7 @@ export function QuickLogSheet() {
                 <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quick actions
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   <QuickActionButton
                     icon={Gift}
                     label="New offer"
