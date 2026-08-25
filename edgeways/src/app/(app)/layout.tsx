@@ -4,6 +4,7 @@ import { QuickLogSheet } from "@/components/quick-log-sheet";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { AlertWatcher } from "@/components/alert-watcher";
 import { CommandPalette } from "@/components/command-palette";
+import { DeskShortcuts } from "@/components/desk-shortcuts";
 import { AddBalanceProvider } from "@/components/add-balance-provider";
 import { AddBetProvider } from "@/components/add-bet-provider";
 import { EachWayCalculatorProvider } from "@/components/each-way-calculator-provider";
@@ -71,6 +72,7 @@ export default async function AppLayout({
                                 <QuickLogSheet />
                                 <PwaInstallPrompt />
                                 <CommandPalette />
+                                <DeskShortcuts />
                                 <DocumentTitleController />
                                 <AlertWatcher />
                                 <RacingAutopilotListener />

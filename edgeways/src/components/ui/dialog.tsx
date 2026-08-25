@@ -6,6 +6,7 @@ import { CircleHelp, XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal"
+import { shouldCommitDialogSave } from "@/lib/keyboard/dialog-save"
 import {
   dialogDescription,
   dialogHeaderBand,
@@ -74,6 +75,7 @@ function DialogContent({
   onFocusOutside,
   onPointerDownOutside,
   onInteractOutside,
+  onKeyDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -92,6 +94,14 @@ function DialogContent({
           className
         )}
         {...props}
+        onKeyDownCapture={(e) => {
+          const save = shouldCommitDialogSave(e.nativeEvent, e.currentTarget)
+          if (!save) return
+          e.preventDefault()
+          e.stopPropagation()
+          save.click()
+        }}
+        onKeyDown={onKeyDown}
         onFocusOutside={(e) => {
           preventDialogDismissOnPortaledContent(e)
           onFocusOutside?.(e)

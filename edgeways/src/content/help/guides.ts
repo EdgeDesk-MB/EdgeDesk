@@ -14,6 +14,8 @@ export interface HelpSection {
   heading?: string;
   paragraphs?: string[];
   bullets?: string[];
+  /** Keycap rows. Used by the keyboard guide. */
+  shortcutIds?: ReadonlyArray<string>;
 }
 
 export interface HelpGuide {
@@ -27,37 +29,37 @@ export const HELP_GUIDES: HelpGuide[] = [
   {
     slug: "getting-started",
     title: "Getting started",
-    description: "Install, run locally, demo mode vs API keys, and the 60-second demo loop.",
+    description: "What Edgeways is, first-run setup, demo data, and the 60-second loop.",
     sections: [
       {
         heading: "What is Edgeways?",
         paragraphs: [
-          "Edgeways is a local-first matched betting command centre. Calculators, profit tracking, live events and a real-time P&L dashboard - with your edge surfaced on every screen.",
-          "Your data lives in SQLite at data/edgeways.db. Nothing leaves your machine unless you add API keys for live feeds.",
+          "Edgeways is a matched betting command centre. Calculators, profit tracking, live events and a real-time P&L dashboard, with your edge surfaced on every screen.",
+          "Your activity lives in your Edgeways account. Export CSV anytime from Settings → Data & API.",
         ],
       },
       {
-        heading: "Run it",
+        heading: "First run",
         bullets: [
-          "npm install && npm run dev",
-          "Open http://localhost:3000",
-          "Optional: cp .env.example .env.local and add API keys",
+          "Sign in, then finish setup: bank, bookies, bet defaults and alerts.",
+          "We do not send bookie offers. You bring the promo; the desk runs the day.",
+          "Settings → Subscription shows your plan, Preview Edge, and opens Stripe for billing.",
         ],
       },
       {
-        heading: "Demo mode vs API keys",
+        heading: "Demo data vs live feeds",
         paragraphs: [
           "Calculators, tracker, offers, settlement and the football simulator work without live feeds. When the racing, football or exchange feeds are not connected, the desk uses demo fixtures and sample racecards.",
         ],
         bullets: [
-          "Demo fixtures and sample racecards when no keys are set",
+          "Demo fixtures and sample racecards when a feed is not connected",
           "Football simulator plays a full 90 minutes in ~3 real minutes",
           "Proxy bookie odds on Racing Desk (ORF-based estimates)",
           "Manual settlement for all sports",
         ],
       },
       {
-        heading: "Recommended free stack (£0/month)",
+        heading: "Live feeds",
         bullets: [
           "Racing cards for today and tomorrow, with paste-in bookie odds",
           "Delayed exchange prices for pre-race lays",
@@ -67,7 +69,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       },
       {
         heading: "The 60-second demo loop",
-        paragraphs: ["Try the full live experience without any API keys:"],
+        paragraphs: ["Try the full live experience without waiting for live feeds:"],
         bullets: [
           "Tracked Events → Simulate match → “2UP drama” → Kick off",
           "Calculators → Dutching → 2UP early payout dutch → Add to profit tracker",
@@ -121,7 +123,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "The live layer: what refreshes when",
         paragraphs: [
-          "The Home dashboard polls the app state every few seconds (tunable in Settings). That poll is also the platform's heartbeat: several background jobs run compute-on-poll, meaning they fire while the desk is open and stay silent when it is not. Nothing runs on a server somewhere - your machine is the desk.",
+          "The Home dashboard polls the app state every few seconds (tunable in Settings). That poll is also the desk's heartbeat: several background jobs run while the desk is open and stay quiet when it is not.",
         ],
         bullets: [
           "Live football scores refresh at most once per 60s per tracked match; goal timelines only re-fetch when the score changes (the API allows ~95 requests/day, and the budget guard alerts once daily if it runs dry).",
@@ -399,7 +401,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Add to tracker",
         paragraphs: [
-          "Core and Pro calculators have an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, and save. With API keys, 2UP Desk and 2UP can find-or-create the real fixture automatically.",
+          "Core and Pro calculators have an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, and save. When football fixtures are connected, 2UP Desk and 2UP can find-or-create the real fixture automatically.",
         ],
       },
       {
@@ -415,66 +417,32 @@ export const HELP_GUIDES: HelpGuide[] = [
   {
     slug: "mobile",
     title: "On your phone",
-    description: "Reach Edgeways from your phone on the same network, install it, and get push alerts.",
+    description: "Install Edgeways on your phone and get push alerts.",
     sections: [
       {
         heading: "Open Edgeways on your phone",
         paragraphs: [
-          "With the dev server running on your computer, visit its LAN address from the phone - for example http://192.168.50.71:3000 (find your IP with ipconfig getifaddr en0 on Mac, or use the machine name such as http://sams-mac-studio.local:3000).",
+          "Open the same Edgeways address you use on the computer, in Chrome or Safari. Sign in with the same account.",
         ],
         bullets: [
-          "Phone and computer must be on the same Wi-Fi network",
-          "The LAN address must be listed in allowedDevOrigins in next.config.ts - without it Next.js blocks its own assets cross-origin and the app loads dead (empty data, menu unresponsive). Your current IP and machine name are already configured; if your router hands out a new IP, add it and restart the server",
+          "Add to Home Screen when the browser offers it, for a full-screen desk",
+          "iPhone: Share → Add to Home Screen. Android Chrome: the install banner, or the browser menu",
         ],
       },
       {
-        heading: "Why push needs one extra step",
-        paragraphs: [
-          "Browsers only allow service workers, install-to-home-screen and push on secure origins. http://localhost counts as secure, but a plain http:// LAN address does not - so over the bare LAN URL the app works fully, but the push toggle reports the browser as unsupported.",
-        ],
-      },
-      {
-        heading: "Enable push on Android Chrome (one-time)",
+        heading: "Enable push",
         bullets: [
-          "On the phone, open chrome://flags/#unsafely-treat-insecure-origin-as-secure",
-          "Enter your Edgeways LAN address (e.g. http://192.168.50.71:3000) in the box, set the flag to Enabled, relaunch Chrome",
-          "Open Edgeways, add it to your Home Screen when prompted, then Settings → Alerts → flip \"Push to this device\" and allow notifications",
-          "Tap \"Send test push\" - the notification should land even after you close the app (lightning badge + yellow bolt icon; open the PWA once after updates so the service worker caches the art)",
+          "Settings → Alerts → flip “Push to this device” and allow notifications",
+          "Tap Send test push. The notification should land even after you close the app (lightning badge + yellow bolt icon)",
+          "Open the installed app once after an update so the service worker can refresh the notification art",
         ],
       },
       {
-        heading: "Two gotchas after the flag",
+        heading: "If push stays off",
         bullets: [
-          "The Home Screen entry opens in Chrome with a URL bar, not full screen. That is expected: Android only mints true standalone apps for real https sites, so a flagged http address gets a shortcut instead. Push works exactly the same either way",
-          "Notifications have TWO switches: the Android app-level one (on the shortcut) and Chrome's site-level one. If Edgeways keeps saying notifications need enabling, the site is blocked in Chrome - tap the tune/padlock icon by the address → Permissions → Notifications → Allow (or Chrome ⋮ → Settings → Site settings → Notifications, and move the address out of Blocked)",
-          "For the real full-screen app and access away from home, serve Edgeways over genuine https (e.g. Tailscale serve) - then no flag is needed at all",
-        ],
-      },
-      {
-        heading: "Alternative: USB (adb)",
-        bullets: [
-          "With USB debugging on and the phone plugged in: adb reverse tcp:3000 tcp:3000",
-          "The phone can then open http://localhost:3000, which browsers treat as secure - no flag needed",
-        ],
-      },
-      {
-        heading: "Once subscribed, push works anywhere",
-        paragraphs: [
-          "The LAN address only matters for browsing and for the one-time subscription. After that, alerts travel from your computer through the browser's push relay to the phone - so they arrive wherever the phone has signal, as long as the Edgeways server is running at home.",
-        ],
-      },
-      {
-        heading: "The proper setup: Tailscale (real https, no flag)",
-        paragraphs: [
-          "With Tailscale on both the computer and the phone, Edgeways gets a genuine https address - full-screen install, push and remote browsing with none of the flag workarounds.",
-        ],
-        bullets: [
-          "In the Tailscale admin console, enable MagicDNS and HTTPS certificates (DNS page, one-time)",
-          "On the computer: tailscale serve --bg 3000 - this proxies https://<machine>.<tailnet>.ts.net to Edgeways with a real certificate",
-          "On the phone (Tailscale connected): open that https address - install properly from the banner, then enable push in Settings → Alerts from the new address",
-          "Afterwards, remove the Chrome flag - it is no longer needed. Push subscriptions are per-address, so re-enable push once from the https address",
-          "Tailscale only needs to be connected for browsing and subscribing; push notifications still arrive with Tailscale off, via the browser's relay",
-          "*.ts.net is already in allowedDevOrigins, so no config change is needed",
+          "Notifications have two switches: the phone’s app-level one and the browser’s site-level one",
+          "If Edgeways says notifications need enabling, the site is blocked. Tap the tune or padlock by the address → Permissions → Notifications → Allow",
+          "On Android you can also use Chrome ⋮ → Settings → Site settings → Notifications, and move the address out of Blocked",
         ],
       },
     ],
@@ -487,19 +455,35 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "The command palette",
         paragraphs: [
-          "Cmd+K (Mac) or Ctrl+K (Windows/Linux) opens the command palette from any page.",
+          "Opens from any page. Type to filter pages, offers and bookie wallets.",
         ],
+        shortcutIds: ["palette"],
         bullets: [
-          "Type to filter pages, open offers and bookie wallets",
           "Quick actions: Add bet, New offer, Matched calculator, Adjust balance, Log casino offer, Check a boost",
           "Arrow keys move, Enter runs, Esc closes",
         ],
       },
       {
+        heading: "Daily shortcuts",
+        paragraphs: [
+          "These only fire when you are not typing in a field, and not while a dialog is open. They never use browser chords such as Cmd+Shift+N. New offer shows the plan lock if Offers is locked.",
+        ],
+        shortcutIds: [
+          "sheet",
+          "add-bet",
+          "new-offer",
+          "matched-calculator",
+          "jump-home",
+          "jump-racing",
+          "jump-offers",
+        ],
+      },
+      {
         heading: "Everyday keys",
+        shortcutIds: ["enter", "esc-help", "save-dialog-help"],
         bullets: [
-          "Enter commits any numeric setting (Tuning, Monthly target) - same as clicking away",
-          "Esc closes every dialog and sheet",
+          "Save a dialog with ⌘Enter on Mac, or Ctrl+Enter on Windows and Linux. We do not use ⌘S, which browsers often steal",
+          "Underline tabs (Settings, Tracker, Racing): Tab moves along the row, then into the page. Arrow keys also work. Segmented filters stay one Tab stop; use arrows there",
           "Tab order follows the visual order on every page; all switches and icon buttons carry accessible names",
         ],
       },
@@ -540,7 +524,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Are delayed exchange prices enough?",
         paragraphs: [
-          "Yes for pre-race matched betting. Prices are 1–3 minutes behind live but fine for place-refund workflows. A live app key (~£499) is only needed for in-play tight spreads.",
+          "Yes for pre-race matched betting. Prices are 1–3 minutes behind live but fine for place-refund workflows. Live prices are only needed for in-play tight spreads.",
         ],
       },
       {
@@ -555,7 +539,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Where is my data stored?",
         paragraphs: [
-          "SQLite at data/edgeways.db in the project folder. Export CSV anytime from Settings → Data & API.",
+          "In your Edgeways account. Export CSV anytime from Settings → Data & API.",
         ],
       },
       {
@@ -575,7 +559,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Support",
         paragraphs: [
-          "Edgeways is a local MVP build. For issues, check Settings → Data & API for connection status and the Roadmap page for known gaps. Community support channel coming in v1.0.",
+          "Email support@edgeways.app or use the contact page. Settings → Data & API shows feed status.",
         ],
       },
     ],
