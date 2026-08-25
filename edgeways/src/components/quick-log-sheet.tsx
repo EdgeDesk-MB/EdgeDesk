@@ -136,7 +136,7 @@ function QuickActionButton({
       className={cn(
         panelSurface,
         offerCampaignCardInteractive,
-        "flex min-h-[5.5rem] flex-col items-start justify-center gap-1.5 px-3.5 py-3 text-left outline-none",
+        "flex min-h-[5.5rem] flex-col items-start justify-center gap-1 px-4 py-3.5 text-left outline-none",
         "active:bg-selection-subtle",
         "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
       )}
