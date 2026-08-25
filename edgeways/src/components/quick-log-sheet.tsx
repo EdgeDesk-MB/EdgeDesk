@@ -107,7 +107,7 @@ function CapturePathButton({
       onClick={onPick}
       className={cn(
         offerCampaignCardInteractive,
-        "skeuo-solid flex min-h-[5.5rem] flex-col items-start justify-center gap-1 rounded-xl bg-primary px-4 py-3.5 text-left text-primary-foreground outline-none",
+        "skeuo-solid flex min-h-[5.5rem] flex-col items-start justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-left text-primary-foreground outline-none",
         "active:brightness-95",
         "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
       )}
@@ -136,7 +136,7 @@ function QuickActionButton({
       className={cn(
         panelSurface,
         offerCampaignCardInteractive,
-        "flex min-h-[5.5rem] flex-col items-start justify-center gap-1 px-4 py-3.5 text-left outline-none",
+        "flex min-h-[5.5rem] flex-col items-start justify-center gap-2 px-4 py-3.5 text-left outline-none",
         "active:bg-selection-subtle",
         "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
       )}
