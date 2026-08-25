@@ -5,9 +5,10 @@
 > [Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c).
 > Repo layout rules: `docs/repo-layout.md`.
 >
-> Last updated: **23 Aug 2026** (EDGE-47 **done** — full Neon desk cutover proven
-on preview: onboarding, wallets, offers, bets, history + restore drill;
-EDGE-37 interim checklist pass done; final pass stays C6).
+> Last updated: **25 Aug 2026** (EDGE-7 **done** — test-mode billing rehearsal
+fully passed: automated webhook drill + Sam's click-through; cancellation
+visibility and success-slip fixes shipped from findings. Live-mode rerun
+stays M3).
 
 ---
 
@@ -45,12 +46,21 @@ customer Settings → Data & API at go-live.
 operator keys must serve all customer-tracked events within provider
 budgets (football live-score polling is the pinch).
 
+**Done 25 Aug:** [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) test-mode
+billing rehearsal — automated drill (16 checks: trial → paid → downgrade →
+upgrade → scheduled cancel → resume → cancel → refund) + Sam's click-through
+all green. Findings shipped: scheduled-cancel visibility in Settings
+(`cancel_at` → Cancelling badge + access-end date), success-slip copy +
+setup-aware CTA. Follow-up filed:
+[EDGE-82](https://linear.app/samhayter/issue/EDGE-82) Checkout must not stack
+a second subscription on existing subscribers. Live-mode rerun stays M3.
+
 **Next session (pick one, do not mix in the same day):**
-- [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) Sam clicks the billing
-  rehearsal in test mode — webhook backbone already automated
-  (`npm run billing:rehearsal`, 11/11 PASS 24 Aug); Sam's 15-min click list
-  is in `docs/stripe-test-rehearsal.md`
-- Flip `SITE_SURFACE=app` only when Neon desk + checklist + Sam says so
+- [EDGE-22](https://linear.app/samhayter/issue/EDGE-22) desk features read
+  the Neon tier — paying currently locks nothing
+- [EDGE-82](https://linear.app/samhayter/issue/EDGE-82) checkout
+  second-subscription guard (small; pairs with EDGE-22)
+- Flip `SITE_SURFACE=app` only when checklist + Sam says so
 
 **Done 24 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80) admin
 control panel shipped to preview (full review + 10 fixes folded in; migration
