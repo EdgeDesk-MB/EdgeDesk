@@ -19,18 +19,17 @@ export default function RoadmapPage() {
     <PageShell>
       <PageHeader
         title="Roadmap"
-        description="What's shipped, what's in progress, and what's planned for v1.0."
+        description="What's shipped, what's in progress, and what's planned."
         icon={Map}
       />
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Version framing</CardTitle>
+          <CardTitle className="text-base">Where we are</CardTitle>
           <CardDescription>
-            Edgeways is at{" "}
-            <Badge variant="secondary">{ROADMAP_VERSION.currentLabel}</Badge> today.{" "}
-            <Badge>{ROADMAP_VERSION.targetLabel}</Badge> targets the core workflow polish -
-            guided racing, settle prompts, help system and offer P&L - not every Phase 2 calculator.
+            Edgeways is in <Badge variant="secondary">{ROADMAP_VERSION.currentLabel}</Badge>{" "}
+            today. <Badge>{ROADMAP_VERSION.targetLabel}</Badge> is the first public release —
+            the full desk, billing and support included.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -95,11 +94,9 @@ export default function RoadmapPage() {
 
       <Card className="border-dashed">
         <CardContent className="py-4 text-sm text-muted-foreground">
-          Roadmap data lives in{" "}
-          <code className="rounded bg-muted px-1 text-xs">src/content/roadmap.ts</code> - update on
-          each release. Full product vision in{" "}
+          This is the public plan. How the desk works today is in{" "}
           <Link href="/help?guide=getting-started" className="text-primary-text hover:underline">
-            Help → Getting started
+            Guides → Getting started
           </Link>
           .
         </CardContent>

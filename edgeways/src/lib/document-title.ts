@@ -40,7 +40,7 @@ const ROUTE_TITLES: readonly { prefix: string; title: string }[] = [
   { prefix: "/alerts", title: "Alerts" },
   { prefix: "/boosts", title: "Boosts" },
   { prefix: "/settings", title: "Settings" },
-  { prefix: "/support", title: "Support" },
+  { prefix: "/support", title: "Guides" },
   { prefix: "/feedback", title: "Feedback" },
   { prefix: "/contact", title: "Contact" },
   { prefix: "/refund", title: "Refunds" },

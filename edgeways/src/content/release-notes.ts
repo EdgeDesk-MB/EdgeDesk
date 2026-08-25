@@ -53,7 +53,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Paste and email intake capture promo codes, min deposit, reward event, winnings wagering, max conversion and payment exclusions. Dynobet-style Bet & Get emails land with the right stakes and Step 1 = deposit + code.",
+        text: "Paste or drop a promo email to capture promo codes, min deposit, reward event, winnings wagering, max conversion and payment exclusions. Bet & Get emails land with the right stakes and Step 1 = deposit + code.",
       },
       {
         kind: "feature",

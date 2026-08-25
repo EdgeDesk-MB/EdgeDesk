@@ -73,7 +73,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "That file could not be read - use the JSON backup from Settings → Data & API (desk data only, not the .db file).",
+            "That file could not be read - use the JSON backup from Settings → Data & backup (desk data only, not the .db file).",
         },
         { status: 400 }
       );

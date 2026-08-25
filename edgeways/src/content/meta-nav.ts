@@ -11,7 +11,6 @@ import {
   BookOpen,
   LayoutDashboard,
   Map,
-  MessageCircle,
   MessageSquarePlus,
   ScrollText,
   Settings,
@@ -40,7 +39,7 @@ export const DESK_NAV_ITEM: MetaNavItem = {
 
 /**
  * Meta / utility tabs. Order = left-to-right after Desk.
- * Support remains a lightweight stub; Feedback is the send channel.
+ * Support lives inside Guides (/help); Feedback is the send channel.
  */
 export const META_NAV_ITEMS: readonly MetaNavItem[] = [
   {
@@ -51,18 +50,11 @@ export const META_NAV_ITEMS: readonly MetaNavItem[] = [
     matchPrefixes: ["/settings"],
   },
   {
-    id: "support",
-    label: "Support",
-    href: "/support",
-    icon: MessageCircle,
-    matchPrefixes: ["/support"],
-  },
-  {
     id: "guides",
     label: "Guides",
     href: "/help",
     icon: BookOpen,
-    matchPrefixes: ["/help"],
+    matchPrefixes: ["/help", "/support"],
   },
   {
     id: "release-notes",

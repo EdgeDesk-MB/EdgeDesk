@@ -44,8 +44,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { estimateLayPlaceOdds } from "@/lib/calc/estimate-lay-place-odds";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
+import { deskRunnerLayPrices } from "@/lib/racing/desk-bet-prefill";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
@@ -142,7 +142,9 @@ export function RacingDeskView() {
   /** True only on first load - soft polls must not blank the page. */
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => searchParams.get("race")
+  );
   const hasPayloadRef = useRef(false);
   const [bookiePlaces, setBookiePlaces] = useState(4);
   const [exchangePlaces, setExchangePlaces] = useState(3);
@@ -527,8 +529,6 @@ export function RacingDeskView() {
     offerId?: number
   ) {
     const runner = race.runners.find((r) => r.name === runnerName);
-    const winOdds = runner?.bookieDecimal ?? runner?.spDecimal ?? 8;
-    const layOdds = runner?.exchangeDecimal ?? winOdds * 1.03;
     const offerTag = findOfferTag(race, offerId);
     const fieldSize = race.fieldSize ?? race.runners.filter((r) => !r.nonRunner).length;
     const terms = ukPlaceTerms(fieldSize, {
@@ -541,6 +541,10 @@ export function RacingDeskView() {
     const raceBookiePlaces = Math.max(bookiePlaces, raceExchangePlaces);
     const placeFraction =
       placeFractionOverride ?? terms.placeFraction ?? (fieldSize <= 7 ? 0.25 : 0.2);
+    const { winOdds, layWinOdds, layPlaceOdds } = deskRunnerLayPrices(
+      runner ?? {},
+      placeFraction
+    );
 
     if (mode === "lay") {
       openMatchedCalculator({
@@ -557,7 +561,7 @@ export function RacingDeskView() {
           epStake
         ),
         backOdds: winOdds,
-        layOdds,
+        layOdds: layWinOdds,
         exchangeId: deskExchangeRow?.id,
         commission: deskExchangeRow?.commissionPct,
       });
@@ -590,7 +594,8 @@ export function RacingDeskView() {
         homeTeam: race.raceName,
         awayTeam: race.offTime,
         ...raceLink,
-        backOdds: winOdds,
+        layOdds: layWinOdds,
+        exchangeId: deskExchangeRow?.id,
         backStake: stakeFromOfferPrefs(
           offerBetPrefs,
           offerTag.offerId,
@@ -624,8 +629,8 @@ export function RacingDeskView() {
         selection: runnerName,
         stakePerPart: epStake,
         winOdds,
-        layWinOdds: layOdds,
-        layPlaceOdds: estimateLayPlaceOdds(winOdds, placeFraction),
+        layWinOdds,
+        layPlaceOdds,
         placeFraction,
         fieldSize,
         bookiePlaces: epMode === "extra_place" ? raceBookiePlaces : raceExchangePlaces,
@@ -651,7 +656,8 @@ export function RacingDeskView() {
       homeTeam: race.raceName,
       awayTeam: race.offTime,
       ...raceLink,
-      backOdds: winOdds,
+      layOdds: layWinOdds,
+      exchangeId: deskExchangeRow?.id,
       backStake: epStake,
       labelSuggestion: `${race.course} · ${runnerName}`,
     });
@@ -853,8 +859,8 @@ export function RacingDeskView() {
           title={summary?.source === "demo" ? "Demo racecards" : "No races for this date"}
           description={
             summary?.source === "demo"
-              ? "Add Racing API credentials in .env.local for real UK & IRE racecards, or add an active place-refund offer to see Intelligence in action."
-              : "Try today's date, check your Racing API key in Settings, or add a place-refund offer."
+              ? "Sample racecards until the racing feed is connected. Add an active place-refund offer to see Intelligence in action."
+              : "Try today's date, or add a place-refund offer to put the desk to work."
           }
           action={{
             label: "Add racing offer",

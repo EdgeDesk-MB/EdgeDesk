@@ -35,7 +35,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "What is Edgeways?",
         paragraphs: [
           "Edgeways is a matched betting command centre. Calculators, profit tracking, live events and a real-time P&L dashboard, with your edge surfaced on every screen.",
-          "Your activity lives in your Edgeways account. Export CSV anytime from Settings → Data & API.",
+          "Your activity lives in your Edgeways account. Export CSV anytime from Settings → Data & backup.",
         ],
       },
       {
@@ -64,7 +64,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Racing cards for today and tomorrow, with paste-in bookie odds",
           "Delayed exchange prices for pre-race lays",
           "Football scores when a match is tracked",
-          "Settings → Data & API shows what is connected. You do not add provider keys.",
+          "Live racing, football and exchange feeds are included. You do not add provider keys.",
         ],
       },
       {
@@ -128,7 +128,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         bullets: [
           "Live football scores refresh at most once per 60s per tracked match; goal timelines only re-fetch when the score changes (the API allows ~95 requests/day, and the budget guard alerts once daily if it runs dry).",
           "Racing cards cache ~15 minutes; delayed exchange prices run 1-3 minutes behind live.",
-          "Compute-on-poll jobs: the Monday weekly digest (week-key latch so it sends once), email intake (checks your IMAP folder every ~5 minutes when enabled), acca auto-results and lay-due alerts.",
+          "Compute-on-poll jobs: the Monday weekly digest (week-key latch so it sends once), acca auto-results and lay-due alerts.",
           "Alerts write to the inbox with a dedupe key, so a re-firing condition updates the existing alert instead of stacking copies; web push mirrors them to your phone.",
         ],
       },
@@ -163,7 +163,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Do next ranks offers using: measured retention + EV basis + bookie health (gubbed sinks, never hides) + funding checks + measured £/hr.",
           "The Daily Plan is Do next re-cut for today, plus timed slots: tracked races, kickoffs, and acca lay-due legs.",
           "The 2UP Desk consumes tracked-event live scores; the Acca Desk consumes event results; the Racing Desk consumes racecards plus your racing offers.",
-          "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, the morning daily tasks digest, acca lay-due, email-intake drafts, API budget, and the weekly digest.",
+          "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, the morning daily tasks digest, acca lay-due, and the weekly digest.",
         ],
       },
     ],
@@ -177,7 +177,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Offers: the campaign lifecycle",
         bullets: [
-          "Capture: New offer → type it, paste the promo text, drop screenshots, or drop a promo EMAIL (.eml) - all parse on-device into the same preview. Or forward emails to your intake folder (Settings → Data & API) and drafts arrive as Planned campaigns.",
+          "Capture: New offer → type it, paste the promo text, drop screenshots, or drop a promo EMAIL (.eml) - all parse on-device into the same preview.",
           "Repeats: tick Repeats when creating for daily/weekly/monthly promos - each occurrence is a separate offer with its own ID. Delete asks whether to remove this occurrence only or this and future. Stop from any instance when the series ends. Casino campaigns use the same control.",
           "Planned → Active: activating LOCKS the expected EV (the baseline your execution is judged against).",
           "Work it: Do next tells you the next action; opening a card starts the effort timer; logging the bet stops it.",
@@ -516,7 +516,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Do I need API keys?",
         paragraphs: [
-          "No. You do not add provider keys. Calculators, tracker, offers, settlement and demo data all work without live feeds. Settings → Data & API shows whether the racing, football and exchange feeds are connected.",
+          "No. You do not add provider keys. Calculators, tracker, offers, settlement and demo data all work without live feeds, and the live racing, football and exchange feeds are included with your plan.",
         ],
       },
       {
@@ -543,7 +543,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Where is my data stored?",
         paragraphs: [
-          "In your Edgeways account. Export CSV anytime from Settings → Data & API.",
+          "In your Edgeways account. Export CSV anytime from Settings → Data & backup.",
         ],
       },
       {
@@ -563,7 +563,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Support",
         paragraphs: [
-          "Email support@edgeways.app or use the contact page. Settings → Data & API shows feed status.",
+          "Email support@edgeways.app or use the contact page. The Guides page covers day-to-day how-tos.",
         ],
       },
     ],

@@ -15,10 +15,16 @@ import {
 } from "@/content/help/guides";
 import { cn } from "@/lib/utils";
 import { listRowSelected } from "@/lib/ui/surface-styles";
-import { BookOpen, Map, MessageCircleQuestion } from "lucide-react";
+import { BookOpen, Mail, Map, MessageCircleQuestion, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOnboarding } from "@/components/help/onboarding-provider";
+import {
+  pagePrimaryButtonProps,
+  pageSecondaryButtonProps,
+} from "@/components/layout/page-header-actions";
+import { LEGAL_PATHS } from "@/lib/legal/public";
+import { SUPPORT_EMAIL, mailtoHref } from "@/lib/marketing/site-contacts";
 
 function isValidGuide(slug: string | null): slug is HelpGuideSlug {
   return slug != null && slug in HELP_GUIDE_BY_SLUG;
@@ -43,8 +49,8 @@ function HelpPageContent() {
   return (
     <PageShell>
       <PageHeader
-        title="Help"
-        description="Guides, FAQs and tips for getting the most from Edgeways."
+        title="Guides"
+        description="Guides, FAQs and support for getting the most from Edgeways."
         icon={BookOpen}
       />
 
@@ -111,16 +117,31 @@ function HelpPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="mt-4 border-dashed">
-            <CardContent className="py-4 text-sm text-muted-foreground">
-              <p>
-                For live connection status, open Settings → Data &amp; API. Feeds power fixtures,
-                racecards and exchange prices when connected — you do not add keys.
-              </p>
-              <p className="mt-2">
-                Support channel coming in v1.0. For now, use the Roadmap page to see what&apos;s
-                shipping and what&apos;s planned.
-              </p>
+          <Card className="mt-4">
+            <CardHeader className="pb-2">
+              <CardTitle section>Support</CardTitle>
+              <CardDescription>
+                Feedback is for bugs, ideas and direct notes. Email is for account and
+                billing — we aim to reply within two working days.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Button asChild {...pagePrimaryButtonProps}>
+                <Link href="/feedback">
+                  <MessageSquarePlus className="size-4" /> Send feedback
+                </Link>
+              </Button>
+              <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+                <a href={mailtoHref(SUPPORT_EMAIL)}>
+                  <Mail className="size-4" /> {SUPPORT_EMAIL}
+                </a>
+              </Button>
+              <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+                <Link href={LEGAL_PATHS.contact}>Contact</Link>
+              </Button>
+              <Button asChild variant="outline" {...pageSecondaryButtonProps}>
+                <Link href={LEGAL_PATHS.refund}>Refunds</Link>
+              </Button>
             </CardContent>
           </Card>
         </div>
