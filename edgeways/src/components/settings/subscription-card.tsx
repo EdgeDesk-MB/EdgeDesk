@@ -162,7 +162,6 @@ export function SubscriptionCard({
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {account.canManage ? (
               <Button
-                size="sm"
                 disabled={pending}
                 aria-busy={pending || undefined}
                 onClick={() => void openPortal()}
@@ -172,7 +171,6 @@ export function SubscriptionCard({
             ) : null}
             {showSubscribeActions(account) && edge ? (
               <Button
-                size="sm"
                 variant="edge"
                 onClick={() => window.location.assign(planCheckoutHref(edge, "month"))}
               >
@@ -181,7 +179,6 @@ export function SubscriptionCard({
             ) : null}
             {showSubscribeActions(account) && core ? (
               <Button
-                size="sm"
                 variant="outline"
                 onClick={() => window.location.assign(planCheckoutHref(core, "month"))}
               >

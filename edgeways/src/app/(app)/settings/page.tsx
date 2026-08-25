@@ -143,19 +143,18 @@ export default function SettingsPage() {
           <CardDescription>Guides, roadmap and onboarding.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button variant="outline" size="sm" className="justify-start gap-2" asChild>
+          <Button variant="outline" className="justify-start gap-2" asChild>
             <a href="/help">
               <BookOpen className="size-4" /> Help hub
             </a>
           </Button>
-          <Button variant="outline" size="sm" className="justify-start gap-2" asChild>
+          <Button variant="outline" className="justify-start gap-2" asChild>
             <a href="/roadmap">
               <Map className="size-4" /> Roadmap
             </a>
           </Button>
           <Button
             variant="outline"
-            size="sm"
             className="justify-start gap-2"
             onClick={resetAndOpenWelcome}
           >
@@ -163,7 +162,6 @@ export default function SettingsPage() {
           </Button>
           <Button
             variant="outline"
-            size="sm"
             className="justify-start gap-2"
             onClick={openSetup}
           >
@@ -1400,7 +1398,6 @@ function IntegrationsPanel({
             <Button
               type="button"
               variant="outline"
-              size="sm"
               className="w-full"
               disabled={testingRacing || !racingApiConfigured}
               onClick={testRacingApi}
@@ -1437,7 +1434,6 @@ function IntegrationsPanel({
           ))}
           <Button
             variant="outline"
-            size="sm"
             className="w-full"
             onClick={() => void testExchangeConnection()}
             disabled={testingExchange}
