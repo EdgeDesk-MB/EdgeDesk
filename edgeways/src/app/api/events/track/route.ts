@@ -4,6 +4,7 @@ import { db, events } from "@/lib/db";
 import { searchFixtureByTeams } from "@/lib/services/apifootball";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isFeedDenied } from "@/lib/entitlements/feed-guard";
+import { rateLimitResponse } from "@/lib/api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,11 @@ function teamsMatch(a: string, b: string): boolean {
  * Returns { event, mode } where mode ∈ "existing" | "api" | "manual".
  */
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const limited = rateLimitResponse("events-track", req, {
+    limit: 60,
+    windowMs: 60 * 1000,
+  });
+  if (limited) return limited;
   // Plain 403 (not the locked-payload pattern): this is a write, and callers
   // dereference `event.id`, so a canned body would crash them. api() throws
   // and the caller's catch toasts instead.

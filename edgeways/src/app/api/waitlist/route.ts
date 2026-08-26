@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { joinWaitlist } from "@/lib/services/waitlist";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { rateLimitResponse } from "@/lib/api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,11 @@ const bodySchema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: Request) {
+  const limited = rateLimitResponse("waitlist", req, {
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (limited) return limited;
   let json: unknown;
   try {
     json = await req.json();

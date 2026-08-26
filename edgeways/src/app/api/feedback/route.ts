@@ -4,6 +4,7 @@ import { listFeedbackReports, submitFeedback } from "@/lib/services/feedback";
 import { FEEDBACK_KINDS } from "@/lib/feedback/types";
 import { getDeskActor, isDeskOwner } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { rateLimitResponse } from "@/lib/api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,11 @@ export const GET = withDeskScope(async function GET() {
 });
 
 export const POST = withDeskScope(async function POST(req: Request) {
+  const limited = rateLimitResponse("feedback", req, {
+    limit: 10,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (limited) return limited;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

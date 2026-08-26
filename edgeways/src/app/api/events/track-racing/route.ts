@@ -3,6 +3,7 @@ import { z } from "zod";
 import { findOrCreateRacingEvent } from "@/lib/services/racing-events";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isFeedDenied } from "@/lib/entitlements/feed-guard";
+import { rateLimitResponse } from "@/lib/api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,11 @@ const schema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const limited = rateLimitResponse("events-track-racing", req, {
+    limit: 60,
+    windowMs: 60 * 1000,
+  });
+  if (limited) return limited;
   // Plain 403 like /api/events/track: write route, callers dereference the event.
   if (await isFeedDenied("calculators")) {
     return NextResponse.json({ error: "Sign in to track races" }, { status: 403 });
