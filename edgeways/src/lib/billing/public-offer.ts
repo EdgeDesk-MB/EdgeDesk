@@ -114,7 +114,7 @@ export const COMPARISON_FEATURES: Record<
   exchange_lay: {
     title: "Live exchange prices",
     description:
-      "Live Betfair lay prices on each runner. You can still type a lay on Core.",
+      "Live exchange lay prices on each runner. You can still type a lay on Core.",
   },
 };
 

@@ -38,25 +38,27 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
 
   try {
     const fixtures = await fixturesByDate(date);
-    return NextResponse.json({ source: "api-football", fixtures, date });
+    return NextResponse.json({ source: "feed", fixtures, date });
   } catch (error) {
     // Free tier often returns HTTP 200 + errors.requests when capped -
     // fall back to demo so Fixtures / EP Desk handoff still works.
+    // D8: warnings are client-facing, so never name the data provider.
     if (isRateLimitError(error)) {
       return NextResponse.json({
         source: "demo",
         fixtures: demoFixtures(),
         date,
         warning:
-          "API-Football daily request limit reached - showing demo fixtures until the quota resets.",
+          "Football data daily limit reached - showing demo fixtures until the quota resets.",
       });
     }
+    console.error("[fixtures] football feed failed:", error);
     return NextResponse.json(
       {
         source: "demo",
         fixtures: demoFixtures(),
         date,
-        warning: `API-Football unavailable (${String(error)}) - showing demo fixtures.`,
+        warning: "Football data feed unavailable - showing demo fixtures.",
       },
       { status: 200 }
     );

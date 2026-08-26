@@ -66,7 +66,11 @@ describe("public offer", () => {
     }
     const lay = rows.find((r) => r.flag === "exchange_lay");
     expect(lay?.title).toBe("Live exchange prices");
-    expect(lay?.description.toLowerCase()).toContain("betfair");
+    // D8: customer-facing copy never names data providers.
+    for (const row of rows) {
+      const copy = `${row.title} ${row.description}`.toLowerCase();
+      expect(copy).not.toMatch(/betfair|smarkets|matchbook|racing api|api-football/);
+    }
   });
 
   it("checkout links carry plan and billing interval", () => {

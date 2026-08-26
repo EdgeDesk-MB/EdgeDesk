@@ -62,10 +62,14 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
 
     return NextResponse.json({ source: "racing-api", oddsTier, racecards: enriched });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not load racecards from The Racing API";
+    // D8: never name the data provider in a client-facing error.
+    console.error("[racecards] racing feed failed:", error);
     return NextResponse.json(
-      { source: "error", racecards: [], error: message },
+      {
+        source: "error",
+        racecards: [],
+        error: "Could not load racecards from the racing feed.",
+      },
       { status: 502 }
     );
   }

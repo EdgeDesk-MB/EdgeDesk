@@ -28,7 +28,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
       status: "unmatched",
       odds: {},
       missing: ALL_FOOTBALL_ODDS_MISSING,
-      error: "Betfair prices are not available on the public demo.",
+      error: "Live exchange prices are not available on the public demo.",
     });
   }
 

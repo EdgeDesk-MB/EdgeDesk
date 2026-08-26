@@ -761,7 +761,7 @@ export function publicDemoApiGet(path: string, now = Date.now()): unknown | unde
         "Over 2.5",
         "BTTS Yes",
       ],
-      error: "Betfair prices are not available on the public demo.",
+      error: "Live exchange prices are not available on the public demo.",
     };
   }
   const accountMatch = path.match(/^\/api\/accounts\/(\d+)$/);
