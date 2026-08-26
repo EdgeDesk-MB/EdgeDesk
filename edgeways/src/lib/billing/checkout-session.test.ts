@@ -4,8 +4,10 @@ import {
   buildSubscriptionCheckoutParams,
   parseCheckoutFrom,
   parsePaidCheckout,
+  priorTrialConsumed,
   signUpRedirectForPlan,
   stripeSubscriptionIsLive,
+  subscriptionConsumedTrial,
   subscribeCancelHref,
   subscribeSuccessHref,
 } from "@/lib/billing/checkout-session";
@@ -98,6 +100,36 @@ describe("checkout session", () => {
     expect(parseCheckoutFrom("desk")).toBeNull();
     expect(subscribeCancelHref()).toBe("/#pricing");
     expect(subscribeCancelHref("setup")).toBe("/setup");
+  });
+
+  it("EDGE-104: drops the trial when the person already had one", () => {
+    const second = buildSubscriptionCheckoutParams({
+      priceId: "price_edge",
+      plan: "edge",
+      interval: "month",
+      clerkUserId: "user_1",
+      successUrl: "https://edgeways.app/subscribe/success",
+      cancelUrl: "https://edgeways.app/#pricing",
+      customerId: "cus_123",
+      trialEligible: false,
+    });
+    expect(second.subscription_data?.trial_period_days).toBeUndefined();
+  });
+
+  it("EDGE-104: detects a consumed trial from local row or Stripe history", () => {
+    expect(priorTrialConsumed(1_777_000_000_000, [])).toBe(true);
+    expect(priorTrialConsumed(null, [{ trial_end: 1_777_000_000 }])).toBe(true);
+    expect(priorTrialConsumed(null, [{ trial_start: 1_777_000_000 }])).toBe(true);
+    // A canceled trial still counts - it was consumed.
+    expect(
+      subscriptionConsumedTrial({ trial_start: 1, trial_end: 2 })
+    ).toBe(true);
+    // A plain paid sub with no trial window leaves the trial available.
+    expect(
+      priorTrialConsumed(null, [{ trial_start: null, trial_end: null }])
+    ).toBe(false);
+    expect(priorTrialConsumed(null, [])).toBe(false);
+    expect(priorTrialConsumed(undefined, [])).toBe(false);
   });
 
   it("EDGE-82: treats active/trialing/past_due as live subscriptions", () => {

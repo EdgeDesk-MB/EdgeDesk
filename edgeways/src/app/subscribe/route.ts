@@ -6,6 +6,7 @@ import {
   checkoutPriceId,
   parseCheckoutFrom,
   parsePaidCheckout,
+  priorTrialConsumed,
   stripeSubscriptionIsLive,
   subscribeCancelHref,
   subscribeSuccessHref,
@@ -110,13 +111,20 @@ export async function GET(request: Request) {
     const appUser = await findAppUserByClerkId(userId);
     const portalCustomerId = appUser?.stripeCustomerId ?? customerId ?? null;
     let hasLiveSub = billingStatusIsLive(appUser?.billingStatus);
+    // Fetched once when there is a customer and no locally-known live sub:
+    // covers the EDGE-82 webhook-lag check and the EDGE-104 trial history.
+    let priorSubs: Awaited<
+      ReturnType<typeof stripe.subscriptions.list>
+    >["data"] = [];
     if (!hasLiveSub && customerId) {
-      const subs = await stripe.subscriptions.list({
-        customer: customerId,
-        status: "all",
-        limit: 10,
-      });
-      hasLiveSub = subs.data.some((sub) => stripeSubscriptionIsLive(sub.status));
+      priorSubs = (
+        await stripe.subscriptions.list({
+          customer: customerId,
+          status: "all",
+          limit: 20,
+        })
+      ).data;
+      hasLiveSub = priorSubs.some((sub) => stripeSubscriptionIsLive(sub.status));
     }
     if (hasLiveSub && portalCustomerId) {
       const configuration = stripePortalConfigurationId();
@@ -144,6 +152,8 @@ export async function GET(request: Request) {
         customerId,
         customerEmail: customerId ? null : email,
         founding,
+        // EDGE-104: one trial per person - a second Edge checkout bills now.
+        trialEligible: !priorTrialConsumed(appUser?.trialEndsAt, priorSubs),
         successUrl: `${origin}${subscribeSuccessHref(paid.plan, paid.interval, undefined, from)}`,
         cancelUrl: `${origin}${subscribeCancelHref(from)}`,
       })

@@ -46,8 +46,11 @@ export function buildSubscriptionCheckoutParams(input: {
   customerId?: string;
   customerEmail?: string | null;
   founding?: boolean;
+  /** EDGE-104: false when the person has already consumed their one trial. */
+  trialEligible?: boolean;
 }): Stripe.Checkout.SessionCreateParams {
-  const trialDays = trialPeriodDaysForCheckout(input.plan);
+  const trialDays =
+    input.trialEligible === false ? 0 : trialPeriodDaysForCheckout(input.plan);
   const metadata = {
     clerkUserId: input.clerkUserId,
     plan: input.plan,
@@ -103,6 +106,30 @@ export function stripeSubscriptionIsLive(
   status: string | null | undefined
 ): boolean {
   return billingStatusIsLive(status);
+}
+
+/**
+ * EDGE-104: one trial per person. A subscription that ever had a trial
+ * window counts, whatever its final status - canceled trials included.
+ */
+export function subscriptionConsumedTrial(sub: {
+  trial_start?: number | null;
+  trial_end?: number | null;
+}): boolean {
+  return sub.trial_start != null || sub.trial_end != null;
+}
+
+/**
+ * Prior-trial signal from both sides: the local app_users row (set by the
+ * webhook) and the Stripe customer's subscription history (covers webhook
+ * gaps and a fresh Clerk account reusing a trialled email).
+ */
+export function priorTrialConsumed(
+  appUserTrialEndsAt: number | null | undefined,
+  subs: readonly { trial_start?: number | null; trial_end?: number | null }[]
+): boolean {
+  if (appUserTrialEndsAt != null) return true;
+  return subs.some(subscriptionConsumedTrial);
 }
 
 export function subscribeSuccessHref(
