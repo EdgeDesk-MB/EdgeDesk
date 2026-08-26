@@ -1,6 +1,10 @@
 /** Homepage Refer a friend prompt. Dismiss is device-local, keyed by Clerk user. */
 
 import { roundPence } from "@/lib/calc/money";
+import {
+  effectivePlan,
+  type EntitlementBilling,
+} from "@/lib/entitlements/effective-plan";
 
 const DISMISSED_KEY = "edgeways:referral-prompt-dismissed";
 const SNOOZED_KEY = "edgeways:referral-prompt-snoozed";
@@ -64,18 +68,17 @@ export function isReferralPromptHidden(userId?: string | null): boolean {
   return isReferralPromptDismissed(userId) || isReferralPromptSnoozed(userId);
 }
 
-/** Live Core or Edge. Trial counts: they already chose a paid plan. */
-export function isReferralSubscriber(account: {
-  plan: string;
-  billingStatus: string;
-} | null | undefined): boolean {
-  if (!account) return false;
-  if (account.plan !== "core" && account.plan !== "edge") return false;
-  return (
-    account.billingStatus === "active" ||
-    account.billingStatus === "trialing" ||
-    account.billingStatus === "past_due"
-  );
+/**
+ * Live Core or Edge, same honouring as the desk gate. Trial and past_due
+ * count: they already chose a paid plan. Free, cancelled, and missing billing
+ * do not.
+ */
+export function isReferralSubscriber(
+  billing: EntitlementBilling | null | undefined
+): boolean {
+  if (!billing) return false;
+  const plan = effectivePlan(billing);
+  return plan === "core" || plan === "edge";
 }
 
 function isProfitable(amount: number | null | undefined): boolean {
@@ -83,16 +86,19 @@ function isProfitable(amount: number | null | undefined): boolean {
   return roundPence(amount) > 0;
 }
 
+const UNSETTLED_BET: ReadonlySet<string> = new Set(["open", "void"]);
+
 /**
- * A first successful moment: a settled bet or a completed casino offer
- * that made a profit. Losing first, then winning, still qualifies.
+ * A successful moment: any settled sports bet or completed casino campaign
+ * with realised profit. People refer after a win, not after signup, so a
+ * later profitable completion still qualifies if the first one lost.
  */
 export function hasReferralSuccessMoment(input: {
   bets: Array<{ status: string; actualProfit: number | null }>;
   casinoSettlements: Array<{ amount: number }>;
 }): boolean {
   for (const bet of input.bets) {
-    if (bet.status === "open" || bet.status === "void") continue;
+    if (UNSETTLED_BET.has(bet.status)) continue;
     if (isProfitable(bet.actualProfit)) return true;
   }
   return input.casinoSettlements.some((row) => isProfitable(row.amount));

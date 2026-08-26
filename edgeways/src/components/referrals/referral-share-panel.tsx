@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { captureReferralShared } from "@/lib/analytics/referrals";
 import { REFERRAL_PITCH } from "@/lib/referrals/prompt";
 import { cn } from "@/lib/utils";
-import { edgePanel, sectionDescription } from "@/lib/ui/surface-styles";
+import {
+  campaignFbBadge,
+  edgePanel,
+  sectionDescription,
+} from "@/lib/ui/surface-styles";
 
 type ReferralMine = {
   code: string;
@@ -79,7 +83,10 @@ export function ReferralCodeChip({
     <code
       aria-busy={loading || undefined}
       aria-label={label}
-      className="inline-flex h-9 min-w-[11ch] items-center justify-center rounded-md border border-edge/40 bg-edge/10 px-3 font-mono text-sm font-bold tracking-widest text-foreground"
+      className={cn(
+        "inline-flex h-8 min-w-[11ch] items-center justify-center rounded-md border px-3 font-mono text-sm font-bold tracking-widest max-sm:h-10",
+        campaignFbBadge
+      )}
     >
       {failed ? "----" : (code ?? "…")}
     </code>
@@ -92,7 +99,7 @@ export function ReferralSharePanel() {
 
   return (
     <div className={edgePanel}>
-      <div className="relative flex flex-col gap-3 overflow-hidden px-4 py-4">
+      <div className="relative flex flex-col gap-3 overflow-hidden px-3 py-3">
         <TicketPercent
           aria-hidden
           className="pointer-events-none absolute -right-4 top-1/2 size-28 -translate-y-1/2 -rotate-12 text-edge/15"

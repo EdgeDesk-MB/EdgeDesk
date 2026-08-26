@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { Check, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,8 +17,8 @@ import {
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import { ReferAFriendArt } from "@/components/referrals/refer-a-friend-art";
 import { useReferralShare } from "@/components/referrals/referral-share-panel";
-import type { SubscriptionAccount } from "@/lib/billing/subscription-view";
-import { api, useAppState } from "@/hooks/use-app-state";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { useAppState } from "@/hooks/use-app-state";
 import {
   hasReferralSuccessMoment,
   isReferralPromptHidden,
@@ -27,18 +27,23 @@ import {
   shouldOpenReferralPrompt,
   snoozeReferralPrompt,
 } from "@/lib/referrals/prompt";
+import { captionHeading, sectionDescription } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
-const REWARDS = [
+const SIDES = [
   {
-    label: "They get",
-    detail: "50% off their first paid month",
+    who: "They get",
+    figure: "50%",
+    detail: "Off their first paid month",
   },
   {
-    label: "You get",
-    detail: "£10 credit when their first payment lands",
+    who: "You get",
+    figure: "£10",
+    detail: "On their first payment",
   },
 ] as const;
+
+const PLATE_CONTROL = "h-11 max-sm:h-11 rounded-[var(--radius-button)]";
 
 function ReferAFriendDialogBody({
   onNotNow,
@@ -51,28 +56,28 @@ function ReferAFriendDialogBody({
 
   return (
     <>
-      <div className="bg-topbar text-topbar-foreground">
+      <div className="shrink-0 bg-edge text-edge-foreground">
         <div className="relative">
           <DialogClose
             className={cn(
-              "absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-lg",
-              "text-topbar-foreground/80 transition-colors",
-              "hover:bg-topbar-foreground/10 hover:text-topbar-foreground",
-              "outline-none focus-visible:ring-2 focus-visible:ring-topbar-foreground/50"
+              "absolute top-4 right-3 z-10 flex size-8 items-center justify-center rounded-lg",
+              "text-edge-foreground/85 transition-colors",
+              "hover:bg-edge-foreground/10 hover:text-edge-foreground",
+              "outline-none focus-visible:ring-2 focus-visible:ring-edge-foreground/50"
             )}
           >
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </DialogClose>
           <div className="flex flex-col items-center px-6 pb-5 pt-7 text-center">
-            <ReferAFriendArt className="h-[7.25rem] w-full max-w-[17.5rem] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-300" />
-            <DialogTitle className="mt-3 text-center text-topbar-foreground">
+            <ReferAFriendArt className="h-[6.5rem] w-full max-w-[15rem]" />
+            <DialogTitle className="mt-3 text-center text-edge-foreground">
               Refer a friend
             </DialogTitle>
-            <DialogDescription className="mt-1 text-center text-topbar-foreground/70">
+            <DialogDescription className="mt-1 text-center text-edge-foreground/85">
               Share a link. They save, you get £10 credit.
             </DialogDescription>
-            <div className="mt-4 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="mt-4 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
               <code
                 aria-busy={(!failed && !referral) || undefined}
                 aria-label={
@@ -82,22 +87,36 @@ function ReferAFriendDialogBody({
                       ? `Your referral code, ${referral.code}`
                       : "Loading referral code"
                 }
-                className="inline-flex h-11 min-w-0 flex-1 items-center justify-center rounded-lg bg-topbar-foreground/12 px-3 font-mono text-sm font-bold tracking-widest text-topbar-foreground"
+                className={cn(
+                  PLATE_CONTROL,
+                  "inline-flex min-w-0 flex-1 items-center justify-center bg-edge-foreground/12 px-3 font-mono text-sm font-bold tracking-widest text-edge-foreground"
+                )}
               >
                 {failed ? "----" : (referral?.code ?? "…")}
               </code>
               {failed ? (
                 <Button
-                  variant="outline"
-                  className="border-topbar-foreground/30 bg-transparent text-topbar-foreground hover:bg-topbar-foreground/10 hover:text-topbar-foreground"
+                  variant="ghost"
+                  className={cn(
+                    PLATE_CONTROL,
+                    "w-full border border-edge-foreground/30 bg-transparent text-edge-foreground sm:w-auto",
+                    "hover:bg-edge-foreground/10 hover:text-edge-foreground",
+                    "dark:hover:bg-edge-foreground/10 dark:hover:text-edge-foreground"
+                  )}
                   onClick={retry}
                 >
                   Try again
                 </Button>
               ) : (
                 <Button
-                  size="lg"
-                  className="bg-topbar-foreground text-topbar hover:bg-topbar-foreground/90"
+                  variant="ghost"
+                  className={cn(
+                    PLATE_CONTROL,
+                    "w-full bg-edge-foreground font-semibold text-edge sm:w-auto",
+                    "hover:bg-edge-foreground/90 hover:text-edge",
+                    "dark:hover:bg-edge-foreground/90 dark:hover:text-edge",
+                    "focus-visible:border-edge-foreground/40 focus-visible:ring-edge-foreground/50"
+                  )}
                   disabled={!referral}
                   aria-busy={!referral || undefined}
                   onClick={() => {
@@ -111,7 +130,7 @@ function ReferAFriendDialogBody({
               )}
             </div>
             {failed ? (
-              <p className="mt-2 text-xs text-topbar-foreground/70" role="alert">
+              <p className="mt-2 text-xs text-edge-foreground/85" role="alert">
                 Could not load your referral code.
               </p>
             ) : null}
@@ -119,26 +138,35 @@ function ReferAFriendDialogBody({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4 px-6 py-5">
-        <ul className="flex flex-col gap-3">
-          {REWARDS.map((row) => (
-            <li key={row.label} className="flex min-w-0 items-start gap-3">
-              <span
-                className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground"
-                aria-hidden
-              >
-                <Check className="size-3" strokeWidth={3} />
-              </span>
-              <p className="min-w-0 text-pretty break-words text-sm leading-snug">
-                <span className="font-semibold">{row.label} </span>
-                <span className="text-muted-foreground">{row.detail}</span>
-              </p>
-            </li>
+      <ScrollFadeEdges
+        className="min-h-0 min-w-0 flex-1"
+        fadeClassName="from-page dark:from-card"
+        scrollClassName="app-scroll-nested px-6 py-5"
+      >
+        <dl className="grid grid-cols-2">
+          {SIDES.map((side, index) => (
+            <div
+              key={side.who}
+              className={cn(
+                "min-w-0",
+                index > 0
+                  ? "border-l border-dashed border-edge/60 pl-4"
+                  : "pr-4"
+              )}
+            >
+              <dt className={captionHeading}>{side.who}</dt>
+              <dd className="mt-1 min-w-0">
+                <p className="text-2xl font-bold leading-none tabular-nums tracking-tight text-edge">
+                  {side.figure}
+                </p>
+                <p className={cn(sectionDescription, "mt-1.5")}>{side.detail}</p>
+              </dd>
+            </div>
           ))}
-        </ul>
-      </div>
+        </dl>
+      </ScrollFadeEdges>
 
-      <DialogFooter className="mx-0 mb-0 sm:justify-start">
+      <DialogFooter className="mx-0 mb-0 shrink-0 px-6 sm:justify-start">
         <Button variant="ghost" size="lg" onClick={onNotNow}>
           Not now
         </Button>
@@ -161,38 +189,17 @@ export function ReferAFriendDialog({
   const { active: publicDemo } = usePublicDemo();
   const { state } = useAppState();
   const { isLoaded, isSignedIn, user } = useUser();
-  const [account, setAccount] = useState<SubscriptionAccount | null>(null);
-  const [accountUserId, setAccountUserId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const userId = user?.id ?? null;
-  if (accountUserId !== userId) {
-    setAccountUserId(userId);
-    setAccount(null);
-  }
   const hidden =
     typeof window === "undefined" || isReferralPromptHidden(userId);
-  const subscribed = isReferralSubscriber(account);
+  const subscribed = isReferralSubscriber(state?.settings.billing);
   const hasSuccessMoment =
     state != null &&
     hasReferralSuccessMoment({
       bets: state.bets,
       casinoSettlements: state.casinoSettlements,
     });
-
-  useEffect(() => {
-    if (publicDemo || isSignedIn !== true || !userId) return;
-    let cancelled = false;
-    api<SubscriptionAccount>("/api/billing/account")
-      .then((data) => {
-        if (!cancelled) setAccount(data);
-      })
-      .catch(() => {
-        if (!cancelled) setAccount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [publicDemo, isSignedIn, userId]);
 
   const eligible =
     isLoaded === true &&
@@ -232,7 +239,7 @@ export function ReferAFriendDialog({
       }}
     >
       <DialogContent
-        className="gap-0 overflow-hidden p-0 sm:max-w-md"
+        className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
         mobile="center"
         showCloseButton={false}
       >

@@ -102,6 +102,21 @@ describe("hasReferralSuccessMoment", () => {
     ).toBe(true);
   });
 
+  it("qualifies on early payout or half-win with profit", () => {
+    expect(
+      hasReferralSuccessMoment({
+        bets: [{ status: "early_payout", actualProfit: 1.2 }],
+        casinoSettlements: [],
+      })
+    ).toBe(true);
+    expect(
+      hasReferralSuccessMoment({
+        bets: [{ status: "half_win", actualProfit: 0.4 }],
+        casinoSettlements: [],
+      })
+    ).toBe(true);
+  });
+
   it("ignores open, void, break-even, and losing completions", () => {
     expect(
       hasReferralSuccessMoment({
@@ -110,6 +125,7 @@ describe("hasReferralSuccessMoment", () => {
           { status: "void", actualProfit: 3 },
           { status: "won", actualProfit: 0 },
           { status: "lost", actualProfit: -2.5 },
+          { status: "push", actualProfit: 0 },
         ],
         casinoSettlements: [{ amount: 0 }, { amount: -4 }],
       })
