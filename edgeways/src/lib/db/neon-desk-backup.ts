@@ -93,6 +93,7 @@ const BET_KEYS: Array<[string, string]> = [
   ["createdAt", "created_at"], ["settledAt", "settled_at"],
   ["offerId", "offer_id"], ["quickLogged", "quick_logged"], ["source", "source"],
   ["purpose", "purpose"], ["sport", "sport"],
+  ["importFingerprint", "import_fingerprint"], ["importMeta", "import_meta"],
 ];
 
 const TX_KEYS: Array<[string, string]> = [
@@ -372,6 +373,10 @@ export async function restoreNeonDeskBackup(
         source: str(r.source),
         purpose: str(r.purpose),
         sport: str(r.sport),
+        // EDGE-98: keep import idempotency across a restore, or a CSV
+        // re-import duplicates every imported bet.
+        importFingerprint: str(r.import_fingerprint),
+        importMeta: str(r.import_meta),
       })
       .returning({ id: pgBets.id });
     const oldId = num(r.id);

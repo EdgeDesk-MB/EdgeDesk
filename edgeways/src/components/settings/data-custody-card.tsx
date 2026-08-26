@@ -140,7 +140,17 @@ export function DataCustodyCard({
       });
       onRestored();
     } catch (e) {
-      toast.error("Restore failed - your data is untouched", { description: String(e) });
+      // Hosted restore is insert-first, delete-old-last with no transaction:
+      // a mid-restore failure can leave a mix of old and new rows, so the
+      // "untouched" promise only holds for the local SQLite path. The dialog
+      // stays open so Restore can be hit again straight away.
+      if (restorePreview.hosted) {
+        toast.error("Restore failed partway", {
+          description: `${String(e)} Run the restore again with the same file - it converges to the backup contents.`,
+        });
+      } else {
+        toast.error("Restore failed - your data is untouched", { description: String(e) });
+      }
     } finally {
       setRestoring(false);
     }
