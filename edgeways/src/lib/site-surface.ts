@@ -2,7 +2,9 @@
 export type SiteSurface = "waitlist" | "app";
 
 export function getSiteSurface(): SiteSurface {
-  return process.env.SITE_SURFACE === "waitlist" ? "waitlist" : "app";
+  // Fail closed (EDGE-109): only an explicit "app" opens the desk. A missing
+  // env var on a new environment must serve the waitlist, not the full app.
+  return process.env.SITE_SURFACE === "app" ? "app" : "waitlist";
 }
 
 /** Homepage version. Production stays waitlist until this is set to launch. */
@@ -13,7 +15,7 @@ export function getLandingVariant(): LandingVariant {
 }
 
 export function isWaitlistSurface(): boolean {
-  return process.env.SITE_SURFACE === "waitlist";
+  return process.env.SITE_SURFACE !== "app";
 }
 
 /** After subscribe: desk when this deploy is the app, home when waitlist still owns /. */

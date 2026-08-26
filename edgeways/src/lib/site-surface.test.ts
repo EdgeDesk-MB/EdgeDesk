@@ -12,8 +12,16 @@ import {
 } from "@/lib/site-surface";
 
 describe("site surface", () => {
-  it("locks only when SITE_SURFACE=waitlist", () => {
+  it("fails closed to waitlist unless SITE_SURFACE=app (EDGE-109)", () => {
+    const prev = process.env.SITE_SURFACE;
+    delete process.env.SITE_SURFACE;
+    expect(isWaitlistSurface()).toBe(true);
+    process.env.SITE_SURFACE = "waitlist";
+    expect(isWaitlistSurface()).toBe(true);
+    process.env.SITE_SURFACE = "app";
     expect(isWaitlistSurface()).toBe(false);
+    if (prev === undefined) delete process.env.SITE_SURFACE;
+    else process.env.SITE_SURFACE = prev;
   });
 
   it("allows marketing and waitlist routes", () => {
@@ -96,17 +104,18 @@ describe("site surface", () => {
 });
 
 describe("post-subscribe next step", () => {
-  it("opens the desk unless this deploy is waitlist-only", () => {
+  it("opens the desk only on an explicit app deploy", () => {
     const prev = process.env.SITE_SURFACE;
-    delete process.env.SITE_SURFACE;
+    process.env.SITE_SURFACE = "app";
     expect(postSubscribeNextHref()).toBe("/setup");
     expect(postSubscribeNextLabel()).toBe("Set up the desk");
     expect(postSubscribeNextHref({ setupDone: true })).toBe("/desk");
     expect(postSubscribeNextLabel({ setupDone: true })).toBe("Open the desk");
-    process.env.SITE_SURFACE = "waitlist";
+    delete process.env.SITE_SURFACE;
     expect(postSubscribeNextHref()).toBe("/");
     expect(postSubscribeNextLabel()).toBe("Back to Edgeways");
     expect(postSubscribeNextHref({ setupDone: true })).toBe("/");
+    process.env.SITE_SURFACE = "waitlist";
     expect(postSubscribeNextHref({ from: "setup" })).toBeNull();
     expect(postSubscribeNextLabel({ from: "setup" })).toBe("Now close the tab");
     if (prev === undefined) delete process.env.SITE_SURFACE;
