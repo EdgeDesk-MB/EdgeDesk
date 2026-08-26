@@ -10,10 +10,13 @@ import {
 } from "@/lib/report/edge-report";
 import { buildSeasonReport, seasonYears } from "@/lib/report/season-report";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
+  const denied = await deniedFeatureResponse("do_next");
+  if (denied) return denied;
   let snapshots = getAllSnapshots() as EvSnapshotRow[];
 
   // J8: ?owner= scopes both inputs through the bookmaker→account mapping.

@@ -22,6 +22,7 @@ import {
   syncOfferStatuses,
 } from "@/lib/services/offers";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,8 @@ const createSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET() {
+  const denied = await deniedFeatureResponse("offers_pipeline");
+  if (denied) return denied;
   if (isNeonDesk()) {
     // Hosted desk: no series sync / backfill (SQLite-only machinery). Plain
     // campaign list with profit summaries computed from Neon rows.
@@ -83,6 +86,8 @@ export const GET = withDeskScope(async function GET() {
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const denied = await deniedFeatureResponse("offers_pipeline");
+  if (denied) return denied;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

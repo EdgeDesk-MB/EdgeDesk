@@ -9,6 +9,7 @@ import {
   updateBetBuilderRun,
 } from "@/lib/services/bet-builder-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,8 @@ const patchSchema = z.object({
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await deniedFeatureResponse("bet_builder_desk");
+  if (denied) return denied;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -112,6 +115,8 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await deniedFeatureResponse("bet_builder_desk");
+  if (denied) return denied;
   const { id } = await ctx.params;
   const run = db.select().from(betBuilderRuns).where(eq(betBuilderRuns.id, Number(id))).get();
   const linkedBetIds = [run?.backBetId, run?.wholeLayBetId].filter(

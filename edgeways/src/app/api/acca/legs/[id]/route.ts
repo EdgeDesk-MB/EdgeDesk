@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logLegLay, setLegResult } from "@/lib/services/acca-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,8 @@ const patchSchema = z.object({
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await deniedFeatureResponse("acca_desk");
+  if (denied) return denied;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {

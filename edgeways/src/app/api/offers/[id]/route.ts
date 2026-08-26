@@ -22,6 +22,7 @@ import {
   withPlaybookOnRules,
 } from "@/lib/offers/offer-playbook";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import {
   deleteNeonDeskOffer,
@@ -67,6 +68,8 @@ const patchSchema = z.object({
 const deleteScopeSchema = z.enum(["instance", "future"]).default("instance");
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await deniedFeatureResponse("offers_pipeline");
+  if (denied) return denied;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -231,6 +234,8 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await deniedFeatureResponse("offers_pipeline");
+  if (denied) return denied;
   const { id } = await ctx.params;
   const offerId = Number(id);
 

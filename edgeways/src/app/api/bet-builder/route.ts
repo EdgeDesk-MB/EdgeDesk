@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBetBuilderRun, listBetBuilderRuns } from "@/lib/services/bet-builder-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
+  const denied = await deniedFeatureResponse("bet_builder_desk");
+  if (denied) return denied;
   return NextResponse.json({ runs: listBetBuilderRuns() });
 });
 
@@ -40,6 +43,8 @@ const createSchema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const denied = await deniedFeatureResponse("bet_builder_desk");
+  if (denied) return denied;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

@@ -1,5 +1,7 @@
 /** Homepage Refer a friend prompt. Dismiss is device-local, keyed by Clerk user. */
 
+import { roundPence } from "@/lib/calc/money";
+
 const DISMISSED_KEY = "edgeways:referral-prompt-dismissed";
 const SNOOZED_KEY = "edgeways:referral-prompt-snoozed";
 
@@ -62,15 +64,53 @@ export function isReferralPromptHidden(userId?: string | null): boolean {
   return isReferralPromptDismissed(userId) || isReferralPromptSnoozed(userId);
 }
 
+/** Live Core or Edge. Trial counts: they already chose a paid plan. */
+export function isReferralSubscriber(account: {
+  plan: string;
+  billingStatus: string;
+} | null | undefined): boolean {
+  if (!account) return false;
+  if (account.plan !== "core" && account.plan !== "edge") return false;
+  return (
+    account.billingStatus === "active" ||
+    account.billingStatus === "trialing" ||
+    account.billingStatus === "past_due"
+  );
+}
+
+function isProfitable(amount: number | null | undefined): boolean {
+  if (amount == null || !Number.isFinite(amount)) return false;
+  return roundPence(amount) > 0;
+}
+
+/**
+ * A first successful moment: a settled bet or a completed casino offer
+ * that made a profit. Losing first, then winning, still qualifies.
+ */
+export function hasReferralSuccessMoment(input: {
+  bets: Array<{ status: string; actualProfit: number | null }>;
+  casinoSettlements: Array<{ amount: number }>;
+}): boolean {
+  for (const bet of input.bets) {
+    if (bet.status === "open" || bet.status === "void") continue;
+    if (isProfitable(bet.actualProfit)) return true;
+  }
+  return input.casinoSettlements.some((row) => isProfitable(row.amount));
+}
+
 export function shouldOpenReferralPrompt(input: {
   pathname: string;
   signedIn: boolean;
   publicDemo: boolean;
   suppressed: boolean;
   hidden: boolean;
+  subscribed: boolean;
+  hasSuccessMoment: boolean;
 }): boolean {
   if (input.publicDemo) return false;
   if (!input.signedIn) return false;
+  if (!input.subscribed) return false;
+  if (!input.hasSuccessMoment) return false;
   if (input.suppressed) return false;
   if (input.hidden) return false;
   return input.pathname === "/desk" || input.pathname === "/desk/";

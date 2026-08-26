@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  hasReferralSuccessMoment,
   isReferralPromptDismissed,
   isReferralPromptHidden,
   isReferralPromptSnoozed,
+  isReferralSubscriber,
   markReferralPromptDismissed,
   referralPromptStorageKey,
   shouldOpenReferralPrompt,
@@ -54,6 +56,67 @@ describe("referral prompt", () => {
   });
 });
 
+describe("isReferralSubscriber", () => {
+  it("accepts a live Core or Edge subscription, including trial", () => {
+    expect(
+      isReferralSubscriber({ plan: "core", billingStatus: "active" })
+    ).toBe(true);
+    expect(
+      isReferralSubscriber({ plan: "edge", billingStatus: "trialing" })
+    ).toBe(true);
+    expect(
+      isReferralSubscriber({ plan: "core", billingStatus: "past_due" })
+    ).toBe(true);
+  });
+
+  it("rejects free, cancelled, or missing billing", () => {
+    expect(
+      isReferralSubscriber({ plan: "free", billingStatus: "active" })
+    ).toBe(false);
+    expect(
+      isReferralSubscriber({ plan: "core", billingStatus: "canceled" })
+    ).toBe(false);
+    expect(
+      isReferralSubscriber({ plan: "edge", billingStatus: "none" })
+    ).toBe(false);
+    expect(isReferralSubscriber(null)).toBe(false);
+  });
+});
+
+describe("hasReferralSuccessMoment", () => {
+  it("qualifies on a settled bet with profit", () => {
+    expect(
+      hasReferralSuccessMoment({
+        bets: [{ status: "won", actualProfit: 4.2 }],
+        casinoSettlements: [],
+      })
+    ).toBe(true);
+  });
+
+  it("qualifies on a completed casino offer with profit", () => {
+    expect(
+      hasReferralSuccessMoment({
+        bets: [{ status: "lost", actualProfit: -8 }],
+        casinoSettlements: [{ amount: 11.31 }],
+      })
+    ).toBe(true);
+  });
+
+  it("ignores open, void, break-even, and losing completions", () => {
+    expect(
+      hasReferralSuccessMoment({
+        bets: [
+          { status: "open", actualProfit: 12 },
+          { status: "void", actualProfit: 3 },
+          { status: "won", actualProfit: 0 },
+          { status: "lost", actualProfit: -2.5 },
+        ],
+        casinoSettlements: [{ amount: 0 }, { amount: -4 }],
+      })
+    ).toBe(false);
+  });
+});
+
 describe("shouldOpenReferralPrompt", () => {
   const ready = {
     pathname: "/desk",
@@ -61,9 +124,11 @@ describe("shouldOpenReferralPrompt", () => {
     publicDemo: false,
     suppressed: false,
     hidden: false,
+    subscribed: true,
+    hasSuccessMoment: true,
   };
 
-  it("opens on the homepage for a signed-in live desk", () => {
+  it("opens on the homepage after a subscribed success moment", () => {
     expect(shouldOpenReferralPrompt(ready)).toBe(true);
     expect(shouldOpenReferralPrompt({ ...ready, pathname: "/desk/" })).toBe(
       true
@@ -77,6 +142,15 @@ describe("shouldOpenReferralPrompt", () => {
     expect(shouldOpenReferralPrompt({ ...ready, pathname: "/offers" })).toBe(
       false
     );
+  });
+
+  it("stays closed without a subscription or a profitable completion", () => {
+    expect(shouldOpenReferralPrompt({ ...ready, subscribed: false })).toBe(
+      false
+    );
+    expect(
+      shouldOpenReferralPrompt({ ...ready, hasSuccessMoment: false })
+    ).toBe(false);
   });
 
   it("stays closed in public demo, while other dialogs are up, or when hidden", () => {
