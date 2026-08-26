@@ -4,7 +4,6 @@ import {
   buildFoundingSchedulePhases,
   foundingCheckoutAllowed,
   foundingCheckoutPriceId,
-  parseFoundingCheckout,
   shouldAttachFoundingSchedule,
 } from "@/lib/billing/founding-schedule";
 
@@ -13,10 +12,7 @@ describe("founding schedule", () => {
     delete process.env.STRIPE_PRICE_EDGE_FOUNDING_MONTH;
   });
 
-  it("is invite-only Edge monthly", () => {
-    expect(parseFoundingCheckout("1")).toBe(true);
-    expect(parseFoundingCheckout("true")).toBe(true);
-    expect(parseFoundingCheckout("yes")).toBe(false);
+  it("is invite-only Edge monthly (eligibility decided server-side, EDGE-93)", () => {
     expect(foundingCheckoutAllowed("edge", "month", true)).toBe(true);
     expect(foundingCheckoutAllowed("edge", "year", true)).toBe(false);
     expect(foundingCheckoutAllowed("core", "month", true)).toBe(false);

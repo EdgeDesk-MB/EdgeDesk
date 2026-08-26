@@ -1,17 +1,12 @@
 /**
  * Founding term: 14-day Edge trial, then 3 months at Core monthly,
- * then Edge list. Not a public price card. Waitlist email, or `?founding=1`.
+ * then Edge list. Not a public price card. Waitlist email only (EDGE-93) —
+ * the subscribe route decides eligibility server-side from the Clerk email.
  */
 import type Stripe from "stripe";
 import { foundingStripePriceId, stripePriceId } from "@/lib/billing/stripe-prices";
 
 export const FOUNDING_PAID_MONTHS = 3;
-
-export function parseFoundingCheckout(
-  value: string | null | undefined
-): boolean {
-  return value === "1" || value === "true";
-}
 
 /** Founding is Edge monthly only. Core and yearly stay on list prices. */
 export function foundingCheckoutAllowed(

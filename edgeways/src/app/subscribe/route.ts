@@ -10,10 +10,7 @@ import {
   subscribeCancelHref,
   subscribeSuccessHref,
 } from "@/lib/billing/checkout-session";
-import {
-  foundingCheckoutPriceId,
-  parseFoundingCheckout,
-} from "@/lib/billing/founding-schedule";
+import { foundingCheckoutPriceId } from "@/lib/billing/founding-schedule";
 import { requestOrigin } from "@/lib/billing/request-origin";
 import {
   getStripe,
@@ -32,7 +29,6 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = parseCheckoutFrom(url.searchParams.get("from"));
   const ref = url.searchParams.get("ref");
-  const queryFounding = parseFoundingCheckout(url.searchParams.get("founding"));
   const paid = parsePaidCheckout(
     url.searchParams.get("plan"),
     url.searchParams.get("interval") ?? "month"
@@ -47,7 +43,6 @@ export async function GET(request: Request) {
     signUp.searchParams.set("plan", paid.plan);
     signUp.searchParams.set("interval", paid.interval);
     if (from) signUp.searchParams.set("from", from);
-    if (queryFounding) signUp.searchParams.set("founding", "1");
     if (ref) signUp.searchParams.set("ref", ref);
     return NextResponse.redirect(signUp);
   }
@@ -69,8 +64,11 @@ export async function GET(request: Request) {
     user?.primaryEmailAddress?.emailAddress ??
     user?.emailAddresses[0]?.emailAddress ??
     null;
-  const onWaitlist = email ? await isWaitlistFoundingEligible(email) : false;
-  const foundingRequested = queryFounding || onWaitlist;
+  // EDGE-93: Founding is waitlist-only. The Clerk account email is looked up
+  // server-side; no query param can grant the founding schedule.
+  const foundingRequested = email
+    ? await isWaitlistFoundingEligible(email)
+    : false;
 
   const foundingPriceId = foundingCheckoutPriceId(
     paid.plan,
