@@ -4,6 +4,7 @@ import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { publicDemoRacingDesk } from "@/lib/demo/public-racing-desk";
 import { getRacingDesk } from "@/lib/services/racing-desk";
 import type { ExchangeProvider } from "@/lib/services/exchange/types";
+import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,12 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   if ((await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1") {
     return NextResponse.json(publicDemoRacingDesk(date));
   }
+  const demo = publicDemoRacingDesk(date);
+  const denied = await lockedFeedResponse("racing_live_feeds", {
+    source: "locked",
+    ...demo,
+  });
+  if (denied) return denied;
   const payload = await getRacingDesk(date, { exchangeProvider });
   return NextResponse.json(payload);
 });

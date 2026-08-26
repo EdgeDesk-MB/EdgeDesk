@@ -91,9 +91,7 @@ function formatLoginError(status?: string, error?: string): string {
   const code = (error ?? status ?? "").toUpperCase();
   if (code.includes("STRONG_AUTH_CODE_REQUIRED")) {
     return (
-      "Betfair requires 2FA. Add BETFAIR_TOTP_SECRET to .env.local " +
-      "(the base32 secret from your Authenticator app setup - not the 6-digit code), " +
-      "then restart the server and test again."
+      "Betfair requires two-factor authentication on this feed. Email support@edgeways.app if you need it connected."
     );
   }
   if (code.includes("CERT_AUTH_REQUIRED")) {
@@ -112,7 +110,7 @@ export async function testBetfairConnection(): Promise<{
     return {
       ok: false,
       status: "not_configured",
-      message: "Set BETFAIR_APP_KEY, BETFAIR_USERNAME, BETFAIR_PASSWORD in .env.local",
+      message: "Betfair is not connected on this desk.",
     };
   }
 
@@ -208,16 +206,18 @@ async function betfairPost<T>(method: string, params: Record<string, unknown>): 
   return res.json() as Promise<T>;
 }
 
-interface MarketCatalogueRow {
+export interface MarketCatalogueRow {
   marketId: string;
   marketName: string;
   marketStartTime: string;
   event?: { id?: string; name?: string; countryCode?: string; openDate?: string };
+  description?: { marketType?: string };
   runners?: Array<{ selectionId: number; runnerName: string }>;
 }
 
-interface MarketBookRow {
+export interface MarketBookRow {
   marketId: string;
+  status?: string;
   runners?: Array<{
     selectionId: number;
     status: string;

@@ -4,8 +4,7 @@ import { publicDemoOfferEdge } from "@/lib/demo/public-racing-desk";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { getRacingDesk } from "@/lib/services/racing-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
-import { canDesk } from "@/lib/entitlements/effective-plan";
-import { resolveEntitlementBilling } from "@/lib/entitlements/resolve-billing";
+import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,15 +21,12 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   if ((await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1") {
     return NextResponse.json(publicDemoOfferEdge(date));
   }
-  const billing = await resolveEntitlementBilling();
-  // Fail open when no billing row resolves (signed out / lookup blip) — the
-  // desk gate already hides the feature; never 403 a paying user on a blip.
-  if (billing && !canDesk({ billing }, "offer_edge")) {
-    return NextResponse.json(
-      { date, plays: [], source: "locked" },
-      { status: 403 }
-    );
-  }
+  const denied = await lockedFeedResponse("offer_edge", {
+    date,
+    plays: [],
+    source: "locked",
+  });
+  if (denied) return denied;
   const { edgePlays, summary } = await getRacingDesk(date);
   return NextResponse.json({ date, plays: edgePlays, source: summary.source });
 });

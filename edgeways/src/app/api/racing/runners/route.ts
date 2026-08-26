@@ -5,6 +5,7 @@ import { localCalendarDate } from "@/lib/events";
 import { parseRacecardRunners } from "@/lib/racing";
 import { titleCaseHorse } from "@/lib/racing/parse-race-result-text";
 import { sortRunnerNamesByOdds } from "@/lib/racing/odds";
+import { isFeedDenied } from "@/lib/entitlements/feed-guard";
 import { getDeskOrderedRunnerNames } from "@/lib/services/racing-desk";
 import { demoRacecards, hasRacingApiKey, racecardsFree } from "@/lib/services/theracingapi";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
@@ -41,8 +42,10 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
       ? localCalendarDate(new Date(event.startTime))
       : localCalendarDate());
 
+  const feedLocked = await isFeedDenied("racing_live_feeds");
+
   // Prefer Racing Desk enrichment (live exchange / bookie) so order matches the desk.
-  if (externalId || hasEventId) {
+  if (!feedLocked && (externalId || hasEventId)) {
     try {
       const deskOrdered = await getDeskOrderedRunnerNames({
         date,
@@ -63,7 +66,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
 
   let runners = formatNames(parseRacecardRunners(event?.goals));
 
-  if (externalId) {
+  if (!feedLocked && externalId) {
     const cards = hasRacingApiKey()
       ? [...(await racecardsFree("today")), ...(await racecardsFree("tomorrow"))]
       : demoRacecards();

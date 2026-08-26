@@ -3,12 +3,21 @@ import {
   hasRacingApiKey,
   resultsToday,
 } from "@/lib/services/theracingapi";
+import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
 
 /** Probe Racing API results access (Basic tier). */
 export const GET = withDeskScope(async function GET() {
+  const denied = await lockedFeedResponse("racing_live_feeds", {
+    source: "locked",
+    tier: "none" as const,
+    resultCount: 0,
+    message: "Live racing feeds sit on Edge.",
+  });
+  if (denied) return denied;
+
   if (!hasRacingApiKey()) {
     return NextResponse.json({
       tier: "none" as const,

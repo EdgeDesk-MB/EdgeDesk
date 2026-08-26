@@ -9,6 +9,7 @@ import {
   resultsToday,
   type RacingRacecard,
 } from "@/lib/services/theracingapi";
+import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,12 @@ async function loadRacecardsForDate(date: string): Promise<{
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
     req.nextUrl.searchParams.get("date") ?? localCalendarDate();
+
+  const denied = await lockedFeedResponse("racing_live_feeds", {
+    source: "locked",
+    racecards: [],
+  });
+  if (denied) return denied;
 
   if (!hasRacingApiKey()) {
     return NextResponse.json({ source: "demo", racecards: demoRacecards(date) });

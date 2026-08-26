@@ -34,6 +34,8 @@ export type {
 } from "./types";
 
 export { betfairConfigured, resetBetfairSession, testBetfairConnection } from "./betfair";
+export { fetchBetfairFootballOdds } from "./football-odds";
+export type { FootballOddsQuery, FootballOddsResult } from "./football-odds-map";
 export { betdaqConfigured } from "./betdaq";
 
 /** Map Settings exchange name → API provider id. */
@@ -156,7 +158,7 @@ export function getExchangeProviderStatus(provider: ExchangeProvider): ExchangeP
         feedType: betfairConfigured() ? betfairFeedType() : undefined,
         message:
           status === "not_configured"
-            ? "Set BETFAIR_APP_KEY, BETFAIR_USERNAME, BETFAIR_PASSWORD in .env.local"
+            ? "Betfair is not connected on this desk."
             : `Betfair ${betfairFeedType()} feed`,
       };
     }
@@ -167,7 +169,7 @@ export function getExchangeProviderStatus(provider: ExchangeProvider): ExchangeP
         status,
         message:
           status === "not_configured"
-            ? "Betdaq requires partner API access - configure BETDAQ_API_KEY when available"
+            ? "Betdaq is not available yet."
             : "Betdaq partner API not yet integrated - use Betfair",
       };
     }

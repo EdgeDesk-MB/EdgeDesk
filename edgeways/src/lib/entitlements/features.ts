@@ -1,8 +1,8 @@
 /**
  * N0 feature flags (docs/roadmap/implementation-briefs.md, brief N0). One id per
- * gated surface, matching the §7.5 tier matrix. Enforcement is preview-only
- * until billing (EDGE-22); the default `planPreview: "unlocked"` keeps today's
- * behaviour for daily use. Never check these inside src/lib/calc/**.
+ * gated surface, matching the §7.5 tier matrix. Desk chrome uses `canDesk`
+ * (EDGE-22). Provider routes 403 via `lockedFeedResponse` (EDGE-83). Never
+ * check these inside src/lib/calc/**.
  */
 
 export const FEATURES = [

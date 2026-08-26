@@ -16,7 +16,7 @@ describe("getExchangeProviderStatus", () => {
   it("reports betfair not configured without env", () => {
     const status = getExchangeProviderStatus("betfair");
     expect(status.status).toBe("not_configured");
-    expect(status.message).toContain("BETFAIR");
+    expect(status.message).toMatch(/not connected/i);
   });
 
   it("reports betdaq as not configured or unsupported", () => {
@@ -30,7 +30,7 @@ describe("testBetfairConnection", () => {
     const result = await testBetfairConnection();
     expect(result.ok).toBe(false);
     expect(result.status).toBe("not_configured");
-    expect(result.message).toContain("BETFAIR");
+    expect(result.message).toMatch(/not connected/i);
   });
 });
 
