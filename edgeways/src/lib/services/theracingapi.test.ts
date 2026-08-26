@@ -41,6 +41,33 @@ describe("theracingapi tier access", () => {
     await expect(racecardsStandard("today")).resolves.toBeNull();
   });
 
+  it("throws RacingApiBudgetError without calling the provider when the daily cap gate denies", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { racecardsFree, registerRacingBudgetGate, RacingApiBudgetError } =
+      await import("./theracingapi");
+    registerRacingBudgetGate(async () => false);
+
+    await expect(racecardsFree("today")).rejects.toBeInstanceOf(RacingApiBudgetError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("calls the provider when the daily cap gate allows", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ racecards: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { racecardsFree, registerRacingBudgetGate } = await import("./theracingapi");
+    registerRacingBudgetGate(async () => true);
+
+    await expect(racecardsFree("today")).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it("uses free racecards when standard tier is unavailable", async () => {
     const today = localCalendarDate();
     const fetchMock = vi

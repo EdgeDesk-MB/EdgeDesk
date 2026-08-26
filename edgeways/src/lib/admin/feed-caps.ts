@@ -1,9 +1,9 @@
 /**
  * Operator-tunable feed caps, stored in operator_settings so the daily ceiling
  * can be raised from /admin/feeds when the provider plan is upgraded — no
- * deploy. Football's cap is the hard spend guard in services/apifootball.ts;
- * racing's is a soft alert threshold on the monitor (its real provider limit
- * is per-second, not per-day).
+ * deploy. Both caps are hard spend guards: football's in
+ * services/apifootball.ts, racing's via the budget gate registered in
+ * services/racing-usage-recorder.ts (EDGE-100).
  */
 import "server-only";
 import { eq } from "drizzle-orm";
@@ -18,7 +18,7 @@ const FEED_CAPS_KEY = "feed_caps";
 export type FeedCaps = {
   /** Hard daily request cap for API-Football spend. */
   football: number;
-  /** Soft daily alert threshold for Racing API requests. */
+  /** Hard daily request cap for Racing API spend (EDGE-100). */
   racing: number;
 };
 

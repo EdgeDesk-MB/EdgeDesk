@@ -7,9 +7,9 @@
  * guard on the conflict branch means an over-cap attempt returns no row (denied)
  * and does not inflate the counter further.
  *
- * Football spends through `spendNeonFeedBudget` (hard cap). Racing records
- * through `recordNeonFeedUsage` (no cap — the provider's real limit is
- * per-second; the daily count feeds the admin usage chart).
+ * Football and racing both spend through `spendNeonFeedBudget` (hard cap,
+ * EDGE-100). `recordNeonFeedUsage` remains for any future feed whose real
+ * constraint is rate, not volume.
  *
  * `feed_budget` is global coordination data — no clerk scoping.
  */

@@ -16,9 +16,9 @@ import {
 import type { FeedCaps } from "@/lib/admin/feed-caps";
 
 /**
- * Raise the daily ceilings when the provider plan is upgraded. Football's cap
- * is enforced on every API-Football request; racing's only drives the monitor
- * thresholds (the provider's real limit is per-second).
+ * Raise the daily ceilings when the provider plan is upgraded. Both caps are
+ * enforced on every provider request (football since EDGE-81c, racing since
+ * EDGE-100) and drive the monitor thresholds.
  */
 export function FeedCapsForm({ initial }: { initial: FeedCaps }) {
   const router = useRouter();
@@ -53,8 +53,8 @@ export function FeedCapsForm({ initial }: { initial: FeedCaps }) {
       <CardHeader>
         <CardTitle className="text-base">Daily caps</CardTitle>
         <CardDescription>
-          Raise these when you upgrade a provider plan. Football is a hard
-          ceiling; racing is the alert threshold.
+          Raise these when you upgrade a provider plan. Both are hard
+          ceilings — requests stop for the day when a cap is hit.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -72,7 +72,7 @@ export function FeedCapsForm({ initial }: { initial: FeedCaps }) {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cap-racing">Racing alert threshold/day</Label>
+            <Label htmlFor="cap-racing">Racing requests/day</Label>
             <Input
               id="cap-racing"
               type="number"

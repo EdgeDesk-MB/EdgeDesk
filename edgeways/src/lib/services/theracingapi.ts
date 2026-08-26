@@ -102,6 +102,27 @@ export function registerRacingUsageRecorder(recorder: () => void): void {
   usageRecorder = recorder;
 }
 
+/**
+ * EDGE-100: hard daily cap. Server boot registers an async gate that
+ * atomically spends against the per-feed budget row; when it returns false
+ * the provider call never happens. Client bundles leave this null (no cap
+ * client-side — demo data makes no provider calls anyway).
+ */
+let budgetGate: (() => Promise<boolean>) | null = null;
+
+export function registerRacingBudgetGate(gate: () => Promise<boolean>): void {
+  budgetGate = gate;
+}
+
+export class RacingApiBudgetError extends Error {
+  constructor() {
+    super(
+      "Daily Racing API request cap reached - racing data resumes tomorrow. The operator can raise the cap in /admin/feeds."
+    );
+    this.name = "RacingApiBudgetError";
+  }
+}
+
 function trackRequest(): void {
   const today = new Date().toISOString().slice(0, 10);
   if (today !== budgetDay) {
@@ -318,6 +339,7 @@ export function isRacingTierAccessError(error: unknown): boolean {
 async function apiGet(path: string): Promise<any> {
   const creds = credentials();
   if (!creds) throw new Error("RACING_API_USERNAME / RACING_API_PASSWORD not configured");
+  if (budgetGate && !(await budgetGate())) throw new RacingApiBudgetError();
   trackRequest();
 
   const token = Buffer.from(`${creds.user}:${creds.pass}`).toString("base64");
