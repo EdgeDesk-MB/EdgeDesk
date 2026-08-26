@@ -70,6 +70,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         homeScore: fixture.homeScore,
         awayScore: fixture.awayScore,
         minute: fixture.minute,
+        period: fixture.period ?? null,
         createdAt: now,
       })
       .returning()

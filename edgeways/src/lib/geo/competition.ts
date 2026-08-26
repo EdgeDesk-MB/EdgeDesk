@@ -1,13 +1,13 @@
 import { isWorldCupCompetition } from "@/lib/accounts/access";
 import { countryLabelToIso } from "@/lib/geo/region";
 
-/** Known domestic leagues → country when API country is missing (demo / sparse feeds). */
+/** Known domestic leagues → flag code when API country is missing (demo / sparse feeds). */
 const COMPETITION_TO_ISO: Record<string, string> = {
-  "premier league": "GB",
-  championship: "GB",
-  "league one": "GB",
-  "league two": "GB",
-  "fa cup": "GB",
+  "premier league": "ENG",
+  championship: "ENG",
+  "league one": "ENG",
+  "league two": "ENG",
+  "fa cup": "ENG",
   "la liga": "ES",
   "serie a": "IT",
   bundesliga: "DE",
@@ -24,7 +24,7 @@ export function isGlobalFootballCompetition(competition: string): boolean {
   return isWorldCupCompetition(competition);
 }
 
-/** ISO alpha-2 for a competition header flag; null when global (World Cup) or unknown. */
+/** Flag code for a competition header; null when global (World Cup) or unknown. */
 export function competitionFlagIso(
   competition: string,
   leagueCountry?: string | null

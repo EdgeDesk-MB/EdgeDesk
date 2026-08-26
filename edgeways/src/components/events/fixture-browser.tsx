@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FIXTURE_SPORTS, type Fixture, type RacingFixture } from "@/components/events/types";
 import { DeskFixtureBoard } from "@/components/events/desk-fixture-board";
@@ -14,7 +15,7 @@ import { useAddBet } from "@/components/add-bet-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
 import { api, useAppState } from "@/hooks/use-app-state";
 import type { EventRow } from "@/lib/db/schema";
-import { isWorldCupCompetition } from "@/lib/accounts/access";
+import { epDeskFixtureHref } from "@/lib/calc/ep/fixture-query";
 import { isCurrentOrFutureFixture, sortFixturesByKickoff } from "@/lib/events";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
 import { racingSyncToast } from "@/lib/racing/sync-toast";
@@ -62,7 +63,6 @@ export function FixtureBrowserContent({
   const [loadingFixtures, setLoadingFixtures] = useState(true);
   const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">("football");
   const [syncingRacing, setSyncingRacing] = useState(false);
-  const [competitionFilter, setCompetitionFilter] = useState<"all" | "world_cup">("all");
 
   const goTracked = useCallback(() => router.push("/tracked-events"), [router]);
 
@@ -236,18 +236,10 @@ export function FixtureBrowserContent({
     myEvents.filter((e) => e.externalId).map((e) => e.externalId!)
   );
 
-  const worldCupCount = (
-    fixtures.filter((f) => isCurrentOrFutureFixture(f.status) && isWorldCupCompetition(f.competition)).length
-  );
-
   const filteredFixtures = useMemo(() => {
     if (fixtureSport !== "football") return [];
-    let list = fixtures.filter((f) => isCurrentOrFutureFixture(f.status));
-    if (competitionFilter === "world_cup") {
-      list = list.filter((f) => isWorldCupCompetition(f.competition));
-    }
-    return sortFixturesByKickoff(list);
-  }, [fixtures, fixtureSport, competitionFilter]);
+    return sortFixturesByKickoff(fixtures.filter((f) => isCurrentOrFutureFixture(f.status)));
+  }, [fixtures, fixtureSport]);
 
   const filteredRaces = useMemo(
     () =>
@@ -259,12 +251,14 @@ export function FixtureBrowserContent({
 
   function openEpDesk(fixture: Fixture) {
     if (variant === "dialog") closeTrackFixture();
-    const q = new URLSearchParams({
-      home: fixture.homeTeam,
-      away: fixture.awayTeam,
-      tab: "dutch",
-    });
-    router.push(`/calculators/ep-desk?${q.toString()}`);
+    router.push(
+      epDeskFixtureHref({
+        home: fixture.homeTeam,
+        away: fixture.awayTeam,
+        startTime: fixture.startTime,
+        tab: "dutch",
+      })
+    );
   }
 
   const sourceHint =
@@ -348,7 +342,9 @@ export function FixtureBrowserContent({
         <TabsList
           variant="line"
           className="justify-start"
-          fadeClassName={tabBleed === "dialog" ? "from-popover" : "from-card"}
+          fadeClassName={
+            tabBleed === "dialog" ? "from-page dark:from-card" : "from-card"
+          }
         >
           {FIXTURE_SPORTS.map((sport) => (
             <TabsTrigger key={sport.id} value={sport.id} className="gap-1.5">
@@ -368,16 +364,12 @@ export function FixtureBrowserContent({
       : "Could not load fixtures"
     : fixtureSport === "horse_racing"
       ? "No live or upcoming races"
-      : competitionFilter === "world_cup"
-        ? "No World Cup fixtures"
-        : "No live or upcoming fixtures";
+      : "No live or upcoming fixtures";
   const emptyDescription = sportError
     ? "Use Refresh to try again."
     : fixtureSport === "horse_racing"
       ? "Finished races stay on Tracked Events. Try another filter if you expected a card."
-      : competitionFilter === "world_cup"
-        ? "None in today's feed. Try All comps."
-        : "Finished matches stay on Tracked Events. Try another filter if you expected a match.";
+      : "Finished matches stay on Tracked Events. Try another filter if you expected a match.";
 
   const hasSportData =
     fixtureSport === "horse_racing" ? racingFixtures.length > 0 : fixtures.length > 0;
@@ -398,9 +390,6 @@ export function FixtureBrowserContent({
       emptyDescription={emptyDescription}
       loading={showLoadingEmpty}
       loadFailed={Boolean(sportError) && !hasSportData}
-      competitionFilter={competitionFilter}
-      onCompetitionFilterChange={setCompetitionFilter}
-      worldCupCount={worldCupCount}
       displayTimezone={normalizeDisplayTimezone(state?.settings?.displayTimezone)}
     />
   );
@@ -410,7 +399,13 @@ export function FixtureBrowserContent({
       <div className={cn("flex min-h-0 flex-col", className)}>
         <div className="shrink-0 px-6 pt-4">{header}</div>
         <div className="shrink-0 px-6 pb-2">{tabs}</div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">{board}</div>
+        <ScrollFadeEdges
+          className="min-h-0 flex-1"
+          fadeClassName="from-page dark:from-card"
+          scrollClassName="app-scroll-nested px-6 pb-6"
+        >
+          {board}
+        </ScrollFadeEdges>
       </div>
     );
   }

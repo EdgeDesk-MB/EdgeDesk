@@ -264,6 +264,27 @@ export function formatEventTitle(ev: {
   return `${ev.homeTeam} v ${ev.awayTeam}`;
 }
 
+/**
+ * Live football clock: HT / Pens / ET from API-Football period, else the minute.
+ * Half-time is `status.short === "HT"`; we used to store that as 45'.
+ */
+export function footballClockLabel(ev: {
+  minute?: number | null;
+  period?: string | null;
+}): string | null {
+  const period = ev.period?.trim().toUpperCase();
+  if (period === "HT") return "HT";
+  if (period === "BT") return "BT";
+  if (period === "P") return "Pens";
+  if (period === "ET") {
+    const extra = ev.minute ?? 0;
+    return extra > 0 ? `ET ${extra}'` : "ET";
+  }
+  const minute = ev.minute ?? 0;
+  if (minute <= 0) return null;
+  return `${minute}'`;
+}
+
 /** Tracker / dashboard event status subtitle. */
 export function formatEventStatus(
   ev: {
@@ -272,6 +293,7 @@ export function formatEventStatus(
     homeScore: number;
     awayScore: number;
     minute: number;
+    period?: string | null;
     goals?: string | null;
     source?: string | null;
     startTime?: number;
@@ -282,7 +304,8 @@ export function formatEventStatus(
   if (ev.sport === "horse_racing") return formatRacingEventStatus(ev, raceResult, now);
   const status = effectiveEventStatus(ev, now);
   if (status === "live") {
-    const min = ev.minute > 0 ? ` (${ev.minute}')` : "";
+    const clock = footballClockLabel(ev);
+    const min = clock ? ` (${clock})` : "";
     return `LIVE ${ev.homeScore}-${ev.awayScore}${min}`;
   }
   if (status === "finished") return `FT ${ev.homeScore}-${ev.awayScore}`;

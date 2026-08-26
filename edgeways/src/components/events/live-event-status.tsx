@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { effectiveEventStatus, eventShowsScore } from "@/lib/events";
+import { effectiveEventStatus, eventShowsScore, footballClockLabel } from "@/lib/events";
 import { parseRaceResults, racingEventStatusDetail } from "@/lib/racing";
 import { cn } from "@/lib/utils";
 import { Radio } from "lucide-react";
@@ -14,6 +14,7 @@ type LiveEventLike = {
   homeScore?: number;
   awayScore?: number;
   minute?: number;
+  period?: string | null;
   goals?: string | null;
 };
 
@@ -71,6 +72,8 @@ export function LiveEventStatusPanel({
     );
   }
 
+  const clock = footballClockLabel(event);
+
   return (
     <div
       className={cn(
@@ -78,9 +81,9 @@ export function LiveEventStatusPanel({
         className
       )}
     >
-      {status === "live" && (
+      {status === "live" && clock && (
         <Badge variant="secondary" className="tabular-nums">
-          {event.minute}&apos;
+          {clock}
         </Badge>
       )}
       {eventShowsScore(event) ? (
@@ -104,6 +107,7 @@ export function liveEventInlineLabel(event: LiveEventLike): string {
     return `Off · ${racingEventStatusDetail(event.goals).toLowerCase()}`;
   }
   if (!eventShowsScore(event)) return "Upcoming";
-  const min = event.minute ? ` (${event.minute}')` : "";
+  const clock = footballClockLabel(event);
+  const min = clock ? ` (${clock})` : "";
   return `Live · ${event.homeScore ?? 0}-${event.awayScore ?? 0}${min}`;
 }

@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import {
   flagEmojiFromIso,
+  flagLabelFromIso,
   racingRegionLabel,
   toIsoCountryCode,
 } from "@/lib/geo/region";
@@ -40,7 +41,7 @@ export function RegionFlag({
   }
 
   const emoji = flagEmojiFromIso(iso);
-  const label = title ?? racingRegionLabel(code);
+  const label = title ?? flagLabelFromIso(iso) ?? racingRegionLabel(code);
 
   return (
     <span

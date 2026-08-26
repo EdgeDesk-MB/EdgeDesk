@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   countLiveNavEvents,
   eventShowsScore,
+  footballClockLabel,
   formatEventStatus,
   formatRacingEventStatus,
   formatRacingOffTime,
@@ -61,6 +62,19 @@ describe("formatRacingEventStatus", () => {
         NOW
       )
     ).toBe("Won by Valedictory");
+  });
+});
+
+describe("footballClockLabel", () => {
+  it("prints HT instead of 45'", () => {
+    expect(footballClockLabel({ minute: 45, period: "HT" })).toBe("HT");
+    expect(footballClockLabel({ minute: 45, period: "1H" })).toBe("45'");
+  });
+
+  it("labels extra time and penalties from the same period field", () => {
+    expect(footballClockLabel({ minute: 105, period: "ET" })).toBe("ET 105'");
+    expect(footballClockLabel({ minute: 120, period: "P" })).toBe("Pens");
+    expect(footballClockLabel({ minute: 90, period: "BT" })).toBe("BT");
   });
 });
 

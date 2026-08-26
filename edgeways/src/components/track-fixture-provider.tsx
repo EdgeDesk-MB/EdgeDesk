@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FixtureBrowserContent } from "@/components/events/fixture-browser";
+import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 
 type TrackFixtureContextValue = {
   openTrackFixture: () => void;
@@ -37,6 +38,9 @@ export function TrackFixtureProvider({ children }: { children: React.ReactNode }
         <DialogContent
           showCloseButton
           className="flex max-h-[min(90dvh,820px)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+          onFocusOutside={preventDialogDismissOnPortaledContent}
+          onPointerDownOutside={preventDialogDismissOnPortaledContent}
+          onInteractOutside={preventDialogDismissOnPortaledContent}
         >
           <DialogHeader className="mx-0 mt-0 shrink-0">
             <DialogTitle>Browse fixtures</DialogTitle>

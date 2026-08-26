@@ -2,33 +2,42 @@
 
 import Link from "next/link";
 import { useNow } from "@/hooks/use-now";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { FixtureScopeFilter } from "@/components/events/fixture-scope-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FilterPill } from "@/components/ui/filter-pill";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ListDaySection } from "@/components/layout/list-day-section";
 import type { Fixture, RacingFixture } from "@/components/events/types";
 import { RegionFlag, GlobalFlag } from "@/components/region-flag";
 import { SportIcon } from "@/components/sport-icon";
 import { TeamCrest } from "@/components/team-crest";
 import { isWorldCupCompetition } from "@/lib/accounts/access";
+import { groupByDisplayDay } from "@/lib/events/fixture-day-groups";
+import {
+  fixtureMatchesFootballScope,
+  groupFootballByLeague,
+} from "@/lib/events/fixture-scope";
 import { competitionFlagIso } from "@/lib/geo/competition";
 import { toIsoCountryCode, racingRegionLabel } from "@/lib/geo/region";
-import {
-  formatFixtureKickoff,
-  sortFixturesByKickoff,
-} from "@/lib/events";
+import { sortFixturesByKickoff } from "@/lib/events";
 import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
+import { formatClockTime } from "@/lib/time-format";
 import {
   captionHeading,
+  deskInsetX,
+  filterPillCountState,
+  filterPillGroup,
+  listDaySectionContentNested,
   listRow,
+  listRowGroup,
   sectionBar,
-  sectionMeta,
   sectionTitle,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -52,39 +61,53 @@ function fixtureBoardEmptyCopy(
   emptyTitle: string,
   emptyDescription: string,
   loadFailed?: boolean,
+  scopeLabel?: string | null,
 ) {
   if (loadFailed) return { title: emptyTitle, description: emptyDescription };
+  const scoped =
+    scopeLabel
+      ? sport === "horse_racing"
+        ? ` at ${scopeLabel}`
+        : ` in ${scopeLabel}`
+      : "";
+  const clearHint = scopeLabel
+    ? "Nothing matches this filter. Show all, or try another status."
+    : null;
   if (statusFilter === "live") {
     return {
-      title: sport === "horse_racing" ? "No live races" : "No live fixtures",
-      description: "Nothing is live in this feed right now. Try All or Scheduled.",
+      title: sport === "horse_racing" ? `No live races${scoped}` : `No live fixtures${scoped}`,
+      description: clearHint ?? "Nothing is live in this feed right now. Try All or Scheduled.",
     };
   }
   if (statusFilter === "scheduled") {
     return {
-      title: sport === "horse_racing" ? "No scheduled races" : "No scheduled fixtures",
-      description: "Nothing upcoming in this feed. Try All or Live.",
+      title:
+        sport === "horse_racing"
+          ? `No scheduled races${scoped}`
+          : `No scheduled fixtures${scoped}`,
+      description: clearHint ?? "Nothing upcoming in this feed. Try All or Live.",
+    };
+  }
+  if (scopeLabel) {
+    return {
+      title:
+        sport === "horse_racing"
+          ? `No races at ${scopeLabel}`
+          : `No fixtures in ${scopeLabel}`,
+      description: "Nothing matches this filter. Show all, or try another status.",
     };
   }
   return { title: emptyTitle, description: emptyDescription };
 }
 
-function groupFootballByCompetition(fixtures: Fixture[]) {
-  const map = new Map<string, Fixture[]>();
-  for (const fixture of fixtures) {
-    const list = map.get(fixture.competition) ?? [];
-    list.push(fixture);
-    map.set(fixture.competition, list);
-  }
-  return [...map.entries()]
-    .map(([competition, items]) => ({
-      competition,
-      leagueFlag: items[0]?.leagueFlag,
-      leagueCountry: items[0]?.leagueCountry,
-      fixtures: sortFixturesByKickoff(items),
-    }))
-    .sort((a, b) => a.competition.localeCompare(b.competition));
+function fixtureDayHeadingId(scope: string, dayKey: string) {
+  const slug = scope
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `fixture-day-${slug}-${dayKey}`;
 }
+
 
 function groupRacesByCourse(races: RacingFixture[]) {
   const map = new Map<string, RacingFixture[]>();
@@ -131,7 +154,7 @@ function FixtureActions({
               <Flame className="size-4 text-amber-600 dark:text-amber-400" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="left" align="center" sideOffset={6}>
+          <TooltipContent side="top" align="center" sideOffset={6}>
             2UP Desk - dutch EV
           </TooltipContent>
         </Tooltip>
@@ -157,7 +180,7 @@ function FixtureActions({
                 <NotebookPen className="size-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="left">Add bet</TooltipContent>
+            <TooltipContent side="top" sideOffset={6}>Add bet</TooltipContent>
           </Tooltip>
         </>
       ) : (
@@ -175,7 +198,7 @@ function FixtureActions({
                 <NotebookPen className="size-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="left">Track &amp; add bet</TooltipContent>
+            <TooltipContent side="top" sideOffset={6}>Track &amp; add bet</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -190,7 +213,7 @@ function FixtureActions({
                 <Plus className="size-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="left">Track only</TooltipContent>
+            <TooltipContent side="top" sideOffset={6}>Track only</TooltipContent>
           </Tooltip>
         </>
       )}
@@ -235,13 +258,15 @@ function CompetitionHeaderIcon({
   competition,
   leagueFlag,
   leagueCountry,
+  size = "md",
 }: {
   competition: string;
   leagueFlag?: string | null;
   leagueCountry?: string | null;
+  size?: "sm" | "md";
 }) {
   if (isWorldCupCompetition(competition)) {
-    return <GlobalFlag size="md" title="FIFA World Cup" />;
+    return <GlobalFlag size={size} title="FIFA World Cup" />;
   }
 
   const iso = competitionFlagIso(competition, leagueCountry);
@@ -249,7 +274,7 @@ function CompetitionHeaderIcon({
     return (
       <RegionFlag
         code={iso}
-        size="md"
+        size={size}
         hideIfUnknown={false}
         title={leagueCountry ?? competition}
       />
@@ -257,14 +282,16 @@ function CompetitionHeaderIcon({
   }
 
   if (leagueFlag) {
-    return <TeamCrest src={leagueFlag} alt={leagueCountry ?? competition} size="md" />;
+    return <TeamCrest src={leagueFlag} alt={leagueCountry ?? competition} size={size} />;
   }
 
   return null;
 }
 
 function FootballCompetitionSection({
+  scopeId,
   competition,
+  label,
   leagueFlag,
   leagueCountry,
   fixtures,
@@ -274,7 +301,9 @@ function FootballCompetitionSection({
   onEpDesk,
   displayTimezone,
 }: {
+  scopeId: string;
   competition: string;
+  label: string;
   leagueFlag?: string | null;
   leagueCountry?: string | null;
   fixtures: Fixture[];
@@ -286,9 +315,10 @@ function FootballCompetitionSection({
 }) {
   const [open, setOpen] = useState(true);
   const now = useNow(30_000);
+  const dayGroups = groupByDisplayDay(fixtures, now, displayTimezone);
 
   return (
-    <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
+    <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
       <CollapsibleSectionHeader open={open} onToggle={() => setOpen((v) => !v)}>
         <p className={cn(sectionTitle, "flex items-center gap-1.5")}>
           <CompetitionHeaderIcon
@@ -296,60 +326,77 @@ function FootballCompetitionSection({
             leagueFlag={leagueFlag}
             leagueCountry={leagueCountry}
           />
-          <span>{competition}</span>
+          <span>{label}</span>
         </p>
       </CollapsibleSectionHeader>
       {open ? (
-      <ul>
-        {fixtures.map((fixture) => {
-          const isTracked = trackedExternalIds.has(fixture.externalId);
-          const live = fixture.status === "live";
-          return (
-            <li
-              key={fixture.externalId}
-              className={cn(
-                listRow,
-                "flex items-center gap-3 px-3 py-2.5",
-                live && "bg-emerald-500/5"
-              )}
+        <div className="pb-6">
+          {dayGroups.map((day) => {
+            const headingId = fixtureDayHeadingId(scopeId, day.dayKey);
+            return (
+            <ListDaySection
+              key={day.dayKey}
+              label={day.label}
+              headingId={headingId}
+              className="pt-2"
+              headerClassName={deskInsetX}
+              contentClassName={listDaySectionContentNested}
             >
-              <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
-                {formatFixtureKickoff(fixture.startTime, now, displayTimezone)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="inline-flex items-center gap-1.5 font-medium">
-                    <TeamCrest src={fixture.homeLogo} alt={fixture.homeTeam} />
-                    {fixture.homeTeam}
-                  </span>
-                  <span className="text-muted-foreground">–</span>
-                  <span className="inline-flex items-center gap-1.5 font-medium">
-                    <TeamCrest src={fixture.awayLogo} alt={fixture.awayTeam} />
-                    {fixture.awayTeam}
-                  </span>
-                  {live ? (
-                    <Badge className="bg-emerald-600 text-[11px] tabular-nums">
-                      {fixture.homeScore}–{fixture.awayScore}
-                      {fixture.minute > 0 ? ` · ${fixture.minute}'` : ""}
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-              <div className="shrink-0">
-                <FixtureActions
-                  isTracked={isTracked}
-                  onTrack={() => onTrack(fixture)}
-                  onTrackAndBet={() => onTrackAndBet(fixture)}
-                  onEpDesk={() => onEpDesk(fixture)}
-                  showEpDesk
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+              <ul aria-labelledby={headingId} className={listRowGroup}>
+                {day.items.map((fixture) => {
+                  const isTracked = trackedExternalIds.has(fixture.externalId);
+                  const live = fixture.status === "live";
+                  return (
+                    <li
+                      key={fixture.externalId}
+                      className={cn(
+                        listRow,
+                        deskInsetX,
+                        "flex items-center gap-3 py-2.5",
+                        live && "bg-success/5"
+                      )}
+                    >
+                      <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
+                        {formatClockTime(fixture.startTime, { timeZone: displayTimezone })}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="inline-flex items-center gap-1.5 font-medium">
+                            <TeamCrest src={fixture.homeLogo} alt={fixture.homeTeam} />
+                            {fixture.homeTeam}
+                          </span>
+                          <span className="text-muted-foreground">–</span>
+                          <span className="inline-flex items-center gap-1.5 font-medium">
+                            <TeamCrest src={fixture.awayLogo} alt={fixture.awayTeam} />
+                            {fixture.awayTeam}
+                          </span>
+                          {live ? (
+                            <Badge variant="active" className="tabular-nums">
+                              {fixture.homeScore}–{fixture.awayScore}
+                              {fixture.minute > 0 ? ` · ${fixture.minute}'` : ""}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <FixtureActions
+                          isTracked={isTracked}
+                          onTrack={() => onTrack(fixture)}
+                          onTrackAndBet={() => onTrackAndBet(fixture)}
+                          onEpDesk={() => onEpDesk(fixture)}
+                          showEpDesk
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </ListDaySection>
+            );
+          })}
+        </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -372,12 +419,13 @@ function RacingCourseSection({
 }) {
   const [open, setOpen] = useState(true);
   const now = useNow(30_000);
+  const dayGroups = groupByDisplayDay(races, now, displayTimezone);
 
   if (races.length === 0) return null;
   const hasRegionFlag = Boolean(toIsoCountryCode(region));
 
   return (
-    <section className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
+    <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
       <CollapsibleSectionHeader open={open} onToggle={() => setOpen((v) => !v)}>
         <p className={cn(captionHeading, "flex items-center gap-1.5 text-foreground")}>
           {hasRegionFlag ? (
@@ -392,50 +440,65 @@ function RacingCourseSection({
       </CollapsibleSectionHeader>
 
       {open ? (
-      <div className={sectionMeta}>
-        <ul>
-          {races.map((race) => {
-            const raceTracked = trackedExternalIds.has(race.externalId);
-            const raceLive = race.status === "live";
+        <div className="pb-6">
+          {dayGroups.map((day) => {
+            const headingId = fixtureDayHeadingId(course, day.dayKey);
             return (
-              <li
-                key={race.externalId}
-                className={cn(
-                  listRow,
-                  "flex items-center gap-3 px-3 py-2.5",
-                  raceLive && "bg-emerald-500/5"
-                )}
-              >
-                <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
-                  {formatFixtureKickoff(race.startTime, now, displayTimezone)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium leading-snug">{race.raceName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {race.fieldSize} runners
-                    {raceLive ? (
-                      <Badge className="ml-2 bg-emerald-600 text-[11px]">Off</Badge>
-                    ) : (
-                      <Badge variant="outline" className="ml-2 text-[11px]">
-                        Upcoming
-                      </Badge>
-                    )}
-                  </p>
-                </div>
-                <div className="shrink-0">
-                  <FixtureActions
-                    isTracked={raceTracked}
-                    onTrack={() => onTrack(race)}
-                    onTrackAndBet={() => onTrackAndBet(race)}
-                  />
-                </div>
-              </li>
+            <ListDaySection
+              key={day.dayKey}
+              label={day.label}
+              headingId={headingId}
+              className="pt-2"
+              headerClassName={deskInsetX}
+              contentClassName={listDaySectionContentNested}
+            >
+              <ul aria-labelledby={headingId} className={listRowGroup}>
+                {day.items.map((race) => {
+                  const raceTracked = trackedExternalIds.has(race.externalId);
+                  const raceLive = race.status === "live";
+                  return (
+                    <li
+                      key={race.externalId}
+                      className={cn(
+                        listRow,
+                        deskInsetX,
+                        "flex items-center gap-3 py-2.5",
+                        raceLive && "bg-success/5"
+                      )}
+                    >
+                      <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
+                        {formatClockTime(race.startTime, { timeZone: displayTimezone })}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium leading-snug">{race.raceName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {race.fieldSize} runners
+                          {raceLive ? (
+                            <Badge variant="active" className="ml-2">Off</Badge>
+                          ) : (
+                            <Badge variant="outline" className="ml-2">
+                              Upcoming
+                            </Badge>
+                          )}
+                        </p>
+                      </div>
+                      <div className="shrink-0">
+                        <FixtureActions
+                          isTracked={raceTracked}
+                          onTrack={() => onTrack(race)}
+                          onTrackAndBet={() => onTrackAndBet(race)}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </ListDaySection>
             );
           })}
-        </ul>
-      </div>
+        </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -453,9 +516,6 @@ export function DeskFixtureBoard({
   emptyDescription,
   loading = false,
   loadFailed = false,
-  competitionFilter = "all",
-  onCompetitionFilterChange,
-  worldCupCount = 0,
   displayTimezone = DEFAULT_DISPLAY_TIMEZONE,
 }: {
   sport: "football" | "horse_racing";
@@ -471,12 +531,14 @@ export function DeskFixtureBoard({
   emptyDescription: string;
   loading?: boolean;
   loadFailed?: boolean;
-  competitionFilter?: "all" | "world_cup";
-  onCompetitionFilterChange?: (value: "all" | "world_cup") => void;
-  worldCupCount?: number;
   displayTimezone?: string;
 }) {
   const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>("all");
+  const [scopeFilter, setScopeFilter] = useState("all");
+
+  useEffect(() => {
+    setScopeFilter("all");
+  }, [sport]);
 
   const filteredFootball = useMemo(
     () => football.filter((f) => matchesStatusFilter(f.status, statusFilter)),
@@ -487,30 +549,96 @@ export function DeskFixtureBoard({
     [racing, statusFilter]
   );
 
+  const footballScopeOptions = useMemo(
+    () =>
+      groupFootballByLeague(football)
+        .map((group) => ({
+          id: group.id,
+          label: group.label,
+          name: group.competition,
+          country: group.leagueCountry,
+          count: group.fixtures.filter((f) => matchesStatusFilter(f.status, statusFilter))
+            .length,
+          icon: (
+            <CompetitionHeaderIcon
+              competition={group.competition}
+              leagueFlag={group.leagueFlag}
+              leagueCountry={group.leagueCountry}
+              size="sm"
+            />
+          ),
+        }))
+        .filter((option) => option.count > 0 || option.id === scopeFilter),
+    [football, statusFilter, scopeFilter]
+  );
+  const racingScopeOptions = useMemo(
+    () =>
+      groupRacesByCourse(racing)
+        .map((group) => ({
+          id: group.course,
+          label: group.course,
+          name: group.course,
+          count: group.races.filter((r) => matchesStatusFilter(r.status, statusFilter)).length,
+          icon: toIsoCountryCode(group.region) ? (
+            <RegionFlag code={group.region} size="sm" />
+          ) : (
+            <SportIcon sport="horse_racing" size={14} className="text-muted-foreground" />
+          ),
+        }))
+        .filter((option) => option.count > 0 || option.id === scopeFilter),
+    [racing, statusFilter, scopeFilter]
+  );
+  const scopeOptions = sport === "football" ? footballScopeOptions : racingScopeOptions;
+
+  const scopedFootball = useMemo(
+    () =>
+      scopeFilter === "all"
+        ? filteredFootball
+        : filteredFootball.filter((f) => fixtureMatchesFootballScope(f, scopeFilter)),
+    [filteredFootball, scopeFilter]
+  );
+  const scopedRacing = useMemo(
+    () =>
+      scopeFilter === "all"
+        ? filteredRacing
+        : filteredRacing.filter((r) => r.course === scopeFilter),
+    [filteredRacing, scopeFilter]
+  );
+
   const footballGroups = useMemo(
-    () => groupFootballByCompetition(filteredFootball),
-    [filteredFootball]
-  );
-  const racingGroups = useMemo(() => groupRacesByCourse(filteredRacing), [filteredRacing]);
-
-  const liveCount = useMemo(
     () =>
-      sport === "football"
-        ? football.filter((f) => f.status === "live").length
-        : racing.filter((r) => r.status === "live").length,
-    [sport, football, racing]
+      groupFootballByLeague(scopedFootball, football).map((group) => ({
+        ...group,
+        fixtures: sortFixturesByKickoff(group.fixtures),
+      })),
+    [scopedFootball, football]
   );
+  const racingGroups = useMemo(() => groupRacesByCourse(scopedRacing), [scopedRacing]);
 
-  const scheduledCount = useMemo(
-    () =>
-      sport === "football"
-        ? football.filter((f) => f.status === "upcoming").length
-        : racing.filter((r) => r.status === "upcoming").length,
-    [sport, football, racing]
-  );
+  const scopedSourceFootball =
+    scopeFilter === "all"
+      ? football
+      : football.filter((f) => fixtureMatchesFootballScope(f, scopeFilter));
+  const scopedSourceRacing =
+    scopeFilter === "all" ? racing : racing.filter((r) => r.course === scopeFilter);
 
-  const totalCount = sport === "football" ? football.length : racing.length;
-  const visibleCount = sport === "football" ? filteredFootball.length : filteredRacing.length;
+  const liveCount =
+    sport === "football"
+      ? scopedSourceFootball.filter((f) => f.status === "live").length
+      : scopedSourceRacing.filter((r) => r.status === "live").length;
+
+  const scheduledCount =
+    sport === "football"
+      ? scopedSourceFootball.filter((f) => f.status === "upcoming").length
+      : scopedSourceRacing.filter((r) => r.status === "upcoming").length;
+
+  const totalCount =
+    sport === "football" ? scopedSourceFootball.length : scopedSourceRacing.length;
+  const visibleCount = sport === "football" ? scopedFootball.length : scopedRacing.length;
+  const scopeLabel =
+    scopeFilter === "all"
+      ? null
+      : scopeOptions.find((option) => option.id === scopeFilter)?.label ?? scopeFilter;
 
   const statusFilters: { id: FixtureStatusFilter; label: string; count?: number }[] = [
     { id: "all", label: "All", count: totalCount },
@@ -523,55 +651,39 @@ export function DeskFixtureBoard({
     emptyTitle,
     emptyDescription,
     loadFailed,
+    scopeLabel,
   );
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <Tabs
-            value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as FixtureStatusFilter)}
-            activationMode="manual"
-            className="w-fit shrink-0"
-          >
-            <TabsList variant="segmented">
-              {statusFilters.map((f) => (
-                <TabsTrigger key={f.id} value={f.id}>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-start gap-4 sm:justify-between">
+          <div className={filterPillGroup} role="group" aria-label="Fixture status">
+            {statusFilters.map((f) => {
+              const active = statusFilter === f.id;
+              const hasCount = f.id !== "all";
+              return (
+                <FilterPill
+                  key={f.id}
+                  active={active}
+                  onClick={() => setStatusFilter(f.id)}
+                  hasCount={hasCount}
+                >
                   {f.label}
-                  {f.count != null && f.count > 0 ? (
-                    <span className="tabular-nums text-muted-foreground">({f.count})</span>
+                  {hasCount ? (
+                    <span className={filterPillCountState(active)}>{f.count ?? 0}</span>
                   ) : null}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <div
-            className={cn(
-              "shrink-0",
-              sport !== "football" && "pointer-events-none invisible"
-            )}
-            aria-hidden={sport !== "football"}
-          >
-            {onCompetitionFilterChange ? (
-              <Tabs
-                value={competitionFilter}
-                onValueChange={(v) => onCompetitionFilterChange(v as "all" | "world_cup")}
-                activationMode="manual"
-              >
-                <TabsList variant="segmented">
-                  <TabsTrigger value="all">All comps</TabsTrigger>
-                  <TabsTrigger value="world_cup" className="gap-1">
-                    <Flame className="size-3.5" />
-                    World Cup
-                    {worldCupCount > 0 ? (
-                      <span className="tabular-nums text-muted-foreground">({worldCupCount})</span>
-                    ) : null}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            ) : null}
+                </FilterPill>
+              );
+            })}
           </div>
+          <FixtureScopeFilter
+            sport={sport}
+            options={scopeOptions}
+            value={scopeFilter}
+            onChange={setScopeFilter}
+            disabled={loading && scopeOptions.length === 0}
+          />
         </div>
 
         {loading ? (
@@ -591,13 +703,26 @@ export function DeskFixtureBoard({
             icon={CalendarDays}
             title={emptyCopy.title}
             description={emptyCopy.description}
+            action={
+              scopeFilter !== "all"
+                ? {
+                    label:
+                      sport === "football"
+                        ? "Show all competitions"
+                        : "Show all courses",
+                    onClick: () => setScopeFilter("all"),
+                  }
+                : undefined
+            }
           />
         ) : sport === "football" ? (
           <div className="space-y-4">
             {footballGroups.map((group) => (
               <FootballCompetitionSection
-                key={group.competition}
+                key={group.id}
+                scopeId={group.id}
                 competition={group.competition}
+                label={group.label}
                 leagueFlag={group.leagueFlag}
                 leagueCountry={group.leagueCountry}
                 fixtures={group.fixtures}
