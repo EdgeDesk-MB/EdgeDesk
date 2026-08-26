@@ -20,11 +20,11 @@ describe("waitlist email helpers", () => {
 
   it("builds a branded thanks email with RG and unsubscribe", () => {
     const mail = buildWaitlistThanksEmail({
-      origin: "https://www.edgeways.app",
-      unsubscribeUrl: "https://www.edgeways.app/api/waitlist/unsubscribe?token=abc",
+      origin: "https://edgeways.app",
+      unsubscribeUrl: "https://edgeways.app/api/waitlist/unsubscribe?token=abc",
     });
     expect(mail.subject).toMatch(/waitlist/i);
-    expect(mail.html).toContain("https://www.edgeways.app/");
+    expect(mail.html).toContain("https://edgeways.app/");
     expect(mail.html).toContain("edgeways");
     expect(mail.html).not.toContain("cid:");
     expect(mail.html).toContain("BeGambleAware.org");

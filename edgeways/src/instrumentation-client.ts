@@ -1,12 +1,11 @@
 import posthog from "posthog-js";
 
 /**
- * Product analytics + error tracking (EDGE-35). Privacy posture per
- * docs/legal/privacy-policy.draft.md: cookieless (no cookies, no local
- * storage) and no autocapture — pageviews, unhandled exceptions and explicit
- * capture() calls only. Events proxy through /ingest (see next.config.ts
- * rewrites) so ad blockers don't drop them and EU data stays on EU hosts.
- * No token (fresh clone, CI) = analytics silently disabled.
+ * Product analytics + error tracking (EDGE-35 / EDGE-49). Privacy posture:
+ * cookieless, no autocapture, no session replay, no heatmaps, no console
+ * capture. Pageviews, unhandled exceptions and explicit capture() only.
+ * Events proxy through /ingest (see next.config.ts) so the browser talks to
+ * our origin, not posthog.com. No token (fresh clone, CI) = silently off.
  */
 const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 
@@ -19,6 +18,9 @@ if (token) {
     cookieless_mode: "always",
     autocapture: false,
     capture_exceptions: true,
+    disable_session_recording: true,
+    enable_heatmaps: false,
+    disable_surveys: true,
     debug: process.env.NODE_ENV === "development",
   });
 }

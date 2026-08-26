@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
+import { PUBLIC_SITE_ORIGIN } from "@/lib/marketing/share-metadata";
 import {
   findWaitlistByEmail,
   findWaitlistByTokenHash,
@@ -17,8 +18,8 @@ const INK = "#111111";
 const CTA_INK = "#222222";
 /** Keep in sync with ResponsibleGamblingNote / BEGAMBLEAWARE_URL. */
 const BEGAMBLEAWARE_URL = "https://www.begambleaware.org";
-/** Canonical public site for waitlist email links. */
-const LIVE_SITE_ORIGIN = "https://www.edgeways.app";
+/** Canonical public site for waitlist email links. Apex, never www. */
+const LIVE_SITE_ORIGIN = PUBLIC_SITE_ORIGIN;
 
 export function normaliseWaitlistEmail(raw: string): string {
   return raw.trim().toLowerCase();
