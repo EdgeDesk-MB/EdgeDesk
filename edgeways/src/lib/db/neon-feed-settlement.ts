@@ -87,12 +87,14 @@ export type OwnedHistoryValues = {
   createdAt: number;
 };
 
-/** Idempotent on `dedupe`, same contract as the desk-scoped writer. */
+/** Idempotent on `(clerk_user_id, dedupe)`, same contract as the desk-scoped writer. */
 export async function insertNeonHistoryForOwner(
   values: OwnedHistoryValues
 ): Promise<void> {
   await getNeonDb()
     .insert(pgHistory)
     .values(values)
-    .onConflictDoNothing({ target: pgHistory.dedupe });
+    .onConflictDoNothing({
+      target: [pgHistory.clerkUserId, pgHistory.dedupe],
+    });
 }

@@ -1,6 +1,6 @@
 /**
  * Hosted desk history feed on Neon (EDGE-47). Writes are idempotent on the
- * `dedupe` natural key, same as the SQLite path.
+ * per-user (clerk_user_id, dedupe) natural key (EDGE-99).
  */
 import "server-only";
 
@@ -45,5 +45,7 @@ export async function insertNeonDeskHistory(
   await getNeonDb()
     .insert(pgHistory)
     .values({ ...values, clerkUserId })
-    .onConflictDoNothing({ target: pgHistory.dedupe });
+    .onConflictDoNothing({
+      target: [pgHistory.clerkUserId, pgHistory.dedupe],
+    });
 }

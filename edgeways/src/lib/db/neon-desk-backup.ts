@@ -9,7 +9,7 @@
  */
 import "server-only";
 
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
 import {
@@ -602,7 +602,9 @@ export async function restoreNeonDeskBackup(
         amount: num(r.amount),
         createdAt: num(r.created_at) ?? Date.now(),
       })
-      .onConflictDoNothing({ target: pgHistory.dedupe })
+      .onConflictDoNothing({
+        target: [pgHistory.clerkUserId, pgHistory.dedupe],
+      })
       .returning({ id: pgHistory.id });
     if (inserted[0]) {
       keepHistoryIds.push(inserted[0].id);

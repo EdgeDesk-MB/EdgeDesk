@@ -12,6 +12,7 @@ import {
   serial,
   text,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -613,35 +614,40 @@ export const balanceTransactions = pgTable("balance_transactions", {
  * settlements and casino settlements. Written idempotently (dedupe key =
  * natural id). Casino P&L rows use kind `casino_settlement`.
  */
-export const history = pgTable("history", {
-  id: serial("id").primaryKey(),
-  dedupe: text("dedupe").notNull().unique(),
-  kind: text("kind", {
-    enum: [
-      "kickoff",
-      "goal",
-      "two_up",
-      "full_time",
-      "settlement",
-      "casino_settlement",
-      "free_bet_promo",
-      "bet_placed",
-      "balance_adjustment",
-    ],
-  }).notNull(),
-  eventId: integer("event_id"),
-  betId: integer("bet_id"),
-  minute: integer("minute"),
-  title: text("title").notNull(),
-  detail: text("detail"),
-  /** User explanation for balance corrections (shown under the title in History). */
-  note: text("note"),
-  /** Settlements (bet + casino) and P&L adjustments: realised profit (+) or loss (−) */
-  amount: doublePrecision("amount"),
-  createdAt: epochMs("created_at").notNull(),
-  /** Hosted owner (EDGE-47) */
-  clerkUserId: text("clerk_user_id"),
-});
+export const history = pgTable(
+  "history",
+  {
+    id: serial("id").primaryKey(),
+    /** Natural idempotency key — unique per user (EDGE-99), not globally. */
+    dedupe: text("dedupe").notNull(),
+    kind: text("kind", {
+      enum: [
+        "kickoff",
+        "goal",
+        "two_up",
+        "full_time",
+        "settlement",
+        "casino_settlement",
+        "free_bet_promo",
+        "bet_placed",
+        "balance_adjustment",
+      ],
+    }).notNull(),
+    eventId: integer("event_id"),
+    betId: integer("bet_id"),
+    minute: integer("minute"),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    /** User explanation for balance corrections (shown under the title in History). */
+    note: text("note"),
+    /** Settlements (bet + casino) and P&L adjustments: realised profit (+) or loss (−) */
+    amount: doublePrecision("amount"),
+    createdAt: epochMs("created_at").notNull(),
+    /** Hosted owner (EDGE-47) */
+    clerkUserId: text("clerk_user_id"),
+  },
+  (t) => [uniqueIndex("history_user_dedupe_unique").on(t.clerkUserId, t.dedupe)]
+);
 
 /** Key-value app preferences (defaults, reminders, OCR behaviour). */
 export const appSettings = pgTable("app_settings", {

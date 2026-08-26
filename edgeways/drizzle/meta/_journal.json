@@ -120,6 +120,13 @@
       "when": 1787812800000,
       "tag": "0016_feed_budget_per_feed",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787844000000,
+      "tag": "0017_military_gertrude_yorkes",
+      "breakpoints": true
     }
   ]
 }
