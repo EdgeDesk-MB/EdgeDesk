@@ -154,10 +154,12 @@ export function normalizeTuning(raw: unknown): TuningSettings {
   };
 }
 
-export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "chart", "feed", "do-next"] as const;
+export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "feed", "do-next"] as const;
 export type MobileDeckPin = (typeof MOBILE_DECK_PINS)[number];
 
 export function normalizeMobileDeckPin(value: string | null | undefined): MobileDeckPin {
+  // Chart is no longer a standalone deck card; it lives on Summary.
+  if (value === "chart") return "hero";
   return (MOBILE_DECK_PINS as readonly string[]).includes(value ?? "")
     ? (value as MobileDeckPin)
     : "auto";

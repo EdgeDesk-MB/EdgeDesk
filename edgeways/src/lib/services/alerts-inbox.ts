@@ -5,9 +5,20 @@
  * keys: a re-firing rule updates its row instead of stacking copies.
  */
 import { desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import {
+  conditionAlertSubject,
+  orphanConditionDedupes,
+  type InboxSubjectTable,
+} from "@/lib/alerts/inbox-orphans";
 import { plainAlertBody } from "@/lib/alerts/plain-body";
 import { settledResultAlertCopy } from "@/lib/alerts/rules";
-import { db, alertsInbox, bets, offers, type AlertsInboxRow } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { db, alertsInbox, bets, events, offers, type AlertsInboxRow } from "@/lib/db";
+
+/** Hosted Neon uses a shared in-memory SQLite stand-in. Do not persist inbox there. */
+function hostedInboxDisabled(): boolean {
+  return isNeonDesk();
+}
 
 export interface IncomingAlert {
   key: string;
@@ -19,6 +30,7 @@ export interface IncomingAlert {
 
 /** Upsert by dedupe key. Read state survives a re-fire (same condition). */
 export function recordAlerts(alerts: IncomingAlert[], now = Date.now()): number {
+  if (hostedInboxDisabled()) return 0;
   let recorded = 0;
   for (const alert of alerts) {
     if (!alert.key || !alert.title) continue;
@@ -53,6 +65,7 @@ export function recordAlerts(alerts: IncomingAlert[], now = Date.now()): number 
  * Does not create rows for bets that never had a settlement alert.
  */
 export function reconcileVoidedSettlementAlerts(now = Date.now()): number {
+  if (hostedInboxDisabled()) return 0;
   const revised = db
     .select({
       id: bets.id,
@@ -118,8 +131,79 @@ export function reconcileVoidedSettlementAlerts(now = Date.now()): number {
   return updated;
 }
 
-export function listInbox(limit = 100): AlertsInboxRow[] {
+/**
+ * Drop condition rows whose bet / offer / event is gone. Public demo used to
+ * write fixture "lay missing" alerts into a live or shared inbox; a new
+ * empty desk must not keep them.
+ */
+export function pruneOrphanConditionAlerts(): number {
+  if (hostedInboxDisabled()) return 0;
+  const rows = db
+    .select({ dedupe: alertsInbox.dedupe })
+    .from(alertsInbox)
+    .all();
+  const subjects = rows
+    .map((row) => ({
+      dedupe: row.dedupe,
+      subject: conditionAlertSubject(row.dedupe),
+    }))
+    .filter(
+      (row): row is { dedupe: string; subject: NonNullable<typeof row.subject> } =>
+        row.subject != null
+    );
+  if (subjects.length === 0) return 0;
+
+  const idsFor = (table: InboxSubjectTable): number[] => [
+    ...new Set(
+      subjects.filter((row) => row.subject.table === table).map((row) => row.subject.id)
+    ),
+  ];
+  const betIds = idsFor("bets");
+  const offerIds = idsFor("offers");
+  const eventIds = idsFor("events");
+  const existing = {
+    bets: new Set(
+      betIds.length > 0
+        ? db.select({ id: bets.id }).from(bets).where(inArray(bets.id, betIds)).all().map((r) => r.id)
+        : []
+    ),
+    offers: new Set(
+      offerIds.length > 0
+        ? db
+            .select({ id: offers.id })
+            .from(offers)
+            .where(inArray(offers.id, offerIds))
+            .all()
+            .map((r) => r.id)
+        : []
+    ),
+    events: new Set(
+      eventIds.length > 0
+        ? db
+            .select({ id: events.id })
+            .from(events)
+            .where(inArray(events.id, eventIds))
+            .all()
+            .map((r) => r.id)
+        : []
+    ),
+  };
+  const gone = orphanConditionDedupes(
+    subjects.map((row) => row.dedupe),
+    existing
+  );
+  if (gone.length === 0) return 0;
+  return db.delete(alertsInbox).where(inArray(alertsInbox.dedupe, gone)).run().changes;
+}
+
+function syncInbox(): void {
   reconcileVoidedSettlementAlerts();
+  pruneOrphanConditionAlerts();
+}
+
+export function listInbox(limit = 100): AlertsInboxRow[] {
+  if (hostedInboxDisabled()) return [];
+  syncInbox();
   return db
     .select()
     .from(alertsInbox)
@@ -130,6 +214,8 @@ export function listInbox(limit = 100): AlertsInboxRow[] {
 
 /** Every inbox dedupe key, including read rows. Watcher uses this as durable seen. */
 export function listInboxDedupes(): string[] {
+  if (hostedInboxDisabled()) return [];
+  syncInbox();
   return db
     .select({ dedupe: alertsInbox.dedupe })
     .from(alertsInbox)
@@ -139,6 +225,8 @@ export function listInboxDedupes(): string[] {
 }
 
 export function unreadCount(): number {
+  if (hostedInboxDisabled()) return 0;
+  syncInbox();
   const row = db
     .select({ n: sql<number>`count(*)` })
     .from(alertsInbox)
@@ -148,6 +236,7 @@ export function unreadCount(): number {
 }
 
 export function markRead(id: number, now = Date.now()): void {
+  if (hostedInboxDisabled()) return;
   db.update(alertsInbox).set({ readAt: now }).where(eq(alertsInbox.id, id)).run();
 }
 
@@ -162,6 +251,7 @@ function kindFromDedupe(dedupe: string): string {
  * stub so the later upsert keeps it read.
  */
 export function markReadByDedupe(dedupe: string, now = Date.now()): number {
+  if (hostedInboxDisabled()) return 0;
   const key = dedupe.trim();
   if (!key) return 0;
   const updated = db
@@ -192,6 +282,7 @@ export function markReadByDedupe(dedupe: string, now = Date.now()): number {
  * Used when an offer is deleted so offer_expiring rows for it go quiet.
  */
 export function markReadByDedupePrefix(prefix: string, now = Date.now()): number {
+  if (hostedInboxDisabled()) return 0;
   const p = prefix.trim();
   if (!p) return 0;
   const res = db
@@ -203,6 +294,7 @@ export function markReadByDedupePrefix(prefix: string, now = Date.now()): number
 }
 
 export function markAllRead(now = Date.now()): number {
+  if (hostedInboxDisabled()) return 0;
   const res = db
     .update(alertsInbox)
     .set({ readAt: now })

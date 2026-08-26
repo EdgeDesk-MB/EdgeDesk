@@ -41,8 +41,17 @@ function suppressKeysForOffer(
   opts?: { completedKind?: OfferNextActionKind; suppressAll?: boolean }
 ): string[] {
   if (opts?.suppressAll || opts?.completedKind == null) return keys;
-  const needle = `offer-${offerId}-${opts.completedKind}:`;
-  return keys.filter((key) => key.includes(needle));
+  const kinds = new Set<string>([opts.completedKind]);
+  if (opts.completedKind === "place_qualifying" || opts.completedKind === "start_planned") {
+    kinds.add("place_qualifying");
+    kinds.add("start_planned");
+    kinds.add("playbook_deposit");
+    kinds.add("playbook_opt_in");
+    kinds.add("playbook_await_award");
+  }
+  return keys.filter((key) =>
+    [...kinds].some((kind) => key.includes(`offer-${offerId}-${kind}:`))
+  );
 }
 
 /**

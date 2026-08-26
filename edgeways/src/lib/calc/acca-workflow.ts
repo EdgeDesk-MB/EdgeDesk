@@ -390,6 +390,84 @@ export function sequentialLiabilityLadder(input: {
   return steps;
 }
 
+export interface AccaAllWinEstimate {
+  /** Bookie all-win minus placed hedges and, while the run is still open, projected remaining lays. */
+  value: number;
+  /** True when at least one remaining lay is sized at the bookie back price. */
+  usedProxy: boolean;
+}
+
+function placedOpenLayLiabilities(
+  legs: LegLiabilityLike[],
+  whole?: { stake?: number | null; odds?: number | null }
+): number {
+  let total = 0;
+  for (const leg of legs) {
+    if (leg.result === "void" || leg.result === "lost") continue;
+    if (leg.layStake == null || leg.layOdds == null || !(leg.layOdds > 1)) continue;
+    total += roundPence(leg.layStake * (leg.layOdds - 1));
+  }
+  if (whole?.stake != null && whole.odds != null && whole.odds > 1) {
+    total += roundPence(whole.stake * (whole.odds - 1));
+  }
+  return roundPence(total);
+}
+
+/**
+ * If-all-win campaign figure for the run card.
+ *
+ * Bookie payout minus every hedge that is already logged is not enough on
+ * sequential / insurance_legs: those methods still lay the remaining legs.
+ * While the run is open, unreserved steps from sequentialLiabilityLadder
+ * (cover, then final lock on sequential) are subtracted too. Bookie prices
+ * stand in for missing lay odds — same proxy as the funding banner.
+ *
+ * A finished run does not invent lays that were never placed. A lost leg
+ * makes all-win impossible (null).
+ */
+export function accaAllWinEstimate(
+  run: AccaProfitRun & { method: AccaMethodKind },
+  legs: AccaLadderLeg[]
+): AccaAllWinEstimate | null {
+  if (legs.some((l) => l.result === "lost")) return null;
+
+  const nonVoid = legs.filter((l) => l.result !== "void");
+  if (nonVoid.length === 0) return { value: 0, usedProxy: false };
+
+  const combined = applyAccaBoost(
+    nonVoid.reduce((a, l) => a * l.backOdds, 1),
+    run.boostPct
+  );
+  const bookie = roundPence(run.stake * (combined - 1));
+  const placed = placedOpenLayLiabilities(legs, {
+    stake: run.wholeLayStake,
+    odds: run.wholeLayOdds,
+  });
+
+  const stillOpen = nonVoid.some((l) => l.result === "pending");
+  let projected = 0;
+  let usedProxy = false;
+  if (
+    stillOpen &&
+    (run.method === "sequential" || run.method === "insurance_legs")
+  ) {
+    const steps = sequentialLiabilityLadder({
+      stake: run.stake,
+      commission: run.commission,
+      boostPct: run.boostPct,
+      method: run.method,
+      legs,
+    });
+    for (const step of steps) {
+      if (step.reserved) continue;
+      projected = roundPence(projected + step.liability);
+      if (step.oddsProxy) usedProxy = true;
+    }
+  }
+
+  return { value: roundPence(bookie - placed - projected), usedProxy };
+}
+
 const OUTCOME_EQUAL_EPS = 0.02;
 
 export type AccaMethodKind =

@@ -13,6 +13,7 @@ import {
   historyGoalEventLabel,
   historyGoalScoreline,
   historyGoalScorelineSegments,
+  historyGoalTwoUpTrigger,
   historyMatchMomentHeadline,
   historyMatchMomentSubline,
   historyRacingResultCopy,
@@ -26,9 +27,14 @@ import {
   historyKindLabel,
   historyOccurredAt,
   historyUsesMinuteBadge,
+  historyInPlayPlacementMinute,
+  historyBetPlacedMatchMinute,
+  isAbsorbedTwoUpHistoryEntry,
   isDeskCampaignLayHistoryEntry,
+  isHiddenHistoryFeedEntry,
   isFreeBetHistoryEntry,
   isFreeBetPlacedHistoryEntry,
+  isLockInPlacedHistoryEntry,
   isBoostHistoryEntry,
   matchesHistoryFilter,
   sortHistoryEntries,
@@ -364,6 +370,66 @@ describe("football match-moment feed copy", () => {
     );
   });
 
+  it("folds the 2UP trigger onto the goal that went two ahead", () => {
+    const g1 = row({
+      id: 31,
+      kind: "goal",
+      title: "Goal!",
+      eventId: 8,
+      betId: undefined,
+      minute: 20,
+      detail: "Wolves 1-0 Blackburn",
+    });
+    const g2 = row({
+      id: 32,
+      kind: "goal",
+      title: "Goal!",
+      eventId: 8,
+      betId: undefined,
+      minute: 38,
+      detail: "Wolves 2-0 Blackburn",
+    });
+    const twoUp = row({
+      id: 33,
+      kind: "two_up",
+      title: "2UP triggered",
+      eventId: 8,
+      betId: undefined,
+      minute: 38,
+      dedupe: "2up:8:home",
+      detail: "Wolves went 2 goals ahead",
+    });
+    const ctx = buildHistoryContext([event], [], {}, [], [g1, g2, twoUp]);
+
+    expect(historyGoalTwoUpTrigger(g1, ctx)).toBeNull();
+    expect(historyGoalTwoUpTrigger(g2, ctx)).toEqual({
+      side: "home",
+      eventId: 8,
+      team: "Wolves",
+    });
+    expect(isAbsorbedTwoUpHistoryEntry(twoUp, ctx)).toBe(true);
+    expect(isHiddenHistoryFeedEntry(twoUp, ctx)).toBe(true);
+    expect(isHiddenHistoryFeedEntry(g2, ctx)).toBe(false);
+    expect(historyEntryLinkLabel(g2, ctx)).toBe(
+      "Open Goal, 2UP triggered, Wolves v Blackburn, Wolves [2] - 0 Blackburn in tracked events"
+    );
+  });
+
+  it("keeps a 2UP row when no goal shows the two-ahead score", () => {
+    const twoUp = row({
+      id: 34,
+      kind: "two_up",
+      title: "2UP triggered",
+      eventId: 8,
+      betId: undefined,
+      minute: 38,
+      dedupe: "2up:8:home",
+      detail: "Wolves went 2 goals ahead",
+    });
+    const ctx = buildHistoryContext([event], [], {}, [], [twoUp]);
+    expect(isAbsorbedTwoUpHistoryEntry(twoUp, ctx)).toBe(false);
+  });
+
   it("brackets the scoring side on a 1-1 equaliser", () => {
     const g1 = row({
       id: 21,
@@ -619,6 +685,85 @@ describe("formatHistoryTimeBadge", () => {
 
     expect(historyUsesMinuteBadge(entry, ctx)).toBe(true);
     expect(formatHistoryTimeBadge(entry, ctx)).toBe("23'");
+  });
+
+  it("shows match minute for a lock-in placed in-play (KO 12:30, placed 12:52 → 22')", () => {
+    const kickoff = new Date("2026-08-22T12:30:00").getTime();
+    const placedAt = new Date("2026-08-22T12:52:00").getTime();
+    const liveEvent: EventRow = {
+      ...event,
+      startTime: kickoff,
+      status: "live",
+      minute: 26,
+    };
+    const lockIn: BetRow = {
+      id: 88,
+      eventId: 1,
+      label: "Lock-in lay · Convert FB · Dynobet",
+      market: "match_odds",
+      selection: "home",
+      betType: "lay_only",
+      bookmaker: null,
+      exchangeId: 1,
+      backStake: 0,
+      backOdds: 0,
+      layStake: 7.5,
+      layOdds: 4,
+      commission: 0,
+      earlyPayout: 0,
+      refundAmount: null,
+      refundRetention: null,
+      legs: null,
+      triggerText: null,
+      triggerRule: null,
+      status: "open",
+      expectedProfit: null,
+      actualProfit: null,
+      notes: 'Lock-in close of "Convert FB · Dynobet"',
+      balanceLedgered: 0,
+      balanceSettled: 0,
+      createdAt: placedAt,
+      settledAt: null,
+      offerId: null,
+      source: null,
+      quickLogged: null,
+      sport: "football",
+      purpose: null,
+      importFingerprint: null,
+      importMeta: null,
+    };
+    const liveCtx = buildHistoryContext([liveEvent], [lockIn], {});
+    const entry = row({
+      kind: "bet_placed",
+      title: "Bet placed",
+      eventId: 1,
+      betId: 88,
+      createdAt: placedAt,
+    });
+
+    expect(historyInPlayPlacementMinute(placedAt, liveEvent)).toBe(22);
+    expect(historyBetPlacedMatchMinute(entry, liveCtx)).toBe(22);
+    expect(historyUsesMinuteBadge(entry, liveCtx)).toBe(true);
+    expect(formatHistoryTimeBadge(entry, liveCtx)).toBe("22'");
+    expect(isLockInPlacedHistoryEntry(entry, liveCtx)).toBe(true);
+    expect(historyEntryTitle(entry, liveCtx)).toBe("Lock-in placed");
+  });
+
+  it("keeps pre-match placements on the clock", () => {
+    const kickoff = new Date("2026-08-22T12:30:00").getTime();
+    const placedAt = new Date("2026-08-22T08:01:00").getTime();
+    const liveEvent: EventRow = { ...event, startTime: kickoff, status: "live", minute: 26 };
+    const preCtx = buildHistoryContext([liveEvent], [], {});
+    const entry = row({
+      kind: "bet_placed",
+      title: "Free bet placed",
+      eventId: 1,
+      betId: undefined,
+      createdAt: placedAt,
+    });
+
+    expect(historyInPlayPlacementMinute(placedAt, liveEvent)).toBeNull();
+    expect(historyUsesMinuteBadge(entry, preCtx)).toBe(false);
   });
 });
 

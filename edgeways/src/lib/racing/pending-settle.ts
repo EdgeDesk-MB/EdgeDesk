@@ -11,7 +11,7 @@ export interface PendingSettleRace {
   trackedEventId?: number;
 }
 
-/** Tracked event passed off without a full race result (missing or winner-only). */
+/** Tracked horse race that has started and still needs a full result (missing or winner-only). */
 export function isEventPendingSettle(event: {
   sport: string;
   startTime: number;
@@ -24,7 +24,7 @@ export function isEventPendingSettle(event: {
   return isRaceResultIncomplete(result);
 }
 
-/** Racing Desk race is tracked and past off without a finished result. */
+/** Tracked Racing Desk race that has started and is not finished. */
 export function isDeskRacePendingSettle(race: RacingDeskRace): boolean {
   if (!race.trackedEventId) return false;
   if (race.startTime > Date.now()) return false;

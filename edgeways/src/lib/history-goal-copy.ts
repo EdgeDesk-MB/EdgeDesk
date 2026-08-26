@@ -328,15 +328,17 @@ export function formatGoalScorelineText(parts: GoalScorelineParts): string {
     .join("");
 }
 
-/**
- * Walk goal rows per match in score order so a 1-1 can inherit "away scored"
- * from the previous 1-0 tick. Used when the scorer timeline was never fetched.
- */
-export function inferGoalScoringSidesFromEntries(
-  entries: Array<Pick<HistoryRow, "id" | "kind" | "eventId" | "detail" | "minute">>,
+type GoalWalkEntry = Pick<HistoryRow, "id" | "kind" | "eventId" | "detail" | "minute">;
+
+function groupOrderedGoalsByEvent(
+  entries: GoalWalkEntry[],
   eventsById: Map<number, Pick<EventRow, "homeTeam" | "awayTeam">>
-): Map<number, Side> {
-  const byEvent = new Map<number, Array<(typeof entries)[number]>>();
+): Array<{
+  eventId: number;
+  event: Pick<EventRow, "homeTeam" | "awayTeam"> | undefined;
+  ordered: GoalWalkEntry[];
+}> {
+  const byEvent = new Map<number, GoalWalkEntry[]>();
   for (const entry of entries) {
     if (entry.kind !== "goal" || entry.eventId == null) continue;
     const list = byEvent.get(entry.eventId) ?? [];
@@ -344,8 +346,7 @@ export function inferGoalScoringSidesFromEntries(
     byEvent.set(entry.eventId, list);
   }
 
-  const out = new Map<number, Side>();
-  for (const [eventId, list] of byEvent) {
+  return [...byEvent.entries()].map(([eventId, list]) => {
     const event = eventsById.get(eventId);
     const ordered = [...list].sort((a, b) => {
       const scoreA = parseGoalHistoryScoreline(a.detail, event);
@@ -358,7 +359,20 @@ export function inferGoalScoringSidesFromEntries(
       if (minuteA !== minuteB) return minuteA - minuteB;
       return a.id - b.id;
     });
+    return { eventId, event, ordered };
+  });
+}
 
+/**
+ * Walk goal rows per match in score order so a 1-1 can inherit "away scored"
+ * from the previous 1-0 tick. Used when the scorer timeline was never fetched.
+ */
+export function inferGoalScoringSidesFromEntries(
+  entries: GoalWalkEntry[],
+  eventsById: Map<number, Pick<EventRow, "homeTeam" | "awayTeam">>
+): Map<number, Side> {
+  const out = new Map<number, Side>();
+  for (const { event, ordered } of groupOrderedGoalsByEvent(entries, eventsById)) {
     let prevHome = 0;
     let prevAway = 0;
     for (const entry of ordered) {
@@ -370,6 +384,49 @@ export function inferGoalScoringSidesFromEntries(
       if (side) out.set(entry.id, side);
       prevHome = score.homeScore;
       prevAway = score.awayScore;
+    }
+  }
+  return out;
+}
+
+export interface HistoryTwoUpTrigger {
+  side: Side;
+  eventId: number;
+  team: string | null;
+}
+
+/**
+ * First goal that puts a side two ahead. Later 3-1 / 4-2 ticks do not re-fire.
+ */
+export function inferTwoUpTriggerGoalIds(
+  entries: GoalWalkEntry[],
+  eventsById: Map<number, Pick<EventRow, "homeTeam" | "awayTeam">>
+): Map<number, HistoryTwoUpTrigger> {
+  const out = new Map<number, HistoryTwoUpTrigger>();
+  for (const { eventId, event, ordered } of groupOrderedGoalsByEvent(entries, eventsById)) {
+    let prevLead = 0;
+    let homeTriggered = false;
+    let awayTriggered = false;
+    for (const entry of ordered) {
+      const score = parseGoalHistoryScoreline(entry.detail, event);
+      if (!score) continue;
+      const lead = score.homeScore - score.awayScore;
+      if (!homeTriggered && lead >= 2 && prevLead < 2) {
+        out.set(entry.id, {
+          side: "home",
+          eventId,
+          team: event?.homeTeam ?? score.homeTeam,
+        });
+        homeTriggered = true;
+      } else if (!awayTriggered && lead <= -2 && prevLead > -2) {
+        out.set(entry.id, {
+          side: "away",
+          eventId,
+          team: event?.awayTeam ?? score.awayTeam,
+        });
+        awayTriggered = true;
+      }
+      prevLead = lead;
     }
   }
   return out;

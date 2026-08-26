@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { OfferRow } from "@/lib/db/schema";
 import {
+  betTypeUsesOfferVenueScope,
   courseMatchesScope,
   encodeScopeCourses,
   formatBetGetFreePlaceSummary,
   formatOfferScopeLabel,
   offerHasResultTrigger,
+  offerMatchesBetContext,
   offerRepeatsSameDay,
   parseOfferRules,
   parseScopeCourses,
@@ -265,6 +267,55 @@ describe("countOfferQualifyingRaces", () => {
         "2026-07-08"
       )
     ).toBeNull();
+  });
+});
+
+describe("betTypeUsesOfferVenueScope", () => {
+  it("applies course scope to qualifying legs only", () => {
+    expect(betTypeUsesOfferVenueScope("qualifying")).toBe(true);
+    expect(betTypeUsesOfferVenueScope("risk_free")).toBe(true);
+    expect(betTypeUsesOfferVenueScope("free_snr")).toBe(false);
+    expect(betTypeUsesOfferVenueScope("free_sr")).toBe(false);
+  });
+});
+
+describe("offerMatchesBetContext", () => {
+  const yorkOffer = {
+    ...baseOffer,
+    scopeCourse: "York",
+    bookmaker: "10bet",
+  };
+
+  it("rejects a qualify pick at a different course", () => {
+    expect(
+      offerMatchesBetContext(yorkOffer, {
+        date: "2026-07-08",
+        course: "Lingfield (AW)",
+        bookmaker: "10bet",
+      })
+    ).toBe(false);
+  });
+
+  it("matches convert on any course and day in the same sport", () => {
+    expect(
+      offerMatchesBetContext(yorkOffer, {
+        date: "2026-07-09",
+        course: "Lingfield (AW)",
+        bookmaker: "10bet",
+        purpose: "convert",
+      })
+    ).toBe(true);
+  });
+
+  it("still requires the same bookmaker on convert", () => {
+    expect(
+      offerMatchesBetContext(yorkOffer, {
+        date: "2026-07-08",
+        course: "York",
+        bookmaker: "Coral",
+        purpose: "convert",
+      })
+    ).toBe(false);
   });
 });
 

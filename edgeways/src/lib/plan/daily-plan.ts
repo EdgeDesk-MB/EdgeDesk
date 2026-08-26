@@ -32,6 +32,8 @@ export interface DailyPlanRaceInput {
   openExpected: number | null;
   /** Whether any bet is logged on this race (alert rules use it; plan ignores it) */
   hasOpenBet?: boolean;
+  /** Racecard id for `/racing?race=` deep links. */
+  externalId?: string | null;
 }
 
 export interface DailyPlanFixtureInput {
@@ -84,6 +86,11 @@ function todayWindow(now: number): { start: number; end: number } {
   const d = new Date(now);
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   return { start, end: start + 24 * 60 * 60 * 1000 };
+}
+
+function raceDeskHref(externalId?: string | null): string {
+  const id = externalId?.trim();
+  return id ? `/racing?race=${encodeURIComponent(id)}` : "/racing";
 }
 
 function sortSlots(slots: DailyPlanSlot[]): DailyPlanSlot[] {
@@ -183,7 +190,7 @@ export function buildDailyPlan(input: DailyPlanInput): DailyPlanSlot[] {
       ev: r.openExpected != null && r.openExpected > 0 ? r.openExpected : undefined,
       basis: r.openExpected != null && r.openExpected > 0 ? "estimated" : undefined,
       priority: "medium",
-      href: "/racing",
+      href: raceDeskHref(r.externalId),
       done: r.resultLogged || r.offTime < now,
     });
   }

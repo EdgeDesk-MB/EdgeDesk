@@ -42,6 +42,7 @@ export const EFFORT_MINUTES: Record<
   playbook_opt_in: 2,
   playbook_clear_wagering: 8,
   playbook_await_award: 0,
+  desk_lay: 4,
   orphan_free_bet: 6,
 };
 
@@ -401,6 +402,7 @@ export function doNextBarClass(kind: DoNextItem["kind"]): string {
       return "bg-amber-500";
     case "place_qualifying":
     case "start_planned":
+    case "desk_lay":
       return "bg-sky-500";
     case "fund_account":
       return "bg-orange-400";
@@ -420,6 +422,7 @@ export function doNextKindBadgeClass(kind: DoNextItem["kind"]): string {
       return "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-300";
     case "place_qualifying":
     case "start_planned":
+    case "desk_lay":
       return "border-sky-500/35 bg-sky-500/10 text-sky-800 dark:text-sky-300";
     case "fund_account":
       return "border-orange-400/35 bg-orange-400/10 text-orange-800 dark:text-orange-300";

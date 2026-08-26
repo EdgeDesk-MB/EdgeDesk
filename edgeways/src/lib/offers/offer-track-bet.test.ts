@@ -54,6 +54,7 @@ function offer(
       totalProfit: 0,
       ...profitPartial,
     },
+    deskProgress: rest.deskProgress ?? null,
   };
 }
 
@@ -119,6 +120,40 @@ describe("deriveTrackBetAction", () => {
     expect(action.prefill).toBeNull();
   });
 
+  it("sends an in-play acca to Acca Desk instead of Mark award received", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 42,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Betfair Sportsbook",
+        sport: "horse_racing",
+        offerType: "promo_terms",
+        betCount: 3,
+        profit: {
+          qualifyingOpenCount: 1,
+          freeBetStage: "awaiting_result",
+        },
+        deskProgress: {
+          kind: "acca",
+          href: "/acca",
+          runId: 7,
+          actionTitle: "Lay 2nd leg",
+          actionDetail: "Lay Dance In The Storm on Acca Desk.",
+          done: 1,
+          total: 2,
+          stageLabel: "Lay 2nd leg",
+          progressCaption: "1/2 laid",
+          nextCaption: "Dance In The Storm",
+          needsAction: true,
+        },
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Lay 2nd leg");
+    expect(action.destination).toEqual({ kind: "open_desk", href: "/acca" });
+    expect(action.prefill).toBeNull();
+  });
+
   it("prefills qualifying stake and bookie for new campaigns", () => {
     const action = deriveTrackBetAction(
       offer({
@@ -181,6 +216,105 @@ describe("deriveTrackBetAction", () => {
     expect(action.prefill?.betType).toBe("free_snr");
     expect(action.prefill?.backStake).toBe(50);
     expect(action.prefill?.triggerText).toBeUndefined();
+    expect(action.prefill?.sport).toBe("horse_racing");
+    expect(action.prefill?.scopeCourse).toBeUndefined();
+    expect(action.prefill?.raceExternalId).toBeUndefined();
+    expect(action.prefill?.raceEventDate).toBeUndefined();
+  });
+
+  it("locks convert to a named reward event, not the user default sport", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 40,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Dynobet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          minOdds: 1.5,
+          minStake: 10,
+          rewardEventLabel: "Hull City vs Manchester United",
+          rewardEventDate: "2026-08-22",
+        }),
+        betCount: 1,
+        profit: {
+          qualifyingSettledCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.prefill?.betType).toBe("free_snr");
+    expect(action.prefill?.sport).toBe("football");
+    expect(action.prefill?.market).toBe("match_odds");
+    expect(action.prefill?.homeTeam).toBe("Hull City");
+    expect(action.prefill?.awayTeam).toBe("Manchester United");
+    expect(action.prefill?.eventDate).toBe("2026-08-22");
+    expect(action.prefill?.rewardEventLabel).toBe("Hull City vs Manchester United");
+    expect(action.prefill?.labelSuggestion).toBe(
+      "Convert FB · Hull City vs Manchester United"
+    );
+    expect(action.prefill?.triggerText).toBeUndefined();
+  });
+
+  it("does not apply reward event scope on the qualifying leg", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 41,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Dynobet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          minOdds: 1.5,
+          minStake: 10,
+          rewardEventLabel: "Hull City vs Manchester United",
+          rewardEventDate: "2026-08-22",
+        }),
+        betCount: 0,
+      })
+    );
+    expect(action.prefill?.betType).toBe("qualifying");
+    expect(action.prefill?.sport).toBeUndefined();
+    expect(action.prefill?.homeTeam).toBeUndefined();
+    expect(action.prefill?.awayTeam).toBeUndefined();
+    expect(action.prefill?.rewardEventLabel).toBeUndefined();
+  });
+
+  it("does not lock convert to the qualifying course or race", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 27,
+        title: "10bet York place refund",
+        bookmaker: "10bet",
+        rules,
+        betCount: 1,
+        scopeCourse: "York",
+        scopeRaceId: "rac_york_1",
+        scopeRaceLabel: "14:20 · Feature",
+        eventDate: "2026-08-20",
+        profit: {
+          qualifyingSettledCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.prefill?.betType).toBe("free_snr");
+    expect(action.prefill?.sport).toBe("horse_racing");
+    expect(action.prefill?.market).toBe("win");
+    expect(action.prefill?.scopeCourse).toBeUndefined();
+    expect(action.prefill?.raceExternalId).toBeUndefined();
+    expect(action.prefill?.raceEventDate).toBeUndefined();
+    expect(action.prefill?.labelSuggestion).toBe("Convert FB · 10bet");
   });
 
   it("disables when qualifying bet is still open and free bet not awarded", () => {
@@ -333,6 +467,62 @@ describe("deriveTrackBetAction", () => {
     expect(action.prefill?.betType).toBe("qualifying");
     expect(action.prefill?.backStake).toBe(20);
     expect(action.prefill?.bookmaker).toBe("Ivybet");
+  });
+
+  it("prefills scopeCourse on Acca Desk qualify for a course-locked meeting", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 50,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Coral",
+        sport: "horse_racing",
+        offerType: "promo_terms",
+        scopeCourse: "York",
+        eventDate: "2026-08-22",
+        rules: JSON.stringify({
+          type: "promo_terms",
+          qualifierScope: "acca",
+          minSelections: 2,
+          minOdds: 2,
+          minStake: 10,
+        }),
+        betCount: 0,
+      })
+    );
+    expect(action.destination.kind).toBe("acca_desk");
+    if (action.destination.kind !== "acca_desk") return;
+    expect(action.destination.prefill.scopeCourse).toBe("York");
+    expect(action.destination.prefill.sport).toBe("horse_racing");
+    expect(action.destination.prefill.purpose).toBe("qualify");
+  });
+
+  it("does not pass course scope to Acca Desk convert", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 51,
+        title: "Bet £10 get £10 Acca free bet",
+        bookmaker: "Coral",
+        sport: "horse_racing",
+        offerType: "promo_terms",
+        scopeCourse: "York",
+        rules: JSON.stringify({
+          type: "promo_terms",
+          rewardScope: "acca",
+          rewardMinSelections: 3,
+        }),
+        betCount: 1,
+        profit: {
+          qualifyingSettledCount: 1,
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.destination.kind).toBe("acca_desk");
+    if (action.destination.kind !== "acca_desk") return;
+    expect(action.destination.prefill.purpose).toBe("convert");
+    expect(action.destination.prefill.scopeCourse).toBeUndefined();
   });
 
   it("falls back to Add bet for Acca scope when Acca Desk is not entitled", () => {
@@ -549,6 +739,52 @@ describe("deriveFreeBetLotConvertAction", () => {
     if (action.destination.kind !== "acca_desk") return;
     expect(action.destination.prefill.backBetType).toBe("free_snr");
     expect(action.destination.prefill.stake).toBe(10);
+  });
+
+  it("does not inherit course scope from a linked racing offer", () => {
+    const action = deriveFreeBetLotConvertAction(
+      { remaining: 10, accountName: "10bet" },
+      offer({
+        id: 32,
+        title: "10bet York place refund",
+        bookmaker: "10bet",
+        scopeCourse: "York",
+        eventDate: "2026-08-20",
+        rules,
+        profit: {
+          freeBetStage: "awarded",
+          freeBetAwarded: true,
+          freeBetAwardAmount: 10,
+        },
+      })
+    );
+    expect(action.prefill?.sport).toBe("horse_racing");
+    expect(action.prefill?.scopeCourse).toBeUndefined();
+    expect(action.prefill?.raceEventDate).toBeUndefined();
+  });
+
+  it("keeps the reward event label on an Accounts convert", () => {
+    const action = deriveFreeBetLotConvertAction(
+      { remaining: 10, accountName: "Dynobet" },
+      offer({
+        id: 42,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Dynobet",
+        sport: "general",
+        offerType: "promo_terms",
+        scopeCourse: null,
+        rules: JSON.stringify({
+          type: "promo_terms",
+          rewardEventLabel: "Hull City vs Manchester United",
+          rewardEventDate: "2026-08-22",
+        }),
+      })
+    );
+    expect(action.prefill?.sport).toBe("football");
+    expect(action.prefill?.homeTeam).toBe("Hull City");
+    expect(action.prefill?.labelSuggestion).toBe(
+      "Convert FB · Hull City vs Manchester United"
+    );
   });
 
   it("falls back to Add bet when lot is unlinked", () => {

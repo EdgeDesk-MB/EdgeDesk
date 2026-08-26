@@ -13,6 +13,10 @@ const OFFER_EXPIRING_ACTION_KINDS: OfferNextActionKind[] = [
   "convert_free_bet",
   "start_planned",
   "review_expiry",
+  "playbook_deposit",
+  "playbook_opt_in",
+  "playbook_clear_wagering",
+  "playbook_await_award",
 ];
 
 export function alertDayKey(now: number): string {

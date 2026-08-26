@@ -3,6 +3,7 @@ import {
   applyExchangeOddsInputChange,
   formatExchangeOdds,
   getExchangeOddsStep,
+  handleExchangeOddsInputEvent,
   handleExchangeOddsWheel,
   roundExchangeOdds,
   stepExchangeOdds,
@@ -84,6 +85,69 @@ describe("applyExchangeOddsInputChange", () => {
       value = v;
     });
     expect(value).toBe(7);
+  });
+
+  it("maps a native HTML step at the 6.0 boundary onto the next tick", () => {
+    // getExchangeOddsStep(6) is 0.1 (current band). Ladder up is 0.2.
+    let value = 6;
+    applyExchangeOddsInputChange(6, 6.1, (v) => {
+      value = v;
+    });
+    expect(value).toBe(6.2);
+  });
+
+  it("maps a native min-grid snap (5.00 → 5.01) onto the next tick", () => {
+    // min=1.01 and step=0.1 makes the browser land on 5.01, not 5.1.
+    let value = 5;
+    applyExchangeOddsInputChange(5, 5.01, (v) => {
+      value = v;
+    });
+    expect(value).toBe(5.1);
+  });
+
+  it("maps a native step=any increment of 1 onto the next tick", () => {
+    let value = 5;
+    applyExchangeOddsInputChange(5, 6, (v) => {
+      value = v;
+    });
+    expect(value).toBe(5.1);
+  });
+
+  it("keeps a typed 5.01 when the input event is insertText", () => {
+    let value = 5;
+    applyExchangeOddsInputChange(
+      5,
+      5.01,
+      (v) => {
+        value = v;
+      },
+      "insertText"
+    );
+    expect(value).toBe(5.01);
+  });
+
+  it("handleExchangeOddsInputEvent maps a bare Event (no inputType) onto the ladder", () => {
+    let value = 6;
+    handleExchangeOddsInputEvent(
+      6,
+      { target: { value: "6.1" }, nativeEvent: new Event("input") },
+      (v) => {
+        value = v;
+      }
+    );
+    expect(value).toBe(6.2);
+  });
+
+  it("handleExchangeOddsInputEvent keeps a typed price when inputType is insertText", () => {
+    let value = 5;
+    handleExchangeOddsInputEvent(
+      5,
+      { target: { value: "5.01" }, nativeEvent: { inputType: "insertText" } },
+      (v) => {
+        value = v;
+      }
+    );
+    expect(value).toBe(5.01);
   });
 });
 

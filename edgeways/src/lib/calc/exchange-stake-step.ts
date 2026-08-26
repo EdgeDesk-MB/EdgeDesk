@@ -3,7 +3,8 @@
  * Matchbook) accept pounds and pence, so the executable increment is £0.01
  * and the idle display is always two decimal places.
  *
- * Arrow / wheel steps stay on that penny grid. Do not use a raw HTML
+ * Arrow / wheel steps stay on that penny grid. Bind the wheel with
+ * `useNonPassiveWheel` (never React `onWheel`). Do not use a raw HTML
  * `step={0.01}` number input for lay stake: native spinners drop trailing
  * zeros and do not share this display rule.
  */

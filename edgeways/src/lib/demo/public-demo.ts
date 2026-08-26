@@ -162,6 +162,8 @@ export function isPublicDemoApiGet(path: string): boolean {
     path === "/api/bet-builder" ||
     path === "/api/casino" ||
     path === "/api/boosts" ||
+    path === "/api/alerts" ||
+    path.startsWith("/api/alerts?") ||
     path.startsWith("/api/racing/desk") ||
     path.startsWith("/api/offers/edge")
   );

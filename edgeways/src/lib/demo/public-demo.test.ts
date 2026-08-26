@@ -198,6 +198,18 @@ describe("public demo fixture", () => {
     expect(goalHistoryCopyFromEntry(goal, event).title).toBe("Goal!");
   });
 
+  it("hides the standalone 2UP row once the 2-0 goal can carry the mark", () => {
+    const now = Date.UTC(2026, 7, 15, 12);
+    const state = buildPublicDemoState("edge", now);
+    expect(state.history.some((row) => row.kind === "two_up")).toBe(true);
+    const feed = publicDemoApiGet("/api/history?filter=all&limit=200", now) as {
+      entries: HistoryRow[];
+    };
+    expect(feed.entries.some((row) => row.kind === "two_up")).toBe(false);
+    const goal = feed.entries.find((row) => row.kind === "goal" && row.minute === 41);
+    expect(goal?.detail).toContain("2-0");
+  });
+
   it("serves Acca, Systems, and Bet Builder lists for demo GETs", () => {
     const acca = publicDemoApiGet("/api/acca") as { runs: unknown[] };
     const systems = publicDemoApiGet("/api/systems") as { runs: unknown[] };
@@ -205,7 +217,16 @@ describe("public demo fixture", () => {
     expect(acca.runs.length).toBeGreaterThan(0);
     expect(systems.runs.length).toBeGreaterThan(0);
     expect(builders.runs.length).toBeGreaterThan(0);
+    const alerts = publicDemoApiGet("/api/alerts") as { alerts: { body: string }[] };
+    expect(alerts.alerts).toHaveLength(3);
+    expect(alerts.alerts.some((row) => row.body.includes("Acca insurance, 3-fold"))).toBe(
+      true
+    );
     expect(publicDemoApiGet("/api/demo/live-status")).toBeUndefined();
+    const footballOdds = publicDemoApiGet(
+      "/api/exchange/football-odds?home=Everton&away=Crystal%20Palace"
+    ) as { status: string };
+    expect(footballOdds.status).toBe("unmatched");
     const lots = publicDemoApiGet("/api/accounts/free-bets") as { lots: unknown[] };
     expect(lots.lots.length).toBeGreaterThan(3);
     const bet365 = publicDemoApiGet("/api/accounts/2") as {

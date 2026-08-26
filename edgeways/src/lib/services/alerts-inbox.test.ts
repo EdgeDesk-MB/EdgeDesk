@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
-import { db, bets } from "@/lib/db";
+import { eq, inArray } from "drizzle-orm";
+import { db, alertsInbox, bets, offers } from "@/lib/db";
 import {
   listInbox,
   listInboxDedupes,
@@ -8,6 +8,7 @@ import {
   markRead,
   markReadByDedupe,
   markReadByDedupePrefix,
+  pruneOrphanConditionAlerts,
   reconcileVoidedSettlementAlerts,
   recordAlerts,
   unreadCount,
@@ -62,16 +63,80 @@ describe("alerts inbox", () => {
   });
 
   it("marks read by dedupe key (Intentional mute)", () => {
+    const bet = db
+      .insert(bets)
+      .values({
+        label: "Unhedged back",
+        market: "win",
+        selection: "Home",
+        betType: "qualifying",
+        bookmaker: "Paddy Power",
+        backStake: 10,
+        backOdds: 2,
+        layStake: 0,
+        layOdds: 0,
+        commission: 0,
+        status: "open",
+        createdAt: T0,
+      })
+      .returning()
+      .get();
+    const key = `naked_exposure:${bet.id}`;
     const before = unreadCount();
+    recordAlerts([{ key, kind: "naked_exposure", title: "Unhedged back bet" }], T0);
+    expect(unreadCount()).toBe(before + 1);
+    expect(markReadByDedupe(key, T0 + 1000)).toBe(1);
+    expect(unreadCount()).toBe(before);
+    const row = listInbox().find((r) => r.dedupe === key);
+    expect(row?.readAt).toBe(T0 + 1000);
+    db.delete(alertsInbox).where(eq(alertsInbox.dedupe, key)).run();
+    db.delete(bets).where(eq(bets.id, bet.id)).run();
+  });
+
+  it("drops condition alerts whose desk row is gone", () => {
     recordAlerts(
-      [{ key: "naked_exposure:97", kind: "naked_exposure", title: "Unhedged back bet" }],
+      [
+        {
+          key: "naked_exposure:40",
+          kind: "naked_exposure",
+          title: "⚠️ Lay missing · full stake exposed",
+          body: "Qualifying · Acca insurance, 3-fold (Paddy Power)",
+        },
+        {
+          key: "naked_exposure:80",
+          kind: "naked_exposure",
+          title: "⚠️ Lay missing · full stake exposed",
+          body: "Qualifying · Yankee on the card (Coral)",
+        },
+        { key: "test:keep:1", kind: "daily_tasks", title: "Keep this" },
+      ],
       T0
     );
-    expect(unreadCount()).toBe(before + 1);
-    expect(markReadByDedupe("naked_exposure:97", T0 + 1000)).toBe(1);
-    expect(unreadCount()).toBe(before);
-    const row = listInbox().find((r) => r.dedupe === "naked_exposure:97");
-    expect(row?.readAt).toBe(T0 + 1000);
+    expect(pruneOrphanConditionAlerts()).toBe(2);
+    const rows = listInbox();
+    expect(rows.some((r) => r.dedupe.startsWith("naked_exposure:"))).toBe(false);
+    expect(rows.some((r) => r.dedupe === "test:keep:1")).toBe(true);
+  });
+
+  it("does not persist inbox rows on the hosted neon stand-in", () => {
+    const backend = process.env.EDGEWAYS_DESK_BACKEND;
+    const databaseUrl = process.env.DATABASE_URL;
+    process.env.EDGEWAYS_DESK_BACKEND = "neon";
+    process.env.DATABASE_URL = "postgres://example";
+    try {
+      expect(
+        recordAlerts([
+          { key: "naked_exposure:40", kind: "naked_exposure", title: "Lay missing" },
+        ])
+      ).toBe(0);
+      expect(listInbox()).toEqual([]);
+      expect(unreadCount()).toBe(0);
+    } finally {
+      if (backend === undefined) delete process.env.EDGEWAYS_DESK_BACKEND;
+      else process.env.EDGEWAYS_DESK_BACKEND = backend;
+      if (databaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = databaseUrl;
+    }
   });
 
   it("keeps a dismiss-before-record row read when the inbox write lands later", () => {
@@ -97,33 +162,33 @@ describe("alerts inbox", () => {
   });
 
   it("marks offer_expiring rows read by prefix when an offer is deleted", () => {
+    const offerA = db
+      .insert(offers)
+      .values({ title: "Place qualifying", createdAt: T0 })
+      .returning()
+      .get();
+    const offerB = db
+      .insert(offers)
+      .values({ title: "Other offer", createdAt: T0 })
+      .returning()
+      .get();
+    const keyA = `offer_expiring:offer-${offerA.id}-place_qualifying:2026-07-13`;
+    const keyB = `offer_expiring:offer-${offerB.id}-place_qualifying:2026-07-13`;
     const before = unreadCount();
     recordAlerts(
       [
-        {
-          key: "offer_expiring:offer-5-place_qualifying:2026-07-13",
-          kind: "offer_expiring",
-          title: "Offer ends today",
-        },
-        {
-          key: "offer_expiring:offer-50-place_qualifying:2026-07-13",
-          kind: "offer_expiring",
-          title: "Other offer",
-        },
+        { key: keyA, kind: "offer_expiring", title: "Offer ends today" },
+        { key: keyB, kind: "offer_expiring", title: "Other offer" },
       ],
       T0
     );
     expect(unreadCount()).toBe(before + 2);
-    expect(markReadByDedupePrefix("offer_expiring:offer-5-", T0 + 1000)).toBe(1);
+    expect(markReadByDedupePrefix(`offer_expiring:offer-${offerA.id}-`, T0 + 1000)).toBe(1);
     expect(unreadCount()).toBe(before + 1);
-    expect(
-      listInbox().find((r) => r.dedupe === "offer_expiring:offer-5-place_qualifying:2026-07-13")
-        ?.readAt
-    ).toBe(T0 + 1000);
-    expect(
-      listInbox().find((r) => r.dedupe === "offer_expiring:offer-50-place_qualifying:2026-07-13")
-        ?.readAt
-    ).toBeNull();
+    expect(listInbox().find((r) => r.dedupe === keyA)?.readAt).toBe(T0 + 1000);
+    expect(listInbox().find((r) => r.dedupe === keyB)?.readAt).toBeNull();
+    db.delete(alertsInbox).where(inArray(alertsInbox.dedupe, [keyA, keyB])).run();
+    db.delete(offers).where(inArray(offers.id, [offerA.id, offerB.id])).run();
   });
 
   it("rewrites result_settled inbox rows when the bet is later voided", () => {

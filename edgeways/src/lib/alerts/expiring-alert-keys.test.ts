@@ -19,6 +19,8 @@ describe("expiring-alert-keys", () => {
     const keys = offerExpiringAlertKeys(5, NOW);
     expect(keys).toContain("offer_expiring:offer-5-place_qualifying:2026-07-13");
     expect(keys).toContain("offer_expiring:offer-5-convert_free_bet:2026-07-13");
+    expect(keys).toContain("offer_expiring:offer-5-playbook_opt_in:2026-07-13");
+    expect(keys).toContain("offer_expiring:offer-5-playbook_await_award:2026-07-13");
     expect(offerExpiringAlertDedupePrefix(5)).toBe("offer_expiring:offer-5-");
   });
 

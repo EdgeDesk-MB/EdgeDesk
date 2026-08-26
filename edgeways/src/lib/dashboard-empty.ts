@@ -34,3 +34,9 @@ export function shouldShowDashboardEmptyCta(state: AppState | null): boolean {
   if (state == null) return false;
   return !hasDeskActivity(state);
 }
+
+/** Getting-started hub (EDGE-63). Setup-missing Home stays a single CTA. */
+export function shouldShowEmptyDeskWelcome(state: AppState | null): boolean {
+  if (state == null) return false;
+  return shouldShowDashboardEmptyCta(state) && !needsSetup(state);
+}

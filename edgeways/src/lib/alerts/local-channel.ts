@@ -28,6 +28,7 @@ import {
 } from "@/lib/alerts/toast-age";
 import { emitAlertInboxRead } from "@/lib/alerts/inbox-read-event";
 import { dismissBrowserNotifications } from "@/lib/alerts/seen";
+import { hasPublicDemoCookieInDocument } from "@/lib/demo/public-demo";
 import { clearApiGetCache } from "@/lib/api-get-cache";
 import { announceAlertDocumentTitle, dismissAlertDocumentTitle } from "@/lib/document-title";
 import { cn } from "@/lib/utils";
@@ -153,6 +154,7 @@ export function persistAlertDismissed(key: string): void {
   if (!dedupe) return;
   dismissAlertDocumentTitle(dedupe);
   void dismissBrowserNotifications([dedupe]);
+  if (hasPublicDemoCookieInDocument()) return;
   void fetch("/api/alerts", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

@@ -4,6 +4,8 @@ import {
   isPublicAssetPath,
   isWaitlistAllowedPath,
   isWaitlistSurface,
+  requestHostname,
+  shouldRedirectWwwToApex,
 } from "@/lib/site-surface";
 import {
   hasPublicDemoCookie,
@@ -23,6 +25,18 @@ export default clerkMiddleware(async (_auth, request) => {
     const response = NextResponse.redirect(liveUrl);
     response.cookies.set(PUBLIC_DEMO_COOKIE, "", { path: "/", maxAge: 0 });
     return response;
+  }
+
+  // www is a Search hostname. Serve icons there; 308 everything else to apex.
+  if (
+    requestHostname(request) === "www.edgeways.app" &&
+    shouldRedirectWwwToApex(request.nextUrl.pathname)
+  ) {
+    const dest = new URL(request.url);
+    dest.protocol = "https:";
+    dest.hostname = "edgeways.app";
+    dest.port = "";
+    return NextResponse.redirect(dest, 308);
   }
 
   if (!isWaitlistSurface()) {

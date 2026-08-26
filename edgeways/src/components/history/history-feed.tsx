@@ -18,12 +18,14 @@ import {
   historyGoalEventLabel,
   historyGoalScoreline,
   historyGoalScorelineSegments,
+  historyGoalTwoUpTrigger,
   historyMatchMomentSubline,
   historyRacingResultCopy,
   historySportMomentHeadline,
   historyKindLabel,
   historySettledNote,
   sortHistoryEntries,
+  isHiddenHistoryFeedEntry,
   isFreeBetPlacedHistoryEntry,
   isFreeBetWonHistoryEntry,
   resolveHistoryEvent,
@@ -34,6 +36,7 @@ import {
 } from "@/lib/history-display";
 import { SportIcon } from "@/components/sport-icon";
 import { HistoryEntryIcon } from "@/components/history/history-entry-icon";
+import { HistoryTwoUpBadge } from "@/components/history/history-two-up-badge";
 import { EarlyFreeBetAwardButton } from "@/components/history/early-free-bet-award-button";
 import {
   BalanceCorrectionDetailLine,
@@ -105,18 +108,33 @@ function HistoryGoalScorelineDisplay({
   entry,
   ctx,
   className,
+  wrap = false,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   className?: string;
+  wrap?: boolean;
 }) {
+  const twoUp = historyGoalTwoUpTrigger(entry, ctx);
   return (
-    <HistoryMomentSublineDisplay
-      ball
-      label={historyGoalEventLabel(entry, ctx)}
-      segments={historyGoalScorelineSegments(entry, ctx)}
-      className={className}
-    />
+    <span
+      className={cn(
+        "flex min-w-0 gap-1.5",
+        wrap ? "items-start" : "items-center",
+        className
+      )}
+    >
+      <HistoryMomentSublineDisplay
+        ball
+        label={historyGoalEventLabel(entry, ctx)}
+        className="min-w-0 truncate"
+      />
+      {twoUp ? <HistoryTwoUpBadge /> : null}
+      <HistoryMomentSublineDisplay
+        segments={historyGoalScorelineSegments(entry, ctx)}
+        className={wrap ? "min-w-0 text-pretty break-words" : "min-w-0 truncate"}
+      />
+    </span>
   );
 }
 
@@ -366,7 +384,7 @@ export function HistoryEntryRow({
                 <HistoryGoalScorelineDisplay
                   entry={entry}
                   ctx={ctx}
-                  className="mt-0.5 block truncate text-xs text-muted-foreground"
+                  className="mt-0.5 text-xs text-muted-foreground"
                 />
               ) : racingCopy ? (
                 <HistoryMomentSublineDisplay
@@ -421,7 +439,7 @@ export function HistoryEntryRow({
               <HistoryGoalScorelineDisplay
                 entry={entry}
                 ctx={ctx}
-                className="block truncate text-xs text-muted-foreground"
+                className="text-xs text-muted-foreground"
               />
             ) : racingCopy ? (
               <HistoryMomentSublineDisplay
@@ -572,10 +590,11 @@ export function HistoryEntryCard({
                     <HistoryGoalScorelineDisplay
                       entry={entry}
                       ctx={ctx}
+                      wrap={!collapsed}
                       className={cn(
                         collapsed
-                          ? "mt-0.5 block truncate text-xs text-muted-foreground"
-                          : "mt-1 block text-sm text-muted-foreground"
+                          ? "mt-0.5 text-xs text-muted-foreground"
+                          : "mt-1 text-sm text-muted-foreground"
                       )}
                     />
                   ) : racingCopy ? (
@@ -736,7 +755,9 @@ export function HistoryFeed({
   onFreeBetAwarded?: () => void;
   onNoteSaved?: () => void;
 }) {
-  const ordered = sortHistoryEntries(entries, ctx);
+  const ordered = sortHistoryEntries(entries, ctx).filter(
+    (entry) => !isHiddenHistoryFeedEntry(entry, ctx)
+  );
   if (ordered.length === 0) {
     return (
       <EmptyState

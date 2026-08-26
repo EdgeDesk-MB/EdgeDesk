@@ -66,6 +66,14 @@ export function encodeScopeCourses(courses: string[]): string {
   return parseScopeCourses(courses.join(", ")).join(", ");
 }
 
+/**
+ * Course, race and meeting-day locks apply to qualifying legs only.
+ * Free-bet conversion stays usable on any event in the same sport.
+ */
+export function betTypeUsesOfferVenueScope(betType: string | null | undefined): boolean {
+  return betType !== "free_snr" && betType !== "free_sr";
+}
+
 /** True when the race course is in the offer's named-course list (or scope is regional). */
 export function courseMatchesScope(
   raceCourse: string | null | undefined,
@@ -290,19 +298,23 @@ export function offerMatchesBetContext(
     raceExternalId?: string | null;
     offTime?: string | null;
     bookmaker?: string | null;
+    /** Convert ignores course / race / meeting-day. Default qualify. */
+    purpose?: "qualify" | "convert";
   }
 ): boolean {
   if (offer.sport !== "horse_racing") return false;
   if (offer.status !== "active" && offer.status !== "planned") return false;
   if (!parseOfferRules(offer as OfferRow)) return false;
 
-  if (offer.eventDate && offer.eventDate !== ctx.date) return false;
-
   if (ctx.bookmaker?.trim() && offer.bookmaker?.trim()) {
     if (offer.bookmaker.trim().toLowerCase() !== ctx.bookmaker.trim().toLowerCase()) {
       return false;
     }
   }
+
+  if (ctx.purpose === "convert") return true;
+
+  if (offer.eventDate && offer.eventDate !== ctx.date) return false;
 
   const raceId = offer.scopeRaceId?.trim();
   if (raceId) {

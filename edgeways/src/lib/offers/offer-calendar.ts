@@ -295,7 +295,8 @@ export function buildOfferCalendarDays(
       (action.kind === "convert_free_bet" ||
         action.kind === "place_qualifying" ||
         action.kind === "start_planned" ||
-        action.kind === "review_expiry")
+        action.kind === "review_expiry" ||
+        action.kind === "desk_lay")
     ) {
       const occurrenceMs = calendarOccurrenceMs(offer, today.getTime());
       const actionDayMs = occurrenceMs >= today.getTime() ? occurrenceMs : today.getTime();

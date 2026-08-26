@@ -2,7 +2,12 @@
  * Match OCR-parsed event hints to tracked / known fixtures.
  */
 import type { BetOcrFields } from "@/lib/ocr/types";
-import { formatRacingEventTitle, racingVenueLabel, type TrackedEventLike } from "@/lib/events";
+import {
+  formatRacingEventTitle,
+  normaliseRacingApiOffTime,
+  racingVenueLabel,
+  type TrackedEventLike,
+} from "@/lib/events";
 
 export type MatchableEvent = TrackedEventLike;
 
@@ -27,6 +32,53 @@ function parseTimeMs(time?: string): number | null {
   if (!time?.match(/^\d{1,2}:\d{2}$/)) return null;
   const [h, m] = time.split(":").map(Number);
   return (h * 60 + m) * 60_000;
+}
+
+function clockFromRacingItem(item: {
+  startTime?: number | null;
+  awayTeam?: string | null;
+  offTime?: string | null;
+}): string | null {
+  if (item.offTime?.trim()) return normaliseRacingApiOffTime(item.offTime);
+  if (item.startTime != null && Number.isFinite(item.startTime)) {
+    const d = new Date(item.startTime);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  const away = item.awayTeam?.trim();
+  if (away && /^\d{1,2}:\d{2}$/.test(away)) return normaliseRacingApiOffTime(away);
+  return null;
+}
+
+export type RacingSlipMatchable = {
+  sport?: string | null;
+  status?: string | null;
+  competition?: string | null;
+  course?: string | null;
+  startTime?: number | null;
+  awayTeam?: string | null;
+  offTime?: string | null;
+};
+
+/** Course + off-time only — never first-meeting fallback (acca legs must not collide). */
+export function matchOcrRacingSlip<T extends RacingSlipMatchable>(
+  hint: { course?: string; eventTime?: string },
+  items: readonly T[]
+): T | undefined {
+  const course = hint.course?.trim();
+  const time = hint.eventTime?.trim();
+  if (!course || !time) return undefined;
+  const wantMs = parseTimeMs(time);
+  if (wantMs == null) return undefined;
+  return items.find((item) => {
+    if (item.status === "finished") return false;
+    if (item.sport && item.sport !== "horse_racing") return false;
+    const venue =
+      item.course?.trim() || racingVenueLabel(item.competition) || item.competition || "";
+    if (!teamMatch(venue, course)) return false;
+    const clock = clockFromRacingItem(item);
+    const haveMs = parseTimeMs(clock ?? undefined);
+    return haveMs != null && haveMs === wantMs;
+  });
 }
 
 function eventStartWindow(event: MatchableEvent): { start: number; end: number } {

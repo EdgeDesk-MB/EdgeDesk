@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Quick-log (C3) - the killer mobile flow. A floating "+" on every mobile
- * screen opens a bottom sheet with three capture paths:
+ * Quick-log (C3) - the killer mobile flow. A floating brand bolt on every
+ * mobile screen opens a bottom sheet with three capture paths:
  *   1. Paste slip (B4 parser prefills everything),
  *   2. From plan (today's Daily Plan slots, one tap to log as placed),
  *   3. Minimal manual (bookie, stake, odds - the rest defaults).
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EdgewaysBolt } from "@/components/edgeways-logo-icon";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
@@ -242,9 +243,9 @@ export function QuickLogSheet() {
           reset();
           setOpen(true);
         }}
-        className="skeuo-solid fixed right-[max(1rem,env(safe-area-inset-right,0px))] bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
+        className="skeuo-solid quick-actions-fab fixed right-[max(1rem,env(safe-area-inset-right,0px))] bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
       >
-        <Zap className="size-7" aria-hidden />
+        <EdgewaysBolt className="size-12" />
       </button>
 
       <Dialog

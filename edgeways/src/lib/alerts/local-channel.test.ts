@@ -228,6 +228,14 @@ describe("createLocalAlertChannel", () => {
     });
   });
 
+  it("does not write inbox reads while the public demo cookie is on", () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("document", { cookie: "ew_public_demo=1" });
+    persistAlertDismissed("naked_exposure:40");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not persist ephemeral auto-close as inbox read", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);

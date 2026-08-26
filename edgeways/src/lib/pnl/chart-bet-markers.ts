@@ -54,6 +54,29 @@ export const PNL_CHART_WINDOW_TRANSITION_MS = 750;
 /** Bet markers stay hidden for the full transition, then fade in over half that time. */
 export const PNL_CHART_MARKER_FADE_IN_MS = PNL_CHART_WINDOW_TRANSITION_MS / 2;
 
+/**
+ * Liveline interpolates `window` over {@link PNL_CHART_WINDOW_TRANSITION_MS}.
+ * If we clip the series to the new span immediately, a shrink leaves empty
+ * chart on the left, so the period looks cut rather than zoomed.
+ */
+export function shouldLingerChartPlotCover(
+  previousViewportSecs: number,
+  nextViewportSecs: number,
+  reduceMotion: boolean
+): boolean {
+  if (reduceMotion) return false;
+  return nextViewportSecs < previousViewportSecs;
+}
+
+/** Series span to feed Liveline: the wider of the viewport and an in-flight shrink cover. */
+export function chartPlotCoverSecs(
+  viewportSecs: number,
+  lingerCoverSecs: number | null
+): number {
+  if (lingerCoverSecs == null) return viewportSecs;
+  return Math.max(viewportSecs, lingerCoverSecs);
+}
+
 const WINDOW_BUFFER_BADGE = 0.05;
 const WINDOW_BUFFER_NO_BADGE = 0.015;
 
@@ -97,7 +120,10 @@ export interface ChartBetMarker {
   kind?: "bet" | "adjustment" | "casino";
   label: string;
   status: BetRow["status"];
+  /** Prior-plateau time (where the icon sits on the line). */
   settledAtSec: number;
+  /** Ledger event time. Window membership uses this, not the prior plateau. */
+  eventTimeSec?: number;
   betProfit: number;
   cumulativeValue: number;
   tone: ChartBetMarkerTone;
@@ -302,6 +328,7 @@ export function buildPnlChartMarkers(events: LedgerMarkerSource[]): ChartBetMark
         label: ev.label,
         status: ev.status,
         settledAtSec: ev.time / 1000 - 1,
+        eventTimeSec: ev.time / 1000,
         betProfit: ev.amount,
         cumulativeValue: 0,
         tone: ev.tone,
@@ -315,6 +342,7 @@ export function buildPnlChartMarkers(events: LedgerMarkerSource[]): ChartBetMark
       label: ev.label,
       status: ev.status,
       settledAtSec: prior.timeSec,
+      eventTimeSec: ev.time / 1000,
       betProfit: ev.amount,
       cumulativeValue: prior.value,
       tone: ev.tone,
@@ -519,6 +547,120 @@ export function buildHomeChartMarkers(opts: {
   return buildPnlChartMarkers(events);
 }
 
+/** Hold samples across a window so Liveline cannot spline two distant tips into an arc. */
+const WINDOW_LINE_SAMPLES = 240;
+
+/**
+ * Rebuild a 24h / week / month series as a sampled staircase: hold the last
+ * P&L, then step only at a real tip (or the live total). Liveline's monotone
+ * spline arcs between sparse points and its hover lerp does the same, so the
+ * hold must be dense.
+ *
+ * Pass `fillToLeftEdge: false` for All (the full ledger is already dense).
+ */
+export function ensureWindowLinePoints(
+  points: LivePnlPoint[],
+  windowSecs: number,
+  opts?: {
+    nowSec?: number;
+    showBadge?: boolean;
+    fillToLeftEdge?: boolean;
+    liveValue?: number;
+  }
+): LivePnlPoint[] {
+  if (points.length === 0 || windowSecs <= 0) return points;
+  if (opts?.fillToLeftEdge === false) return points;
+  const nowSec = opts?.nowSec ?? Date.now() / 1000;
+  const leftEdge = chartWindowLeftEdge(windowSecs, nowSec, opts?.showBadge ?? false);
+  const rightEdge = leftEdge + windowSecs;
+  const carry = seriesValueAt(points, leftEdge) ?? points[0]?.value ?? 0;
+  const live = opts?.liveValue ?? points.at(-1)?.value ?? carry;
+  const tips: LivePnlPoint[] = [];
+  for (const p of [...points].sort((a, b) => a.time - b.time)) {
+    if (p.time <= leftEdge || p.time > Math.min(rightEdge, nowSec + 0.5)) continue;
+    const last = tips.at(-1);
+    if (last && Math.abs(last.time - p.time) < 0.05) {
+      tips[tips.length - 1] = p;
+    } else {
+      tips.push(p);
+    }
+  }
+
+  const leftTime = leftEdge + Math.min(120, Math.max(2, windowSecs * 0.005));
+  const sampleEvery = Math.max(30, windowSecs / WINDOW_LINE_SAMPLES);
+  const stepped: LivePnlPoint[] = [];
+  const push = (time: number, value: number) => {
+    const last = stepped.at(-1);
+    if (!last) {
+      stepped.push({ time, value });
+      return;
+    }
+    if (time < last.time + 0.02) {
+      last.time = Math.max(last.time, time);
+      last.value = value;
+      return;
+    }
+    if (Math.abs(last.time - time) < 0.05 && last.value === value) return;
+    stepped.push({ time, value });
+  };
+
+  push(leftTime, carry);
+  let cursorT = leftTime;
+  let cursorV = carry;
+  const events = tips.filter((p) => p.time > leftTime + 0.5);
+  if (nowSec > (events.at(-1)?.time ?? leftTime) + 0.5) {
+    events.push({ time: nowSec, value: live });
+  }
+
+  for (const ev of events) {
+    while (cursorT + sampleEvery < ev.time - 1) {
+      cursorT += sampleEvery;
+      push(cursorT, cursorV);
+    }
+    if (ev.time > cursorT + 0.5) {
+      push(Math.max(cursorT + 0.25, ev.time - 1), cursorV);
+    }
+    push(ev.time, ev.value);
+    cursorT = ev.time;
+    cursorV = ev.value;
+  }
+
+  return stepped.length >= 2
+    ? stepped
+    : [
+        { time: leftTime, value: carry },
+        { time: nowSec, value: live },
+      ];
+}
+
+/** True when the plotted series has a vertex at this moment (not just a carried plateau). */
+export function seriesVertexNear(
+  points: LivePnlPoint[],
+  timeSec: number,
+  slopSec = 2
+): boolean {
+  for (const p of points) {
+    if (Math.abs(p.time - timeSec) <= slopSec) return true;
+  }
+  return false;
+}
+
+/**
+ * True when the ledger (not the densified plot line) has a real tip inside
+ * the visible window. A 24h carry-forward with no settlements must not light
+ * up All-history markers.
+ */
+export function hasInWindowLedgerTip(
+  points: LivePnlPoint[],
+  leftEdge: number,
+  rightEdge: number
+): boolean {
+  for (const p of points) {
+    if (p.time >= leftEdge - 2 && p.time <= rightEdge) return true;
+  }
+  return false;
+}
+
 /**
  * Liveline only plots from the first in-window series point — not back to
  * `leftEdge`. Markers timed in the gap before that point sit in empty chart
@@ -541,25 +683,45 @@ export function firstLinePointTimeInWindow(
 export function projectBetMarkers(
   markers: ChartBetMarker[],
   layout: PnlChartLayout,
-  linePoints?: LivePnlPoint[]
+  linePoints?: LivePnlPoint[],
+  opts?: { ledgerPoints?: LivePnlPoint[] }
 ): ProjectedBetMarker[] {
+  if (!layout.hasSufficientData) return [];
   const { pad, chartW, chartH, leftEdge, rightEdge, toX, toY } = layout;
+  const vertices = opts?.ledgerPoints ?? linePoints;
+  if (vertices && !hasInWindowLedgerTip(vertices, leftEdge, rightEdge)) return [];
   const projected: ProjectedBetMarker[] = [];
   const firstDrawnTime = linePoints
     ? firstLinePointTimeInWindow(linePoints, leftEdge, rightEdge)
     : null;
 
   for (const marker of markers) {
-    if (marker.settledAtSec < leftEdge || marker.settledAtSec > rightEdge) continue;
-    if (firstDrawnTime != null && marker.settledAtSec < firstDrawnTime - 1) continue;
+    const eventTimeSec = marker.eventTimeSec ?? marker.settledAtSec;
+    // A 24h view must not keep This-week events just because the icon sits on
+    // the prior plateau (that time can fall inside a wider leftover series).
+    if (eventTimeSec < leftEdge || eventTimeSec > rightEdge) continue;
+    if (firstDrawnTime != null && eventTimeSec < firstDrawnTime - 1) continue;
+    // Ledger tip only — densified hold samples are not events. The icon sits
+    // on the prior plateau, so either time may be the plotted vertex.
+    if (
+      vertices &&
+      !seriesVertexNear(vertices, eventTimeSec) &&
+      !seriesVertexNear(vertices, marker.settledAtSec)
+    ) {
+      continue;
+    }
+    let plotTime = marker.settledAtSec;
+    if (firstDrawnTime != null && plotTime < firstDrawnTime - 1) {
+      plotTime = firstDrawnTime;
+    }
+    if (plotTime < leftEdge || plotTime > rightEdge) continue;
     // Markers are already timed at the prior plateau (or £0 origin). Read the
-    // line at that time (inclusive) so they sit ON the plotted point, then the
-    // next series tip is the movement that follows.
+    // plotted line at that time so they sit ON the same Y Liveline uses.
     const lineValue = linePoints
-      ? seriesValueAt(linePoints, marker.settledAtSec)
+      ? seriesValueAt(linePoints, plotTime)
       : null;
     if (linePoints && lineValue == null) continue;
-    const x = toX(marker.settledAtSec);
+    const x = toX(plotTime);
     const y = toY(lineValue ?? marker.cumulativeValue);
     if (x < pad.left - 6 || x > pad.left + chartW + 6) continue;
     if (y < pad.top - 6 || y > pad.top + chartH + 6) continue;
@@ -706,8 +868,9 @@ export function computePnlChartLayout(opts: {
   const rightEdge = nowSec + windowSecs * buffer;
   const leftEdge = rightEdge - windowSecs;
 
-  // Markers must still project even when few (or zero) line points fall in a
-  // narrow window (5m/1hr).
+  // Layout is still computed when the window is sparse so callers can keep a
+  // fallback range. Liveline itself draws nothing when `visible.length < 2`
+  // (blank canvas) — the overlay must not paint markers in that state.
   const visible: LivePnlPoint[] = [];
   for (const p of livePoints) {
     if (p.time >= leftEdge - 2 && p.time <= rightEdge) visible.push(p);
@@ -743,6 +906,7 @@ export function projectChartAnnotations(
   layout: PnlChartLayout,
   linePoints?: LivePnlPoint[]
 ): ProjectedChartAnnotation[] {
+  if (!layout.hasSufficientData) return [];
   const { pad, chartW, chartH, leftEdge, rightEdge, toX, toY } = layout;
   const projected: ProjectedChartAnnotation[] = [];
 

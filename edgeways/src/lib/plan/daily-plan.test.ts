@@ -269,6 +269,21 @@ describe("buildDailyPlan slot content", () => {
     expect(slots.find((s) => s.kind === "kickoff")?.ev).toBe(8);
   });
 
+  it("deep-links race slots to the racing desk card", () => {
+    const slots = buildDailyPlan({
+      offers: [],
+      doNext: [],
+      races: [
+        race({ eventId: 1, externalId: "rac_york_1610" }),
+        race({ eventId: 2, course: "Newmarket", offTime: AT(14, 9) }),
+      ],
+      fixtures: [],
+      now: NOW,
+    });
+    expect(slots.find((s) => s.id === "race-1")?.href).toBe("/racing?race=rac_york_1610");
+    expect(slots.find((s) => s.id === "race-2")?.href).toBe("/racing");
+  });
+
   it("keeps ids stable across rebuilds with identical inputs", () => {
     const input = {
       offers: [offer({ id: 5, expiresAt: AT(11) })],

@@ -43,7 +43,17 @@ export interface BetOcrFields {
   /** True when each-way / E/W is on the slip. */
   eachWay?: boolean;
   /** Multi-selection legs when the slip lists them. */
-  legs?: Array<{ label: string; odds?: number }>;
+  legs?: SlipLeg[];
+}
+
+/** One selection from a multiples / acca slip. */
+export interface SlipLeg {
+  label: string;
+  odds?: number;
+  market?: "win" | "place" | "each_way";
+  /** Canonical 24h HH:mm from "Win - 15:00 York". */
+  eventTime?: string;
+  course?: string;
 }
 
 export type ScreenshotSource = "bookie" | "exchange";

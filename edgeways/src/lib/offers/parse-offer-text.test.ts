@@ -407,6 +407,33 @@ info@news.progressplay.com`,
     expect(draft.title).toBe("Bet £20 get £10 free bet (Football)");
   });
 
+  it("parses Dynobet match-locked Hull vs Man Utd free bet without calling it football", () => {
+    const draft = parseOfferFromText(
+      `DYNOBET
+Hull vs. Man Utd Bet & Get
+
+1. Deposit at least £20 using the promo code MANUTD
+2. Place bets worth £10 on any sports event
+3. Receive a £10 Free Bet for the Hull City vs. Man Utd match on 22/8/26 only
+
+The free bet can only be used on the Hull City vs. Man Utd match on 22/8/26.
+Minimum odds 1.5. 1x wagering requirement on the winnings. Max conversion £200.
+Valid until 22 August, 2026, 23:59 GMT. Opt-in required.`,
+      new Date("2026-08-21T12:00:00")
+    );
+    expect(draft.bookmaker).toBe("Dynobet");
+    expect(draft.category).toBe("general");
+    expect(draft.betStake).toBe(10);
+    expect(draft.freeBetAmount).toBe(10);
+    expect(draft.important.promoCode).toBe("MANUTD");
+    expect(draft.important.minOdds).toBe(1.5);
+    expect(draft.important.rewardEventLabel).toMatch(/Hull/i);
+    expect(draft.important.rewardEventLabel).toMatch(/Man Utd|Manchester/i);
+    expect(draft.important.rewardEventDate).toBe("2026-08-22");
+    expect(draft.important.winningsWageringX).toBe(1);
+    expect(draft.important.maxConversion).toBe(200);
+  });
+
   it("does not treat Dynobet 'up to 5 free bet' monthly cap as £5/£5 stakes", () => {
     const draft = parseOfferFromText(
       `Dynobet

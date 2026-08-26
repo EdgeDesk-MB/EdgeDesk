@@ -28,6 +28,14 @@ import type {
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { extraPlace } from "@/lib/calc/extra-place";
 import { openBetOutcomeKind } from "@/lib/pnl/open-bet-valuation";
+import {
+  buildRacingDeskCampaignBets,
+  deskRunnerMarksForEvent,
+  isRacingDeskHiddenBet,
+} from "@/lib/racing-desk/desk-active-bets";
+import { listAccaRuns } from "@/lib/services/acca-desk";
+import { listBetBuilderRuns } from "@/lib/services/bet-builder-desk";
+import { listSystemRuns } from "@/lib/services/systems-desk";
 
 export { isDeskRacePast } from "@/lib/racing-desk/past";
 import {
@@ -582,6 +590,7 @@ export async function getRacingDesk(
     allEvents.filter((e) => e.externalId).map((e) => [e.externalId!, e])
   );
   const allBets = db.select().from(bets).all();
+  const betsById = new Map(allBets.map((b) => [b.id, b]));
   const betsByEvent = new Map<number, BetRow[]>();
   for (const bet of allBets) {
     if (bet.eventId == null) continue;
@@ -589,6 +598,83 @@ export async function getRacingDesk(
     list.push(bet);
     betsByEvent.set(bet.eventId, list);
   }
+  const accaBundles = listAccaRuns();
+  const betBuilderBundles = listBetBuilderRuns();
+  const systemBundles = listSystemRuns();
+  const deskMarkInput = {
+    acca: accaBundles.map(({ run, legs, backBetType }) => {
+      const back = run.backBetId != null ? betsById.get(run.backBetId) : undefined;
+      return {
+        id: run.id,
+        label: run.label,
+        status: run.status,
+        method: run.method,
+        offerId: run.offerId,
+        noLay: run.noLay,
+        stake: run.stake,
+        commission: run.commission,
+        boostPct: run.boostPct,
+        wholeLayStake: run.wholeLayStake,
+        wholeLayOdds: run.wholeLayOdds,
+        backBetId: run.backBetId,
+        backBetType,
+        bookmaker: run.bookmaker,
+        backStake: back?.backStake ?? run.stake,
+        backOdds: back?.backOdds ?? 0,
+        legs: legs.map((leg) => ({
+          seq: leg.seq,
+          label: leg.label,
+          selection: leg.selection,
+          result: leg.result,
+          layStake: leg.layStake,
+          layOdds: leg.layOdds,
+          backOdds: leg.backOdds,
+          eventId: leg.eventId,
+        })),
+      };
+    }),
+    betBuilder: betBuilderBundles.map(({ run, selections }) => {
+      const back = run.backBetId != null ? betsById.get(run.backBetId) : undefined;
+      return {
+        id: run.id,
+        label: run.label,
+        status: run.status,
+        method: run.method,
+        offerId: run.offerId,
+        wholeLayStake: run.wholeLayStake,
+        backBetId: run.backBetId,
+        bookmaker: run.bookmaker,
+        backStake: back?.backStake ?? run.stake,
+        backOdds: back?.backOdds ?? run.backOdds,
+        eventId: run.eventId,
+        selectionCount: selections.length,
+        selections: selections.map((sel) => ({
+          label: sel.label,
+          selection: sel.selection,
+        })),
+      };
+    }),
+    systems: systemBundles.map(({ run, legs }) => {
+      const back = run.backBetId != null ? betsById.get(run.backBetId) : undefined;
+      return {
+        id: run.id,
+        label: run.label,
+        status: run.status,
+        offerId: run.offerId,
+        backBetId: run.backBetId,
+        bookmaker: run.bookmaker,
+        backStake: back?.backStake ?? run.totalStake,
+        backOdds: back?.backOdds ?? 0,
+        legs: legs.map((leg) => ({
+          seq: leg.seq,
+          label: leg.label,
+          selection: leg.selection,
+          result: leg.result,
+          eventId: leg.eventId,
+        })),
+      };
+    }),
+  };
 
   const isDemo = source === "demo" && !hasRacingApiKey();
   const useProxyOdds = !isDemo && apiOddsTier === "free";
@@ -669,7 +755,12 @@ export async function getRacingDesk(
   let races: RacingDeskRace[] = cards.map((card) => {
     const tracked = eventByExternal.get(card.externalId);
     const linkedBets = tracked ? (betsByEvent.get(tracked.id) ?? []) : [];
-    const openBetCount = linkedBets.filter((b) => b.status === "open").length;
+    const deskMarks = tracked ? deskRunnerMarksForEvent(tracked.id, deskMarkInput) : [];
+    const markSources = [
+      ...linkedBets.filter((b) => !isRacingDeskHiddenBet(b)),
+      ...deskMarks,
+    ];
+    const openBetCount = markSources.filter((b) => b.status === "open").length;
     const standardPlaces = placePositions(card.fieldSize, {
       type: card.type,
       raceName: card.raceName,
@@ -692,8 +783,8 @@ export async function getRacingDesk(
     if (result) {
       runners = applyRaceResultToDeskRunners(runners, result);
     }
-    if (linkedBets.length > 0) {
-      runners = applyRunnerBetMarks(runners, linkedBets);
+    if (markSources.length > 0) {
+      runners = applyRunnerBetMarks(runners, markSources);
     }
 
     const pricedRunnerCount = runners.filter((r) => (r.bookieDecimal ?? 0) > 1).length;
@@ -841,11 +932,7 @@ export async function getRacingDesk(
     raceCount: races.length,
     upcomingCount: races.filter((r) => r.status === "upcoming").length,
     trackedCount,
-    openPositions: allBets.filter((b) => {
-      if (b.status !== "open" || b.eventId == null) return false;
-      const ev = allEvents.find((e) => e.id === b.eventId);
-      return ev?.sport === "horse_racing";
-    }).length,
+    openPositions: 0,
     racingPnlToday: racingPnlToday(allBets, allEvents, date),
     source: error ? "error" : source === "demo" ? "demo" : "racing-api",
     oddsSnapshotsEnabled: true,
@@ -875,8 +962,9 @@ export async function getRacingDesk(
   };
 
   const raceByExternal = new Map(races.map((r) => [r.externalId, r]));
-  const activeBets = allBets
-    .filter((b) => b.status === "open" && b.eventId != null)
+  const eventsById = new Map(allEvents.map((e) => [e.id, e]));
+  const trackerBets = allBets
+    .filter((b) => b.status === "open" && b.eventId != null && !isRacingDeskHiddenBet(b))
     .flatMap((b): RacingDeskActiveBet[] => {
       const ev = allEvents.find((e) => e.id === b.eventId);
       if (!ev || ev.sport !== "horse_racing") return [];
@@ -933,8 +1021,27 @@ export async function getRacingDesk(
           profitIfExtraPlace,
         },
       ];
-    })
-    .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
+    });
+
+  const campaignBets = buildRacingDeskCampaignBets({
+    eventsById,
+    ...deskMarkInput,
+  }).map((row) => {
+    const ev = eventsById.get(row.eventId);
+    const race = ev?.externalId ? raceByExternal.get(ev.externalId) : undefined;
+    return {
+      ...row,
+      course: race?.course ?? row.course,
+      offTime: race?.offTime ?? row.offTime,
+      startTime: race?.startTime ?? row.startTime,
+      raceExternalId: race?.externalId ?? row.raceExternalId,
+    };
+  });
+
+  const activeBets = [...trackerBets, ...campaignBets].sort(
+    (a, b) => (a.startTime ?? 0) - (b.startTime ?? 0)
+  );
+  summary.openPositions = activeBets.length;
 
   const racingPnlDay = racingPnlByRace(allBets, allEvents, date);
   for (const row of racingPnlDay.rows) {

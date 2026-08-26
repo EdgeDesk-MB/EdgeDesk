@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,7 @@ import { SportIcon } from "@/components/sport-icon";
 import {
   bandNotTrackedFixtures,
   bandTrackedEvents,
+  filterByOfferCourseScope,
   fixtureSelectValue,
   groupByHourBandIfDense,
   parseFixtureSelectValue,
@@ -29,8 +30,13 @@ import { type TrackedEventLike } from "@/lib/events";
 import { api } from "@/hooks/use-app-state";
 import { useKnownFixtures } from "@/hooks/use-known-fixtures";
 import { MARKETS, marketDef } from "@/lib/markets";
+import {
+  formatOfferScopeLabel,
+  isRegionalScope,
+} from "@/lib/offers/racing-offer-rules";
 import { isRacingSport, SPORTS } from "@/lib/sports";
 import type { EventRow } from "@/lib/db/schema";
+import { sectionDescription } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export type DeskLegEventDraft = {
@@ -136,6 +142,7 @@ export function DeskLegEventFields({
   showMarketSelection = true,
   /** Hide sport/event when the parent already owns the linked fixture (BB legs). */
   showSportEvent = true,
+  scopeCourse,
   className,
   onEventLinked,
 }: {
@@ -145,11 +152,26 @@ export function DeskLegEventFields({
   disabled?: boolean;
   showMarketSelection?: boolean;
   showSportEvent?: boolean;
+  /** Named-course lock (qualify). Event list stays on that meeting. */
+  scopeCourse?: string | null;
   className?: string;
   /** Kick-off hint when an event or pending fixture is chosen (for schedule fields). */
   onEventLinked?: (hint: { startTime: number | null }) => void;
 }) {
   const sport = value.sport || "football";
+  const courseScope =
+    scopeCourse?.trim() && !isRegionalScope(scopeCourse)
+      ? scopeCourse.trim()
+      : null;
+  const courseScopeLocked = Boolean(courseScope);
+  const courseScopeLabel = courseScope
+    ? formatOfferScopeLabel(courseScope)
+    : null;
+  const sportSelectId = useId();
+  const eventSelectId = useId();
+  const eventHintId = useId();
+  const marketSelectId = useId();
+  const selectionFieldId = useId();
   const markets = MARKETS[sport] ?? MARKETS.other ?? [];
 
   const { fixtures: knownFixtures, loading: fixturesLoading } = useKnownFixtures(sport);
@@ -166,13 +188,18 @@ export function DeskLegEventFields({
     return new Set([value.eventId]);
   }, [value.eventId]);
 
-  const trackedForSport = useMemo(
-    () =>
-      events.filter(
-        (e) => e.sport === sport || (value.eventId != null && e.id === value.eventId)
-      ) as TrackedEventLike[],
-    [events, sport, value.eventId]
-  );
+  const trackedForSport = useMemo(() => {
+    const base = events.filter(
+      (e) => e.sport === sport || (value.eventId != null && e.id === value.eventId)
+    ) as TrackedEventLike[];
+    if (!courseScope || !isRacingSport(sport)) return base;
+    const scoped = filterByOfferCourseScope(base, courseScope);
+    if (value.eventId != null && !scoped.some((e) => e.id === value.eventId)) {
+      const linked = base.find((e) => e.id === value.eventId);
+      if (linked) return [linked, ...scoped];
+    }
+    return scoped;
+  }, [events, sport, value.eventId, courseScope]);
 
   const trackedHourBands = useMemo(
     () => toHourBands(bandTrackedEvents(trackedForSport, Date.now(), keepIds)),
@@ -188,7 +215,10 @@ export function DeskLegEventFields({
   }, [events]);
 
   const fixturesForList = useMemo(() => {
-    const base = knownFixtures.filter((f) => f.sport === sport);
+    let base = knownFixtures.filter((f) => f.sport === sport);
+    if (courseScope && isRacingSport(sport)) {
+      base = filterByOfferCourseScope(base, courseScope);
+    }
     const pending = value.pendingFixture;
     if (
       pending &&
@@ -198,7 +228,7 @@ export function DeskLegEventFields({
       return [...base, pending];
     }
     return base;
-  }, [knownFixtures, sport, value.pendingFixture]);
+  }, [knownFixtures, sport, value.pendingFixture, courseScope]);
 
   const notTrackedHourBands = useMemo(
     () => toHourBands(bandNotTrackedFixtures(fixturesForList, trackedExternalIds)),
@@ -240,7 +270,9 @@ export function DeskLegEventFields({
     ? fixtureSelectValue(value.pendingFixture.externalId)
     : value.eventId != null
       ? String(value.eventId)
-      : "none";
+      : courseScopeLocked
+        ? "__scope_pending__"
+        : "none";
 
   function changeSport(next: string) {
     const nextMarkets = MARKETS[next] ?? MARKETS.other ?? [];
@@ -257,9 +289,11 @@ export function DeskLegEventFields({
 
   function changeEvent(raw: string) {
     if (raw === "none") {
+      if (courseScopeLocked) return;
       onChange({ ...value, eventId: null, pendingFixture: null, selection: "" });
       return;
     }
+    if (raw === "__scope_pending__") return;
 
     const externalId = parseFixtureSelectValue(raw);
     if (externalId) {
@@ -324,11 +358,26 @@ export function DeskLegEventFields({
   return (
     <div className={cn("grid gap-2", className)}>
       {showSportEvent ? (
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Sport</Label>
-            <Select value={sport} onValueChange={changeSport} disabled={disabled}>
-              <SelectTrigger className="w-full">
+        <>
+        <div className="grid min-w-0 grid-cols-2 gap-2 max-sm:grid-cols-1">
+          <div className="flex min-w-0 flex-col gap-1">
+            <Label htmlFor={sportSelectId} className="text-xs text-muted-foreground">
+              Sport
+            </Label>
+            <Select
+              value={sport}
+              onValueChange={changeSport}
+              disabled={disabled || courseScopeLocked}
+            >
+              <SelectTrigger
+                id={sportSelectId}
+                className="w-full"
+                aria-label={
+                  courseScopeLocked
+                    ? `Sport, locked to ${sportLabel} for this campaign`
+                    : undefined
+                }
+              >
                 <SelectValue>
                   <span className="flex items-center gap-1.5">
                     <SportIcon sport={sport} className="size-3.5 shrink-0" />
@@ -348,21 +397,46 @@ export function DeskLegEventFields({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Event</Label>
+          <div className="flex min-w-0 flex-col gap-1">
+            <Label
+              htmlFor={eventSelectId}
+              className="min-w-0 text-pretty break-words text-xs text-muted-foreground"
+            >
+              {courseScopeLocked && courseScopeLabel
+                ? `Event · ${courseScopeLabel}`
+                : "Event"}
+            </Label>
             <Select
               value={selectValue}
               onValueChange={changeEvent}
               disabled={disabled}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Manual entry" />
+              <SelectTrigger
+                id={eventSelectId}
+                className="w-full"
+                aria-describedby={
+                  courseScopeLocked && courseScopeLabel ? eventHintId : undefined
+                }
+              >
+                <SelectValue
+                  placeholder={
+                    courseScopeLocked && courseScopeLabel
+                      ? `Select a ${courseScopeLabel} race`
+                      : "Manual entry"
+                  }
+                />
               </SelectTrigger>
               <SelectContent className="max-h-72">
-                <SelectItem value="none">Manual entry</SelectItem>
+                {courseScopeLocked && courseScopeLabel ? (
+                  <SelectItem value="__scope_pending__" disabled>
+                    Select a {courseScopeLabel} race
+                  </SelectItem>
+                ) : (
+                  <SelectItem value="none">Manual entry</SelectItem>
+                )}
                 {notTrackedHourBands.length > 0 ? (
                   <>
-                    <SelectSeparator />
+                    {!courseScopeLocked ? <SelectSeparator /> : null}
                     <SelectGroup className="p-0">
                       <SelectLabel className="text-foreground">{fixturesSectionLabel}</SelectLabel>
                       {notTrackedHourBands.map((band, bandIdx) => (
@@ -434,7 +508,9 @@ export function DeskLegEventFields({
                   <>
                     <SelectSeparator />
                     <SelectItem value="__empty__" disabled>
-                      No {sportLabel} fixtures loaded
+                      {courseScopeLocked && courseScopeLabel
+                        ? `No ${courseScopeLabel} races loaded yet for this day.`
+                        : `No ${sportLabel} fixtures loaded`}
                     </SelectItem>
                   </>
                 ) : null}
@@ -442,17 +518,25 @@ export function DeskLegEventFields({
             </Select>
           </div>
         </div>
+        {courseScopeLocked && courseScopeLabel ? (
+          <span id={eventHintId} className={sectionDescription}>
+            Limited to {courseScopeLabel} races for this campaign.
+          </span>
+        ) : null}
+        </>
       ) : null}
       {showMarketSelection ? (
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Market</Label>
+        <div className="grid min-w-0 grid-cols-2 gap-2 max-sm:grid-cols-1">
+          <div className="flex min-w-0 flex-col gap-1">
+            <Label htmlFor={marketSelectId} className="text-xs text-muted-foreground">
+              Market
+            </Label>
             <Select
               value={value.market || markets[0]?.value || "other"}
               onValueChange={changeMarket}
               disabled={disabled}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger id={marketSelectId} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -464,15 +548,17 @@ export function DeskLegEventFields({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Selection</Label>
+          <div className="flex min-w-0 flex-col gap-1">
+            <Label htmlFor={selectionFieldId} className="text-xs text-muted-foreground">
+              Selection
+            </Label>
             {choices.length > 0 ? (
               <Select
                 value={value.selection || undefined}
                 onValueChange={changeSelection}
                 disabled={disabled || runnersLoading}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id={selectionFieldId} className="w-full">
                   <SelectValue
                     placeholder={runnersLoading ? "Loading runners…" : "Pick selection"}
                   />
@@ -487,6 +573,7 @@ export function DeskLegEventFields({
               </Select>
             ) : (
               <Input
+                id={selectionFieldId}
                 value={value.selection}
                 onChange={(e) => changeSelection(e.target.value)}
                 placeholder={
@@ -497,7 +584,6 @@ export function DeskLegEventFields({
                     : "e.g. selection"
                 }
                 disabled={disabled}
-                className="h-9"
               />
             )}
           </div>

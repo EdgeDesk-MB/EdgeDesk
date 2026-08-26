@@ -11,7 +11,7 @@ import {
   extractSlipLegs,
   extractUnitStake,
 } from "@/lib/bets/parse-bet-structure";
-import type { OcrBetStructure } from "@/lib/ocr/types";
+import type { OcrBetStructure, SlipLeg } from "@/lib/ocr/types";
 
 export interface ParsedField<T> {
   value: T;
@@ -31,7 +31,7 @@ export interface ParsedBet {
   structure: ParsedField<OcrBetStructure> | null;
   unitStake: ParsedField<number> | null;
   eachWay: boolean;
-  legs: Array<{ label: string; odds?: number }>;
+  legs: SlipLeg[];
 }
 
 // ---------------------------------------------------------------------------

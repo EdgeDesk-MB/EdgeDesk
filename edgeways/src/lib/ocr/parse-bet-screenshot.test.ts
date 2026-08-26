@@ -67,6 +67,49 @@ describe("parseBookieScreenshot", () => {
     expect(f.backOdds).not.toBe(500);
   });
 
+  it("reads a Tesseract sparse dump with silk junk on the second runner", () => {
+    const f = parseBookieScreenshot(`MULTIPLES
+
+2 Selections
+
+4 Notable Speech
+
+3.50
+
+Win - 15:00 York
+
+V* 7 Dance In The Storm
+
+3.25
+
+Win - 16:10 York
+`);
+    expect(f.legs).toHaveLength(2);
+    expect(f.legs?.[1]?.label).toBe("Dance In The Storm");
+    expect(f.legs?.[1]?.eventTime).toBe("16:10");
+  });
+
+  it("reads Sportsbook multiples legs with course and off time", () => {
+    const f = parseBookieScreenshot(`
+MULTIPLES
+2 Selections
+4 Notable Speech 3.50
+Win - 15:00 York
+7 Dance In The Storm 3.25
+Win - 16:10 York
+`);
+    expect(f.structure).toBe("accumulator");
+    expect(f.legs).toHaveLength(2);
+    expect(f.legs?.[0]).toMatchObject({
+      label: "Notable Speech",
+      odds: 3.5,
+      eventTime: "15:00",
+      course: "York",
+      market: "win",
+    });
+    expect(f.legs?.[1]?.label).toBe("Dance In The Storm");
+  });
+
   it("detects win market and free bet promo", () => {
     const f = parseBookieScreenshot(BOOKIE_OCR);
     expect(f.marketHint).toBe("win");

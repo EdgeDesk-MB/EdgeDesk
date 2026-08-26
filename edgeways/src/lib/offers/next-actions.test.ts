@@ -84,6 +84,7 @@ function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title
       totalProfit: 0,
       ...profitPartial,
     },
+    deskProgress: rest.deskProgress ?? null,
   };
 }
 
@@ -158,6 +159,109 @@ describe("deriveOfferNextAction", () => {
       })
     );
     expect(planned?.kind).toBe("playbook_deposit");
+  });
+
+  it("does not keep opt-in as next once the qualifying bet is logged", () => {
+    const rules = JSON.stringify({
+      type: "bet_get_free_place",
+      playbook: {
+        version: 1,
+        steps: [
+          {
+            id: "opt_in",
+            kind: "opt_in",
+            title: "Opt in to the offer",
+            detail: "Confirm opt-in before qualifying.",
+            sortOrder: 0,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+          {
+            id: "qualify",
+            kind: "qualify",
+            title: "Place £10 qualifying bet",
+            detail: "Match on the exchange.",
+            sortOrder: 1,
+            status: "done",
+            completion: "auto",
+            completedAt: now,
+          },
+          {
+            id: "await_award",
+            kind: "await_award",
+            title: "Await free bet award",
+            detail: "Wait for the token.",
+            sortOrder: 2,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+          {
+            id: "done",
+            kind: "done",
+            title: "Offer complete",
+            detail: "",
+            sortOrder: 3,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+        ],
+      },
+    });
+    const action = deriveOfferNextAction(
+      offer({
+        id: 212,
+        title: "Bet £10 get £10 free bet (2nd–4th)",
+        bookmaker: "Paddy Power",
+        status: "active",
+        rules,
+        betCount: 1,
+        openBets: 1,
+        profit: {
+          qualifyingOpenCount: 1,
+          freeBetStage: "awaiting_result",
+        },
+      }),
+      now
+    );
+    expect(action?.kind).not.toBe("playbook_opt_in");
+    expect(action?.kind).toBe("playbook_await_award");
+  });
+
+  it("prefers Lay 2nd leg over await-award while an acca run still needs a lay", () => {
+    const action = deriveOfferNextAction(
+      offer({
+        id: 42,
+        title: "Bet £10 get £10 free bet",
+        bookmaker: "Betfair Sportsbook",
+        status: "active",
+        betCount: 3,
+        openBets: 2,
+        profit: {
+          qualifyingOpenCount: 1,
+          freeBetStage: "awaiting_result",
+        },
+        deskProgress: {
+          kind: "acca",
+          href: "/acca",
+          runId: 7,
+          actionTitle: "Lay 2nd leg",
+          actionDetail: "Lay Dance In The Storm on Acca Desk.",
+          done: 1,
+          total: 2,
+          stageLabel: "Lay 2nd leg",
+          progressCaption: "1/2 laid",
+          nextCaption: "Dance In The Storm",
+          needsAction: true,
+        },
+      }),
+      now
+    );
+    expect(action?.kind).toBe("desk_lay");
+    expect(action?.title).toBe("Lay 2nd leg");
+    expect(action?.href).toBe("/acca");
   });
 
   it("asks to convert when free bet is awarded", () => {

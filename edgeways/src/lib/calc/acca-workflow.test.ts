@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accaAllWinEstimate,
   accaCampaignProfit,
   accaOutcomePercentages,
   accaSquareProvisional,
@@ -492,5 +493,104 @@ describe("sequentialLiabilityLadder - all-win exchange reservations", () => {
         ],
       })
     ).toEqual([]);
+  });
+});
+
+describe("accaAllWinEstimate - sequential remaining lays, not bookie minus placed only", () => {
+  // York double on the desk: £10 @ 3.50 × 3.25 = 11.375, bookie all-win £103.75.
+  // Leg 1 is laid £10 @ 3.70 (liability £27) and still pending; leg 2 is unlaid.
+  // Subtracting only the placed £27 leaves +£76.75 — that is "stop laying".
+  // Sequential lock sizes the final at the bookie 3.25:
+  //   win0 = 103.75 − 27 = 76.75 · lose0 = −37 · L = 113.75 / 3.25 = £35
+  //   lock liability 35 × 2.25 = £78.75
+  //   all-win = 103.75 − 27 − 78.75 = −£2.00
+  const yorkRun = { stake: 10, commission: 0, method: "sequential" as const };
+  const yorkLegs = [
+    {
+      seq: 1,
+      label: "Notable Speech",
+      backOdds: 3.5,
+      result: "pending" as const,
+      layStake: 10,
+      layOdds: 3.7,
+    },
+    {
+      seq: 2,
+      label: "Dance In The Storm",
+      backOdds: 3.25,
+      result: "pending" as const,
+      layStake: null,
+      layOdds: null,
+    },
+  ];
+
+  it("York sequential double: all-win is −£2 after the projected final lock, not +£76.75", () => {
+    const r = accaAllWinEstimate(yorkRun, yorkLegs);
+    expect(r).not.toBeNull();
+    expect(r!.value).toBeCloseTo(-2, 10);
+    expect(r!.usedProxy).toBe(true);
+    expect(r!.value).not.toBeCloseTo(10 * (3.5 * 3.25 - 1) - 27, 10);
+  });
+
+  it("matches finalLegLockLay.lockedIfWin on the same York inputs", () => {
+    const lock = finalLegLockLay({
+      accaStake: 10,
+      combinedBackOdds: 3.5 * 3.25,
+      priorLiabilities: 27,
+      legLayOdds: 3.25,
+      commission: 0,
+    });
+    if (!lock) throw new Error("expected lock");
+    expect(lock.layStake).toBeCloseTo(35, 10);
+    expect(lock.lockedIfWin).toBeCloseTo(-2, 10);
+    expect(accaAllWinEstimate(yorkRun, yorkLegs)?.value).toBeCloseTo(lock.lockedIfWin, 10);
+  });
+
+  it("insurance_legs keeps cover on the last (no equalise): −£6.50", () => {
+    // Cover 2 = 10 + 27 = £37 @ 3.25 → liability 37 × 2.25 = £83.25
+    // all-win = 103.75 − 27 − 83.25 = −£6.50
+    const r = accaAllWinEstimate({ ...yorkRun, method: "insurance_legs" }, yorkLegs);
+    expect(r?.value).toBeCloseTo(-6.5, 10);
+    expect(r?.usedProxy).toBe(true);
+  });
+
+  it("once the run has finished, only placed lays count (no phantom lock)", () => {
+    // Both won; last horse was never laid. Realised all-win is bookie − first liability.
+    const r = accaAllWinEstimate(yorkRun, [
+      { ...yorkLegs[0]!, result: "won" },
+      { ...yorkLegs[1]!, result: "won" },
+    ]);
+    expect(r?.value).toBeCloseTo(103.75 - 27, 10);
+    expect(r?.usedProxy).toBe(false);
+  });
+
+  it("a lost leg makes all-win impossible", () => {
+    expect(
+      accaAllWinEstimate(yorkRun, [
+        { ...yorkLegs[0]!, result: "lost" },
+        yorkLegs[1]!,
+      ])
+    ).toBeNull();
+  });
+
+  it("whole-acca lay stays bookie profit minus the combined hedge", () => {
+    const whole = wholeAccaLay({
+      stake: 10,
+      combinedOdds: 11.52,
+      layOdds: 12.5,
+      commission: 0,
+    })!;
+    const r = accaAllWinEstimate(
+      {
+        stake: 10,
+        commission: 0,
+        method: "insurance_whole",
+        wholeLayStake: whole.layStake,
+        wholeLayOdds: 12.5,
+      },
+      [{ seq: 1, label: "Acca", backOdds: 11.52, result: "pending", layStake: null, layOdds: null }]
+    );
+    expect(r?.value).toBeCloseTo(whole.profitIfAllWin, 6);
+    expect(r?.usedProxy).toBe(false);
   });
 });

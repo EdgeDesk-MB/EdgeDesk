@@ -250,11 +250,17 @@ export interface RacingDeskSummary {
   layColor?: string;
 }
 
+export type RacingDeskActiveBetKind = "bet" | "acca" | "bet_builder" | "systems";
+
 /** Open horse-racing bets linked to today's desk (Active bets strip). */
 export interface RacingDeskActiveBet {
   betId: number;
   eventId: number;
   raceExternalId: string | null;
+  /** Desk campaign row. Default is a normal tracker bet. */
+  kind?: RacingDeskActiveBetKind;
+  /** Active-bets CTA. Default `/tracker?highlight=`. */
+  href?: string;
   label: string;
   selection: string;
   market: string;
@@ -279,6 +285,10 @@ export interface RacingDeskActiveBet {
   qualifyingLoss?: number | null;
   impliedExtraPlaceOdds?: number | null;
   profitIfExtraPlace?: number | null;
+  /** Desk next action, e.g. "Lay 2nd leg". */
+  triggerNote?: string | null;
+  /** Desk progress, e.g. "1/2 laid". */
+  progressCaption?: string | null;
 }
 
 /** Day P&L series + by-race table for Racing Desk “Racing P&L today”. */

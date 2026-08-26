@@ -9,15 +9,21 @@ import {
   buildHomeChartMarkers,
   buildSettledPnlSeries,
   chartBetMarkerClassName,
+  chartPlotCoverSecs,
   chartWindowAnchorValue,
+  chartWindowLeftEdge,
   computePnlChartLayout,
   computePnlValueRange,
+  ensureWindowLinePoints,
   isChartAnnotationEntry,
   markerToneForStatus,
   markerToneFromBet,
   firstLinePointTimeInWindow,
+  hasInWindowLedgerTip,
   projectBetMarkers,
   seriesValueAt,
+  seriesVertexNear,
+  shouldLingerChartPlotCover,
   spreadOverlappingAnnotations,
 } from "./chart-bet-markers";
 import { buildHistoryContext } from "@/lib/history-display";
@@ -193,6 +199,34 @@ describe("buildHomeChartMarkers Acca campaign marker", () => {
     const acca = markers.find((m) => m.id === 4);
     expect(acca?.betProfit).toBeCloseTo(-36.2, 10);
     expect(acca?.tone).toBe("loss");
+  });
+});
+
+describe("chartPlotCoverSecs", () => {
+  it("keeps the previous span while a shrink lingers", () => {
+    expect(chartPlotCoverSecs(86_400, 2_592_000)).toBe(2_592_000);
+  });
+
+  it("follows the viewport once linger is cleared", () => {
+    expect(chartPlotCoverSecs(86_400, null)).toBe(86_400);
+  });
+
+  it("does not shrink below the viewport if linger is stale", () => {
+    expect(chartPlotCoverSecs(604_800, 86_400)).toBe(604_800);
+  });
+});
+
+describe("shouldLingerChartPlotCover", () => {
+  it("lingers when the viewport shrinks", () => {
+    expect(shouldLingerChartPlotCover(2_592_000, 86_400, false)).toBe(true);
+  });
+
+  it("does not linger when the viewport expands", () => {
+    expect(shouldLingerChartPlotCover(86_400, 2_592_000, false)).toBe(false);
+  });
+
+  it("does not linger when motion is reduced", () => {
+    expect(shouldLingerChartPlotCover(2_592_000, 86_400, true)).toBe(false);
   });
 });
 
@@ -574,10 +608,254 @@ describe("projectBetMarkers", () => {
       nowSec - 100
     );
   });
+
+  it("does not keep This-week events on a 24h window", () => {
+    const nowSec = 2_000_000;
+    const windowSecs = 86_400;
+    const weekAgo = nowSec - 5 * 86_400;
+    const historic = [
+      { time: weekAgo, value: 100 },
+      { time: weekAgo + 3_600, value: 140 },
+      { time: nowSec - 200_000, value: 200 },
+      { time: nowSec, value: 200 },
+    ];
+    const stepped = ensureWindowLinePoints(historic, windowSecs, {
+      nowSec,
+      showBadge: false,
+      liveValue: 200,
+    });
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs,
+      showBadge: false,
+      livePoints: stepped,
+      liveValue: 200,
+      nowSec,
+      referenceValue: 200,
+    });
+    expect(layout?.hasSufficientData).toBe(true);
+
+    const weekEvent = {
+      id: 1,
+      kind: "bet" as const,
+      label: "This week leftover",
+      status: "won" as const,
+      settledAtSec: chartWindowLeftEdge(windowSecs, nowSec, false) + 120,
+      eventTimeSec: weekAgo + 3_600,
+      betProfit: 40,
+      cumulativeValue: 100,
+      tone: "win" as const,
+    };
+    expect(
+      projectBetMarkers([weekEvent], layout!, stepped, { ledgerPoints: historic })
+    ).toHaveLength(0);
+  });
+});
+
+describe("ensureWindowLinePoints", () => {
+  const nowSec = 1_000_000;
+  const windowSecs = 86_400;
+
+  it("does not fill All (fillToLeftEdge false)", () => {
+    const points = [
+      { time: nowSec - 200_000, value: 0 },
+      { time: nowSec, value: 40 },
+    ];
+    expect(
+      ensureWindowLinePoints(points, windowSecs, {
+        nowSec,
+        showBadge: false,
+        fillToLeftEdge: false,
+      })
+    ).toEqual(points);
+  });
+
+  it("holds the last P&L flat, then steps only at a real tip", () => {
+    const firstDrawn = nowSec - 3_600;
+    const points = [
+      { time: nowSec - 200_000, value: 400 },
+      { time: firstDrawn, value: 441 },
+      { time: nowSec, value: 455 },
+    ];
+    const stepped = ensureWindowLinePoints(points, windowSecs, { nowSec, showBadge: false });
+    const leftEdge = chartWindowLeftEdge(windowSecs, nowSec, false);
+    expect(stepped[0]?.value).toBe(400);
+    expect(firstLinePointTimeInWindow(stepped, leftEdge, leftEdge + windowSecs)).toBe(
+      stepped[0]?.time
+    );
+    const beforeTip = stepped.find((p) => Math.abs(p.time - (firstDrawn - 1)) < 0.6);
+    expect(beforeTip?.value).toBe(400);
+    for (let i = 1; i < stepped.length; i++) {
+      const dt = stepped[i]!.time - stepped[i - 1]!.time;
+      const dv = stepped[i]!.value - stepped[i - 1]!.value;
+      if (Math.abs(dv) > 0.004) expect(dt).toBeLessThan(5);
+    }
+    // Dense hold so Liveline cannot spline the left edge to the first tip.
+    const holdSamples = stepped.filter((p) => p.time < firstDrawn - 1 && p.value === 400);
+    expect(holdSamples.length).toBeGreaterThan(10);
+  });
+
+  it("hides 24h gap markers that have no ledger vertex", () => {
+    const firstDrawn = nowSec - 3_600;
+    const points = [
+      { time: nowSec - 200_000, value: 400 },
+      { time: firstDrawn, value: 441 },
+      { time: nowSec, value: 455 },
+    ];
+    const stepped = ensureWindowLinePoints(points, windowSecs, { nowSec, showBadge: false });
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs,
+      showBadge: false,
+      livePoints: stepped,
+      liveValue: 455,
+      nowSec,
+      referenceValue: 400,
+    });
+    expect(layout?.hasSufficientData).toBe(true);
+
+    const leftEdge = chartWindowLeftEdge(windowSecs, nowSec, false);
+    const gapMarker = {
+      id: 1,
+      kind: "bet" as const,
+      label: "In gap",
+      status: "lost" as const,
+      settledAtSec: leftEdge + 60,
+      betProfit: -1,
+      cumulativeValue: 441,
+      tone: "loss" as const,
+    };
+    expect(seriesVertexNear(points, gapMarker.settledAtSec)).toBe(false);
+    expect(
+      projectBetMarkers([gapMarker], layout!, stepped, { ledgerPoints: points })
+    ).toHaveLength(0);
+
+    const onLine = { ...gapMarker, id: 2, settledAtSec: firstDrawn };
+    const projected = projectBetMarkers([onLine], layout!, stepped, {
+      ledgerPoints: points,
+    });
+    expect(projected).toHaveLength(1);
+    expect(projected[0]?.y).toBeCloseTo(layout!.toY(441), 6);
+  });
+
+  it("stays flat when 24h has no in-window tips (no diagonal span)", () => {
+    const points = [
+      { time: nowSec - 200_000, value: 40 },
+      { time: nowSec, value: 40 },
+    ];
+    const stepped = ensureWindowLinePoints(points, windowSecs, {
+      nowSec,
+      showBadge: false,
+      liveValue: 40,
+    });
+    expect(stepped.every((p) => p.value === 40)).toBe(true);
+    expect(stepped.length).toBeGreaterThan(10);
+    expect(stepped[0]?.time).toBeLessThan(nowSec - windowSecs * 0.8);
+    expect(stepped.at(-1)?.time).toBeGreaterThan(nowSec - 2);
+  });
+
+  it("hides every marker when the ledger has no in-window tip", () => {
+    const historic = [{ time: nowSec - 200_000, value: 40 }];
+    const stepped = ensureWindowLinePoints(
+      [...historic, { time: nowSec, value: 40 }],
+      windowSecs,
+      { nowSec, showBadge: false, liveValue: 40 }
+    );
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs,
+      showBadge: false,
+      livePoints: stepped,
+      liveValue: 40,
+      nowSec,
+      referenceValue: 40,
+    });
+    expect(layout?.hasSufficientData).toBe(true);
+    const leftEdge = chartWindowLeftEdge(windowSecs, nowSec, false);
+    expect(hasInWindowLedgerTip(historic, leftEdge, leftEdge + windowSecs)).toBe(false);
+
+    const floating = {
+      id: 1,
+      kind: "bet" as const,
+      label: "All-history leftover",
+      status: "won" as const,
+      settledAtSec: leftEdge + 3_600,
+      betProfit: 5,
+      cumulativeValue: 12,
+      tone: "win" as const,
+    };
+    expect(
+      projectBetMarkers([floating], layout!, stepped, { ledgerPoints: historic })
+    ).toHaveLength(0);
+  });
+
+  it("keeps 24h markers on the windowed line, not the All-history scale", () => {
+    const firstDrawn = nowSec - 3_600;
+    const historic = [
+      { time: nowSec - 200_000, value: 0 },
+      { time: nowSec - 180_000, value: 80 },
+      { time: nowSec - 150_000, value: 200 },
+      { time: nowSec - 120_000, value: 400 },
+      { time: firstDrawn, value: 441 },
+      { time: nowSec - 1_800, value: 500 },
+    ];
+    const stepped = ensureWindowLinePoints(historic, windowSecs, {
+      nowSec,
+      showBadge: false,
+      liveValue: 534.27,
+    });
+    const layout = computePnlChartLayout({
+      width: 400,
+      height: 200,
+      pad: { top: 12, bottom: 28, left: 16, right: 72 },
+      windowSecs,
+      showBadge: false,
+      livePoints: stepped,
+      liveValue: 534.27,
+      nowSec,
+      referenceValue: 400,
+    });
+    expect(layout?.hasSufficientData).toBe(true);
+    // Windowed scale starts near the carry, not £0.
+    expect(layout!.minVal).toBeGreaterThan(300);
+
+    const leftoverAll = {
+      id: 1,
+      kind: "bet" as const,
+      label: "Old All marker",
+      status: "won" as const,
+      settledAtSec: nowSec - 180_000,
+      betProfit: 80,
+      cumulativeValue: 0,
+      tone: "win" as const,
+    };
+    const onWindow = {
+      id: 2,
+      kind: "bet" as const,
+      label: "Today",
+      status: "won" as const,
+      settledAtSec: firstDrawn,
+      betProfit: 41,
+      cumulativeValue: 400,
+      tone: "win" as const,
+    };
+    const projected = projectBetMarkers([leftoverAll, onWindow], layout!, stepped, {
+      ledgerPoints: historic,
+    });
+    expect(projected.map((p) => p.marker.id)).toEqual([2]);
+    expect(projected[0]?.y).toBeCloseTo(layout!.toY(441), 6);
+    expect(projected[0]?.y).not.toBeCloseTo(layout!.toY(0), 0);
+  });
 });
 
 describe("computePnlChartLayout", () => {
-  it("builds a layout on narrow windows even with fewer than 2 points in view", () => {
+  it("marks a sparse window as insufficient so markers are not painted on a blank chart", () => {
     const nowSec = 1_000;
     const livePoints = [
       { time: nowSec - 5_000, value: 0 },
@@ -594,17 +872,13 @@ describe("computePnlChartLayout", () => {
       nowSec,
     });
     expect(layout).not.toBeNull();
+    expect(layout?.hasSufficientData).toBe(false);
 
     const bets = [
       bet({ id: 1, status: "won", actualProfit: 5, settledAt: (nowSec - 200) * 1000 }),
       bet({ id: 2, status: "won", actualProfit: 5, settledAt: (nowSec - 100) * 1000 }),
     ];
-    const projected = projectBetMarkers(buildChartBetMarkers(bets), layout!);
-    // Bet 2 sits on bet 1's tip at nowSec-200 — inside the 300s window.
-    expect(projected.some((p) => p.marker.id === 2)).toBe(true);
-    expect(projected.find((p) => p.marker.id === 2)?.marker.settledAtSec).toBe(
-      nowSec - 200
-    );
+    expect(projectBetMarkers(buildChartBetMarkers(bets), layout!)).toHaveLength(0);
   });
 
   it("reuses fallbackRange (not the currentValue/referenceValue guess) when the window is sparse", () => {

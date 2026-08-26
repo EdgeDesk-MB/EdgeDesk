@@ -4,6 +4,7 @@ import {
   noteUserOriginatedSettlesFromRequest,
   noteUserOriginatedSettlesFromResponse,
 } from "@/lib/alerts/note-user-settle";
+import { parseLockedFeedBody } from "@/lib/api-feed-lock";
 import { cachedGet, clearApiGetCache } from "@/lib/api-get-cache";
 import { publicDemoApiGet } from "@/lib/demo/public-desk-api";
 import {
@@ -41,6 +42,8 @@ export async function api<T = unknown>(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    const locked = parseLockedFeedBody<T>(res.status, body);
+    if (locked) return locked;
     throw new Error(`${res.status}: ${body.slice(0, 200)}`);
   }
   // Mutations change server data - drop warm GETs so the next paint is fresh.

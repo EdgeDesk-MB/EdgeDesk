@@ -3,6 +3,7 @@ import {
   hasDeskActivity,
   needsSetup,
   shouldShowDashboardEmptyCta,
+  shouldShowEmptyDeskWelcome,
 } from "@/lib/dashboard-empty";
 import type { AppState } from "@/lib/services/state.types";
 
@@ -24,6 +25,7 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     boostsOpen: 0,
     casinoNeedsAction: 0,
     demoMode: false,
+    hostedDesk: false,
     livePositions: [],
     liveEventModels: [],
     series: [],
@@ -92,6 +94,37 @@ describe("shouldShowDashboardEmptyCta", () => {
     expect(shouldShowDashboardEmptyCta(baseState({ settledProfit: 12.5 }))).toBe(
       false
     );
+  });
+});
+
+describe("shouldShowEmptyDeskWelcome", () => {
+  it("is false until bank or bookie exists", () => {
+    expect(shouldShowEmptyDeskWelcome(baseState())).toBe(false);
+  });
+
+  it("is true after setup with no bets", () => {
+    expect(
+      shouldShowEmptyDeskWelcome(
+        baseState({
+          balances: {
+            total: 100,
+            bookies: 0,
+            exchanges: 0,
+            banks: 100,
+            pendingBankCredits: 0,
+            inBets: 0,
+            bankroll: 100,
+            accounts: [
+              {
+                id: 1,
+                name: "Bank",
+                type: "bank",
+              } as AppState["balances"]["accounts"][number],
+            ],
+          },
+        })
+      )
+    ).toBe(true);
   });
 });
 

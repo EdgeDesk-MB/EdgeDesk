@@ -3,6 +3,7 @@
  * First run downloads ~2MB of language data in the browser.
  */
 import type { BetOcrFields, ScreenshotSource } from "./types";
+import { extractSlipLegs } from "@/lib/bets/parse-bet-structure";
 import { parseBetScreenshot, summariseOcrFields } from "./parse-bet-screenshot";
 import { repairOcrRaceResultText } from "@/lib/racing/parse-race-result-text";
 
@@ -165,13 +166,29 @@ export async function ocrOfferScreenshots(
   return out;
 }
 
+function scoreBetSlipOcrText(text: string): number {
+  const legs = extractSlipLegs(text);
+  return (
+    legs.length * 10 +
+    legs.filter((l) => l.course && l.eventTime).length * 5 +
+    (/\bmultiples?\b/i.test(text) ? 2 : 0)
+  );
+}
+
 export async function ocrBetScreenshot(file: File, source: ScreenshotSource): Promise<OcrResult> {
-  const { text, confidence } = await extractTextFromImage(file);
-  const fields = parseBetScreenshot(text, source);
+  const sparse = await extractTextFromImage(file, "sparse");
+  let picked = sparse;
+  if (source === "bookie" && extractSlipLegs(sparse.text).length < 2) {
+    const auto = await extractTextFromImage(file, "auto");
+    if (scoreBetSlipOcrText(auto.text) > scoreBetSlipOcrText(sparse.text)) {
+      picked = auto;
+    }
+  }
+  const fields = parseBetScreenshot(picked.text, source);
   return {
-    text,
+    text: picked.text,
     fields,
     summary: summariseOcrFields(fields),
-    confidence,
+    confidence: picked.confidence,
   };
 }

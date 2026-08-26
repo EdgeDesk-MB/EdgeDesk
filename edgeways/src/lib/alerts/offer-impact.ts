@@ -45,6 +45,9 @@ export interface OfferImpactOffer {
   offerType?: string | null;
   /** JSON rules text - stake, free-bet amount, min runners, regions. */
   rules?: string | null;
+  /** Linked qualifying activity - meeting-start nudges stay quiet once placed. */
+  qualifyingOpenCount?: number;
+  qualifyingSettledCount?: number;
 }
 
 function asExpiryFields(offer: OfferImpactOffer) {

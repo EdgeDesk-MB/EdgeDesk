@@ -21,7 +21,8 @@ export type OfferNextActionKind =
   | "playbook_deposit"
   | "playbook_opt_in"
   | "playbook_clear_wagering"
-  | "playbook_await_award";
+  | "playbook_await_award"
+  | "desk_lay";
 
 /** The specific race and runner Offer Edge recommends for this action. */
 export interface OfferNextActionEdge {
@@ -133,7 +134,16 @@ export function deriveOfferNextAction(
       };
       if (step) {
         const soft = softKind(step.kind);
-        if (soft) {
+        const qualifyStarted =
+          profit.qualifyingOpenCount > 0 || profit.qualifyingSettledCount > 0;
+        const preQualifyGate =
+          soft === "playbook_deposit" || soft === "playbook_opt_in";
+        // Don't keep "opt in / deposit" as Do Next once the qualifier is logged.
+        // An in-play acca / builder / system still needs desk work — don't
+        // jump to "await award" over "Lay 2nd leg".
+        const deskBlocksAward =
+          soft === "playbook_await_award" && offer.deskProgress != null;
+        if (soft && !(qualifyStarted && preQualifyGate) && !deskBlocksAward) {
           return {
             ...base,
             kind: soft,
@@ -144,6 +154,18 @@ export function deriveOfferNextAction(
         }
       }
     }
+  }
+
+  const desk = offer.deskProgress;
+  if (desk?.needsAction) {
+    return {
+      ...base,
+      kind: "desk_lay",
+      priority: expiringSoon ? 4 : 6,
+      title: desk.actionTitle,
+      detail: desk.actionDetail,
+      href: desk.href,
+    };
   }
 
   if (offer.status === "planned" && offer.betCount === 0) {
@@ -162,6 +184,16 @@ export function deriveOfferNextAction(
   }
 
   if (profit.qualifyingOpenCount > 0 && profit.freeBetStage === "awaiting_result") {
+    if (desk) {
+      return {
+        ...base,
+        kind: "await_result",
+        priority: 50,
+        title: desk.actionTitle,
+        detail: desk.actionDetail,
+        href: desk.href,
+      };
+    }
     return {
       ...base,
       kind: "await_result",
@@ -173,6 +205,16 @@ export function deriveOfferNextAction(
   }
 
   if (profit.qualifyingOpenCount > 0 && profit.freeBetStage === "none") {
+    if (desk) {
+      return {
+        ...base,
+        kind: "await_result",
+        priority: 55,
+        title: desk.actionTitle,
+        detail: desk.actionDetail,
+        href: desk.href,
+      };
+    }
     return {
       ...base,
       kind: "await_result",
@@ -297,6 +339,8 @@ export function offerNextActionLabel(kind: OfferNextActionKind): string {
       return "Clear WR";
     case "playbook_await_award":
       return "Awaiting award";
+    case "desk_lay":
+      return "Lay";
     default:
       return kind;
   }

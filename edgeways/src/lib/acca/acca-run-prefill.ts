@@ -21,6 +21,11 @@ export interface AccaRunPrefill {
   /** qualify → qualifying back; convert → free bet back (uses free-bet lot). */
   purpose?: "qualify" | "convert";
   backBetType?: DeskBackBetType;
+  /**
+   * Named-course lock for qualify (not UK & IRE, not convert).
+   * New acca Event lists stay on this meeting.
+   */
+  scopeCourse?: string;
 }
 
 export function emptyLegCountFromPrefill(prefill?: AccaRunPrefill | null): number {

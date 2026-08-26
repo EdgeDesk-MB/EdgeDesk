@@ -2,8 +2,20 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TUNING,
   normalizeAgeConfirmedAt,
+  normalizeMobileDeckPin,
   normalizeTuning,
 } from "./settings-shared";
+
+describe("normalizeMobileDeckPin", () => {
+  it("keeps known pins and remaps a leftover chart pin to Summary", () => {
+    expect(normalizeMobileDeckPin("auto")).toBe("auto");
+    expect(normalizeMobileDeckPin("hero")).toBe("hero");
+    expect(normalizeMobileDeckPin("do-next")).toBe("do-next");
+    expect(normalizeMobileDeckPin("chart")).toBe("hero");
+    expect(normalizeMobileDeckPin("nope")).toBe("auto");
+    expect(normalizeMobileDeckPin(undefined)).toBe("auto");
+  });
+});
 
 describe("normalizeAgeConfirmedAt", () => {
   it("treats missing, empty and garbage as unconfirmed", () => {

@@ -6,6 +6,7 @@ import {
   formatGoalScorelineText,
   goalHistoryCopyFromEntry,
   inferGoalScoringSidesFromEntries,
+  inferTwoUpTriggerGoalIds,
   inferScoringSide,
   inferScoringSideFromScoreDelta,
   previousScorelineFromDedupe,
@@ -296,5 +297,79 @@ describe("inferGoalScoringSidesFromEntries", () => {
     expect(sides.get(1)).toBe("home");
     expect(sides.get(2)).toBe("away");
     expect(sides.get(3)).toBe("home");
+  });
+});
+
+describe("inferTwoUpTriggerGoalIds", () => {
+  const hull = { homeTeam: "Hull City", awayTeam: "Manchester United" };
+
+  it("marks the goal that first puts a side two ahead", () => {
+    const eventsById = new Map([[9, hull]]);
+    const triggers = inferTwoUpTriggerGoalIds(
+      [
+        {
+          id: 1,
+          kind: "goal",
+          eventId: 9,
+          minute: 12,
+          detail: "Hull City 1-0 Manchester United",
+        },
+        {
+          id: 2,
+          kind: "goal",
+          eventId: 9,
+          minute: 38,
+          detail: "Hull City 2-0 Manchester United",
+        },
+        {
+          id: 3,
+          kind: "goal",
+          eventId: 9,
+          minute: 70,
+          detail: "Hull City 3-0 Manchester United",
+        },
+      ],
+      eventsById
+    );
+    expect(triggers.get(1)).toBeUndefined();
+    expect(triggers.get(2)).toEqual({
+      side: "home",
+      eventId: 9,
+      team: "Hull City",
+    });
+    expect(triggers.get(3)).toBeUndefined();
+  });
+
+  it("can fire once per side in the same match", () => {
+    const eventsById = new Map([[9, hull]]);
+    const triggers = inferTwoUpTriggerGoalIds(
+      [
+        {
+          id: 1,
+          kind: "goal",
+          eventId: 9,
+          minute: 20,
+          detail: "Hull City 2-0 Manchester United",
+        },
+        {
+          id: 2,
+          kind: "goal",
+          eventId: 9,
+          minute: 55,
+          detail: "Hull City 2-2 Manchester United",
+        },
+        {
+          id: 3,
+          kind: "goal",
+          eventId: 9,
+          minute: 80,
+          detail: "Hull City 2-4 Manchester United",
+        },
+      ],
+      eventsById
+    );
+    expect(triggers.get(1)?.side).toBe("home");
+    expect(triggers.get(2)).toBeUndefined();
+    expect(triggers.get(3)?.side).toBe("away");
   });
 });

@@ -108,7 +108,7 @@ function SplitFlow({
 }
 
 /** Positive money green, shared by MoneyFlow signColor and static P&L labels. */
-export const moneyPositiveClass = "text-emerald-600 dark:text-emerald-400";
+export const moneyPositiveClass = "text-profit";
 
 interface MoneyFlowProps {
   value: number;

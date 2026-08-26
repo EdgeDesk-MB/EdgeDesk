@@ -61,7 +61,7 @@ describe("quietOfferPromptToasts", () => {
     vi.unstubAllGlobals();
   });
 
-  it("dismisses sticky tags and suppresses only the completed kind", () => {
+  it("dismisses sticky tags and suppresses the completed kind plus pre-qualify gates", () => {
     stubSessionStorage();
     vi.stubGlobal("Notification", undefined);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
@@ -69,8 +69,10 @@ describe("quietOfferPromptToasts", () => {
     const offerId = 5;
     const keys = offerExpiringAlertKeys(offerId);
     const placeKey = keys.find((k) => k.includes("place_qualifying"));
+    const optInKey = keys.find((k) => k.includes("playbook_opt_in"));
     const convertKey = keys.find((k) => k.includes("convert_free_bet"));
     expect(placeKey).toBeTruthy();
+    expect(optInKey).toBeTruthy();
     expect(convertKey).toBeTruthy();
 
     quietOfferPromptToasts(offerId, { completedKind: "place_qualifying" });
@@ -81,6 +83,7 @@ describe("quietOfferPromptToasts", () => {
 
     const seen = readSeenAlertKeys();
     expect(seen.has(placeKey!)).toBe(true);
+    expect(seen.has(optInKey!)).toBe(true);
     expect(seen.has(convertKey!)).toBe(false);
   });
 

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DialogSaveButton } from "@/components/ui/dialog-save-button";
 import {
   Dialog,
   DialogContent,
@@ -119,6 +120,7 @@ import {
   teamsMatch,
   type TrackedEventLike,
 } from "@/lib/events";
+import { findRewardEventMatch } from "@/lib/offers/reward-event-scope";
 import {
   bandNotTrackedFixtures,
   bandTrackedEvents,
@@ -143,6 +145,7 @@ import {
   offerMatchesBetContext,
   parseOfferRules,
 } from "@/lib/offers/racing-offer-rules";
+import { sportDisplayLabel } from "@/lib/sports";
 import { qualifyingOfferTriggerText } from "@/lib/offers/offer-track-bet";
 import {
   bookmakerFromOfferPrefs,
@@ -202,6 +205,10 @@ export interface AddBetPrefill {
   raceExternalId?: string;
   /** Calendar day for raceExternalId / course scope when outside today/tomorrow. */
   raceEventDate?: string;
+  /** Football / general: reward-event day so Convert can load that fixture list. */
+  eventDate?: string;
+  /** Named free-bet lock (e.g. Hull City vs Manchester United). Convert only. */
+  rewardEventLabel?: string;
   /**
    * Racing: seed Selection dropdown runners immediately (e.g. Racing Desk card)
    * before /api/racing/runners or knownFixtures land.
@@ -603,19 +610,22 @@ export function AddBetDialog({
     let cancelled = false;
     const today = localCalendarDate();
     const tomorrow = tomorrowCalendarDate();
-    const extraDate = prefill?.raceEventDate?.trim();
+    const extraDate =
+      prefill?.eventDate?.trim() || prefill?.raceEventDate?.trim();
 
     async function load() {
       try {
         if (sport === "football") {
-          const [a, b] = await Promise.all([
-            api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${today}`),
-            api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${tomorrow}`),
-          ]);
+          const dates = [...new Set([today, tomorrow, ...(extraDate ? [extraDate] : [])])];
+          const batches = await Promise.all(
+            dates.map((d) => api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${d}`))
+          );
           if (cancelled) return;
           const byId = new Map<string, Fixture>();
-          for (const f of [...(a.fixtures ?? []), ...(b.fixtures ?? [])]) {
-            if (f.externalId) byId.set(f.externalId, f);
+          for (const batch of batches) {
+            for (const f of batch.fixtures ?? []) {
+              if (f.externalId) byId.set(f.externalId, f);
+            }
           }
           setKnownFixtures(knownFromFootballFixtures([...byId.values()]));
           return;
@@ -641,7 +651,7 @@ export function AddBetDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, sport, prefill?.raceEventDate]);
+  }, [open, sport, prefill?.eventDate, prefill?.raceEventDate]);
 
   // Populate fields when editing an existing bet (once per open, when events are ready)
   useEffect(() => {
@@ -812,6 +822,7 @@ export function AddBetDialog({
       }
       if (prefill.homeTeam) setHomeTeam(prefill.homeTeam);
       if (prefill.awayTeam) setAwayTeam(prefill.awayTeam);
+      if (prefill.eventDate?.trim()) setEventDate(prefill.eventDate.trim());
       if (prefill.bookmaker) setBookmaker(prefill.bookmaker);
       if (prefill.eventId !== undefined) setEventId(String(prefill.eventId));
       const prefillStakingFreeBet =
@@ -960,17 +971,27 @@ export function AddBetDialog({
   /** Course/race-scoped campaign CTA: stay on that meeting, no freehand escape. */
   const courseScopeLocked =
     !editBet &&
+    !stakingFreeBet &&
     !!prefill?.scopeCourse?.trim() &&
     !isRegionalScope(prefill.scopeCourse);
   const courseScopeLabel = courseScopeLocked
     ? formatOfferScopeLabel(prefill?.scopeCourse)
+    : null;
+  /** Free-bet convert stays sport-locked even when course scope is lifted. */
+  const sportScopeLocked =
+    !editBet &&
+    (courseScopeLocked ||
+      (stakingFreeBet && Boolean(prefill?.sport && isKnownSport(prefill.sport))));
+  const rewardEventLock = prefill?.rewardEventLabel?.trim() || null;
+  const sportScopeLabel = sportScopeLocked
+    ? rewardEventLock || sportDisplayLabel(prefill?.sport ?? sport).toLowerCase()
     : null;
 
   const trackedEvents = useMemo(() => {
     let base = events.filter(
       (e) => (e.sport ?? "football") === sport && e.status !== "finished"
     );
-    if (sport === "horse_racing" && prefill?.scopeCourse) {
+    if (sport === "horse_racing" && !stakingFreeBet && prefill?.scopeCourse) {
       base = filterByOfferCourseScope(base, prefill.scopeCourse);
     }
     const linkedId =
@@ -985,7 +1006,7 @@ export function AddBetDialog({
       }
     }
     return sortTrackedEvents(base);
-  }, [events, sport, editBet?.eventId, eventId, prefill?.scopeCourse]);
+  }, [events, sport, editBet?.eventId, eventId, prefill?.scopeCourse, stakingFreeBet]);
 
   const trackedExternalIds = useMemo(() => {
     const ids = new Set<string>();
@@ -996,9 +1017,11 @@ export function AddBetDialog({
   }, [events]);
 
   const scopedKnownFixtures = useMemo(() => {
-    if (sport !== "horse_racing" || !prefill?.scopeCourse) return knownFixtures;
+    if (sport !== "horse_racing" || stakingFreeBet || !prefill?.scopeCourse) {
+      return knownFixtures;
+    }
     return filterByOfferCourseScope(knownFixtures, prefill.scopeCourse);
-  }, [sport, knownFixtures, prefill?.scopeCourse]);
+  }, [sport, knownFixtures, prefill?.scopeCourse, stakingFreeBet]);
 
   const linkedEventKeepIds = useMemo(() => {
     const linkedId =
@@ -1124,6 +1147,7 @@ export function AddBetDialog({
         raceExternalId,
         offTime,
         bookmaker: bookmaker || null,
+        purpose: stakingFreeBet ? "convert" : "qualify",
       })
     );
   }, [
@@ -1135,6 +1159,7 @@ export function AddBetDialog({
     eventDate,
     eventTime,
     bookmaker,
+    stakingFreeBet,
   ]);
 
   const reservedCashCredit = editBetReservedCredit(editBet, bookmaker, "cash");
@@ -1412,6 +1437,50 @@ export function AddBetDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, prefill?.raceExternalId, editBet, events, knownFixtures]);
 
+  // Convert: pick the named reward fixture once tracked events / cards load.
+  const rewardPrefillKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      rewardPrefillKeyRef.current = null;
+      return;
+    }
+    if (editBet) return;
+    const home = prefill?.homeTeam?.trim();
+    const away = prefill?.awayTeam?.trim();
+    if (!home || !away) return;
+    if (prefill?.betType !== "free_snr" && prefill?.betType !== "free_sr") return;
+    const key = `${home}|${away}|${prefill.eventDate ?? ""}`;
+    if (rewardPrefillKeyRef.current === key) return;
+
+    const sportId = isKnownSport(prefill.sport) ? prefill.sport : sport;
+    const tracked = findRewardEventMatch(events, home, away, sportId);
+    if (tracked) {
+      rewardPrefillKeyRef.current = key;
+      queueMicrotask(() => applyTrackedEvent(tracked as EventLite, sportId));
+      return;
+    }
+    const fixture = findRewardEventMatch(knownFixtures, home, away, sportId);
+    if (fixture) {
+      rewardPrefillKeyRef.current = key;
+      queueMicrotask(() => {
+        if (isKnownSport(sportId)) setSport(sportId);
+        applyPendingFixture(fixture);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    open,
+    prefill?.homeTeam,
+    prefill?.awayTeam,
+    prefill?.betType,
+    prefill?.eventDate,
+    prefill?.sport,
+    editBet,
+    events,
+    knownFixtures,
+    sport,
+  ]);
+
   // Fetch Racing Desk odds-order for the linked race (tracked or pending fixture)
   useEffect(() => {
     if (!open || sport !== "horse_racing") {
@@ -1472,7 +1541,7 @@ export function AddBetDialog({
   ]);
 
   function changeSport(s: string) {
-    if (editBet || courseScopeLocked) return;
+    if (editBet || sportScopeLocked) return;
     const next: SportValue = isKnownSport(s) ? s : "football";
     setSport(next);
     const first = (MARKETS[next] ?? MARKETS.other)[0].value;
@@ -2092,7 +2161,7 @@ export function AddBetDialog({
                 <Select
                   value={sport || undefined}
                   onValueChange={changeSport}
-                  disabled={!!editBet || courseScopeLocked}
+                  disabled={!!editBet || sportScopeLocked}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select sport" />
@@ -2105,9 +2174,10 @@ export function AddBetDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                {courseScopeLocked ? (
+                {sportScopeLocked && sportScopeLabel ? (
                   <span className="text-[11px] leading-tight text-muted-foreground">
-                    Locked to horse racing for this campaign.
+                    Locked to {sportScopeLabel} for this{" "}
+                    {rewardEventLock ? "free bet" : "campaign"}.
                   </span>
                 ) : null}
               </div>
@@ -2228,7 +2298,7 @@ export function AddBetDialog({
                 </span>
               )}
               {selectedEvent && effectiveEventStatus(selectedEvent) === "live" && (
-                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-500">
+                <span className="text-[11px] font-semibold text-profit">
                   {liveEventInlineLabel(selectedEvent)}
                 </span>
               )}
@@ -2293,7 +2363,7 @@ export function AddBetDialog({
               !stakingFreeBet && (
               <div className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2.5 dark:bg-input/25">
                 <div className="mb-1.5 flex items-center gap-1.5">
-                  <Gift className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <Gift className="size-3.5 shrink-0 text-profit" />
                   <Label className="text-xs font-semibold text-foreground">
                     Qualifying offer
                     {matchingOffers.length > 1 ? "s" : ""}
@@ -2877,7 +2947,7 @@ export function AddBetDialog({
               <Trash2 className="size-4" />
             </Button>
           )}
-          <Button
+          <DialogSaveButton
             onClick={save}
             disabled={
               !addBetMatchedSaveEnabled({
@@ -2896,7 +2966,7 @@ export function AddBetDialog({
             )}
           >
             {editBet ? "Save changes" : "Save bet"}
-          </Button>
+          </DialogSaveButton>
           </div>
         </div>
         <div

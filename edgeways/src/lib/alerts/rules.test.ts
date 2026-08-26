@@ -71,6 +71,7 @@ describe("offerExpiringAlertKeys", () => {
     const keys = offerExpiringAlertKeys(5, NOW);
     expect(keys).toContain("offer_expiring:offer-5-place_qualifying:2026-07-13");
     expect(keys).toContain("offer_expiring:offer-5-convert_free_bet:2026-07-13");
+    expect(keys).toContain("offer_expiring:offer-5-playbook_opt_in:2026-07-13");
     expect(offerExpiringAlertDedupePrefix(5)).toBe("offer_expiring:offer-5-");
   });
 });
@@ -239,16 +240,79 @@ describe("offer_expiring rule", () => {
     ).toHaveLength(0);
   });
 
-  it("skips await_result and fund_account items", () => {
+  it("skips await_result, fund_account, and playbook_await_award items", () => {
     const items = [
       doNextItem({ id: "d", kind: "await_result", remainingEv: 12, daysLeft: 0.04 }),
       doNextItem({ id: "e", kind: "fund_account", remainingEv: 12, daysLeft: 0.04 }),
+      doNextItem({
+        id: "offer-5-playbook_await_award",
+        kind: "playbook_await_award",
+        remainingEv: 12,
+        daysLeft: 0.04,
+      }),
     ];
     expect(
       evaluateAlertRules({
         ...base,
         offers: [offer({ expiresAt: NOW + 60 * MIN })],
         doNext: items,
+      })
+    ).toHaveLength(0);
+  });
+
+  it("stays quiet for completed campaigns and after the qualifier is logged", () => {
+    const firstOff = NOW + 15 * MIN;
+    const racingOffer = offer({
+      sport: "horse_racing",
+      eventDate: "2026-07-13",
+      scopeCourse: "York",
+      expiresAt: NOW + 12 * HOUR,
+    });
+    const races = [
+      {
+        eventId: 1,
+        course: "York",
+        offTime: firstOff,
+        resultLogged: false,
+        openExpected: null,
+        hasOpenBet: false,
+        fieldSize: 12,
+      },
+    ];
+    const qualifyingItem = doNextItem({
+      id: "offer-5-place_qualifying",
+      remainingEv: 8,
+      daysLeft: 0.3,
+      offerTitle: "Bet £10 get £10 free bet (2nd)",
+    });
+
+    expect(
+      evaluateAlertRules({
+        ...base,
+        now: firstOff - 13 * MIN,
+        prefs: { ...base.prefs, raceOffSoon: false },
+        offers: [{ ...racingOffer, status: "completed" }],
+        races,
+        doNext: [qualifyingItem],
+      })
+    ).toHaveLength(0);
+
+    expect(
+      evaluateAlertRules({
+        ...base,
+        now: firstOff - 13 * MIN,
+        prefs: { ...base.prefs, raceOffSoon: false },
+        offers: [{ ...racingOffer, qualifyingOpenCount: 1 }],
+        races,
+        doNext: [
+          doNextItem({
+            id: "offer-5-playbook_opt_in",
+            kind: "playbook_opt_in",
+            remainingEv: 8,
+            daysLeft: 0.3,
+            offerTitle: "Bet £10 get £10 free bet (2nd)",
+          }),
+        ],
       })
     ).toHaveLength(0);
   });

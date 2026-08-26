@@ -12,6 +12,7 @@ import {
   syncPlaybookFromOfferProfit,
 } from "@/lib/offers/offer-playbook";
 import {
+  betTypeUsesOfferVenueScope,
   isRegionalScope,
   parseOfferRules,
   placeRefundTriggerText,
@@ -23,11 +24,17 @@ import {
   type OfferImportantTerms,
 } from "@/lib/offers/offer-terms";
 import {
+  inferRewardEventSport,
+  parseRewardEventTeams,
+} from "@/lib/offers/reward-event-scope";
+import {
   bookmakerFromOfferPrefs,
   stakeFromOfferPrefs,
   type AppSettings,
 } from "@/lib/services/settings-shared";
+import { isKnownSport } from "@/lib/sports";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import { deskKindLabel } from "@/lib/offers/offer-desk-progress";
 
 function ctaLabelForAction(
   action: ReturnType<typeof deriveOfferNextAction>,
@@ -80,6 +87,8 @@ export type TrackBetDestination =
   | { kind: "choose"; options: PlacementOption[] }
   /** Soft playbook gates (deposit / opt-in / WR / await) — footer confirms the step. */
   | { kind: "playbook_mark_done"; stepId: string }
+  /** Existing Acca / Bet Builder / Systems run — open that desk, don't create another. */
+  | { kind: "open_desk"; href: "/acca" | "/bet-builder" | "/systems" }
   | { kind: "none" };
 
 export interface TrackBetAction {
@@ -121,6 +130,18 @@ function mergeImportantNotes(
   return bits.length > 0 ? bits.join(" · ") : null;
 }
 
+function convertSport(
+  purpose: "qualify" | "convert",
+  offerSport: string | null | undefined,
+  important: OfferImportantTerms
+): string | null {
+  if (purpose === "convert") {
+    const scoped = inferRewardEventSport(important.rewardEventLabel, offerSport);
+    if (scoped) return scoped;
+  }
+  return isKnownSport(offerSport) ? offerSport : (offerSport ?? null);
+}
+
 function buildAccaPrefill(input: {
   offer: OfferSummary;
   important: OfferImportantTerms;
@@ -134,7 +155,7 @@ function buildAccaPrefill(input: {
     ? important.rewardMinSelections ?? important.minSelections
     : important.minSelections;
   const eventLabel = important.rewardEventLabel?.trim();
-  return {
+  const prefill: AccaRunPrefill = {
     offerId: offer.id,
     label: isConvert
       ? eventLabel
@@ -143,7 +164,7 @@ function buildAccaPrefill(input: {
       : offer.title.trim() || `Qualify · ${bookmaker ?? "Acca"}`,
     stake,
     bookmaker,
-    sport: offer.sport ?? null,
+    sport: convertSport(purpose, offer.sport, important),
     minOdds: important.minOdds,
     minStake: isConvert ? null : important.minStake,
     maxStake: important.maxStake,
@@ -154,6 +175,21 @@ function buildAccaPrefill(input: {
     purpose,
     backBetType: isConvert ? "free_snr" : "qualifying",
   };
+
+  // Same as Add bet: course lock is qualify-only. Convert stays sport-wide.
+  if (
+    purpose === "qualify" &&
+    offer.sport === "horse_racing" &&
+    betTypeUsesOfferVenueScope("qualifying")
+  ) {
+    const course = offer.scopeCourse?.trim();
+    if (course && !isRegionalScope(course)) {
+      prefill.scopeCourse = course;
+      prefill.sport = "horse_racing";
+    }
+  }
+
+  return prefill;
 }
 
 function buildBetBuilderPrefill(input: {
@@ -178,7 +214,7 @@ function buildBetBuilderPrefill(input: {
       : offer.title.trim() || `Qualify · ${bookmaker ?? "Bet builder"}`,
     stake,
     bookmaker,
-    sport: offer.sport ?? null,
+    sport: convertSport(purpose, offer.sport, important),
     minOdds: important.minOdds,
     minStake: isConvert ? null : important.minStake,
     maxStake: important.maxStake,
@@ -190,6 +226,33 @@ function buildBetBuilderPrefill(input: {
   };
 }
 
+function applyRewardEventConvertScope(
+  prefill: AddBetPrefill,
+  important: OfferImportantTerms
+): void {
+  const eventLabel = important.rewardEventLabel?.trim();
+  if (!eventLabel) return;
+  const teams = parseRewardEventTeams(eventLabel);
+  const sport = inferRewardEventSport(eventLabel, prefill.sport);
+  if (sport) {
+    prefill.sport = sport;
+    if (sport === "football") prefill.market = "match_odds";
+  }
+  if (teams) {
+    prefill.homeTeam = teams.homeTeam;
+    prefill.awayTeam = teams.awayTeam;
+  }
+  const date = important.rewardEventDate?.trim();
+  if (date) {
+    prefill.eventDate = date;
+    prefill.raceEventDate = date;
+  }
+  prefill.rewardEventLabel = eventLabel;
+  // Convert must not carry a qualifying offer trigger. The lock lives on
+  // rewardEventLabel so Add bet can caption it without filling Offer trigger.
+  delete prefill.triggerText;
+}
+
 function buildAddBetPrefill(input: {
   offer: OfferSummary;
   important: OfferImportantTerms;
@@ -199,12 +262,13 @@ function buildAddBetPrefill(input: {
 }): AddBetPrefill {
   const { offer, important, betType, stake, bookmaker } = input;
   const eventLabel = important.rewardEventLabel?.trim();
+  const knownSport = isKnownSport(offer.sport) ? offer.sport : undefined;
   const prefill: AddBetPrefill = {
     offerId: offer.id,
     betType,
     backStake: stake,
     bookmaker,
-    sport: offer.sport ?? undefined,
+    sport: knownSport,
     labelSuggestion:
       betType === "free_snr"
         ? eventLabel
@@ -217,30 +281,33 @@ function buildAddBetPrefill(input: {
     const trigger = qualifyingOfferTriggerText(offer);
     if (trigger) prefill.triggerText = trigger;
   }
-  if (betType === "free_snr") {
-    const locked = rewardEventNote(important);
-    if (locked) {
-      prefill.triggerText = [prefill.triggerText, locked].filter(Boolean).join(" · ");
-    }
-  }
 
   if (offer.sport === "horse_racing") {
     prefill.sport = "horse_racing";
     prefill.market = "win";
-    const course = offer.scopeCourse?.trim();
-    if (course && !isRegionalScope(course)) {
-      prefill.scopeCourse = course;
-      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
+    // Awarded free bets are sport-locked only. Course / race / meeting-day
+    // stay on the qualifying leg so convert can use any horse race.
+    if (betTypeUsesOfferVenueScope(betType)) {
+      const course = offer.scopeCourse?.trim();
+      if (course && !isRegionalScope(course)) {
+        prefill.scopeCourse = course;
+        if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
+      }
+      if (offer.scopeRaceLabel?.trim()) {
+        prefill.labelSuggestion = course
+          ? `${course} · ${offer.scopeRaceLabel.trim()}`
+          : offer.scopeRaceLabel.trim();
+      }
+      if (offer.scopeRaceId?.trim()) {
+        prefill.raceExternalId = offer.scopeRaceId.trim();
+        if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
+      }
     }
-    if (offer.scopeRaceLabel?.trim()) {
-      prefill.labelSuggestion = course
-        ? `${course} · ${offer.scopeRaceLabel.trim()}`
-        : offer.scopeRaceLabel.trim();
-    }
-    if (offer.scopeRaceId?.trim()) {
-      prefill.raceExternalId = offer.scopeRaceId.trim();
-      if (offer.eventDate?.trim()) prefill.raceEventDate = offer.eventDate.trim();
-    }
+  }
+
+  // Named free-bet lock wins over campaign sport / racing defaults.
+  if (betType === "free_snr") {
+    applyRewardEventConvertScope(prefill, important);
   }
 
   return prefill;
@@ -412,6 +479,7 @@ export function resolveTrackBetDestination(
     openAccaRun: (prefill: AccaRunPrefill) => void;
     openBetBuilderRun: (prefill: BetBuilderRunPrefill) => void;
     openScopeChooser: (options: PlacementOption[]) => void;
+    openDesk?: (href: "/acca" | "/bet-builder" | "/systems") => void;
     beforeOpen?: () => void;
   }
 ): boolean {
@@ -419,6 +487,10 @@ export function resolveTrackBetDestination(
   const d = action.destination;
   if (d.kind === "none" || d.kind === "playbook_mark_done") return false;
   handlers.beforeOpen?.();
+  if (d.kind === "open_desk") {
+    handlers.openDesk?.(d.href);
+    return handlers.openDesk != null;
+  }
   if (d.kind === "choose") {
     handlers.openScopeChooser(d.options);
     return true;
@@ -491,8 +563,7 @@ export function deriveTrackBetAction(
   if (
     action?.kind === "playbook_deposit" ||
     action?.kind === "playbook_opt_in" ||
-    action?.kind === "playbook_clear_wagering" ||
-    action?.kind === "playbook_await_award"
+    action?.kind === "playbook_clear_wagering"
   ) {
     const rawPb = readPlaybookFromRulesJson(offer.rules);
     const step = rawPb
@@ -506,12 +577,38 @@ export function deriveTrackBetAction(
         ? "Mark deposit done"
         : action.kind === "playbook_opt_in"
           ? "Mark opt-in done"
-          : action.kind === "playbook_clear_wagering"
-            ? "Mark WR cleared"
-            : "Mark award received";
+          : "Mark WR cleared";
     return {
       enabled: true,
       label,
+      reason: null,
+      destination: { kind: "playbook_mark_done", stepId: step.id },
+      prefill: null,
+    };
+  }
+
+  const desk = offer.deskProgress;
+  if (desk) {
+    return {
+      enabled: true,
+      label: desk.needsAction ? desk.actionTitle : `Open ${deskKindLabel(desk.kind)}`,
+      reason: null,
+      destination: { kind: "open_desk", href: desk.href },
+      prefill: null,
+    };
+  }
+
+  if (action?.kind === "playbook_await_award") {
+    const rawPb = readPlaybookFromRulesJson(offer.rules);
+    const step = rawPb
+      ? currentPlaybookStep(syncPlaybookFromOfferProfit(rawPb, profit))
+      : null;
+    if (!step) {
+      return disabled(action.title, action.detail || action.title);
+    }
+    return {
+      enabled: true,
+      label: "Mark award received",
       reason: null,
       destination: { kind: "playbook_mark_done", stepId: step.id },
       prefill: null,
@@ -632,11 +729,17 @@ export function deriveFreeBetLotConvertAction(
     bookmaker,
     settings,
   }).map((opt) => {
+    const scopedLabel =
+      opt.markPrefill.rewardEventLabel?.trim() ||
+      important.rewardEventLabel?.trim();
+    const convertLabel = scopedLabel
+      ? (opt.markPrefill.labelSuggestion ?? `Convert FB · ${scopedLabel}`)
+      : `Convert FB · ${lot.accountName}`;
     const lotPrefill = {
       ...opt.markPrefill,
       bookmaker: lot.accountName,
       backStake: lot.remaining,
-      labelSuggestion: `Convert FB · ${lot.accountName}`,
+      labelSuggestion: convertLabel,
     };
     if (opt.destination.kind === "add_bet") {
       return {
@@ -658,7 +761,7 @@ export function deriveFreeBetLotConvertAction(
             ...opt.destination.prefill,
             bookmaker: lot.accountName,
             stake: lot.remaining,
-            label: `Convert FB · ${lot.accountName}`,
+            label: convertLabel,
           },
         },
       } satisfies PlacementOption;
@@ -673,7 +776,7 @@ export function deriveFreeBetLotConvertAction(
             ...opt.destination.prefill,
             bookmaker: lot.accountName,
             stake: lot.remaining,
-            label: `Convert FB · ${lot.accountName}`,
+            label: convertLabel,
           },
         },
       } satisfies PlacementOption;

@@ -57,6 +57,7 @@ function offer(
       ...profitPartial,
     },
     recurrence: rest.recurrence ?? null,
+    deskProgress: rest.deskProgress ?? null,
   };
 }
 
@@ -97,6 +98,40 @@ describe("buildOfferCalendarDays", () => {
     );
     const item = days.flatMap((d) => d.items).find((i) => i.offerId === 3);
     expect(item?.priority).toBe("critical");
+  });
+
+  it("puts an in-play acca lay on today as an action", () => {
+    const board = buildOfferCalendarBoard(
+      [
+        offer({
+          id: 42,
+          title: "Bet £10 get £10 free bet",
+          status: "active",
+          betCount: 3,
+          expiresAt: new Date(2026, 6, 20, 18, 0, 0).getTime(),
+          profit: { qualifyingOpenCount: 1, freeBetStage: "awaiting_result" },
+          deskProgress: {
+            kind: "acca",
+            href: "/acca",
+            runId: 7,
+            actionTitle: "Lay 2nd leg",
+            actionDetail: "Lay Dance In The Storm on Acca Desk.",
+            done: 1,
+            total: 2,
+            stageLabel: "Lay 2nd leg",
+            progressCaption: "1/2 laid",
+            nextCaption: "Dance In The Storm",
+            needsAction: true,
+          },
+        }),
+      ],
+      { now, horizonDays: 14 }
+    );
+    const today = board.find((c) => c.id === "today");
+    const item = today?.items.find((i) => i.offerId === 42);
+    expect(item?.kind).toBe("action");
+    expect(item?.actionKind).toBe("desk_lay");
+    expect(item?.label).toBe("Lay 2nd leg");
   });
 
   it("keeps far-out expiries at low priority even with high advantage signals", () => {

@@ -102,28 +102,79 @@ export function formatExchangeOdds(odds: number): string {
   return parseFloat(odds.toFixed(2)).toString();
 }
 
+const TYPING_INPUT_TYPES = new Set([
+  "insertText",
+  "insertFromPaste",
+  "insertFromDrop",
+  "insertFromYank",
+  "insertCompositionText",
+  "deleteContentBackward",
+  "deleteContentForward",
+  "deleteByCut",
+  "deleteByDrag",
+  "deleteContent",
+  "deleteWordBackward",
+  "deleteWordForward",
+]);
+
 /**
- * Native spinner sends previous ± HTML `step`. Map that onto the ladder.
- * Any other change (typing 6.97) is kept as entered.
+ * Native number-input chevrons do not follow the exchange ladder.
+ * They add the HTML `step`, or snap to `min + n × step` (5.00 → 5.01 when
+ * min is 1.01 and step is 0.1). `step="any"` instead adds 1.
+ * Keyboard / paste events keep the typed price.
+ */
+export function isNativeOddsStepperChange(
+  previous: number,
+  next: number,
+  inputType?: string
+): boolean {
+  if (!Number.isFinite(previous) || !Number.isFinite(next)) return false;
+  if (next === previous) return false;
+  if (inputType && TYPING_INPUT_TYPES.has(inputType)) return false;
+
+  const delta = Math.abs(next - previous);
+  const htmlStep = getExchangeOddsStep(previous);
+  const upStep = getExchangeOddsStep(previous, "up");
+  const downStep = getExchangeOddsStep(previous, "down");
+  const maxDelta = Math.max(1, htmlStep, upStep, downStep);
+  return delta <= maxDelta + 1e-6;
+}
+
+/**
+ * Native spinner / chevron: map onto the ladder.
+ * Typed prices (6.97, 5.01) stay as entered.
  */
 export function applyExchangeOddsInputChange(
   previous: number,
   next: number,
-  onChange: (v: number) => void
+  onChange: (v: number) => void,
+  inputType?: string
 ): void {
   if (!Number.isFinite(next)) {
     onChange(Number.NaN);
     return;
   }
-  if (Number.isFinite(previous)) {
-    const delta = next - previous;
-    const step = getExchangeOddsStep(previous);
-    if (Math.abs(Math.abs(delta) - step) < 1e-6) {
-      onChange(stepExchangeOdds(previous, delta > 0 ? "up" : "down"));
-      return;
-    }
+  if (isNativeOddsStepperChange(previous, next, inputType)) {
+    onChange(stepExchangeOdds(previous, next > previous ? "up" : "down"));
+    return;
   }
   onChange(next);
+}
+
+/** React `onChange` for lay-odds number inputs: pass `inputType` so typing stays. */
+export function handleExchangeOddsInputEvent(
+  previous: number,
+  event: { target: { value: string }; nativeEvent: { inputType?: string } | Event },
+  onChange: (v: number) => void
+): void {
+  const rawInputType =
+    "inputType" in event.nativeEvent ? event.nativeEvent.inputType : undefined;
+  applyExchangeOddsInputChange(
+    previous,
+    parseFloat(event.target.value),
+    onChange,
+    typeof rawInputType === "string" ? rawInputType : undefined
+  );
 }
 
 function stepOnTick(base: number, direction: ExchangeOddsDirection): number {
@@ -167,7 +218,11 @@ export function handleExchangeOddsKeyDown(
   }
 }
 
-/** Scroll-wheel handler - scroll down lowers odds, scroll up raises (exchange ladder). */
+/**
+ * Scroll-wheel handler - scroll down lowers odds, scroll up raises (exchange ladder).
+ * Bind with `useNonPassiveWheel`. React `onWheel` is passive, so preventDefault
+ * cannot stop the native number-input step.
+ */
 export function handleExchangeOddsWheel(
   e: { deltaY: number; preventDefault: () => void },
   value: number,
@@ -178,7 +233,10 @@ export function handleExchangeOddsWheel(
   onChange(stepExchangeOdds(value, e.deltaY > 0 ? "down" : "up"));
 }
 
-/** Arrow keys + scroll wheel for exchange lay odds inputs. Typed values stay. */
+/**
+ * Arrow keys + scroll wheel for exchange lay odds inputs. Typed values stay.
+ * Attach `onWheel` via `useNonPassiveWheel`, never React `onWheel`.
+ */
 export function exchangeOddsStepHandlers(
   value: number,
   onChange: (v: number) => void

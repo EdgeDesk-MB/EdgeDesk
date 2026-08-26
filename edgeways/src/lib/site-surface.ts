@@ -79,6 +79,8 @@ export function isWaitlistAllowedPath(pathname: string): boolean {
 /** Next metadata, PWA, and build assets — never redirect these. */
 export function isPublicAssetPath(pathname: string): boolean {
   if (pathname.startsWith("/_next/")) return true;
+  // PostHog reverse proxy (next.config.ts). Waitlist gate must not 307 this to /.
+  if (pathname === "/ingest" || pathname.startsWith("/ingest/")) return true;
   if (pathname === "/favicon.ico") return true;
   if (pathname === "/robots.txt" || pathname === "/sitemap.xml") return true;
   if (pathname === "/manifest.webmanifest") return true;
@@ -94,4 +96,23 @@ export function isPublicAssetPath(pathname: string): boolean {
   }
   if (pathname.startsWith("/brand/")) return true;
   return false;
+}
+
+/** Google keys the Search favicon by hostname. These must 200 on www. */
+export function isSearchFaviconPath(pathname: string): boolean {
+  if (pathname === "/favicon.ico") return true;
+  if (pathname === "/icon" || pathname.startsWith("/icon?")) return true;
+  if (pathname === "/apple-icon.png") return true;
+  return /^\/icon-\d+\.png$/.test(pathname);
+}
+
+/** HTML and APIs on www go to the apex. Icon files stay so Googlebot-Image can fetch them. */
+export function shouldRedirectWwwToApex(pathname: string): boolean {
+  return !isSearchFaviconPath(pathname);
+}
+
+export function requestHostname(request: Pick<Request, "headers">): string {
+  const host =
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  return host.split(",")[0]?.trim().split(":")[0] ?? "";
 }

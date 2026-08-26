@@ -80,6 +80,24 @@ describe("deriveOfferPlaybook", () => {
     );
     expect(qualify?.detail).not.toMatch(/min odds/i);
   });
+
+  it("names the convert step after a locked reward event", () => {
+    const pb = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      betStake: 10,
+      freeBetAmount: 10,
+      minOdds: 1.5,
+      bookmaker: "Dynobet",
+      rewardEventLabel: "Hull City vs Manchester United",
+      rewardEventDate: "2026-08-22",
+    });
+    const convert = pb.steps.find((s) => s.kind === "convert");
+    expect(convert?.title).toBe(
+      "Use £10 free bet on Hull City vs Manchester United (min odds 1.5)"
+    );
+    expect(convert?.detail).toMatch(/Hull City vs Manchester United/);
+    expect(convert?.detail).toMatch(/2026-08-22/);
+  });
 });
 
 describe("mergePlaybookProgress", () => {
@@ -276,5 +294,38 @@ describe("syncPlaybookFromOfferProfit", () => {
       profit({ qualifyingOpenCount: 1, freeBetStage: "awaiting_result" })
     );
     expect(classic.steps.find((s) => s.id === "qualify")?.status).toBe("done");
+  });
+
+  it("auto-completes pending deposit and opt-in once a qualifier is logged", () => {
+    const withDeposit = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      promoCode: "X",
+      minDeposit: 10,
+      depositRequired: true,
+      betStake: 10,
+      freeBetAmount: 10,
+    });
+    const withOptIn = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      optInRequired: true,
+      betStake: 10,
+      freeBetAmount: 10,
+      bookmaker: "Paddy Power",
+    });
+    expect(withDeposit.steps.some((s) => s.kind === "deposit")).toBe(true);
+    expect(withOptIn.steps.some((s) => s.kind === "opt_in")).toBe(true);
+
+    const depositSynced = syncPlaybookFromOfferProfit(
+      withDeposit,
+      profit({ qualifyingOpenCount: 1, freeBetStage: "awaiting_result" })
+    );
+    const optInSynced = syncPlaybookFromOfferProfit(
+      withOptIn,
+      profit({ qualifyingOpenCount: 1, freeBetStage: "awaiting_result" })
+    );
+    expect(depositSynced.steps.find((s) => s.kind === "deposit")?.status).toBe("done");
+    expect(optInSynced.steps.find((s) => s.kind === "opt_in")?.status).toBe("done");
+    expect(optInSynced.steps.find((s) => s.kind === "qualify")?.status).toBe("done");
+    expect(currentPlaybookStep(optInSynced)?.kind).toBe("await_award");
   });
 });

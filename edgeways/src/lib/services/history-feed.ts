@@ -12,7 +12,7 @@ import {
 import { getPromoAwardsByBetId } from "@/lib/services/balances";
 import {
   buildHistoryContext,
-  isDeskCampaignLayHistoryEntry,
+  isHiddenHistoryFeedEntry,
   sortHistoryEntries,
   type HistoryContext,
   type HistoryFilter,
@@ -113,7 +113,7 @@ export function getHistoryFeed(options?: {
   const context = buildHistoryContext(allEvents, allBets, promoAwards, offerTitles, raw);
 
   let entries = sortHistoryEntries(raw, context).filter(
-    (e) => !isDeskCampaignLayHistoryEntry(e, context)
+    (e) => !isHiddenHistoryFeedEntry(e, context)
   );
   if (options?.filter && options.filter !== "all") {
     entries = entries.filter((e) => matchesHistoryFilter(e, options.filter!, context));

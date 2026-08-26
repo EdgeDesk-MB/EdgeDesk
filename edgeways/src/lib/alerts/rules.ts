@@ -43,6 +43,23 @@ const OFFER_EV_FLOOR = 1;
 /** "Race off soon" window before the off. */
 const RACE_WINDOW_MS = 15 * 60_000;
 
+function isQuietOfferExpiringKind(kind: DoNextItem["kind"]): boolean {
+  return (
+    kind === "await_result" ||
+    kind === "fund_account" ||
+    kind === "playbook_await_award"
+  );
+}
+
+function offerQualifyingAlreadyPlaced(
+  offer: OfferImpactOffer | undefined
+): boolean {
+  return (
+    (offer?.qualifyingOpenCount ?? 0) > 0 ||
+    (offer?.qualifyingSettledCount ?? 0) > 0
+  );
+}
+
 export interface SettledBetNotice {
   betId: number;
   label: string;
@@ -330,12 +347,13 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
 
   if (prefs.offerExpiring) {
     for (const item of doNext) {
-      if (item.kind === "await_result" || item.kind === "fund_account") continue;
+      if (isQuietOfferExpiringKind(item.kind)) continue;
       if (item.remainingEv < OFFER_EV_FLOOR) continue;
       // Still require a same-day (or overdue) window so multi-day promos stay quiet.
       if (item.daysLeft == null || item.daysLeft > 1) continue;
 
       const offer = item.offerId != null ? offersById.get(item.offerId) : undefined;
+      if (offer?.status === "completed" || offer?.status === "expired") continue;
       const impact = offer
         ? resolveOfferImpact(offer, races, item.edge?.startTime ?? null, item.kind)
         : item.daysLeft < 0
@@ -350,6 +368,9 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
               qualifyingRaceCount: null,
             };
       if (impact == null) continue;
+      // Qualifier already logged: don't nag that the meeting is about to start.
+      // Convert / review-expiry still use the hard deadline (source "expiry").
+      if (offerQualifyingAlreadyPlaced(offer) && impact.source !== "expiry") continue;
 
       const hardExpiry =
         offer != null

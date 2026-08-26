@@ -1014,6 +1014,7 @@ export function buildPublicDemoState(
   const livePositions: LivePosition[] = [
     {
       betId: 2,
+      eventId: 1,
       label: "2UP Arsenal",
       eventName: "Arsenal vs Chelsea",
       eventSport: "football",
@@ -1028,6 +1029,7 @@ export function buildPublicDemoState(
     },
     {
       betId: 60,
+      eventId: 1,
       label: "BB · Arsenal win + BTTS + over 2.5",
       eventName: "Arsenal vs Chelsea",
       eventSport: "football",
@@ -1223,6 +1225,7 @@ export function buildPublicDemoState(
     boostsOpen: 1,
     casinoNeedsAction: 1,
     demoMode: true,
+    hostedDesk: false,
     livePositions,
     liveEventModels: [
       {
@@ -1244,6 +1247,7 @@ export function buildPublicDemoState(
         resultLogged: false,
         openExpected: 40,
         hasOpenBet: true,
+        externalId: "demo-newm-1500",
       },
     ],
     planFixtures: [

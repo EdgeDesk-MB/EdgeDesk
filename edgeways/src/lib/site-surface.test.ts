@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   getLandingVariant,
   isPublicAssetPath,
+  isSearchFaviconPath,
   isWaitlistAllowedPath,
   isWaitlistSurface,
   postSubscribeNextHref,
   postSubscribeNextLabel,
+  requestHostname,
+  shouldRedirectWwwToApex,
 } from "@/lib/site-surface";
 
 describe("site surface", () => {
@@ -38,6 +41,10 @@ describe("site surface", () => {
     expect(isWaitlistAllowedPath("/setup")).toBe(true);
     expect(isWaitlistAllowedPath("/api/demo/state")).toBe(true);
     expect(isWaitlistAllowedPath("/api/health")).toBe(true);
+    expect(isWaitlistAllowedPath("/admin")).toBe(true);
+    expect(isWaitlistAllowedPath("/admin/users")).toBe(true);
+    expect(isWaitlistAllowedPath("/api/admin/session")).toBe(true);
+    expect(isWaitlistAllowedPath("/api/maintenance")).toBe(true);
   });
 
   it("blocks desk routes", () => {
@@ -57,6 +64,34 @@ describe("site surface", () => {
     expect(isPublicAssetPath("/sw.js")).toBe(true);
     expect(isPublicAssetPath("/robots.txt")).toBe(true);
     expect(isPublicAssetPath("/sitemap.xml")).toBe(true);
+    expect(isPublicAssetPath("/ingest")).toBe(true);
+    expect(isPublicAssetPath("/ingest/e")).toBe(true);
+    expect(isPublicAssetPath("/ingest/decide")).toBe(true);
+    expect(isPublicAssetPath("/ingest/static/array.js")).toBe(true);
+    expect(isPublicAssetPath("/ingest-not-ours")).toBe(false);
+  });
+
+  it("keeps Search favicon files on www and 308s the rest", () => {
+    expect(isSearchFaviconPath("/favicon.ico")).toBe(true);
+    expect(isSearchFaviconPath("/icon-192.png")).toBe(true);
+    expect(isSearchFaviconPath("/icon-512.png")).toBe(true);
+    expect(isSearchFaviconPath("/icon")).toBe(true);
+    expect(isSearchFaviconPath("/apple-icon.png")).toBe(true);
+    expect(isSearchFaviconPath("/")).toBe(false);
+    expect(isSearchFaviconPath("/robots.txt")).toBe(false);
+    expect(shouldRedirectWwwToApex("/")).toBe(true);
+    expect(shouldRedirectWwwToApex("/terms")).toBe(true);
+    expect(shouldRedirectWwwToApex("/favicon.ico")).toBe(false);
+    expect(shouldRedirectWwwToApex("/icon-192.png")).toBe(false);
+    expect(shouldRedirectWwwToApex("/icon")).toBe(false);
+  });
+
+  it("reads the forwarded host first", () => {
+    const headers = new Headers({
+      host: "edgeways.app",
+      "x-forwarded-host": "www.edgeways.app",
+    });
+    expect(requestHostname({ headers })).toBe("www.edgeways.app");
   });
 });
 

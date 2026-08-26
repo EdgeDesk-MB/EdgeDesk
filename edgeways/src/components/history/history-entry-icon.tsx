@@ -3,6 +3,7 @@ import {
   isBoostHistoryEntry,
   isFreeBetPlacedHistoryEntry,
   isFreeBetWonHistoryEntry,
+  isLockInPlacedHistoryEntry,
   isRacingHistoryEntry,
   type HistoryContext,
 } from "@/lib/history-display";
@@ -15,6 +16,7 @@ import {
   Dices,
   Flag,
   Gift,
+  Lock,
   Play,
   PlusCircle,
   Zap,
@@ -43,13 +45,16 @@ export function HistoryEntryIcon({
     if (freeBetPlaced) {
       return <PlusCircle className={cn("size-3.5", freeBetIconClass, className)} />;
     }
+    if (isLockInPlacedHistoryEntry(entry, ctx)) {
+      return <Lock className={cn("size-3.5 text-primary-text", className)} />;
+    }
     return <PlusCircle className={cn("size-3.5 text-primary-text", className)} />;
   }
   if (entry.kind === "goal") {
     return (
       <FootballIcon
         size={14}
-        className={cn("text-emerald-600 dark:text-emerald-400", className)}
+        className={cn("text-profit", className)}
       />
     );
   }
@@ -68,7 +73,7 @@ export function HistoryEntryIcon({
     );
   }
   if (entry.kind === "two_up") {
-    return <Zap className={cn("size-3.5 text-amber-500", className)} />;
+    return <Zap className={cn("size-3.5 text-primary-text", className)} />;
   }
   if (entry.kind === "free_bet_promo") {
     return <Gift className={cn("size-3.5", freeBetIconClass, className)} />;
@@ -80,7 +85,7 @@ export function HistoryEntryIcon({
       <Banknote
         className={cn(
           "size-3.5",
-          isCredit && "text-emerald-600",
+          isCredit && "text-profit",
           isDebit && "text-negative",
           !isCredit && !isDebit && "text-muted-foreground",
           className
@@ -93,7 +98,7 @@ export function HistoryEntryIcon({
       <Dices
         className={cn(
           "size-3.5",
-          win && "text-emerald-600",
+          win && "text-profit",
           loss && "text-negative",
           !win && !loss && "text-muted-foreground",
           className
@@ -101,7 +106,7 @@ export function HistoryEntryIcon({
       />
     );
   }
-  if (win) return <CircleCheck className={cn("size-3.5 text-emerald-600", className)} />;
+  if (win) return <CircleCheck className={cn("size-3.5 text-profit", className)} />;
   if (loss || isFreeBetWonHistoryEntry(entry)) {
     return <CircleX className={cn("size-3.5 text-negative", className)} />;
   }

@@ -10,8 +10,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -20,39 +18,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MoneyFlow } from "@/components/money-flow";
-import { VenueBadge } from "@/components/venue-badge";
-import { useAddBet } from "@/components/add-bet-provider";
-import { useAccaRun } from "@/components/acca-run-provider";
-import { useBetBuilderRun } from "@/components/bet-builder-run-provider";
-import { useScopePlaceChooser } from "@/components/scope-place-chooser-provider";
-import { api, apiGet, useAppState } from "@/hooks/use-app-state";
-import {
-  deriveFreeBetLotConvertAction,
-  resolveTrackBetDestination,
-} from "@/lib/offers/offer-track-bet";
-import { Gift, Trash2 } from "lucide-react";
-import { EmptyState } from "@/components/help/empty-state";
-import { convertFreeBetButtonClass, dialogTitleIcon } from "@/lib/ui/surface-styles";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { useAppState } from "@/hooks/use-app-state";
+import { Gift } from "lucide-react";
+import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
-import { FreeBetExpiryControl } from "@/components/accounts/free-bet-expiry-control";
-import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
+import {
+  FreeBetsLots,
+  useConvertFreeBetLot,
+} from "@/components/accounts/free-bet-lots-panel";
+import {
+  MobileBalancesDialog,
+  type BalancesSheetTab,
+} from "@/components/accounts/mobile-balances-dialog";
 
-type Lot = {
-  id: number;
-  accountId: number;
-  accountName: string;
-  remaining: number;
-  originalAmount: number;
-  note: string | null;
-  createdAt: number;
-  betId: number | null;
-  expiresAt: number | null;
-};
+export type { BalancesSheetTab };
 
 type FreeBetsContextValue = {
   openFreeBets: () => void;
+  openBalances: (tab?: BalancesSheetTab) => void;
 };
 
 const FreeBetsContext = createContext<FreeBetsContextValue | null>(null);
@@ -65,8 +50,14 @@ export function useFreeBets() {
 
 export function FreeBetsProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [balancesOpen, setBalancesOpen] = useState(false);
+  const [balancesTab, setBalancesTab] = useState<BalancesSheetTab>("balances");
   const openFreeBets = useCallback(() => setOpen(true), []);
-  const value = useMemo(() => ({ openFreeBets }), [openFreeBets]);
+  const openBalances = useCallback((tab: BalancesSheetTab = "balances") => {
+    setBalancesTab(tab);
+    setBalancesOpen(true);
+  }, []);
+  const value = useMemo(() => ({ openFreeBets, openBalances }), [openFreeBets, openBalances]);
 
   return (
     <FreeBetsContext.Provider value={value}>
@@ -75,6 +66,12 @@ export function FreeBetsProvider({ children }: { children: ReactNode }) {
       </Suspense>
       {children}
       <FreeBetsConvertDialog open={open} onOpenChange={setOpen} />
+      <MobileBalancesDialog
+        open={balancesOpen}
+        onOpenChange={setBalancesOpen}
+        tab={balancesTab}
+        onTabChange={setBalancesTab}
+      />
     </FreeBetsContext.Provider>
   );
 }
@@ -95,57 +92,16 @@ function FreeBetsConvertDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { state } = useAppState(open ? 5_000 : 0);
-  const { openAddBet } = useAddBet();
-  const { openAccaRun } = useAccaRun();
-  const { openBetBuilderRun } = useBetBuilderRun();
-  const { openScopeChooser } = useScopePlaceChooser();
+  const convert = useConvertFreeBetLot(() => onOpenChange(false));
 
   const freeBetTotal = state?.balances?.accounts
     ?.filter((a) => a.type === "bookie")
     .reduce((s, a) => s + (a.freeBets ?? 0), 0);
 
-  function convert(lot: Lot) {
-    const offerId =
-      lot.betId != null
-        ? state?.bets?.find((b) => b.id === lot.betId)?.offerId ?? null
-        : null;
-    const offer =
-      offerId != null ? state?.offers?.find((o) => o.id === offerId) ?? null : null;
-    const action = deriveFreeBetLotConvertAction(lot, offer, state?.settings);
-    onOpenChange(false);
-    const opened = resolveTrackBetDestination(action, {
-      openAddBet,
-      openAccaRun,
-      openBetBuilderRun,
-      openScopeChooser,
-    });
-    if (!opened) return;
-    if (action.destination.kind === "acca_desk") {
-      toast.message("Acca Desk opened", {
-        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName} · reward Acca`,
-      });
-    } else if (action.destination.kind === "bet_builder_desk") {
-      toast.message("Bet Builder Desk opened", {
-        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
-      });
-    } else if (action.destination.kind === "choose") {
-      toast.message("Choose how to convert", {
-        description: `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
-      });
-    } else {
-      toast.message("Add bet opened", {
-        description:
-          offer == null
-            ? `£${lot.remaining.toFixed(2)} at ${lot.accountName} · no linked campaign`
-            : `£${lot.remaining.toFixed(2)} free bet at ${lot.accountName}`,
-      });
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md overflow-y-auto sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-md">
+        <DialogHeader className="mx-0 mt-0 shrink-0">
           <DialogTitle className="flex items-center gap-2.5">
             <Gift className={cn(dialogTitleIcon, "text-edge")} />
             Convert free bets
@@ -162,176 +118,14 @@ function FreeBetsConvertDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {open ? <FreeBetsLots freeBetTotal={freeBetTotal} onConvert={convert} /> : null}
+        <ScrollFadeEdges
+          className="min-h-0 flex-1"
+          fadeClassName="from-page dark:from-card"
+          scrollClassName="px-[var(--layout-card-x)] py-[var(--layout-card-x)]"
+        >
+          {open ? <FreeBetsLots freeBetTotal={freeBetTotal} onConvert={convert} /> : null}
+        </ScrollFadeEdges>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * Lots live in a child mounted per open, refetching as the polled free-bet
- * total moves; loading is the null state, so no synchronous effect setState.
- */
-function FreeBetsLots({
-  freeBetTotal,
-  onConvert,
-}: {
-  freeBetTotal: number | undefined;
-  onConvert: (lot: Lot) => void;
-}) {
-  const [lots, setLots] = useState<Lot[] | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    let live = true;
-    apiGet<{ lots: Lot[] }>("/api/accounts/free-bets")
-      .then((r) => {
-        if (live) {
-          setLots(
-            (r.lots ?? []).map((lot) => ({
-              ...lot,
-              expiresAt: lot.expiresAt ?? null,
-            }))
-          );
-        }
-      })
-      .catch(() => {
-        if (live) setLots([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [freeBetTotal, reloadKey]);
-
-  return (
-    <div className="flex min-w-0 flex-col gap-2">
-      {lots == null ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
-      ) : lots.length === 0 ? (
-        <EmptyState
-          compact
-          oneLine
-          icon={Gift}
-          title="No open free bets right now"
-          description="Promo free bets land here by bookie."
-        />
-      ) : (
-        lots.map((lot) => {
-          const note = freeBetLotNoteLabel(lot.note);
-          return (
-            <div
-              key={lot.id}
-              className="flex min-w-0 items-start justify-between gap-3 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2.5"
-            >
-              <span className="min-w-0 flex-1 overflow-hidden">
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <VenueBadge name={lot.accountName} />
-                  <MoneyFlow
-                    value={lot.remaining}
-                    className="font-semibold text-violet-700 dark:text-violet-300"
-                  />
-                </span>
-                <span className="mt-0.5 block text-xs leading-snug break-words text-muted-foreground">
-                  {note}
-                </span>
-                <span className="mt-0.5 block">
-                  <FreeBetExpiryControl
-                    lotId={lot.id}
-                    expiresAt={lot.expiresAt}
-                    accountName={lot.accountName}
-                    remaining={lot.remaining}
-                    onChanged={(expiresAt) =>
-                      setLots((prev) =>
-                        prev
-                          ? prev.map((row) =>
-                              row.id === lot.id ? { ...row, expiresAt } : row
-                            )
-                          : prev
-                      )
-                    }
-                  />
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="edge"
-                  className={convertFreeBetButtonClass}
-                  onClick={() => onConvert(lot)}
-                >
-                  Convert
-                </Button>
-                <RemoveFreeBetButton
-                  lot={lot}
-                  onRemoved={() => setReloadKey((k) => k + 1)}
-                />
-              </span>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-function RemoveFreeBetButton({
-  lot,
-  onRemoved,
-}: {
-  lot: Lot;
-  onRemoved: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function confirm() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await api("/api/accounts/free-bets", {
-        method: "DELETE",
-        json: { lotId: lot.id },
-      });
-      setOpen(false);
-      toast.success("Free bet removed");
-      onRemoved();
-    } catch (e) {
-      toast.error("Could not remove free bet", { description: String(e) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-8 text-muted-foreground hover:text-destructive"
-        aria-label={`Remove free bet for ${lot.accountName}`}
-        title="Remove free bet"
-        onClick={() => setOpen(true)}
-      >
-        <Trash2 className="size-3.5" />
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent mobile="center" className="max-w-sm" showCloseButton={!busy}>
-          <DialogHeader>
-            <DialogTitle>Remove free bet?</DialogTitle>
-            <DialogDescription>Remove this lot from {lot.accountName}.</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={() => void confirm()} disabled={busy}>
-              {busy ? "Removing…" : "Remove"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }

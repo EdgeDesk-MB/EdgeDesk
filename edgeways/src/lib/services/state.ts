@@ -22,7 +22,18 @@ import {
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { buildNeonDeskAppState } from "@/lib/db/neon-desk-state";
 import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
-import { isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
+import { isLockInLoggedBet } from "@/lib/bets/lock-in-bets";
+import { isBetBuilderDeskBack, isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
+import { isSystemsDeskBack } from "@/lib/bets/systems-desk-bets";
+import { buildDeskLivePositions } from "@/lib/pnl/desk-live-positions";
+import {
+  hasBetWinTrigger,
+  parseBetTriggerRule,
+  ruleNeedsTimeline,
+  toMatchResult,
+  toSettleable,
+  toTriggerContext,
+} from "@/lib/bets/settle-inputs";
 import {
   backfillMissingCasinoOfferBalances,
   ledgerFromSettledBet,
@@ -62,12 +73,12 @@ import {
 } from "@/lib/services/exchange";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
+import { sumOpenWorstCaseProfit } from "@/lib/pnl/open-bet-worst-case";
 import {
   freeBetAwardPhrase,
   freeBetEffectsForBet,
 } from "@/lib/offers/early-free-bet-award";
 import {
-  betWinRuleForBet,
   evaluateFreeBetAward,
   evaluateUnconditionalFreeBet,
   isPlaceFreeBetEffect,
@@ -78,11 +89,7 @@ import {
   racingMarketReadyToSettle,
   settleRacingBet,
   triggerIfEndedNow,
-  type DutchLegRecord,
   type GoalEvent,
-  type MatchResult,
-  type SettleableBet,
-  type TriggerContext,
   type TriggerRule,
 } from "@/lib/calc";
 import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
@@ -109,6 +116,7 @@ import {
   formatAccaPlacedTitle,
   formatAccaSettlementTitle,
   formatSettlementTitleWithFreeBet,
+  historyInPlayPlacementMinute,
 } from "@/lib/history-display";
 import {
   formatGoalHistoryCopy,
@@ -125,11 +133,13 @@ import {
 import {
   autoResultBetBuilderSelections,
   betBuilderLayDue,
+  listBetBuilderRuns,
   maybeBetBuilderLayDueAlerts,
   pendingBetBuilderRacingEventIds,
 } from "@/lib/services/bet-builder-desk";
 import {
   autoResultLinkedSystemLegs,
+  listSystemRuns,
   pendingSystemRacingEventIds,
 } from "@/lib/services/systems-desk";
 import { listInboxDedupes, recordAlerts, unreadCount } from "@/lib/services/alerts-inbox";
@@ -143,7 +153,6 @@ import {
 import { openBetCoversRacingEvent } from "@/lib/alerts/race-open-bet-coverage";
 import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
-import { parseEwMeta } from "@/lib/bets/ew-meta";
 import { backfillOffersFromBets, listOfferSummaries, syncOfferSeriesInstances, syncOfferStatuses } from "@/lib/services/offers";
 import { repairMisparsedPlaceFreeBetTriggers } from "@/lib/offers/repair-place-free-bet-triggers";
 import { repairInventedPlaceRulesOnUnconditionalOffers } from "@/lib/offers/repair-invented-place-rules";
@@ -168,76 +177,13 @@ import type {
   RacingAutopilotNotice,
 } from "@/lib/services/state.types";
 
-export function toSettleable(bet: BetRow): SettleableBet {
-  return {
-    market: bet.market as SettleableBet["market"],
-    selection: bet.selection,
-    betType: bet.betType as SettleableBet["betType"],
-    backStake: bet.backStake,
-    backOdds: bet.backOdds,
-    layStake: bet.layStake,
-    layOdds: bet.layOdds,
-    commission: bet.commission,
-    earlyPayout: !!bet.earlyPayout,
-    refundAmount: bet.refundAmount ?? undefined,
-    refundRetention: bet.refundRetention ?? undefined,
-    legs: bet.legs ? (JSON.parse(bet.legs) as DutchLegRecord[]) : undefined,
-    ewMeta: parseEwMeta(bet.notes) ?? undefined,
-  };
-}
+export {
+  toMatchResult,
+  toSettleable,
+  toTriggerContext,
+} from "@/lib/bets/settle-inputs";
 
-export function toMatchResult(event: EventRow): MatchResult {
-  // Bets settle at 90 minutes (FT). Use the stored 90-min score for AET/PEN matches.
-  const usesFtScore =
-    (event.matchEnding === "aet" || event.matchEnding === "pen") &&
-    event.ftHomeScore != null &&
-    event.ftAwayScore != null;
-  return {
-    homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
-    awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
-    homeLed2: !!event.homeLed2,
-    awayLed2: !!event.awayLed2,
-    inPlay: event.status === "live",
-  };
-}
-
-export function toTriggerContext(event: EventRow): TriggerContext {
-  const usesFtScore =
-    (event.matchEnding === "aet" || event.matchEnding === "pen") &&
-    event.ftHomeScore != null &&
-    event.ftAwayScore != null;
-  return {
-    homeTeam: event.homeTeam,
-    awayTeam: event.awayTeam,
-    homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
-    awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
-    finished: event.status === "finished",
-    goals: event.goals ? (JSON.parse(event.goals) as GoalEvent[]) : [],
-  };
-}
-
-/** Does this rule need the goal timeline (scorers/order), not just the score? */
-function ruleNeedsTimeline(rule: TriggerRule): boolean {
-  switch (rule.kind) {
-    case "first_goalscorer":
-    case "last_goalscorer":
-    case "player_scores":
-    case "team_scores_first":
-      return true;
-    case "and":
-      return rule.rules.some(ruleNeedsTimeline);
-    default:
-      return false;
-  }
-}
-
-function parseRule(bet: BetRow): TriggerRule | null {
-  return betWinRuleForBet(bet.triggerRule);
-}
-
-function hasBetWinTrigger(bet: BetRow): boolean {
-  return parseRule(bet) != null;
-}
+const parseRule = parseBetTriggerRule;
 
 /** Advance all running simulations to the current wall clock. */
 function tickSimulations(): void {
@@ -343,6 +289,7 @@ async function refreshApiEvents(): Promise<void> {
           homeScore: fixture.homeScore,
           awayScore: fixture.awayScore,
           minute: fixture.minute,
+          period: fixture.period ?? null,
           homeLed2,
           awayLed2,
           goals,
@@ -564,6 +511,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
           eventId: row.eventId ?? null,
           betId: row.betId ?? null,
           ...(row.createdAt != null ? { createdAt: row.createdAt } : {}),
+          ...(existing.minute == null && row.minute != null ? { minute: row.minute } : {}),
         })
         .where(eq(history.dedupe, row.dedupe))
         .run();
@@ -739,11 +687,16 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
       kind: "bet_placed",
       betId: bet.id,
       eventId: bet.eventId,
+      minute: linkedEvent
+        ? historyInPlayPlacementMinute(bet.createdAt, linkedEvent)
+        : null,
       title: accaBundle
         ? formatAccaPlacedTitle(bet.betType)
-        : bet.betType === "free_snr" || bet.betType === "free_sr"
-          ? "Free bet placed"
-          : "Bet placed",
+        : isLockInLoggedBet(bet)
+          ? "Lock-in placed"
+          : bet.betType === "free_snr" || bet.betType === "free_sr"
+            ? "Free bet placed"
+            : "Bet placed",
       detail: accaDetail ?? bet.label,
       createdAt: bet.createdAt,
     });
@@ -1003,6 +956,7 @@ export async function getAppState(): Promise<AppState> {
           b.offerId != null ? offersById.get(b.offerId) : undefined
         )
       ),
+      externalId: e.externalId ?? null,
     }));
 
   const planFixtures = allEvents
@@ -1025,8 +979,6 @@ export async function getAppState(): Promise<AppState> {
     .filter((f): f is NonNullable<typeof f> => f != null);
 
   const livePositions: LivePosition[] = [];
-  let provisionalTotal = 0;
-  const liveValuedBetIds = new Set<number>();
 
   for (const bet of allBets.filter((b) => b.status === "open")) {
     const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
@@ -1034,6 +986,8 @@ export async function getAppState(): Promise<AppState> {
     // Acca desk hedges/backs: campaign floor via sumAccaSquareProvisional —
     // never live-value the individual lay (would double-count vs cover ≈ £0).
     if (isAccaDeskLay(bet) || isAccaDeskBack(bet)) continue;
+    if (isBetBuilderDeskLay(bet) || isBetBuilderDeskBack(bet)) continue;
+    if (isSystemsDeskBack(bet)) continue;
 
     const rule = parseRule(bet);
     const snapshotProvisional = rule
@@ -1049,13 +1003,9 @@ export async function getAppState(): Promise<AppState> {
       valuationMode = valuation.mode;
     }
 
-    // Prefer live valuation; fall back to worst-case expected when live can't price it.
+    // Positions tab still shows live snapshot / model EV. Headline Prov does not.
     if (provisional == null) provisional = openBetExpectedProfit(bet);
 
-    if (provisional != null) {
-      provisionalTotal += provisional;
-      liveValuedBetIds.add(bet.id);
-    }
     const triggerNote = formatLivePositionTriggerNote(
       bet,
       rule,
@@ -1067,6 +1017,7 @@ export async function getAppState(): Promise<AppState> {
         : `${event.homeScore}-${event.awayScore}`;
     livePositions.push({
       betId: bet.id,
+      eventId: event.id,
       label: bet.label,
       eventName: event ? formatEventTitle(event) : "-",
       eventSport: event.sport ?? undefined,
@@ -1081,15 +1032,70 @@ export async function getAppState(): Promise<AppState> {
     });
   }
 
-  // Pre-result open bets: count worst-case guaranteed (e.g. free-bet conversion).
-  for (const bet of allBets.filter((b) => b.status === "open")) {
-    if (liveValuedBetIds.has(bet.id)) continue;
-    // Acca desk backs/lays: campaign provisional is summed below when square.
-    if (isAccaDeskLay(bet) || isAccaDeskBack(bet)) continue;
-    const expected = openBetExpectedProfit(bet);
-    if (expected != null) provisionalTotal += expected;
-  }
-  provisionalTotal += sumAccaSquareProvisional(accaBundles);
+  livePositions.push(
+    ...buildDeskLivePositions({
+      now,
+      eventsById: eventById,
+      acca: accaBundles.map(({ run, legs, backBetType }) => ({
+        id: run.id,
+        label: run.label,
+        status: run.status,
+        method: run.method,
+        offerId: run.offerId,
+        noLay: run.noLay,
+        stake: run.stake,
+        commission: run.commission,
+        boostPct: run.boostPct,
+        wholeLayStake: run.wholeLayStake,
+        wholeLayOdds: run.wholeLayOdds,
+        backBetId: run.backBetId,
+        backBetType,
+        legs: legs.map((leg) => ({
+          seq: leg.seq,
+          label: leg.label,
+          result: leg.result,
+          layStake: leg.layStake,
+          layOdds: leg.layOdds,
+          backOdds: leg.backOdds,
+          eventId: leg.eventId,
+          scheduledAt: leg.scheduledAt,
+        })),
+      })),
+      betBuilder: listBetBuilderRuns().map(({ run, selections }) => ({
+        id: run.id,
+        label: run.label,
+        status: run.status,
+        method: run.method,
+        offerId: run.offerId,
+        wholeLayStake: run.wholeLayStake,
+        backBetId: run.backBetId,
+        eventId: run.eventId,
+        scheduledAt: run.scheduledAt,
+        selectionCount: selections.length,
+      })),
+      systems: listSystemRuns().map(({ run, legs }) => ({
+        id: run.id,
+        label: run.label,
+        status: run.status,
+        offerId: run.offerId,
+        backBetId: run.backBetId,
+        legs: legs.map((leg) => ({
+          seq: leg.seq,
+          label: leg.label,
+          result: leg.result,
+          eventId: leg.eventId,
+          scheduledAt: leg.scheduledAt,
+        })),
+      })),
+    })
+  );
+
+  const accaDeskIds = allBets
+    .filter((b) => isAccaDeskLay(b) || isAccaDeskBack(b))
+    .map((b) => b.id);
+  let provisionalTotal =
+    sumOpenWorstCaseProfit(allBets, { excludeBetIds: accaDeskIds }) +
+    sumAccaSquareProvisional(accaBundles);
   provisionalTotal = Math.round(provisionalTotal * 100) / 100;
 
   const promoAwards = getPromoAwardsByBetId();
@@ -1178,6 +1184,7 @@ export async function getAppState(): Promise<AppState> {
       .all()
       .filter((o) => isCasinoInMainFeed(o)).length,
     demoMode: isDemoMode(),
+    hostedDesk: false,
     livePositions,
     liveEventModels,
     series,

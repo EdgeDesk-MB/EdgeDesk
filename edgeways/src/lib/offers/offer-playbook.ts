@@ -150,8 +150,12 @@ function qualifyDetail(_facts: OfferPlaybookFacts): string {
 
 function convertTitle(facts: OfferPlaybookFacts): string {
   const fb = money(facts.freeBetAmount);
+  const min =
+    facts.rewardEventLabel && facts.minOdds != null
+      ? ` (min odds ${facts.minOdds})`
+      : "";
   if (fb && facts.rewardEventLabel) {
-    return `Use £${fb} free bet on ${facts.rewardEventLabel}`;
+    return `Use £${fb} free bet on ${facts.rewardEventLabel}${min}`;
   }
   if (fb) return `Convert £${fb} free bet (SNR)`;
   return "Convert the free bet";
@@ -518,6 +522,10 @@ export function syncPlaybookFromOfferProfit(
 
   const steps = playbook.steps.map((step) => {
     switch (step.kind) {
+      case "deposit":
+      case "opt_in":
+        // A linked qualifier is proof they funded the bookie and opted in.
+        return qualStarted ? setStepDone(step, now, "auto") : step;
       case "qualify":
         return qualStarted ? setStepDone(step, now, "auto") : step;
       case "await_award":

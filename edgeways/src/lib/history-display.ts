@@ -1,5 +1,6 @@
 import type { AccaLegRow, AccaRunRow, BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
+import { isLockInLoggedBet } from "@/lib/bets/lock-in-bets";
 import { accaFoldName } from "@/lib/bets/acca-fold-name";
 import { isBetBuilderDeskLay } from "@/lib/bets/bet-builder-desk-bets";
 import { formatGbp } from "@/lib/format-money";
@@ -18,9 +19,11 @@ import {
   goalHistoryCopyFromEntry,
   goalHistoryScorelineParts,
   inferGoalScoringSidesFromEntries,
+  inferTwoUpTriggerGoalIds,
   parseGoalHistoryScoreline,
   type GoalScorelineParts,
   type HistoryTitlePart,
+  type HistoryTwoUpTrigger,
 } from "@/lib/history-goal-copy";
 import type { Side } from "@/lib/calc/trigger";
 import { racingResultCopyFromGoals, type RacingResultCopy } from "@/lib/history-racing-copy";
@@ -43,7 +46,7 @@ export const HISTORY_FILTERS: { id: HistoryFilter; label: string; description: s
   { id: "settlements", label: "Settlements", description: "Bet and casino settlements" },
   { id: "casino", label: "Casino", description: "Completed casino campaigns" },
   { id: "free_bets", label: "Free bets", description: "When a promo awards a free bet" },
-  { id: "match_events", label: "Match events", description: "Goals, kick-offs, 2UP and full time" },
+  { id: "match_events", label: "Match events", description: "Goals (incl. 2UP), kick-offs and full time" },
   { id: "racing", label: "Racing", description: "Race results and horse-racing bets" },
   { id: "boosts", label: "Boosts", description: "Price boost bets placed and settled" },
 ];
@@ -56,6 +59,8 @@ export interface HistoryContext {
   offerTitleById: Map<number, string>;
   /** Scoring side per goal row, inferred from successive scorelines in the feed. */
   goalScoringSideById: Map<number, Side>;
+  /** First goal that put a side two ahead, per match. */
+  twoUpTriggerByGoalId: Map<number, HistoryTwoUpTrigger>;
 }
 
 export function buildHistoryContext(
@@ -72,6 +77,7 @@ export function buildHistoryContext(
     promoByBetId,
     offerTitleById: new Map(offerTitles.map((o) => [o.id, o.title])),
     goalScoringSideById: inferGoalScoringSidesFromEntries(historyEntries, eventsById),
+    twoUpTriggerByGoalId: inferTwoUpTriggerGoalIds(historyEntries, eventsById),
   };
 }
 
@@ -139,9 +145,43 @@ function formatHistoryClock(when: Date): string {
   return formatClockTime(when);
 }
 
+/**
+ * Match minute for a football bet placed after kick-off.
+ * Pre-match and racing stay on the wall clock.
+ */
+export function historyInPlayPlacementMinute(
+  placedAt: number,
+  event: Pick<EventRow, "sport" | "startTime" | "status" | "minute">
+): number | null {
+  if (event.sport === "horse_racing") return null;
+  if (!(event.startTime > 0)) return null;
+  const elapsedMs = placedAt - event.startTime;
+  if (elapsedMs < 30_000) return null;
+  const ftMinute = Math.max(event.minute || 90, 90);
+  const ftAt = event.startTime + ftMinute * 60_000;
+  if (event.status === "finished" && placedAt > ftAt + 120_000) return null;
+  const minute = Math.floor(elapsedMs / 60_000);
+  if (minute < 1 || minute > 130) return null;
+  return minute;
+}
+
+/** Stored or derived minute for an in-play bet_placed row. */
+export function historyBetPlacedMatchMinute(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): number | null {
+  if (entry.kind !== "bet_placed") return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  if (!event || event.sport === "horse_racing") return null;
+  if (entry.minute != null && entry.minute > 0) return entry.minute;
+  const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
+  return historyInPlayPlacementMinute(bet?.createdAt ?? entry.createdAt, event);
+}
+
 /** True when the badge should show a live minute (e.g. 23') instead of a clock time. */
 export function historyUsesMinuteBadge(entry: HistoryRow, ctx: HistoryContext): boolean {
   const event = resolveHistoryEvent(entry, ctx);
+  if (historyBetPlacedMatchMinute(entry, ctx) != null) return true;
   // AET/extra-time full_time entries show the match minute ("120'") not the wall clock
   // so they read consistently alongside AET goals at the same minute.
   if (entry.kind === "full_time" && (entry.minute ?? 90) > 90 && event?.sport !== "horse_racing") {
@@ -172,7 +212,8 @@ export function formatHistoryTimeBadgeParts(
   const now = new Date();
 
   if (historyUsesMinuteBadge(entry, ctx)) {
-    return { primary: `${entry.minute}'` };
+    const minute = historyBetPlacedMatchMinute(entry, ctx) ?? entry.minute;
+    return { primary: `${minute}'` };
   }
 
   const time = formatHistoryClock(when);
@@ -260,6 +301,12 @@ export function isFreeBetPlacedHistoryEntry(entry: HistoryRow, ctx: HistoryConte
   return bet != null && isFreeBetBetType(bet.betType);
 }
 
+export function isLockInPlacedHistoryEntry(entry: HistoryRow, ctx: HistoryContext): boolean {
+  if (entry.kind !== "bet_placed" || entry.betId == null) return false;
+  const bet = ctx.betsById.get(entry.betId);
+  return bet != null && isLockInLoggedBet(bet);
+}
+
 /**
  * Acca / Bet Builder desk hedge lays — belong on the desk while the campaign
  * is live. History narrates the campaign back (+ match events), not per-leg lays.
@@ -277,6 +324,7 @@ export function isDeskCampaignLayHistoryEntry(
 
 /** Display title - upgrades legacy "Bet placed" rows when the bet is a free bet. */
 export function historyEntryTitle(entry: HistoryRow, ctx: HistoryContext): string {
+  if (isLockInPlacedHistoryEntry(entry, ctx)) return "Lock-in placed";
   if (isFreeBetPlacedHistoryEntry(entry, ctx)) return "Free bet placed";
   if (entry.kind === "goal") {
     return goalHistoryCopyFromEntry(entry, resolveHistoryEvent(entry, ctx)).title;
@@ -377,6 +425,72 @@ export function historyGoalEventLabel(entry: HistoryRow, ctx: HistoryContext): s
   return goalHistoryCopyFromEntry(entry, resolveHistoryEvent(entry, ctx)).title;
 }
 
+/** 2UP mark for the goal that first put a side two ahead. */
+export function historyGoalTwoUpTrigger(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): HistoryTwoUpTrigger | null {
+  if (entry.kind !== "goal") return null;
+  return ctx.twoUpTriggerByGoalId.get(entry.id) ?? null;
+}
+
+function twoUpHistorySide(
+  entry: HistoryRow,
+  event: EventRow | undefined
+): Side | null {
+  const fromDedupe = entry.dedupe.match(/^2up:\d+:(home|away)$/);
+  if (fromDedupe?.[1] === "home" || fromDedupe?.[1] === "away") {
+    return fromDedupe[1];
+  }
+  if (!event) return null;
+  const text = `${entry.title} ${entry.detail ?? ""}`;
+  const hasHome = Boolean(event.homeTeam && text.includes(event.homeTeam));
+  const hasAway = Boolean(event.awayTeam && text.includes(event.awayTeam));
+  if (hasHome && !hasAway) return "home";
+  if (hasAway && !hasHome) return "away";
+  return null;
+}
+
+function eventTwoUpTriggerSides(
+  ctx: HistoryContext,
+  eventId: number
+): Set<Side> {
+  const sides = new Set<Side>();
+  for (const trigger of ctx.twoUpTriggerByGoalId.values()) {
+    if (trigger.eventId === eventId) sides.add(trigger.side);
+  }
+  return sides;
+}
+
+/**
+ * Standalone two_up rows that already sit on a Goal! line as a 2UP pill.
+ * Keep the row when no matching goal exists (score tick without a goal entry).
+ */
+export function isAbsorbedTwoUpHistoryEntry(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): boolean {
+  if (entry.kind !== "two_up") return false;
+  const event = resolveHistoryEvent(entry, ctx);
+  const eventId = entry.eventId ?? event?.id;
+  if (eventId == null) return false;
+  const triggered = eventTwoUpTriggerSides(ctx, eventId);
+  if (triggered.size === 0) return false;
+  const side = twoUpHistorySide(entry, event);
+  if (side) return triggered.has(side);
+  return triggered.size === 1;
+}
+
+/** Rows the History feed should not render. */
+export function isHiddenHistoryFeedEntry(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): boolean {
+  return (
+    isDeskCampaignLayHistoryEntry(entry, ctx) || isAbsorbedTwoUpHistoryEntry(entry, ctx)
+  );
+}
+
 /** Bracketed scoreline segments for the goal subline. */
 export function historyGoalScorelineSegments(
   entry: HistoryRow,
@@ -468,7 +582,8 @@ function sportMomentLinkPhrase(
     if (entry.kind === "goal") {
       const scoreline = historyGoalScoreline(entry, ctx);
       const score = scoreline ? formatGoalScorelineText(scoreline) : null;
-      return [kind, fixture, score].filter(Boolean).join(", ");
+      const twoUp = historyGoalTwoUpTrigger(entry, ctx);
+      return [kind, twoUp ? "2UP triggered" : null, fixture, score].filter(Boolean).join(", ");
     }
     return [kind, fixture].filter(Boolean).join(", ");
   }
@@ -648,8 +763,9 @@ export function formatBetMeta(bet: BetRow): string[] {
   if (bet.layStake > 0) {
     lines.push(`Lay ${formatGbp(bet.layStake)} @ ${bet.layOdds.toFixed(2)}`);
   }
-  const type =
-    bet.betType === "free_snr"
+  const type = isLockInLoggedBet(bet)
+    ? "Lock-in"
+    : bet.betType === "free_snr"
       ? "Free bet (SNR)"
       : bet.betType === "free_sr"
         ? "Free bet (SR)"

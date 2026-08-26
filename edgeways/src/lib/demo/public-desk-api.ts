@@ -6,14 +6,22 @@ import { buildPublicDemoState } from "@/lib/demo/public-fixture";
 import { publicDemoOfferEdge, publicDemoRacingDesk } from "@/lib/demo/public-racing-desk";
 import {
   buildHistoryContext,
-  isDeskCampaignLayHistoryEntry,
+  isHiddenHistoryFeedEntry,
   matchesHistoryFilter,
   type HistoryFilter,
 } from "@/lib/history-display";
 import type { AccaRunView } from "@/lib/services/acca-desk";
 import type { BoostDiaryEntry } from "@/lib/services/boosts-client";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
-import type { AccaLegRow, AccaRunRow, BetBuilderRunRow, BetBuilderSelectionRow, SystemLegRow, SystemRunRow } from "@/lib/db/schema";
+import type {
+  AccaLegRow,
+  AccaRunRow,
+  AlertsInboxRow,
+  BetBuilderRunRow,
+  BetBuilderSelectionRow,
+  SystemLegRow,
+  SystemRunRow,
+} from "@/lib/db/schema";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -667,7 +675,7 @@ function publicDemoHistoryPayload(path: string, now: number) {
     offerTitles,
     state.history
   );
-  let entries = state.history.filter((e) => !isDeskCampaignLayHistoryEntry(e, context));
+  let entries = state.history.filter((e) => !isHiddenHistoryFeedEntry(e, context));
   if (filter !== "all") {
     entries = entries.filter((e) => matchesHistoryFilter(e, filter, context));
   }
@@ -688,8 +696,49 @@ function pathAndDate(path: string): { pathname: string; date: string } {
   return { pathname: pathname ?? path, date };
 }
 
+/** Canned Alerts page for the public demo. Never written to a live desk. */
+export function publicDemoAlertsInbox(now = Date.now()): AlertsInboxRow[] {
+  const raisedAt = t(0, 9, now);
+  return [
+    {
+      id: 1,
+      dedupe: "naked_exposure:40",
+      kind: "naked_exposure",
+      title: "⚠️ Lay missing · full stake exposed",
+      body: "Qualifying · Acca insurance, 3-fold (Paddy Power)",
+      href: "/tracker?highlight=40",
+      createdAt: raisedAt,
+      updatedAt: raisedAt,
+      readAt: null,
+    },
+    {
+      id: 2,
+      dedupe: "naked_exposure:80",
+      kind: "naked_exposure",
+      title: "⚠️ Lay missing · full stake exposed",
+      body: "Qualifying · Yankee on the card (Coral)",
+      href: "/tracker?highlight=80",
+      createdAt: raisedAt,
+      updatedAt: raisedAt,
+      readAt: null,
+    },
+    {
+      id: 3,
+      dedupe: "two_up_lock:1",
+      kind: "two_up_lock",
+      title: "🔒 2UP · hedge the lay",
+      body: "Arsenal vs Chelsea · early payout is in",
+      href: "/tracker?highlight=1",
+      createdAt: raisedAt,
+      updatedAt: raisedAt,
+      readAt: null,
+    },
+  ];
+}
+
 export function publicDemoApiGet(path: string, now = Date.now()): unknown | undefined {
   const { pathname, date } = pathAndDate(path);
+  if (pathname === "/api/alerts") return { alerts: publicDemoAlertsInbox(now) };
   if (pathname === "/api/racing/desk") return publicDemoRacingDesk(date);
   if (pathname === "/api/offers/edge") return publicDemoOfferEdge(date);
   if (pathname === "/api/history") return publicDemoHistoryPayload(path, now);
@@ -699,6 +748,22 @@ export function publicDemoApiGet(path: string, now = Date.now()): unknown | unde
   if (path === "/api/casino") return { offers: publicDemoCasinoOffers(now) };
   if (path === "/api/boosts") return { entries: publicDemoBoosts(now) };
   if (path === "/api/accounts/free-bets") return { lots: publicDemoFreeBetLots(now) };
+  if (pathname === "/api/exchange/football-odds") {
+    return {
+      status: "unmatched",
+      odds: {},
+      missing: [
+        "home back",
+        "draw back",
+        "away back",
+        "home lay",
+        "away lay",
+        "Over 2.5",
+        "BTTS Yes",
+      ],
+      error: "Betfair prices are not available on the public demo.",
+    };
+  }
   const accountMatch = path.match(/^\/api\/accounts\/(\d+)$/);
   if (accountMatch) {
     const id = Number(accountMatch[1]);
