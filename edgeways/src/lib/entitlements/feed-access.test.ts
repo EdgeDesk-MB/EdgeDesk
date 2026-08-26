@@ -7,10 +7,11 @@ const trial = { plan: "edge", billingStatus: "trialing" } as const;
 const canceled = { plan: "edge", billingStatus: "canceled" } as const;
 
 describe("shouldDenyFeed", () => {
-  it("fails open without a billing row", () => {
-    expect(shouldDenyFeed(null, "racing_live_feeds")).toBe(false);
-    expect(shouldDenyFeed(undefined, "exchange_lay")).toBe(false);
-    expect(shouldDenyFeed(null, "offer_edge")).toBe(false);
+  it("fails closed without a billing row", () => {
+    expect(shouldDenyFeed(null, "racing_live_feeds")).toBe(true);
+    expect(shouldDenyFeed(undefined, "exchange_lay")).toBe(true);
+    expect(shouldDenyFeed(null, "offer_edge")).toBe(true);
+    expect(shouldDenyFeed(null, "acca_desk")).toBe(true);
   });
 
   it("denies Core and Free on Edge-only feeds", () => {

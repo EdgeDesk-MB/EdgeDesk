@@ -21,8 +21,9 @@ export async function resolveEntitlementBilling(): Promise<EntitlementBilling | 
     }
     return { plan: user.plan, billingStatus: user.billingStatus };
   } catch (err) {
-    // Fail open: a Neon/Clerk blip must never lock a paying user out of the
-    // desk. Logged server-side; the gate falls back to preview behaviour.
+    // EDGE-89: fail closed. A Neon/Clerk blip now 403s gated feeds (locked
+    // payload) instead of spending operator keys for everyone. Logged loudly
+    // so an outage is visible rather than silently open.
     console.error("[entitlements] billing resolve failed:", err);
     return null;
   }
