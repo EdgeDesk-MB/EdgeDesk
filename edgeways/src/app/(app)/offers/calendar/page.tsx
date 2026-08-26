@@ -26,7 +26,7 @@ import {
   type OfferCategoryId,
 } from "@/lib/offers/offer-categories";
 import { FilterPill } from "@/components/ui/filter-pill";
-import { filterPillCountState } from "@/lib/ui/surface-styles";
+import { filterPillCountState, toolbarSelectTrigger } from "@/lib/ui/surface-styles";
 import { CalendarDays, Plus } from "lucide-react";
 
 export default function OfferCalendarPage() {
@@ -87,7 +87,7 @@ export default function OfferCalendarPage() {
               >
                 <SelectTrigger
                   size="sm"
-                  className="w-auto rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground hover:text-foreground data-[state=open]:bg-muted/60 data-[state=open]:text-foreground"
+                  className={toolbarSelectTrigger}
                 >
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>

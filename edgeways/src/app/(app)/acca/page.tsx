@@ -53,6 +53,7 @@ import {
 import {
   DEFAULT_LAY_LEAD_MINUTES,
   LAY_DUE_EXPIRY_MS,
+  accaAllWinEstimate,
   accaCampaignProfit,
   accaSquareProvisional,
   accaOutcomePercentages,
@@ -298,15 +299,6 @@ function RunCard({
     return map;
   }, [state?.events]);
   const prior = priorLayLiabilities(legs);
-  // Auditor F2: the all-win projection must carry EVERY placed liability -
-  // lays on pending legs and the whole-acca lay included (voids excluded).
-  const placedLiabilities =
-    legs
-      .filter((l) => l.layBetId != null && l.result !== "void" && l.result !== "lost")
-      .reduce((a, l) => a + (l.layStake ?? 0) * ((l.layOdds ?? 1) - 1), 0) +
-    (run.wholeLayBetId != null && run.wholeLayStake != null && run.wholeLayOdds != null
-      ? run.wholeLayStake * (run.wholeLayOdds - 1)
-      : 0);
   const rawCombinedOdds = combined(legs);
   const combinedOdds = applyAccaBoost(rawCombinedOdds, run.boostPct);
   const boosted = run.boostPct != null && run.boostPct > 0;
@@ -384,6 +376,17 @@ function RunCard({
     .filter(Boolean)
     .join(" · ");
   const foldName = accaFoldNameFromResults(legs);
+  const ladderLegs = legs.map((l) => ({
+    seq: l.seq,
+    label: deskLegTitleParts(
+      l,
+      l.eventId != null ? eventById.get(l.eventId) ?? null : null
+    ).primary,
+    backOdds: l.backOdds,
+    result: l.result,
+    layStake: l.layStake,
+    layOdds: l.layOdds,
+  }));
   const funding =
     active && !anyLost
       ? accaExchangeFundingModel({
@@ -391,21 +394,23 @@ function RunCard({
           stake: run.stake,
           commission: run.commission,
           boostPct: run.boostPct,
-          legs: legs.map((l) => ({
-            seq: l.seq,
-            label: deskLegTitleParts(
-              l,
-              l.eventId != null ? eventById.get(l.eventId) ?? null : null
-            ).primary,
-            backOdds: l.backOdds,
-            result: l.result,
-            layStake: l.layStake,
-            layOdds: l.layOdds,
-          })),
+          legs: ladderLegs,
           accounts: state?.balances?.accounts,
           exchangeId: defaultExchange?.id ?? null,
         })
       : null;
+  const allWinEst = accaAllWinEstimate(
+    {
+      stake: run.stake,
+      commission: run.commission,
+      method: run.method,
+      wholeLayStake: run.wholeLayStake,
+      wholeLayOdds: run.wholeLayOdds,
+      boostPct: run.boostPct,
+      backBetType,
+    },
+    ladderLegs
+  );
 
   // Mid-run: tint from square provisional when known; otherwise wait for
   // finished / busted Campaign P&L.
@@ -618,15 +623,23 @@ function RunCard({
                     : "Next leg loss: covered (≈ £0)"}
                 </span>
               ) : null}
-              <span>
-                If all win (est.):{" "}
-                <MoneyFlow
-                  value={run.stake * (combinedOdds - 1) - placedLiabilities}
-                  signColor
-                  signDisplay
-                  className="inline font-medium"
-                />
-              </span>
+              {allWinEst != null ? (
+                <span className="inline-flex flex-wrap items-center gap-x-1.5">
+                  If all win (est.):{" "}
+                  <MoneyFlow
+                    value={allWinEst.value}
+                    signColor
+                    signDisplay
+                    className="inline font-medium"
+                  />
+                  {allWinEst.usedProxy ? (
+                    <EvBasisBadge
+                      basis="estimated"
+                      description="Remaining lays sized at bookie prices until you log the exchange bet."
+                    />
+                  ) : null}
+                </span>
+              ) : null}
               {refundHit && run.status === "completed" ? (
                 <span className="font-medium text-success">
                   Exactly one leg lost - claim the £{run.refundAmount!.toFixed(2)} refund

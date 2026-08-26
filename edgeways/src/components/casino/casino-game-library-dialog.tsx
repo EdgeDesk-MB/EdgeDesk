@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Library, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -102,7 +103,11 @@ export function CasinoGameLibraryDialog({
             Save
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
+        <ScrollFadeEdges
+          className="min-h-0 flex-1 rounded-md border"
+          fadeClassName="from-page dark:from-card"
+          scrollClassName="app-scroll-nested"
+        >
           {games == null ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : games.length === 0 ? (
@@ -140,7 +145,7 @@ export function CasinoGameLibraryDialog({
                 ))}
             </ul>
           )}
-        </div>
+        </ScrollFadeEdges>
       </DialogContent>
     </Dialog>
   );

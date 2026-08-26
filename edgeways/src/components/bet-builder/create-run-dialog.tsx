@@ -29,6 +29,7 @@ import {
 } from "@/components/calc/bet-panels";
 import { DateTimePicker } from "@/components/date-time-picker";
 import { DeskLegEventFields } from "@/components/desk/desk-leg-event-fields";
+import { DeskRunDialogBody } from "@/components/desk/desk-run-dialog-body";
 import { DeskStakeSource } from "@/components/desk/desk-stake-source";
 import { WarningNotice } from "@/components/ui/warning-notice";
 import { nextDeskLegLabel } from "@/lib/desk/desk-leg-title";
@@ -61,7 +62,6 @@ import type {
   ExchangeRow,
 } from "@/lib/db/schema";
 import {
-  deskRunDialogBodyClass,
   deskRunDialogContentClass,
   deskRunLegsPanelClass,
   deskRunPanelClass,
@@ -382,7 +382,7 @@ export function BetBuilderCreateRunForm({
             : "Same-event selections, one kick-off."}
         </DialogDescription>
       </DialogHeader>
-      <div className={deskRunDialogBodyClass}>
+      <DeskRunDialogBody>
 
       {prefill && !isEdit ? <RequirementsStrip prefill={prefill} /> : null}
 
@@ -658,7 +658,7 @@ export function BetBuilderCreateRunForm({
           </Button>
         </div>
       </div>
-      </div>
+      </DeskRunDialogBody>
 
       <DialogFooter>
         <Button

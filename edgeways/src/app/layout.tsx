@@ -12,6 +12,7 @@ import { BrandAccentProvider } from "@/components/brand-accent-provider";
 import { UiFontProvider } from "@/components/ui-font-provider";
 import { HeaderPatternProvider } from "@/components/header-pattern-provider";
 import { BrandStorageMigration } from "@/components/brand-storage-migration";
+import { PostHogIdentify } from "@/components/analytics/posthog-identify";
 import { SyncAppUser } from "@/components/sync-app-user";
 import { BRAND_ACCENT_FOUC_SCRIPT } from "@/lib/brand-accent-fouc";
 import {
@@ -39,6 +40,7 @@ import { figtree, geistMono, notoSans } from "@/fonts";
 import {
   SHARE_LOCALE,
   SHARE_SITE_NAME,
+  canonicalUrl,
   marketingShareCopy,
   publicSiteUrl,
 } from "@/lib/marketing/share-metadata";
@@ -53,6 +55,10 @@ export const metadata: Metadata = {
     template: "%s · Edgeways",
   },
   description: rootShare.description,
+  // Apex only. www HTML 308s here; icon files stay on www for Googlebot-Image.
+  alternates: {
+    canonical: canonicalUrl("/"),
+  },
   // Outbound bookie/casino clicks must not send Edgeways as Referer.
   referrer: "no-referrer",
   // Google Search wants a stable square PNG, multiple of 48px. The 32px SVG
@@ -143,6 +149,7 @@ export default async function RootLayout({
         >
           <BrandStorageMigration />
           <SyncAppUser />
+          <PostHogIdentify />
           <ThemeProvider>
             <BrandAccentProvider>
               <UiFontProvider>

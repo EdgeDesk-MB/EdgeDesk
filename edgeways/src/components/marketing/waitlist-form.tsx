@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LEGAL_PATHS } from "@/lib/legal/public";
+import { captureWaitlistJoined } from "@/lib/analytics/waitlist";
 
 type FormStatus =
   | { kind: "idle" }
@@ -46,12 +47,16 @@ export function WaitlistForm({
         return;
       }
 
+      const already = body.status === "already_confirmed";
+      captureWaitlistJoined({
+        formId: id,
+        status: already ? "already_confirmed" : "joined",
+      });
       setStatus({
         kind: "success",
-        message:
-          body.status === "already_confirmed"
-            ? "You're already on the list. We'll be in touch."
-            : "Thanks! You'll hear from us soon :)",
+        message: already
+          ? "You're already on the list. We'll be in touch."
+          : "Thanks! You'll hear from us soon :)",
       });
       setEmail("");
     } catch {

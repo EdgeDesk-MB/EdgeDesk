@@ -342,7 +342,7 @@ export function OfferCampaignCard({
                           "inline font-medium tabular-nums",
                           isExpired
                             ? inactiveFigure
-                            : "text-emerald-600 dark:text-emerald-400"
+                            : "text-profit"
                         )}
                       />
                     </p>
@@ -361,7 +361,7 @@ export function OfferCampaignCard({
                         campaignCardPnl,
                         isExpired
                           ? inactiveFigure
-                          : "text-emerald-600 dark:text-emerald-400"
+                          : "text-profit"
                       )}
                     />
                   </>

@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingDocPage } from "@/components/marketing/marketing-doc-page";
 import { TRIAL_DAYS } from "@/lib/billing/public-offer";
+import { LEGAL_PATHS } from "@/lib/legal/public";
+import { canonicalUrl } from "@/lib/marketing/share-metadata";
 import { SUPPORT_EMAIL, mailtoHref } from "@/lib/marketing/site-contacts";
 
 export const metadata: Metadata = {
   title: "Refunds",
   description:
     "How Edgeways trials, cancellation, and refunds work. Edge has a 14-day trial. Core is billed from day one.",
+  alternates: { canonical: canonicalUrl(LEGAL_PATHS.refund) },
 };
 
 export default function RefundPage() {

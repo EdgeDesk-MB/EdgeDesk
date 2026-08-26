@@ -13,7 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { OddsmonkeyMark } from "@/components/import/oddsmonkey-mark";
 import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
+import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 import { api } from "@/hooks/use-app-state";
 import { formatEvGbp } from "@/lib/format-money";
 import {
@@ -148,7 +150,10 @@ export function PlatformImportDialog({
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import from Oddsmonkey</DialogTitle>
+            <DialogTitle className="flex items-center gap-2.5">
+              <OddsmonkeyMark className={dialogTitleIcon} />
+              Import from Oddsmonkey
+            </DialogTitle>
             <DialogDescription
               explainer={
                 <DialogExplainer title="Import from Oddsmonkey">

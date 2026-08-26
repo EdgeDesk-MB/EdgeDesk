@@ -32,6 +32,7 @@ function TooltipTrigger({
 
 function TooltipContent({
   className,
+  side = "top",
   sideOffset = 0,
   collisionPadding = 8,
   children,
@@ -41,6 +42,7 @@ function TooltipContent({
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
+        side={side}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(

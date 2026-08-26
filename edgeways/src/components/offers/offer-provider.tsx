@@ -91,7 +91,13 @@ export function OfferProvider({ children }: { children: React.ReactNode }) {
         open={viewOpen}
         onOpenChange={handleViewOpenChange}
         offer={viewOfferState}
-        nextActionLabel={viewAction ? offerNextActionLabel(viewAction.kind) : null}
+        nextActionLabel={
+          viewAction
+            ? viewAction.kind === "desk_lay"
+              ? viewAction.title
+              : offerNextActionLabel(viewAction.kind)
+            : null
+        }
         nextActionDetail={viewAction?.detail ?? null}
         onRefresh={handleRefresh}
         onEdit={handleViewEdit}

@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { PageShell } from "@/components/page-shell";
-import { LivePnlChart } from "@/components/dashboard/live-pnl-chart";
+import {
+  DEFAULT_CHART_WINDOW,
+  LivePnlChart,
+  PnlChartWindowPills,
+} from "@/components/dashboard/live-pnl-chart";
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
 import { DashboardDoNext } from "@/components/dashboard/dashboard-do-next";
@@ -15,16 +19,56 @@ import { useAppState } from "@/hooks/use-app-state";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { effectiveEventStatus } from "@/lib/events";
 import { listOfferNextActions } from "@/lib/offers/next-actions";
-import { shouldShowDashboardEmptyCta } from "@/lib/dashboard-empty";
+import {
+  shouldShowDashboardEmptyCta,
+  shouldShowEmptyDeskWelcome,
+} from "@/lib/dashboard-empty";
+import { EmptyState } from "@/components/help/empty-state";
 import {
   dashboardMainGrid,
   dashboardPage,
   dashboardPanelColumn,
 } from "@/lib/ui/dashboard-layout";
-import { DEFAULT_HOME_LAYOUT, applyDeckLayout } from "@/lib/ui/home-layout";
+import {
+  DEFAULT_HOME_LAYOUT,
+  applyDeckLayout,
+  isChartOnMobileSummary,
+} from "@/lib/ui/home-layout";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, SlidersHorizontal } from "lucide-react";
 import { canDesk } from "@/lib/entitlements/effective-plan";
+
+function MobileHomeSummary({
+  overview,
+  chartProps,
+  showChart,
+}: {
+  overview: ComponentProps<typeof DashboardOverviewBar>;
+  chartProps: ComponentProps<typeof LivePnlChart>;
+  showChart: boolean;
+}) {
+  const [windowSecs, setWindowSecs] = useState(DEFAULT_CHART_WINDOW);
+  return (
+    <DashboardOverviewBar
+      {...overview}
+      headerAction={
+        showChart ? (
+          <PnlChartWindowPills value={windowSecs} onChange={setWindowSecs} />
+        ) : undefined
+      }
+      chart={
+        showChart ? (
+          <LivePnlChart
+            {...chartProps}
+            embed
+            windowSecs={windowSecs}
+            onWindowChange={setWindowSecs}
+          />
+        ) : undefined
+      }
+    />
+  );
+}
 
 export default function DashboardPage() {
   const { state } = useAppState();
@@ -76,43 +120,53 @@ export default function DashboardPage() {
     ? state.planRaces.length + state.planFixtures.length + nextActions.length
     : 0;
 
-  const overviewBar = (
-    <DashboardOverviewBar
-      liveTotal={liveTotal}
-      settled={settled}
-      provisional={provisional}
-      openBets={openBets.length}
-      offers={offers}
-      bets={state.bets}
-      casinoSettlements={state.casinoSettlements}
-      pnlAdjustments={state.pnlAdjustments}
-    />
-  );
-
-  const pnlChart = (
-    <LivePnlChart
-      liveTotal={liveTotal}
-      historicSeries={state.series}
-      bets={state.bets}
-      adjustments={state.pnlAdjustments}
-      casinoSettlements={state.casinoSettlements}
-      liveInPlay={showLive}
-      hasLiveEvent={liveEvents.length > 0}
-      panel
-      className="min-h-0 flex-1"
-    />
-  );
-
   const homeLayout = state.settings.homeLayout ?? DEFAULT_HOME_LAYOUT;
   const desktopHidden = new Set<string>(homeLayout.desktopHidden);
+  const showMobileChart = showActivity && isChartOnMobileSummary(homeLayout);
 
-  // Data-driven conditionals first (no plan signals = no plan card), then the
-  // user's order and hidden set (E2).
+  const chartProps = {
+    liveTotal,
+    historicSeries: state.series,
+    bets: state.bets,
+    adjustments: state.pnlAdjustments,
+    casinoSettlements: state.casinoSettlements,
+    liveInPlay: showLive,
+    hasLiveEvent: liveEvents.length > 0,
+    panel: true as const,
+    className: "min-h-0 flex-1",
+  };
+
+  const pnlChart = <LivePnlChart {...chartProps} />;
+
+  const overviewProps = {
+    liveTotal,
+    settled,
+    provisional,
+    openBets: openBets.length,
+    offers,
+    bets: state.bets,
+    casinoSettlements: state.casinoSettlements,
+    pnlAdjustments: state.pnlAdjustments,
+    hasLiveEvent: liveEvents.length > 0,
+  };
+
+  const overviewDesktop = <DashboardOverviewBar {...overviewProps} />;
+  const overviewMobile = (
+    <MobileHomeSummary
+      overview={overviewProps}
+      chartProps={chartProps}
+      showChart={showMobileChart}
+    />
+  );
+
+  // Plan stays mounted so an empty day keeps the header and a plated empty.
+  // Then the user's order and hidden set (E2). Chart is not a standalone card.
   const deckCards = applyDeckLayout(
     [
-      { id: "hero", label: "Summary", node: overviewBar },
-      ...(planSignals > 0 ? [{ id: "plan", label: "Today's plan", node: <DailyPlan /> }] : []),
-      { id: "chart", label: "Chart", node: pnlChart },
+      { id: "hero", label: "Summary", node: overviewMobile },
+      ...(canDoNext
+        ? [{ id: "plan", label: "Today's plan", node: <DailyPlan keepMounted /> }]
+        : []),
       { id: "feed", label: "History feed", node: <DashboardFeedPanel state={state} /> },
       ...(canDoNext && nextActions.length > 0
         ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
@@ -129,7 +183,16 @@ export default function DashboardPage() {
     return (
       <PageShell>
         <NakedExposureBanner />
-        <EmptyDeskWelcome />
+        {shouldShowEmptyDeskWelcome(state) ? (
+          <EmptyDeskWelcome />
+        ) : (
+          <EmptyState
+            icon={SlidersHorizontal}
+            title="Set up the desk"
+            description="Add your bank and bookies first. Then you can import history or log a ticket."
+            action={{ label: "Set up the desk", href: "/setup" }}
+          />
+        )}
       </PageShell>
     );
   }
@@ -142,7 +205,7 @@ export default function DashboardPage() {
         {isMobile !== true ? (
           <>
             {!desktopHidden.has("hero") ? (
-              <div className="hidden sm:contents">{overviewBar}</div>
+              <div className="hidden sm:contents">{overviewDesktop}</div>
             ) : null}
             {canDoNext && !desktopHidden.has("do-next") ? (
               <DashboardDoNext className="hidden sm:block" />
@@ -151,7 +214,7 @@ export default function DashboardPage() {
         ) : null}
 
         <>
-            {isMobile === true ? (
+            {isMobile !== false ? (
               <MobileHomeDeck
                 cards={deckCards}
                 pin={state.settings.mobileDeckPin}

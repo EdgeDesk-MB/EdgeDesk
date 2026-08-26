@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyFlow } from "@/components/money-flow";
 import { OfferPnlSlice } from "@/components/offers/offer-pnl-slice";
@@ -133,7 +134,11 @@ export function DashboardPnlSummaries({
               </DialogDescription>
             </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-[var(--layout-card-x)] py-[var(--layout-card-x)]">
+          <ScrollFadeEdges
+            className="min-h-0 flex-1"
+            fadeClassName="from-page dark:from-card"
+            scrollClassName="px-[var(--layout-card-x)] py-[var(--layout-card-x)]"
+          >
             <Tabs
               value={activeTab}
               onValueChange={(v) => setTab(v as typeof tab)}
@@ -170,7 +175,7 @@ export function DashboardPnlSummaries({
                 <MonthlyPnlSection variant="plain" />
               </TabsContent>
             </Tabs>
-          </div>
+          </ScrollFadeEdges>
 
           <div className="shrink-0 border-t bg-selection-subtle/50 px-[var(--layout-card-x)] py-[var(--layout-card-x)]">
             <Button variant="outline" className="h-10 w-full" asChild>

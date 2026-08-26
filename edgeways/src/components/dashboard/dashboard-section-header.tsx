@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { ChevronRight, CircleHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { cardInsetX } from "@/lib/ui/layout-spacing";
+import { cardInsetX, homeDeckSectionHeader } from "@/lib/ui/layout-spacing";
 import {
   Tooltip,
   TooltipContent,
@@ -126,13 +126,16 @@ export function DashboardSectionHeader({
         pageAlign ? pageInsetX : cardInsetX,
         // Mobile deck / page scroll: keep the section title pinned while the body moves.
         "max-sm:sticky max-sm:top-0 max-sm:z-20 max-sm:bg-page",
+        // Same bar height as Do next (title + sort tabs). Centre title and actions.
+        homeDeckSectionHeader,
         className
       )}
     >
       <div
         className={cn(
-          "flex gap-2",
-          prominent ? "items-center" : "items-start"
+          "flex w-full min-w-0 gap-2",
+          prominent ? "items-center" : "items-start",
+          "max-sm:items-center"
         )}
       >
         <div className="min-w-0">

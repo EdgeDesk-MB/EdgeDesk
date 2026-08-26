@@ -8,3 +8,14 @@ export function bankrollAriaLabel(exchange: number, inBets: number, total: numbe
     ? `Bankroll: in-bets ${inBets.toFixed(2)}, total ${total.toFixed(2)}`
     : `Bankroll: exchange ${exchange.toFixed(2)}, total ${total.toFixed(2)}`;
 }
+
+/** Whole-tab control on mobile: one name for profit, free bets and bankroll. */
+export function balancesSheetAriaLabel(
+  profit: number,
+  freeBets: number,
+  exchange: number,
+  inBets: number,
+  total: number
+): string {
+  return `Open balances. Profit ${profit.toFixed(2)}, free bets ${freeBets.toFixed(2)}, ${bankrollAriaLabel(exchange, inBets, total)}`;
+}

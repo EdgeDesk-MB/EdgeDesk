@@ -16,12 +16,25 @@ export const HOME_WIDGET_LABELS: Record<HomeWidgetId, string> = {
   feed: "History feed",
 };
 
-/** Deck order matches the shipped C1 deck; desktop shows everything. */
+/**
+ * Deck order includes `chart` so Settings can show/hide it, but the phone
+ * does not render Chart as its own card — it sits on Summary. Reorder
+ * skips `chart`; a visible Chart cannot hide Summary.
+ */
 export const DEFAULT_HOME_LAYOUT: HomeLayoutSettings = {
   deckOrder: ["hero", "plan", "chart", "feed", "do-next"],
   deckHidden: [],
   desktopHidden: [],
 };
+
+/** Chart is not a standalone mobile card; treat a stored "chart" pin as Summary. */
+export function resolveMobileDeckCardId(id: string | null | undefined): string {
+  return id === "chart" ? "hero" : (id ?? "hero");
+}
+
+export function isChartOnMobileSummary(layout: HomeLayoutSettings): boolean {
+  return !layout.deckHidden.includes("chart");
+}
 
 export interface HomeLayoutSettings {
   /** Mobile deck card order (widget ids) */
@@ -68,6 +81,11 @@ export function normalizeHomeLayout(raw: unknown): HomeLayoutSettings {
     desktopHidden = desktopHidden.filter((id) => id !== "hero");
   }
 
+  // Chart lives on Summary on the phone; a visible chart cannot hide Summary.
+  if (!deckHidden.includes("chart") && deckHidden.includes("hero")) {
+    deckHidden = deckHidden.filter((id) => id !== "hero");
+  }
+
   return { deckOrder, deckHidden, desktopHidden };
 }
 
@@ -98,11 +116,36 @@ export function moveWidget(
   id: HomeWidgetId,
   direction: -1 | 1
 ): HomeWidgetId[] {
+  // Chart is not a swipe card — keep it where it sits and skip over it.
+  if (id === "chart") return order;
   const index = order.indexOf(id);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= order.length) return order;
+  if (index < 0) return order;
+  let target = index + direction;
+  while (target >= 0 && target < order.length && order[target] === "chart") {
+    target += direction;
+  }
+  if (target < 0 || target >= order.length) return order;
   const next = [...order];
   next[index] = next[target]!;
   next[target] = id;
+  return next;
+}
+
+/**
+ * Deck show/hide. Chart sits on Summary, so showing Chart unhides Summary
+ * and hiding Summary also hides Chart.
+ */
+export function toggleDeckHidden(
+  hidden: HomeWidgetId[],
+  id: HomeWidgetId,
+  visible: boolean
+): HomeWidgetId[] {
+  let next = visible ? hidden.filter((x) => x !== id) : [...new Set([...hidden, id])];
+  if (id === "chart" && visible) {
+    next = next.filter((x) => x !== "hero");
+  }
+  if (id === "hero" && !visible && !next.includes("chart")) {
+    next = [...next, "chart"];
+  }
   return next;
 }

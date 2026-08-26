@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ import { DeskPageHeader } from "@/components/layout/desk-page-header";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { useBookieAccounts } from "@/hooks/use-bookie-accounts";
 import { useExchanges } from "@/hooks/use-exchanges";
@@ -61,11 +62,15 @@ import {
   type EpThreshold,
 } from "@/lib/calc/ep/strategy";
 import {
-  applyExchangeOddsInputChange,
   exchangeOddsStepHandlers,
-  getExchangeOddsStep,
+  handleExchangeOddsInputEvent,
 } from "@/lib/calc/exchange-odds-step";
 import type { ExchangeRow } from "@/lib/db/schema";
+import { EP_DESK_PATH, parseEpDeskFixtureQuery } from "@/lib/calc/ep/fixture-query";
+import {
+  footballOddsToDeskPatch,
+  type FootballOddsResult,
+} from "@/lib/services/exchange/football-odds-map";
 import { dialogTitleIcon } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Flag, Flame, X } from "lucide-react";
@@ -203,7 +208,10 @@ function EpDeskContent() {
   const [playbookOpen, setPlaybookOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("offers");
   const [tracking, setTracking] = useState(false);
-  const fixtureApplied = useRef(false);
+  const fixtureHome = searchParams.get("home")?.trim() ?? "";
+  const fixtureAway = searchParams.get("away")?.trim() ?? "";
+  const fixtureStart = searchParams.get("start")?.trim() ?? "";
+  const fixtureTab = searchParams.get("tab");
 
   // Live tab state (not persisted)
   const [hg, setHg] = useState(0);
@@ -221,39 +229,84 @@ function EpDeskContent() {
     });
   }, []);
 
-  // Fixture browser → EP Desk: ?home=&away=&tab=dutch - reset odds so prior match doesn't stick
+  // Fixture browser → 2UP Desk: apply ?home=&away=&start=&tab=, then strip
+  // the query so refresh keeps the form instead of reloading the fixture.
   useEffect(() => {
-    if (!hydrated || fixtureApplied.current) return;
-    const home = searchParams.get("home")?.trim();
-    const away = searchParams.get("away")?.trim();
-    if (!home && !away) return;
-    fixtureApplied.current = true;
+    if (!hydrated) return;
+    const fixture = parseEpDeskFixtureQuery({
+      home: fixtureHome,
+      away: fixtureAway,
+      start: fixtureStart,
+      tab: fixtureTab,
+    });
+    if (!fixture) return;
+
     queueMicrotask(() => {
-    setS((prev) => ({
-      ...DEFAULTS,
-      // Keep wallet prefs / stake sizing from previous session
-      bkH2: prev.bkH2,
-      bkH1: prev.bkH1,
-      bkA2: prev.bkA2,
-      bkA1: prev.bkA1,
-      stakeMode: prev.stakeMode,
-      stakeAmt: prev.stakeAmt,
-      rounding: prev.rounding,
-      oComm: prev.oComm,
-      homeTeam: home || DEFAULTS.homeTeam,
-      awayTeam: away || DEFAULTS.awayTeam,
-    }));
-    const tab = searchParams.get("tab");
-    if (tab === "dutch" || tab === "offers" || tab === "lay" || tab === "live") {
-      setActiveTab(tab);
-    } else {
-      setActiveTab("dutch");
-    }
-    toast.message("Match loaded from fixtures", {
-      description: "Odds reset - paste exchange + EP prices for this match.",
+      setS((prev) => ({
+        ...DEFAULTS,
+        // Keep wallet prefs / stake sizing from previous session
+        bkH2: prev.bkH2,
+        bkH1: prev.bkH1,
+        bkA2: prev.bkA2,
+        bkA1: prev.bkA1,
+        stakeMode: prev.stakeMode,
+        stakeAmt: prev.stakeAmt,
+        rounding: prev.rounding,
+        oComm: prev.oComm,
+        homeTeam: fixture.home,
+        awayTeam: fixture.away,
+        oHomeWin: 0,
+        oDraw: 0,
+        oAwayWin: 0,
+        oLayH: 0,
+        oLayA: 0,
+        oOver: "",
+        oBtts: "",
+      }));
+      setActiveTab(fixture.tab);
     });
-    });
-  }, [hydrated, searchParams]);
+
+    let cancelled = false;
+    const toastId = toast.loading("Loading exchange prices…");
+    const q = new URLSearchParams({ home: fixture.home, away: fixture.away });
+    if (fixture.startTime != null) q.set("start", String(fixture.startTime));
+
+    void api<FootballOddsResult>(`/api/exchange/football-odds?${q.toString()}`)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.status === "live") {
+          setS((prev) => ({ ...prev, ...footballOddsToDeskPatch(result.odds) }));
+          toast.success("Exchange prices loaded", {
+            id: toastId,
+            description:
+              result.missing.length > 0
+                ? `Missing ${result.missing.join(", ")}. Paste those by hand.`
+                : result.eventName ?? "Exchange backs, lays, Over 2.5 and BTTS.",
+          });
+          return;
+        }
+        toast.message("No exchange prices for this match", {
+          id: toastId,
+          description: result.error ?? "Paste exchange + EP prices.",
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast.message("Could not load exchange prices", {
+          id: toastId,
+          description: "Paste exchange + EP prices for this match.",
+        });
+      })
+      .finally(() => {
+        if (cancelled) return;
+        router.replace(EP_DESK_PATH, { scroll: false });
+      });
+
+    return () => {
+      cancelled = true;
+      toast.dismiss(toastId);
+    };
+  }, [hydrated, fixtureHome, fixtureAway, fixtureStart, fixtureTab, router]);
 
   // Prefer available wallets for empty EP book fields once accounts load
   useEffect(() => {
@@ -908,15 +961,15 @@ function InputMatrix({
             <tbody className="[&_td]:py-1 [&_td]:pr-2">
               <tr>
                 <td className="text-[11px] uppercase tracking-wide text-muted-foreground">Exch back</td>
-                <td><Num value={s.oHomeWin} onChange={(v) => set("oHomeWin", v)} /></td>
-                <td><Num value={s.oDraw} onChange={(v) => set("oDraw", v)} /></td>
-                <td><Num value={s.oAwayWin} onChange={(v) => set("oAwayWin", v)} /></td>
+                <td><Num value={s.oHomeWin > 1 ? s.oHomeWin : NaN} onChange={(v) => set("oHomeWin", v)} /></td>
+                <td><Num value={s.oDraw > 1 ? s.oDraw : NaN} onChange={(v) => set("oDraw", v)} /></td>
+                <td><Num value={s.oAwayWin > 1 ? s.oAwayWin : NaN} onChange={(v) => set("oAwayWin", v)} /></td>
               </tr>
               <tr>
                 <td className="text-[11px] uppercase tracking-wide text-muted-foreground">Exch lay</td>
-                <td><Num value={s.oLayH} onChange={(v) => set("oLayH", v)} exchangeOddsStepping /></td>
+                <td><Num value={s.oLayH > 1 ? s.oLayH : NaN} onChange={(v) => set("oLayH", v)} exchangeOddsStepping /></td>
                 <td className="text-center text-muted-foreground">-</td>
-                <td><Num value={s.oLayA} onChange={(v) => set("oLayA", v)} exchangeOddsStepping /></td>
+                <td><Num value={s.oLayA > 1 ? s.oLayA : NaN} onChange={(v) => set("oLayA", v)} exchangeOddsStepping /></td>
               </tr>
               <tr>
                 <td className="text-[11px] uppercase tracking-wide text-muted-foreground">EP 2UP</td>
@@ -1004,20 +1057,21 @@ function Num({
   const exchangeStep = exchangeOddsStepping
     ? exchangeOddsStepHandlers(value, onChange)
     : null;
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(exchangeStep?.onWheel);
 
   return (
     <Input
+      ref={wheelRef}
       type="number"
       inputMode="decimal"
-      step={exchangeOddsStepping ? getExchangeOddsStep(value) : step}
+      step={exchangeOddsStepping ? "any" : step}
       value={Number.isFinite(value) ? value : ""}
       onChange={(e) =>
         exchangeOddsStepping
-          ? applyExchangeOddsInputChange(value, parseFloat(e.target.value), onChange)
+          ? handleExchangeOddsInputEvent(value, e, onChange)
           : onChange(parseFloat(e.target.value))
       }
       onKeyDown={exchangeStep?.onKeyDown}
-      onWheel={exchangeStep?.onWheel}
       className={cn("h-9 font-mono tabular-nums", wide ? "w-28" : "w-full")}
     />
   );
@@ -1685,7 +1739,7 @@ function LiveTab({
                 className={cn(
                   "rounded-full border px-3 py-1 font-mono text-xs transition-colors",
                   t.on
-                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                    ? "border-emerald-500 bg-emerald-500/15 text-profit"
                     : "text-muted-foreground hover:bg-muted",
                   t.locked && "cursor-not-allowed opacity-90"
                 )}

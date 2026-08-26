@@ -5,6 +5,22 @@ import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
 import { cn } from "@/lib/utils";
 
 const SCROLL_EPS = 2;
+/** Overhang past the clip so fractional zoom cannot leave a hairline. */
+const FADE_OVERHANG_PX = 2;
+
+const CHILD_SCROLLER_SELECTOR =
+  "[data-radix-select-viewport], [data-slot='command-list']";
+
+function resolveChildScroller(wrap: HTMLElement | null): HTMLElement | null {
+  if (!wrap) return null;
+  const marked = wrap.querySelector<HTMLElement>(CHILD_SCROLLER_SELECTOR);
+  if (marked) return marked;
+  // Radix Select Viewport also emits a <style> sibling — skip non-boxes.
+  for (const node of wrap.children) {
+    if (node instanceof HTMLElement && node.tagName !== "STYLE") return node;
+  }
+  return null;
+}
 
 /**
  * Wraps a scrolling container and fades its leading/trailing edge in and
@@ -23,6 +39,9 @@ const SCROLL_EPS = 2;
  * interacts (wheel / pointer / touch). That beats browser scroll restoration,
  * scroll anchoring when cards are prepended, and snap-mandatory bounce on
  * Home Do next refresh.
+ *
+ * `scrollAsChild` overlays the fades on an existing scroller (Radix Select
+ * viewport, cmdk list) instead of wrapping children in a new overflow box.
  */
 export function ScrollFadeEdges({
   children,
@@ -35,6 +54,7 @@ export function ScrollFadeEdges({
   springSnap = false,
   pinScrollStart = false,
   scrollStartKey,
+  scrollAsChild = false,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -50,21 +70,29 @@ export function ScrollFadeEdges({
   pinScrollStart?: boolean;
   /** Re-pin to start when this value changes (e.g. sort mode / leading card) */
   scrollStartKey?: string | number;
+  /** First child is the scroller; do not create a nested overflow box. */
+  scrollAsChild?: boolean;
 }) {
   const horizontal = orientation === "horizontal";
+  const wrapRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lockStartRef = useRef(pinScrollStart);
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
 
-  const canDrag = horizontal && dragToScroll;
+  const canDrag = !scrollAsChild && horizontal && dragToScroll;
   const drag = useDragToScroll(scrollRef, {
     springSnap: canDrag && springSnap,
     hoverArrowKeys: canDrag && springSnap,
   });
 
+  const getScroller = useCallback((): HTMLElement | null => {
+    if (scrollAsChild) return resolveChildScroller(wrapRef.current);
+    return scrollRef.current;
+  }, [scrollAsChild]);
+
   const update = useCallback(() => {
-    const el = scrollRef.current;
+    const el = getScroller();
     if (!el) return;
     if (horizontal) {
       const { scrollLeft, scrollWidth, clientWidth } = el;
@@ -77,10 +105,10 @@ export function ScrollFadeEdges({
       setShowStart(canScroll && scrollTop > SCROLL_EPS);
       setShowEnd(canScroll && scrollTop + clientHeight < scrollHeight - SCROLL_EPS);
     }
-  }, [horizontal]);
+  }, [getScroller, horizontal]);
 
   const pinToStart = useCallback(() => {
-    const el = scrollRef.current;
+    const el = getScroller();
     if (!el) return;
     // Mandatory snap can bounce away from 0 in the same frame we set it.
     const prevSnap = el.style.scrollSnapType;
@@ -88,7 +116,7 @@ export function ScrollFadeEdges({
     if (horizontal) el.scrollLeft = 0;
     else el.scrollTop = 0;
     requestAnimationFrame(() => {
-      const node = scrollRef.current;
+      const node = getScroller();
       if (!node) return;
       node.style.scrollSnapType = prevSnap;
       if (lockStartRef.current) {
@@ -98,7 +126,7 @@ export function ScrollFadeEdges({
       update();
     });
     update();
-  }, [horizontal, update]);
+  }, [getScroller, horizontal, update]);
 
   const releaseStartLock = useCallback(() => {
     lockStartRef.current = false;
@@ -115,7 +143,7 @@ export function ScrollFadeEdges({
   }, [pinScrollStart, pinToStart, scrollStartKey]);
 
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = getScroller();
     if (!el) return;
 
     const onScroll = () => {
@@ -143,6 +171,9 @@ export function ScrollFadeEdges({
     ro.observe(el);
     const content = el.firstElementChild;
     if (content) ro.observe(content);
+    if (scrollAsChild && wrapRef.current && wrapRef.current !== el) {
+      ro.observe(wrapRef.current);
+    }
 
     el.addEventListener("scroll", onScroll, { passive: true });
     el.addEventListener("wheel", releaseStartLock, { passive: true });
@@ -153,7 +184,7 @@ export function ScrollFadeEdges({
       el.removeEventListener("wheel", releaseStartLock);
       el.removeEventListener("touchstart", releaseStartLock);
     };
-  }, [update, children, horizontal, pinToStart, releaseStartLock]);
+  }, [getScroller, update, children, horizontal, pinToStart, releaseStartLock, scrollAsChild]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -164,41 +195,67 @@ export function ScrollFadeEdges({
   );
 
   const fadeBase = fadeClassName ?? "from-page";
+  const fadeLength = fadeSize + FADE_OVERHANG_PX;
+  // Solid for the first few px — gradient interpolation at 0% is slightly
+  // transparent and reads as a hairline on the clip edge.
+  const fadeStop = "from-[6px]";
 
   return (
-    <div className={cn("relative min-h-0 w-full min-w-0 flex-1 overflow-hidden", className)}>
-      <div
-        ref={scrollRef}
-        className={cn(
-          "box-border h-full min-h-0 w-full min-w-0",
-          horizontal ? "overflow-x-auto overflow-y-hidden" : "overflow-y-auto",
-          // Stop the browser shifting scrollLeft when cards are prepended
-          // (lots/edge arriving after first paint).
-          pinScrollStart && "[overflow-anchor:none]",
-          canDrag && "cursor-grab active:cursor-grabbing",
-          scrollClassName
-        )}
-        onPointerDown={canDrag || pinScrollStart ? onPointerDown : undefined}
-        onPointerMove={canDrag ? drag.onPointerMove : undefined}
-        onPointerUp={canDrag ? drag.onPointerUp : undefined}
-        onPointerEnter={canDrag ? drag.onPointerEnter : undefined}
-        onPointerLeave={canDrag ? drag.onPointerLeave : undefined}
-        onPointerCancel={canDrag ? drag.onPointerCancel : undefined}
-        onClickCapture={canDrag ? drag.onClickCapture : undefined}
-      >
-        {children}
-      </div>
+    <div
+      ref={wrapRef}
+      className={cn(
+        // Overflow stays on the scroller. Hidden here clips the overhang
+        // that covers subpixel seams at non-integer zoom.
+        "relative min-h-0 w-full min-w-0",
+        // Select/cmdk already own overflow — a flex parent would let
+        // `flex: 1` on the Viewport collapse or fight max-height inherit.
+        scrollAsChild ? "block" : "flex flex-1 flex-col",
+        className
+      )}
+    >
+      {scrollAsChild ? (
+        children
+      ) : (
+        <div
+          ref={scrollRef}
+          className={cn(
+            "box-border min-h-0 w-full min-w-0",
+            // Vertical: flex-1 fills a constrained parent (dialog max-h, desk
+            // column). `h-full` does not resolve when the wrapper is only
+            // `flex-1` / `max-h-*` (height: auto), so the list grew, the
+            // wrapper clipped, and nothing scrolled.
+            horizontal
+              ? "h-full overflow-x-auto overflow-y-hidden"
+              : "min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
+            // Stop the browser shifting scrollLeft when cards are prepended
+            // (lots/edge arriving after first paint).
+            pinScrollStart && "[overflow-anchor:none]",
+            canDrag && "cursor-grab active:cursor-grabbing",
+            scrollClassName
+          )}
+          onPointerDown={canDrag || pinScrollStart ? onPointerDown : undefined}
+          onPointerMove={canDrag ? drag.onPointerMove : undefined}
+          onPointerUp={canDrag ? drag.onPointerUp : undefined}
+          onPointerEnter={canDrag ? drag.onPointerEnter : undefined}
+          onPointerLeave={canDrag ? drag.onPointerLeave : undefined}
+          onPointerCancel={canDrag ? drag.onPointerCancel : undefined}
+          onClickCapture={canDrag ? drag.onClickCapture : undefined}
+        >
+          {children}
+        </div>
+      )}
       {showStart ? (
         <div
           aria-hidden
           className={cn(
             "pointer-events-none absolute z-10",
             horizontal
-              ? "inset-y-0 left-0 bg-gradient-to-r to-transparent"
-              : "inset-x-0 top-0 bg-gradient-to-b to-transparent",
+              ? "-left-[2px] inset-y-0 bg-gradient-to-r to-transparent"
+              : "-top-[2px] inset-x-0 bg-gradient-to-b to-transparent",
+            fadeStop,
             fadeBase
           )}
-          style={horizontal ? { width: fadeSize } : { height: fadeSize }}
+          style={horizontal ? { width: fadeLength } : { height: fadeLength }}
         />
       ) : null}
       {showEnd ? (
@@ -207,11 +264,12 @@ export function ScrollFadeEdges({
           className={cn(
             "pointer-events-none absolute z-10",
             horizontal
-              ? "inset-y-0 right-0 bg-gradient-to-l to-transparent"
-              : "inset-x-0 bottom-0 bg-gradient-to-t to-transparent",
+              ? "-right-[2px] inset-y-0 bg-gradient-to-l to-transparent"
+              : "-bottom-[2px] inset-x-0 bg-gradient-to-t to-transparent",
+            fadeStop,
             fadeBase
           )}
-          style={horizontal ? { width: fadeSize } : { height: fadeSize }}
+          style={horizontal ? { width: fadeLength } : { height: fadeLength }}
         />
       ) : null}
     </div>

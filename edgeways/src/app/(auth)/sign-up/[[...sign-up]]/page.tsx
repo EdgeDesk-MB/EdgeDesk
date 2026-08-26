@@ -7,13 +7,19 @@ import {
 export default async function SignUpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; interval?: string; from?: string }>;
+  searchParams: Promise<{
+    plan?: string;
+    interval?: string;
+    from?: string;
+    ref?: string;
+  }>;
 }) {
   const query = await searchParams;
   const after = signUpRedirectForPlan(
     query.plan,
     query.interval,
-    parseCheckoutFrom(query.from)
+    parseCheckoutFrom(query.from),
+    query.ref
   );
   return <SignUpForm afterUrl={after} />;
 }

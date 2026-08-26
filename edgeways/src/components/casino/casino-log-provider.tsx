@@ -270,16 +270,16 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
           if (!v) resetForm();
         }}
       >
-        <DialogContent className="flex max-h-[92vh] max-w-md flex-col overflow-hidden">
+        <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
           {createdOfferId == null ? (
             <>
-              <DialogHeader className="shrink-0">
+              <DialogHeader className="mx-0 mt-0 shrink-0">
                 <DialogTitle>Log a casino offer</DialogTitle>
                 <DialogDescription>
                   Name the campaign, then add its steps.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-x-clip overflow-y-auto px-6 py-4">
                 <InlinePasteStrip
                   text={pasteText}
                   onTextChange={handlePasteTextChange}
@@ -293,7 +293,7 @@ export function CasinoLogProvider({ children }: { children: React.ReactNode }) {
 Stake £10 get a £20 casino bonus
 35x wagering · Selected slots only · RTP 96.5%`}
                 />
-                <div className="flex flex-col gap-1.5">
+                <div className="flex min-w-0 flex-col gap-1.5">
                   <PasteFieldLabel provenance={pasteProvenance.casino} describedById="casino-venue-paste">
                     Casino
                   </PasteFieldLabel>
@@ -306,10 +306,10 @@ Stake £10 get a £20 casino bonus
                     label=""
                     placeholder="Select bookie"
                     kinds={["bookie"]}
-                    className={cn("w-full", pasteFieldClass(pasteProvenance.casino))}
+                    className={cn("w-full min-w-0", pasteFieldClass(pasteProvenance.casino))}
                   />
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex min-w-0 flex-col gap-1.5">
                   <PasteFieldLabel
                     htmlFor="casino-title"
                     provenance={pasteProvenance.title}
@@ -343,8 +343,8 @@ Stake £10 get a £20 casino bonus
                   aria-invalid={urlError ? true : undefined}
                   error={urlError}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
+                <div className="grid min-w-0 grid-cols-2 gap-3 max-sm:grid-cols-1">
+                  <div className="flex min-w-0 flex-col gap-1.5">
                     <Label htmlFor="casino-expires-date" className="text-xs text-muted-foreground">
                       Expires
                     </Label>
@@ -356,7 +356,7 @@ Stake £10 get a £20 casino bonus
                       shortcuts="ending"
                     />
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex min-w-0 flex-col gap-1.5">
                     <Label htmlFor="casino-expires-time" className="text-xs text-muted-foreground">
                       Time
                     </Label>
@@ -369,14 +369,14 @@ Stake £10 get a £20 casino bonus
                     />
                   </div>
                 </div>
-                <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
+                <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
                   <input
                     type="checkbox"
                     className="mt-0.5"
                     checked={repeatsEnabled}
                     onChange={(e) => setRepeatsEnabled(e.target.checked)}
                   />
-                  <span>
+                  <span className="min-w-0 text-pretty break-words">
                     <span className="font-medium text-foreground">Repeats</span>
                     <span className="mt-0.5 block text-muted-foreground">
                       Creates a new campaign each occurrence. Each gets its own ID so steps
@@ -392,7 +392,7 @@ Stake £10 get a £20 casino bonus
                   />
                 ) : null}
               </div>
-              <div className="flex shrink-0 justify-end gap-2 border-t pt-3">
+              <div className="flex shrink-0 justify-end gap-2 border-t px-6 py-4">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
@@ -403,7 +403,7 @@ Stake £10 get a £20 casino bonus
             </>
           ) : (
             <>
-              <DialogHeader>
+              <DialogHeader className="mx-0 mt-0 shrink-0">
                 <DialogTitle>
                   {onQualifyPhase
                     ? "Step 1 · Qualifying wager"
@@ -419,52 +419,54 @@ Stake £10 get a £20 casino bonus
                       : `Add a step so this campaign can show an EV.`}
                 </DialogDescription>
               </DialogHeader>
-              {onQualifyPhase ? (
-                <CasinoComponentForm
-                  key="qualify"
-                  casinoOfferId={createdOfferId}
-                  initialComponentType="qualifying_wager"
-                  sourceText={draft?.sourceText}
-                  initialValues={{
-                    amount: draft?.qualifyStake,
-                    rtp: draft?.rtp,
-                  }}
-                  submitLabel="Next step"
-                  onSaved={advanceFromQualify}
-                  onCancel={finish}
-                />
-              ) : (
-                <CasinoComponentForm
-                  key="reward"
-                  casinoOfferId={createdOfferId}
-                  initialComponentType={
-                    twoStep ? rewardStepType(draft) : "qualifying_wager"
-                  }
-                  sourceText={draft?.sourceText}
-                  initialGameName={carriedStep?.game}
-                  initialGameNames={carriedStep?.eligibleGames}
-                  initialValues={
-                    draft || carriedStep
-                      ? {
-                          amount: draft?.bonusAmount,
-                          // Only prefill wagering / contribution when OCR found them.
-                          wageringMultiplier: draft?.wageringMultiplier,
-                          contributionPct: draft?.contributionPct,
-                          // Prefer RTP chosen on the qualifying step, else OCR.
-                          rtp: carriedStep?.rtp ?? draft?.rtp,
-                          spins: draft?.spins,
-                          spinValue: draft?.spinValue,
-                          chipCount: draft?.chipCount,
-                          chipValue: draft?.chipValue,
-                          cashbackPct: draft?.cashbackPct,
-                        }
-                      : undefined
-                  }
-                  submitLabel={twoStep ? "Finish" : "Add step"}
-                  onSaved={finish}
-                  onCancel={finish}
-                />
-              )}
+              <div className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto px-6 py-4">
+                {onQualifyPhase ? (
+                  <CasinoComponentForm
+                    key="qualify"
+                    casinoOfferId={createdOfferId}
+                    initialComponentType="qualifying_wager"
+                    sourceText={draft?.sourceText}
+                    initialValues={{
+                      amount: draft?.qualifyStake,
+                      rtp: draft?.rtp,
+                    }}
+                    submitLabel="Next step"
+                    onSaved={advanceFromQualify}
+                    onCancel={finish}
+                  />
+                ) : (
+                  <CasinoComponentForm
+                    key="reward"
+                    casinoOfferId={createdOfferId}
+                    initialComponentType={
+                      twoStep ? rewardStepType(draft) : "qualifying_wager"
+                    }
+                    sourceText={draft?.sourceText}
+                    initialGameName={carriedStep?.game}
+                    initialGameNames={carriedStep?.eligibleGames}
+                    initialValues={
+                      draft || carriedStep
+                        ? {
+                            amount: draft?.bonusAmount,
+                            // Only prefill wagering / contribution when OCR found them.
+                            wageringMultiplier: draft?.wageringMultiplier,
+                            contributionPct: draft?.contributionPct,
+                            // Prefer RTP chosen on the qualifying step, else OCR.
+                            rtp: carriedStep?.rtp ?? draft?.rtp,
+                            spins: draft?.spins,
+                            spinValue: draft?.spinValue,
+                            chipCount: draft?.chipCount,
+                            chipValue: draft?.chipValue,
+                            cashbackPct: draft?.cashbackPct,
+                          }
+                        : undefined
+                    }
+                    submitLabel={twoStep ? "Finish" : "Add step"}
+                    onSaved={finish}
+                    onCancel={finish}
+                  />
+                )}
+              </div>
             </>
           )}
         </DialogContent>

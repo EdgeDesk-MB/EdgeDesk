@@ -13,13 +13,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppState } from "@/hooks/use-app-state";
+import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { bookiePanelTint } from "@/lib/brands/bookies";
 import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
 import type { ExchangeRow } from "@/lib/db/schema";
 import {
-  applyExchangeOddsInputChange,
   exchangeOddsStepHandlers,
-  getExchangeOddsStep,
+  handleExchangeOddsInputEvent,
 } from "@/lib/calc/exchange-odds-step";
 import {
   commitLayStake,
@@ -175,6 +175,7 @@ export function PanelInput({
     !disabled && exchangeOddsStepping
       ? exchangeOddsStepHandlers(value, onChange)
       : null;
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(exchangeStep?.onWheel);
 
   return (
     <label className="flex flex-col gap-1">
@@ -186,20 +187,20 @@ export function PanelInput({
           </span>
         )}
         <input
+          ref={wheelRef}
           type="number"
           inputMode="decimal"
-          step={exchangeOddsStepping ? getExchangeOddsStep(value) : step}
+          step={exchangeOddsStepping ? "any" : step}
           min={min}
           placeholder={placeholder}
           disabled={disabled}
           value={Number.isFinite(value) ? value : ""}
           onChange={(e) =>
             exchangeOddsStepping
-              ? applyExchangeOddsInputChange(value, parseFloat(e.target.value), onChange)
+              ? handleExchangeOddsInputEvent(value, e, onChange)
               : onChange(parseFloat(e.target.value))
           }
           onKeyDown={exchangeStep?.onKeyDown}
-          onWheel={exchangeStep?.onWheel}
           className={cn(
             "h-11 w-full rounded-md border-0 bg-[var(--pi)] px-3 text-lg font-bold tabular-nums text-black/85 outline-none ring-primary/40 placeholder:text-base placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40",
             PANEL_TINT_TRANSITION,
@@ -404,6 +405,7 @@ function LayStakeInput({
     setDirty(true);
     onChange(next);
   });
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(stakeStep.onWheel);
 
   // While unfocused the display derives straight from `value`, and onFocus
   // seeds `text` fresh - no sync effect needed.
@@ -427,6 +429,7 @@ function LayStakeInput({
 
   return (
     <input
+      ref={wheelRef}
       type="text"
       inputMode="decimal"
       aria-label={label}
@@ -443,7 +446,6 @@ function LayStakeInput({
         setDirty(false);
       }}
       onKeyDown={stakeStep.onKeyDown}
-      onWheel={stakeStep.onWheel}
       onChange={(e) => {
         const next = e.target.value;
         setText(next);

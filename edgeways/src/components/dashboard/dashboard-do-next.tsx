@@ -51,7 +51,7 @@ function DoNextEvCorner({ remainingEv, basis }: { remainingEv: number; basis: Ev
       aria-hidden={!show}
     >
       <EvBasisBadge basis={basis} className="mb-0.5 justify-end" />
-      <p className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+      <p className="text-base font-bold tabular-nums text-profit">
         {show ? formatEvGbp(remainingEv) : "£0.00"}
       </p>
     </div>

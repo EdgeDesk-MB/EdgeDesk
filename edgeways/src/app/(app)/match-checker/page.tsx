@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { NumField } from "@/components/calc/num-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -50,7 +51,7 @@ function verdictChip(verdict: MatchVerdict): { label: string; className: string 
     case "good":
       return {
         label: "Good match",
-        className: "bg-emerald-600/10 text-emerald-600 dark:text-emerald-400",
+        className: "bg-emerald-600/10 text-profit",
       };
     case "ok":
       return { label: "OK match", className: "bg-warning/10 text-warning" };
@@ -67,7 +68,7 @@ export default function MatchCheckerPage() {
   const [mode, setMode] = useState<BetMode>("qualifying");
   const [stake, setStake] = useState("50");
   const [backOdds, setBackOdds] = useState("");
-  const [layOdds, setLayOdds] = useState("");
+  const [layOdds, setLayOdds] = useState(Number.NaN);
   const [commissionPct, setCommissionPct] = useState<string | null>(null);
 
   const commission =
@@ -81,7 +82,7 @@ export default function MatchCheckerPage() {
         mode,
         backStake: parseFloat(stake) || 0,
         backOdds: parseFloat(backOdds) || 0,
-        layOdds: parseFloat(layOdds) || 0,
+        layOdds: Number.isFinite(layOdds) ? layOdds : 0,
         commission: Number.isFinite(commission) ? commission : 0.02,
       }),
     [mode, stake, backOdds, layOdds, commission]
@@ -159,18 +160,14 @@ export default function MatchCheckerPage() {
                   onChange={(e) => setBackOdds(e.target.value)}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="mc-lay">Lay odds</Label>
-                <Input
-                  id="mc-lay"
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  placeholder="e.g. 4.6"
-                  value={layOdds}
-                  onChange={(e) => setLayOdds(e.target.value)}
-                />
-              </div>
+              <NumField
+                label="Lay odds"
+                value={layOdds}
+                onChange={setLayOdds}
+                min={1.01}
+                placeholder="e.g. 4.6"
+                exchangeOddsStepping
+              />
             </div>
           </CardContent>
         </Card>
@@ -228,7 +225,7 @@ export default function MatchCheckerPage() {
                       mode,
                       backStake: parseFloat(stake) || undefined,
                       backOdds: parseFloat(backOdds) || undefined,
-                      layOdds: parseFloat(layOdds) || undefined,
+                      layOdds: Number.isFinite(layOdds) ? layOdds : undefined,
                       // The calculator's prefill contract is PERCENT (see
                       // racing-desk-view passing commissionPct), not fraction.
                       commission: commission * 100,

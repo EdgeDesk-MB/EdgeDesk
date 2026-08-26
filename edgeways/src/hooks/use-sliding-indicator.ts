@@ -42,12 +42,17 @@ export function useSlidingIndicator(
     }
     const rootRect = root.getBoundingClientRect();
     const activeRect = active.getBoundingClientRect();
+    const plateHost =
+      active.closest<HTMLElement>('[data-slot="tabs-trigger"]') ?? active;
     // Round — subpixel churn from font/layout was restarting CSS transitions.
+    // `left` is from the padding edge so it matches `position: absolute`.
     const next = {
-      left: Math.round(activeRect.left - rootRect.left + root.scrollLeft),
+      left: Math.round(
+        activeRect.left - rootRect.left - root.clientLeft + root.scrollLeft
+      ),
       width: Math.round(activeRect.width),
       ready: activeRect.width > 0,
-      plate: active.dataset.plate ?? null,
+      plate: plateHost.dataset.plate ?? null,
     };
     setBox((prev) =>
       prev.left === next.left &&
@@ -68,6 +73,9 @@ export function useSlidingIndicator(
     ro.observe(root);
     for (const child of root.children) {
       if (child instanceof HTMLElement) ro.observe(child);
+    }
+    for (const label of root.querySelectorAll("[data-slot='tabs-trigger-label']")) {
+      if (label instanceof HTMLElement) ro.observe(label);
     }
 
     const mo = new MutationObserver(() => measure());

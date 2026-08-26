@@ -42,7 +42,7 @@ export function DemoModeCard() {
       });
       setStatus(next);
       toast.success(enabled ? "Demo mode armed" : "Demo mode disarmed", {
-        description: "Restart the server (npm run dev) to apply.",
+        description: "Reload Edgeways to apply.",
       });
     } catch (e) {
       toast.error("Could not update demo mode", { description: String(e) });
@@ -89,13 +89,13 @@ export function DemoModeCard() {
               {status.active
                 ? "Demo database active - every page shows invented numbers."
                 : "Real database active."}
-              {restartNeeded ? " Restart the server to apply the change." : ""}
+              {restartNeeded ? " Reload Edgeways to apply the change." : ""}
             </p>
           </div>
           <Switch
             checked={status.markerPresent}
             disabled={busy}
-            aria-label="Use demo data after the next server restart"
+            aria-label="Use demo data after reload"
             onCheckedChange={(v) => void toggle(v)}
           />
         </div>

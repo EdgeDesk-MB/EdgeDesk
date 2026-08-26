@@ -14,12 +14,15 @@ import { outlineButtonGroup } from "@/components/layout/page-header-actions";
 import {
   campaignCardBadge,
   campaignCardHeader,
+  campaignCardNextAction,
   campaignCardPnl,
   campaignCardPnlLabel,
+  campaignCardStakeLine,
   campaignCardTitle,
   offerCampaignCardShell,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
+import { formatGbp } from "@/lib/format-money";
 import { formatClockTime } from "@/lib/time-format";
 import { Eye, NotebookPen } from "lucide-react";
 
@@ -46,7 +49,7 @@ export function ActiveBetsStrip({
       <EmptyState
         icon={NotebookPen}
         title="No active bets"
-        description="Log a racing bet from a racecard and it shows here while open. Race results settle each-way and extra-place automatically."
+        description="Log a racing bet from a racecard, or an acca, bet builder or systems run with a racing leg. Race results settle each-way and extra-place automatically."
         action={
           onBrowseRaces
             ? { label: "Browse races", onClick: onBrowseRaces }
@@ -58,29 +61,51 @@ export function ActiveBetsStrip({
 
   return (
     <section className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <h2 className="text-sm font-semibold tracking-tight">Active bets</h2>
-        <span className="text-xs text-muted-foreground">
-          {bets.length} open · race result settles EW / EP automatically
+        <span className="min-w-0 text-pretty break-words text-xs text-muted-foreground">
+          {bets.some((bet) => bet.kind && bet.kind !== "bet")
+            ? `${bets.length} open · singles settle from the race result; acca, bet builder and systems open on their desk`
+            : `${bets.length} open · race result settles EW / EP automatically`}
         </span>
       </div>
       <div className="flex flex-col gap-4.5">
         {bets.map((b) => {
           const marketLabel =
-            b.mode === "extra_place"
-              ? "Extra place"
-              : b.mode === "each_way" || b.market === "each_way"
-                ? "Each way"
-                : b.market === "extra_place"
-                  ? "Extra place"
-                  : b.market === "win"
-                    ? "Win"
-                    : b.market;
+            b.kind === "acca"
+              ? "Acca"
+              : b.kind === "bet_builder"
+                ? "Bet builder"
+                : b.kind === "systems"
+                  ? "Systems"
+                  : b.mode === "extra_place"
+                    ? "Extra place"
+                    : b.mode === "each_way" || b.market === "each_way"
+                      ? "Each way"
+                      : b.market === "extra_place"
+                        ? "Extra place"
+                        : b.market === "win"
+                          ? "Win"
+                          : b.market;
           const off =
             b.startTime != null
               ? formatClockTime(new Date(b.startTime))
               : b.offTime;
           const headerTint = activeBetHeaderTint(b.expectedProfit);
+          const stakeOdds =
+            b.backStake > 0 && b.backOdds > 1
+              ? `${formatGbp(b.backStake)} @ ${b.backOdds.toFixed(2)}`
+              : null;
+          const deskHref = b.kind && b.kind !== "bet" ? b.href : null;
+          const isDesk = Boolean(deskHref);
+          const deskCta =
+            b.kind === "acca"
+              ? "Acca desk"
+              : b.kind === "bet_builder"
+                ? "Bet builder desk"
+                : b.kind === "systems"
+                  ? "Systems desk"
+                  : null;
 
           return (
             <Card
@@ -105,17 +130,40 @@ export function ActiveBetsStrip({
                         Active
                       </Badge>
                     </div>
-                    <p className={cn(campaignCardTitle, "mt-0 text-[15px]")}>
+                    <p
+                      className={cn(
+                        campaignCardTitle,
+                        "mt-0 min-w-0 text-pretty break-words text-[15px]"
+                      )}
+                    >
                       {b.selection || b.label}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {[b.course, off, `£${b.backStake.toFixed(2)} @ ${b.backOdds}`]
+                    <p className="min-w-0 text-pretty break-words text-xs text-muted-foreground">
+                      {[isDesk ? b.label : null, b.course, off, isDesk ? null : stakeOdds]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {isDesk && stakeOdds ? (
+                      <p className={cn(campaignCardStakeLine, "mt-1")}>{stakeOdds}</p>
+                    ) : null}
+                    {isDesk && b.progressCaption ? (
+                      <p className="min-w-0 text-pretty break-words text-xs text-muted-foreground">
+                        {b.progressCaption}
+                      </p>
+                    ) : null}
+                    {b.triggerNote ? (
+                      <p
+                        className={cn(
+                          campaignCardNextAction,
+                          "mt-0 min-w-0 text-pretty break-words font-medium"
+                        )}
+                      >
+                        Next: {b.triggerNote}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right">
-                    {b.expectedProfit != null && (
+                    {b.expectedProfit != null ? (
                       <div className="flex flex-col items-end gap-0.5">
                         <span className={campaignCardPnlLabel}>
                           {openBetOutcomeLabel(b.outcomeKind)}
@@ -127,7 +175,19 @@ export function ActiveBetsStrip({
                           className={cn(campaignCardPnl, "text-[21px]")}
                         />
                       </div>
-                    )}
+                    ) : isDesk ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className={campaignCardPnlLabel}>Campaign P&L</span>
+                        <span
+                          className={cn(
+                            campaignCardPnl,
+                            "text-[21px] leading-tight text-muted-foreground"
+                          )}
+                        >
+                          In play
+                        </span>
+                      </div>
+                    ) : null}
                     {b.mode === "extra_place" && b.profitIfExtraPlace != null && (
                       <div className="mt-1 text-xs">
                         <span className="text-muted-foreground">If EP </span>
@@ -152,7 +212,7 @@ export function ActiveBetsStrip({
                     />
                   )}
                   {b.mode === "extra_place" && b.impliedExtraPlaceOdds != null && (
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       QL{" "}
                       <MoneyFlow
                         value={b.qualifyingLoss ?? 0}
@@ -187,11 +247,11 @@ export function ActiveBetsStrip({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      router.push(`/tracker?highlight=${b.betId}`);
+                      router.push(deskHref ?? `/tracker?highlight=${b.betId}`);
                     }}
                   >
                     <NotebookPen className="size-3.5" />
-                    Tracker
+                    {deskCta ?? "Tracker"}
                   </Button>
                 </div>
               </div>

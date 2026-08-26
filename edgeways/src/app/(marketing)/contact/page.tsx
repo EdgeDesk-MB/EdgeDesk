@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { MarketingDocPage } from "@/components/marketing/marketing-doc-page";
+import { LEGAL_PATHS } from "@/lib/legal/public";
+import { canonicalUrl } from "@/lib/marketing/share-metadata";
 import {
   HELLO_EMAIL,
   SUPPORT_EMAIL,
@@ -10,6 +12,7 @@ export const metadata: Metadata = {
   title: "Contact",
   description:
     "Say hello. A person at Edgeways will write back within two working days.",
+  alternates: { canonical: canonicalUrl(LEGAL_PATHS.contact) },
 };
 
 export default function ContactPage() {

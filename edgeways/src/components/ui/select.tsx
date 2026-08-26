@@ -3,9 +3,10 @@
 import * as React from "react"
 import { Select as SelectPrimitive } from "radix-ui"
 
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
 import { fieldControl } from "@/lib/ui/surface-styles"
 import { cn } from "@/lib/utils"
-import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { ChevronDownIcon, CheckIcon } from "lucide-react"
 
 function Select({
   ...props
@@ -76,7 +77,10 @@ function SelectContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "relative z-[100] max-h-(--radix-select-content-available-height) origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Overflow stays on the Viewport. Content must not scroll: Radix
+          // scroll chevrons remount on first wheel and call scrollIntoView,
+          // which is the jump on Category and every other long select.
+          "relative z-[100] max-h-(--radix-select-content-available-height) origin-(--radix-select-content-transform-origin) overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           position === "item-aligned" && "min-w-36",
           // Hug the widest row instead of pinning to the (often narrower)
           // trigger width - never below the trigger, never past the edge of
@@ -89,18 +93,23 @@ function SelectContent({
         align={align}
         {...props}
       >
-        <SelectScrollUpButton />
-        <SelectPrimitive.Viewport
-          data-position={position}
-          className={cn(
-            position === "popper" && "w-full",
-            position === "item-aligned" &&
-              "h-(--radix-select-trigger-height) w-full min-w-(--radix-select-trigger-width)"
-          )}
+        <ScrollFadeEdges
+          scrollAsChild
+          fadeClassName="from-popover"
+          className="max-h-(--radix-select-content-available-height) flex-none"
         >
-          {children}
-        </SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
+          <SelectPrimitive.Viewport
+            data-position={position}
+            className={cn(
+              "app-scroll-overlay min-h-0 max-h-(--radix-select-content-available-height) p-1 overscroll-contain [overflow-anchor:none]",
+              position === "popper" && "w-full",
+              position === "item-aligned" &&
+                "w-full min-w-(--radix-select-trigger-width)"
+            )}
+          >
+            {children}
+          </SelectPrimitive.Viewport>
+        </ScrollFadeEdges>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   )
@@ -162,52 +171,12 @@ function SelectSeparator({
   )
 }
 
-function SelectScrollUpButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) {
-  return (
-    <SelectPrimitive.ScrollUpButton
-      data-slot="select-scroll-up-button"
-      className={cn(
-        "z-10 flex cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      <ChevronUpIcon
-      />
-    </SelectPrimitive.ScrollUpButton>
-  )
-}
-
-function SelectScrollDownButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownButton>) {
-  return (
-    <SelectPrimitive.ScrollDownButton
-      data-slot="select-scroll-down-button"
-      className={cn(
-        "z-10 flex cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      <ChevronDownIcon
-      />
-    </SelectPrimitive.ScrollDownButton>
-  )
-}
-
 export {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectLabel,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
   SelectSeparator,
   SelectTrigger,
   SelectValue,

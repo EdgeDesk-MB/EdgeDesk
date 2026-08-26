@@ -26,7 +26,7 @@ export function PriceMovementArrow({
     <span
       className={cn(
         "inline-flex items-center",
-        isSteamer && "text-emerald-600 dark:text-emerald-400",
+        isSteamer && "text-profit",
         isDrifter && "text-red-600 dark:text-red-400",
         className
       )}
@@ -63,7 +63,7 @@ export function PriceMovementBadge({
       <span
         className={cn(
           "inline-flex items-center justify-end gap-0.5 text-[11px] font-medium tabular-nums",
-          isSteamer && "text-emerald-600 dark:text-emerald-400",
+          isSteamer && "text-profit",
           isDrifter && "text-red-600 dark:text-red-400",
           !isSteamer && !isDrifter && "text-muted-foreground",
           className
@@ -86,7 +86,7 @@ export function PriceMovementBadge({
         <span
           className={cn(
             "inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums",
-            isSteamer && "text-emerald-600 dark:text-emerald-400",
+            isSteamer && "text-profit",
             isDrifter && "text-red-600 dark:text-red-400",
             !isSteamer && !isDrifter && "text-muted-foreground"
           )}

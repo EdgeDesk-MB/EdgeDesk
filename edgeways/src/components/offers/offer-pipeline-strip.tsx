@@ -1,6 +1,11 @@
+"use client";
+
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useAppState } from "@/hooks/use-app-state";
 import {
   deriveOfferPipelineStage,
+  earliestOpenBetEventAt,
   formatOfferPipelineStageLabel,
   isTerminalPipelineStage,
   OFFER_PIPELINE_PROGRESS_STAGES,
@@ -9,6 +14,7 @@ import {
   type OfferPipelineStage,
 } from "@/lib/offers/pipeline";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import type { OfferDeskProgress } from "@/lib/offers/offer-desk-progress";
 import { Check } from "lucide-react";
 
 /** Progress fill — free-bet stages use `--edge` (same plate as FB badge / Convert). */
@@ -85,6 +91,54 @@ function TerminalPipelineStatus({
  * Campaign progress — hidden until the first step.
  * Completed = campaign closed; Settled = all bet results in (final).
  */
+function DeskProgressStrip({
+  progress,
+  className,
+}: {
+  progress: OfferDeskProgress;
+  className?: string;
+}) {
+  const pct =
+    progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const stage: OfferPipelineStage = progress.needsAction ? "qualifying" : "awaiting";
+  const caption = [
+    progress.progressCaption,
+    progress.nextCaption ? `next ${progress.nextCaption}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const announced = `${progress.stageLabel}: ${caption}`;
+  return (
+    <div className={cn("min-w-0", className)} aria-label={announced}>
+      <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+        <p className={cn("min-w-0 text-pretty break-words text-xs font-semibold", stageLabelClass(stage))}>
+          {progress.stageLabel}
+        </p>
+        <p className="min-w-0 text-pretty break-words text-xs tabular-nums text-muted-foreground sm:text-right">
+          {caption}
+        </p>
+      </div>
+      <div
+        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted dark:bg-input/40"
+        role="progressbar"
+        aria-label={announced}
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuetext={caption}
+      >
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-300 ease-out",
+            stageProgressClass(stage)
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function OfferPipelineStrip({
   offer,
   className,
@@ -92,6 +146,18 @@ export function OfferPipelineStrip({
   offer: OfferSummary;
   className?: string;
 }) {
+  const { state } = useAppState(0);
+  const awaitingEventAt = useMemo(() => {
+    if (offer.awaitingEventAt != null) return offer.awaitingEventAt;
+    const eventsById = new Map(state.events.map((e) => [e.id, e]));
+    return earliestOpenBetEventAt(
+      state.bets.filter((b) => b.offerId === offer.id),
+      eventsById
+    );
+  }, [offer.awaitingEventAt, offer.id, state.bets, state.events]);
+  if (offer.deskProgress) {
+    return <DeskProgressStrip progress={offer.deskProgress} className={className} />;
+  }
   const stage = deriveOfferPipelineStage(offer);
 
   if (stage === "planned") return null;
@@ -111,7 +177,10 @@ export function OfferPipelineStrip({
   const activeIdx = pipelineProgressIndex(stage);
   const total = OFFER_PIPELINE_PROGRESS_STAGES.length;
   const pct = Math.round(((activeIdx + 1) / total) * 100);
-  const currentLabel = formatOfferPipelineStageLabel(offer, stage);
+  const currentLabel = formatOfferPipelineStageLabel(
+    { ...offer, awaitingEventAt },
+    stage
+  );
   const next =
     activeIdx < total - 1 ? OFFER_PIPELINE_PROGRESS_STAGES[activeIdx + 1] : null;
 
@@ -121,7 +190,7 @@ export function OfferPipelineStrip({
         <p className={cn("text-xs font-semibold", stageLabelClass(stage))}>
           {currentLabel}
         </p>
-        <p className="text-[11px] tabular-nums text-muted-foreground">
+        <p className="text-xs tabular-nums text-muted-foreground">
           {activeIdx + 1}/{total}
           {next ? ` · next ${next.label}` : ""}
         </p>

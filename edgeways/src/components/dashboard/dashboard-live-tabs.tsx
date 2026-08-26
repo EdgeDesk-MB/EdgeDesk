@@ -12,6 +12,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
@@ -35,8 +36,13 @@ import {
 } from "@/components/racing/racing-placings-dialog";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { filterPillCountState, selectionSubtle } from "@/lib/ui/surface-styles";
-import { dashboardPanelBody, dashboardSection } from "@/lib/ui/dashboard-layout";
+import { dashboardSection } from "@/lib/ui/dashboard-layout";
 import { livePositionTriggerNoteShowsBolt } from "@/lib/services/live-position-note";
+import { sumEventIfEndedNow } from "@/lib/pnl/open-bet-worst-case";
+import { deskLiveEventIds, deskNotesForEvent } from "@/lib/pnl/desk-live-positions";
+import { liveMatchBackTags } from "@/lib/events/live-match-backs";
+import { useLiveMatchBacks } from "@/hooks/use-live-match-backs";
+import { ExchangeBackTags } from "@/components/events/exchange-back-tags";
 import {
   pruneLiveDockLocks,
   readLiveDockExpanded,
@@ -198,14 +204,14 @@ function PositionList({
             onToggleLock={() => onToggleLock(position.betId)}
           >
             <Link
-              href="/tracker"
+              href={position.href ?? "/tracker"}
               className="flex min-w-0 items-start justify-between gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold leading-snug">
+                <div className="min-w-0 text-pretty break-words text-sm font-semibold leading-snug">
                   {position.label}
                 </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
+                <div className="mt-0.5 min-w-0 text-pretty break-words text-xs text-muted-foreground">
                   {position.eventName}
                   {position.eventSport === "horse_racing" ? (
                     <> · {position.eventStatusLabel}</>
@@ -222,18 +228,18 @@ function PositionList({
                   position.provisional != null &&
                   Math.abs(position.provisional - position.snapshotProvisional) >
                     0.05 && (
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    <div className="mt-0.5 text-xs text-muted-foreground">
                       if ended now{" "}
                       <MoneyFlow
                         value={position.snapshotProvisional}
                         signColor
                         signDisplay
-                        className="inline text-[11px] font-medium tabular-nums"
+                        className="inline text-xs font-medium tabular-nums"
                       />
                     </div>
                   )}
                 {position.triggerNote && (
-                  <div className="mt-1 line-clamp-2 text-xs text-warning">
+                  <div className="mt-1 min-w-0 text-pretty break-words text-xs text-warning">
                     {livePositionTriggerNoteShowsBolt(position.triggerNote)
                       ? "⚡ "
                       : null}
@@ -250,14 +256,16 @@ function PositionList({
                       signDisplay
                       className="text-sm font-semibold tabular-nums"
                     />
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       {position.valuationMode === "model"
                         ? "model EV"
                         : "if ended now"}
                     </div>
                   </>
                 ) : (
-                  <span className="text-xs text-muted-foreground">manual</span>
+                  <span className="text-xs text-muted-foreground">
+                    {position.kind && position.kind !== "bet" ? "In play" : "manual"}
+                  </span>
                 )}
               </div>
             </Link>
@@ -288,18 +296,28 @@ function liveEventSubtitle(event: EventRow): string | null {
 
 function LiveEventRow({
   event,
-  model,
   linkedBets,
   locked,
   onToggleLock,
   onRecordPlacings,
+  ifEndedNow,
+  deskNotes = [],
+  backTags,
+  backsSuspended,
+  backsQuoteSeq,
+  backsLoading,
 }: {
   event: EventRow;
-  model?: { marketsLabel: string; homeWin: number; draw: number; awayWin: number } | null;
   linkedBets: BetRow[];
   locked: boolean;
   onToggleLock: () => void;
   onRecordPlacings: (eventId: number, payload: PlacingsPayload) => void;
+  ifEndedNow: number | null;
+  deskNotes?: { text: string; needsAction: boolean; href: string }[];
+  backTags: ReturnType<typeof liveMatchBackTags>;
+  backsSuspended: boolean;
+  backsQuoteSeq: number;
+  backsLoading: boolean;
 }) {
   const [placingsOpen, setPlacingsOpen] = useState(false);
   const isRacing = event.sport === "horse_racing";
@@ -312,42 +330,50 @@ function LiveEventRow({
   const hitClass =
     "block w-full cursor-pointer text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+  const endedNowFigure =
+    ifEndedNow != null ? (
+      <div className="shrink-0 text-right">
+        <MoneyFlow
+          value={ifEndedNow}
+          signColor
+          signDisplay
+          className="text-sm font-semibold tabular-nums"
+        />
+        <div className="text-xs text-muted-foreground">if ended now</div>
+      </div>
+    ) : null;
+
   const titleBlock = (
-    <SportEventBlock
-      sport={event.sport}
-      title={title}
-      titleClassName="text-sm font-semibold"
-    >
-      {subtitle && (
-        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-          {subtitle}
-        </div>
-      )}
-    </SportEventBlock>
+    <div className="flex min-w-0 items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <SportEventBlock
+          sport={event.sport}
+          title={title}
+          titleClassName="min-w-0 truncate text-sm font-semibold"
+        >
+          {subtitle && (
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+              {subtitle}
+            </div>
+          )}
+        </SportEventBlock>
+      </div>
+      {endedNowFigure}
+    </div>
   );
 
   const statusFooter = (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <LiveEventStatusPanel event={event} layout="bar" />
-      {model && event.sport === "football" && (
-        <div
-          className="text-xs tabular-nums text-muted-foreground"
-          title="Dixon-Coles live model (remaining goals)"
-        >
-          <span className="text-foreground/80">
-            {Math.round(model.homeWin * 100)}%
-          </span>
-          <span className="mx-1 opacity-40">·</span>
-          <span>{Math.round(model.draw * 100)}%</span>
-          <span className="mx-1 opacity-40">·</span>
-          <span className="text-foreground/80">
-            {Math.round(model.awayWin * 100)}%
-          </span>
-          <span className="ml-1.5 text-[11px] uppercase tracking-wide opacity-60">
-            model
-          </span>
-        </div>
-      )}
+      {backTags || backsSuspended ? (
+        <ExchangeBackTags
+          tags={backTags ?? []}
+          suspended={backsSuspended}
+          quoteSeq={backsQuoteSeq}
+        />
+      ) : backsLoading ? (
+        <div className="h-6 min-w-[9.5rem]" aria-hidden />
+      ) : null}
     </div>
   );
 
@@ -381,6 +407,24 @@ function LiveEventRow({
     </Link>
   );
 
+  const deskNoteLinks =
+    deskNotes.length > 0 ? (
+      <div className="mt-1 min-w-0 space-y-0.5 text-pretty break-words text-xs">
+        {deskNotes.map((note) => (
+          <Link
+            key={`${note.href}:${note.text}`}
+            href={note.href}
+            className={cn(
+              "block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              note.needsAction ? "text-warning" : "text-muted-foreground"
+            )}
+          >
+            {note.text}
+          </Link>
+        ))}
+      </div>
+    ) : null;
+
   const row = (
     <LiveDockRow
       locked={locked}
@@ -389,6 +433,7 @@ function LiveEventRow({
       footer={footerHit}
     >
       {titleHit}
+      {deskNoteLinks}
     </LiveDockRow>
   );
 
@@ -411,6 +456,13 @@ function LiveEventRow({
   return row;
 }
 
+function liveDockEvents(state: AppState | null): EventRow[] {
+  const deskIds = deskLiveEventIds(state?.livePositions ?? []);
+  return (state?.events ?? []).filter(
+    (event) => effectiveEventStatus(event) === "live" || deskIds.has(event.id)
+  );
+}
+
 function EventsList({
   state,
   visibleIds,
@@ -426,10 +478,8 @@ function EventsList({
   onRecordPlacings: (eventId: number, payload: PlacingsPayload) => void;
   footerHint?: ReactNode;
 }) {
-  const liveEvents = (state?.events ?? []).filter(
-    (e) => effectiveEventStatus(e) === "live"
-  );
-  const modelsById = new Map((state?.liveEventModels ?? []).map((m) => [m.eventId, m]));
+  const liveEvents = liveDockEvents(state);
+  const { byId: matchBacks, loaded: matchBacksLoaded } = useLiveMatchBacks(liveEvents);
   const bets = state?.bets ?? [];
   const rows =
     visibleIds == null
@@ -457,11 +507,33 @@ function EventsList({
         <LiveEventRow
           key={event.id}
           event={event}
-          model={modelsById.get(event.id) ?? null}
           linkedBets={bets.filter((b) => b.eventId === event.id)}
           locked={lockedIds.has(event.id)}
           onToggleLock={() => onToggleLock(event.id)}
           onRecordPlacings={onRecordPlacings}
+          ifEndedNow={
+            event.sport === "football"
+              ? sumEventIfEndedNow(state?.livePositions ?? [], event.id)
+              : null
+          }
+          deskNotes={deskNotesForEvent(state?.livePositions ?? [], event.id)}
+          backTags={
+            event.sport === "football"
+              ? liveMatchBackTags({
+                  homeTeam: event.homeTeam,
+                  awayTeam: event.awayTeam,
+                  odds: matchBacks.get(event.id)?.odds ?? {},
+                  selections: bets
+                    .filter((bet) => bet.eventId === event.id && bet.status === "open")
+                    .map((bet) => bet.selection),
+                })
+              : null
+          }
+          backsSuspended={
+            event.sport === "football" && !!matchBacks.get(event.id)?.suspended
+          }
+          backsQuoteSeq={matchBacks.get(event.id)?.quoteSeq ?? 0}
+          backsLoading={event.sport === "football" && !matchBacksLoaded}
         />
       ))}
       {footerHint}
@@ -501,14 +573,11 @@ export function DashboardLiveTabs({
 }) {
   const { refresh } = useAppState();
   const positionCount = state?.livePositions.length ?? 0;
-  const liveEvents = useMemo(
-    () => (state?.events ?? []).filter((e) => effectiveEventStatus(e) === "live"),
-    [state]
-  );
+  const liveEvents = useMemo(() => liveDockEvents(state), [state]);
   const eventCount = liveEvents.length;
   const hasLiveEvent = eventCount > 0;
-  // Events first: situational awareness (scores / models). Positions is one tap
-  // away for provisional P&L and 2UP trigger notes - alerts still fire either way.
+  // Events first: score + match-level if-ended-now. Positions is one tap
+  // away for per-leg live readings and 2UP trigger notes.
   const [tab, setTab] = useState("events");
   // Client lazy init avoids expanded→collapsed flash after localStorage read.
   const [expanded, setExpanded] = useState(() => readLiveDockExpanded(true));
@@ -667,7 +736,7 @@ export function DashboardLiveTabs({
         icon={hasLiveEvent ? Radio : undefined}
         iconClassName={
           hasLiveEvent
-            ? "animate-pulse text-emerald-600 motion-reduce:animate-none"
+            ? "animate-pulse text-profit motion-reduce:animate-none"
             : undefined
         }
         title="Live"
@@ -707,19 +776,23 @@ export function DashboardLiveTabs({
       <CardContent
         id={LIVE_DOCK_PANEL_ID}
         className={cn(
-          "px-[var(--layout-card-x)] pb-3 pt-2",
-          !showBody && "hidden",
-          docked
-            ? cn(
-                "app-scroll-nested min-h-0 overflow-y-auto",
-                expanded
-                  ? "max-h-[min(42vh,22rem)]"
-                  : "max-h-[min(28vh,14rem)]"
-              )
-            : dashboardPanelBody
+          "flex min-h-0 flex-col overflow-hidden p-0",
+          !showBody && "hidden"
         )}
       >
-        {showBody ? panel : null}
+        <ScrollFadeEdges
+          className={cn(
+            "min-h-0 flex-1",
+            docked &&
+              (expanded
+                ? "max-h-[min(42vh,22rem)]"
+                : "max-h-[min(28vh,14rem)]")
+          )}
+          fadeClassName={docked ? "from-page" : "from-card"}
+          scrollClassName="app-scroll-nested px-[var(--layout-card-x)] pb-3 pt-2"
+        >
+          {showBody ? panel : null}
+        </ScrollFadeEdges>
       </CardContent>
     </section>
   );

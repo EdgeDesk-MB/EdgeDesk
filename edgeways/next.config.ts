@@ -6,6 +6,21 @@ const nextConfig: NextConfig = {
   // Fully hidden - the on-screen Rendering/Compiling badge is dev-only
   // chrome, not a performance signal. Errors still surface regardless.
   devIndicators: false,
+  // Desk heartbeats hit every few seconds. Hide them so the terminal stays
+  // useful for compiles, page loads, and mutations. Errors still print.
+  logging: {
+    incomingRequests: {
+      ignore: [
+        /\/api\/state/,
+        /\/api\/reminders/,
+        /\/api\/accounts\/free-bets/,
+        /\/api\/exchanges/,
+        /\/api\/offers\/edge/,
+        /\/ingest\//,
+        /\/manifest\.webmanifest/,
+      ],
+    },
+  },
   /**
    * Phones on the LAN hit the dev server by IP or Bonjour name; without
    * these, Next blocks its own /_next dev resources cross-origin and the
@@ -15,6 +30,7 @@ const nextConfig: NextConfig = {
   // Note: wildcards match ONE label only - "*.ts.net" does NOT cover
   // "sams-mac-studio.tail975520.ts.net", hence the explicit entries.
   allowedDevOrigins: [
+    "127.0.0.1",
     "192.168.50.71",
     "sams-mac-studio.local",
     "*.local",

@@ -7,6 +7,7 @@ import {
 import {
   PUBLIC_SITE_ORIGIN,
   SHARE_SITE_NAME,
+  canonicalUrl,
   marketingShareCopy,
   marketingShareMetadata,
   publicSiteUrl,
@@ -58,6 +59,8 @@ describe("marketingShareMetadata", () => {
     expect(meta.twitter?.card).toBe("summary_large_image");
     expect(meta.twitter?.title).toBe(copy.title);
     expect(meta.openGraph?.url).toBe(`${PUBLIC_SITE_ORIGIN}/`);
+    expect(meta.alternates?.canonical).toBe(`${PUBLIC_SITE_ORIGIN}/`);
+    expect(canonicalUrl("/terms")).toBe(`${PUBLIC_SITE_ORIGIN}/terms`);
     const ogImages = meta.openGraph?.images;
     const image = Array.isArray(ogImages) ? ogImages[0] : ogImages;
     expect(image).toMatchObject({
@@ -84,5 +87,15 @@ describe("publicSiteUrl", () => {
   it("honours NEXT_PUBLIC_SITE_URL when valid", () => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://preview.example";
     expect(publicSiteUrl().origin).toBe("https://preview.example");
+  });
+
+  it("strips www from the live host so metadataBase stays on the apex", () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.edgeways.app";
+    expect(publicSiteUrl().origin).toBe(PUBLIC_SITE_ORIGIN);
+  });
+
+  it("ignores the Vercel preview host so production tags stay on the apex", () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://edgeways-edgeways.vercel.app";
+    expect(publicSiteUrl().origin).toBe(PUBLIC_SITE_ORIGIN);
   });
 });

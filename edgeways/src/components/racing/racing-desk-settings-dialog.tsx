@@ -167,7 +167,7 @@ export function RacingDeskSettingsDialog({
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               {epValid ? (
-                <span className="text-emerald-600 dark:text-emerald-400">
+                <span className="text-profit">
                   EP zone: {exchangePlaces + 1}–{bookiePlaces}
                 </span>
               ) : (

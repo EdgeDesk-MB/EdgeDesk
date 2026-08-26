@@ -28,6 +28,7 @@ import { BetImportDialog } from "@/components/add-bet/bet-import-dialog";
 import { DeferredTextInput } from "@/components/add-bet/deferred-text-input";
 import { DateTimePicker } from "@/components/date-time-picker";
 import { DeskLegEventFields } from "@/components/desk/desk-leg-event-fields";
+import { DeskRunDialogBody } from "@/components/desk/desk-run-dialog-body";
 import { DeskStakeSource } from "@/components/desk/desk-stake-source";
 import { nextDeskLegLabel } from "@/lib/desk/desk-leg-title";
 import { resolveDeskEventIdForSave } from "@/lib/desk/resolve-desk-event-id";
@@ -51,7 +52,6 @@ import { MARKETS } from "@/lib/markets";
 import { toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import type { SystemLegRow, SystemRunRow } from "@/lib/db/schema";
 import {
-  deskRunDialogBodyClass,
   deskRunDialogContentClass,
   deskRunLegsPanelClass,
 } from "@/lib/ui/desk-run-dialog";
@@ -342,7 +342,7 @@ export function CreateSystemRunForm({
             : "Log a full-cover ticket."}
         </DialogDescription>
       </DialogHeader>
-      <div className={deskRunDialogBodyClass}>
+      <DeskRunDialogBody>
 
       <div className="flex flex-col gap-3">
         {!isEdit ? (
@@ -583,7 +583,7 @@ export function CreateSystemRunForm({
           </p>
         ) : null}
       </div>
-      </div>
+      </DeskRunDialogBody>
 
       <DialogFooter>
         <Button {...pagePrimaryButtonProps} onClick={() => void save()} disabled={saving}>

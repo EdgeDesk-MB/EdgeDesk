@@ -28,13 +28,31 @@ export type ShareCopy = {
   imageLine: string;
 };
 
+function isPublicMarketingHost(hostname: string): boolean {
+  if (hostname === "www.edgeways.app") return false;
+  if (hostname === "vercel.app" || hostname.endsWith(".vercel.app")) return false;
+  return true;
+}
+
 export function publicSiteUrl(): URL {
   const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim() || PUBLIC_SITE_ORIGIN;
   try {
-    return new URL(raw);
+    const url = new URL(raw);
+    // Search treats each host as its own site. Never emit www or *.vercel.app.
+    if (!isPublicMarketingHost(url.hostname)) {
+      return new URL(PUBLIC_SITE_ORIGIN);
+    }
+    return url;
   } catch {
     return new URL(PUBLIC_SITE_ORIGIN);
   }
+}
+
+/** Absolute apex URL for rel=canonical. Never www. */
+export function canonicalUrl(path = "/"): string {
+  if (!path || path === "/") return `${PUBLIC_SITE_ORIGIN}/`;
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${PUBLIC_SITE_ORIGIN}${suffix}`;
 }
 
 export function marketingShareCopy(variant: LandingVariant): ShareCopy {
@@ -78,6 +96,9 @@ export function marketingShareMetadata(variant: LandingVariant): Metadata {
       absolute: `${copy.title} · ${SHARE_SITE_NAME}`,
     },
     description: copy.description,
+    alternates: {
+      canonical: canonicalUrl("/"),
+    },
     openGraph: {
       title: copy.title,
       description: copy.description,

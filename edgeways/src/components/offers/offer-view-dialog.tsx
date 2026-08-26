@@ -62,8 +62,9 @@ export function OfferViewDialog({
   const trackBet = deriveTrackBetAction(offer, state?.settings);
   const isConvertAction = trackBet.prefill?.betType === "free_snr";
   const isPlaybookMarkDone = trackBet.destination.kind === "playbook_mark_done";
+  const isOpenDesk = trackBet.destination.kind === "open_desk";
   const canQuickMark =
-    trackBet.enabled && trackBet.prefill != null && !isPlaybookMarkDone;
+    trackBet.enabled && trackBet.prefill != null && !isPlaybookMarkDone && !isOpenDesk;
 
   function handleTrackBet() {
     if (isPlaybookMarkDone) {
@@ -177,7 +178,14 @@ export function OfferViewDialog({
                 Open in Campaigns
               </Link>
             </Button>
-            {isPlaybookMarkDone ? (
+            {isOpenDesk && trackBet.destination.kind === "open_desk" ? (
+              <Button size="lg" asChild>
+                <Link href={trackBet.destination.href} onClick={() => onOpenChange(false)}>
+                  <ExternalLink className="size-4" />
+                  {trackBet.label}
+                </Link>
+              </Button>
+            ) : isPlaybookMarkDone ? (
               <Button
                 size="lg"
                 onClick={() => void handlePlaybookMarkDone()}

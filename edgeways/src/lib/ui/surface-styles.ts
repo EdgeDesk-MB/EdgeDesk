@@ -76,6 +76,7 @@ export const selectionSubdued = "bg-selection-subdued";
  * (`--canvas` / dark `--page`) so the plate is darker than the modal.
  * Page-toned dialogs (`data-dialog-tone=page`, e.g. Race picks) already
  * sit on `--page` in dark, so the plate sinks to `--canvas`.
+ * Rim is Card chrome (solid ring / glassy face). Do not add `border-dashed`.
  */
 export const emptyStatePlate = cn(
   "bg-card",
@@ -145,6 +146,9 @@ export const listDaySectionLabel =
 /** Stack under a day-split heading (campaign cards or a day's table). */
 export const listDaySectionContent = "mt-3 flex flex-col gap-4.5";
 
+/** Day-split inside a plate that already stacks hairline rows (Browse fixtures). */
+export const listDaySectionContentNested = "mt-1.5 flex flex-col gap-0";
+
 /** Burger drawer utility row (meta links, Log out). `w-full` so buttons fill like links. */
 export const drawerUtilityRow =
   "flex w-full items-center gap-3 px-4 py-3.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/60";
@@ -170,8 +174,10 @@ export const deskTableHeaderCell =
 /** Match Racing Desk results `<td>`: py-2.5 / px-2. */
 export const deskTableBodyCell = "px-2 py-2.5 align-middle";
 
-export const listRow =
-  "border-b border-border/60 transition-colors hover:bg-selection-subtle";
+export const listRow = "border-b border-border/60";
+
+/** Put on the parent of sibling `listRow`s so the last hairline drops. */
+export const listRowGroup = "[&>:last-child]:border-b-0";
 
 export const listRowInteractive = cn(
   "rounded-md border border-transparent transition-colors",
@@ -352,6 +358,13 @@ export function filterPillState(
   );
 }
 
+/**
+ * Quiet rounded-full select / combobox trigger beside FilterPills
+ * (Offers category, fixture competition filter).
+ */
+export const toolbarSelectTrigger =
+  "w-auto rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground hover:text-foreground data-[state=open]:bg-muted/60 data-[state=open]:text-foreground data-[empty=false]:bg-muted/60 data-[empty=false]:text-foreground";
+
 /** Compact “Convert” CTA shared by Do next cards and Accounts free-bet rows. */
 export const convertFreeBetButtonClass = "h-7 shrink-0 text-xs";
 
@@ -426,6 +439,13 @@ export const edgeMarkerPill =
 /** Qualifying-offer count pill — same geometry as edgeMarkerPill. */
 export const qualifyMarkerPill =
   "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-success/15 px-1.5 text-[12px] font-bold tabular-nums leading-none text-success";
+
+/**
+ * 2UP trigger mark on a Goal! history row — solid brand plate, same box as
+ * edgeMarkerPill. Do not also render a standalone two_up feed row.
+ */
+export const historyTwoUpBadge =
+  "inline-flex h-5 min-w-5 shrink-0 items-center justify-center gap-0.5 rounded-full bg-brand px-1.5 text-[12px] font-bold leading-none text-brand-foreground";
 
 /**
  * White L→R wash (10% → 5%) with mix-blend overlay — lifts tinted outline

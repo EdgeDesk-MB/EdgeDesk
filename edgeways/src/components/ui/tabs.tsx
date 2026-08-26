@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
 import { useSlidingIndicator } from "@/hooks/use-sliding-indicator"
 import { COLLAPSE_EASE, SPRING_DURATION_MS, springTransition } from "@/lib/ui/motion"
+import { lineTabTriggers, nextLineTabIndex } from "@/lib/ui/line-tabs-keyboard"
 
 function Tabs({
   className,
@@ -70,10 +71,27 @@ function TabsScrollList({
   const isLine = variant === "line"
   const indicator = useSlidingIndicator(
     listRef,
-    '[data-slot="tabs-trigger"][data-state="active"], [data-slot="tabs-trigger"][data-active]'
+    isLine
+      ? '[data-slot="tabs-trigger"][data-state="active"] [data-slot="tabs-trigger-label"], [data-slot="tabs-trigger"][data-active] [data-slot="tabs-trigger-label"]'
+      : '[data-slot="tabs-trigger"][data-state="active"], [data-slot="tabs-trigger"][data-active]'
   )
 
   const isSegmented = variant === "segmented"
+
+  function onListKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    props.onKeyDown?.(e)
+    if (!isLine || e.defaultPrevented || e.key !== "Tab") return
+    const target = e.target
+    if (!(target instanceof HTMLElement)) return
+    if (target.getAttribute("data-slot") !== "tabs-trigger") return
+    const tabs = lineTabTriggers(e.currentTarget)
+    const next = nextLineTabIndex(tabs.indexOf(target), tabs.length, e.shiftKey)
+    if (next == null) return
+    e.preventDefault()
+    const el = tabs[next]
+    el.focus()
+    el.click()
+  }
 
   return (
     <ScrollFadeEdges
@@ -85,9 +103,9 @@ function TabsScrollList({
       )}
       scrollClassName={cn(
         "app-scroll-overlay overflow-x-auto",
-        // Match card content inset when TabsLineBar bleeds; Racing Desk
-        // (no bleed, px-0 CardContent) also lands on --card-spacing.
-        isLine ? "px-(--card-spacing)" : undefined,
+        // TabsLineBar sets --tabs-line-inset (card vs dialog). Fallback
+        // keeps Racing Desk / unbled strips on --card-spacing.
+        isLine ? "px-[var(--tabs-line-inset,var(--card-spacing))]" : undefined,
         isSegmented && "rounded-[var(--segmented-radius)]"
       )}
       fadeClassName={fadeClassName}
@@ -106,6 +124,7 @@ function TabsScrollList({
           className
         )}
         {...props}
+        onKeyDown={onListKeyDown}
         data-sliding={isSegmented && indicator.ready ? "true" : undefined}
       >
         {isLine && indicator.ready ? (
@@ -210,6 +229,7 @@ const TAB_DRAG_EPS = 4
  */
 function TabsTrigger({
   className,
+  children,
   onMouseDown,
   onClick,
   onPointerMove,
@@ -225,7 +245,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group/tab-trigger relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
+        "group/tab-trigger relative inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:flex-1 group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:w-auto group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:shrink-0 group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
         segmentedTrigger,
         "group-data-[variant=default]/tabs-list:data-active:bg-background group-data-[variant=default]/tabs-list:data-active:text-foreground dark:group-data-[variant=default]/tabs-list:data-active:border-input dark:group-data-[variant=default]/tabs-list:data-active:bg-input/30 dark:group-data-[variant=default]/tabs-list:data-active:text-foreground",
         // Line tabs use a shared sliding spring underline on TabsList — hide per-trigger after.
@@ -291,7 +311,14 @@ function TabsTrigger({
         )
         commitRef.current = false
       }}
-    />
+    >
+      <span
+        data-slot="tabs-trigger-label"
+        className="inline-flex items-center justify-center gap-[inherit]"
+      >
+        {children}
+      </span>
+    </TabsPrimitive.Trigger>
   )
 }
 
@@ -312,9 +339,10 @@ export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
 
 /**
  * Full-width bottom rule for underline tab rows - active indicator sits on
- * this line. Bleeds to the true edge with no re-added inset: the line-variant
- * TabsList owns leading/trailing space via `px-(--card-spacing)` so that
- * space lives inside the scrollable region and fades correctly.
+ * this line. Bleeds to the true edge with no re-added inset: sets
+ * `--tabs-line-inset` (card = `--card-spacing`, dialog = 1.5rem) so the
+ * line-variant TabsList can pad inside the scrollable region and fade
+ * correctly.
  */
 export function TabsLineBar({
   className,
@@ -330,10 +358,10 @@ export function TabsLineBar({
         // stays short by 2× the bleed. Expand width explicitly so the hairline
         // reaches both module edges.
         bleed === "card"
-          ? "-mx-(--card-spacing) w-[calc(100%+2*var(--card-spacing))]"
+          ? "-mx-(--card-spacing) w-[calc(100%+2*var(--card-spacing))] [--tabs-line-inset:var(--card-spacing)]"
           : bleed === "dialog"
-            ? "-mx-6 w-[calc(100%+3rem)]"
-            : "w-full",
+            ? "-mx-6 w-[calc(100%+3rem)] [--tabs-line-inset:1.5rem]"
+            : "w-full [--tabs-line-inset:var(--card-spacing)]",
         className
       )}
       {...props}

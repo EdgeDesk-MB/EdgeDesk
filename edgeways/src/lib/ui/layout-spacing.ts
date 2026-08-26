@@ -42,6 +42,18 @@ export const deskBandPadFooter = cn(
   "pt-[var(--layout-section-y)] pb-1"
 );
 
+/**
+ * Mobile Home swipe-deck section headers (`DashboardSectionHeader`).
+ * Fixed `--home-deck-header-h` below `sm` so Do next (sort tabs) and
+ * title-only cards share one bar; title and actions sit on the midline.
+ */
+export const homeDeckSectionHeader = cn(
+  "max-sm:box-border max-sm:flex max-sm:h-[var(--home-deck-header-h)] max-sm:items-center max-sm:py-0"
+);
+
+/** Floor for the P&L plot on mobile Summary so the card does not collapse. */
+export const homeDeckChartMinH = "min-h-[var(--home-deck-chart-min-h)]";
+
 /** Section band inside a card (headers, tab bars) */
 export const sectionBar = cn("border-b border-border/60", deskBandPad);
 

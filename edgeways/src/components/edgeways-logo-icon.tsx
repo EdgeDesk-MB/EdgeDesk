@@ -2,6 +2,22 @@ import { BOLT_PATH } from "@/lib/brand/bolt-mark";
 import { cn } from "@/lib/utils";
 
 /**
+ * Bare brand bolt — same path as the mobile top-bar mark.
+ * Fill via currentColor so the parent surface sets contrast.
+ */
+export function EdgewaysBolt({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={cn("size-8 shrink-0 fill-current", className)}
+    >
+      <path d={BOLT_PATH} />
+    </svg>
+  );
+}
+
+/**
  * Compact Edgeways mark — contrast bolt on brand plate.
  * For small slots (menu header, PWA prompt). Top bar uses EdgewaysLogo.
  */

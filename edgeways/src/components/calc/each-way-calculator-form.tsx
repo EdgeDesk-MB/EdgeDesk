@@ -407,7 +407,7 @@ export function EachWayCalculatorForm({
               Profit if extra place{" "}
               <MoneyFlow
                 value={extraResult.profitIfExtraPlace}
-                className="font-semibold text-emerald-600"
+                className="font-semibold text-profit"
               />
             </span>
           </div>

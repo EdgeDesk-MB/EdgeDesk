@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { BetImportDialog } from "@/components/add-bet/bet-import-dialog";
 import { DeferredTextInput } from "@/components/add-bet/deferred-text-input";
+import { deskLegsFromOcrSlip } from "@/lib/ocr/apply-desk-slip-legs";
 import { summariseOcrFields } from "@/lib/ocr/parse-bet-screenshot";
 import type { BetOcrFields } from "@/lib/ocr/types";
 import { NumField } from "@/components/calc/num-field";
@@ -30,12 +31,14 @@ import {
 } from "@/components/calc/bet-panels";
 import { DateTimePicker } from "@/components/date-time-picker";
 import { DeskLegEventFields } from "@/components/desk/desk-leg-event-fields";
+import { DeskRunDialogBody } from "@/components/desk/desk-run-dialog-body";
 import { DeskStakeSource } from "@/components/desk/desk-stake-source";
 import { nextDeskLegLabel } from "@/lib/desk/desk-leg-title";
 import { resolveDeskEventIdForSave } from "@/lib/desk/resolve-desk-event-id";
 import { usePauseAppStatePolling } from "@/components/app-state-provider";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { useKnownFixtures } from "@/hooks/use-known-fixtures";
 import { applyAccaBoost } from "@/lib/calc/acca-workflow";
 import {
   emptyLegCountFromPrefill,
@@ -58,7 +61,6 @@ import { MARKETS } from "@/lib/markets";
 import { toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import type { AccaLegRow, AccaRunRow, ExchangeRow } from "@/lib/db/schema";
 import {
-  deskRunDialogBodyClass,
   deskRunDialogContentClass,
   deskRunLegsPanelClass,
   deskRunPanelClass,
@@ -158,6 +160,7 @@ export function CreateRunForm({
   usePauseAppStatePolling(true);
   const { state } = useAppState(0);
   const events = state?.events ?? [];
+  const { fixtures: racingFixtures } = useKnownFixtures("horse_racing");
 
   const [label, setLabel] = useState(edit?.run.label ?? prefill?.label ?? "");
   const [method, setMethod] = useState<AccaRunRow["method"]>(
@@ -254,20 +257,14 @@ export function CreateRunForm({
       // Straight multiples belong on Acca Desk; keep current method.
     }
     if (fields.legs && fields.legs.length >= 2) {
-      setLegs(
-        fields.legs.map((leg) => ({
-          label: leg.label,
-          backOdds: leg.odds != null && leg.odds > 1 ? leg.odds : NaN,
-          scheduledAt: "",
-          sport: seedSport,
-          eventId: null,
-          pendingFixture: null,
-          market: defaultMarketForSport(seedSport),
-          selection: "",
-        }))
-      );
+      const next = deskLegsFromOcrSlip(fields.legs, {
+        events,
+        fixtures: racingFixtures,
+        seedSport,
+      });
+      setLegs(next);
       if (!label.trim()) {
-        setLabel(fields.legs.slice(0, 3).map((l) => l.label).join(" / "));
+        setLabel(next.slice(0, 3).map((l) => l.label).join(" / "));
       }
     } else if (fields.selection && !label.trim()) {
       setLabel(fields.selection);
@@ -385,7 +382,7 @@ export function CreateRunForm({
               : "Log the acca, then lay each leg."}
         </DialogDescription>
       </DialogHeader>
-      <div className={deskRunDialogBodyClass}>
+      <DeskRunDialogBody>
 
       {prefill && !isEdit ? <RequirementsStrip prefill={prefill} /> : null}
 
@@ -594,6 +591,7 @@ export function CreateRunForm({
             </div>
             <DeskLegEventFields
               events={events}
+              scopeCourse={isEdit ? undefined : prefill?.scopeCourse}
               value={{
                 sport: leg.sport,
                 eventId: leg.eventId,
@@ -670,7 +668,7 @@ export function CreateRunForm({
         </div>
       </div>
       {funding ? <ExchangeFundingNotice model={funding} /> : null}
-      </div>
+      </DeskRunDialogBody>
 
       <DialogFooter>
         <Button

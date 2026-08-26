@@ -250,7 +250,7 @@ function SuggestionRow({
               className="h-8 gap-1.5"
               onClick={() => onBackRunner(suggestion.externalId, runnerName, suggestion.offerId)}
             >
-              <Gift className="size-3.5 text-emerald-600" />
+              <Gift className="size-3.5 text-profit" />
               Back {runnerName}
             </Button>
           ) : null}
@@ -326,7 +326,7 @@ function SuggestionRow({
                       onBackRunner(suggestion.externalId, runner.name, suggestion.offerId)
                     }
                   >
-                    <Gift className="size-3 text-emerald-600" />
+                    <Gift className="size-3 text-profit" />
                     Back
                   </Button>
                 </div>

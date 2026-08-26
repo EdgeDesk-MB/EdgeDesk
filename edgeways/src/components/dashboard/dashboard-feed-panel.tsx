@@ -111,7 +111,12 @@ export function DashboardFeedPanel({
         title="History feed"
         description="Goals, results, bet and casino settlements in real time."
         action={
-          <div className="flex min-w-0 justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ScrollFadeEdges
+            orientation="horizontal"
+            className="min-w-0 w-full flex-none"
+            fadeClassName="from-page"
+            scrollClassName="flex justify-end gap-1"
+          >
             {FEED_FILTERS.map((f) => (
               <FilterPill
                 key={f.id}
@@ -123,7 +128,7 @@ export function DashboardFeedPanel({
                 {f.label}
               </FilterPill>
             ))}
-          </div>
+          </ScrollFadeEdges>
         }
       />
       <ScrollFadeEdges

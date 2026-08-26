@@ -16,13 +16,19 @@ import type { BetRow } from "@/lib/db/schema";
 import { formatClockTime } from "@/lib/time-format";
 import {
   anchorSeriesAtZero,
+  chartPlotCoverSecs,
   chartWindowAnchorValue,
+  ensureWindowLinePoints,
   PNL_CHART_PADDING_DEFAULT,
   PNL_CHART_PADDING_PANEL,
+  PNL_CHART_WINDOW_TRANSITION_MS,
+  shouldLingerChartPlotCover,
   type ChartCasinoSettlement,
   type PnlAdjustment,
 } from "@/lib/pnl/chart-bet-markers";
 import { FilterPill } from "@/components/ui/filter-pill";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { EmptyState } from "@/components/help/empty-state";
 
 export interface LivePnlPoint {
   time: number;
@@ -43,7 +49,40 @@ const CHART_WINDOWS: ReadonlyArray<{
   { label: "All", secs: ALL_WINDOW_SECS },
 ];
 
-const DEFAULT_CHART_WINDOW = ALL_WINDOW_SECS;
+export const DEFAULT_CHART_WINDOW = ALL_WINDOW_SECS;
+
+export function PnlChartWindowPills({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (secs: number) => void;
+}) {
+  const isAllSelected = value === ALL_WINDOW_SECS;
+  return (
+    <ScrollFadeEdges
+      orientation="horizontal"
+      className="min-w-0 w-full flex-none"
+      fadeClassName="from-page"
+      scrollClassName="flex justify-end gap-1"
+    >
+      {CHART_WINDOWS.map((w) => (
+        <FilterPill
+          key={w.label}
+          compact
+          active={w.secs === ALL_WINDOW_SECS ? isAllSelected : value === w.secs}
+          onClick={() => onChange(w.secs)}
+          className={cn(
+            "shrink-0 whitespace-nowrap",
+            w.desktopOnly && "hidden sm:inline-flex"
+          )}
+        >
+          {w.label}
+        </FilterPill>
+      ))}
+    </ScrollFadeEdges>
+  );
+}
 
 /** Liveline draws y-axis labels at `w - pad.right + 8` (11px mono). */
 const PANEL_CHART_PADDING = { left: 16, right: 72 } as const;
@@ -91,6 +130,57 @@ function formatChartTime(secs: number, t: number): string {
   return formatClockTime(d, { withSeconds: true });
 }
 
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+/**
+ * Keep the previous (wider) series on screen while Liveline zooms the viewport
+ * in. Set during render so the first frame of a shrink is not already clipped.
+ */
+function useChartPlotCover(chartWindowSecs: number, effectiveWindowSecs: number) {
+  const isAllSelected = chartWindowSecs === ALL_WINDOW_SECS;
+  const prevUserWindowRef = useRef(chartWindowSecs);
+  const prevViewportRef = useRef(effectiveWindowSecs);
+  const [lingerCover, setLingerCover] = useState<{
+    secs: number;
+    fromAll: boolean;
+  } | null>(null);
+
+  const prevUserWindow = prevUserWindowRef.current;
+  const prevViewportSecs = prevViewportRef.current;
+  if (prevUserWindow !== chartWindowSecs) {
+    prevUserWindowRef.current = chartWindowSecs;
+    const nextLinger = shouldLingerChartPlotCover(
+      prevViewportSecs,
+      effectiveWindowSecs,
+      prefersReducedMotion()
+    )
+      ? { secs: prevViewportSecs, fromAll: prevUserWindow === ALL_WINDOW_SECS }
+      : null;
+    if (lingerCover?.secs !== nextLinger?.secs || lingerCover?.fromAll !== nextLinger?.fromAll) {
+      setLingerCover(nextLinger);
+    }
+  }
+  prevViewportRef.current = effectiveWindowSecs;
+
+  useEffect(() => {
+    if (lingerCover == null) return;
+    const timer = window.setTimeout(() => {
+      setLingerCover(null);
+    }, PNL_CHART_WINDOW_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [lingerCover]);
+
+  return {
+    plotCoverSecs: chartPlotCoverSecs(effectiveWindowSecs, lingerCover?.secs ?? null),
+    fillToLeftEdge: !isAllSelected && lingerCover?.fromAll !== true,
+  };
+}
+
 export const LivePnlChart = memo(function LivePnlChart({
   liveTotal,
   historicSeries,
@@ -104,6 +194,10 @@ export const LivePnlChart = memo(function LivePnlChart({
   liveInPlay = true,
   /** Live event in play - switches header to Live Chart + green Radio icon */
   hasLiveEvent = false,
+  /** Mobile Summary embed: no second section header. Window pills live in the Summary header. */
+  embed = false,
+  windowSecs: windowSecsProp,
+  onWindowChange,
   className,
 }: {
   liveTotal: number;
@@ -118,33 +212,49 @@ export const LivePnlChart = memo(function LivePnlChart({
   panel?: boolean;
   liveInPlay?: boolean;
   hasLiveEvent?: boolean;
+  embed?: boolean;
+  windowSecs?: number;
+  onWindowChange?: (secs: number) => void;
   className?: string;
 }) {
   const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   const [livePoints, setLivePoints] = useState<LivePnlPoint[]>([]);
-  const [chartWindowSecs, setChartWindowSecs] = useState<number>(DEFAULT_CHART_WINDOW);
+  const [localWindowSecs, setLocalWindowSecs] = useState<number>(DEFAULT_CHART_WINDOW);
+  const chartWindowSecs = windowSecsProp ?? localWindowSecs;
+  const setChartWindowSecs = onWindowChange ?? setLocalWindowSecs;
+  const [nowTick, setNowTick] = useState(() => Date.now() / 1000);
   const chartHostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
   }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTick(Date.now() / 1000), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const ledgerPoints = useMemo(
+    () =>
+      historicSeries.map((p) => ({
+        // Series is epoch ms; tolerate a seconds-already payload.
+        time: p.time > 1e12 ? p.time / 1000 : p.time,
+        value: p.value,
+      })),
+    [historicSeries]
+  );
 
   // Chart always shows retained P&L (net of exchange commission).
   useEffect(() => {
     const nowSec = Date.now() / 1000;
-    const historic = historicSeries.map((p) => ({
-      time: p.time / 1000,
-      value: p.value,
-    }));
     setLivePoints((prev) => {
-      const lastHistTime = historic.at(-1)?.time ?? 0;
+      const lastHistTime = ledgerPoints.at(-1)?.time ?? 0;
       const liveTail = prev.filter((p) => p.time > lastHistTime + 0.5);
       const tail = [...liveTail, { time: nowSec, value: liveTotal }].slice(-3600);
-      return anchorSeriesAtZero([...historic, ...tail], nowSec);
+      return anchorSeriesAtZero([...ledgerPoints, ...tail], nowSec);
     });
-  }, [historicSeries, liveTotal]);
+  }, [ledgerPoints, liveTotal]);
 
   const isDark = resolvedTheme === "dark";
   useLivelineHoverOutline(chartHostRef, mounted && !isDark);
@@ -167,6 +277,10 @@ export const LivePnlChart = memo(function LivePnlChart({
   );
 
   const isAllSelected = chartWindowSecs === ALL_WINDOW_SECS;
+  const { plotCoverSecs, fillToLeftEdge } = useChartPlotCover(
+    chartWindowSecs,
+    effectiveWindowSecs
+  );
   const markerPadding = panel ? PNL_CHART_PADDING_PANEL : PNL_CHART_PADDING_DEFAULT;
   const showBadge = !panel;
   const chartReferenceValue = useMemo(
@@ -177,29 +291,24 @@ export const LivePnlChart = memo(function LivePnlChart({
       }),
     [livePoints, effectiveWindowSecs, showBadge, isAllSelected]
   );
+  const chartPoints = useMemo(
+    () =>
+      ensureWindowLinePoints(livePoints, plotCoverSecs, {
+        nowSec: nowTick,
+        showBadge,
+        fillToLeftEdge,
+        liveValue: liveTotal,
+      }),
+    [livePoints, plotCoverSecs, showBadge, nowTick, fillToLeftEdge, liveTotal]
+  );
 
   const windowPills = (
-    <div className="flex min-w-0 justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {CHART_WINDOWS.map((w) => (
-        <FilterPill
-          key={w.label}
-          compact
-          active={w.secs === ALL_WINDOW_SECS ? isAllSelected : chartWindowSecs === w.secs}
-          onClick={() => setChartWindowSecs(w.secs)}
-          className={cn(
-            "shrink-0 whitespace-nowrap",
-            w.desktopOnly && "hidden sm:inline-flex"
-          )}
-        >
-          {w.label}
-        </FilterPill>
-      ))}
-    </div>
+    <PnlChartWindowPills value={chartWindowSecs} onChange={setChartWindowSecs} />
   );
 
   const body = (
     <>
-      {panel ? (
+      {panel && !embed ? (
         <DashboardSectionHeader
           prominent
           className="bg-page"
@@ -213,7 +322,7 @@ export const LivePnlChart = memo(function LivePnlChart({
           description="P&L after exchange commission. Streams while tracked events are in play."
           action={windowPills}
         />
-      ) : (
+      ) : embed ? null : (
         <CardHeader className={cn("shrink-0 pb-2", (compact || mini) && "py-3", mini && "py-2")}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -269,7 +378,7 @@ export const LivePnlChart = memo(function LivePnlChart({
             {mounted ? (
               <Liveline
                 key={resolvedTheme}
-                data={livePoints}
+                data={chartPoints}
                 value={liveTotal}
                 theme={isDark ? "dark" : "light"}
                 color={chartColor}
@@ -290,10 +399,10 @@ export const LivePnlChart = memo(function LivePnlChart({
                   },
                   windowStyle: "rounded" as const,
                 })}
-                // Mobile: the chart lives in the Home swipe deck. Liveline's
-                // touch scrub preventDefaults touchmove, which would swallow
-                // the deck's horizontal swipe — so touch scrub stays off on
-                // small viewports. Desktop hover scrub is unaffected.
+                // Mobile: the chart lives on Summary in the Home swipe deck.
+                // Liveline's touch scrub preventDefaults touchmove, which
+                // would swallow the deck swipe — so touch scrub stays off
+                // on small viewports. Desktop hover scrub is unaffected.
                 scrub={isMobile === true ? false : undefined}
                 referenceLine={{ value: chartReferenceValue }}
                 emptyText="Profit updates appear here as bets settle and events go live."
@@ -301,8 +410,14 @@ export const LivePnlChart = memo(function LivePnlChart({
                 formatTime={(t) => formatChartTime(effectiveWindowSecs, t)}
               />
             ) : (
-              <div className="flex h-full min-h-[8rem] items-center justify-center rounded-md bg-muted/30 text-xs text-muted-foreground">
-                Loading chart…
+              <div className="flex h-full min-h-[8rem] items-center justify-center p-3">
+                <EmptyState
+                  compact
+                  busy
+                  className="shadow-none"
+                  title="Loading chart"
+                  description="Profit updates appear here as bets settle."
+                />
               </div>
             )}
             {mounted &&
@@ -311,13 +426,15 @@ export const LivePnlChart = memo(function LivePnlChart({
                 bets={bets}
                 adjustments={adjustments}
                 casinoSettlements={casinoSettlements}
-                livePoints={livePoints}
+                livePoints={chartPoints}
+                ledgerPoints={ledgerPoints}
                 liveValue={liveTotal}
                 windowSecs={effectiveWindowSecs}
                 activeWindowSecs={chartWindowSecs}
                 showBadge={showBadge}
                 referenceValue={chartReferenceValue}
                 padding={markerPadding}
+                nowSec={nowTick}
               />
             ) : null}
           </div>

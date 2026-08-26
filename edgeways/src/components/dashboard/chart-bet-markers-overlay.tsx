@@ -48,19 +48,27 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   casinoSettlements = [],
   markers: markersProp,
   livePoints,
+  ledgerPoints,
   liveValue,
   windowSecs,
   activeWindowSecs,
   showBadge,
   referenceValue = 0,
   padding,
+  nowSec,
 }: {
   bets?: BetRow[];
   adjustments?: PnlAdjustment[];
   casinoSettlements?: ChartCasinoSettlement[];
   /** Pre-built markers (e.g. Racing Desk day chart). Skips Home ledger build. */
   markers?: ChartBetMarker[];
+  /** Series actually passed to Liveline (windowed staircase included). */
   livePoints: LivePnlPoint[];
+  /**
+   * Raw historic ledger tips. Markers only sit on these vertices so a
+   * densified carry-forward cannot light up All-history markers.
+   */
+  ledgerPoints?: LivePnlPoint[];
   liveValue: number;
   windowSecs: number;
   /** The user-selected timeframe (not the continuously-drifting "All" bound) - drives the hide/fade below. */
@@ -69,15 +77,12 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   /** Liveline reference-line value — mirrors the chart floor anchor (0 for All). */
   referenceValue?: number;
   padding: PnlChartPadding;
+  /** Same clock Liveline / the window series used. Defaults to now. */
+  nowSec?: number;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [projected, setProjected] = useState<ProjectedBetMarker[]>([]);
-
-  // Frozen {min, max} from the last frame that had 2+ in-window points -
-  // reused when the window goes sparse so markers don't jump to a
-  // mismatched scale relative to Liveline's own (also-frozen) line range.
-  const lastGoodRangeRef = useRef<{ min: number; max: number } | null>(null);
 
   // Hide markers for the duration of Liveline's window-change animation, then
   // fade them back in over half that time so they don't pop in mid-reflow.
@@ -87,7 +92,7 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   useEffect(() => {
     if (prevActiveWindowRef.current === activeWindowSecs) return;
     prevActiveWindowRef.current = activeWindowSecs;
-    lastGoodRangeRef.current = null;
+    setProjected([]);
     setMarkerFade({ opacity: 0, transition: false });
     const timer = window.setTimeout(() => {
       setMarkerFade({ opacity: 1, transition: true });
@@ -116,17 +121,13 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   }, []);
 
   useEffect(() => {
-    lastGoodRangeRef.current = null;
-  }, [windowSecs, referenceValue]);
-
-  useEffect(() => {
     if (!size.width || !size.height || markers.length === 0) {
       setProjected([]);
       return;
     }
 
     let raf = 0;
-    let lastKey = "";
+    let lastKey: string | null = null;
 
     const tick = () => {
       const layout = computePnlChartLayout({
@@ -137,13 +138,15 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
         showBadge,
         livePoints,
         liveValue,
-        fallbackRange: lastGoodRangeRef.current ?? undefined,
+        nowSec,
         referenceValue,
       });
-      if (layout?.hasSufficientData) {
-        lastGoodRangeRef.current = { min: layout.minVal, max: layout.maxVal };
-      }
-      const next = layout ? projectBetMarkers(markers, layout, livePoints) : [];
+      const next =
+        layout?.hasSufficientData
+          ? projectBetMarkers(markers, layout, livePoints, {
+              ledgerPoints,
+            })
+          : [];
       const key = next
         .map((p) => `${p.marker.kind ?? "bet"}:${p.marker.id}:${p.x.toFixed(1)}:${p.y.toFixed(1)}`)
         .join("|");
@@ -156,7 +159,18 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [markers, size, padding, windowSecs, showBadge, livePoints, liveValue, referenceValue]);
+  }, [
+    markers,
+    size,
+    padding,
+    windowSecs,
+    showBadge,
+    livePoints,
+    ledgerPoints,
+    liveValue,
+    referenceValue,
+    nowSec,
+  ]);
 
   if (markers.length === 0) return null;
 

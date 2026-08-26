@@ -8,8 +8,10 @@
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarClock } from "lucide-react";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
 import { doNextBarClass } from "@/lib/offers/do-next";
@@ -20,6 +22,7 @@ import {
 } from "@/lib/plan/daily-plan";
 import { formatEvGbp } from "@/lib/format-money";
 import { formatClockTime } from "@/lib/time-format";
+import { EmptyState } from "@/components/help/empty-state";
 import { dashboardSection } from "@/lib/ui/dashboard-layout";
 import { cardInsetX } from "@/lib/ui/layout-spacing";
 import { cn } from "@/lib/utils";
@@ -77,7 +80,7 @@ function SlotRow({
       {slot.ev != null && slot.ev > 0.5 && !slot.done ? (
         <span className="flex shrink-0 items-center gap-1.5">
           {slot.basis ? <EvBasisBadge basis={slot.basis} /> : null}
-          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-xs">
+          <span className="text-sm font-bold tabular-nums text-profit sm:text-xs">
             {formatEvGbp(slot.ev)}
           </span>
         </span>
@@ -101,7 +104,25 @@ function SlotRow({
   return <div className={rowClass}>{body}</div>;
 }
 
-export function DailyPlan({ className }: { className?: string }) {
+function PlanHeader() {
+  return (
+    <DashboardSectionHeader
+      prominent
+      className="bg-page"
+      title="Today's plan"
+      description="Deadlines, races and kick-offs in time order."
+    />
+  );
+}
+
+export function DailyPlan({
+  className,
+  /** Keep the section chrome when the sheet is empty (mobile deck card). */
+  keepMounted = false,
+}: {
+  className?: string;
+  keepMounted?: boolean;
+}) {
   const { items: doNext, state } = useDoNextItems(5000);
   const [slots, setSlots] = useState<DailyPlanSlot[]>([]);
   const dayKeyRef = useRef("");
@@ -109,48 +130,85 @@ export function DailyPlan({ className }: { className?: string }) {
   const offers = state?.offers;
   const races = state?.planRaces;
   const fixtures = state?.planFixtures;
+  const accaLegs = state?.accaLayDue;
 
-  useEffect(() => {
-    if (!state) return;
-    const now = Date.now();
-    const dayKey = new Date(now).toDateString();
-    const fresh = buildDailyPlan({
+  const sheet = useMemo(() => {
+    if (!state) return null;
+    return buildDailyPlan({
       offers: offers ?? [],
       doNext,
       races: races ?? [],
       fixtures: fixtures ?? [],
-      accaLegs: state.accaLayDue ?? [],
-      now,
+      accaLegs: accaLegs ?? [],
+      now: Date.now(),
     });
+  }, [state, offers, doNext, races, fixtures, accaLegs]);
+
+  useEffect(() => {
+    if (!sheet) return;
+    const dayKey = new Date().toDateString();
     setSlots((prev) => {
       const base = dayKeyRef.current === dayKey ? prev : [];
       dayKeyRef.current = dayKey;
-      return mergePlanWithSeen(base, fresh);
+      return mergePlanWithSeen(base, sheet);
     });
-  }, [state, offers, doNext, races, fixtures]);
+  }, [sheet]);
 
-  if (slots.length === 0) return null;
+  const visibleSlots = slots.length > 0 ? slots : (sheet ?? []);
 
-  const timed = slots.filter((s) => s.at != null);
-  const anytime = slots.filter((s) => s.at == null);
-  const doneCount = slots.filter((s) => s.done).length;
+  if (sheet == null) {
+    if (!keepMounted) return null;
+    return (
+      <section
+        className={cn(dashboardSection, "max-h-none shrink-0 sm:h-auto", className)}
+      >
+        <PlanHeader />
+        <div className={cn(cardInsetX, "py-3")}>
+          <EmptyState
+            compact
+            busy
+            title="Loading today's plan"
+            description="The run-sheet will appear here."
+          />
+        </div>
+      </section>
+    );
+  }
+
+  if (visibleSlots.length === 0) {
+    if (!keepMounted) return null;
+    return (
+      <section
+        className={cn(dashboardSection, "max-h-none shrink-0 sm:h-auto", className)}
+      >
+        <PlanHeader />
+        <div className={cn(cardInsetX, "py-3")}>
+          <EmptyState
+            compact
+            icon={CalendarClock}
+            title="Nothing on the clock"
+            description="Add an offer or track a race and it will land here."
+            action={{ label: "Browse offers", href: "/offers" }}
+          />
+        </div>
+      </section>
+    );
+  }
+
+  const timed = visibleSlots.filter((s) => s.at != null);
+  const anytime = visibleSlots.filter((s) => s.at == null);
+  const doneCount = visibleSlots.filter((s) => s.done).length;
 
   return (
     // Mobile (deck card): fill the viewport height; desktop: natural height above the Feed.
     <section
       className={cn(dashboardSection, "max-h-none shrink-0 sm:h-auto", className)}
     >
-      <DashboardSectionHeader
-        prominent
-        className="bg-page"
-        title="Today's plan"
-        description="Deadlines, races and kick-offs in time order."
-      />
-      <div
-        className={cn(
-          "app-scroll-nested min-h-0 flex-1 overflow-y-auto py-1.5 sm:max-h-[17.5rem] sm:flex-none",
-          cardInsetX
-        )}
+      <PlanHeader />
+      <ScrollFadeEdges
+        className="min-h-0 flex-1 sm:max-h-[17.5rem] sm:flex-none"
+        fadeClassName="from-page"
+        scrollClassName={cn("app-scroll-nested py-1.5", cardInsetX)}
       >
         {timed.length > 0 ? (
           <ol className="flex flex-col">
@@ -184,10 +242,10 @@ export function DailyPlan({ className }: { className?: string }) {
         ) : null}
         {doneCount > 0 ? (
           <p className="pb-1 pt-1.5 text-[11px] text-muted-foreground">
-            {doneCount} of {slots.length} done
+            {doneCount} of {visibleSlots.length} done
           </p>
         ) : null}
-      </div>
+      </ScrollFadeEdges>
     </section>
   );
 }

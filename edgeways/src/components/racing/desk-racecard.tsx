@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { PressButton } from "@/components/ui/button-3d";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   formatDecimalOdds,
   formatSpOddsDisplay,
@@ -65,7 +70,7 @@ import {
 } from "lucide-react";
 import { formatExchangeMatchError } from "@/lib/services/exchange/format-exchange-error";
 import { cn } from "@/lib/utils";
-import { darken, lighten } from "@/lib/brands/exchanges";
+import { oddsCellClass, oddsCellStyle } from "@/lib/ui/odds-cell";
 import { racingRegionLabel } from "@/lib/geo/region";
 import { countRecommendedOffersOnRace } from "@/lib/racing/offer-tags";
 import {
@@ -212,7 +217,7 @@ export interface DeskRacecardProps {
 
 function spreadTone(spreadPct?: number): string {
   if (spreadPct == null) return "text-muted-foreground";
-  if (spreadPct <= 3) return "text-emerald-600 dark:text-emerald-400";
+  if (spreadPct <= 3) return "text-profit";
   if (spreadPct <= 8) return "text-amber-600 dark:text-amber-400";
   return "text-muted-foreground";
 }
@@ -223,20 +228,35 @@ function formatLaySize(size?: number): string | null {
   return `£${Math.round(size)}`;
 }
 
-/**
- * Exchange-branded odds cell - same lighten/darken pattern as calculator Back/Lay panels.
- * Light mode: pastel tint. Dark mode: deep panel tint (0.72) so cells match the calc, not washed mid-tones.
- */
-function oddsCellStyle(hex?: string): CSSProperties | undefined {
-  if (!hex) return undefined;
-  return {
-    "--odds-cell": lighten(hex, 0.72),
-    "--odds-cell-dark": darken(hex, 0.72),
-  } as CSSProperties;
+function RunnerActionButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          aria-label={label}
+          onClick={onClick}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center" sideOffset={6}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
-
-const oddsCellClass =
-  "bg-[var(--odds-cell)] text-black/85 dark:bg-[var(--odds-cell-dark)] dark:text-white/95";
 
 
 /** One contiguous free-bet place run (merged when offers overlap/adjoin). */
@@ -378,7 +398,7 @@ function RunnerRow({
             </Badge>
           )}
           {!resultMode && isSteamer && (
-            <Badge variant="outline" className="border-emerald-500/40 text-[11px] text-emerald-600">
+            <Badge variant="outline" className="border-profit/40 text-[11px] text-profit">
               steamer
             </Badge>
           )}
@@ -533,54 +553,39 @@ function RunnerRow({
           </td>
           <td className="w-28 py-1.5 pl-1 pr-3 text-right">
             <div className="flex justify-end gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                title="Matched lay calculator"
+              <RunnerActionButton
+                label="Matched lay calculator"
                 onClick={() => onBet(race, runner.name, "lay")}
               >
                 <TrendingDown className="size-3.5 text-muted-foreground" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                title="Add win bet"
+              </RunnerActionButton>
+              <RunnerActionButton
+                label="Add win bet"
                 onClick={() => onBet(race, runner.name, "win")}
               >
                 <NotebookPen className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                title="Each-way calculator"
+              </RunnerActionButton>
+              <RunnerActionButton
+                label="Each-way calculator"
                 onClick={() => onBet(race, runner.name, "each_way")}
               >
                 <Layers2 className="size-3.5" />
-              </Button>
+              </RunnerActionButton>
               {showOfferChrome && hasPlaceOffer && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  title="Place-refund offer bet"
+                <RunnerActionButton
+                  label="Place-refund offer bet"
                   onClick={() => onBet(race, runner.name, "place_refund")}
                 >
-                  <Gift className="size-3.5 text-emerald-600" />
-                </Button>
+                  <Gift className="size-3.5 text-profit" />
+                </RunnerActionButton>
               )}
               {!hideOffers && bookiePlaces > exchangePlaces && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  title="Extra place calculator"
+                <RunnerActionButton
+                  label="Extra place calculator"
                   onClick={() => onBet(race, runner.name, "extra_place")}
                 >
                   <Calculator className="size-3.5" />
-                </Button>
+                </RunnerActionButton>
               )}
             </div>
           </td>
@@ -976,7 +981,7 @@ export function DeskRacecard({
               {selected.fieldSize} runners · {selected.standardPlaces} places
             </span>
             {(selected.liveLayCount ?? 0) > 0 ? (
-              <span className="text-emerald-600 dark:text-emerald-400">
+              <span className="text-profit">
                 Betfair lays · {selected.liveLayCount}/{selected.runners.filter((r) => !r.nonRunner).length}
               </span>
             ) : selected.exchangeMatchError ? (
@@ -1088,6 +1093,7 @@ export function DeskRacecard({
               aria-hidden
             />
           </button>
+          <TooltipProvider delayDuration={200}>
           <div
             id="racecard-runner-grid"
             ref={runnerGridRef}
@@ -1215,6 +1221,7 @@ export function DeskRacecard({
               </div>
             ) : null}
           </div>
+          </TooltipProvider>
         </>
       )}
       {!showInPlayEmpty && (refreshLabel || exchangeStatusLabel) && (

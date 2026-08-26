@@ -70,12 +70,11 @@ export function RacingSettlePrompt({
 
   const primary = visible[0];
   const moreCount = visible.length - 1;
-  const tierHint =
-    resultsTier === "basic"
-      ? "Results sync automatically while the app is open, or "
-      : resultsTier === "free"
-        ? "Free tier, upgrade Racing API Basic for auto results, or "
-        : "Set Racing API credentials for auto results, or ";
+  const trackedEventsLink = (
+    <Link href="/tracked-events" className="font-medium underline underline-offset-2">
+      Tracked Events
+    </Link>
+  );
 
   return (
     <div
@@ -91,31 +90,35 @@ export function RacingSettlePrompt({
           {visible.length === 1 ? "Race awaiting result" : `${visible.length} races awaiting results`}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{primary.course}</span> ({formatClockString(primary.offTime)}) passed off without a
-          winner. {tierHint}
-          set the winner on{" "}
-          <Link href="/tracked-events" className="font-medium underline underline-offset-2">
-            Tracked Events
-          </Link>
-          .
-          {moreCount > 0 && (
-            <span>
-              {" "}
-              +{moreCount} more
-            </span>
+          <span className="font-medium text-foreground">{primary.course}</span>
+          {" "}
+          ({formatClockString(primary.offTime)}) has started.{" "}
+          {resultsTier === "basic" ? (
+            <>
+              Results sync automatically while the app is open, or set the result on {trackedEventsLink}.
+            </>
+          ) : resultsTier === "free" ? (
+            <>
+              Set the result on {trackedEventsLink}, or upgrade to Racing API Basic for automatic results.
+            </>
+          ) : (
+            <>
+              Set the result on {trackedEventsLink}, or set Racing API credentials for automatic results.
+            </>
           )}
+          {moreCount > 0 && <span> +{moreCount} more</span>}
         </p>
       </div>
       <div className="flex shrink-0 gap-1">
         <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-          <Link href="/tracked-events">Settle</Link>
+          <Link href="/tracked-events">Set result</Link>
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="size-7 text-warning hover:text-warning/80"
-          aria-label="Dismiss settle reminder"
+          aria-label="Dismiss result reminder"
           onClick={() => (visible.length === 1 ? dismiss(primary.id) : dismissAll())}
         >
           <X className="size-3.5" />

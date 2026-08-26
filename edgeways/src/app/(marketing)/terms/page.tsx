@@ -7,9 +7,11 @@ import {
   LEGAL_OPERATOR,
   LEGAL_PATHS,
 } from "@/lib/legal/public";
+import { canonicalUrl } from "@/lib/marketing/share-metadata";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
+  alternates: { canonical: canonicalUrl(LEGAL_PATHS.terms) },
 };
 
 export default function TermsPage() {

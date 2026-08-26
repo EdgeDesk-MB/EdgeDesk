@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { DatePicker } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
 import { Button } from "@/components/ui/button";
+import { DialogSaveButton } from "@/components/ui/dialog-save-button";
 import {
   Dialog,
   DialogContent,
@@ -1692,7 +1693,8 @@ Expires 12 Aug 2026, 23:59`}
           ) : resultConditional ? (
             <p className="text-xs text-muted-foreground">
               Place-refund offers stay available all day: after you log a qualifier, a fresh copy
-              appears so you can go again on the next race in this scope.
+              appears so you can go again on the next race in this scope. The awarded free bet is
+              not locked to these courses, only to the same sport.
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -2235,7 +2237,7 @@ Expires 12 Aug 2026, 23:59`}
       </div>
 
       <div className="shrink-0 border-t px-6 py-4">
-        <Button
+        <DialogSaveButton
           type="submit"
           className="w-full"
           disabled={saving || (titleRequired && !title.trim() && editingId == null)}
@@ -2249,7 +2251,7 @@ Expires 12 Aug 2026, 23:59`}
               <Plus className="size-4" /> Add offer
             </>
           )}
-        </Button>
+        </DialogSaveButton>
       </div>
 
       <Dialog
@@ -2330,13 +2332,13 @@ Expires 12 Aug 2026, 23:59`}
             >
               Cancel
             </Button>
-            <Button
+            <DialogSaveButton
               type="button"
               disabled={saving}
               onClick={() => void persistOffer(seriesUpdateScope === "series")}
             >
               {saving ? "Saving…" : "Save"}
-            </Button>
+            </DialogSaveButton>
           </div>
         </DialogContent>
       </Dialog>

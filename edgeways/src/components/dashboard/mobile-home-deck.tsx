@@ -8,6 +8,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { resolveMobileDeckCardId } from "@/lib/ui/home-layout";
 import { cn } from "@/lib/utils";
 
 export interface HomeDeckCard {
@@ -63,19 +65,21 @@ export function MobileHomeDeck({
   }, []);
 
   // Initial position: this session's remembered card, else the user's pin,
-  // else the deterministic context pick (open positions → chart; morning with
-  // plan work → plan; otherwise hero). The programmatic scroll fires
-  // onScroll, which sets the active index.
+  // else the deterministic context pick (open positions → Summary, which
+  // holds the chart; morning with plan work → plan; otherwise hero).
+  // A stored or pinned "chart" id maps to Summary. The programmatic
+  // scroll fires onScroll, which sets the active index.
   useEffect(() => {
     if (didInitRef.current || cards.length === 0) return;
     didInitRef.current = true;
     const contextPick = hasOpenPositions
-      ? "chart"
+      ? "hero"
       : new Date().getHours() < 12 && hasPlanWork
         ? "plan"
         : "hero";
-    const startId =
-      readStoredCard() ?? (pin !== "auto" ? pin : contextPick);
+    const startId = resolveMobileDeckCardId(
+      readStoredCard() ?? (pin !== "auto" ? pin : contextPick)
+    );
     const index = cards.findIndex((c) => c.id === startId);
     if (index > 0) scrollToIndex(index, false);
   }, [cards, pin, hasOpenPositions, hasPlanWork, scrollToIndex]);
@@ -122,9 +126,13 @@ export function MobileHomeDeck({
             aria-label={`${card.label} (${i + 1} of ${cards.length})`}
             className="flex w-screen shrink-0 snap-center flex-col overflow-hidden bg-background"
           >
-            <div className="app-scroll-nested min-h-0 flex-1 overflow-y-auto">
+            <ScrollFadeEdges
+              className="min-h-0 flex-1"
+              fadeClassName="from-background"
+              scrollClassName="app-scroll-nested"
+            >
               {card.node}
-            </div>
+            </ScrollFadeEdges>
           </div>
         ))}
       </div>

@@ -270,7 +270,10 @@ export function RacingPnlTodayView({
                   return (
                     <TableRow
                       key={row.eventId}
-                      className={cn(listRow, clickable && "cursor-pointer")}
+                      className={cn(
+                        listRow,
+                        clickable && "cursor-pointer hover:bg-selection-subtle"
+                      )}
                       onClick={
                         clickable
                           ? () => onSelectRace?.(row.raceExternalId!)

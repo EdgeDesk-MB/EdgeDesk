@@ -72,6 +72,7 @@ export function OfferPlaybookPanel({
     };
   }, [step?.kind, offer.bookmaker, offer.id]);
 
+  if (offer.deskProgress) return null;
   if (!playbook || !step || !progress) return null;
   if (offer.status === "completed" || offer.status === "expired") return null;
   if (step.kind === "done" && step.status === "done") return null;
@@ -150,6 +151,7 @@ export function OfferPlaybookPanel({
 
 /** True when the playbook is the primary “what now” UI (soften pipeline chrome). */
 export function offerPlaybookIsPrimary(offer: OfferSummary): boolean {
+  if (offer.deskProgress) return false;
   const raw = readPlaybookFromRulesJson(offer.rules);
   if (!raw) return false;
   if (offer.status === "completed" || offer.status === "expired") return false;

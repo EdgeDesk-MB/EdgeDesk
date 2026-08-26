@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { enGB as dayPickerEnGB } from "react-day-picker/locale";
@@ -99,6 +99,7 @@ export function DateTimePicker({
   shortcuts?: "ending";
 }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const parts = splitDatetimeLocal(value);
   const parsedTime = parseHm(parts.time);
   const [draftDate, setDraftDate] = useState(parts.date);
@@ -162,13 +163,20 @@ export function DateTimePicker({
 
   const panel = (
     <PopoverContent
+      ref={panelRef}
       align={trigger === "link" ? "start" : "end"}
-      className="w-auto gap-0 p-0"
-      onOpenAutoFocus={(e) => e.preventDefault()}
+      collisionPadding={16} // --overlay-gutter (1rem)
+      tabIndex={-1}
+      // Default popover is 18rem, too narrow for calendar + time wheels.
+      className="min-h-0 w-max min-w-0 max-h-[min(var(--radix-popover-content-available-height,100dvh),calc(100dvh-var(--overlay-gutter)))] max-w-[var(--overlay-datetime-max)] gap-0 overflow-hidden p-0"
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        panelRef.current?.focus();
+      }}
       onWheel={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-col sm:flex-row">
-        <div className="flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain sm:flex-row sm:items-stretch">
+        <div className="flex shrink-0 flex-col">
           <Calendar
             mode="single"
             locale={dayPickerEnGB}
@@ -201,7 +209,12 @@ export function DateTimePicker({
             </div>
           ) : null}
         </div>
-        <div className="flex flex-col justify-center border-t sm:border-l sm:border-t-0">
+        <div
+          className={cn(
+            "flex shrink-0 flex-col border-t sm:border-l sm:border-t-0",
+            shortcuts === "ending" ? "justify-between" : "justify-center"
+          )}
+        >
           <div className="px-3 py-2">
             <p className="mb-1 text-center text-xs font-medium text-muted-foreground">
               Time
@@ -226,7 +239,7 @@ export function DateTimePicker({
           ) : null}
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-2 py-2">
         <Button
           type="button"
           variant="ghost"
@@ -261,7 +274,7 @@ export function DateTimePicker({
 
   if (trigger === "link") {
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover modal open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
@@ -287,7 +300,7 @@ export function DateTimePicker({
 
   if (trigger === "icon") {
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover modal open={open} onOpenChange={setOpen}>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -322,7 +335,7 @@ export function DateTimePicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}

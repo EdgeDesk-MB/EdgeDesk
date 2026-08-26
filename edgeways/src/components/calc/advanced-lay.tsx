@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import {
-  applyExchangeOddsInputChange,
   exchangeOddsStepHandlers,
-  getExchangeOddsStep,
+  handleExchangeOddsInputEvent,
 } from "@/lib/calc/exchange-odds-step";
 import { layStakeStepHandlers } from "@/lib/calc/exchange-stake-step";
 import { cn } from "@/lib/utils";
@@ -105,33 +105,17 @@ export function AdvancedLaySection({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {/* Part lays already placed */}
-      {partLays.map((part, i) => {
-        const oddsStep = exchangeOddsStepHandlers(part.odds, (odds) =>
-          onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
-        );
-        const stakeStep = layStakeStepHandlers(part.stake, (stake) =>
-          onPartLays(partLays.map((p, j) => (j === i ? { ...p, stake } : p)))
-        );
-        return (
+      {partLays.map((part, i) => (
         <div key={i} className="flex items-end gap-2 max-sm:flex-col max-sm:items-stretch">
           <label className="flex flex-1 flex-col gap-1">
             <span className="text-xs font-medium text-black/60 dark:text-white/60">
               Part lay {i + 1} odds
             </span>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={1.01}
-              step={getExchangeOddsStep(part.odds)}
-              value={Number.isFinite(part.odds) ? part.odds : ""}
-              onChange={(e) =>
-                applyExchangeOddsInputChange(part.odds, parseFloat(e.target.value), (odds) =>
-                  onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
-                )
+            <PartLayOddsInput
+              value={part.odds}
+              onChange={(odds) =>
+                onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
               }
-              onKeyDown={oddsStep.onKeyDown}
-              onWheel={oddsStep.onWheel}
-              className="h-9 w-full rounded-md border-0 bg-black/10 px-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
             />
           </label>
           <label className="flex flex-1 flex-col gap-1">
@@ -140,22 +124,11 @@ export function AdvancedLaySection({
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-black/50 dark:text-white/50">
                 £
               </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step={0.01}
-                value={Number.isFinite(part.stake) ? part.stake : ""}
-                onChange={(e) =>
-                  onPartLays(
-                    partLays.map((p, j) =>
-                      j === i ? { ...p, stake: parseFloat(e.target.value) } : p
-                    )
-                  )
+              <PartLayStakeInput
+                value={part.stake}
+                onChange={(stake) =>
+                  onPartLays(partLays.map((p, j) => (j === i ? { ...p, stake } : p)))
                 }
-                onKeyDown={stakeStep.onKeyDown}
-                onWheel={stakeStep.onWheel}
-                className="h-9 w-full rounded-md border-0 bg-black/10 pl-7 pr-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
               />
             </span>
           </label>
@@ -168,8 +141,7 @@ export function AdvancedLaySection({
             <X className="size-4" />
           </button>
         </div>
-        );
-      })}
+      ))}
       <button
         type="button"
         onClick={() => onPartLays([...partLays, { odds: NaN, stake: NaN }])}
@@ -250,5 +222,53 @@ export function AdvancedLaySection({
         </label>
       </div>
     </div>
+  );
+}
+
+function PartLayOddsInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (odds: number) => void;
+}) {
+  const oddsStep = exchangeOddsStepHandlers(value, onChange);
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(oddsStep.onWheel);
+  return (
+    <input
+      ref={wheelRef}
+      type="number"
+      inputMode="decimal"
+      min={1.01}
+      step="any"
+      value={Number.isFinite(value) ? value : ""}
+      onChange={(e) => handleExchangeOddsInputEvent(value, e, onChange)}
+      onKeyDown={oddsStep.onKeyDown}
+      className="h-9 w-full rounded-md border-0 bg-black/10 px-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
+    />
+  );
+}
+
+function PartLayStakeInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (stake: number) => void;
+}) {
+  const stakeStep = layStakeStepHandlers(value, onChange);
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(stakeStep.onWheel);
+  return (
+    <input
+      ref={wheelRef}
+      type="number"
+      inputMode="decimal"
+      min={0}
+      step={0.01}
+      value={Number.isFinite(value) ? value : ""}
+      onChange={(e) => onChange(parseFloat(e.target.value))}
+      onKeyDown={stakeStep.onKeyDown}
+      className="h-9 w-full rounded-md border-0 bg-black/10 pl-7 pr-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
+    />
   );
 }

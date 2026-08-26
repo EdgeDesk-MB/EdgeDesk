@@ -36,6 +36,7 @@ import { EFFORT_MINUTES } from "@/lib/offers/do-next";
 import {
   HOME_WIDGET_LABELS,
   moveWidget,
+  toggleDeckHidden,
   type HomeLayoutSettings,
   type HomeWidgetId,
 } from "@/lib/ui/home-layout";
@@ -58,6 +59,7 @@ import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 import { SPORTS } from "@/lib/sports";
 import { SportLabel } from "@/components/sport-icon";
 import { sectionDescription } from "@/lib/ui/surface-styles";
+import { cn } from "@/lib/utils";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import { useAdminSession } from "@/hooks/use-admin-session";
 
@@ -478,14 +480,17 @@ function HomeLayoutCard({
             className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
           >
             <div className="flex min-w-0 items-center gap-1">
-              <div className="flex flex-col">
+              <div
+                className={cn("flex flex-col", id === "chart" && "invisible")}
+                aria-hidden={id === "chart"}
+              >
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="size-6 text-muted-foreground"
                   aria-label={`Move ${HOME_WIDGET_LABELS[id]} up in the deck`}
-                  disabled={i === 0}
+                  disabled={id === "chart" || i === 0}
                   onClick={() => commit({ deckOrder: moveWidget(layout.deckOrder, id, -1) })}
                 >
                   <ChevronUp className="size-3.5" />
@@ -496,13 +501,18 @@ function HomeLayoutCard({
                   size="icon"
                   className="size-6 text-muted-foreground"
                   aria-label={`Move ${HOME_WIDGET_LABELS[id]} down in the deck`}
-                  disabled={i === layout.deckOrder.length - 1}
+                  disabled={id === "chart" || i === layout.deckOrder.length - 1}
                   onClick={() => commit({ deckOrder: moveWidget(layout.deckOrder, id, 1) })}
                 >
                   <ChevronDown className="size-3.5" />
                 </Button>
               </div>
-              <p className="truncate text-sm font-medium">{HOME_WIDGET_LABELS[id]}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{HOME_WIDGET_LABELS[id]}</p>
+                {id === "chart" ? (
+                  <p className="text-xs text-muted-foreground">Sits on Summary on the phone</p>
+                ) : null}
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-4 pr-1">
               <span className="flex w-12 justify-center">
@@ -517,8 +527,14 @@ function HomeLayoutCard({
               <span className="flex w-12 justify-center">
                 <Switch
                   checked={!layout.deckHidden.includes(id)}
-                  aria-label={`Show ${HOME_WIDGET_LABELS[id]} in the mobile deck`}
-                  onCheckedChange={(v) => commit({ deckHidden: toggle(layout.deckHidden, id, v) })}
+                  aria-label={
+                    id === "chart"
+                      ? "Show Chart on the mobile Summary"
+                      : `Show ${HOME_WIDGET_LABELS[id]} in the mobile deck`
+                  }
+                  onCheckedChange={(v) =>
+                    commit({ deckHidden: toggleDeckHidden(layout.deckHidden, id, v) })
+                  }
                 />
               </span>
             </div>
@@ -526,7 +542,8 @@ function HomeLayoutCard({
         ))}
         <p className="text-xs text-muted-foreground">
           Hidden widgets stay reachable from their own pages - the tracker chart, the offers
-          calendar and the history feed.
+          calendar and the history feed. On the phone, Chart sits on Summary rather than its
+          own card. Showing Chart turns Summary back on; hiding Summary hides Chart too.
         </p>
       </CardContent>
     </Card>
@@ -959,14 +976,13 @@ function AutomationCard({
               <SelectItem value="auto">Auto (context-aware)</SelectItem>
               <SelectItem value="hero">Summary</SelectItem>
               <SelectItem value="plan">Today&apos;s plan</SelectItem>
-              <SelectItem value="chart">Chart</SelectItem>
               <SelectItem value="feed">Feed</SelectItem>
               <SelectItem value="do-next">Do next</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Auto picks the chart with open positions, the plan in the morning, otherwise the
-            overview.
+            Auto picks Summary when you have open positions (the chart lives there), Today&apos;s
+            plan in the morning, otherwise Summary.
           </p>
         </div>
       </CardContent>

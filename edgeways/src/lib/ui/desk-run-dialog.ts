@@ -2,12 +2,12 @@ import { cn } from "@/lib/utils";
 
 /** Tall desk create/edit shell: flex column, one scroll region, sticky footer. */
 export const deskRunDialogContentClass = cn(
-  "flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden sm:max-w-xl"
+  "flex max-h-[90vh] max-w-lg flex-col gap-5 overflow-hidden sm:max-w-xl"
 );
 
-/** Scrollable body inside deskRunDialogContentClass (keeps DialogFooter pinned). */
+/** Inner scroller for DeskRunDialogBody (ScrollFadeEdges owns overflow). */
 export const deskRunDialogBodyClass = cn(
-  "app-scroll-nested flex min-h-0 flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto pr-0.5"
+  "app-scroll-nested flex min-h-0 flex-1 flex-col gap-5 pr-0.5"
 );
 
 /**

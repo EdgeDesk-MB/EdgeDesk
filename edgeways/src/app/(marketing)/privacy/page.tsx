@@ -5,10 +5,13 @@ import {
   ICO_REGISTRATION_NOTE,
   LEGAL_EFFECTIVE_DATE,
   LEGAL_OPERATOR,
+  LEGAL_PATHS,
 } from "@/lib/legal/public";
+import { canonicalUrl } from "@/lib/marketing/share-metadata";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
+  alternates: { canonical: canonicalUrl(LEGAL_PATHS.privacy) },
 };
 
 export default function PrivacyPage() {
@@ -93,7 +96,8 @@ export default function PrivacyPage() {
               <td>While you use the app</td>
               <td>
                 Product events and error reports via PostHog (EU cloud,
-                cookieless, no autocapture)
+                cookieless, no autocapture, no session replay, heatmaps or
+                console capture)
               </td>
             </tr>
             <tr>
@@ -294,8 +298,9 @@ export default function PrivacyPage() {
       <p>
         The app uses local storage for preferences and session sign-in. Those
         are strictly necessary. PostHog runs in cookieless mode and does not
-        set analytics cookies, so we do not show a cookie banner. If that
-        changes, we will update this page and add a consent step.
+        set analytics cookies, so we do not show a cookie banner. We do not
+        record your screen, collect heatmaps, or capture the browser console.
+        If that changes, we will update this page and add a consent step.
       </p>
 
       <h2>10. Children</h2>

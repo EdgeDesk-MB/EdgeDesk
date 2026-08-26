@@ -27,6 +27,7 @@ function actionTone(kind: OfferNextAction["kind"]): string {
       return "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300";
     case "place_qualifying":
     case "start_planned":
+    case "desk_lay":
       return "border-primary/30 bg-primary/10 text-primary-text";
     default:
       return "border-border/60 bg-selection-subtle text-muted-foreground";

@@ -3,11 +3,11 @@
 import { useId, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { darken } from "@/lib/brands/exchanges";
 import {
-  applyExchangeOddsInputChange,
   exchangeOddsStepHandlers,
-  getExchangeOddsStep,
+  handleExchangeOddsInputEvent,
 } from "@/lib/calc/exchange-odds-step";
 import {
   commitLayStake,
@@ -78,6 +78,9 @@ export function NumField({
     !disabled && layStakeStepping
       ? layStakeStepHandlers(value, onChange)
       : null;
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(
+    oddsStep?.onWheel ?? stakeStep?.onWheel
+  );
 
   const moneyDisplay = focused
     ? text
@@ -133,24 +136,23 @@ export function NumField({
         {exchangeOddsStepping ? (
           <Input
             id={id}
+            ref={wheelRef}
             type="number"
             inputMode="decimal"
-            step={getExchangeOddsStep(value)}
+            step="any"
             min={min ?? 1.01}
             value={Number.isFinite(value) ? value : ""}
             placeholder={placeholder}
             disabled={disabled}
             onKeyDown={oddsStep?.onKeyDown}
-            onWheel={oddsStep?.onWheel}
-            onChange={(e) =>
-              applyExchangeOddsInputChange(value, parseFloat(e.target.value), onChange)
-            }
+            onChange={(e) => handleExchangeOddsInputEvent(value, e, onChange)}
             className={fieldClass}
             style={tintStyle}
           />
         ) : isMoney ? (
           <Input
             id={id}
+            ref={wheelRef}
             type="text"
             inputMode="decimal"
             value={moneyDisplay}
@@ -171,7 +173,6 @@ export function NumField({
               commitMoneyText(text);
             }}
             onKeyDown={stakeStep?.onKeyDown}
-            onWheel={stakeStep?.onWheel}
             onChange={(e) => {
               const next = e.target.value;
               setText(next);

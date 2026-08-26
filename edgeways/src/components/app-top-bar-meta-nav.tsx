@@ -244,7 +244,7 @@ export function AppTopBarMetaNav() {
   }, [activeId]);
 
   return (
-    <div className="relative overflow-visible">
+    <div className="relative overflow-visible pt-[var(--layout-meta-nav-gap)]">
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 hidden h-px bg-topbar-border sm:block"
         aria-hidden

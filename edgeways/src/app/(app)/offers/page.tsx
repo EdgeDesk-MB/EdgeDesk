@@ -24,7 +24,7 @@ import {
   startOfLocalDay,
 } from "@/lib/offers/offer-list-groups";
 import { FilterPill } from "@/components/ui/filter-pill";
-import { filterPillCountState } from "@/lib/ui/surface-styles";
+import { filterPillCountState, toolbarSelectTrigger } from "@/lib/ui/surface-styles";
 import { formatPillLabel } from "@/lib/ui/status-badges";
 import { listOfferNextActions, offerNextActionLabel } from "@/lib/offers/next-actions";
 import {
@@ -253,7 +253,7 @@ function OffersContent() {
               >
                 <SelectTrigger
                   size="sm"
-                  className="w-auto rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground hover:text-foreground data-[state=open]:bg-muted/60 data-[state=open]:text-foreground"
+                  className={toolbarSelectTrigger}
                 >
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>

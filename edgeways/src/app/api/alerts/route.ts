@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { eq, like, isNull } from "drizzle-orm";
+import { resolveAlertsInboxMode } from "@/lib/alerts/inbox-access";
+import { isNeonDesk } from "@/lib/db/desk-backend";
 import { db, alertsInbox } from "@/lib/db";
+import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { publicDemoAlertsInbox } from "@/lib/demo/public-desk-api";
 import {
   listInbox,
   markAllRead,
@@ -13,9 +18,24 @@ import {
 import { dismissPush, sendPush } from "@/lib/services/push";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
+async function alertsInboxMode() {
+  const demoActive = (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  return resolveAlertsInboxMode({
+    publicDemo: demoActive,
+    neonDesk: isNeonDesk(),
+  });
+}
+
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
+  const mode = await alertsInboxMode();
+  if (mode === "demo") {
+    return NextResponse.json({ alerts: publicDemoAlertsInbox() });
+  }
+  if (mode === "hosted_empty") {
+    return NextResponse.json({ alerts: [] });
+  }
   return NextResponse.json({ alerts: listInbox() });
 });
 
@@ -39,11 +59,17 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const mode = await alertsInboxMode();
+  if (mode !== "desk") {
+    return NextResponse.json({ recorded: 0 });
+  }
   const recorded = recordAlerts(parsed.data.alerts);
   // F3: fan out to subscribed devices - fire-and-forget, the inbox row is
   // already the durable record.
-  for (const alert of parsed.data.alerts) {
-    void sendPush(alert).catch(() => {});
+  if (recorded > 0) {
+    for (const alert of parsed.data.alerts) {
+      void sendPush(alert).catch(() => {});
+    }
   }
   return NextResponse.json({ recorded });
 });
@@ -59,6 +85,10 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  const mode = await alertsInboxMode();
+  if (mode !== "desk") {
+    return NextResponse.json({ updated: 0 });
   }
   if ("all" in parsed.data) {
     const unreadTags = db

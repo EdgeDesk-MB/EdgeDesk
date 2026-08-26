@@ -39,9 +39,11 @@ import { detectNakedExposure } from "@/lib/bets/naked-exposure";
 import { suggestTwoUpLock } from "@/lib/calc/two-up-lock";
 import { parseRaceDisplayMeta, parseRacecardRunners } from "@/lib/racing";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
 
 export function AlertWatcher() {
   const { items: doNext, lots, state } = useDoNextItems();
+  const publicDemo = usePublicDemo();
   const channel = useMemo(() => createLocalAlertChannel(), []);
   const seenRef = useRef<Set<string> | null>(null);
   /** Condition keys firing on the previous poll - used to dismiss cleared prompts. */
@@ -169,12 +171,14 @@ export function AlertWatcher() {
       });
     }
 
-    // Drop Do Next rows for offers that no longer exist (deleted mid-session /
-    // stale memo) so offer_expiring cannot fire after a campaign is gone.
-    const liveOfferIds = new Set((state.offers ?? []).map((o) => o.id));
-    const liveDoNext = doNext.filter(
-      (item) => item.offerId == null || liveOfferIds.has(item.offerId)
-    );
+    // Drop Do Next rows for offers that no longer exist, or are already
+    // finished, so offer_expiring cannot fire after a campaign is done.
+    const liveDoNext = doNext.filter((item) => {
+      if (item.offerId == null) return true;
+      const offer = (state.offers ?? []).find((o) => o.id === item.offerId);
+      if (offer == null) return false;
+      return offer.status !== "completed" && offer.status !== "expired";
+    });
 
     const alerts = evaluateAlertRules({
       now,
@@ -206,6 +210,8 @@ export function AlertWatcher() {
         status: o.status,
         offerType: o.offerType,
         rules: o.rules,
+        qualifyingOpenCount: o.profit?.qualifyingOpenCount,
+        qualifyingSettledCount: o.profit?.qualifyingSettledCount,
       })),
       races: (state.planRaces ?? []).map((r) => {
         const event = (state.events ?? []).find((e) => e.id === r.eventId);
@@ -285,6 +291,9 @@ export function AlertWatcher() {
     }
     if (dirty) {
       storeSeenAlertKeys(seen);
+      // Public demo is a canned desk. Never write those fixture alerts into
+      // a live or shared inbox (raw fetch bypasses the `api()` write guard).
+      if (publicDemo.active) return;
       // F2: toasts/notifications deliver; the inbox is the record. Batched,
       // fire-and-forget - a failed write never blocks delivery.
       void fetch("/api/alerts", {
@@ -301,7 +310,7 @@ export function AlertWatcher() {
         }),
       }).catch(() => {});
     }
-  }, [state, doNext, lots, channel]);
+  }, [state, doNext, lots, channel, publicDemo.active]);
 
   return null;
 }

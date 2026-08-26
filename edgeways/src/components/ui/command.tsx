@@ -10,6 +10,7 @@ import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { cn } from "@/lib/utils";
 
 function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
@@ -71,11 +72,17 @@ function CommandList({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.List>) {
   return (
-    <CommandPrimitive.List
-      data-slot="command-list"
-      className={cn("max-h-[340px] overflow-y-auto overflow-x-hidden p-1", className)}
-      {...props}
-    />
+    <ScrollFadeEdges
+      scrollAsChild
+      fadeClassName="from-popover"
+      className={cn("min-h-0 max-h-[340px] flex-1", className)}
+    >
+      <CommandPrimitive.List
+        data-slot="command-list"
+        className="app-scroll-overlay h-full min-h-0 max-h-full overflow-x-hidden overflow-y-auto overscroll-contain p-1"
+        {...props}
+      />
+    </ScrollFadeEdges>
   );
 }
 
