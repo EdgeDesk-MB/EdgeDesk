@@ -4,3 +4,5 @@ backups/
 .aider*
 .Ulysses*
 **/.Ulysses*
+.vercel/
+node_modules/

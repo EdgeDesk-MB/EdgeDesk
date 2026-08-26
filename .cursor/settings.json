@@ -1,0 +1,13 @@
+{
+  "plugins": {
+    "vercel": {
+      "enabled": true
+    },
+    "neon-postgres": {
+      "enabled": true
+    },
+    "clerk": {
+      "enabled": true
+    }
+  }
+}
