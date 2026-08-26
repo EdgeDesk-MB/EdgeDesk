@@ -119,17 +119,25 @@ export function subscribeSuccessHref(
 export function signUpRedirectForPlan(
   plan: PlanId | string | null | undefined,
   interval: string | null | undefined,
-  from?: CheckoutFrom | null
+  from?: CheckoutFrom | null,
+  ref?: string | null
 ): string {
   const paid = parsePaidCheckout(
     plan,
     interval === "year" ? "year" : plan ? "month" : null
   );
-  if (!paid) return liveDeskHref("/setup");
+  const refParam = ref?.trim() || null;
+  if (!paid) {
+    const setup = liveDeskHref("/setup");
+    if (!refParam) return setup;
+    const joiner = setup.includes("?") ? "&" : "?";
+    return `${setup}${joiner}ref=${encodeURIComponent(refParam)}`;
+  }
   const params = new URLSearchParams({
     plan: paid.plan,
     interval: paid.interval,
   });
   if (from === "setup") params.set("from", "setup");
+  if (refParam) params.set("ref", refParam);
   return `/subscribe?${params.toString()}`;
 }

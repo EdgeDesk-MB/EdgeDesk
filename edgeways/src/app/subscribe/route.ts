@@ -22,6 +22,7 @@ import {
 import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
 import { publicCatalogueReady } from "@/lib/billing/stripe-prices";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { claimReferralBestEffort } from "@/lib/referrals/referral-service";
 import { findAppUserByClerkId } from "@/lib/services/app-users";
 import { isWaitlistFoundingEligible } from "@/lib/services/waitlist";
 
@@ -30,6 +31,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = parseCheckoutFrom(url.searchParams.get("from"));
+  const ref = url.searchParams.get("ref");
   const queryFounding = parseFoundingCheckout(url.searchParams.get("founding"));
   const paid = parsePaidCheckout(
     url.searchParams.get("plan"),
@@ -46,8 +48,14 @@ export async function GET(request: Request) {
     signUp.searchParams.set("interval", paid.interval);
     if (from) signUp.searchParams.set("from", from);
     if (queryFounding) signUp.searchParams.set("founding", "1");
+    if (ref) signUp.searchParams.set("ref", ref);
     return NextResponse.redirect(signUp);
   }
+
+  // EDGE-67: a signed-in arrival with ?ref= claims the referral before
+  // checkout, so attribution holds even if the code is never typed into
+  // the Stripe promotion-code box.
+  await claimReferralBestEffort(userId, ref);
 
   if (!publicCatalogueReady()) {
     return NextResponse.json(

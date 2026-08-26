@@ -46,6 +46,12 @@ export type AppUser = {
   founding: boolean;
   onboardingProfile: OnboardingProfile | null;
   role: AppUserRole;
+  /** EDGE-67: this user's anonymous share code (XXXX-XXXX). Lazy-created. */
+  referralCode: string | null;
+  /** EDGE-67: referrer's clerk_user_id, claimed at sign-up via ?ref=. */
+  referredBy: string | null;
+  /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
+  referralCreditAt: number | null;
 };
 
 function usesHostedPostgres(): boolean {
@@ -57,6 +63,16 @@ let neonDeskSettingsColumnReady = false;
 let neonRoleColumnReady = false;
 let neonCancelAtColumnReady = false;
 let neonOperatorSettingsReady = false;
+let neonReferralColumnsReady = false;
+
+export async function ensureNeonReferralColumns(): Promise<void> {
+  if (neonReferralColumnsReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS referral_code text`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS referred_by text`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS referral_credit_at bigint`;
+  neonReferralColumnsReady = true;
+}
 
 async function ensureNeonOnboardingColumn(): Promise<void> {
   if (neonOnboardingColumnReady) return;
@@ -131,6 +147,9 @@ function fromRow(row: {
   founding?: number | null;
   onboardingProfile?: string | null;
   role?: string | null;
+  referralCode?: string | null;
+  referredBy?: string | null;
+  referralCreditAt?: number | null;
 }): AppUser {
   return {
     clerkUserId: row.clerkUserId,
@@ -146,6 +165,9 @@ function fromRow(row: {
     founding: row.founding === 1,
     onboardingProfile: parseOnboardingProfile(row.onboardingProfile),
     role: parseAppUserRole(row.role),
+    referralCode: row.referralCode ?? null,
+    referredBy: row.referredBy ?? null,
+    referralCreditAt: row.referralCreditAt ?? null,
   };
 }
 
@@ -163,6 +185,7 @@ export async function findAppUserByClerkId(
     await ensureNeonOnboardingColumn();
     await ensureNeonRoleColumn();
     await ensureNeonCancelAtColumn();
+    await ensureNeonReferralColumns();
     const rows = await getNeonDb()
       .select()
       .from(pgUsers)
@@ -262,6 +285,9 @@ export async function ensureAppUser(input: {
     founding: false,
     onboardingProfile: null,
     role: "user",
+    referralCode: null,
+    referredBy: null,
+    referralCreditAt: null,
   };
 }
 
@@ -429,4 +455,98 @@ export async function setAppUserRole(input: {
   const row = await findAppUserByClerkId(clerkUserId);
   if (!row) throw new Error("app_users row missing after role write.");
   return toAdminUserRow(row);
+}
+
+/* ---- EDGE-67 referrals ---- */
+
+export async function findAppUserByReferralCode(
+  code: string
+): Promise<AppUser | undefined> {
+  const id = code.trim();
+  if (!id) return undefined;
+  if (usesHostedPostgres()) {
+    await ensureNeonReferralColumns();
+    const rows = await getNeonDb()
+      .select()
+      .from(pgUsers)
+      .where(eq(pgUsers.referralCode, id))
+      .limit(1);
+    const row = rows[0];
+    return row ? fromRow(row) : undefined;
+  }
+  const row = sqliteDb
+    .select()
+    .from(sqliteUsers)
+    .where(eq(sqliteUsers.referralCode, id))
+    .get() as SqliteAppUserRow | undefined;
+  return row ? fromRow(row) : undefined;
+}
+
+export async function saveAppUserReferralCode(input: {
+  clerkUserId: string;
+  referralCode: string;
+}): Promise<void> {
+  if (usesHostedPostgres()) await ensureNeonReferralColumns();
+  const set = { referralCode: input.referralCode, updatedAt: Date.now() };
+  if (usesHostedPostgres()) {
+    await getNeonDb()
+      .update(pgUsers)
+      .set(set)
+      .where(eq(pgUsers.clerkUserId, input.clerkUserId.trim()));
+  } else {
+    sqliteDb
+      .update(sqliteUsers)
+      .set(set)
+      .where(eq(sqliteUsers.clerkUserId, input.clerkUserId.trim()))
+      .run();
+  }
+}
+
+/**
+ * Set referred_by once. Returns false when the row already has a referrer —
+ * the first claim wins so a second code can't overwrite attribution.
+ */
+export async function claimAppUserReferral(input: {
+  clerkUserId: string;
+  referrerClerkUserId: string;
+}): Promise<boolean> {
+  const clerkUserId = input.clerkUserId.trim();
+  if (usesHostedPostgres()) {
+    await ensureNeonReferralColumns();
+    const updated = await getNeonDb()
+      .update(pgUsers)
+      .set({ referredBy: input.referrerClerkUserId, updatedAt: Date.now() })
+      .where(and(eq(pgUsers.clerkUserId, clerkUserId), sql`referred_by IS NULL`))
+      .returning({ clerkUserId: pgUsers.clerkUserId });
+    return updated.length > 0;
+  }
+  const updated = sqliteDb
+    .update(sqliteUsers)
+    .set({ referredBy: input.referrerClerkUserId, updatedAt: Date.now() })
+    .where(
+      and(eq(sqliteUsers.clerkUserId, clerkUserId), sql`referred_by IS NULL`)
+    )
+    .run();
+  return updated.changes > 0;
+}
+
+/** One-credit-per-referee guard: stamped on the referee row after granting. */
+export async function markAppUserReferralCredited(input: {
+  clerkUserId: string;
+  creditedAt: number;
+}): Promise<void> {
+  if (usesHostedPostgres()) await ensureNeonReferralColumns();
+  const set = { referralCreditAt: input.creditedAt, updatedAt: Date.now() };
+  if (usesHostedPostgres()) {
+    await getNeonDb()
+      .update(pgUsers)
+      .set(set)
+      .where(eq(pgUsers.clerkUserId, input.clerkUserId.trim()));
+  } else {
+    sqliteDb
+      .update(sqliteUsers)
+      .set(set)
+      .where(eq(sqliteUsers.clerkUserId, input.clerkUserId.trim()))
+      .run();
+  }
 }

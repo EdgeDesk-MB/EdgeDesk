@@ -11,6 +11,7 @@ import {
 } from "@/lib/billing/entitlement-from-stripe";
 import { attachFoundingScheduleIfNeeded } from "@/lib/billing/founding-schedule";
 import { getStripe } from "@/lib/billing/stripe-server";
+import { grantReferralCreditForInvoice } from "@/lib/referrals/referral-service";
 import {
   applyAppUserEntitlement,
   findAppUserByStripeCustomerId,
@@ -26,8 +27,24 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "customer.subscription.deleted":
       await applyStripeSubscription(event.data.object);
       return;
+    case "invoice.paid":
+      await handleInvoicePaid(event.data.object);
+      return;
     default:
       return;
+  }
+}
+
+/**
+ * EDGE-67: a referee's first non-zero paid invoice (trial end) grants the
+ * referrer a balance credit. Failures are logged, never thrown — a referral
+ * hiccup must not 500 the webhook and stall entitlement retries.
+ */
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  try {
+    await grantReferralCreditForInvoice(invoice);
+  } catch (error) {
+    console.error("[billing/webhook] referral credit", error);
   }
 }
 
