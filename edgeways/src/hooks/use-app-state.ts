@@ -9,7 +9,6 @@ import { cachedGet, clearApiGetCache } from "@/lib/api-get-cache";
 import { publicDemoApiGet } from "@/lib/demo/public-desk-api";
 import {
   hasPublicDemoCookieInDocument,
-  isPublicDemoSetupWrite,
   publicDemoWriteMessage,
 } from "@/lib/demo/public-demo";
 import { toast } from "sonner";
@@ -26,7 +25,9 @@ export async function api<T = unknown>(
     if (method === "GET" || method === "HEAD") {
       const canned = publicDemoApiGet(path);
       if (canned !== undefined) return canned as T;
-    } else if (!isPublicDemoSetupWrite(path)) {
+    } else {
+      // EDGE-106: no setup-write exemption - the server 403s these too, and
+      // the toast is a kinder failure than a raw error.
       toast.error(publicDemoWriteMessage());
       throw new Error(publicDemoWriteMessage());
     }

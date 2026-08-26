@@ -15,6 +15,11 @@ import {
   neonExchangeExists,
 } from "@/lib/db/neon-desk-accounts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import {
+  denyPublicDemoWrite,
+  isPublicDemoRequest,
+} from "@/lib/demo/public-demo-guard";
+import { publicDemoApiGet } from "@/lib/demo/public-desk-api";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +33,10 @@ const createSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET() {
+  // EDGE-106: a demo session gets the canned desk, never live balances.
+  if (await isPublicDemoRequest()) {
+    return NextResponse.json(publicDemoApiGet("/api/accounts"));
+  }
   if (isNeonDesk()) {
     const [accountRows, transactionRows, betRows] = await Promise.all([
       listNeonDeskAccounts(),
@@ -42,6 +51,8 @@ export const GET = withDeskScope(async function GET() {
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

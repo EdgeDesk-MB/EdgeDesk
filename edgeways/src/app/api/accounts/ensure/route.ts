@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ensureVenueAccount } from "@/lib/accounts/ensure-venue";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { denyPublicDemoWrite } from "@/lib/demo/public-demo-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ const schema = z.object({
 
 /** Idempotent: create/reactivate a bookie or exchange wallet from a free-typed name. */
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

@@ -7,10 +7,18 @@ import {
 } from "@/lib/services/balances";
 import { db, accounts } from "@/lib/db";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import {
+  denyPublicDemoWrite,
+  isPublicDemoRequest,
+} from "@/lib/demo/public-demo-guard";
+import { publicDemoApiGet } from "@/lib/demo/public-desk-api";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
+  if (await isPublicDemoRequest()) {
+    return NextResponse.json(publicDemoApiGet("/api/accounts/pending"));
+  }
   const pending = listPendingTransactions();
   const acctName = new Map(
     db
@@ -32,6 +40,8 @@ const confirmSchema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const parsed = confirmSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

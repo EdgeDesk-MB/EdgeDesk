@@ -68,10 +68,6 @@ export function isPublicDemoDeskPath(pathname: string): boolean {
   ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-export function isPublicDemoSetupWrite(path: string): boolean {
-  return path.startsWith("/api/accounts") || path.startsWith("/api/settings");
-}
-
 const PUBLIC_DEMO_APPEARANCE_KEYS = [
   "brandAccentPreset",
   "brandAccentHex",

@@ -5,6 +5,7 @@ import {
   transferBetweenAccounts,
 } from "@/lib/services/balances";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { denyPublicDemoWrite } from "@/lib/demo/public-demo-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ const schema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

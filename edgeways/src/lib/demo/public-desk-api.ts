@@ -748,6 +748,10 @@ export function publicDemoApiGet(path: string, now = Date.now()): unknown | unde
   if (path === "/api/casino") return { offers: publicDemoCasinoOffers(now) };
   if (path === "/api/boosts") return { entries: publicDemoBoosts(now) };
   if (path === "/api/accounts/free-bets") return { lots: publicDemoFreeBetLots(now) };
+  // EDGE-106: the accounts list and pending queue are canned too, so a demo
+  // session never reads live balances - the server routes reuse these.
+  if (path === "/api/accounts") return buildPublicDemoState("edge", now).balances;
+  if (path === "/api/accounts/pending") return { pending: [] };
   if (pathname === "/api/exchange/football-odds") {
     return {
       status: "unmatched",

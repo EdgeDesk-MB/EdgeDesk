@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import type { AppSettingsPatch } from "@/lib/services/settings-merge";
 import {
   normalizeDefaultSport,
@@ -7,11 +6,7 @@ import {
   normalizePlanPreview,
 } from "@/lib/services/settings-shared";
 import { normalizeTimeFormat } from "@/lib/time-format";
-import {
-  PUBLIC_DEMO_COOKIE,
-  stripPublicDemoAppearancePatch,
-} from "@/lib/demo/public-demo";
-import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
+import { denyPublicDemoWrite } from "@/lib/demo/public-demo-guard";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import {
   getNeonDeskSettings,
@@ -31,6 +26,10 @@ export const GET = withDeskScope(async function GET() {
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: Request) {
+  // EDGE-106: a demo session never writes live settings (previously only the
+  // appearance keys were stripped - everything else still landed on the desk).
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const body = (await req.json()) as Record<string, unknown>;
   const patch: AppSettingsPatch = {};
 
@@ -122,17 +121,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
     }
   }
 
-  const demoActive = await verifyPublicDemoCookieValue(
-    (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
-  );
-  const safePatch = stripPublicDemoAppearancePatch(
-    patch as Record<string, unknown>,
-    demoActive
-  ) as AppSettingsPatch;
-
   if (isNeonDesk()) {
     try {
-      const next = await patchNeonDeskSettings(safePatch);
+      const next = await patchNeonDeskSettings(patch);
       const billing = await resolveEntitlementBilling();
       return NextResponse.json({ ...next, billing });
     } catch (err) {
@@ -144,7 +135,7 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
     }
   }
   const { patchAppSettings } = await import("@/lib/services/settings");
-  const next = patchAppSettings(safePatch);
+  const next = patchAppSettings(patch);
   const billing = await resolveEntitlementBilling();
   return NextResponse.json({ ...next, billing });
 });

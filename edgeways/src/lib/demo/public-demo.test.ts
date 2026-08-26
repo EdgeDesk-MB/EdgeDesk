@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   hasPublicDemoCookie,
   isPublicDemoDeskPath,
-  isPublicDemoSetupWrite,
   stripPublicDemoAppearancePatch,
   parsePublicDemoView,
   publicDemoBarLine,
@@ -72,12 +71,6 @@ describe("public demo helpers", () => {
     expect(isPublicDemoDeskPath("/accounts")).toBe(true);
     expect(isPublicDemoDeskPath("/racing")).toBe(true);
     expect(isPublicDemoDeskPath("/login")).toBe(false);
-  });
-
-  it("treats account and settings writes as the signed-in setup exception", () => {
-    expect(isPublicDemoSetupWrite("/api/accounts")).toBe(true);
-    expect(isPublicDemoSetupWrite("/api/settings")).toBe(true);
-    expect(isPublicDemoSetupWrite("/api/bets")).toBe(false);
   });
 
   it("strips appearance fields from a public-demo settings patch", () => {
@@ -231,6 +224,15 @@ describe("public demo fixture", () => {
     expect(footballOdds.status).toBe("unmatched");
     const lots = publicDemoApiGet("/api/accounts/free-bets") as { lots: unknown[] };
     expect(lots.lots.length).toBeGreaterThan(3);
+    // EDGE-106: the accounts list and pending queue are canned too, so a demo
+    // session never reads live balances.
+    const accounts = publicDemoApiGet("/api/accounts") as {
+      accounts: unknown[];
+      bankroll: number;
+    };
+    expect(accounts.accounts.length).toBeGreaterThan(0);
+    expect(accounts.bankroll).toBeGreaterThan(0);
+    expect(publicDemoApiGet("/api/accounts/pending")).toEqual({ pending: [] });
     const bet365 = publicDemoApiGet("/api/accounts/2") as {
       freeBetLots: unknown[];
       transactions: unknown[];

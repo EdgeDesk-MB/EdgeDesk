@@ -13,6 +13,11 @@ import {
   renameNeonDeskAccount,
 } from "@/lib/db/neon-desk-accounts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import {
+  denyPublicDemoWrite,
+  isPublicDemoRequest,
+} from "@/lib/demo/public-demo-guard";
+import { publicDemoApiGet } from "@/lib/demo/public-desk-api";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +60,11 @@ function patchFields(p: z.infer<typeof patchSchema>) {
 export const GET = withDeskScope(async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
 
+  // EDGE-106: a demo session gets the canned account, never the live one.
+  if (await isPublicDemoRequest()) {
+    return NextResponse.json(publicDemoApiGet(`/api/accounts/${id}`));
+  }
+
   if (isNeonDesk()) {
     const accountId = Number(id);
     const [accountRows, transactionRows] = await Promise.all([
@@ -83,6 +93,8 @@ export const GET = withDeskScope(async function GET(_req: NextRequest, ctx: { pa
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -184,6 +196,8 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const demoBlock = await denyPublicDemoWrite();
+  if (demoBlock) return demoBlock;
   const { id } = await ctx.params;
   if (isNeonDesk()) {
     const updated = await patchNeonDeskAccount(Number(id), { isActive: 0 });

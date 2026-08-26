@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/hooks/use-app-state";
+import { hasPublicDemoCookieInDocument } from "@/lib/demo/public-demo";
 
 /**
  * If the user confirmed 18+ at Clerk sign-up (`unsafeMetadata`), mirror that
@@ -21,6 +22,8 @@ export function SyncClerkAgeConfirmation({
   useEffect(() => {
     if (!isLoaded || !user || started.current) return;
     if (localAgeConfirmedAt != null) return;
+    // Demo sessions cannot write settings (EDGE-106) - skip silently.
+    if (hasPublicDemoCookieInDocument()) return;
 
     const meta = user.unsafeMetadata ?? {};
     const confirmed =
