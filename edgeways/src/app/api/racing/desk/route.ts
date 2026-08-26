@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { publicDemoRacingDesk } from "@/lib/demo/public-racing-desk";
 import { getRacingDesk } from "@/lib/services/racing-desk";
 import type { ExchangeProvider } from "@/lib/services/exchange/types";
@@ -22,7 +23,11 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("exchange");
   const exchangeProvider =
     raw && PROVIDERS.has(raw as ExchangeProvider) ? (raw as ExchangeProvider) : null;
-  if ((await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1") {
+  if (
+    await verifyPublicDemoCookieValue(
+      (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
+    )
+  ) {
     return NextResponse.json(publicDemoRacingDesk(date));
   }
   const demo = publicDemoRacingDesk(date);

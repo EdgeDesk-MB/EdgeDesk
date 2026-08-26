@@ -146,6 +146,7 @@ describe("brand-accent storage", () => {
 
   it("skips stored accent in the public-demo FOUC script", () => {
     expect(BRAND_ACCENT_FOUC_SCRIPT).toContain(PUBLIC_DEMO_COOKIE);
-    expect(BRAND_ACCENT_FOUC_SCRIPT).toContain('_ewDemo + "=1"');
+    // Signed cookie (EDGE-91): presence match on the name prefix, not "=1".
+    expect(BRAND_ACCENT_FOUC_SCRIPT).toContain('indexOf(_ewDemo) === 0');
   });
 });

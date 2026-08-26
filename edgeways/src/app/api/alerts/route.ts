@@ -6,6 +6,7 @@ import { resolveAlertsInboxMode } from "@/lib/alerts/inbox-access";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { db, alertsInbox } from "@/lib/db";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { publicDemoAlertsInbox } from "@/lib/demo/public-desk-api";
 import {
   listInbox,
@@ -19,7 +20,9 @@ import { dismissPush, sendPush } from "@/lib/services/push";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 async function alertsInboxMode() {
-  const demoActive = (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  const demoActive = await verifyPublicDemoCookieValue(
+    (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
+  );
   return resolveAlertsInboxMode({
     publicDemo: demoActive,
     neonDesk: isNeonDesk(),

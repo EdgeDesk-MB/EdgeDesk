@@ -11,6 +11,7 @@ import {
   PUBLIC_DEMO_COOKIE,
   stripPublicDemoAppearancePatch,
 } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import {
   getNeonDeskSettings,
@@ -121,7 +122,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
     }
   }
 
-  const demoActive = (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  const demoActive = await verifyPublicDemoCookieValue(
+    (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
+  );
   const safePatch = stripPublicDemoAppearancePatch(
     patch as Record<string, unknown>,
     demoActive

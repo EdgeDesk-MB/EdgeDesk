@@ -31,6 +31,7 @@ import { cookies } from "next/headers";
 import { PublicDemoProvider } from "@/components/demo/public-demo-provider";
 import { DemoPlanBar } from "@/components/demo/demo-plan-bar";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 
 /**
  * Desk chrome: shell, top bar, and interactive providers.
@@ -41,7 +42,9 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const demoActive = (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  const demoActive = await verifyPublicDemoCookieValue(
+    (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
+  );
   return (
     <PublicDemoProvider initialActive={demoActive}>
     <AppStateProvider>

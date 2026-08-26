@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { ALL_FOOTBALL_ODDS_MISSING } from "@/lib/services/exchange/football-odds-map";
 import { fetchBetfairFootballOdds } from "@/lib/services/exchange/football-odds";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
@@ -18,7 +19,11 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     return NextResponse.json({ error: "home and away are required" }, { status: 400 });
   }
 
-  if ((await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1") {
+  if (
+    await verifyPublicDemoCookieValue(
+      (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
+    )
+  ) {
     return NextResponse.json({
       status: "unmatched",
       odds: {},

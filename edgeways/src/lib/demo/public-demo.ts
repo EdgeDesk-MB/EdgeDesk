@@ -21,11 +21,16 @@ export function parsePublicDemoView(
   return "edge";
 }
 
+/**
+ * Presence-only check for client UI (banners, write-blocking, FOUC skips).
+ * The value is HMAC-signed (EDGE-91) and the secret never reaches the browser,
+ * so any non-empty value counts here — every server gate verifies properly.
+ */
 export function hasPublicDemoCookie(cookieHeader: string | null | undefined): boolean {
   if (!cookieHeader) return false;
   return cookieHeader.split(";").some((part) => {
     const [name, value] = part.trim().split("=");
-    return name === PUBLIC_DEMO_COOKIE && value === "1";
+    return name === PUBLIC_DEMO_COOKIE && !!value;
   });
 }
 

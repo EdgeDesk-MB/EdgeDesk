@@ -26,10 +26,12 @@ import type { HistoryRow } from "@/lib/db/schema";
 import { buildHomeChartMarkers } from "@/lib/pnl/chart-bet-markers";
 
 describe("public demo helpers", () => {
-  it("reads the public-demo cookie", () => {
+  it("reads the public-demo cookie by presence (server verifies the signature)", () => {
     expect(hasPublicDemoCookie("ew_public_demo=1")).toBe(true);
-    expect(hasPublicDemoCookie("other=1; ew_public_demo=1")).toBe(true);
-    expect(hasPublicDemoCookie("ew_public_demo=0")).toBe(false);
+    expect(hasPublicDemoCookie("ew_public_demo=v1.abc123")).toBe(true);
+    expect(hasPublicDemoCookie("other=1; ew_public_demo=v1.abc123")).toBe(true);
+    expect(hasPublicDemoCookie("ew_public_demo=")).toBe(false);
+    expect(hasPublicDemoCookie("other=1")).toBe(false);
     expect(hasPublicDemoCookie(null)).toBe(false);
   });
 

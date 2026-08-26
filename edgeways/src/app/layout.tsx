@@ -36,6 +36,7 @@ import {
   normalizeHeaderPattern,
 } from "@/lib/header-pattern";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { figtree, geistMono, notoSans } from "@/fonts";
 import {
   SHARE_LOCALE,
@@ -97,7 +98,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const jar = await cookies();
-  const demoActive = jar.get(PUBLIC_DEMO_COOKIE)?.value === "1";
+  const demoActive = await verifyPublicDemoCookieValue(
+    jar.get(PUBLIC_DEMO_COOKIE)?.value
+  );
   const cookieHex = demoActive
     ? null
     : normalizeHex(jar.get(BRAND_ACCENT_COOKIE_KEY)?.value);

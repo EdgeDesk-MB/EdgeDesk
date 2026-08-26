@@ -8,11 +8,11 @@ import {
   shouldRedirectWwwToApex,
 } from "@/lib/site-surface";
 import {
-  hasPublicDemoCookie,
   isPublicDemoDeskPath,
   PUBLIC_DEMO_COOKIE,
   PUBLIC_DEMO_LIVE_PARAM,
 } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 
 /**
  * Next.js 16+: file must be named proxy.ts (Clerk + Next convention).
@@ -51,7 +51,7 @@ export default clerkMiddleware(async (_auth, request) => {
 
   const demoCookie = request.cookies.get(PUBLIC_DEMO_COOKIE)?.value;
   if (
-    hasPublicDemoCookie(`${PUBLIC_DEMO_COOKIE}=${demoCookie ?? ""}`) &&
+    (await verifyPublicDemoCookieValue(demoCookie)) &&
     (isPublicDemoDeskPath(pathname) ||
       pathname === "/api/state" ||
       pathname.startsWith("/api/accounts") ||

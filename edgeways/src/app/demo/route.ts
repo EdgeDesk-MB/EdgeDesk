@@ -3,10 +3,11 @@ import {
   parsePublicDemoView,
   PUBLIC_DEMO_COOKIE,
 } from "@/lib/demo/public-demo";
+import { signPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 
 export const dynamic = "force-dynamic";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const url = new URL(request.url);
   const view = parsePublicDemoView(url.searchParams.get("view"));
   const dest = new URL("/desk", url.origin);
@@ -16,8 +17,12 @@ export function GET(request: Request) {
     dest.searchParams.set("setup", "1");
   }
 
+  const signed = await signPublicDemoCookieValue();
+  if (!signed) {
+    return new NextResponse("Demo unavailable", { status: 503 });
+  }
   const response = NextResponse.redirect(dest);
-  response.cookies.set(PUBLIC_DEMO_COOKIE, "1", {
+  response.cookies.set(PUBLIC_DEMO_COOKIE, signed, {
     path: "/",
     sameSite: "lax",
     maxAge: 60 * 60 * 4,

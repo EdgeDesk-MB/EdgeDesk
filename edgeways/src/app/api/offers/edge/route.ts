@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { publicDemoOfferEdge } from "@/lib/demo/public-racing-desk";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
+import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { getRacingDesk } from "@/lib/services/racing-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
@@ -18,7 +19,11 @@ export const dynamic = "force-dynamic";
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
     req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
-  if ((await cookies()).get(PUBLIC_DEMO_COOKIE)?.value === "1") {
+  if (
+    await verifyPublicDemoCookieValue(
+      (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
+    )
+  ) {
     return NextResponse.json(publicDemoOfferEdge(date));
   }
   const denied = await lockedFeedResponse("offer_edge", {
