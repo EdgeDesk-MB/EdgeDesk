@@ -556,6 +556,8 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("app_users", "referral_code TEXT");
   addColumn("app_users", "referred_by TEXT");
   addColumn("app_users", "referral_credit_at INTEGER");
+  addColumn("app_users", "legal_accepted_at INTEGER");
+  addColumn("app_users", "legal_version TEXT");
   addColumn("waitlist_signups", "unsubscribed_at INTEGER");
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS casino_offer_series (

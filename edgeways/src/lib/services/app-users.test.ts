@@ -8,6 +8,7 @@ import {
   findAppUserByClerkId,
   findAppUserByStripeCustomerId,
   normaliseAppUserEmail,
+  recordAppUserLegalAcceptance,
   saveAppUserOnboardingProfile,
 } from "@/lib/services/app-users";
 
@@ -58,6 +59,42 @@ describe("ensureAppUser", () => {
     await ensureAppUser({ clerkUserId, email: "keep@example.com" });
     const again = await ensureAppUser({ clerkUserId, email: null });
     expect(again.email).toBe("keep@example.com");
+  });
+});
+
+describe("recordAppUserLegalAcceptance (EDGE-105)", () => {
+  it("stamps the server time and document version, first write wins", async () => {
+    const clerkUserId = `user_test_legal_${Date.now()}`;
+    await ensureAppUser({ clerkUserId, email: "legal@example.com" });
+
+    const before = Date.now();
+    await recordAppUserLegalAcceptance({
+      clerkUserId,
+      legalVersion: "26 August 2026",
+    });
+    const first = await findAppUserByClerkId(clerkUserId);
+    expect(first?.legalAcceptedAt).toBeGreaterThanOrEqual(before);
+    expect(first?.legalVersion).toBe("26 August 2026");
+
+    // A second record attempt must not move the audit timestamp.
+    const stamped = first!.legalAcceptedAt!;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await recordAppUserLegalAcceptance({
+      clerkUserId,
+      legalVersion: "1 January 2099",
+    });
+    const second = await findAppUserByClerkId(clerkUserId);
+    expect(second?.legalAcceptedAt).toBe(stamped);
+    expect(second?.legalVersion).toBe("26 August 2026");
+  });
+
+  it("is a no-op for a blank user id", async () => {
+    await expect(
+      recordAppUserLegalAcceptance({
+        clerkUserId: "  ",
+        legalVersion: "26 August 2026",
+      })
+    ).resolves.toBeUndefined();
   });
 });
 

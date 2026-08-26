@@ -457,6 +457,9 @@ export const appUsers = sqliteTable("app_users", {
   referredBy: text("referred_by"),
   /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
   referralCreditAt: integer("referral_credit_at"),
+  /** EDGE-105: server-recorded ToS/Privacy acceptance. First write wins. */
+  legalAcceptedAt: integer("legal_accepted_at"),
+  legalVersion: text("legal_version"),
 });
 
 /** Operator key-value (maintenance banner). Not customer desk data. */

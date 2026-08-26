@@ -52,6 +52,10 @@ export type AppUser = {
   referredBy: string | null;
   /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
   referralCreditAt: number | null;
+  /** EDGE-105: server-recorded ToS/Privacy acceptance (epoch ms). */
+  legalAcceptedAt: number | null;
+  /** EDGE-105: LEGAL_EFFECTIVE_DATE at the moment of acceptance. */
+  legalVersion: string | null;
 };
 
 function usesHostedPostgres(): boolean {
@@ -64,6 +68,15 @@ let neonRoleColumnReady = false;
 let neonCancelAtColumnReady = false;
 let neonOperatorSettingsReady = false;
 let neonReferralColumnsReady = false;
+let neonLegalColumnsReady = false;
+
+export async function ensureNeonLegalColumns(): Promise<void> {
+  if (neonLegalColumnsReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS legal_accepted_at bigint`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS legal_version text`;
+  neonLegalColumnsReady = true;
+}
 
 export async function ensureNeonReferralColumns(): Promise<void> {
   if (neonReferralColumnsReady) return;
@@ -150,6 +163,8 @@ function fromRow(row: {
   referralCode?: string | null;
   referredBy?: string | null;
   referralCreditAt?: number | null;
+  legalAcceptedAt?: number | null;
+  legalVersion?: string | null;
 }): AppUser {
   return {
     clerkUserId: row.clerkUserId,
@@ -168,6 +183,8 @@ function fromRow(row: {
     referralCode: row.referralCode ?? null,
     referredBy: row.referredBy ?? null,
     referralCreditAt: row.referralCreditAt ?? null,
+    legalAcceptedAt: row.legalAcceptedAt ?? null,
+    legalVersion: row.legalVersion ?? null,
   };
 }
 
@@ -186,6 +203,7 @@ export async function findAppUserByClerkId(
     await ensureNeonRoleColumn();
     await ensureNeonCancelAtColumn();
     await ensureNeonReferralColumns();
+    await ensureNeonLegalColumns();
     const rows = await getNeonDb()
       .select()
       .from(pgUsers)
@@ -288,6 +306,8 @@ export async function ensureAppUser(input: {
     referralCode: null,
     referredBy: null,
     referralCreditAt: null,
+    legalAcceptedAt: null,
+    legalVersion: null,
   };
 }
 
@@ -528,6 +548,45 @@ export async function claimAppUserReferral(input: {
     )
     .run();
   return updated.changes > 0;
+}
+
+/**
+ * EDGE-105: server-side ToS/Privacy acceptance record. First write wins —
+ * the NULL guard keeps the original timestamp as the audit trail, and no API
+ * route accepts these fields from the client.
+ */
+export async function recordAppUserLegalAcceptance(input: {
+  clerkUserId: string;
+  legalVersion: string;
+}): Promise<void> {
+  const clerkUserId = input.clerkUserId.trim();
+  if (!clerkUserId) return;
+  const now = Date.now();
+  const set = {
+    legalAcceptedAt: now,
+    legalVersion: input.legalVersion,
+    updatedAt: now,
+  };
+  if (usesHostedPostgres()) {
+    await ensureNeonLegalColumns();
+    await getNeonDb()
+      .update(pgUsers)
+      .set(set)
+      .where(
+        and(eq(pgUsers.clerkUserId, clerkUserId), sql`legal_accepted_at IS NULL`)
+      );
+  } else {
+    sqliteDb
+      .update(sqliteUsers)
+      .set(set)
+      .where(
+        and(
+          eq(sqliteUsers.clerkUserId, clerkUserId),
+          sql`legal_accepted_at IS NULL`
+        )
+      )
+      .run();
+  }
 }
 
 /** One-credit-per-referee guard: stamped on the referee row after granting. */

@@ -519,6 +519,9 @@ export const appUsers = pgTable("app_users", {
   referredBy: text("referred_by"),
   /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
   referralCreditAt: bigint("referral_credit_at", { mode: "number" }),
+  /** EDGE-105: server-recorded ToS/Privacy acceptance. First write wins. */
+  legalAcceptedAt: bigint("legal_accepted_at", { mode: "number" }),
+  legalVersion: text("legal_version"),
 });
 
 /** Operator key-value (maintenance banner). Not customer desk data. */
