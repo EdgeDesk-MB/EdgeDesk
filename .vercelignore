@@ -1,0 +1,15 @@
+# CLI deploys run from the repo root (Root Directory setting = edgeways).
+# Keep uploads under the 100 MB limit; patterns anchored to avoid matching
+# source dirs like edgeways/src/app/api/data (see edgeways/.vercelignore).
+/edgeways/data
+/edgeways/.next
+/docs
+/extension
+/backups
+/.claude
+/.cursor
+/.vscode
+*.db
+*.db-*
+.env*
+!.env.example
