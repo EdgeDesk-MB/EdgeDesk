@@ -31,25 +31,18 @@ export function BrandAccentSelect({
 }) {
   const { presetId, hex, pending, setPreset, setCustomHex } = useBrandAccent();
   const [hexDraft, setHexDraft] = useState(hex);
+  const [prevHex, setPrevHex] = useState(hex);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    // presetId/hex only advance after settle — safe to mirror into the draft.
-    setHexDraft(hex);
-  }, [hex]);
-
-  useEffect(() => {
-    return () => {
-      flushPersist();
-    };
-    // Flush the last typed custom hex if Settings unmounts mid-debounce.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const pendingPersist = useRef<{
     id: BrandAccentPresetId;
     hex: string;
   } | null>(null);
+
+  // presetId/hex only advance after settle — safe to mirror into the draft.
+  if (prevHex !== hex) {
+    setPrevHex(hex);
+    setHexDraft(hex);
+  }
 
   function flushPersist() {
     const pending = pendingPersist.current;
@@ -80,6 +73,14 @@ export function BrandAccentSelect({
       flushPersist();
     }, 300);
   }
+
+  useEffect(() => {
+    return () => {
+      flushPersist();
+    };
+    // Flush the last typed custom hex if Settings unmounts mid-debounce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function pickPreset(id: Exclude<BrandAccentPresetId, "custom">) {
     const resolved = await setPreset(id);

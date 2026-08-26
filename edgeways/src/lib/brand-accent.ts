@@ -216,7 +216,8 @@ export function boostBrandForLightLogo(hex: string): string {
   }
   const rgb = hexToRgb(brand);
   if (!rgb) return brand;
-  let { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const { h, s, l: baseL } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  let l = baseL;
   let lifted = brand;
   for (let i = 0; i < 14; i++) {
     // Never clamp below current L — high-L / low-Y hues (orchid) must not darken.
@@ -239,7 +240,8 @@ export function ensureBrandTextOnDark(hex: string): string {
   }
   const rgb = hexToRgb(brand);
   if (!rgb) return brand;
-  let { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const { h, s, l: baseL } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  let l = baseL;
   let lifted = brand;
   for (let i = 0; i < 14; i++) {
     l = Math.min(0.84, l + 0.055);
@@ -262,7 +264,9 @@ export function ensureBrandOnLight(hex: string): string {
   }
   const rgb = hexToRgb(brand);
   if (!rgb) return brand;
-  let { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const { h, s: rawS, l: rawL } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  let s = rawS;
+  let l = rawL;
   if (s < 0.08) s = 0;
   let darkened = brand;
   for (let i = 0; i < 14; i++) {

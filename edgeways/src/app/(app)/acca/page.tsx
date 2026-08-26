@@ -765,9 +765,18 @@ function LegRow({
   const [stakeTouched, setStakeTouched] = useState(false);
   const { exchanges, defaultExchange } = useExchanges();
   const [exchange, setExchange] = useState<ExchangeRow | null>(null);
-  useEffect(() => {
+  const [prevExchangeSync, setPrevExchangeSync] = useState<{
+    def: ExchangeRow | null;
+    cur: ExchangeRow | null;
+  } | null>(null);
+  if (
+    prevExchangeSync === null ||
+    prevExchangeSync.def !== defaultExchange ||
+    prevExchangeSync.cur !== exchange
+  ) {
+    setPrevExchangeSync({ def: defaultExchange, cur: exchange });
     if (exchange == null && defaultExchange) setExchange(defaultExchange);
-  }, [defaultExchange, exchange]);
+  }
   const active = run.status === "active";
   // layStake != null covers a real lay and deliberate £0 no-lay.
   const laid = leg.layStake != null;
@@ -843,9 +852,13 @@ function LegRow({
     });
   }, [canLay, run, legs, isFinal, prior, layOdds]);
 
-  useEffect(() => {
+  const [prevSuggestion, setPrevSuggestion] = useState<{
+    current: number | null;
+  } | null>(null);
+  if (prevSuggestion === null || prevSuggestion.current !== suggestion) {
+    setPrevSuggestion({ current: suggestion });
     if (!stakeTouched && suggestion != null) setLayStake(suggestion);
-  }, [suggestion, stakeTouched]);
+  }
 
   const isNoLayStake = Number.isFinite(layStake) && layStake === 0;
   const canLog = isNoLayStake || (layOdds > 1 && layStake > 0);
@@ -1142,9 +1155,18 @@ function WholeLayRow({
   const [stakeTouched, setStakeTouched] = useState(false);
   const { exchanges, defaultExchange } = useExchanges();
   const [exchange, setExchange] = useState<ExchangeRow | null>(null);
-  useEffect(() => {
+  const [prevExchangeSync, setPrevExchangeSync] = useState<{
+    def: ExchangeRow | null;
+    cur: ExchangeRow | null;
+  } | null>(null);
+  if (
+    prevExchangeSync === null ||
+    prevExchangeSync.def !== defaultExchange ||
+    prevExchangeSync.cur !== exchange
+  ) {
+    setPrevExchangeSync({ def: defaultExchange, cur: exchange });
     if (exchange == null && defaultExchange) setExchange(defaultExchange);
-  }, [defaultExchange, exchange]);
+  }
   const suggestion = useMemo(
     () =>
       layOdds > 1
@@ -1152,9 +1174,13 @@ function WholeLayRow({
         : null,
     [run, combinedOdds, layOdds]
   );
-  useEffect(() => {
+  const [prevSuggestion, setPrevSuggestion] = useState<{
+    current: typeof suggestion;
+  } | null>(null);
+  if (prevSuggestion === null || prevSuggestion.current !== suggestion) {
+    setPrevSuggestion({ current: suggestion });
     if (!stakeTouched && suggestion != null) setLayStake(suggestion.layStake);
-  }, [suggestion, stakeTouched]);
+  }
   const isNoLayStake = Number.isFinite(layStake) && layStake === 0;
   const canLog =
     (isNoLayStake && run.method === "combined") || (layOdds > 1 && layStake > 0);

@@ -28,6 +28,7 @@ describe("settlementEventResultLabel", () => {
         { horse: "Malbay Madness (IRE)", position: 1 },
         { horse: "Trasna Na Pairce (IRE)", position: 4 },
       ],
+      fieldSize: 2,
     });
     expect(
       settlementEventResultLabel({

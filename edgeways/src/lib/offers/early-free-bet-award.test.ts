@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { serializeTriggerBundle, type AiEffect } from "@/lib/calc/ai-triggers";
+import type { BetRow } from "@/lib/db/schema";
 import {
   FREE_BET_EARNED_PHRASE,
   FREE_BET_WON_PHRASE,
@@ -9,16 +10,19 @@ import {
   unconditionalFreeBetEffect,
 } from "./early-free-bet-award";
 
-function bet(partial: {
-  id?: number;
-  status?: string;
-  bookmaker?: string | null;
-  betType?: string;
-  label?: string;
-  triggerText?: string | null;
-  triggerRule?: string | null;
-  offerId?: number | null;
-}) {
+type BetPick = Pick<
+  BetRow,
+  | "id"
+  | "status"
+  | "bookmaker"
+  | "betType"
+  | "triggerRule"
+  | "label"
+  | "triggerText"
+  | "offerId"
+>;
+
+function bet(partial: Partial<BetPick>): BetPick {
   return {
     id: partial.id ?? 1,
     status: partial.status ?? "open",
@@ -32,11 +36,13 @@ function bet(partial: {
 }
 
 function ruleWithEffect(effect: AiEffect): string {
-  return serializeTriggerBundle({
+  const rule = serializeTriggerBundle({
     v: 2,
     betWin: null,
     effects: [effect],
   });
+  if (rule == null) throw new Error("expected a serialised rule");
+  return rule;
 }
 
 describe("freeBetAwardPhrase", () => {

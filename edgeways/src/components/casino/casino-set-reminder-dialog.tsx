@@ -5,7 +5,7 @@
  * bonus credited the next day. Defaults to tomorrow at 12:00.
  */
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -61,12 +61,15 @@ export function CasinoSetReminderDialog({
   const [time, setTime] = useState(DEFAULT_TIME);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setNote("");
-    setDate(tomorrowYmd());
-    setTime(DEFAULT_TIME);
-  }, [open]);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setNote("");
+      setDate(tomorrowYmd());
+      setTime(DEFAULT_TIME);
+    }
+  }
 
   async function save() {
     const trimmed = note.trim();

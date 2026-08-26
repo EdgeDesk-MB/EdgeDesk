@@ -17,6 +17,8 @@ export function SetupPageClient() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
   const [opened, setOpened] = useState(false);
+  const needsWizard =
+    isLoaded === true && isSignedIn === true && !isOnboardingComplete(user?.id);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -24,10 +26,7 @@ export function SetupPageClient() {
       router.replace("/login");
       return;
     }
-    if (!isOnboardingComplete(user?.id)) {
-      setOpened(true);
-      return;
-    }
+    if (!isOnboardingComplete(user?.id)) return;
     let cancelled = false;
     void api<BalanceSummary>("/api/accounts")
       .then((summary) => {
@@ -49,7 +48,7 @@ export function SetupPageClient() {
     };
   }, [isLoaded, isSignedIn, router, user?.id]);
 
-  if (!opened) {
+  if (!opened && !needsWizard) {
     return (
         <EmptyState
           busy

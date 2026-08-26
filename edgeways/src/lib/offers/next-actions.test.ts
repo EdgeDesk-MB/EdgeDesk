@@ -41,7 +41,10 @@ function edgePlay(over: Partial<OfferEdgePlay> = {}): OfferEdgePlay {
   };
 }
 
-function offer(partial: Partial<OfferSummary> & Pick<OfferSummary, "id" | "title">): OfferSummary {
+function offer(
+  partial: Omit<Partial<OfferSummary>, "profit" | "id" | "title"> &
+    Pick<OfferSummary, "id" | "title"> & { profit?: Partial<OfferSummary["profit"]> }
+): OfferSummary {
   const { profit: profitPartial, ...rest } = partial;
   return {
     id: rest.id,

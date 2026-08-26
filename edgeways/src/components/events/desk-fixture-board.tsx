@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useNow } from "@/hooks/use-now";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { FixtureScopeFilter } from "@/components/events/fixture-scope-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -536,9 +536,11 @@ export function DeskFixtureBoard({
   const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>("all");
   const [scopeFilter, setScopeFilter] = useState("all");
 
-  useEffect(() => {
+  const [prevSport, setPrevSport] = useState(sport);
+  if (prevSport !== sport) {
+    setPrevSport(sport);
     setScopeFilter("all");
-  }, [sport]);
+  }
 
   const filteredFootball = useMemo(
     () => football.filter((f) => matchesStatusFilter(f.status, statusFilter)),

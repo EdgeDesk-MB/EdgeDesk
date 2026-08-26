@@ -47,7 +47,6 @@ export function HeaderPatternProvider({
   useEffect(() => {
     const demo = hasPublicDemoCookieInDocument();
     const next = demo ? DEFAULT_HEADER_PATTERN : readStoredHeaderPattern();
-    setPatternIdState(next);
     applyHeaderPattern(next);
     if (!demo) writeStoredHeaderPattern(next);
   }, []);

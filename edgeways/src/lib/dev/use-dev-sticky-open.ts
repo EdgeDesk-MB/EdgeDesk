@@ -21,21 +21,25 @@ export function useDevStickyOpen(
   initial = false
 ): [boolean, Dispatch<SetStateAction<boolean>>] {
   const [open, setOpen] = useState(initial);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => process.env.NODE_ENV !== "development");
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development") {
-      setReady(true);
-      return;
-    }
-    try {
-      if (sessionStorage.getItem(storageKey(id)) === "1") {
-        setOpen(true);
+    if (process.env.NODE_ENV !== "development") return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        if (sessionStorage.getItem(storageKey(id)) === "1") {
+          setOpen(true);
+        }
+      } catch {
+        /* private mode / quota */
       }
-    } catch {
-      /* private mode / quota */
-    }
-    setReady(true);
+      setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -60,20 +64,24 @@ export function useDevStickyJson<T>(
   initial: T
 ): [T, Dispatch<SetStateAction<T>>] {
   const [value, setValue] = useState(initial);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => process.env.NODE_ENV !== "development");
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development") {
+    if (process.env.NODE_ENV !== "development") return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const raw = sessionStorage.getItem(storageKey(id));
+        if (raw != null) setValue(JSON.parse(raw) as T);
+      } catch {
+        /* ignore */
+      }
       setReady(true);
-      return;
-    }
-    try {
-      const raw = sessionStorage.getItem(storageKey(id));
-      if (raw != null) setValue(JSON.parse(raw) as T);
-    } catch {
-      /* ignore */
-    }
-    setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {

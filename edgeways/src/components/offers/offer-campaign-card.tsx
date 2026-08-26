@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -120,16 +120,20 @@ export function OfferCampaignCard({
   const reminderSyncKey = (offer.reminders ?? [])
     .map((r) => `${r.id}:${r.remindAt}:${r.cancelledAt ?? ""}`)
     .join("|");
-  useEffect(() => {
+  // Sync when the server snapshot of pending reminders changes (poll / refresh).
+  const remindersKey = `${offer.id}|${reminderSyncKey}`;
+  const [prevRemindersKey, setPrevRemindersKey] = useState(remindersKey);
+  if (prevRemindersKey !== remindersKey) {
+    setPrevRemindersKey(remindersKey);
     setReminders(offer.reminders ?? []);
-    // Sync when the server snapshot of pending reminders changes (poll / refresh).
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by reminderSyncKey
-  }, [offer.id, reminderSyncKey]);
-  useEffect(() => {
+  }
+  // Reset only when switching campaigns (or default prop), not on every poll tick.
+  const detailsKey = `${offer.id}|${defaultDetailsOpen}`;
+  const [prevDetailsKey, setPrevDetailsKey] = useState(detailsKey);
+  if (prevDetailsKey !== detailsKey) {
+    setPrevDetailsKey(detailsKey);
     setDetailsOpen(defaultDetailsOpen && !offerPlaybookIsPrimary(offer));
-    // Reset only when switching campaigns (or default prop), not on every poll tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- offer.id gates playbook check
-  }, [offer.id, defaultDetailsOpen]);
+  }
   const offerWithReminders: OfferSummary = { ...offer, reminders };
   const {
     rulesSummary,

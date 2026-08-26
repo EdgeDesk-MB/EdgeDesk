@@ -66,7 +66,6 @@ export function BrandAccentProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const demo = hasPublicDemoCookieInDocument();
     const next = demo ? DEFAULT_ACCENT_STATE : readStoredBrandAccent();
-    setState(next);
     applyBrandAccent(next.hex);
     if (!demo) writeStoredBrandAccent(next);
     // Enable brand colour transitions only after the initial paint settles,

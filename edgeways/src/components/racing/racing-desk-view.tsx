@@ -231,10 +231,16 @@ export function RacingDeskView() {
     }
   }, [date, activeDeskProvider]);
 
-  useEffect(() => {
-    hasPayloadRef.current = false;
+  // Adjust-during-render: a date switch blanks the card and re-enters loading.
+  const [prevDate, setPrevDate] = useState(date);
+  if (prevDate !== date) {
+    setPrevDate(date);
     setPayload(null);
     setLoading(true);
+  }
+
+  useEffect(() => {
+    hasPayloadRef.current = false;
     queueMicrotask(() => void load({ soft: false }));
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps -- hard reload on date only
 

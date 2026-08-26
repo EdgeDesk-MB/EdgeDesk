@@ -53,11 +53,16 @@ export function DashboardFeedPanel({
   const [casinoFeed, setCasinoFeed] = useState<CasinoHistoryPayload | null>(null);
   const { refresh } = useAppState(10_000);
 
-  useEffect(() => {
+  const [prevFeedFilter, setPrevFeedFilter] = useState(feedFilter);
+  if (prevFeedFilter !== feedFilter) {
+    setPrevFeedFilter(feedFilter);
     if (feedFilter !== "casino") {
       setCasinoFeed(null);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (feedFilter !== "casino") return;
     let live = true;
     // Dedicated fetch: state.history is capped at ~40 across ALL kinds, so an
     // older casino row can fall out of the Home All window while History still

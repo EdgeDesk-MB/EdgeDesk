@@ -157,7 +157,7 @@ export function BetCampaignSections({
   accaRuns = [],
   betBuilderRuns = [],
   systemRuns = [],
-  now = Date.now(),
+  now,
   onEdit,
   onPatch,
   onPatchEvent,
@@ -172,7 +172,7 @@ export function BetCampaignSections({
   accaRuns?: AccaRunViewLite[];
   betBuilderRuns?: BetBuilderRunViewLite[];
   systemRuns?: SystemRunViewLite[];
-  now?: number;
+  now: number;
   onEdit: (bet: BetRow) => void;
   onPatch: (id: number, json: Record<string, unknown>, message: string) => void;
   onPatchEvent: (id: number, json: Record<string, unknown>, message: string) => void;

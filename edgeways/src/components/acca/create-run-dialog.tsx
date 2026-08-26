@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -198,25 +198,31 @@ export function CreateRunForm({
   );
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (edit || !prefill) return;
-    setLabel(prefill.label);
-    setStake(prefill.stake);
-    setBookmaker(prefill.bookmaker ?? "");
-    setMethod(prefill.suggestedMethod ?? "sequential");
-    setBackBetType(normaliseDeskBackBetType(prefill.backBetType));
-    setLegs(
-      emptyLegs(
-        emptyLegCountFromPrefill(prefill),
-        prefill.sport?.trim() || "football"
-      )
-    );
-  }, [prefill, edit]);
+  const [prevPrefillSync, setPrevPrefillSync] = useState({ prefill, edit });
+  if (prevPrefillSync.prefill !== prefill || prevPrefillSync.edit !== edit) {
+    setPrevPrefillSync({ prefill, edit });
+    if (!edit && prefill) {
+      setLabel(prefill.label);
+      setStake(prefill.stake);
+      setBookmaker(prefill.bookmaker ?? "");
+      setMethod(prefill.suggestedMethod ?? "sequential");
+      setBackBetType(normaliseDeskBackBetType(prefill.backBetType));
+      setLegs(
+        emptyLegs(
+          emptyLegCountFromPrefill(prefill),
+          prefill.sport?.trim() || "football"
+        )
+      );
+    }
+  }
 
-  useEffect(() => {
-    if (edit != null || defaultExchange == null) return;
-    setCommissionPct(defaultExchange.commissionPct);
-  }, [defaultExchange, edit]);
+  const [prevExchangeSync, setPrevExchangeSync] = useState({ defaultExchange, edit });
+  if (prevExchangeSync.defaultExchange !== defaultExchange || prevExchangeSync.edit !== edit) {
+    setPrevExchangeSync({ defaultExchange, edit });
+    if (edit == null && defaultExchange != null) {
+      setCommissionPct(defaultExchange.commissionPct);
+    }
+  }
 
   const methodHelp = ACCA_METHOD_HELP[method];
   const showLayPanel = method === "combined" ? !noLay : true;

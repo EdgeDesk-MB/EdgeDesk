@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StickyNote } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,11 @@ export function BalanceCorrectionNoteButton({
   const [saving, setSaving] = useState(false);
   const hasNote = Boolean(entry.note?.trim());
 
-  useEffect(() => {
+  const [prevSync, setPrevSync] = useState({ open, note: entry.note });
+  if (prevSync.open !== open || prevSync.note !== entry.note) {
+    setPrevSync({ open, note: entry.note });
     if (open) setDraft(entry.note ?? "");
-  }, [open, entry.note]);
+  }
 
   if (entry.kind !== "balance_adjustment") return null;
 

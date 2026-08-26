@@ -536,25 +536,28 @@ export function SetupWizardForm({
   }, [isPage, userId]);
 
   useEffect(() => {
-    const draft = readSetupDraft(userId, isPage ? "page" : "dialog");
-    if (draft) {
-      setBankName(draft.bankName);
-      setBankBalance(draft.bankBalance);
-      setBookies(draft.bookies);
-      setStake(draft.stake);
-      setDefaultBookie(draft.defaultBookie);
-      setDefaultExchangeName(draft.defaultExchangeName);
-      if (draft.defaultSport) setDefaultSport(normalizeDefaultSport(draft.defaultSport));
-      setAppearance(draft.appearance);
-      setExperience(draft.experience);
-      setWhyHere(draft.whyHere);
-      setAttribution(draft.attribution);
-      setAttributionOther(draft.attributionOther);
-      setMonthlyTarget(draft.monthlyTarget);
-      const idx = steps.findIndex((row) => row.id === draft.stepId);
-      if (idx >= 0) setStep(idx);
-    }
-    draftReady.current = true;
+    // localStorage is client-only; defer a microtask past hydration.
+    queueMicrotask(() => {
+      const draft = readSetupDraft(userId, isPage ? "page" : "dialog");
+      if (draft) {
+        setBankName(draft.bankName);
+        setBankBalance(draft.bankBalance);
+        setBookies(draft.bookies);
+        setStake(draft.stake);
+        setDefaultBookie(draft.defaultBookie);
+        setDefaultExchangeName(draft.defaultExchangeName);
+        if (draft.defaultSport) setDefaultSport(normalizeDefaultSport(draft.defaultSport));
+        setAppearance(draft.appearance);
+        setExperience(draft.experience);
+        setWhyHere(draft.whyHere);
+        setAttribution(draft.attribution);
+        setAttributionOther(draft.attributionOther);
+        setMonthlyTarget(draft.monthlyTarget);
+        const idx = steps.findIndex((row) => row.id === draft.stepId);
+        if (idx >= 0) setStep(idx);
+      }
+      draftReady.current = true;
+    });
   }, [userId, isPage, steps]);
 
   useEffect(() => {
@@ -665,10 +668,11 @@ export function SetupWizardForm({
     };
   }, [isPage, upgradePlan, upgradeConfirmed, upgradeIntent, currentPlan]);
 
-  useEffect(() => {
-    if (!defaultExchange) return;
+  const [prevDefaultExchange, setPrevDefaultExchange] = useState(defaultExchange);
+  if (defaultExchange && prevDefaultExchange !== defaultExchange) {
+    setPrevDefaultExchange(defaultExchange);
     setDefaultExchangeName((current) => current || defaultExchange.name);
-  }, [defaultExchange]);
+  }
 
   useEffect(() => {
     function readPermission() {

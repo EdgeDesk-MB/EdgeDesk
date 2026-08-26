@@ -29,6 +29,7 @@ import {
 import { type TrackedEventLike } from "@/lib/events";
 import { api } from "@/hooks/use-app-state";
 import { useKnownFixtures } from "@/hooks/use-known-fixtures";
+import { useNow } from "@/hooks/use-now";
 import { MARKETS, marketDef } from "@/lib/markets";
 import {
   formatOfferScopeLabel,
@@ -177,6 +178,7 @@ export function DeskLegEventFields({
   const { fixtures: knownFixtures, loading: fixturesLoading } = useKnownFixtures(sport);
   const [runners, setRunners] = useState<string[]>([]);
   const [runnersLoading, setRunnersLoading] = useState(false);
+  const now = useNow(30_000);
 
   const selectedEvent = useMemo(() => {
     if (value.eventId == null) return undefined;
@@ -202,8 +204,8 @@ export function DeskLegEventFields({
   }, [events, sport, value.eventId, courseScope]);
 
   const trackedHourBands = useMemo(
-    () => toHourBands(bandTrackedEvents(trackedForSport, Date.now(), keepIds)),
-    [trackedForSport, keepIds]
+    () => toHourBands(bandTrackedEvents(trackedForSport, now, keepIds)),
+    [trackedForSport, keepIds, now]
   );
 
   const trackedExternalIds = useMemo(() => {
@@ -236,15 +238,25 @@ export function DeskLegEventFields({
   );
 
   // Runners for a tracked race only. Pending fixtures use card runners (no network).
-  useEffect(() => {
-    if (!isRacingSport(sport) || value.eventId == null || value.pendingFixture) {
-      setRunners([]);
-      setRunnersLoading(false);
-      return;
+  const runnersEventId =
+    isRacingSport(sport) && value.eventId != null && !value.pendingFixture
+      ? value.eventId
+      : null;
+  const [prevRunnersEventId, setPrevRunnersEventId] = useState(runnersEventId);
+  if (prevRunnersEventId !== runnersEventId) {
+    setPrevRunnersEventId(runnersEventId);
+    if (runnersEventId === null) {
+      if (runners.length > 0) setRunners([]);
+      if (runnersLoading) setRunnersLoading(false);
+    } else if (!runnersLoading) {
+      setRunnersLoading(true);
     }
+  }
+
+  useEffect(() => {
+    if (runnersEventId === null) return;
     let cancelled = false;
-    setRunnersLoading(true);
-    api<{ runners: string[] }>(`/api/racing/runners?eventId=${value.eventId}`)
+    api<{ runners: string[] }>(`/api/racing/runners?eventId=${runnersEventId}`)
       .then((res) => {
         if (!cancelled) setRunners(res.runners ?? []);
       })
@@ -257,7 +269,7 @@ export function DeskLegEventFields({
     return () => {
       cancelled = true;
     };
-  }, [sport, value.eventId, value.pendingFixture]);
+  }, [runnersEventId]);
 
   const effectiveRunners =
     value.pendingFixture?.runners?.length

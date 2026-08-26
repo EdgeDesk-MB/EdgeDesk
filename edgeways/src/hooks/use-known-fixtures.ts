@@ -134,25 +134,26 @@ export function useKnownFixtures(sport: string): {
     if (!supported) return false;
     return readWarmCache(sport) == null;
   });
+  const [prevSport, setPrevSport] = useState(sport);
 
-  useEffect(() => {
+  if (prevSport !== sport) {
+    setPrevSport(sport);
     if (!supported) {
       setFixtures([]);
       setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const warm = readWarmCache(sport);
-    if (warm) {
-      setFixtures(warm);
-      setLoading(false);
     } else {
+      const warm = readWarmCache(sport);
       // Drop the previous sport's list immediately so Horse racing never
       // briefly shows football fixtures (or vice versa).
-      setFixtures([]);
-      setLoading(true);
+      setFixtures(warm ?? []);
+      setLoading(warm == null);
     }
+  }
+
+  useEffect(() => {
+    if (!supported) return;
+
+    let cancelled = false;
 
     void loadKnownFixtures(sport)
       .then((next) => {

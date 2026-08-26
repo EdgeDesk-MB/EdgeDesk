@@ -104,11 +104,14 @@ export function OfferEdgePanel({
   const [plays, setPlays] = useState<OfferEdgePlay[] | null>(null);
   const [dataSource, setDataSource] = useState<EdgeDataSource | undefined>();
 
+  const [prevEntitled, setPrevEntitled] = useState(entitled);
+  if (prevEntitled !== entitled) {
+    setPrevEntitled(entitled);
+    if (!entitled) setPlays(null);
+  }
+
   useEffect(() => {
-    if (!entitled) {
-      setPlays(null);
-      return;
-    }
+    if (!entitled) return;
     let cancelled = false;
     fetchOfferEdgePlays(eventDate).then((data) => {
       if (cancelled) return;

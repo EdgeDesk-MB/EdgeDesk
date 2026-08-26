@@ -401,28 +401,36 @@ describe("tracked banding", () => {
 
 describe("formatKnownFixtureOption", () => {
   it("formats football with clock only (day band carries the date)", () => {
+    // Pin now before kickoff so the live window never flips the label.
+    const now = msOnDay(0, "10:00");
     const start = msOnDay(0, "15:00");
-    const parts = partsKnownFixtureOption({
-      externalId: "1",
-      sport: "football",
-      competition: "PL",
-      homeTeam: "Arsenal",
-      awayTeam: "Chelsea",
-      startTime: start,
-      status: "upcoming",
-    });
+    const parts = partsKnownFixtureOption(
+      {
+        externalId: "1",
+        sport: "football",
+        competition: "PL",
+        homeTeam: "Arsenal",
+        awayTeam: "Chelsea",
+        startTime: start,
+        status: "upcoming",
+      },
+      now
+    );
     expect(parts.title).toBe("Arsenal v Chelsea");
     expect(parts.time).toBe(formatClockString("15:00"));
     expect(parts.time).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-    const label = formatKnownFixtureOption({
-      externalId: "1",
-      sport: "football",
-      competition: "PL",
-      homeTeam: "Arsenal",
-      awayTeam: "Chelsea",
-      startTime: start,
-      status: "upcoming",
-    });
+    const label = formatKnownFixtureOption(
+      {
+        externalId: "1",
+        sport: "football",
+        competition: "PL",
+        homeTeam: "Arsenal",
+        awayTeam: "Chelsea",
+        startTime: start,
+        status: "upcoming",
+      },
+      now
+    );
     expect(label).toBe(`Arsenal v Chelsea · ${formatClockString("15:00")}`);
   });
 

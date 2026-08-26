@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,12 +51,16 @@ export function DemoNoticeDialog({ suppressed = false }: { suppressed?: boolean 
     signedIn: isSignedIn === true,
   });
 
-  useEffect(() => {
-    if (!isLoaded || suppressed || kind === "none") return;
-    if (kind === "account" && live.status === "loading") return;
-    if (noticeAlreadySeen(kind)) return;
-    setOpen(true);
-  }, [isLoaded, suppressed, kind, live.status]);
+  const ready =
+    isLoaded === true &&
+    !suppressed &&
+    kind !== "none" &&
+    !(kind === "account" && live.status === "loading");
+  const [handledKind, setHandledKind] = useState<string | null>(null);
+  if (ready && handledKind !== kind) {
+    setHandledKind(kind);
+    if (!noticeAlreadySeen(kind)) setOpen(true);
+  }
 
   function dismiss() {
     if (kind !== "none") markNoticeSeen(kind);

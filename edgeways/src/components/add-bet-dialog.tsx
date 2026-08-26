@@ -1239,20 +1239,43 @@ export function AddBetDialog({
   const labelHasOfferTrigger = Boolean(labelOfferTrigger);
 
   // Apply offer-trigger from label once when first detected — not on every keystroke.
-  useEffect(() => {
-    if (stakingFreeBet) return;
-    if (!labelOfferTrigger) return;
-    if (triggerLinkedFromLabel) return;
-    if (triggerText.trim()) return;
-    setTriggerText(labelOfferTrigger);
-    setTriggerLinkedFromLabel(true);
-  }, [labelOfferTrigger, stakingFreeBet, triggerLinkedFromLabel, triggerText]);
+  const [prevTriggerSync, setPrevTriggerSync] = useState({
+    trigger: labelOfferTrigger,
+    freeBet: stakingFreeBet,
+    linked: triggerLinkedFromLabel,
+    text: triggerText,
+  });
+  if (
+    prevTriggerSync.trigger !== labelOfferTrigger ||
+    prevTriggerSync.freeBet !== stakingFreeBet ||
+    prevTriggerSync.linked !== triggerLinkedFromLabel ||
+    prevTriggerSync.text !== triggerText
+  ) {
+    setPrevTriggerSync({
+      trigger: labelOfferTrigger,
+      freeBet: stakingFreeBet,
+      linked: triggerLinkedFromLabel,
+      text: triggerText,
+    });
+    if (
+      !stakingFreeBet &&
+      labelOfferTrigger &&
+      !triggerLinkedFromLabel &&
+      !triggerText.trim()
+    ) {
+      setTriggerText(labelOfferTrigger);
+      setTriggerLinkedFromLabel(true);
+    }
+  }
 
-  useEffect(() => {
-    if (!stakingFreeBet) return;
-    setTriggerText("");
-    setTriggerLinkedFromLabel(false);
-  }, [stakingFreeBet]);
+  const [prevStakingFreeBet, setPrevStakingFreeBet] = useState(stakingFreeBet);
+  if (prevStakingFreeBet !== stakingFreeBet) {
+    setPrevStakingFreeBet(stakingFreeBet);
+    if (stakingFreeBet) {
+      setTriggerText("");
+      setTriggerLinkedFromLabel(false);
+    }
+  }
 
   function handleTriggerTextChange(value: string) {
     setTriggerLinkedFromLabel(false);

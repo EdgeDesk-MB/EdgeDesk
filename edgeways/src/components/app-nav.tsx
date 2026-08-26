@@ -408,12 +408,15 @@ function NavSubPanel({
   children: ReactNode;
 }) {
   const [settled, setSettled] = useState(expanded);
+  const [prevExpanded, setPrevExpanded] = useState(expanded);
+
+  if (prevExpanded !== expanded) {
+    setPrevExpanded(expanded);
+    if (!expanded) setSettled(false);
+  }
 
   useEffect(() => {
-    if (!expanded) {
-      setSettled(false);
-      return;
-    }
+    if (!expanded) return;
     // Fallback if transitionend is skipped (reduced motion / already at target).
     const t = window.setTimeout(() => setSettled(true), SPRING_DURATION_MS + 40);
     return () => clearTimeout(t);

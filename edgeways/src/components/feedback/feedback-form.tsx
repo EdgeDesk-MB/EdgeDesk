@@ -141,7 +141,7 @@ export function FeedbackForm() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Send feedback</CardTitle>
           <CardDescription>
-            Pick a type, describe it, then send it. We'll review every report.
+            Pick a type, describe it, then send it. We&rsquo;ll review every report.
           </CardDescription>
         </CardHeader>
         <CardContent>

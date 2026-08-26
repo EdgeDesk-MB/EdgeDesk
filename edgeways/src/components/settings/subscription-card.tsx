@@ -45,9 +45,20 @@ export function SubscriptionCard({
   onPatch?: (patch: Partial<Pick<AppSettings, "planPreview">>) => void;
 }) {
   const { active: publicDemo } = usePublicDemo();
-  const [account, setAccount] = useState<SubscriptionAccount | null>(null);
+  const [account, setAccount] = useState<SubscriptionAccount | null>(
+    publicDemo ? PUBLIC_DEMO_ACCOUNT : null
+  );
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
+
+  const [prevPublicDemo, setPrevPublicDemo] = useState(publicDemo);
+  if (prevPublicDemo !== publicDemo) {
+    setPrevPublicDemo(publicDemo);
+    if (publicDemo) {
+      setFailed(false);
+      setAccount(PUBLIC_DEMO_ACCOUNT);
+    }
+  }
 
   async function load() {
     setFailed(false);
@@ -63,12 +74,8 @@ export function SubscriptionCard({
   }
 
   useEffect(() => {
-    if (publicDemo) {
-      setFailed(false);
-      setAccount(PUBLIC_DEMO_ACCOUNT);
-      return;
-    }
-    void load();
+    if (publicDemo) return;
+    queueMicrotask(() => void load());
   }, [publicDemo]);
 
   async function openPortal() {

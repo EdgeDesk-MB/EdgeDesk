@@ -10,7 +10,6 @@ import {
 function runner(partial: Partial<RacingRunnerDetail> & { name: string }): RacingRunnerDetail {
   return {
     horseId: partial.horseId ?? partial.name.toLowerCase().replace(/\s+/g, "-"),
-    name: partial.name,
     number: partial.number ?? "1",
     jockey: partial.jockey ?? "Jockey",
     trainer: partial.trainer ?? "Trainer",

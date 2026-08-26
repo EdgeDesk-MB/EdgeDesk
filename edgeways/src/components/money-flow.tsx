@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useState } from "react";
 import NumberFlow from "@number-flow/react";
 import { evFractionDigits } from "@/lib/format-money";
 import { OFFER_INACTIVE_FIGURE_CLASS } from "@/lib/offers/offer-inactive-ui";
@@ -24,13 +24,22 @@ const RAPID_UPDATE_MS = 90;
  * so the first rapid frame already skips NumberFlow animation.
  */
 function useAnimateMoneyFlow(value: number, enabled: boolean): boolean {
-  const prev = useRef({ value, t: 0 });
+  const [tracker, setTracker] = useState({ value, recent: false });
+
+  useEffect(() => {
+    if (!tracker.recent) return;
+    const timer = window.setTimeout(
+      () => setTracker((t) => (t.recent ? { ...t, recent: false } : t)),
+      RAPID_UPDATE_MS
+    );
+    return () => window.clearTimeout(timer);
+  }, [tracker]);
+
   if (!enabled) return false;
-  const now = performance.now();
-  if (value !== prev.current.value) {
-    const rapid = prev.current.t > 0 && now - prev.current.t < RAPID_UPDATE_MS;
-    prev.current = { value, t: now };
-    return !rapid;
+  if (value !== tracker.value) {
+    const animate = !tracker.recent;
+    setTracker({ value, recent: true });
+    return animate;
   }
   return true;
 }

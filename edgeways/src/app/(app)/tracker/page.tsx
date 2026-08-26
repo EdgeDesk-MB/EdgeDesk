@@ -121,14 +121,30 @@ function TrackerContent() {
       .catch(() => setSystemRuns([]));
   }, [state?.bets?.length]);
 
-  useEffect(() => {
+  const [prevUrlDeskQueue, setPrevUrlDeskQueue] = useState(urlDeskQueue);
+  if (prevUrlDeskQueue !== urlDeskQueue) {
+    setPrevUrlDeskQueue(urlDeskQueue);
     setDeskQueueState(urlDeskQueue);
-  }, [urlDeskQueue]);
+  }
 
-  useEffect(() => {
+  const [prevListFilters, setPrevListFilters] = useState({
+    queue: deferredDeskQueue,
+    offer: offerFilterId,
+    event: eventFilterId,
+  });
+  if (
+    prevListFilters.queue !== deferredDeskQueue ||
+    prevListFilters.offer !== offerFilterId ||
+    prevListFilters.event !== eventFilterId
+  ) {
+    setPrevListFilters({
+      queue: deferredDeskQueue,
+      offer: offerFilterId,
+      event: eventFilterId,
+    });
     setVisibleCampaignGroups(INITIAL_CAMPAIGN_GROUPS);
     setVisibleFlatBets(INITIAL_FLAT_BETS);
-  }, [deferredDeskQueue, offerFilterId, eventFilterId]);
+  }
 
   const bets = useMemo(() => state?.bets ?? [], [state]);
   const events = useMemo(() => state?.events ?? [], [state]);
@@ -172,15 +188,21 @@ function TrackerContent() {
     deskQueue === "offers" ||
     (queueCounts[deskQueue] ?? 0) >= INITIAL_FLAT_BETS;
 
-  useEffect(() => {
+  const [prevListGate, setPrevListGate] = useState({
+    pending: listPending,
+    heavy: heavyListTarget,
+  });
+  if (prevListGate.pending !== listPending || prevListGate.heavy !== heavyListTarget) {
+    setPrevListGate({ pending: listPending, heavy: heavyListTarget });
     if (!heavyListTarget) {
       setListReady(true);
-      return;
-    }
-    if (listPending) {
+    } else if (listPending) {
       setListReady(false);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!heavyListTarget || listPending) return;
     const t = window.setTimeout(() => setListReady(true), 0);
     return () => clearTimeout(t);
   }, [listPending, deferredDeskQueue, heavyListTarget]);

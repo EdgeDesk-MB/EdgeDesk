@@ -22,13 +22,18 @@ export function DeferredTextInput({
   commitMs?: number;
 }) {
   const [local, setLocal] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localRef = useRef(local);
-  localRef.current = local;
+
+  if (prevValue !== value) {
+    setPrevValue(value);
+    setLocal(value);
+  }
 
   useEffect(() => {
-    setLocal(value);
-  }, [value]);
+    localRef.current = local;
+  });
 
   useEffect(() => {
     return () => {

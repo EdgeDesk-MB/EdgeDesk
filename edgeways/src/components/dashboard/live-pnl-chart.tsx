@@ -143,29 +143,30 @@ function prefersReducedMotion(): boolean {
  */
 function useChartPlotCover(chartWindowSecs: number, effectiveWindowSecs: number) {
   const isAllSelected = chartWindowSecs === ALL_WINDOW_SECS;
-  const prevUserWindowRef = useRef(chartWindowSecs);
-  const prevViewportRef = useRef(effectiveWindowSecs);
+  const [prev, setPrev] = useState({
+    userWindow: chartWindowSecs,
+    viewportSecs: effectiveWindowSecs,
+  });
   const [lingerCover, setLingerCover] = useState<{
     secs: number;
     fromAll: boolean;
   } | null>(null);
 
-  const prevUserWindow = prevUserWindowRef.current;
-  const prevViewportSecs = prevViewportRef.current;
-  if (prevUserWindow !== chartWindowSecs) {
-    prevUserWindowRef.current = chartWindowSecs;
-    const nextLinger = shouldLingerChartPlotCover(
-      prevViewportSecs,
-      effectiveWindowSecs,
-      prefersReducedMotion()
-    )
-      ? { secs: prevViewportSecs, fromAll: prevUserWindow === ALL_WINDOW_SECS }
-      : null;
-    if (lingerCover?.secs !== nextLinger?.secs || lingerCover?.fromAll !== nextLinger?.fromAll) {
-      setLingerCover(nextLinger);
+  if (prev.userWindow !== chartWindowSecs || prev.viewportSecs !== effectiveWindowSecs) {
+    if (prev.userWindow !== chartWindowSecs) {
+      const nextLinger = shouldLingerChartPlotCover(
+        prev.viewportSecs,
+        effectiveWindowSecs,
+        prefersReducedMotion()
+      )
+        ? { secs: prev.viewportSecs, fromAll: prev.userWindow === ALL_WINDOW_SECS }
+        : null;
+      if (lingerCover?.secs !== nextLinger?.secs || lingerCover?.fromAll !== nextLinger?.fromAll) {
+        setLingerCover(nextLinger);
+      }
     }
+    setPrev({ userWindow: chartWindowSecs, viewportSecs: effectiveWindowSecs });
   }
-  prevViewportRef.current = effectiveWindowSecs;
 
   useEffect(() => {
     if (lingerCover == null) return;
@@ -247,12 +248,14 @@ export const LivePnlChart = memo(function LivePnlChart({
 
   // Chart always shows retained P&L (net of exchange commission).
   useEffect(() => {
-    const nowSec = Date.now() / 1000;
-    setLivePoints((prev) => {
-      const lastHistTime = ledgerPoints.at(-1)?.time ?? 0;
-      const liveTail = prev.filter((p) => p.time > lastHistTime + 0.5);
-      const tail = [...liveTail, { time: nowSec, value: liveTotal }].slice(-3600);
-      return anchorSeriesAtZero([...ledgerPoints, ...tail], nowSec);
+    queueMicrotask(() => {
+      const nowSec = Date.now() / 1000;
+      setLivePoints((prev) => {
+        const lastHistTime = ledgerPoints.at(-1)?.time ?? 0;
+        const liveTail = prev.filter((p) => p.time > lastHistTime + 0.5);
+        const tail = [...liveTail, { time: nowSec, value: liveTotal }].slice(-3600);
+        return anchorSeriesAtZero([...ledgerPoints, ...tail], nowSec);
+      });
     });
   }, [ledgerPoints, liveTotal]);
 

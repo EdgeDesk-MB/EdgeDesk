@@ -82,8 +82,13 @@ export default function SystemsDeskPage() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    api<{ runs: RunBundle[] }>("/api/systems")
+      .then((data) => setRuns(data.runs))
+      .catch(() => {
+        toast.error("Could not load system bets");
+        setRuns([]);
+      });
+  }, []);
 
   const activeRuns = useMemo(
     () => runs?.filter((r) => r.run.status === "active") ?? [],

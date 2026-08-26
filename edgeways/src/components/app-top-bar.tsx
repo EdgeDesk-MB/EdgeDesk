@@ -14,7 +14,7 @@ import { ChromeTab } from "@/components/chrome-tab";
 import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
 import { isNegativeGbp } from "@/lib/format-money";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { accountOwner } from "@/lib/accounts/owners";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -29,6 +29,32 @@ import { COLLAPSE_EASE, SPRING_DURATION_MS, SPRING_EASE } from "@/lib/ui/motion"
 import { cn } from "@/lib/utils";
 
 const BALANCE_PILL_COLLAPSED_KEY = "edgeways.balancePillCollapsed";
+
+const balancePillListeners = new Set<() => void>();
+
+function subscribeBalancePillCollapsed(listener: () => void): () => void {
+  balancePillListeners.add(listener);
+  return () => {
+    balancePillListeners.delete(listener);
+  };
+}
+
+function readBalancePillCollapsed(): boolean {
+  try {
+    return localStorage.getItem(BALANCE_PILL_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeBalancePillCollapsed(next: boolean) {
+  try {
+    localStorage.setItem(BALANCE_PILL_COLLAPSED_KEY, next ? "1" : "0");
+  } catch {
+    /* private mode / blocked storage */
+  }
+  for (const listener of balancePillListeners) listener();
+}
 
 /** Matches header `h-14` content box after `pb-1` — rem↔rem so height can interpolate. */
 const BALANCE_PILL_EXPANDED_H = "3.25rem";
@@ -274,32 +300,21 @@ function MobileStatStacks({
  * Mobile uses `MobileBalanceTab` (no chevron).
  */
 function BalancePill({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = useSyncExternalStore(
+    subscribeBalancePillCollapsed,
+    readBalancePillCollapsed,
+    () => false
+  );
   /** Skip motion on the first paint after restoring localStorage (avoids expand→collapse flash). */
   const [motionReady, setMotionReady] = useState(false);
 
   useEffect(() => {
-    try {
-      if (localStorage.getItem(BALANCE_PILL_COLLAPSED_KEY) === "1") {
-        setCollapsed(true);
-      }
-    } catch {
-      /* private mode / blocked storage */
-    }
     const id = requestAnimationFrame(() => setMotionReady(true));
     return () => cancelAnimationFrame(id);
   }, []);
 
   function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(BALANCE_PILL_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    writeBalancePillCollapsed(!collapsed);
   }
 
   const heightMotion = motionReady ? collapseStyle : undefined;

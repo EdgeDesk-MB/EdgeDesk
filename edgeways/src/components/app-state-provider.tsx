@@ -44,13 +44,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [pauseCount, setPauseCount] = useState(0);
   const inFlight = useRef<Promise<void> | null>(null);
   const inFlightStartedAt = useRef(0);
+  const [prevDemo, setPrevDemo] = useState({
+    active: publicDemo.active,
+    view: publicDemo.view,
+  });
+
+  if (
+    prevDemo.active !== publicDemo.active ||
+    prevDemo.view !== publicDemo.view
+  ) {
+    setPrevDemo({ active: publicDemo.active, view: publicDemo.view });
+    if (publicDemo.active) {
+      setState(buildPublicDemoState(publicDemo.view));
+      setError(null);
+    }
+  }
 
   useEffect(() => {
     if (!publicDemo.active) return;
-    const next = buildPublicDemoState(publicDemo.view);
-    setDisplayTimeFormat(next.settings.timeFormat);
-    setState(next);
-    setError(null);
+    setDisplayTimeFormat(
+      buildPublicDemoState(publicDemo.view).settings.timeFormat
+    );
   }, [publicDemo.active, publicDemo.view]);
 
   const refresh = useCallback(async () => {
@@ -71,8 +85,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return inFlight.current;
     }
 
-    let run!: Promise<void>;
-    run = (async () => {
+    const run: Promise<void> = (async () => {
       try {
         const res = await fetch("/api/state", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -83,13 +96,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         setError(String(e));
         // Keep the last good snapshot - never blank the desk on a failed poll.
-      } finally {
-        if (inFlight.current === run) inFlight.current = null;
       }
     })();
 
     inFlight.current = run;
     inFlightStartedAt.current = Date.now();
+    void run.finally(() => {
+      if (inFlight.current === run) inFlight.current = null;
+    });
     return run;
   }, [publicDemo.active, publicDemo.view]);
 
@@ -109,9 +123,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (publicDemo.active) return;
     if (pollingPaused) return;
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
     const timer = setInterval(() => void refresh(), pollMs);
-    return () => clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [refresh, pollMs, pollingPaused, publicDemo.active]);
 
   useEffect(() => {

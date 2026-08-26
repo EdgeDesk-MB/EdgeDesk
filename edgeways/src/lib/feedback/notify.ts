@@ -16,7 +16,7 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function feedbackNotifyRecipients(
-  env: NodeJS.ProcessEnv = process.env
+  env: Record<string, string | undefined> = process.env
 ): string[] {
   const raw = env.FEEDBACK_NOTIFY_TO?.trim() || env.WAITLIST_NOTIFY_TO?.trim() || "";
   return raw

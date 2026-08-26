@@ -589,16 +589,28 @@ export function DashboardLiveTabs({
     [state?.livePositions]
   );
 
-  useEffect(() => {
+  const [prevLiveIds, setPrevLiveIds] = useState<{
+    events: number[];
+    positions: number[];
+  } | null>(null);
+  if (
+    prevLiveIds === null ||
+    prevLiveIds.events !== liveEventIds ||
+    prevLiveIds.positions !== livePositionIds
+  ) {
+    setPrevLiveIds({ events: liveEventIds, positions: livePositionIds });
     const pruned = pruneLiveDockLocks(locks, liveEventIds, livePositionIds);
     if (
       pruned.events.length !== locks.events.length ||
       pruned.positions.length !== locks.positions.length
     ) {
       setLocks(pruned);
-      writeLiveDockLocks(pruned);
     }
-  }, [locks, liveEventIds, livePositionIds]);
+  }
+
+  useEffect(() => {
+    writeLiveDockLocks(locks);
+  }, [locks]);
 
   const setExpandedPersist = useCallback((next: boolean) => {
     setExpanded(next);

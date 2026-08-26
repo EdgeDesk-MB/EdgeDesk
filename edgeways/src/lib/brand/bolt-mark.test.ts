@@ -66,7 +66,6 @@ describe("setAccentFavicon", () => {
     headChildren.push(nextIcon);
 
     // Minimal document stub for the favicon swap path.
-    // @ts-expect-error test stub
     globalThis.document = {
       head: {
         appendChild(node: (typeof headChildren)[number]) {
@@ -107,7 +106,7 @@ describe("setAccentFavicon", () => {
           },
         };
       },
-    };
+    } as unknown as Document;
 
     expect(() => setAccentFavicon("#3B82F6")).not.toThrow();
     expect(headChildren).toHaveLength(2);

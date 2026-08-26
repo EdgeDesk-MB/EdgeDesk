@@ -149,12 +149,13 @@ export function OfferPipelineStrip({
   const { state } = useAppState(0);
   const awaitingEventAt = useMemo(() => {
     if (offer.awaitingEventAt != null) return offer.awaitingEventAt;
+    if (!state) return null;
     const eventsById = new Map(state.events.map((e) => [e.id, e]));
     return earliestOpenBetEventAt(
       state.bets.filter((b) => b.offerId === offer.id),
       eventsById
     );
-  }, [offer.awaitingEventAt, offer.id, state.bets, state.events]);
+  }, [offer.awaitingEventAt, offer.id, state]);
   if (offer.deskProgress) {
     return <DeskProgressStrip progress={offer.deskProgress} className={className} />;
   }

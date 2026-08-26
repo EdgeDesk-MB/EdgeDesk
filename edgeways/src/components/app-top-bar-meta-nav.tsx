@@ -237,9 +237,9 @@ export function AppTopBarMetaNav() {
     const aRect = active.getBoundingClientRect();
     const pad = 8;
     if (aRect.left < sRect.left + pad) {
-      scroller.scrollLeft += aRect.left - sRect.left - pad;
+      scroller.scrollTo({ left: scroller.scrollLeft + aRect.left - sRect.left - pad });
     } else if (aRect.right > sRect.right - pad) {
-      scroller.scrollLeft += aRect.right - sRect.right + pad;
+      scroller.scrollTo({ left: scroller.scrollLeft + aRect.right - sRect.right + pad });
     }
   }, [activeId]);
 

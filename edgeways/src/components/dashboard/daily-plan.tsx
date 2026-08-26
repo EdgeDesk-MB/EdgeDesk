@@ -14,6 +14,7 @@ import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { EvBasisBadge } from "@/components/ui/ev-basis-badge";
 import { useDoNextItems } from "@/hooks/use-do-next-items";
+import { useNow } from "@/hooks/use-now";
 import { doNextBarClass } from "@/lib/offers/do-next";
 import {
   buildDailyPlan,
@@ -126,6 +127,7 @@ export function DailyPlan({
   const { items: doNext, state } = useDoNextItems(5000);
   const [slots, setSlots] = useState<DailyPlanSlot[]>([]);
   const dayKeyRef = useRef("");
+  const now = useNow(60_000);
 
   const offers = state?.offers;
   const races = state?.planRaces;
@@ -140,9 +142,9 @@ export function DailyPlan({
       races: races ?? [],
       fixtures: fixtures ?? [],
       accaLegs: accaLegs ?? [],
-      now: Date.now(),
+      now,
     });
-  }, [state, offers, doNext, races, fixtures, accaLegs]);
+  }, [state, offers, doNext, races, fixtures, accaLegs, now]);
 
   useEffect(() => {
     if (!sheet) return;

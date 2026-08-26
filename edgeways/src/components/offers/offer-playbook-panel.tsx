@@ -49,18 +49,24 @@ export function OfferPlaybookPanel({
     };
   }, [offer.rules, offer.profit]);
 
+  const wrBookie =
+    step?.kind === "clear_wagering" && offer.bookmaker?.trim()
+      ? offer.bookmaker.trim().toLowerCase()
+      : null;
+  const [prevWrBookie, setPrevWrBookie] = useState(wrBookie);
+  if (prevWrBookie !== wrBookie) {
+    setPrevWrBookie(wrBookie);
+    if (wrBookie === null) setWrLeft(null);
+  }
+
   useEffect(() => {
-    if (step?.kind !== "clear_wagering" || !offer.bookmaker?.trim()) {
-      setWrLeft(null);
-      return;
-    }
-    const bookie = offer.bookmaker.trim().toLowerCase();
+    if (wrBookie === null) return;
     let cancelled = false;
     void apiGet<{ accounts: AccountBalance[] }>("/api/accounts")
       .then((res) => {
         if (cancelled) return;
         const account = res.accounts.find(
-          (a) => a.type === "bookie" && a.name.trim().toLowerCase() === bookie
+          (a) => a.type === "bookie" && a.name.trim().toLowerCase() === wrBookie
         );
         setWrLeft(account?.wrRemaining ?? null);
       })
@@ -70,7 +76,7 @@ export function OfferPlaybookPanel({
     return () => {
       cancelled = true;
     };
-  }, [step?.kind, offer.bookmaker, offer.id]);
+  }, [wrBookie, offer.id]);
 
   if (offer.deskProgress) return null;
   if (!playbook || !step || !progress) return null;

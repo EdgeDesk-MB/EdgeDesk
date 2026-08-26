@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -198,23 +198,29 @@ export function BetBuilderCreateRunForm({
   const [layStakeTouched, setLayStakeTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (edit || !prefill) return;
-    setLabel(prefill.label);
-    setStake(prefill.stake);
-    setBookmaker(prefill.bookmaker ?? "");
-    setMethod(prefill.suggestedMethod ?? "combined");
-    setBackBetType(normaliseDeskBackBetType(prefill.backBetType));
-    const nextSport = prefill.sport?.trim() || "football";
-    setSport(nextSport);
-    setSelections(emptySelections(emptySelectionCountFromPrefill(prefill), nextSport));
-    if (prefill.eventLabel) setEventLabel(prefill.eventLabel);
-  }, [prefill, edit]);
+  const [prevPrefillSync, setPrevPrefillSync] = useState({ prefill, edit });
+  if (prevPrefillSync.prefill !== prefill || prevPrefillSync.edit !== edit) {
+    setPrevPrefillSync({ prefill, edit });
+    if (!edit && prefill) {
+      setLabel(prefill.label);
+      setStake(prefill.stake);
+      setBookmaker(prefill.bookmaker ?? "");
+      setMethod(prefill.suggestedMethod ?? "combined");
+      setBackBetType(normaliseDeskBackBetType(prefill.backBetType));
+      const nextSport = prefill.sport?.trim() || "football";
+      setSport(nextSport);
+      setSelections(emptySelections(emptySelectionCountFromPrefill(prefill), nextSport));
+      if (prefill.eventLabel) setEventLabel(prefill.eventLabel);
+    }
+  }
 
-  useEffect(() => {
-    if (edit != null || defaultExchange == null) return;
-    setCommissionPct(defaultExchange.commissionPct);
-  }, [defaultExchange, edit]);
+  const [prevExchangeSync, setPrevExchangeSync] = useState({ defaultExchange, edit });
+  if (prevExchangeSync.defaultExchange !== defaultExchange || prevExchangeSync.edit !== edit) {
+    setPrevExchangeSync({ defaultExchange, edit });
+    if (edit == null && defaultExchange != null) {
+      setCommissionPct(defaultExchange.commissionPct);
+    }
+  }
 
   const commission = Number.isFinite(commissionPct) ? commissionPct / 100 : 0;
   const laySuggestion = useMemo(
@@ -234,9 +240,13 @@ export function BetBuilderCreateRunForm({
     [isEdit, method, stake, backOdds, layOdds, commission]
   );
 
-  useEffect(() => {
+  const [prevLaySuggestion, setPrevLaySuggestion] = useState<{
+    current: typeof laySuggestion;
+  } | null>(null);
+  if (prevLaySuggestion === null || prevLaySuggestion.current !== laySuggestion) {
+    setPrevLaySuggestion({ current: laySuggestion });
     if (!layStakeTouched && laySuggestion != null) setLayStake(laySuggestion.layStake);
-  }, [laySuggestion, layStakeTouched]);
+  }
 
   const validSelections = selections.filter((s) => s.label.trim());
   const canSave =

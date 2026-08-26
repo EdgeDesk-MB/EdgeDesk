@@ -4,9 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -44,6 +44,26 @@ function readDemoSearch(): { view: PublicDemoView; forceSetup: boolean } {
   };
 }
 
+const SERVER_DEMO_SEARCH: { view: PublicDemoView; forceSetup: boolean } = {
+  view: "edge",
+  forceSetup: false,
+};
+
+const subscribeNoop = () => () => {};
+
+let demoSearchCache: {
+  key: string;
+  value: { view: PublicDemoView; forceSetup: boolean };
+} | null = null;
+
+function readDemoSearchSnapshot(): { view: PublicDemoView; forceSetup: boolean } {
+  const key = window.location.search;
+  if (demoSearchCache == null || demoSearchCache.key !== key) {
+    demoSearchCache = { key, value: readDemoSearch() };
+  }
+  return demoSearchCache.value;
+}
+
 export function PublicDemoProvider({
   children,
   initialActive = false,
@@ -54,17 +74,17 @@ export function PublicDemoProvider({
   const [active] = useState(
     () => initialActive || hasPublicDemoCookieInDocument()
   );
-  const [view, setViewState] = useState<PublicDemoView>("edge");
-  const [forceSetup, setForceSetup] = useState(false);
-
-  useEffect(() => {
-    const next = readDemoSearch();
-    setViewState(next.view);
-    setForceSetup(next.forceSetup);
-  }, []);
+  const search = useSyncExternalStore(
+    subscribeNoop,
+    readDemoSearchSnapshot,
+    () => SERVER_DEMO_SEARCH
+  );
+  const [viewOverride, setViewOverride] = useState<PublicDemoView | null>(null);
+  const view = viewOverride ?? search.view;
+  const forceSetup = search.forceSetup;
 
   const setView = useCallback((next: PublicDemoView) => {
-    setViewState(next);
+    setViewOverride(next);
     const url = new URL(window.location.href);
     url.searchParams.set("view", next);
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);

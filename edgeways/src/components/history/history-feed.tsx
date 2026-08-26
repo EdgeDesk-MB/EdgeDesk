@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { MoneyFlow } from "@/components/money-flow";
 import type { BetRow, HistoryRow } from "@/lib/db/schema";
@@ -54,9 +54,11 @@ import { EmptyState } from "@/components/help/empty-state";
 /** Local override so a saved note paints before the parent refresh lands. */
 function useBalanceCorrectionNote(entry: HistoryRow) {
   const [override, setOverride] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
+  const [prevEntry, setPrevEntry] = useState({ id: entry.id, note: entry.note });
+  if (prevEntry.id !== entry.id || prevEntry.note !== entry.note) {
+    setPrevEntry({ id: entry.id, note: entry.note });
     setOverride(undefined);
-  }, [entry.id, entry.note]);
+  }
   const fromEntry = balanceCorrectionNoteText(entry);
   const note =
     override !== undefined ? (override?.trim() ? override.trim() : undefined) : fromEntry;

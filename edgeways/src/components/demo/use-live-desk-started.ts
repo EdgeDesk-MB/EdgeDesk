@@ -13,14 +13,20 @@ export function useLiveDeskStarted(enabled: boolean): {
   const [status, setStatus] = useState<LiveDeskStatus>(enabled ? "loading" : "ready");
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    if (!enabled) {
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
+  if (prevEnabled !== enabled) {
+    setPrevEnabled(enabled);
+    if (enabled) {
+      setStatus("loading");
+    } else {
       setStarted(false);
       setStatus("ready");
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!enabled) return;
     let live = true;
-    setStatus("loading");
     fetch("/api/demo/live-status", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error("Could not read the live desk.");
@@ -41,6 +47,10 @@ export function useLiveDeskStarted(enabled: boolean): {
     };
   }, [enabled, tick]);
 
-  const retry = useCallback(() => setTick((n) => n + 1), []);
+  const retry = useCallback(() => {
+    if (!enabled) return;
+    setStatus("loading");
+    setTick((n) => n + 1);
+  }, [enabled]);
   return { started, status, retry };
 }

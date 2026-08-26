@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { NumFlow } from "@/components/money-flow";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
@@ -22,32 +22,34 @@ function useOddsFlash(
   flash: "up" | "down" | null;
   trend: "up" | "down" | null;
 } {
-  const prev = useRef<number | undefined>(undefined);
   const [flash, setFlash] = useState<"up" | "down" | null>(null);
   const [trend, setTrend] = useState<"up" | "down" | null>(null);
+  const [prevQuote, setPrevQuote] = useState({ odds, paused, quoteSeq });
+
+  if (
+    prevQuote.odds !== odds ||
+    prevQuote.paused !== paused ||
+    prevQuote.quoteSeq !== quoteSeq
+  ) {
+    setPrevQuote({ odds, paused, quoteSeq });
+    if (paused) {
+      if (flash !== null) setFlash(null);
+    } else {
+      const dir = liveOddsFlash(prevQuote.odds, odds);
+      if (trend !== dir) setTrend(dir);
+      if (flash !== null) setFlash(null);
+    }
+  }
 
   useEffect(() => {
-    if (paused) {
-      prev.current = odds;
-      setFlash(null);
-      return;
-    }
-    const dir = liveOddsFlash(prev.current, odds);
-    prev.current = odds;
-    if (!dir) {
-      setTrend(null);
-      setFlash(null);
-      return;
-    }
-    setTrend(dir);
-    setFlash(null);
-    const frame = window.requestAnimationFrame(() => setFlash(dir));
+    if (paused || trend === null) return;
+    const frame = window.requestAnimationFrame(() => setFlash(trend));
     const clear = window.setTimeout(() => setFlash(null), FLASH_MS);
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(clear);
     };
-  }, [odds, paused, quoteSeq]);
+  }, [trend, paused, quoteSeq]);
 
   return { flash, trend };
 }

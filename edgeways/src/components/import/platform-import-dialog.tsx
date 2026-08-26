@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -74,13 +74,18 @@ export function PlatformImportDialog({
     return true;
   }
 
-  useEffect(() => {
-    if (!open || !seedText) return;
-    const next = parseOddsmonkeyProfits(seedText);
-    if (next.drafts.length === 0) return;
-    setParsed(next);
-    setProgress(null);
-  }, [open, seedText]);
+  const seedKey = open && seedText ? seedText : null;
+  const [prevSeedKey, setPrevSeedKey] = useState<string | null>(null);
+  if (prevSeedKey !== seedKey) {
+    setPrevSeedKey(seedKey);
+    if (seedKey != null) {
+      const next = parseOddsmonkeyProfits(seedKey);
+      if (next.drafts.length > 0) {
+        setParsed(next);
+        setProgress(null);
+      }
+    }
+  }
 
   const preview = parsed ? oddsmonkeyPreview(parsed) : null;
   const previewRange = preview

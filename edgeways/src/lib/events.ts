@@ -337,7 +337,7 @@ export function eventShowsScore(
  */
 export function effectiveEventStatus(
   ev: {
-    sport?: string;
+    sport?: string | null;
     status: string;
     source?: string | null;
     startTime?: number;

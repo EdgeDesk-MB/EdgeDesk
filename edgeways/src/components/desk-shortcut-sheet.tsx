@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Dialog,
@@ -26,10 +26,12 @@ export function DeskShortcutSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [prevOpen, setPrevOpen] = useState(open);
 
-  useEffect(() => {
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (!open) setQuery("");
-  }, [open]);
+  }
 
   const rows = useMemo(
     () => filterShortcutRows(SHORTCUT_SHEET_ROWS, query),

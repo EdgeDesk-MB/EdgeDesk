@@ -40,6 +40,7 @@ import { formatClockTime } from "@/lib/time-format";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import { SportEventBlock } from "@/components/sport-icon";
 import { formatPillLabel } from "@/lib/ui/status-badges";
+import { useNow } from "@/hooks/use-now";
 import {
   placingsTriggerLabel,
   RacingPlacingsDialog,
@@ -76,6 +77,7 @@ export function EventRowView({
   const isRacing = event.sport === "horse_racing";
   const status = effectiveEventStatus(event);
   const live = status === "live";
+  const now = useNow(60_000);
   const raceResult = isRacing ? parseRaceResults(event.goals) : null;
   const betCount = linkedBets.length;
   const openBetCount = linkedBets.filter((b) => b.status === "open").length;
@@ -194,7 +196,7 @@ export function EventRowView({
           <span className="text-sm text-muted-foreground">
             {raceResult ? (
               <>Won by {raceResult.winner}</>
-            ) : event.startTime > Date.now() ? (
+            ) : event.startTime > now ? (
               "-"
             ) : event.status === "finished" ? (
               "-"

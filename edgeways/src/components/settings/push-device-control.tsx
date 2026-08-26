@@ -127,8 +127,8 @@ export function PushDeviceControl() {
       setSupported(ok);
       setOrigin(window.location.origin);
       setPermission(typeof Notification !== "undefined" ? Notification.permission : "unknown");
+      void refreshDevices();
     });
-    void refreshDevices();
     if (!ok) return;
 
     let cancelled = false;

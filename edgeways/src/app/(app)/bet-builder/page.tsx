@@ -526,9 +526,13 @@ function WholeLayRow({ run, onChanged }: { run: BetBuilderRunRow; onChanged: () 
         : null,
     [run.stake, run.backOdds, run.commission, layOdds]
   );
-  useEffect(() => {
+  const [prevSuggestion, setPrevSuggestion] = useState<{
+    current: typeof suggestion;
+  } | null>(null);
+  if (prevSuggestion === null || prevSuggestion.current !== suggestion) {
+    setPrevSuggestion({ current: suggestion });
     if (!stakeTouched && suggestion != null) setLayStake(suggestion.layStake);
-  }, [suggestion, stakeTouched]);
+  }
   const canLog = layOdds > 1 && layStake > 0;
 
   async function log() {

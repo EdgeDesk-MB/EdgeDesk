@@ -21,12 +21,15 @@ export function useOfferEdgeRaceCount(
   // Align with Offer Edge client cache TTL so the nav can notice new picks.
   const now = useNow(60_000);
   const prevOfferKey = useRef(racingOfferKey);
+  const [prevEntitled, setPrevEntitled] = useState(entitled);
+
+  if (prevEntitled !== entitled) {
+    setPrevEntitled(entitled);
+    if (!entitled) setCount(0);
+  }
 
   useEffect(() => {
-    if (!entitled) {
-      setCount(0);
-      return;
-    }
+    if (!entitled) return;
     let cancelled = false;
     const date = new Date().toISOString().slice(0, 10);
     const offerSetChanged = prevOfferKey.current !== racingOfferKey;

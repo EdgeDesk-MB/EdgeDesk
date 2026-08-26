@@ -56,7 +56,7 @@ describe("marketingShareMetadata", () => {
     expect(meta.title).toEqual({
       absolute: `${copy.title} · ${SHARE_SITE_NAME}`,
     });
-    expect(meta.twitter?.card).toBe("summary_large_image");
+    expect(meta.twitter).toMatchObject({ card: "summary_large_image" });
     expect(meta.twitter?.title).toBe(copy.title);
     expect(meta.openGraph?.url).toBe(`${PUBLIC_SITE_ORIGIN}/`);
     expect(meta.alternates?.canonical).toBe(`${PUBLIC_SITE_ORIGIN}/`);

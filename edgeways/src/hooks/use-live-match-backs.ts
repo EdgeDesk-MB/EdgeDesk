@@ -49,6 +49,13 @@ export function useLiveMatchBacks(events: EventRow[]): {
   const [byId, setById] = useState<Map<number, LiveMatchBacksEntry>>(() => new Map());
   const [loaded, setLoaded] = useState(false);
   const previousRef = useRef(byId);
+  const [prevKey, setPrevKey] = useState(key);
+
+  if (prevKey !== key) {
+    setPrevKey(key);
+    if (key === "") setById(new Map());
+    setLoaded(false);
+  }
 
   useEffect(() => {
     const live = events.filter(
@@ -56,13 +63,10 @@ export function useLiveMatchBacks(events: EventRow[]): {
     );
     if (live.length === 0) {
       previousRef.current = new Map();
-      setById(new Map());
-      setLoaded(true);
       return;
     }
 
     let cancelled = false;
-    setLoaded(false);
 
     const load = async () => {
       const entries = await Promise.all(
@@ -110,5 +114,5 @@ export function useLiveMatchBacks(events: EventRow[]): {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- poll when the live set changes
   }, [key]);
 
-  return { byId, loaded };
+  return { byId, loaded: key === "" ? true : loaded };
 }

@@ -125,7 +125,6 @@ export function ScrollFadeEdges({
       }
       update();
     });
-    update();
   }, [getScroller, horizontal, update]);
 
   const releaseStartLock = useCallback(() => {
@@ -162,8 +161,8 @@ export function ScrollFadeEdges({
       update();
     };
 
-    update();
-
+    // ResizeObserver delivers an initial observation on observe(), so the
+    // first fade computation arrives with it rather than a sync setState here.
     const ro = new ResizeObserver(() => {
       if (lockStartRef.current) pinToStart();
       else update();

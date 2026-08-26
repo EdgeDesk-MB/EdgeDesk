@@ -40,7 +40,6 @@ export function UiFontProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const demo = hasPublicDemoCookieInDocument();
     const next = demo ? DEFAULT_UI_FONT : readStoredUiFont();
-    setFontIdState(next);
     applyUiFont(next);
     if (!demo) writeStoredUiFont(next);
   }, []);
