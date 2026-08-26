@@ -90,6 +90,18 @@ export function clearRacingResultsCache(): void {
 let budgetDay = "";
 let requestsToday = 0;
 
+/**
+ * This module is bundled for the client (demo racing desk), so it must never
+ * reference Neon — even a dynamic import() is followed by the bundler. The
+ * server-only `racing-usage-recorder` module registers a durable counter here
+ * at server boot (instrumentation.ts); on the client this stays null.
+ */
+let usageRecorder: (() => void) | null = null;
+
+export function registerRacingUsageRecorder(recorder: () => void): void {
+  usageRecorder = recorder;
+}
+
 function trackRequest(): void {
   const today = new Date().toISOString().slice(0, 10);
   if (today !== budgetDay) {
@@ -97,6 +109,7 @@ function trackRequest(): void {
     requestsToday = 0;
   }
   requestsToday += 1;
+  usageRecorder?.();
 }
 
 function credentials(): { user: string; pass: string } | null {

@@ -8,6 +8,7 @@ import {
   doublePrecision,
   integer,
   pgTable,
+  primaryKey,
   serial,
   text,
   unique,
@@ -70,14 +71,21 @@ export const feedSyncState = pgTable("feed_sync_state", {
 });
 
 /**
- * Durable API-Football daily spend (EDGE-81c). In-memory counters are
- * per-instance, so the real cap was previously instance-count x DAILY_BUDGET.
- * `day` is the UTC calendar date (YYYY-MM-DD) so a new day resets by key.
+ * Durable per-feed daily spend (EDGE-81c, generalised by the feed monitor).
+ * In-memory counters are per-instance, so the real cap was previously
+ * instance-count x DAILY_BUDGET. `day` is the UTC calendar date (YYYY-MM-DD)
+ * so a new day resets by key. Football rows carry the hard spend cap; racing
+ * rows are an informational counter (the provider's real limit is per-second).
  */
-export const feedBudget = pgTable("feed_budget", {
-  day: text("day").primaryKey(),
-  used: integer("used").notNull().default(0),
-});
+export const feedBudget = pgTable(
+  "feed_budget",
+  {
+    feed: text("feed").notNull().default("football"),
+    day: text("day").notNull(),
+    used: integer("used").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.feed, table.day] })]
+);
 
 export const exchanges = pgTable("exchanges", {
   id: serial("id").primaryKey(),
@@ -504,6 +512,12 @@ export const appUsers = pgTable("app_users", {
   deskSettings: text("desk_settings"),
   /** Operator role. `admin` opens /admin. Bootstrap email is always admin. */
   role: text("role").notNull().default("user"),
+  /** EDGE-67: this user's anonymous share code (XXXX-XXXX). Lazy-created. */
+  referralCode: text("referral_code"),
+  /** EDGE-67: referrer's clerk_user_id, claimed at sign-up via ?ref=. */
+  referredBy: text("referred_by"),
+  /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
+  referralCreditAt: bigint("referral_credit_at", { mode: "number" }),
 });
 
 /** Operator key-value (maintenance banner). Not customer desk data. */

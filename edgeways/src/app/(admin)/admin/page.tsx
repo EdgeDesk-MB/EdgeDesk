@@ -16,17 +16,19 @@ import { loadStripeOverview } from "@/lib/admin/stripe-overview";
 import { loadActivityOverview } from "@/lib/admin/activity";
 import { listAppUsers } from "@/lib/services/app-users";
 import { listWaitlistSignups } from "@/lib/services/waitlist-store";
-import { loadFeedStatus } from "@/lib/admin/feeds";
+import { loadFeedMonitor, loadFeedStatus } from "@/lib/admin/feeds";
+import { FEED_STATE_LABEL } from "@/lib/admin/feed-monitor";
 import { readMaintenanceBanner } from "@/lib/admin/operator-settings";
 import { sectionTitle, tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export default async function AdminOverviewPage() {
-  const [stripe, users, waitlist, feeds, banner, activity] = await Promise.all([
+  const [stripe, users, waitlist, feeds, feedMonitor, banner, activity] = await Promise.all([
     loadStripeOverview(),
     listAppUsers(),
     listWaitlistSignups(500),
     loadFeedStatus(),
+    loadFeedMonitor(),
     readMaintenanceBanner(),
     loadActivityOverview(),
   ]);
@@ -47,7 +49,11 @@ export default async function AdminOverviewPage() {
       ? `${deskEntries} entr${deskEntries === 1 ? "y" : "ies"}`
       : "Local desk",
     "/admin/feeds": feeds.football.configured
-      ? `${feeds.football.used}/${feeds.football.budget} football`
+      ? `${feedMonitor.football.used}/${feedMonitor.football.cap} football${
+          feedMonitor.football.state === "ok"
+            ? ""
+            : ` — ${FEED_STATE_LABEL[feedMonitor.football.state]}`
+        }`
       : feeds.racing.configured
         ? "Racing set"
         : "Unset",

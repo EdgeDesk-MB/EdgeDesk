@@ -1,4 +1,5 @@
 import "server-only";
+import { and, count, eq, inArray, lt } from "drizzle-orm";
 import {
   DAILY_BUDGET,
   apiUsageTodayAsync,
@@ -14,6 +15,22 @@ import {
   getAllExchangeProviderStatuses,
   testExchangeConnections,
 } from "@/lib/services/exchange";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { getNeonDb } from "@/lib/db/neon";
+import { events as pgEvents } from "@/lib/db/schema.pg";
+import {
+  neonFeedBudgetUsed,
+  neonFeedUsageHistory,
+  type FeedUsageDay,
+} from "@/lib/db/neon-feed-budget";
+import { readFeedCaps, type FeedCaps } from "@/lib/admin/feed-caps";
+import {
+  feedThresholdState,
+  fillDailySeries,
+  projectDailyPace,
+  type FeedThresholdState,
+  type FeedUsageDayPoint,
+} from "@/lib/admin/feed-monitor";
 
 export type FeedStatus = {
   football: {
@@ -61,6 +78,106 @@ export async function loadFeedStatus(): Promise<FeedStatus> {
     exchange: {
       providers: mapExchangeProviders(getAllExchangeProviderStatuses()),
     },
+  };
+}
+
+export const FEED_MONITOR_HISTORY_DAYS = 30;
+
+export type FeedMonitorLane = {
+  used: number;
+  cap: number;
+  state: FeedThresholdState;
+  projected: number;
+  capReachedAt: number | null;
+  history: FeedUsageDayPoint[];
+};
+
+export type FeedMonitor = {
+  hosted: boolean;
+  caps: FeedCaps;
+  football: FeedMonitorLane;
+  racing: FeedMonitorLane;
+  demand: {
+    /** Global API-sourced events currently live — what the poller is polling. */
+    liveFootball: number;
+    /** API-sourced events still to start before the end of the UTC day. */
+    upcomingFootball: number;
+  };
+};
+
+function monitorLane(
+  used: number,
+  cap: number,
+  history: FeedUsageDay[],
+  now: Date
+): FeedMonitorLane {
+  const pace = projectDailyPace(used, cap, now);
+  return {
+    used,
+    cap,
+    state: feedThresholdState(used, cap),
+    projected: pace.projected,
+    capReachedAt: pace.capReachedAt,
+    history: fillDailySeries(history, FEED_MONITOR_HISTORY_DAYS, now),
+  };
+}
+
+async function countApiEvents(
+  statuses: Array<"upcoming" | "live">,
+  before?: number
+): Promise<number> {
+  const conditions = [
+    eq(pgEvents.source, "api"),
+    inArray(pgEvents.status, statuses),
+  ];
+  if (before != null) conditions.push(lt(pgEvents.startTime, before));
+  const rows = await getNeonDb()
+    .select({ value: count() })
+    .from(pgEvents)
+    .where(and(...conditions));
+  return Number(rows[0]?.value ?? 0);
+}
+
+/**
+ * Cross-instance usage, pace and demand for the admin feed monitor. Local
+ * desks have no shared pool to monitor, so history/demand only load hosted.
+ */
+export async function loadFeedMonitor(): Promise<FeedMonitor> {
+  const caps = await readFeedCaps();
+  const now = new Date();
+  const status = await loadFeedStatus();
+
+  if (!isNeonDesk()) {
+    return {
+      hosted: false,
+      caps,
+      football: monitorLane(status.football.used, caps.football, [], now),
+      racing: monitorLane(status.racing.used, caps.racing, [], now),
+      demand: { liveFootball: 0, upcomingFootball: 0 },
+    };
+  }
+
+  const endOfDay = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1
+  );
+  const [footballUsed, racingUsed, footballHistory, racingHistory, live, upcoming] =
+    await Promise.all([
+      neonFeedBudgetUsed(),
+      neonFeedBudgetUsed(undefined, "racing"),
+      neonFeedUsageHistory("football", FEED_MONITOR_HISTORY_DAYS),
+      neonFeedUsageHistory("racing", FEED_MONITOR_HISTORY_DAYS),
+      countApiEvents(["live"]),
+      countApiEvents(["upcoming"], endOfDay),
+    ]);
+
+  return {
+    hosted: true,
+    caps,
+    football: monitorLane(footballUsed, caps.football, footballHistory, now),
+    racing: monitorLane(racingUsed, caps.racing, racingHistory, now),
+    demand: { liveFootball: live, upcomingFootball: upcoming },
   };
 }
 

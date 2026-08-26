@@ -451,6 +451,12 @@ export const appUsers = sqliteTable("app_users", {
   onboardingProfile: text("onboarding_profile"),
   /** Operator role. `admin` opens /admin. Bootstrap email is always admin. */
   role: text("role").notNull().default("user"),
+  /** EDGE-67: this user's anonymous share code (XXXX-XXXX). Lazy-created. */
+  referralCode: text("referral_code"),
+  /** EDGE-67: referrer's clerk_user_id, claimed at sign-up via ?ref=. */
+  referredBy: text("referred_by"),
+  /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
+  referralCreditAt: integer("referral_credit_at"),
 });
 
 /** Operator key-value (maintenance banner). Not customer desk data. */

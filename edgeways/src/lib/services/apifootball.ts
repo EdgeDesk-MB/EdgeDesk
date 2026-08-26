@@ -65,6 +65,26 @@ function spendLocalBudget(): boolean {
 }
 
 /**
+ * Operator-tunable cap (admin → Feed health) with a 60s cache so the per-request
+ * budget claim stays one round-trip. Falls back to DAILY_BUDGET when the
+ * settings read fails — never fails open above the safe default.
+ */
+let capCache: { at: number; value: number } | null = null;
+
+async function footballDailyCap(): Promise<number> {
+  if (!isNeonDesk()) return DAILY_BUDGET;
+  if (capCache && Date.now() - capCache.at < 60_000) return capCache.value;
+  try {
+    const { readFeedCaps } = await import("@/lib/admin/feed-caps");
+    const caps = await readFeedCaps();
+    capCache = { at: Date.now(), value: caps.football };
+    return caps.football;
+  } catch {
+    return DAILY_BUDGET;
+  }
+}
+
+/**
  * Hosted (Neon) desks share one durable counter (EDGE-81c) so the cap holds
  * across serverless instances and cold starts; local keeps module state. The
  * in-memory counter is still advanced on the hosted path so `apiUsageToday()`
@@ -73,8 +93,9 @@ function spendLocalBudget(): boolean {
 async function spendBudget(): Promise<boolean> {
   if (!isNeonDesk()) return spendLocalBudget();
   try {
+    const cap = await footballDailyCap();
     const { spendNeonFeedBudget } = await import("@/lib/db/neon-feed-budget");
-    const used = await spendNeonFeedBudget(DAILY_BUDGET);
+    const used = await spendNeonFeedBudget(cap);
     if (used == null) return false;
     const today = new Date().toISOString().slice(0, 10);
     if (today !== budgetDay) {
@@ -103,7 +124,8 @@ export async function apiUsageTodayAsync(): Promise<{
   if (!isNeonDesk()) return apiUsageToday();
   try {
     const { neonFeedBudgetUsed } = await import("@/lib/db/neon-feed-budget");
-    return { used: await neonFeedBudgetUsed(), budget: DAILY_BUDGET };
+    const used = await neonFeedBudgetUsed();
+    return { used, budget: await footballDailyCap() };
   } catch {
     return apiUsageToday();
   }
@@ -365,7 +387,8 @@ export function demoFixtures(): Fixture[] {
     competition: string,
     home: string,
     away: string,
-    startTime: number
+    startTime: number,
+    leagueCountry?: string
   ): Fixture => ({
     externalId: `demo-${id}`,
     sport: "football",
@@ -377,19 +400,20 @@ export function demoFixtures(): Fixture[] {
     homeScore: 0,
     awayScore: 0,
     minute: 0,
+    leagueCountry: leagueCountry ?? null,
   });
   return [
-    mk("wc0", "FIFA World Cup", "France", "Morocco", k(17, 30)),
-    mk("wc1", "FIFA World Cup", "Mexico", "England", k(18, 0)),
-    mk("wc2", "FIFA World Cup", "Brazil", "Germany", k(19, 45)),
-    mk("wc3", "World Cup - Group Stage", "Spain", "France", k(20, 0)),
-    mk("1", "Premier League", "Arsenal", "Liverpool", k(12, 30)),
-    mk("2", "Premier League", "Man City", "Chelsea", k(15, 0)),
-    mk("3", "Premier League", "Newcastle", "Spurs", k(17, 30)),
-    mk("4", "Championship", "Leeds", "Sunderland", k(14, 0)),
-    mk("5", "La Liga", "Barcelona", "Real Madrid", k(20, 0)),
-    mk("6", "Serie A", "Inter", "Juventus", k(19, 45)),
-    mk("7", "Bundesliga", "Bayern Munich", "Dortmund", k(14, 30)),
-    mk("8", "Ligue 1", "PSG", "Marseille", k(20, 45)),
+    mk("wc0", "FIFA World Cup", "France", "Morocco", k(17, 30), "World"),
+    mk("wc1", "FIFA World Cup", "Mexico", "England", k(18, 0), "World"),
+    mk("wc2", "FIFA World Cup", "Brazil", "Germany", k(19, 45), "World"),
+    mk("wc3", "World Cup - Group Stage", "Spain", "France", k(20, 0), "World"),
+    mk("1", "Premier League", "Arsenal", "Liverpool", k(12, 30), "England"),
+    mk("2", "Premier League", "Man City", "Chelsea", k(15, 0), "England"),
+    mk("3", "Premier League", "Newcastle", "Spurs", k(17, 30), "England"),
+    mk("4", "Championship", "Leeds", "Sunderland", k(14, 0), "England"),
+    mk("5", "La Liga", "Barcelona", "Real Madrid", k(20, 0), "Spain"),
+    mk("6", "Serie A", "Inter", "Juventus", k(19, 45), "Italy"),
+    mk("7", "Bundesliga", "Bayern Munich", "Dortmund", k(14, 30), "Germany"),
+    mk("8", "Ligue 1", "PSG", "Marseille", k(20, 45), "France"),
   ];
 }
