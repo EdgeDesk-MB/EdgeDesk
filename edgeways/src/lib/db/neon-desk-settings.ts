@@ -19,7 +19,16 @@ import { appUsers as pgUsers } from "@/lib/db/schema.pg";
 export async function getNeonDeskSettings(): Promise<AppSettings> {
   const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return parseStoredSettings(null);
+  return getNeonDeskSettingsForUser(clerkUserId);
+}
 
+/**
+ * Explicit-owner settings read for system processes (EDGE-110): the leased
+ * feed poller has no desk actor but needs each owner's alert prefs.
+ */
+export async function getNeonDeskSettingsForUser(
+  clerkUserId: string
+): Promise<AppSettings> {
   await ensureNeonDeskSettingsColumn();
   const rows = await getNeonDb()
     .select({ deskSettings: pgUsers.deskSettings })

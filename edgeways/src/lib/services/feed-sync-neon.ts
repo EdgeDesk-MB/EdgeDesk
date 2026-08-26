@@ -21,10 +21,10 @@
  * one-shot result backfill for matches that slept through their live window.
  *
  * NOT PORTED (and why):
- * - The budget-exhaustion alert from `refreshApiEvents()`. It writes via
- *   `recordAlerts` / `sendPush`, both SQLite-local (alerts_inbox and push
- *   subscriptions are not hosted yet), and it is a single-operator nudge rather
- *   than customer-facing. Hosted usage is still visible via `apiUsageTodayAsync`.
+ * - The budget-exhaustion alert from `refreshApiEvents()`. It is a
+ *   single-operator nudge rather than customer-facing. Hosted usage is still
+ *   visible via `apiUsageTodayAsync`. (Customer-facing result_settled alerts
+ *   ARE emitted here - EDGE-110 - via the per-user Neon inbox + push.)
  * - Wallet ledger rows on settlement. Hosted bet placement does not ledger
  *   (`balance_ledgered` stays 0), and local `ledgerBetSettlement` is itself a
  *   no-op for such a bet, so writing wallet rows here would invent money moves
@@ -60,6 +60,7 @@ import { hasBetWinTrigger, parseBetTriggerRule, ruleNeedsTimeline } from "@/lib/
 import { shouldFetchGoalTimeline } from "@/lib/live-poll-rules";
 import { formatEventTitle, formatRacingEventTitle, localCalendarDate } from "@/lib/events";
 import { parseRaceResults } from "@/lib/racing";
+import { settledResultAlert, type SettledBetNotice } from "@/lib/alerts/rules";
 import type { EventRow } from "@/lib/db/schema";
 import type { NeonEventFeedPatch } from "@/lib/db/neon-events";
 import type {
@@ -80,6 +81,11 @@ export type NeonFeedSyncDeps = {
   hasApiKey: () => boolean;
   hasRacingApiKey: () => boolean;
   now: () => number;
+  /**
+   * EDGE-110: deliver a result_settled alert to one owner's Neon inbox and
+   * push devices. Default respects the owner's alertsResultSettled pref.
+   */
+  notifySettlement: (clerkUserId: string, notice: SettledBetNotice) => Promise<void>;
 };
 
 export type NeonFeedSyncResult = {
@@ -114,6 +120,28 @@ const backfillAttempted = new Set<number>();
  */
 const MAX_SETTLEMENTS_PER_RUN = 250;
 
+/**
+ * Default settlement notifier (EDGE-110): respect the owner's result_settled
+ * pref, record to their Neon inbox (durable), then fan out push (best-effort).
+ */
+async function defaultNotifySettlement(
+  clerkUserId: string,
+  notice: SettledBetNotice
+): Promise<void> {
+  const [{ getNeonDeskSettingsForUser }, inbox, push] = await Promise.all([
+    import("@/lib/db/neon-desk-settings"),
+    import("@/lib/db/neon-alerts-inbox"),
+    import("@/lib/services/push"),
+  ]);
+  const settings = await getNeonDeskSettingsForUser(clerkUserId);
+  if (!settings.alertsResultSettled) return;
+  const alert = settledResultAlert(notice);
+  const recorded = await inbox.recordNeonAlertsForUser(clerkUserId, [alert]);
+  if (recorded > 0) {
+    await push.sendPushToUser(clerkUserId, alert).catch(() => {});
+  }
+}
+
 async function defaultDeps(): Promise<NeonFeedSyncDeps> {
   const [{ listNeonEvents, updateNeonEvent }, settlement] = await Promise.all([
     import("@/lib/db/neon-events"),
@@ -131,6 +159,7 @@ async function defaultDeps(): Promise<NeonFeedSyncDeps> {
     hasApiKey: realHasApiKey,
     hasRacingApiKey: realHasRacingApiKey,
     now: Date.now,
+    notifySettlement: defaultNotifySettlement,
   };
 }
 
@@ -329,6 +358,21 @@ async function settleOpenBets(
       narratedEvents.add(narrationKey);
       await deps.insertHistory(fullTimeHistory(event, clerkUserId)).catch(() => {});
     }
+
+    // EDGE-110: the owner's inbox + push devices. The poller is the only
+    // place hosted settlements are detected, so this is the result_settled
+    // source on hosted (local raises it from the dashboard poll instead).
+    await deps
+      .notifySettlement(clerkUserId, {
+        betId: bet.id,
+        label: bet.label,
+        profit: outcome.profit,
+        status: outcome.status,
+        betType: bet.betType,
+        offerTitle: null,
+        bookmaker: bet.bookmaker,
+      })
+      .catch(() => {});
   }
   return { settled, sweepSettled };
 }

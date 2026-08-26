@@ -9,12 +9,12 @@ import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { publicDemoAlertsInbox } from "@/lib/demo/public-desk-api";
 import {
-  listInbox,
-  markAllRead,
-  markRead,
-  markReadByDedupe,
-  markReadByDedupePrefix,
-  recordAlerts,
+  listInboxAsync,
+  markAllReadAsync,
+  markReadAsync,
+  markReadByDedupeAsync,
+  markReadByDedupePrefixAsync,
+  recordAlertsAsync,
 } from "@/lib/services/alerts-inbox";
 import { dismissPush, sendPush } from "@/lib/services/push";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
@@ -36,10 +36,7 @@ export const GET = withDeskScope(async function GET() {
   if (mode === "demo") {
     return NextResponse.json({ alerts: publicDemoAlertsInbox() });
   }
-  if (mode === "hosted_empty") {
-    return NextResponse.json({ alerts: [] });
-  }
-  return NextResponse.json({ alerts: listInbox() });
+  return NextResponse.json({ alerts: await listInboxAsync() });
 });
 
 const recordSchema = z.object({
@@ -63,10 +60,10 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const mode = await alertsInboxMode();
-  if (mode !== "desk") {
+  if (mode === "demo") {
     return NextResponse.json({ recorded: 0 });
   }
-  const recorded = recordAlerts(parsed.data.alerts);
+  const recorded = await recordAlertsAsync(parsed.data.alerts);
   // F3: fan out to subscribed devices - fire-and-forget, the inbox row is
   // already the durable record.
   if (recorded > 0) {
@@ -84,49 +81,65 @@ const patchSchema = z.union([
   z.object({ all: z.literal(true), read: z.literal(true) }),
 ]);
 
+/** Dedupe keys a PATCH is about to mark read, for push dismiss tags. */
+async function unreadTagsForPatch(
+  data: z.infer<typeof patchSchema>
+): Promise<string[]> {
+  if (isNeonDesk()) {
+    const neon = await import("@/lib/db/neon-alerts-inbox");
+    if ("all" in data) return neon.listNeonUnreadDedupes();
+    if ("dedupePrefix" in data) return neon.listNeonDedupesByPrefix(data.dedupePrefix);
+    if ("dedupe" in data) return [data.dedupe];
+    const dedupe = await neon.neonInboxDedupeById(data.id);
+    return dedupe ? [dedupe] : [];
+  }
+  if ("all" in data) {
+    return db
+      .select({ dedupe: alertsInbox.dedupe })
+      .from(alertsInbox)
+      .where(isNull(alertsInbox.readAt))
+      .all()
+      .map((r) => r.dedupe);
+  }
+  if ("dedupePrefix" in data) {
+    const prefix = data.dedupePrefix.replace(/%/g, "");
+    return db
+      .select({ dedupe: alertsInbox.dedupe })
+      .from(alertsInbox)
+      .where(like(alertsInbox.dedupe, `${prefix}%`))
+      .all()
+      .map((r) => r.dedupe);
+  }
+  if ("dedupe" in data) return [data.dedupe];
+  const row = db
+    .select({ dedupe: alertsInbox.dedupe })
+    .from(alertsInbox)
+    .where(eq(alertsInbox.id, data.id))
+    .get();
+  return row?.dedupe ? [row.dedupe] : [];
+}
+
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const mode = await alertsInboxMode();
-  if (mode !== "desk") {
+  if (mode === "demo") {
     return NextResponse.json({ updated: 0 });
   }
+  const tags = await unreadTagsForPatch(parsed.data);
+  let updated: number;
   if ("all" in parsed.data) {
-    const unreadTags = db
-      .select({ dedupe: alertsInbox.dedupe })
-      .from(alertsInbox)
-      .where(isNull(alertsInbox.readAt))
-      .all()
-      .map((r) => r.dedupe);
-    const updated = markAllRead();
-    if (unreadTags.length > 0) void dismissPush(unreadTags).catch(() => {});
-    return NextResponse.json({ updated });
+    updated = await markAllReadAsync();
+  } else if ("dedupePrefix" in parsed.data) {
+    updated = await markReadByDedupePrefixAsync(parsed.data.dedupePrefix);
+  } else if ("dedupe" in parsed.data) {
+    updated = await markReadByDedupeAsync(parsed.data.dedupe);
+  } else {
+    await markReadAsync(parsed.data.id);
+    updated = 1;
   }
-  if ("dedupePrefix" in parsed.data) {
-    const prefix = parsed.data.dedupePrefix.replace(/%/g, "");
-    const tags = db
-      .select({ dedupe: alertsInbox.dedupe })
-      .from(alertsInbox)
-      .where(like(alertsInbox.dedupe, `${prefix}%`))
-      .all()
-      .map((r) => r.dedupe);
-    const updated = markReadByDedupePrefix(parsed.data.dedupePrefix);
-    if (tags.length > 0) void dismissPush(tags).catch(() => {});
-    return NextResponse.json({ updated });
-  }
-  if ("dedupe" in parsed.data) {
-    const updated = markReadByDedupe(parsed.data.dedupe);
-    void dismissPush([parsed.data.dedupe]).catch(() => {});
-    return NextResponse.json({ updated });
-  }
-  const row = db
-    .select({ dedupe: alertsInbox.dedupe })
-    .from(alertsInbox)
-    .where(eq(alertsInbox.id, parsed.data.id))
-    .get();
-  markRead(parsed.data.id);
-  if (row?.dedupe) void dismissPush([row.dedupe]).catch(() => {});
-  return NextResponse.json({ updated: 1 });
+  if (tags.length > 0) void dismissPush(tags).catch(() => {});
+  return NextResponse.json({ updated });
 });

@@ -7,9 +7,9 @@ describe("resolveAlertsInboxMode", () => {
     expect(resolveAlertsInboxMode({ publicDemo: true, neonDesk: true })).toBe("demo");
   });
 
-  it("keeps hosted logins off the shared memory inbox", () => {
+  it("routes hosted logins to the per-user Neon inbox (EDGE-110)", () => {
     expect(resolveAlertsInboxMode({ publicDemo: false, neonDesk: true })).toBe(
-      "hosted_empty"
+      "hosted"
     );
   });
 

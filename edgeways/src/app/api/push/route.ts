@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
   return NextResponse.json({
-    publicKey: getVapidPublicKey(),
-    devices: listSubscriptions().map((s) => ({
+    publicKey: await getVapidPublicKey(),
+    devices: (await listSubscriptions()).map((s) => ({
       id: s.id,
       label: s.label,
       createdAt: s.createdAt,
@@ -68,12 +68,16 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  saveSubscription({
+  const saved = await saveSubscription({
     endpoint: parsed.data.subscription.endpoint,
     p256dh: parsed.data.subscription.keys.p256dh,
     auth: parsed.data.subscription.keys.auth,
     label: parsed.data.label ?? null,
   });
+  if (!saved) {
+    // Hosted desk with no signed-in user: a subscription needs an owner.
+    return NextResponse.json({ error: "Sign in to enable push." }, { status: 401 });
+  }
   return NextResponse.json({ ok: true });
 });
 
@@ -84,6 +88,6 @@ export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  removeSubscription(parsed.data.endpoint);
+  await removeSubscription(parsed.data.endpoint);
   return NextResponse.json({ ok: true });
 });

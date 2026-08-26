@@ -34,6 +34,9 @@ export type NeonDeskSnapshot = {
   settings?: AppSettings;
   /** Durable Neon usage (EDGE-81c); falls back to this instance's counter. */
   apiUsage?: { used: number; budget: number };
+  /** Hosted alerts inbox badge + watcher seen-set (EDGE-110). */
+  alertsUnread?: number;
+  deliveredAlertKeys?: string[];
 };
 
 export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
@@ -121,8 +124,8 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     mugPlans: [],
     accaLayDue: [],
     betBuilderLayDue: [],
-    alertsUnread: 0,
-    deliveredAlertKeys: [],
+    alertsUnread: input.alertsUnread ?? 0,
+    deliveredAlertKeys: input.deliveredAlertKeys ?? [],
     boostsOpen: 0,
     casinoNeedsAction: allCasinoOffers.filter((o) => isCasinoInMainFeed(o)).length,
     demoMode: false,

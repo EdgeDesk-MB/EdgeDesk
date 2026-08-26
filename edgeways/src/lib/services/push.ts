@@ -1,9 +1,12 @@
 /**
  * Web push delivery (F3) - a real AlertChannel behind the same alert logic.
- * VAPID keys are generated once and live in app_settings (local-first, no
- * env needed). Sending requires the local server to be running and online;
- * delivery goes via the browser vendors' push relays, so the phone gets it
- * anywhere. Sam's phone is Android (Chrome push - no iOS quirks).
+ * VAPID keys are generated once and persisted (local: app_settings; hosted:
+ * Neon operator_settings) so no env is needed. Sending requires the server to
+ * be online; delivery goes via the browser vendors' push relays, so the phone
+ * gets it anywhere. Sam's phone is Android (Chrome push - no iOS quirks).
+ *
+ * EDGE-110: hosted desks store subscriptions per-user in Neon and fan out
+ * through db/neon-push.ts; local keeps the single-operator SQLite table.
  */
 import "server-only";
 import webpush from "web-push";
@@ -14,6 +17,7 @@ import {
 } from "@/lib/alerts/notification-icons";
 import { ensureNotificationTitleEmoji } from "@/lib/alerts/notification-title";
 import { db, appSettings, pushSubscriptions, type PushSubscriptionRow } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
 import type { IncomingAlert } from "@/lib/services/alerts-inbox";
 
 function readSetting(key: string): string | undefined {
@@ -27,7 +31,7 @@ function writeSetting(key: string, value: string): void {
 }
 
 /** Generate once, persist, reuse - rotating VAPID keys orphans subscriptions. */
-export function getVapidPublicKey(): string {
+function getLocalVapidPublicKey(): string {
   let pub = readSetting("vapidPublicKey");
   const priv = readSetting("vapidPrivateKey");
   if (!pub || !priv) {
@@ -39,18 +43,30 @@ export function getVapidPublicKey(): string {
   return pub;
 }
 
-function configureVapid(): void {
-  const pub = getVapidPublicKey();
+export async function getVapidPublicKey(): Promise<string> {
+  if (isNeonDesk()) {
+    const { getNeonVapidKeys } = await import("@/lib/db/neon-push");
+    return (await getNeonVapidKeys()).publicKey;
+  }
+  return getLocalVapidPublicKey();
+}
+
+function configureLocalVapid(): void {
+  const pub = getLocalVapidPublicKey();
   const priv = readSetting("vapidPrivateKey")!;
   webpush.setVapidDetails("mailto:samhayter.design@gmail.com", pub, priv);
 }
 
-export function saveSubscription(input: {
+export async function saveSubscription(input: {
   endpoint: string;
   p256dh: string;
   auth: string;
   label?: string | null;
-}): void {
+}): Promise<boolean> {
+  if (isNeonDesk()) {
+    const { saveNeonPushSubscription } = await import("@/lib/db/neon-push");
+    return saveNeonPushSubscription(input);
+  }
   db.insert(pushSubscriptions)
     .values({
       endpoint: input.endpoint,
@@ -64,13 +80,22 @@ export function saveSubscription(input: {
       set: { p256dh: input.p256dh, auth: input.auth, label: input.label ?? null },
     })
     .run();
+  return true;
 }
 
-export function removeSubscription(endpoint: string): void {
+export async function removeSubscription(endpoint: string): Promise<void> {
+  if (isNeonDesk()) {
+    const { removeNeonPushSubscription } = await import("@/lib/db/neon-push");
+    return removeNeonPushSubscription(endpoint);
+  }
   db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).run();
 }
 
-export function listSubscriptions(): PushSubscriptionRow[] {
+export async function listSubscriptions(): Promise<PushSubscriptionRow[]> {
+  if (isNeonDesk()) {
+    const { listNeonPushSubscriptions } = await import("@/lib/db/neon-push");
+    return listNeonPushSubscriptions();
+  }
   return db.select().from(pushSubscriptions).all();
 }
 
@@ -82,10 +107,13 @@ export type PushFanoutResult = {
   failures: { label: string | null; statusCode: number | null; reason: string }[];
 };
 
-async function fanoutPush(payload: string, ttlSeconds: number): Promise<PushFanoutResult> {
-  const subs = listSubscriptions();
+async function fanoutLocalPush(
+  payload: string,
+  ttlSeconds: number
+): Promise<PushFanoutResult> {
+  const subs = db.select().from(pushSubscriptions).all();
   if (subs.length === 0) return { sent: 0, pruned: 0, failed: 0, failures: [] };
-  configureVapid();
+  configureLocalVapid();
 
   let sent = 0;
   let pruned = 0;
@@ -108,7 +136,9 @@ async function fanoutPush(payload: string, ttlSeconds: number): Promise<PushFano
         const status = (e as { statusCode?: number }).statusCode ?? null;
         const message = e instanceof Error ? e.message : String(e);
         if (status === 404 || status === 410) {
-          removeSubscription(sub.endpoint);
+          db.delete(pushSubscriptions)
+            .where(eq(pushSubscriptions.endpoint, sub.endpoint))
+            .run();
           pruned++;
           failures.push({
             label: sub.label,
@@ -129,15 +159,18 @@ async function fanoutPush(payload: string, ttlSeconds: number): Promise<PushFano
   return { sent, pruned, failed, failures };
 }
 
-/**
- * Fan an alert out to every subscribed device. Dead subscriptions (404/410
- * from the push relay) are pruned. Failures never throw - push is a
- * best-effort channel on top of the inbox record.
- */
-export async function sendPush(
+async function fanoutPush(payload: string, ttlSeconds: number): Promise<PushFanoutResult> {
+  if (isNeonDesk()) {
+    const { fanoutNeonPush } = await import("@/lib/db/neon-push");
+    return fanoutNeonPush(payload, ttlSeconds);
+  }
+  return fanoutLocalPush(payload, ttlSeconds);
+}
+
+function buildAlertPayload(
   alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
-): Promise<PushFanoutResult> {
-  const payload = JSON.stringify({
+): string {
+  return JSON.stringify({
     // Exactly one leading emoji: keep semantic marks from alert rules
     // (🟢/⚠/🔒/⏰/🛎️), otherwise brand ⚡. Never stack a second bolt.
     title: ensureNotificationTitleEmoji(alert.title),
@@ -147,7 +180,30 @@ export async function sendPush(
     icon: NOTIFICATION_ICON,
     badge: NOTIFICATION_BADGE,
   });
-  return fanoutPush(payload, 60 * 60);
+}
+
+/**
+ * Fan an alert out to every subscribed device. Dead subscriptions (404/410
+ * from the push relay) are pruned. Failures never throw - push is a
+ * best-effort channel on top of the inbox record.
+ */
+export async function sendPush(
+  alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
+): Promise<PushFanoutResult> {
+  return fanoutPush(buildAlertPayload(alert), 60 * 60);
+}
+
+/**
+ * System-context fanout for the hosted feed poller (EDGE-110): it settles
+ * every user's bets, so there is no desk actor - the owner is explicit.
+ */
+export async function sendPushToUser(
+  clerkUserId: string,
+  alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
+): Promise<PushFanoutResult> {
+  if (!isNeonDesk()) return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  const { fanoutNeonPushToUser } = await import("@/lib/db/neon-push");
+  return fanoutNeonPushToUser(clerkUserId, buildAlertPayload(alert), 60 * 60);
 }
 
 /**

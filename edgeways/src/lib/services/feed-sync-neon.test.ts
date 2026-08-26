@@ -13,6 +13,7 @@ import type {
   OwnedHistoryValues,
 } from "@/lib/db/neon-feed-settlement";
 import type { NeonEventFeedPatch } from "@/lib/db/neon-events";
+import type { SettledBetNotice } from "@/lib/alerts/rules";
 import { serializeRaceResults, type RaceResult } from "@/lib/racing";
 
 const NOW = 1_800_000_000_000;
@@ -108,6 +109,7 @@ type Harness = {
   updates: Array<{ id: number; patch: NeonEventFeedPatch }>;
   settlements: NeonBetSettlement[];
   history: OwnedHistoryValues[];
+  notifications: Array<{ clerkUserId: string; notice: SettledBetNotice }>;
   fixturesByIds: ReturnType<typeof vi.fn>;
   fixtureGoalEvents: ReturnType<typeof vi.fn>;
   resultsForRaceIds: ReturnType<typeof vi.fn>;
@@ -123,6 +125,7 @@ function harness(options: {
   const updates: Array<{ id: number; patch: NeonEventFeedPatch }> = [];
   const settlements: NeonBetSettlement[] = [];
   const history: OwnedHistoryValues[] = [];
+  const notifications: Array<{ clerkUserId: string; notice: SettledBetNotice }> = [];
   const fixturesByIds = vi.fn(async () => options.fixtures ?? []);
   const fixtureGoalEvents = vi.fn(async () => [
     { minute: 10, side: "home" as const, player: "Saka" },
@@ -138,6 +141,7 @@ function harness(options: {
     updates,
     settlements,
     history,
+    notifications,
     fixturesByIds,
     fixtureGoalEvents,
     resultsForRaceIds,
@@ -162,6 +166,9 @@ function harness(options: {
       hasApiKey: () => true,
       hasRacingApiKey: () => options.racingKey ?? false,
       now: () => NOW,
+      notifySettlement: async (clerkUserId, notice) => {
+        notifications.push({ clerkUserId, notice });
+      },
     },
   };
 }
@@ -239,6 +246,33 @@ describe("runNeonFeedSync — settlement", () => {
     const fullTime = h.history.find((row) => row.kind === "full_time")!;
     expect(fullTime.clerkUserId).toBe("user_a");
     expect(fullTime.detail).toBe("Arsenal 2-1 Liverpool");
+  });
+
+  it("emits a result_settled notification to the bet owner (EDGE-110)", async () => {
+    const h = harness({
+      events: [event()],
+      openBets: [{ bet: bet(), clerkUserId: "user_a" }],
+      fixtures: [fixture()],
+    });
+    await runNeonFeedSync(h.deps);
+
+    expect(h.notifications).toHaveLength(1);
+    expect(h.notifications[0]!.clerkUserId).toBe("user_a");
+    expect(h.notifications[0]!.notice).toMatchObject({
+      betId: 100,
+      status: "won",
+      profit: h.settlements[0]!.actualProfit,
+    });
+  });
+
+  it("emits no notification for pre-cutover rows with no owner", async () => {
+    const h = harness({
+      events: [event()],
+      openBets: [{ bet: bet(), clerkUserId: null }],
+      fixtures: [fixture()],
+    });
+    await runNeonFeedSync(h.deps);
+    expect(h.notifications).toEqual([]);
   });
 
   it("leaves open bets alone when the match is still live", async () => {

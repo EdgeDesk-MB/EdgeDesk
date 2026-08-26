@@ -15,6 +15,10 @@ import {
 import { listNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
 import { listNeonEvents } from "@/lib/db/neon-events";
+import {
+  listNeonInboxDedupes,
+  unreadNeonCount,
+} from "@/lib/db/neon-alerts-inbox";
 import { appStateFromNeonDesk } from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
@@ -26,7 +30,7 @@ export {
 } from "@/lib/db/neon-desk-state-map";
 
 export async function buildNeonDeskAppState(): Promise<AppState> {
-  const [bets, events, offers, accounts, transactions, history, casinoOffers, settings, apiUsage] =
+  const [bets, events, offers, accounts, transactions, history, casinoOffers, settings, apiUsage, alertsUnread, deliveredAlertKeys] =
     await Promise.all([
       listNeonDeskBets(),
       listNeonEvents().catch(() => []),
@@ -37,6 +41,10 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
       listNeonDeskCasinoOffers(),
       getNeonDeskSettings(),
       apiUsageTodayAsync(),
+      // EDGE-110: the badge and the watcher's durable seen-set come from the
+      // per-user Neon inbox. Fail soft: an inbox hiccup must not 500 Home.
+      unreadNeonCount().catch(() => 0),
+      listNeonInboxDedupes().catch(() => []),
       // Every hosted dashboard poll is a chance to advance the shared feed.
       // Taking the lease is one cheap query alongside the snapshot reads; the
       // sync itself is handed to `after()`, so the response is never blocked.
@@ -52,5 +60,7 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     casinoOffers,
     settings,
     apiUsage,
+    alertsUnread,
+    deliveredAlertKeys,
   });
 }

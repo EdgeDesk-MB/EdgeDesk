@@ -414,6 +414,8 @@ export const offerSeries = pgTable("offer_series", {
 /** Web-push subscriptions (F3) - one row per device/browser */
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
+  /** Owning desk (EDGE-110). Null on pre-cutover rows; they fan out to nobody. */
+  clerkUserId: text("clerk_user_id"),
   endpoint: text("endpoint").notNull().unique(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
@@ -424,18 +426,24 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 });
 
 /** Persistent alert history (F2) - toasts/notifications deliver, this is the record */
-export const alertsInbox = pgTable("alerts_inbox", {
-  id: serial("id").primaryKey(),
-  /** Stable rule dedupe key - a re-firing rule updates its row */
-  dedupe: text("dedupe").notNull().unique(),
-  kind: text("kind").notNull(),
-  title: text("title").notNull(),
-  body: text("body"),
-  href: text("href"),
-  createdAt: epochMs("created_at").notNull(),
-  updatedAt: epochMs("updated_at").notNull(),
-  readAt: epochMs("read_at"),
-});
+export const alertsInbox = pgTable(
+  "alerts_inbox",
+  {
+    id: serial("id").primaryKey(),
+    /** Owning desk (EDGE-110) - dedupe keys like result_settled:1 are per-user. */
+    clerkUserId: text("clerk_user_id"),
+    /** Stable rule dedupe key - a re-firing rule updates its row */
+    dedupe: text("dedupe").notNull(),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    href: text("href"),
+    createdAt: epochMs("created_at").notNull(),
+    updatedAt: epochMs("updated_at").notNull(),
+    readAt: epochMs("read_at"),
+  },
+  (t) => [uniqueIndex("alerts_inbox_user_dedupe_unique").on(t.clerkUserId, t.dedupe)]
+);
 
 /**
  * User-set reminders (e.g. free spins credited tomorrow). Fired into the

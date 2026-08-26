@@ -10,7 +10,10 @@ import {
   offerExpiringAlertDedupePrefix,
   offerExpiringAlertKeys,
 } from "@/lib/alerts/expiring-alert-keys";
-import { markReadByDedupe, markReadByDedupePrefix } from "@/lib/services/alerts-inbox";
+import {
+  markReadByDedupeAsync,
+  markReadByDedupePrefixAsync,
+} from "@/lib/services/alerts-inbox";
 import { dismissPush } from "@/lib/services/push";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -27,7 +30,11 @@ export function offerExpiringDismissTags(offerId: number, now = Date.now()): str
 
 export function quietOfferAlerts(offerId: number, now = Date.now()): void {
   if (!Number.isFinite(offerId) || offerId <= 0) return;
-  markReadByDedupePrefix(offerExpiringAlertDedupePrefix(offerId), now);
+  // Async dispatchers (EDGE-110): hosted desks mark the Neon inbox; local runs
+  // the sync SQLite path inside. Fire-and-forget either way.
+  void markReadByDedupePrefixAsync(offerExpiringAlertDedupePrefix(offerId), now).catch(
+    () => {}
+  );
   void dismissPush(offerExpiringDismissTags(offerId, now)).catch(() => {});
 }
 
@@ -43,7 +50,9 @@ export function freeBetExpiringDismissTags(lotId: number, now = Date.now()): str
 
 export function quietFreeBetAlerts(lotId: number, now = Date.now()): void {
   if (!Number.isFinite(lotId) || lotId <= 0) return;
-  markReadByDedupePrefix(freeBetExpiringAlertDedupePrefix(lotId), now);
+  void markReadByDedupePrefixAsync(freeBetExpiringAlertDedupePrefix(lotId), now).catch(
+    () => {}
+  );
   void dismissPush(freeBetExpiringDismissTags(lotId, now)).catch(() => {});
 }
 
@@ -51,6 +60,6 @@ export function quietFreeBetAlerts(lotId: number, now = Date.now()): void {
 export function quietAlertTags(tags: string[], now = Date.now()): void {
   const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
   if (clean.length === 0) return;
-  for (const tag of clean) markReadByDedupe(tag, now);
+  for (const tag of clean) void markReadByDedupeAsync(tag, now).catch(() => {});
   void dismissPush(clean).catch(() => {});
 }

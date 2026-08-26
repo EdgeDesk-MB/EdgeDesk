@@ -15,7 +15,12 @@ import { settledResultAlertCopy } from "@/lib/alerts/rules";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { db, alertsInbox, bets, events, offers, type AlertsInboxRow } from "@/lib/db";
 
-/** Hosted Neon uses a shared in-memory SQLite stand-in. Do not persist inbox there. */
+/**
+ * The sync SQLite functions below are the LOCAL path. On hosted they stay
+ * inert (the shared in-memory SQLite stand-in must never act as a per-login
+ * record); request handlers use the async dispatchers at the bottom, which
+ * route to db/neon-alerts-inbox.ts (EDGE-110).
+ */
 function hostedInboxDisabled(): boolean {
   return isNeonDesk();
 }
@@ -301,4 +306,83 @@ export function markAllRead(now = Date.now()): number {
     .where(isNull(alertsInbox.readAt))
     .run();
   return res.changes;
+}
+
+/* ------------------------------------------------------------------ */
+/* EDGE-110: async dispatchers. Hosted desk -> Neon (per-user rows);  */
+/* local desk -> the sync SQLite functions above. Request handlers    */
+/* (and any code path that can run on hosted) must use these.         */
+/* ------------------------------------------------------------------ */
+
+export async function recordAlertsAsync(
+  alerts: IncomingAlert[],
+  now = Date.now()
+): Promise<number> {
+  if (isNeonDesk()) {
+    const { recordNeonAlerts } = await import("@/lib/db/neon-alerts-inbox");
+    return recordNeonAlerts(alerts, now);
+  }
+  return recordAlerts(alerts, now);
+}
+
+export async function listInboxAsync(limit = 100): Promise<AlertsInboxRow[]> {
+  if (isNeonDesk()) {
+    const { listNeonInbox } = await import("@/lib/db/neon-alerts-inbox");
+    return listNeonInbox(limit);
+  }
+  return listInbox(limit);
+}
+
+export async function listInboxDedupesAsync(): Promise<string[]> {
+  if (isNeonDesk()) {
+    const { listNeonInboxDedupes } = await import("@/lib/db/neon-alerts-inbox");
+    return listNeonInboxDedupes();
+  }
+  return listInboxDedupes();
+}
+
+export async function unreadCountAsync(): Promise<number> {
+  if (isNeonDesk()) {
+    const { unreadNeonCount } = await import("@/lib/db/neon-alerts-inbox");
+    return unreadNeonCount();
+  }
+  return unreadCount();
+}
+
+export async function markReadAsync(id: number, now = Date.now()): Promise<void> {
+  if (isNeonDesk()) {
+    const { markNeonRead } = await import("@/lib/db/neon-alerts-inbox");
+    return markNeonRead(id, now);
+  }
+  markRead(id, now);
+}
+
+export async function markReadByDedupeAsync(
+  dedupe: string,
+  now = Date.now()
+): Promise<number> {
+  if (isNeonDesk()) {
+    const { markNeonReadByDedupe } = await import("@/lib/db/neon-alerts-inbox");
+    return markNeonReadByDedupe(dedupe, now);
+  }
+  return markReadByDedupe(dedupe, now);
+}
+
+export async function markReadByDedupePrefixAsync(
+  prefix: string,
+  now = Date.now()
+): Promise<number> {
+  if (isNeonDesk()) {
+    const { markNeonReadByDedupePrefix } = await import("@/lib/db/neon-alerts-inbox");
+    return markNeonReadByDedupePrefix(prefix, now);
+  }
+  return markReadByDedupePrefix(prefix, now);
+}
+
+export async function markAllReadAsync(now = Date.now()): Promise<number> {
+  if (isNeonDesk()) {
+    const { markNeonAllRead } = await import("@/lib/db/neon-alerts-inbox");
+    return markNeonAllRead(now);
+  }
+  return markAllRead(now);
 }
