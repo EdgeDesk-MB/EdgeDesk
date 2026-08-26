@@ -218,3 +218,19 @@ export async function dismissPush(tags: string[]): Promise<PushFanoutResult> {
   // Short TTL: a dismiss that arrives hours later is useless.
   return fanoutPush(payload, 5 * 60);
 }
+
+/** System-context dismiss for one owner's devices (webhooks, poller). */
+export async function dismissPushForUser(
+  clerkUserId: string,
+  tags: string[]
+): Promise<PushFanoutResult> {
+  if (!isNeonDesk()) return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))].slice(0, 50);
+  if (clean.length === 0) return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  const { fanoutNeonPushToUser } = await import("@/lib/db/neon-push");
+  return fanoutNeonPushToUser(
+    clerkUserId,
+    JSON.stringify({ action: "dismiss", tags: clean }),
+    5 * 60
+  );
+}

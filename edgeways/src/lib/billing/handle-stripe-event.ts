@@ -10,6 +10,10 @@ import {
   sourceFromStripeSubscription,
 } from "@/lib/billing/entitlement-from-stripe";
 import { attachFoundingScheduleIfNeeded } from "@/lib/billing/founding-schedule";
+import {
+  clearPaymentFailedAlert,
+  notifyPaymentFailed,
+} from "@/lib/billing/dunning";
 import { getStripe } from "@/lib/billing/stripe-server";
 import { grantReferralCreditForInvoice } from "@/lib/referrals/referral-service";
 import {
@@ -30,6 +34,11 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "invoice.paid":
       await handleInvoicePaid(event.data.object);
       return;
+    case "invoice.payment_failed":
+      // EDGE-6: alert + email the owner. Stripe runs the retry cadence; when
+      // it gives up, customer.subscription.deleted drops the entitlement.
+      await notifyPaymentFailed(event.data.object);
+      return;
     default:
       return;
   }
@@ -46,6 +55,9 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   } catch (error) {
     console.error("[billing/webhook] referral credit", error);
   }
+  // EDGE-6: a successful payment (incl. a recovered retry) quiets the
+  // payment_failed prompt on the owner's desk and devices.
+  await clearPaymentFailedAlert(invoice);
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {

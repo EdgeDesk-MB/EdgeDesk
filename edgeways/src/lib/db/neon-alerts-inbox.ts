@@ -213,8 +213,18 @@ export async function markNeonReadByDedupe(
   now = Date.now()
 ): Promise<number> {
   const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return 0;
+  return markNeonReadByDedupeForUser(clerkUserId, dedupe, now);
+}
+
+/** Explicit-owner variant for system contexts (webhooks, poller). */
+export async function markNeonReadByDedupeForUser(
+  clerkUserId: string,
+  dedupe: string,
+  now = Date.now()
+): Promise<number> {
   const key = dedupe.trim();
-  if (!clerkUserId || !key) return 0;
+  if (!key) return 0;
   const updated = await getNeonDb()
     .update(pgAlertsInbox)
     .set({ readAt: now })
