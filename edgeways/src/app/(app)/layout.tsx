@@ -32,6 +32,12 @@ import { PublicDemoProvider } from "@/components/demo/public-demo-provider";
 import { DemoPlanBar } from "@/components/demo/demo-plan-bar";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
+import type { Metadata } from "next";
+
+/** Desk shells are private - never indexable, even signed out (EDGE-107). */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 /**
  * Desk chrome: shell, top bar, and interactive providers.
