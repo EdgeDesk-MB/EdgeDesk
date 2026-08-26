@@ -20,9 +20,9 @@ New UI must look like it was built by the same person on the same day as the res
 - **Documented patterns** for page headers, stat strips, pills and lists — never bespoke variants of these.
 - **Copy is British English**, sentence case, commas rather than em dashes. Entity names identical everywhere; action verbs identical through a flow.
 - **Times of day** via `formatClockTime` / `formatClockString` from `src/lib/time-format.ts` — never `toLocaleTimeString`. Dates, numbers and currency via the shared formatting utilities.
-- **Lay odds / lay stake** via `exchangeOddsStepping` / `layStakeStepping` (or `LayStakeBanner`). Never a raw `step={0.01}` number input. See `docs/design-system.md` → “Lay fields (odds and stake)”.
+- **Lay odds / lay stake** via `exchangeOddsStepping` / `layStakeStepping` (or `LayStakeBanner`). Never a raw `step={0.01}` number input. Wheel via `useNonPassiveWheel`, never React `onWheel`. See `docs/design-system.md` → “Lay fields (odds and stake)”.
 - **One icon set, one radius language, shadow scale not shadow improvisation, spacing scale only.**
-- **Overflow.** Nothing paints outside the viewport or its plate. Wrap (`text-pretty break-words`, `min-w-0` on flex children). Internal scroll is fine. Page-level horizontal scroll is a launch blocker. See `design-system.md` → “Overflow (go-live gate)”.
+- **Overflow.** Nothing paints outside the viewport or its plate. Wrap (`text-pretty break-words`, `min-w-0` on flex children). Nested clipped scrolls use `ScrollFadeEdges` (no one-off fades). Page-level horizontal scroll is a launch blocker. See `design-system.md` → “Overflow (go-live gate)”.
 
 ## Component reuse rules
 

@@ -15,9 +15,16 @@ Use `exchangeOddsStepping` on `NumField` / `PanelInput`, or
 `exchangeOddsStepHandlers` from `src/lib/calc/exchange-odds-step.ts`.
 
 - UK exchange tick ladder (Betfair / Betdaq / Matchbook / Smarkets).
-- Up / down arrows and the wheel move one tick. Typed prices stay as
-  entered (6.97 is valid until the user steps). Do not snap on blur.
+- Up / down arrows, the native chevron stepper, and the wheel move one
+  tick. Typed prices stay as entered (6.97 is valid until the user
+  steps). Do not snap on blur.
 - Match Add bet `PanelInput`: arrows = ladder, typing = precise odds.
+- Bind the wheel with `useNonPassiveWheel`. Never React `onWheel`.
+  React registers wheel as passive, so `preventDefault` cannot stop the
+  native number-input step (6 → 6.1 instead of 6 → 6.2).
+- Chevron steppers go through `handleExchangeOddsInputEvent`. Native
+  `min + n × step` snaps (5.00 → 5.01) must become the next tick (5.1).
+  Use `step="any"` on lay-odds number inputs.
 
 ## Lay stake
 

@@ -25,9 +25,11 @@ Defined in `src/app/globals.css`:
 | `--stat-tile-selected` / `--stat-tile-selected-border` | Interactive `StatTile` summary tabs — white plate (light) / lifted grey (dark); rim via 1px box-shadow only |
 | `--ew-stat-tile-selected-face` | Selected StatTile glossy inset face (stronger than `--ew-surface-face`) |
 | `--stat-tile-hover-mix` / `--stat-tile-press-mix` | Inactive interactive tile hover / press `color-mix` toward `--stat-tile-selected` |
+| `--fab-shadow` | Mobile quick-actions FAB outer drop (hairline + bloom). Layered under the skeuo face via `.quick-actions-fab`. `--page-shadow` is `none` in dark, so the FAB cannot share it |
 | `--border` | Tightened neutral borders (`border-border/80` on cards and tables) |
 | `--negative` | Loss P&L + Racing Desk holding/elapsed status. Light = deeper brick (`oklch` ~0.5 / 0.14); dark = lighter red for canvas contrast |
 | `--success` | Qualifying / completed / positive eligibility (not P&L) |
+| `--profit` | **P&L / “it paid” type** (`text-profit`, `moneyPositiveClass`). Light is a deeper green so 12px figures clear `--canvas`. Dark is the old emerald-400 lift. Do not reuse `--success` for money |
 | `--warning` | Caution and execution risk only (near-min fields, NR traps, real warnings). Light = mid amber (`oklch` 0.54 / 0.18 / 68) so type and 10% washes stay amber, not khaki. Dark = lifted gold (`oklch` 0.72 / 0.13 / 75) for canvas contrast |
 | `--edge` | **Offer Edge / free-bet campaign signature** (violet). Race picks, recommended markers, Edge today, side-nav `Pro` mark (`proNavTag` = same plate as `edgeNavTag`) with `--edge-foreground` on the plate. Also: FB badge, Convert CTA, campaign pipeline **awarded / converting** label + bar (`text-edge` / `bg-edge`). Gift / promo-balance rows may still use historical `violet-*`; Zap there is the shared lightning motif. Marketing Edge plan: mixed rim, shine, and trial button use `--edge`. Choose Core uses `--marketing-brand`. |
 
@@ -35,7 +37,7 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 
 **Brand on light surfaces.** Brand accent fails contrast on white/page backgrounds. Light-mode primary buttons are ink + brand type (same recipe as chips). Use `text-primary-text` for non-button accent text (links, icons, sublines). Do not use `text-primary` for body copy in light mode.
 
-**Subscription.** Settings → Subscription (first tab, `/settings?tab=subscription`): live plan and status from `app_users` (EDGE-5), **Manage billing** into Stripe Customer Portal, return lands on this tab. Free or cancelled shows Start 14-day Edge trial / Choose Core. Clerk is identity only. Do not build a custom card form. Test portal can switch Core↔Edge list prices. Founding is invite-only, not a portal product.
+**Subscription.** Settings → Subscription (first tab, `/settings?tab=subscription`): live plan and status from `app_users` (EDGE-5), **Manage billing** into Stripe Customer Portal, return lands on this tab. Free or cancelled shows Start 14-day Edge trial / Choose Core. **Try Edge** is a button on this tab (not Appearance, not a switch), visible only to Free and Core. It turns on an Edge entitlement preview so they can walk the full desk, then Start trial sits underneath to convert. **Back to Free / Core** exits the preview. Hidden for Edge subscribers and on the public demo (viewing bar). Clerk is identity only. Do not build a custom card form. Test portal can switch Core↔Edge list prices. Founding is invite-only, not a portal product.
 
 **Appearance.** Settings → Appearance: Light/Dark (`ThemeSelect`), UI font dropdown (`UiFontSelect`: Noto Sans (default), Figtree), header pattern picker (`HeaderPatternSelect`: twelve [Hero Patterns](https://heropatterns.com/) tiles, default Diagonal lines), plus brand accent presets (Amber, Viridian, Coral, Azure, Orchid, Citrine, Rose) and Custom colour picker. Default keeps next/font on `--font-sans` (Noto); Figtree sets `html[data-font="figtree"]` so `--font-sans` / `--font-heading` resolve to `--font-figtree` (persisted in localStorage, SSR cookie `edgeways-ui-font`, and `AppSettings.uiFont`; FOUC script in `<head>`). Accent apply sets `--brand` plus contrast tokens; swatches show a loader until settle, then the selected style. Non-default accent/font/pattern persist in localStorage, an SSR cookie, and `AppSettings`. Choosing the product defaults (Amber, Noto, diagonal lines) **clears** those stores so a hard refresh paints CSS defaults. Public demo never reads or writes appearance prefs (always Amber + Noto). A blocking head script mirrors localStorage/cookie before paint; brand colour transitions only run after `html.brand-accent-ready` (avoids Amber → selected flash).
 
@@ -46,7 +48,7 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 - **As thin strokes on light surfaces** (line-tab underlines, mobile topbar stripe): `--brand-highlight` keeps mid/dark brands as-is and darkens bright brands to ≤ 0.45 luminance — reverse of the brand-text lift; saturation unchanged.
 - **Topbar:** same flip for lockup / inactive meta (`--brand-on-topbar`). Light mode ink plate uses `--brand-logo` for the lockup, Beta plate, **and** burger (`--topbar-accent`) — dark brands are lifted to the brand-text floor (≥ 0.55) so Viridian etc. clear `#111`; inactive meta tabs are white. Burger icon uses `--brand-logo-foreground` (logo-plate luminance — ink once the lift crosses 0.45).
 
-**Pressable buttons (react-3d-button).** `default` / `pagePrimary` / `outline` / `secondary` / `destructive` / `success` on `Button` render through `PressButton` (`components/ui/button-3d.tsx`). Depth is **Shopify-style** (Polaris `shadow-button` via `--ew-btn-shadow`): no chunky extruded colour slab — a 1px inset bottom lip + top shine on the face. Press switches to `--ew-btn-shadow-pressed` and shunts content **0.25px** down. Hover is a **stable** 0.5px content shunt (no left/right skew tracking — that jittered icon+label lock-ups). Ghost / link / `asChild` stay flat (no pack press), but share the same face shadow tokens. **Never put `DialogTrigger asChild` / `PopoverTrigger asChild` on a pressable `Button`** — Radix trigger props force the flat path, so the control ends up taller / differently faced than Press siblings. Use controlled `open` + `Button onClick` (dialogs) or `PopoverAnchor` (DatePicker) instead. Icon + label use a **6px** gap (`0.375rem`) on the pack’s inner content span. Campaign-card outline clusters (`outlineButtonGroup`) must keep every outline `sm` control on the Press path at the same height. Toggle: `toggle` + `active` / `onToggleChange` (Racing Desk Track race / Tracked; success when on). Prefer `size="lg"` (`h-9`) for page-header action clusters.
+**Pressable buttons (react-3d-button).** `default` / `pagePrimary` / `outline` / `secondary` / `destructive` / `success` on `Button` render through `PressButton` (`components/ui/button-3d.tsx`). Depth is **Shopify-style** (Polaris `shadow-button` via `--ew-btn-shadow`): no chunky extruded colour slab — a 1px inset bottom lip + top shine on the face. Press switches to `--ew-btn-shadow-pressed` and shunts content **0.25px** down. Hover is a **stable** 0.5px content shunt (no left/right skew tracking — that jittered icon+label lock-ups). Ghost / link / `asChild` stay flat (no pack press), but share the same face shadow tokens. **Never put `DialogTrigger asChild` / `PopoverTrigger asChild` on a pressable `Button`** — Radix trigger props force the flat path, so the control ends up taller / differently faced than Press siblings. Use controlled `open` + `Button onClick` (dialogs) or `PopoverAnchor` (DatePicker) instead. Icon + label use a **6px** gap (`0.375rem`) on the pack’s inner content span. Campaign-card outline clusters (`outlineButtonGroup`) must keep every outline `sm` control on the Press path at the same height. Toggle: `toggle` + `active` / `onToggleChange` (Racing Desk Track race / Tracked; success when on). Prefer `size="lg"` (`h-9`) for page-header action clusters. **Disabled** keeps the fill family (primary stays a quiet brand mix, not charcoal) and readable type. Do not stack `opacity: 0.5` on `--muted` / `--secondary`. Shortcut keycaps inherit the label colour so they stay visible on the plate.
 
 **Filter pills & segmented tabs.** Page filters use `<FilterPill>` (`components/ui/filter-pill.tsx`) — PressButton + `rounded="full"`, inactive outline face, active solid `--brand` plate + `--brand-foreground` type (same filled-accent pattern as `tone="edge"` violet). `TabsList variant="segmented"` (e.g. Do next Priority / Edge / Rate) uses the same active brand plate. The active fill is a shared sliding plate (`useSlidingIndicator`, same spring as line-tab underlines) — do not snap a per-trigger background. Per-tab plate colour via `data-plate` on the trigger (`edge`, `ink`; default `--brand`). The track is `bg-foreground/8` in light so it reads on canvas and cards (`dark:bg-input/30`). **Counts** via `filterPillCountState()`: inactive = muted fill; active = ink `#111` + off-white `#fafafa` in both themes so the number stays white on any user brand and on edge violet (never brand-on-brand, brand-on-edge, or dark-mode `--brand-text`). Faces use `--ew-chip-shadow`: soft **white** inset rims in dark mode (nailed — do not change), soft **dark** inset rims in light mode (same geometry, inverted polarity). Ink plates (Login on #111) use `--ew-ink-plate-shadow` instead. Home compact chips share that recipe via `filterPillState()`. Segmented roots use `activationMode="manual"` (arrows move focus; Enter/Space commits) so arrowing does not thrash content. Focus ring is inset (no offset) so the active pill does not balloon in the track.
 
@@ -59,6 +61,8 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 **Lifted containers (site-wide).** Cards, `.surface-lift`, `.page-panel`, bet panels, and `panelSurface` share a **minimal** glassy face via `--ew-surface-face` / `--ew-surface-rim` (softer than chips / Do next — soft top catch, no boxy stroke). Dark drops outer `ring-*` so the face carries the edge. Prefer `panelSurface` over ad-hoc `rounded-xl border bg-card`. Class escape hatch: `.surface-glass`. Ranked items inside a list modal (Race picks) use `dialogTicketSurface` and sit the dialog on `--page` in both themes (`data-dialog-tone=page` + `dark:bg-page`) so `--card` tickets lift. Do not rest `bg-card` tickets on a `dark:bg-card` dialog.
 
 **Alert toasts.** Rest on `--page-shadow`. Hover uses `--toast-shadow-hover` plus the campaign-card brightness lift (`0.98` light / `1.12` dark). Shadow and filter only, no padding or size change.
+
+**Mobile quick-actions FAB.** The floating brand bolt (`.quick-actions-fab`, same `BOLT_PATH` as the mobile top-bar mark) is the one skeuo exception that also takes an outer drop: `--shadow-skeuo` + `--fab-shadow`. Inset face stays Shopify; the drop keeps a brand plate from melting into brand page chrome. Do not flatten it with `shadow-none`. Do not swap the mark for Lucide `Zap` — that icon is boosts only.
 
 **Warning notices.** In-page execution warnings use `<WarningNotice>` (`components/ui/warning-notice.tsx`) on the `warningNotice` token (`surface-styles.ts`): `border-warning/40 bg-warning/10`, title `font-semibold text-warning`, body muted 12px. Same plate as Acca / Bet Builder offer requirements. Softer `warningPanel` (`/25` `/5` + wash) is for tinted cards, not this copy block. `--warning` is for caution and execution risk only. Bold selection names in the body (`<strong>`), not colour alone. Blocked or failed tinted plates use `destructivePanel` (same `/25` `/5` wash as Qualifying / Warning). Neutral inset notes (setup copy, Core upgrade nudge) use `quietPanel`. Edge-tier nudges use `edgePanel`. Onboarding upgrade confirmation uses `successNotice` (`border-success/40 bg-success/10`, no mix-blend wash) with a solid success tick and ink title. Do not use washed `qualifyPanel` plus `text-success` type: that reads muddy in dark.
 
@@ -135,11 +139,20 @@ Plate colour flips with theme:
   Page panel radius is `0` below `sm`.
 
 1. **`AppTopBarHeader`** — lockup, bankroll stacks, burger (mobile). Fixed `h-14` so the
-   balance pill can collapse without reflowing the page. Desktop balances sit
-   in `ChromeTab edge="hang"`, top-aligned. A 12px bottom strip (chevron up)
+   balance pill can collapse without reflowing the page. Below `md`, the lockup sits in a
+   `@container/brand` leftover slot: wordmark when that slot is at least `13.5rem`
+   (wordmark + Beta + inset, plus a little air), otherwise the bolt (Beta stays). The
+   hang tab and burger shrink the slot, so the fallback is a collision, not a
+   `sm` breakpoint. The Demo data badge is `sm+` only, because it does not fit
+   beside the hang tab on a phone. `md+` keeps the wordmark in the nav column. Desktop (`sm+`) balances
+   sit in `ChromeTab edge="hang"`, top-aligned. A 12px bottom strip (chevron up)
    collapses metrics upward with `COLLAPSE_EASE` height + spring fade
    (`lib/ui/motion.ts`); collapsed keeps a short “Show balances” + chevron-down
-   reveal (`localStorage`). The hang pill is always 2×2: Profit + Free bets on
+   reveal (`localStorage`). **Mobile (`< sm`):** no chevron and no collapse. The
+   whole hang tab is one tap target (min 52px) and opens `MobileBalancesDialog`,
+   a bottom sheet with segmented **Balances** / **Free bets** tabs. Profit and
+   Free bets rows in that sheet are 44px targets (tracker, or the Free bets tab).
+   The hang pill is always 2×2: Profit + Free bets on
    the left, Exchange (or In-bets when money is tied up) + Total on the right.
    Exchange stays visible at £0.00. Total is never shown on its own.
 2. **`AppTopBarMetaNav`** — same plate as the header, all breakpoints. Active
@@ -161,7 +174,12 @@ Meta-nav details:
 - **Settings (side nav)** — on Desk only: Light/Dark `ThemeSelect` plus Default
   exchange. Brand accent lives on Settings → Appearance.
 - **Mobile** — same meta strip as desktop; burger drawer still carries desk
-  section nav + the meta links.
+  section nav + the meta links. 12px (`--layout-meta-nav-gap`) sits above the
+  strip so the tabs clear the hang balance pill. Desktop keeps the gap at 0.
+  `--layout-header-h` includes the gap so page height and toast offset stay
+  aligned. Toasts stay top-right at every breakpoint, sitting 16px under that
+  offset. On viewports ≤600px they cap at `--overlay-max` so they read as a
+  card, not a full-bleed banner. Do not let Sonner stretch them full-width.
 
 ## Page headers
 
@@ -176,19 +194,23 @@ cluster). Stats stay at 8px; buttons inside the cluster stay at 8px.
 **Ending date/time shortcuts** - expiry fields pass `shortcuts="ending"` to `DatePicker`
 (Tomorrow, 7 days), `TimePicker` / `EventTimeInput` (End of day → `23:59`), and the combined
 `DateTimePicker` (Tomorrow + 7 days under the calendar, End of day under the wheels). Compact
-`FilterPill` chips sit under the calendar / wheels.
+`FilterPill` chips sit under the calendar / wheels. `DateTimePicker` is wider than the default
+18rem popover (calendar + time wheels) and caps at `--overlay-datetime-max`
+(`min(26rem, 100vw − gutter)`) and available height, with Clear / Today / Done pinned so they
+stay on-screen. Collision padding matches `--overlay-gutter` (16px).
 
 **Modal headers** - every `Dialog` uses the Adjust balance band: `dialogHeaderBand` / `dialogTitle` / `dialogDescription` in `surface-styles.ts` (baked into `DialogHeader`, `DialogTitle`, `DialogDescription`). Title is 20px (`text-xl`) extrabold; the matching title icon is `dialogTitleIcon` (`size-5`). Prefer a short description; when a name or sentence needs more room it **wraps** inside the header (`text-pretty break-words`) — never truncate or overflow the modal. Extra help uses `DialogExplainer` (CircleHelp popover) immediately after the description text, not pinned to the trailing edge of the header. Not a second task. Footer actions stay fully visible (`flex-wrap`). Do not restyle a header with `text-base` or drop the hairline. `p-0` shells cancel the default bleed with `mx-0 mt-0` on the header.
 
-**Tooltips.** Prefer short copy. That is content guidance only — when a name or sentence needs more room the tooltip **wraps** (`text-pretty break-words` on `TooltipContent`). Never `truncate`, `whitespace-nowrap`, or `line-clamp-1` inside a tooltip. Chart marker labels follow the same rule. Overlay width is capped at `--overlay-max` (`min(20rem, 100vw − 1rem)`).
+**Tooltips.** Prefer short copy. That is content guidance only — when a name or sentence needs more room the tooltip **wraps** (`text-pretty break-words` on `TooltipContent`). Never `truncate`, `whitespace-nowrap`, or `line-clamp-1` inside a tooltip. Chart marker labels follow the same rule. Overlay width is capped at `--overlay-max` (`min(20rem, 100vw − 1rem)`). Row-action icon tooltips sit **above** the control (`side="top"` on `TooltipContent`, the primitive default). Do not pin them left of a trailing action cluster.
 
 **Overflow (go-live gate).** Nothing may paint outside the viewport or its containing plate. This is a launch blocker.
 
 - **Wrap first.** Titles, descriptions, tooltip/popover copy, and dialog headers use `min-w-0 text-pretty break-words`. Short copy is guidance, not a nowrap mandate.
 - **Contain, then scroll.** Tables and chip rows may scroll *inside* their plate (`overflow-x-auto` + `min-w-0 max-w-full`). Page-level horizontal scroll is forbidden.
 - **Flex children shrink.** Any `flex-1` / row child that holds copy needs `min-w-0` or it will blow the page.
-- **Overlays stay on-screen.** Tooltip, popover, dropdown, and toast cap at `calc(100vw − var(--overlay-gutter))` and wrap. Do not give them a raw `w-*` without a viewport max.
+- **Overlays stay on-screen.** Tooltip, popover, dropdown, and toast cap at `calc(100vw − var(--overlay-gutter))` and wrap. Do not give them a raw `w-*` without a viewport max. `DateTimePicker` uses `--overlay-datetime-max` so the plate wraps both columns; it still uses that viewport cap, plus available height so Done stays on-screen.
 - **Clip the shell.** `html` / `body` / `.app-scroll` / `PageShell` use `overflow-x: clip`. Do not remove that to “fix” a wide child — fix the child. Nested panels that must show a standing scrollbar use `.app-scroll-always` (same thin thumb as `.app-scroll-nested` hover).
+- **Fade clipped scroll.** Any nested region that scrolls (dialog body, max-height panel, card list, tab strip, select/dropdown/command list) uses `ScrollFadeEdges` (`src/components/ui/scroll-fade-edges.tsx`). Soft start/end fades appear only while more content is clipped. Vertical is the default; tab strips and card decks use `orientation="horizontal"`. Pass `fadeClassName` to match the surface (`from-page`, `from-card`, `from-popover`, `from-page dark:from-card`, …). Nested thumbs stay on `.app-scroll-nested` / `.app-scroll-overlay` via `scrollClassName`. Do **not** invent a second mask or a one-off gradient. Radix Select must not render scroll chevrons: they remount on first scroll and jump the list. Overlay fades with `scrollAsChild` on the Viewport instead. Exempt: the page-level `.app-scroll` shell, and time wheels (those keep their existing mask).
 - List-row `truncate` is allowed only on fixed-height chrome (nav, feed rows) where the full string is available elsewhere. Never use it as the overflow strategy for tooltips, dialogs, or page titles.
 
 **`CalculatorPageHeader`** - borderless meta band for calculator shells.
@@ -210,9 +232,9 @@ When bumping micro labels, bump sibling lock-up icons (`size-2.5` → `size-3`) 
 
 ## Stat strips
 
-**`StatStrip`** + **`StatTile`** (`src/components/layout/stat-strip.tsx`) - 2–5 column grid of compact metric tiles. Used on Dashboard, Racing Desk, Tracker. Racing Desk **Racing P&L today** puts the race breakdown on the left and the day chart on the right from `lg` up (chart stays first on a phone).
+**`StatStrip`** + **`StatTile`** (`src/components/layout/stat-strip.tsx`) - 2–5 column grid of compact metric tiles. Used on Racing Desk, Edge Report, Settings → Subscription. Racing Desk **Racing P&L today** puts the race breakdown on the left and the day chart on the right from `lg` up (chart stays first on a phone). Nested in a `Card`, idle tiles sink to `--page` so they still plate against `bg-card`. That fill lives in `globals.css` on `[data-slot="card"] .surface-lift[data-stat-tile]` (not `in-data-[slot=card]:bg-page`) so it beats `.surface-lift` `background-color` and stays out of the selected-tab fill. Hover and press only apply when `aria-pressed` is present (interactive tabs).
 
-**Density.** `px-4 py-4`, fixed three-row stack (label / value / sub — sub slot always reserved). Label and sub: `text-[11px]` uppercase / muted; value: `text-2xl` bold tabular.
+**Density.** `px-4 py-4`, fixed three-row stack (label / value / sub — sub slot always reserved). Label and sub: `text-[11px]` uppercase / muted; value: `text-2xl` bold tabular. Settings → Subscription passes `valueClassName` (`text-lg`) so a status chip can sit beside the plan name.
 
 **Interactive tiles** (`onClick` + `active`) are summary tabs: selected fill `--stat-tile-selected` (white in light, lifted grey in dark) with `--ew-stat-tile-selected-face` and a single 1px shadow rim (`--stat-tile-selected-border`). Fill/face live in `globals.css` on `.surface-lift[data-stat-tile][aria-pressed="true"]` so they beat the shared surface background utility; selected also drops the default `surfaceLift` ring. Focus uses `ring-brand/60`. Non-interactive tiles stay on the default surface plate.
 
@@ -232,8 +254,9 @@ switcher (Free / Core / Edge) uses `data-plate` so the sliding plate is ink,
 brand, or `--edge` violet.
 
 **Select vs hold (app-wide).** Tabs activate on a clean click only. Click-and-hold (≥200ms)
-or drag-to-pan must not change the active tab — hold is scroll intent. Keyboard
-(Enter / Space / arrow focus) is unchanged.
+or drag-to-pan must not change the active tab — hold is scroll intent. Keyboard: line tabs
+accept Tab / Shift+Tab along the row (then Tab leaves into the page). Arrows, Enter and
+Space still work. Segmented filters stay one Tab stop; use arrows there.
 
 Use line tabs for primary page sections. When a section needs a second filter row underneath
 (e.g. Tracker queues: All / Open / Unlayed), keep those as **`filterPillState`** pills, not a
@@ -250,23 +273,53 @@ From `src/lib/ui/surface-styles.ts`:
   (`bg-brand text-brand-foreground`). Pass `tone="edge"` for Offer Edge filters so the active
   plate stays violet (`--edge` / `--edge-foreground`).
   Prefer line tabs for page-level section switching.
+- **`toolbarSelectTrigger`** - quiet rounded-full select / combobox beside
+  FilterPills (Offers category, fixture competition filter). Transparent rest,
+  muted type; open or applied value uses `bg-muted/60`. Not a raised
+  `fieldControl` dropdown.
 - **Page CTAs** - `pagePrimaryButtonProps` (`variant="pagePrimary"`, `size="default"` / h-8,
   bold) next to outline siblings via `pageSecondaryButtonProps` at the same height.
 - **`listPillState(active)`** - time/selection pills on racecards
-- **`listRow`** - hairline stack on a card or plate (`border-b`, hover
-  `--selection-subtle`). Use for settings-style rows (welcome Get to know,
-  Racing Desk / matcher summaries). Bleed to the plate with `cardBleedX` +
-  `cardInsetX` on each row. Drop the last row’s border when a `CardFooter`
-  hairline already closes the block.
+- **History 2UP mark** (`historyTwoUpBadge` / `<HistoryTwoUpBadge>`) - compact brand
+  pill (`Zap` + `2UP`) on the Goal! row that first puts a side two ahead. Do not
+  also render a standalone `two_up` feed row for that trigger.
+- **Exchange back tags** (`ExchangeBackTags`) - live match-odds backs on Home →
+  Live → Events. Betfair back plate (`exchanges.ts` `backColor`) via the shared
+  `oddsCellStyle` / `oddsCellClass` recipe in `lib/ui/odds-cell.ts` (same as
+  Racing Desk odds cells). Radius is `rounded-sm` (2px tighter than `rounded-md`).
+  Each badge uses `.surface-glass` for the shared inset rim. No tooltip.
+  Hide the row when prices are missing; do not fall
+  back to MODEL percentages. The open selection uses a heavier label only.
+  Secondary names on the tinted plate use `text-black/60 dark:text-white/70`,
+  matching calc Back/Lay copy. A price tick uses `NumFlow` (same Add bet
+  counter). For 3s the digits flash profit or negative four times. A
+  `size-3` `ChevronUp` (`text-profit`) or `ChevronDown` (`text-negative`)
+  sits to the right of the price after a move. For the same 3s as the digit
+  flash, green nudges up then down and red down then up. The next live quote
+  with an unchanged back hides the chevron. Hold, empty, or suspend polls
+  do not count as a quote, so the last icon stays.
+  When Betfair parks the book,
+  keep the last backs at 60% opacity and show `Market suspended` in
+  `text-xs text-muted-foreground`; do not flash until the market reopens.
+- **`listRow`** - hairline stack on a card or plate (`border-b`). The row
+  itself is not a control, so there is no hover wash. Pressable stacks use
+  `listRowInteractive`. Wrap sibling rows in `listRowGroup` so the last
+  hairline drops (`[&>:last-child]:border-b-0`). When the class sits on a
+  nested child (welcome Get to know), drop the last border on the parent
+  instead. Bleed to the plate with `cardBleedX` + `cardInsetX` on each row.
 - **`listRowInteractive`** - rounded pressable block (no hairline). Use for
   standalone taps (quick log, intelligence rows), not a stacked list.
 - **`listRowSelected(active)`** - grey selection for sidebar lists
 - **`sectionBar` / `sectionMeta`** - panel section headers
 - **Day-split lists** (`ListDaySection`) - Campaigns, Casino Campaigns, Tracked
-  Events. Label (`Today` / `Yesterday` / `Monday 6th July`) plus a hairline, then
-  that day's cards or table. Tokens: `listDaySectionLabel` / `listDaySectionContent`.
-  Labels from `formatOfferListGroupLabel`. Do not invent a second day-header
-  treatment.
+  Events, and Browse fixtures (inside each competition / course). Label
+  (`Today` / `Yesterday` / `Monday 6th July`) plus a hairline, then that day's
+  cards, table, or fixture rows. Tokens: `listDaySectionLabel` /
+  `listDaySectionContent`. Inside a competition/course plate with hairline
+  rows, use `listDaySectionContentNested` (`mt-1.5 gap-0`) instead of the
+  campaign-card stack. Labels from `formatOfferListGroupLabel` (or the
+  display-timezone wrapper `formatFixtureListDayLabel`). Do not invent a
+  second day-header treatment.
 - **`tableHeaderCell` / `tableBodyCell`** - compact table density
 - **`deskTrackerSummaryBand`** - Profit Tracker Acca / Bet Builder / Systems
   strip above a bet ledger (`bg-selection-subtle` / dark `bg-input/50`) so the
@@ -276,8 +329,10 @@ From `src/lib/ui/surface-styles.ts`:
   (`--edge` plate). Do not put a section-level Pro tag on Combo Desk or Edge
   Report; those are Core. Offer Edge chrome (Race picks count) stays Edge-only.
 - **`demoDataTag`** — solid `--warning` plate + white type. Header Demo data
-  mark and Race picks (dialog, confidence chip, trigger) share this so invented
-  numbers cannot look live.
+  mark (`sm+` only, see AppTopBarHeader) and Race picks (dialog, confidence
+  chip, trigger) share this so invented numbers cannot look live.
+  **`adminModeTag`** is the same box; `/admin` uses the label ADMIN so the
+  operator space cannot look like a customer desk.
 - **`emptyStatePlate`** / **`emptyStateIconWell`** / **`emptyStateCopyInset`**
   - empty-state card, circular icon, and page-level copy inset (32px / 64px).
   Page empties lift to `--card` (lighter than `--page` in both
@@ -296,12 +351,13 @@ From `src/lib/ui/surface-styles.ts`:
 
 Every content empty (page lists, filtered boards, calendars, tables, **and
 modals**) uses `<EmptyState>` from `src/components/help/empty-state.tsx`:
-circular icon well, dashed card plate (`border border-dashed ring-0`),
-semibold title, muted description, optional CTA. In-feed empties use
-`bare` (no plate). Do not ship centred muted text on its own. Plated
-empties keep `data-slot="card"` so the glassy face applies; mark them
-with `data-empty-state` rather than overwriting the card slot. Page-level
-titles are `h2`; compact / nested / dialog titles are `h3`.
+circular icon well, solid card plate (same ring / glassy face as other
+Cards; do not add `border-dashed`), semibold title, muted description,
+optional CTA. In-feed empties use `bare` (no plate). Do not ship centred
+muted text on its own. Plated empties keep `data-slot="card"` so the
+glassy face applies; mark them with `data-empty-state` rather than
+overwriting the card slot. Page-level titles are `h2`; compact / nested /
+dialog titles are `h3`. Dashed rims stay on drop-zones, not empties.
 
 Plate polarity follows the canvas → page → card stack (see
 `emptyStatePlate`). On a page the plate is lighter than `--page`. Nested
@@ -315,11 +371,11 @@ surface. The plate switches via `in-data-[slot=card]` and
   32px from the left and right edges on mobile (`px-8`), 64px from `sm` up
   (`sm:px-16`). Do not cap page empty copy with `max-w-sm` / `max-w-md`.
   Compact and modal empties keep the narrower `max-w-md` measure.
-- **Modal** - `compact` so the plate fits the dialog. Keep the dashed rim
+- **Modal** - `compact` so the plate fits the dialog. Keep the plate
   (do not flatten with `shadow-none` unless the empty sits inside another
   lifted card).
 - **In-feed** - `bare` (History feed and any similar live feed). Icon well
-  and copy sit on the page background: no plate, dashed rim, or radius.
+  and copy sit on the page background: no plate or radius.
   Page-level History (`/history`) still uses the plate.
 - **Nested in a card** - `compact`. Flatten with `className="shadow-none"`
   only for small nested hints (Home live dock, calendars, tracker lists).
@@ -330,8 +386,9 @@ surface. The plate switches via `in-data-[slot=card]` and
   items / filter miss) still uses `EmptyState`.
 - **First-run empty Home** - after bank/bookies exist, `EmptyDeskWelcome` is a
   getting-started hub (several next actions), not a single content gap. Title
-  and welcome line sit on the page; a hairline then Get started (2×2 tiles) sit
-  under that, then a Quick links row of `size="lg"` outline buttons. “Get to
+  and welcome line sit on the page; a hairline then Get started (2×2 tiles:
+  Log / Add on the first row, Imports on the second, `size-6` leading marks)
+  sit under that, then a Quick links row of `size="lg"` outline buttons. “Get to
   know the desk” is a `Card` page area (same shell as Profit
   Tracker) with `listRow` items on the card face. `pb-16` above the footer is
   deliberate air after the list. The card footer holds the full-width
@@ -348,6 +405,33 @@ surface. The plate switches via `in-data-[slot=card]` and
 Copy: British English, sentence case, commas. Title names the gap; description
 invites the next action.
 
+## Keyboard shortcuts sheet
+
+`?` (when not typing) opens `DeskShortcutSheet`, not Help. Keycaps are
+`Kbd` / `ShortcutKeys` in `src/components/ui/kbd.tsx`: muted plate, border,
+`text-xs`. Sequences use “then” between keys (`g` then `h`). Chord pairs
+(`⌘` `K`) sit adjacent. Mac shows `⌘`, Windows/Linux `Ctrl`. Modifier
+chords stay `invisible` until the platform is known, so Windows does not
+flash `⌘`. Bare keys and sequences can paint immediately. Filter empty
+is a line of copy, not `<EmptyState>`. Nested
+list scroll uses `ScrollFadeEdges` plus `app-scroll-nested` so clipped
+rows fade instead of hard-cutting, and a classic gutter does not sit on
+the keycaps. The keyboard Help guide renders the same `ShortcutRowList`
+keycaps. The full guide stays linked from the sheet.
+
+**Dialog save.** Primary confirm uses `DialogSaveButton`
+(`data-dialog-save`). The button paints a stable `⌘↵` (Mac) or `Ctrl ↵`
+(Windows/Linux) chord, and only on keyboard/desktop pointers
+(`shortcut-hint`: `(hover: hover) and (pointer: fine)`). Do not show
+keycaps on phones or other coarse pointers. Wait until the platform is
+known before painting, so Windows does not flash `⌘`. On the confirm
+button the keycaps are compact `11px` so they sit in the primary label;
+sheet and Help keycaps stay `text-xs`. `⌘Enter` / `Ctrl+Enter` saves
+from a field or elsewhere. Do **not** bind `⌘S` or a bare letter:
+browsers and extensions often steal `⌘S`, and a lone `S` fights typing.
+Do not swap the keycap when a modifier is held. Esc still closes. Mark
+every modal confirm this way.
+
 ## Lay fields (odds and stake)
 
 Every lay-odds and lay-stake input uses the shared exchange increment helpers.
@@ -360,8 +444,13 @@ on `NumField` / `PanelInput` (or `exchangeOddsStepHandlers` on a raw input).
 - Tick ladder is the UK exchange table (Betfair / Betdaq / Matchbook / Smarkets):
   1.01–2.00 ×0.01, 2–3 ×0.02, 3–4 ×0.05, 4–6 ×0.10, 6–10 ×0.20, 10–20 ×0.50,
   20–30 ×1, 30–50 ×2, 50–100 ×5, 100–1000 ×10.
-- Up / down arrows (and the scroll wheel) move one exchange tick. From a
-  typed off-tick price they go to the next tick only (6.97 → 7.0 / 6.8).
+- Up / down arrows, the native chevron stepper, and the scroll wheel move
+  one exchange tick. From a typed off-tick price they go to the next tick
+  only (6.97 → 7.0 / 6.8). A native snap such as 5.00 → 5.01 must become 5.1.
+- The wheel must be bound with `useNonPassiveWheel` (`src/hooks/use-non-passive-wheel.ts`).
+  React `onWheel` is passive, so it cannot stop the native number-input
+  increment. Chevron clicks go through `handleExchangeOddsInputEvent`.
+  `NumField` / `PanelInput` already do this.
 - Manual typing is kept as entered. Do not snap 6.97 to 7.0 on blur. Same
   behaviour as Add bet `PanelInput`.
 
@@ -381,6 +470,7 @@ Agent rule: `edgeways/.cursor/rules/lay-fields.mdc`.
 - **`PageShell`** - `max-w-7xl` content width
 - **`CalculatorShell`** - centred narrow column for forms
 - **`SectionHeader`** - in-card list panel titles (Racing Desk courses, history groups)
+- **Home mobile deck headers** (`DashboardSectionHeader`) — `--home-deck-header-h` (`4rem`) below `sm`. Every swipe-card header uses this height so Do next (title + segmented sort tabs) and title-only cards share one bar. Title and header actions sit vertically centred. Token: `homeDeckSectionHeader` in `layout-spacing.ts`. The P&L chart is not its own mobile card; it sits on Summary, with window pills in the Summary header `action` slot (same as Feed / desktop Chart). Plot floor: `--home-deck-chart-min-h`. Desktop still has a separate chart panel. In Settings, Chart is visibility-only (no deck reorder); showing it requires Summary.
 
 ## Applying to new pages
 

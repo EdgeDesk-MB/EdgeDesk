@@ -105,18 +105,30 @@ already Drizzle.
 Linear IDs in comments) never reach the browser *as long as the repo stays
 private and nothing imports them into the bundle*. Gates:
 
-- [ ] **Repo stays private** (confirm `EdgeDesk-MB/EdgeDesk` visibility).
+- [x] **Repo stays private** (confirm `EdgeDesk-MB/EdgeDesk` visibility).
   If it ever goes open-source, internal docs move to a private repo first.
-- [ ] **Customer-facing in-app content audit** — the app *does* render
+  Evidence 20 Aug 2026: unauthenticated GitHub API returns 404. Sam
+  confirmed the repo is private the same evening.
+- [x] **Customer-facing in-app content audit** — the app *does* render
   curated content (`/roadmap`, `/release-notes`, help guides). Sweep
   `src/content/` for internal names, Linear IDs, and strategy asides before
   launch. These pages are for customers; the internal roadmap stays in docs.
-- [ ] **Env var discipline** — only `NEXT_PUBLIC_*` vars reach the browser
+  Evidence 20 Aug 2026: Help/Settings env language already stripped (19 Aug).
+  Roadmap no longer names git branches, `src/content` paths, O1/P0–P3, or
+  “Tonight polish”. Guard: `src/content/roadmap.test.ts`.
+- [x] **Env var discipline** — only `NEXT_PUBLIC_*` vars reach the browser
   (by design). The PostHog *personal* API key (`phx_…`) and all provider
   secrets stay server-side / `.env.local` (git-ignored) — never commit, never
   reference in client code. Pre-launch: one `git log -p` secrets sweep.
-- [ ] **Dev artifacts gated** — `src/lib/dev/*`, demo-mode affordances and
+  Evidence 20 Aug 2026: `.env.local` gitignored; never committed. Client only
+  reads `NEXT_PUBLIC_POSTHOG_*` and `NEXT_PUBLIC_SITE_URL`. No `phx_` /
+  `sk_live_` / `whsec_` values in tracked files. `.env.example` has empty
+  secret slots and test price IDs only.
+- [x] **Dev artifacts gated** — `src/lib/dev/*`, demo-mode affordances and
   any dev-only routes must be inert in production builds.
+  Evidence 20 Aug 2026: `useDevStickyOpen` is a no-op unless
+  `NODE_ENV === "development"`. Public `/demo` is a customer fixture, not a
+  hidden dev route. Settings demo mode is an explicit user action.
 
 **PostHog, honestly:** the *fact* of analytics must not be hidden — the
 privacy policy discloses it (UK GDPR/PECR). What we *can* and do minimise:
@@ -126,6 +138,10 @@ byte of data back); events travel via our own `/ingest` path so no
 replay, no heatmaps, no console capture (all locked server-side, EDGE-35);
 IPs anonymised. A customer inspecting their browser sees anonymous pageview
 beacons to our own domain — exactly what the privacy policy describes.
+Evidence 20 Aug 2026: `instrumentation-client.ts` uses `api_host: "/ingest"`,
+`cookieless_mode: "always"`, `autocapture: false`,
+`disable_session_recording: true`, `enable_heatmaps: false`,
+`disable_surveys: true`. Privacy §3 and §9 now say the same.
 
 ## 7. Task map (Linear)
 

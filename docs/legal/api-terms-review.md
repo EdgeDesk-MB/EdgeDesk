@@ -11,8 +11,8 @@
 | Scenario | Description | Status |
 |----------|-------------|--------|
 | **A. Local-first personal** | Today's app: each install uses the owner's own API keys on their own machine | Current state |
-| **B. Hosted, bring-your-own-key** | Subscribers enter their own provider keys; data flows provider → subscriber, Edgeways never stores or re-serves it | Likely first hosted shape |
-| **C. Hosted pooled feed proxy** | Edgeways holds paid provider keys and serves the data to all subscribers (roadmap §7.2) | Later; **this is where terms bite** |
+| **B. Hosted, bring-your-own-key** | Subscribers enter their own provider keys | **Rejected 22 Aug 2026 (D7).** Not the product. |
+| **C. Hosted pooled feed proxy** | Edgeways holds paid provider keys and serves the data to entitled subscribers (roadmap §7.2) | **The hosted product.** Customers bring money only. |
 
 ## Provider positions (quoted from current terms)
 
@@ -26,9 +26,9 @@
   **betting operators and sportsbooks**." — Edgeways is neither (never takes a
   wager), but expect the question in any permission conversation.
 
-**Reading:** A and B are fine (their data in our app is the sanctioned use).
-C — serving pooled racecard/odds data to paying subscribers — is resale-shaped
-and **needs written permission** first.
+**Reading:** A is today's personal desk. B is rejected (D7). C is the hosted
+product and is resale-shaped: **written permission is a go-live item**
+(EDGE-45), not optional later work.
 
 ### API-Football (API-Sports)
 
@@ -40,9 +40,10 @@ and **needs written permission** first.
   sports platforms, or any mass media distribution **may require additional
   licenses** from the relevant rights holders."
 
-**Reading:** A and B are fine. C is two problems: their no-publication-license
-stance needs a written OK, and league data rights sit with us to clear.
-Football is a secondary sport for Edgeways — do not let it gate launch.
+**Reading:** A is fine. B is rejected (D7). C needs a written OK plus league
+rights clearance. Football is still a secondary sport; if permission is
+refused, ship football on demo + manual settle, do **not** fall back to
+asking the customer for a key.
 
 ### Betfair Exchange
 
@@ -56,9 +57,12 @@ Football is a secondary sport for Edgeways — do not let it gate launch.
   Betfair customers" — which is exactly what a hosted Edgeways with exchange
   integration does, *even with BYOK*.
 
-**Reading:** A is fine (today). B likely triggers the Vendor licence the moment
-we distribute exchange-integrated software to Betfair customers. C definitely
-requires a commercial agreement. **Betfair is the strictest of the three.**
+**Reading:** A is fine (today). B is rejected as a customer experience (D7)
+and would still trigger the Vendor licence if we shipped it. C definitely
+requires a commercial agreement. **Betfair is the strictest of the three:**
+Sam's personal live key must not be fanned out. Until Flutter licenses C,
+Edgeways ships without customer-facing exchange keys (paste / estimates /
+no live lays).
 
 ## Conclusions
 
@@ -88,9 +92,9 @@ Program) has exactly three lanes:
 
 | Licence | Cost | What it covers | Edgeways fit |
 |---------|------|----------------|--------------|
-| **Personal betting** (Live App Key) | £499 one-off activation | The account holder's own live betting via API. **Read-only live keys are not permitted** | Each subscriber's own key (BYOK) |
-| **Software Vendor Licence** | £1,499 + security certification | Distributing an API-built app to other Betfair customers; includes the Vendor Services API to manage/monetise user subscriptions | Hosted Edgeways with exchange integration, BYOK |
-| **Company Exchange Data Licence** | Bespoke, via Flutter B2B data services | A company *using/redistributing* Betfair Exchange data | Pooled live-price proxy (§7.2) — the expensive path |
+| **Personal betting** (Live App Key) | £499 one-off activation | The account holder's own live betting via API. **Read-only live keys are not permitted** | Sam's own desk only. Must not serve subscribers. |
+| **Software Vendor Licence** | £1,499 + security certification | Distributing an API-built app to other Betfair customers; includes the Vendor Services API to manage/monetise user subscriptions | Needed if hosted Edgeways talks to Betfair at all. Does **not** let customers bring keys (D7). |
+| **Company Exchange Data Licence** | Bespoke, via Flutter B2B data services | A company *using/redistributing* Betfair Exchange data | Operator-held pooled prices (D7 / §7.2). The path that matches the product. |
 
 Hard facts that shape the architecture:
 
@@ -104,19 +108,18 @@ Hard facts that shape the architecture:
   subscriptions** — Betfair has already built the billing hook a hosted
   Edgeways Edge tier would want.
 
-**Recommended path:** Edge-tier exchange integration ships as **BYOK live key**
-(subscriber pays their own £499 if they want live; delayed free key otherwise)
-under a **Software Vendor Licence** once hosted. A pooled live-price proxy is a
-Flutter B2B data-licence negotiation — treat as later/never unless subscriber
-revenue justifies it. This keeps the ticket's design intent intact: cache
-aggressively, live-lay polling stays gated to the top tier (N0 matrix already
-puts `exchange_lay` in Edge only).
+**Recommended path (D7):** customers never hold a Betfair key. Delayed
+operator-held prices first, only if Flutter permits that use; live pooled
+prices only after a Company Exchange Data Licence (and Vendor licence if the
+app talks to Betfair at all). Until then: paste odds, estimates, or no live
+lays. Cache aggressively; live-lay polling stays Edge-only (N0). Do not
+ship a "paste your app key" field to paper over the licence gap.
 
 ## Actions
 
 | # | Action | Owner | When |
 |---|--------|-------|------|
-| 1 | Email The Racing API + API-Football for written redistribution permission (pooled subscriber feeds) | Sam | Before §7.2 feed proxy work — EDGE-45 |
-| 2 | Decide Betfair path for hosted: Software Vendor Licence + BYOK (recommended) vs no exchange integration at v1 | Sam | With D6 (EDGE-18) |
-| 3 | Include this review in the solicitor pack | Sam | EDGE-8 |
-| 4 | Keep free-tier onboarding (paste odds, manual settle, simulator) as the default path so attrition never burns API budget | Product rule, already in `docs/strategy/api-dependencies-and-tiers.md` | Ongoing |
+| 1 | Email The Racing API + API-Football for written redistribution permission (operator-held pooled feeds) | Sam | Go-live path — EDGE-45. D6 is done. |
+| 2 | Betfair hosted path: Flutter conversation for operator-held delayed, then data licence for live. No customer keys. | Sam | EDGE-14. D7 locked 22 Aug 2026. |
+| 3 | Include this review + D7 in the solicitor pack | Sam | EDGE-8 |
+| 4 | Free/Core stay on demo, paste odds, manual settle, simulator so quota is a plan gate, not a key-collection gate | Product rule (D7 + `docs/strategy/api-dependencies-and-tiers.md`) | Ongoing |

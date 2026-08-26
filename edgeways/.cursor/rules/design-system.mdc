@@ -6,9 +6,9 @@ alwaysApply: false
 
 - Read `docs/design-system.md` before UI changes: colour tokens, page headers, type scale floor, stat strips, pills, lists, empty states, layout, overflow.
 - Nothing may paint outside the viewport or its plate. Wrap (`text-pretty break-words`, `min-w-0`); internal scroll is fine; page-level horizontal scroll is not. See design-system.md → “Overflow (go-live gate)”.
-- Content empties (pages, boards, tables, modals) use `<EmptyState>` — icon well, dashed plate, title, description. Not centred muted text.
+- Content empties (pages, boards, tables, modals) use `<EmptyState>` — icon well, solid plate, title, description. Not centred muted text. Not a dashed drop-zone rim.
 - Design tokens and existing shadcn patterns only; no ad-hoc colours.
 - Microcopy is British English, sentence case, commas rather than em dashes.
 - No UI type below 11px; prefer 12px (`text-xs`) for XSmall. See `micro-typography.mdc`.
 - Render times of day only via `formatClockTime` / `formatClockString` from `src/lib/time-format.ts`.
-- Lay odds / lay stake fields: exchange increment helpers only. See `lay-fields.mdc` and `docs/design-system.md` → “Lay fields (odds and stake)”.
+- Lay odds / lay stake fields: exchange increment helpers only. Wheel via `useNonPassiveWheel`, never React `onWheel`. See `lay-fields.mdc` and `docs/design-system.md` → “Lay fields (odds and stake)”.

@@ -1,11 +1,12 @@
 # Social presence how-to — Edgeways
 
 > Fill-in-the-blank for creating and naming brand accounts.
-> Last updated: **14 Aug 2026**.
+> Last updated: **21 Aug 2026**.
 >
 > Brand casing is **Edgeways** (title case). Site: https://edgeways.app
 > Waitlist copy this file quotes lives in `edgeways/src/components/marketing/`.
-> Handle claim is also on [EDGE-10](https://linear.app/samhayter/issue/EDGE-10).
+> Handle claim is [EDGE-70](https://linear.app/samhayter/issue/EDGE-70).
+> Trademark search (on hold) is [EDGE-10](https://linear.app/samhayter/issue/EDGE-10).
 
 This is **not** a content calendar. Do not try to feed six networks. Claim
 the names, look finished, point everything at the waitlist, then post lightly
@@ -24,7 +25,7 @@ Meta has three layers. Do not mix them up:
 | Layer | What it is | Public? | Do this |
 | --- | --- | --- | --- |
 | Personal profile | Sam's own Facebook | Yes, as you | Needed to log in. Never post as Edgeways from here. |
-| **Page** | The brand. Facebook display name: `edgeways.app` | **Yes. This is the thing.** | Live. Remaining: cover, vanity URL, CTA, Business Manager. |
+| **Page** | The brand. Facebook display name: `edgeways.app` | **Yes. This is the thing.** | Live. Vanity is `@edgewaysapp`. Remaining: cover, Business Manager. |
 | Business Manager / Meta Business Suite | Admin office: owns the Page, Instagram, later ads | No | Create **after** the Page, at [business.facebook.com](https://business.facebook.com). Name it Edgeways. Add the Page as an asset. |
 
 "Facebook Business" in Meta's marketing usually means that admin office,
@@ -32,8 +33,10 @@ or Instagram's Professional account, not a second public page. One Page.
 Then one Business Manager so the Page is not glued forever to one personal
 login.
 
-Tonight: cover + vanity URL + CTA if you still have energy. Otherwise
-Business Manager and Instagram tomorrow.
+Facebook Sign up CTA done 21 Aug. Cover and Business Manager can wait.
+YouTube, Slack, and Reddit parked 21 Aug.
+Waitlist footer links X, Instagram, Facebook, TikTok, YouTube,
+LinkedIn, and Slack. Reddit stays out.
 
 ---
 
@@ -61,8 +64,8 @@ address, no hours. Messenger shows as a contact by default. That is fine.
 | --- | --- |
 | **Cover photo** | Still empty. The grey gradient looks unfinished. No designed 1640×624 exists yet. Temporary: ink `#111` plate with `logo-yellow.png`. Or skip until a proper cover. Do not stretch the OG card. |
 | **Feed / boost still** | Ready: `edgeways/brand/social/facebook-feed-4x5.png` (2160×2700, 4:5). Hero + 2×2 homepage glimpses (Daily plan, Edge Report, Racing Desk, Alerts). Post as a **photo**, not a link share. Then boost that post. Caption: waitlist + `https://edgeways.app` + 18+. Button Sign up, not Follow. |
-| **Username / vanity URL** | Desktop, switched into the Page. Settings → Page setup → Name → Edit Username. `edgeways.app` is **not available** (tried 14 Aug 2026; likely reserved as a URL-shaped handle). Try `edgeways`, then `edgewaysapp`. Letters, numbers, and periods only. May ask for your Facebook password. |
-| **Call-to-action button** | **Sign up** → `https://edgeways.app`. Learn more if Sign up is missing. |
+| **Username / vanity URL** | **Done.** `@edgewaysapp` → [facebook.com/edgewaysapp](https://www.facebook.com/edgewaysapp). `edgeways.app` was not available (tried 14 Aug 2026). |
+| **Call-to-action button** | **Done 21 Aug.** Sign up → `https://edgeways.app`. |
 | **Business Manager** | [business.facebook.com](https://business.facebook.com). Name it Edgeways. Add this Page as an asset so it is not glued to one personal login. Then Instagram professional. |
 
 ### Do not
@@ -151,9 +154,97 @@ When later settings ask (not this step):
 | Profile photo | `edgeways/brand/masters/square.png` (ink bolt on yellow, 512×512) |
 | Cover photo | You do not have one yet. See [Assets](#assets). Skip or use a temporary ink plate rather than a stretched lockup. |
 
-Create the Instagram professional account from **Meta Business Suite**
-after this wizard so the Page and Instagram share a brand, not a personal
-profile.
+Instagram is live and linked to this Page ([EDGE-71](https://linear.app/samhayter/issue/EDGE-71)).
+Further Instagram work is profile polish only, not a new account.
+
+---
+
+## Instagram — live (19 Aug 2026)
+
+[EDGE-71](https://linear.app/samhayter/issue/EDGE-71) Done. Business /
+professional. Linked to the Facebook Page. Avatar is the yellow bolt.
+Threads parked. Do not post Reels for the algorithm.
+
+| Field | Locked |
+| --- | --- |
+| **Name** | `Edgeways` |
+| **Username** | `edgeways_app` (unless you got `edgeways` / `edgewaysapp`) |
+| **Website** | `https://edgeways.app` |
+| **Bio** | Paste from [§3](#3-descriptions-paste-library) |
+| **AI Creator** | Off |
+| **Category** | Software or Product/service |
+| **Contact** | Email `hello@edgeways.app` only |
+| **Facebook Page** | Linked |
+
+---
+
+## X — live (19 Aug 2026)
+
+[EDGE-72](https://linear.app/samhayter/issue/EDGE-72) Done. Brand account,
+not personal. Handle `@edgewaysapp`. Display name `Edgeways`. Avatar
+`square.png`. Bio from [§3](#3-descriptions-paste-library). Website
+`https://edgeways.app`. Public. Do not tweet tips.
+
+---
+
+## LinkedIn — live (19 Aug 2026)
+
+[EDGE-73](https://linear.app/samhayter/issue/EDGE-73) Done. Company Page,
+not a personal profile. Name `Edgeways`. URL
+[linkedin.com/company/edgewaysapp](https://www.linkedin.com/company/edgewaysapp).
+Industry software. Logo `square.png`. Tagline and About from
+[§3](#3-descriptions-paste-library). Do not post. On the waitlist footer.
+
+---
+
+## TikTok — parked (19 Aug 2026)
+
+[EDGE-74](https://linear.app/samhayter/issue/EDGE-74) Done. Business
+account. Handle `@edgewaysapp`. Name `Edgeways`. No videos. Linked from
+the waitlist footer.
+
+---
+
+## YouTube — parked (21 Aug 2026)
+
+[EDGE-75](https://linear.app/samhayter/issue/EDGE-75) Done. Brand channel
+`@edgewaysapp`. Name `Edgeways`. Avatar is the yellow bolt. Banner skipped.
+No videos. In the waitlist footer (21 Aug 2026).
+
+First Google account hit video verification. Channel was created on a
+clean `samhayter.design@gmail.com` login. Add `hello@edgeways.app` as a
+manager when convenient. Do not turn a personal watch-history YouTube
+into Edgeways.
+
+---
+
+## Slack — parked (21 Aug 2026)
+
+[EDGE-76](https://linear.app/samhayter/issue/EDGE-76) Done. Workspace
+`Edgeways` at [edgeways.slack.com](https://edgeways.slack.com). Owner
+`sam@edgeways.app`. Domain auto-join off. Invite-only, 18+. In the
+waitlist footer (21 Aug 2026). Strangers still need an invite.
+
+Icon is `square.png` (yellow bolt). Channels stay `#announcements`,
+`#support`, `#general`. No public invite link. First people come
+from the waitlist / `hello@`.
+
+---
+
+## Reddit — parked (21 Aug 2026)
+
+[EDGE-77](https://linear.app/samhayter/issue/EDGE-77) Done. Restricted
+community [r/edgeways](https://www.reddit.com/r/edgeways). Mod account
+`u/edgewaysapp`. Topic Technology. NSFW off. Base colour `#FFC71E`.
+Icon is the yellow bolt. Not in the waitlist footer. Do not post.
+
+Description:
+
+```
+Edgeways is the matched betting command centre for UK bettors. Official community is on Slack. Adults only, 18+.
+```
+
+Ignore Reddit’s “Make 3 posts” widget. Slack stays the official room.
 
 ---
 
@@ -194,7 +285,7 @@ Two lists. Mixing them is how this becomes a second job.
 
 ### Claim this week (even if you never post)
 
-Empty pages with the right name beat a squatter. This is the D7 / EDGE-10 job.
+Empty pages with the right name beat a squatter. This is the D7 / EDGE-70 job.
 
 | Network | Why claim it | Post on it now? |
 | --- | --- | --- |
@@ -205,17 +296,21 @@ Empty pages with the right name beat a squatter. This is the D7 / EDGE-10 job.
 | **TikTok** | Park `@edgeways` / `@edgewaysapp`. | No. Needs a video cadence you do not have. |
 | **YouTube** | Park the brand channel for later product films. | No. |
 | **Threads** | Comes with Instagram. Same handle. | No. |
+| **Slack workspace** | Official Edgeways community. Invite-only, 18+. Product updates and support. | Lightly, once the room is open. |
+| **Reddit** | Park `r/edgeways` (or `r/edgewaysapp`). Restricted or private. | No. Not the public community. |
+
+**Community choice (EDGE-70):** Slack is the official room. Reddit is a parked name only. A public subreddit becomes a tips and bookie-offers board we would have to moderate, and that fights “we do not send bookie offers.” Slack stays invite-only from the waitlist / `hello@`. Discord stays out.
 
 ### Do not bother, pre-launch
 
-- **Discord / Reddit as an official community.** Out of scope (competitive landscape: community is gate territory). Moderation + gambling-adjacent is a trap.
+- **Discord, or Reddit as the official community.** Park the subreddit. Do not run a public forum.
 - **Pinterest, Snapchat, WhatsApp Channel.** No audience overlap worth the handle hunt.
 - **Personal Facebook / personal Instagram as the brand.** Page + professional IG only.
 
-The waitlist footer already shows **X, Instagram, Facebook** as coming soon
-(`edgeways/src/components/marketing/marketing-social-links.tsx`). Those three
-are the public set. Wire the `href`s once the accounts exist. Do not add
-TikTok or LinkedIn to the footer until you will actually post there.
+The waitlist footer shows **X, Instagram, Facebook, TikTok, YouTube,
+LinkedIn, Slack**
+(`edgeways/src/components/marketing/marketing-social-links.tsx`). Reddit
+stays out. Slack is invite-only: the mark is a claim, not an open door.
 
 ### Paid ads and targeting
 
@@ -414,7 +509,8 @@ it when a designed cover exists.
 1. Same avatar + same bio family on every network.
 2. Website / CTA → `https://edgeways.app`.
 3. Pin one post: waitlist is open, 18+, link.
-4. Swap the footer placeholders in `marketing-social-links.tsx`.
+4. Footer hrefs are live (21 Aug 2026), including YouTube and Slack.
+   Reddit stays out.
 5. Tick the handle table below and note it on EDGE-10.
 
 ---
@@ -450,12 +546,15 @@ Fill as you go. Preferred handle first; write the fallback if you had to take it
 
 | Network | Handle | URL | Claimed |
 | --- | --- | --- | --- |
-| Facebook Page | edgeways.app (display) | facebook.com/… (vanity still to set) | Yes, 13 Aug 2026 |
-| Instagram | | instagram.com/… | |
-| X | | x.com/… | |
-| LinkedIn Company | | linkedin.com/company/… | |
-| TikTok | | tiktok.com/@… | |
-| YouTube | | youtube.com/@… | |
-| Threads | | | |
+| Facebook Page | edgeways.app (display), @edgewaysapp | facebook.com/edgewaysapp | Yes, 13 Aug 2026. Vanity 20 Aug 2026. |
+| Instagram | edgeways_app | instagram.com/edgeways_app | Yes, 19 Aug 2026 (EDGE-71). Tell Sam if the handle changed. |
+| X | edgewaysapp | x.com/edgewaysapp | Yes, 19 Aug 2026 (EDGE-72) |
+| LinkedIn Company | edgewaysapp | linkedin.com/company/edgewaysapp | Yes, 19 Aug 2026 (EDGE-73) |
+| TikTok | edgewaysapp | tiktok.com/@edgewaysapp | Yes, 19 Aug 2026 (EDGE-74). Parked. |
+| YouTube | edgewaysapp | youtube.com/@edgewaysapp | Yes, 21 Aug 2026 (EDGE-75). Parked. |
+| Slack | edgeways | edgeways.slack.com | Yes, 21 Aug 2026 (EDGE-76). Parked. Invite-only. |
+| Reddit | edgeways | reddit.com/r/edgeways | Yes, 21 Aug 2026 (EDGE-77). Restricted. Mod u/edgewaysapp. |
+| Threads | edgeways_app | (comes with Instagram) | Parked with EDGE-71 |
 
-Canonical public trio (footer): Facebook, Instagram, X.
+Canonical public set (footer): X, Instagram, Facebook, TikTok, YouTube,
+LinkedIn, Slack. Reddit stays out.

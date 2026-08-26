@@ -57,9 +57,10 @@ the app derives every market and auto-settles linked bets.
   parent `../docs/strategy/` — see `../docs/repo-layout.md`)
 - Design system: `docs/design-system.md`
 - Lay odds / lay stake fields: `src/lib/calc/exchange-odds-step.ts` and
-  `src/lib/calc/exchange-stake-step.ts`. Arrows follow the exchange ladder;
-  typed lay odds stay as entered (do not snap on blur). Rule:
-  `.cursor/rules/lay-fields.mdc`.
+  `src/lib/calc/exchange-stake-step.ts`. Arrows, chevron steppers, and
+  the wheel follow the exchange ladder (`useNonPassiveWheel` +
+  `handleExchangeOddsInputEvent`). Typed lay odds stay as entered (do
+  not snap on blur). Rule: `.cursor/rules/lay-fields.mdc`.
 - Alert quieting: `src/lib/services/quiet-alerts.ts` (server-only). Dedupe keys
   live in `src/lib/alerts/expiring-alert-keys.ts`. Never import quiet-alerts
   from `free-bet-lots` or other `/api/state` graph modules. Call `quiet*` from

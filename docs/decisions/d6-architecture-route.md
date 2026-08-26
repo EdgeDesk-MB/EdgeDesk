@@ -18,7 +18,7 @@ The only real question is: **where do users' betting records live?**
 | Ops for a solo dev | One deployment, instant updates, one DB to back up | Per-user install support (the dev-server fragility we already manage), release-channel updates |
 | Privacy story | "Never leaves your device" **dies**; fallback is EU hosting + export/delete + no data sale | Fully intact — and it's a genuine differentiator in this niche |
 | UK GDPR surface | We become controller of gambling-adjacent financial records: DSARs, security, breach liability | Minimal — we never hold betting records (privacy policy draft §1 already written around this) |
-| Feed proxy / BYOK | Identical either way (EDGE-45 permissions still required for pooled feeds; Betfair vendor licence either way) | Identical |
+| Feed proxy | Identical either way. D7 (22 Aug 2026) locks operator-held keys; BYOK is not a hosted option. EDGE-45 permissions still required; Betfair needs a Flutter commercial path. | Identical |
 | Fits the launch motion | Yes — waitlist, countdown and "sign in from the website" all assume a URL | The CTA has to sell an install, not a login |
 
 ## What each choice changes downstream

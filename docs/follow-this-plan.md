@@ -5,10 +5,9 @@
 > [Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c).
 > Repo layout rules: `docs/repo-layout.md`.
 >
-> Last updated: **25 Aug 2026** (EDGE-7 **done** — test-mode billing rehearsal
-fully passed: automated webhook drill + Sam's click-through; cancellation
-visibility and success-slip fixes shipped from findings. Live-mode rerun
-stays M3. EDGE-22 **done** — the desk now enforces the real plan.)
+> Last updated: **25 Aug 2026** (EDGE-83 **done** — server 403 on racing feeds
+and exchange prices. EDGE-82 / EDGE-22 / EDGE-7 already done the same day.
+Live-mode billing rerun stays M3.)
 
 ---
 
@@ -24,6 +23,10 @@ The billing and first-run path is in. [EDGE-4](https://linear.app/samhayter/issu
 paying now locks desk features: the desk gates on the webhook-fed plan from
 `app_users`, the Settings preview can only step down, and `/api/offers/edge`
 is guarded server-side.
+[EDGE-83](https://linear.app/samhayter/issue/EDGE-83) is **Done** (25 Aug) —
+Core/Free billing rows get 403 on live racing feeds and exchange prices
+(same fail-open pattern as Offer Edge). Demo and unsigned localhost still
+load.
 
 **Done 23 Aug:** [EDGE-47](https://linear.app/samhayter/issue/EDGE-47)
 Neon desk cutover — offers, wallets, history and bets all read/write Neon on
@@ -61,9 +64,13 @@ existing subscribers to the portal, the webhook falls back to a still-live
 sub when an old one dies, and pricing CTAs read "Manage subscription" for
 subscribers. Live-mode rerun stays M3.
 
+**Done 25 Aug:** [EDGE-83](https://linear.app/samhayter/issue/EDGE-83) —
+server 403 on racing desk/racecards/results/test and exchange football-odds/test
+when the billing row is not Edge. Runners skip the live enrichment path.
+`api()` treats a `source: "locked"` 403 as a safe fallback (demo desk, empty
+cards, unmatched prices).
+
 **Next session (pick one, do not mix in the same day):**
-- Server-side entitlement guards on the remaining gated-data routes (racing
-  feeds, exchange lay) — same 403 pattern as `/api/offers/edge`
 - Flip `SITE_SURFACE=app` only when checklist + Sam says so
 
 **Done 24 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80) admin

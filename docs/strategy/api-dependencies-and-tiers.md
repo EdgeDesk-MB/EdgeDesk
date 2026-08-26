@@ -4,7 +4,14 @@ Edgeways runs **local-first**: calculators, tracker, offers, and settlement logi
 
 Last updated: July 2026.
 
-**Personal-use default: stay on free tiers (£0/mo).** Paid APIs are optional time-savers, not requirements. If you later sell subscriptions, price plans so *subscriber* API usage is covered by revenue - never by your personal free keys.
+**Personal desk:** stay on free tiers while dogfooding, then buy **operator**
+paid plans when one Saturday match burns the football quota (API-Football Pro
+~$19, not All-Sports $99).
+
+**Hosted product (D7, 22 Aug 2026):** subscribers never bring keys. Sam holds
+every provider account. Subscription revenue funds the keys. Price Edge so
+pooled usage is covered by Edge income, not by asking customers to open
+api-sports / Racing API / Betfair developer accounts.
 
 ---
 
@@ -55,12 +62,16 @@ Everything else     →  local / manual (calcs, offers, tracker, OCR, sim)
 
 **Rule of thumb:** if the monthly API bill exceeds the time you save × your hourly value (or your matched-betting edge), skip it.
 
-### If you open Edgeways to paying subscribers later
+### Paying subscribers (D7)
 
-- **Do not** share your personal free API keys with customers.
-- Each paid plan should include a **cost floor**: Racing + football + exchange usage per active user, plus hosting.
-- Prefer **bring-your-own-key** for power users, or a **pooled paid tier** funded by subscription revenue.
-- Free-tier product features (paste odds, manual settle, simulator) remain the onboarding path so attrition doesn’t burn API budget.
+- Customers pay Edgeways only. They never see a provider key field.
+- Sam holds **paid** operator keys (not the personal free football quota) and
+  a **feed proxy** fans one poll out to entitled desks (§7.2).
+- Written redistribution permission first (EDGE-45). If a provider refuses,
+  that feed degrades (demo / paste / manual settle). Do not fall back to BYOK.
+- Free/Core stay on paste odds, manual settle, and the simulator so attrition
+  does not burn the operator budget. That is an entitlement gate, not a
+  "bring your own key" gate.
 
 ---
 
