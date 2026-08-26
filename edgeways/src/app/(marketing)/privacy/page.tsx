@@ -33,19 +33,20 @@ export default function PrivacyPage() {
         </>
       }
     >
-      <h2>1. The short version (local-first)</h2>
+      <h2>1. The short version</h2>
       <p>
         <strong className="font-semibold text-white/80">
-          Your betting records never leave your device by default.
+          Edgeways is a hosted desk: your betting records live in our database,
+          tied to your account.
         </strong>{" "}
-        Edgeways stores your bets, balances, offers, and analytics in a
-        database on your own computer. We cannot see them, sell them, or lose
-        them, because we never have them.
+        Your bets, balances, offers, and analytics are stored in a Postgres
+        database hosted by Neon in the UK (London), so your desk is the same
+        on every device you sign in from.
       </p>
       <p>
-        We only receive the small amount of data described in section 3:
-        account details if you subscribe, feedback you choose to send, and
-        product analytics.
+        We do not sell your data, profile your betting behaviour for
+        advertising, or share your records with bookmakers, exchanges, or odds
+        providers. Section 3 lists everything we hold.
       </p>
 
       <h2>2. Who is responsible for your data</h2>
@@ -72,6 +73,17 @@ export default function PrivacyPage() {
               <td>
                 Email address, name (optional), subscription tier,
                 authentication identifiers
+              </td>
+            </tr>
+            <tr>
+              <td>Desk records</td>
+              <td>While you use the hosted desk</td>
+              <td>
+                The records you create: bets, stakes, balances, offers you
+                track, wallets, and betting history. Stored in our Neon
+                Postgres database (London) and linked to your account. We do
+                not send these records to bookmakers, exchanges, or odds
+                providers.
               </td>
             </tr>
             <tr>
@@ -131,11 +143,13 @@ export default function PrivacyPage() {
       </div>
       <p>
         <strong className="font-semibold text-white/80">
-          What we do not collect:
+          What we never do with your data:
         </strong>{" "}
-        your bets, stakes, balances, bookmaker accounts, betting history, or
-        any content of your local database. There is no advertising tracking,
-        no data sale, and no profiling of your betting behaviour by us.
+        no advertising tracking, no data sale, and no profiling of your betting
+        behaviour. We never see or store your card details, and we never send
+        your desk records to bookmakers, exchanges, or the odds and fixture
+        providers we read data from — those feeds receive only generic fixture
+        and race queries, never anything about you.
       </p>
 
       <h2>4. Lawful bases (UK GDPR)</h2>
@@ -150,6 +164,10 @@ export default function PrivacyPage() {
           <tbody>
             <tr>
               <td>Provide the service and manage your subscription</td>
+              <td>Contract (Art. 6(1)(b))</td>
+            </tr>
+            <tr>
+              <td>Store and sync your desk records on the hosted service</td>
               <td>Contract (Art. 6(1)(b))</td>
             </tr>
             <tr>
@@ -219,6 +237,13 @@ export default function PrivacyPage() {
               <td>Stripe Payments Europe / Stripe, Inc. as applicable</td>
             </tr>
             <tr>
+              <td>Neon</td>
+              <td>
+                Hosted Postgres database storing account and desk records
+              </td>
+              <td>United Kingdom (AWS eu-west-2, London)</td>
+            </tr>
+            <tr>
               <td>Vercel</td>
               <td>Website and account hosting</td>
               <td>EU and US regions as configured</td>
@@ -236,12 +261,24 @@ export default function PrivacyPage() {
         transferred outside the UK, we rely on adequacy regulations or
         UK-approved safeguards (for example, the UK Addendum to EU SCCs).
       </p>
+      <p>
+        Odds, fixture, and race data is supplied to us by third-party
+        providers. That data flows one way — into the app. Our requests to
+        those providers contain only the fixture, race, or market being looked
+        up, never your account details or desk records, so they are not
+        processors of your personal data.
+      </p>
 
       <h2>6. Retention</h2>
       <ul>
         <li>
           Account and subscription data: kept while your account is active,
           then 24 months after closure unless law requires longer.
+        </li>
+        <li>
+          Desk records (bets, balances, offers, history): kept while your
+          account is active and deleted when you delete your account. Rows you
+          delete in the app are removed from the live database immediately.
         </li>
         <li>
           Payment records: kept for 6 years to meet tax and accounting
@@ -279,17 +316,19 @@ export default function PrivacyPage() {
         things first.
       </p>
       <p>
-        Because your betting records live on your device, you already hold
-        them: the app&apos;s built-in backup/export (Settings → Data &amp;
-        backup) is your data-portability tool, and deleting the local database
-        erases them.
+        The app&apos;s built-in export (Settings → Data &amp; backup) is your
+        data-portability tool: it downloads a full copy of your desk records.
+        For access, correction, or deletion of anything held server-side,
+        email us and we will action it within one month. Deleting your account
+        erases the desk records attached to it.
       </p>
 
       <h2>8. Security</h2>
       <p>
-        Account data is held behind authenticated access with encryption in
-        transit (TLS). The local-first design means the most sensitive data,
-        your betting records, is protected by your own device&apos;s security.
+        Account and desk data is stored in a Postgres database hosted by Neon
+        in the UK, behind authenticated access (Clerk), with encryption in
+        transit (TLS) and encryption at rest on the database platform. Each
+        account&apos;s records are scoped to that account at the query level.
         No method is 100% secure. If a breach affects your personal data we
         will notify you and the ICO as the law requires.
       </p>

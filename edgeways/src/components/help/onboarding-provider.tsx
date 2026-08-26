@@ -16,6 +16,7 @@ import { AgeGateDialog } from "@/components/compliance/age-gate-dialog";
 import { SyncClerkAgeConfirmation } from "@/components/compliance/sync-clerk-age";
 import { DemoNoticeDialog } from "@/components/demo/demo-notice-dialog";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
+import { ReferAFriendDialog } from "@/components/referrals/refer-a-friend-dialog";
 import { useAppState } from "@/hooks/use-app-state";
 import { hasDeskActivity, needsSetup } from "@/lib/dashboard-empty";
 import {
@@ -202,6 +203,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           />
           <SetupWizard open={setupOpen} onOpenChange={setSetupOpen} />
           <DemoNoticeDialog
+            suppressed={ageOpen || setupOpen || welcomeOpen}
+          />
+          <ReferAFriendDialog
             suppressed={ageOpen || setupOpen || welcomeOpen}
           />
         </>

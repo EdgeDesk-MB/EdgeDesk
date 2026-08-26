@@ -198,27 +198,28 @@ export default function TermsPage() {
 
       <h2>7. Your data</h2>
       <p>
-        7.1 Edgeways is{" "}
-        <strong className="font-semibold text-white/80">local-first</strong>:
-        your betting records are stored on your own device by default and never
-        leave it unless you choose a cloud/sync feature or contact support with
-        diagnostics. Our{" "}
+        7.1 Edgeways is a{" "}
+        <strong className="font-semibold text-white/80">hosted service</strong>:
+        your desk records (bets, offers, balances, wallets and history) are
+        stored in our database — Postgres hosted by Neon in the UK (London)
+        — so your desk is the same on every device you sign in from. Our{" "}
         <Link href={LEGAL_PATHS.privacy}>Privacy Policy</Link> explains what we
-        collect and why.
+        hold and why.
       </p>
       <p>
-        7.2{" "}
+        7.2 The app provides one-tap export and restore (Settings → Data &amp;
+        backup). We run infrastructure backups for service continuity, but they
+        are not a substitute for your own exports:{" "}
         <strong className="font-semibold text-white/80">
-          Backups are your responsibility
-        </strong>{" "}
-        while the service is local-first. The app provides one-tap backup and
-        restore (Settings → Data &amp; backup). Use it. We cannot recover data
-        lost from your device.
+          we may be unable to recover records you delete
+        </strong>
+        , so export anything you care about before removing it.
       </p>
       <p>
-        7.3 You can export or delete your data at any time. Deleting your
-        account deletes data we hold about you per the Privacy Policy. Local
-        data on your device is yours to keep or delete.
+        7.3 You can export your data at any time in Settings. To delete your
+        account and the server-side records attached to it, email{" "}
+        <a href={mailtoHref(SUPPORT_EMAIL)}>{SUPPORT_EMAIL}</a> — deletion is
+        handled per the Privacy Policy.
       </p>
 
       <h2>8. Intellectual property</h2>

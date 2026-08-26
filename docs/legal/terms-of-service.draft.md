@@ -1,10 +1,11 @@
 # Edgeways — Terms of Service
 
-> **Published 17 Aug 2026 (EDGE-61).** Customer page: `/terms`. Sam read
+> **Published 17 Aug 2026 (EDGE-61); storage sections rewritten 26 Aug 2026
+> (EDGE-92) for the hosted Neon desk.** Customer page: `/terms`. Sam read
 > 16 Aug (EDGE-11). Solicitor (EDGE-8) before charging strangers. Not legal
 > advice.
 
-**Effective date:** 17 August 2026
+**Effective date:** 26 August 2026
 **Service:** Edgeways, a subscription web application for tracking and analysing matched betting activity
 **Operator:** Sam Hayter trading as Edgeways ("we", "us", "our")
 **Contact:** support@edgeways.app
@@ -113,18 +114,19 @@ for money laundering or any unlawful purpose; or misrepresent your age.
 
 ## 7. Your data
 
-7.1 Edgeways is **local-first**: your betting records are stored on your own
-device by default and never leave it unless you choose a cloud/sync feature or
-contact support with diagnostics. Our Privacy Policy (/privacy) explains what we
-collect and why.
+7.1 Edgeways is a **hosted service**: your desk records (bets, offers,
+balances, wallets and history) are stored in our database — Postgres hosted by
+Neon in the UK (London) — so your desk is the same on every device you sign in
+from. Our Privacy Policy (/privacy) explains what we hold and why.
 
-7.2 **Backups are your responsibility** while the service is local-first. The
-app provides one-tap backup and restore (Settings → Data & backup); use it. We
-cannot recover data lost from your device.
+7.2 The app provides one-tap export and restore (Settings → Data & backup). We
+run infrastructure backups for service continuity, but they are not a
+substitute for your own exports: **we may be unable to recover records you
+delete**, so export anything you care about before removing it.
 
-7.3 You can export or delete your data at any time. Deleting your account
-deletes data we hold about you per the Privacy Policy; local data on your
-device is yours to keep or delete.
+7.3 You can export your data at any time in Settings. To delete your account
+and the server-side records attached to it, email support@edgeways.app —
+deletion is handled per the Privacy Policy.
 
 ## 8. Intellectual property
 

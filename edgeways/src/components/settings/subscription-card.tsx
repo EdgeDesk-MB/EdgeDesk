@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CreditCard, Gift, TicketPercent } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
+import { ReferralSharePanel } from "@/components/referrals/referral-share-panel";
 import { requestBillingPortal } from "@/lib/billing/open-portal";
 import { planCheckoutHref, PUBLIC_PLANS } from "@/lib/billing/public-offer";
-import { captureReferralShared } from "@/lib/analytics/referrals";
 import {
   billingStatusBadgeVariant,
   billingStatusLabel,
@@ -24,7 +23,7 @@ import {
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import type { PlanPreview } from "@/lib/entitlements/plans";
 import type { AppSettings } from "@/lib/services/settings-shared";
-import { edgePanel, quietPanel, sectionDescription } from "@/lib/ui/surface-styles";
+import { quietPanel, edgePanel, sectionDescription } from "@/lib/ui/surface-styles";
 
 const TILE_VALUE = "h-8 min-w-0 gap-2 text-lg";
 
@@ -195,92 +194,10 @@ export function SubscriptionCard({
               </Button>
             ) : null}
           </div>
-
-          {!publicDemo ? <ReferralPanel /> : null}
         </div>
       )}
-    </div>
-  );
-}
 
-type ReferralMine = {
-  code: string;
-  shareUrl: string;
-};
-
-function ReferralPanel() {
-  const [referral, setReferral] = useState<ReferralMine | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  function load() {
-    fetch("/api/referrals/mine")
-      .then((response) => {
-        if (!response.ok) throw new Error("load failed");
-        return response.json() as Promise<ReferralMine>;
-      })
-      .then((data) => setReferral(data))
-      .catch(() => setFailed(true));
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  function retry() {
-    setFailed(false);
-    setReferral(null);
-    load();
-  }
-
-  async function copyLink() {
-    if (!referral) return;
-    try {
-      await navigator.clipboard.writeText(referral.shareUrl);
-      captureReferralShared({ surface: "settings" });
-      toast.success("Referral link copied", {
-        description: "Share it with a friend to earn £10 credit.",
-      });
-    } catch {
-      toast.error("Could not copy the link", {
-        description: referral.shareUrl,
-      });
-    }
-  }
-
-  return (
-    <div className={cn(edgePanel, "mt-4")}>
-      <div className="relative flex flex-col gap-3 px-4 py-4">
-        <TicketPercent
-          aria-hidden
-          className="pointer-events-none absolute -right-4 top-1/2 size-44 -translate-y-1/2 -rotate-12 text-edge/20"
-        />
-        <div className="relative flex items-center gap-2">
-          <Gift className="size-4 text-edge" aria-hidden />
-          <p className="text-sm font-semibold">Refer a friend</p>
-        </div>
-        <p className={cn(sectionDescription, "relative")}>
-          They get 50% off their first paid month. You get £10 credit towards
-          your bill when their first payment lands.
-        </p>
-        <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center">
-          <code className="inline-flex h-9 min-w-[11ch] items-center justify-center rounded-md border border-edge/40 bg-edge/10 px-3 font-mono text-sm font-bold tracking-widest text-foreground">
-            {failed ? "————" : (referral?.code ?? "…")}
-          </code>
-          {failed ? (
-            <Button variant="outline" onClick={retry}>
-              Try again
-            </Button>
-          ) : (
-            <Button
-              variant="edge"
-              disabled={!referral}
-              onClick={() => void copyLink()}
-            >
-              Copy referral link
-            </Button>
-          )}
-        </div>
-      </div>
+      {!publicDemo ? <ReferralSharePanel /> : null}
     </div>
   );
 }
