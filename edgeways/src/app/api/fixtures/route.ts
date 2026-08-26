@@ -6,6 +6,7 @@ import {
   localCalendarDate,
 } from "@/lib/services/apifootball";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,15 @@ function isRateLimitError(error: unknown): boolean {
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
     req.nextUrl.searchParams.get("date") ?? localCalendarDate();
+
+  // Guard before the demo fallback so unsigned hosted callers get 403, not
+  // free demo fixtures. Callers tolerate `{ fixtures: [] }` and paint empty.
+  const locked = await lockedFeedResponse("calculators", {
+    source: "locked",
+    fixtures: [],
+    date,
+  });
+  if (locked) return locked;
 
   if (!hasApiKey()) {
     return NextResponse.json({ source: "demo", fixtures: demoFixtures() });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, events } from "@/lib/db";
 import { searchFixtureByTeams } from "@/lib/services/apifootball";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { isFeedDenied } from "@/lib/entitlements/feed-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,12 @@ function teamsMatch(a: string, b: string): boolean {
  * Returns { event, mode } where mode ∈ "existing" | "api" | "manual".
  */
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  // Plain 403 (not the locked-payload pattern): this is a write, and callers
+  // dereference `event.id`, so a canned body would crash them. api() throws
+  // and the caller's catch toasts instead.
+  if (await isFeedDenied("calculators")) {
+    return NextResponse.json({ error: "Sign in to track fixtures" }, { status: 403 });
+  }
   const parsed = trackSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
