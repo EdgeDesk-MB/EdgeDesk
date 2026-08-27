@@ -16,7 +16,8 @@
     "db:casino-smoke": "npx tsx --tsconfig scripts/tsconfig.json scripts/neon-casino-smoke.ts",
     "db:feeds-smoke": "npx tsx --tsconfig scripts/tsconfig.json scripts/neon-feeds-smoke.ts",
     "billing:rehearsal": "npx tsx --tsconfig scripts/tsconfig.json scripts/billing-rehearsal.ts",
-    "db:resend-smoke": "npx tsx scripts/resend-smoke.ts"
+    "db:resend-smoke": "npx tsx scripts/resend-smoke.ts",
+    "resend:audience-sync": "npx tsx --tsconfig scripts/tsconfig.json scripts/resend-audience-backfill.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",

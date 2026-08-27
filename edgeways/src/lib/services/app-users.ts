@@ -20,6 +20,7 @@ import {
   type AppUserRole,
 } from "@/lib/admin/emails";
 import { notifyOwnerOfNewUser } from "@/lib/admin/owner-growth-notify";
+import { syncAppUserToResendAudience } from "@/lib/admin/resend-audience-sync";
 import { adminRoleChangeBlock } from "@/lib/admin/roles";
 import type { PlanId } from "@/lib/entitlements/plans";
 import type {
@@ -264,6 +265,7 @@ export async function ensureAppUser(input: {
   const now = Date.now();
   const existing = await findAppUserByClerkId(clerkUserId);
   const wasNew = !existing;
+  const emailChanged = Boolean(email && existing && email !== existing.email);
   const createdAt = existing?.createdAt ?? now;
   const nextEmail = email ?? existing?.email ?? null;
 
@@ -336,6 +338,10 @@ export async function ensureAppUser(input: {
     });
   }
 
+  if (wasNew || emailChanged) {
+    await syncResendAudienceQuietly(row);
+  }
+
   return row;
 }
 
@@ -379,7 +385,16 @@ export async function applyAppUserEntitlement(input: {
 
   const row = await findAppUserByClerkId(input.clerkUserId);
   if (!row) throw new Error("app_users row missing after entitlement write.");
+  await syncResendAudienceQuietly(row);
   return row;
+}
+
+async function syncResendAudienceQuietly(user: AppUser): Promise<void> {
+  try {
+    await syncAppUserToResendAudience(user);
+  } catch (error) {
+    console.error("[app-users] resend audience sync failed", error);
+  }
 }
 
 export async function saveAppUserOnboardingProfile(input: {
