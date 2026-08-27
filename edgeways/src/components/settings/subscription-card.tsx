@@ -15,6 +15,7 @@ import {
   billingStatusBadgeVariant,
   billingStatusLabel,
   isCancelling,
+  isComplimentaryAccount,
   planDisplayName,
   showSubscribeActions,
   type SubscriptionAccount,
@@ -263,6 +264,7 @@ function planTileSub(
   publicDemo: boolean
 ): string | undefined {
   if (publicDemo) return "Public demo";
+  if (isComplimentaryAccount(account)) return "Operator account";
   if (account.billingStatus === "past_due") return "Update the card";
   if (account.founding) return "Founding rate";
   if (account.billingStatus === "canceled") return "Until period ends";
@@ -277,6 +279,7 @@ function billingTileValue(account: SubscriptionAccount): string {
   if (account.billingStatus === "trialing" && account.trialEndsAt) {
     return subscriptionDateLabel(account.trialEndsAt);
   }
+  if (isComplimentaryAccount(account)) return "Complimentary";
   return account.canManage ? "Stripe" : "None";
 }
 
@@ -286,6 +289,7 @@ function billingTileSub(account: SubscriptionAccount): string {
     return "Trial ends";
   }
   if (account.billingStatus === "trialing") return "Trial is live";
+  if (isComplimentaryAccount(account)) return "No card required";
   if (account.canManage) return "Card and invoices";
   return "No billing yet";
 }

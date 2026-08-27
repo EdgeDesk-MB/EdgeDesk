@@ -26,6 +26,10 @@ import type {
   BillingStatus,
 } from "@/lib/billing/entitlement-from-stripe";
 import {
+  COMPLIMENTARY_OPERATOR_ENTITLEMENT,
+  needsComplimentaryOperatorGrant,
+} from "@/lib/billing/operator-complimentary";
+import {
   parseOnboardingProfile,
   serializeOnboardingProfile,
   type OnboardingProfile,
@@ -48,7 +52,7 @@ export type AppUser = {
   role: AppUserRole;
   /** EDGE-67: this user's anonymous share code (XXXX-XXXX). Lazy-created. */
   referralCode: string | null;
-  /** EDGE-67: referrer's clerk_user_id, claimed at sign-up via ?ref=. */
+  /** EDGE-67: referrer's clerk_user_id, claimed via ?ref= or the ew_ref cookie. */
   referredBy: string | null;
   /** EDGE-67: when this user's first paid invoice granted the referrer credit. */
   referralCreditAt: number | null;
@@ -249,6 +253,7 @@ export async function findAppUserByStripeCustomerId(
 export async function ensureAppUser(input: {
   clerkUserId: string;
   email?: string | null;
+  skipOperatorGrant?: boolean;
 }): Promise<AppUser> {
   const clerkUserId = input.clerkUserId.trim();
   if (!clerkUserId) {
@@ -289,26 +294,39 @@ export async function ensureAppUser(input: {
       .run();
   }
 
-  return (await findAppUserByClerkId(clerkUserId)) ?? {
+  const row = (await findAppUserByClerkId(clerkUserId)) ?? {
     clerkUserId,
     email: nextEmail,
     createdAt,
     updatedAt: now,
-    plan: "free",
-    billingStatus: "none",
+    plan: "free" as const,
+    billingStatus: "none" as const,
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     trialEndsAt: null,
     cancelAt: null,
     founding: false,
     onboardingProfile: null,
-    role: "user",
+    role: "user" as const,
     referralCode: null,
     referredBy: null,
     referralCreditAt: null,
     legalAcceptedAt: null,
     legalVersion: null,
   };
+
+  if (
+    !input.skipOperatorGrant &&
+    needsComplimentaryOperatorGrant(row)
+  ) {
+    return applyAppUserEntitlement({
+      clerkUserId,
+      email: nextEmail,
+      entitlement: COMPLIMENTARY_OPERATOR_ENTITLEMENT,
+    });
+  }
+
+  return row;
 }
 
 export async function applyAppUserEntitlement(input: {
@@ -319,6 +337,7 @@ export async function applyAppUserEntitlement(input: {
   await ensureAppUser({
     clerkUserId: input.clerkUserId,
     email: input.email,
+    skipOperatorGrant: true,
   });
   const now = Date.now();
   const { entitlement } = input;

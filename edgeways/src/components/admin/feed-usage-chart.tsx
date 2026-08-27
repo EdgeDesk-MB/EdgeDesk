@@ -3,6 +3,7 @@ import {
   feedThresholdState,
   type FeedUsageDayPoint,
 } from "@/lib/admin/feed-monitor";
+import { formatUtcDayLabel } from "@/lib/admin/series";
 import { cn } from "@/lib/utils";
 
 const WIDTH = 600;
@@ -14,16 +15,6 @@ const STATE_BAR_CLASS = {
   warning: "fill-warning",
   critical: "fill-destructive",
 } as const;
-
-function dayLabel(day: string): string {
-  // YYYY-MM-DD → "14 Aug" (UTC-safe: parse parts, never Date.parse)
-  const [year, month, date] = day.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, date)).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
 
 /**
  * 30-day daily request volume against the feed's cap. Server-rendered SVG —
@@ -86,9 +77,7 @@ export function FeedUsageChart({
                 point.day === today && "stroke-foreground/40"
               )}
             >
-              <title>
-                {dayLabel(point.day)}: {point.used.toLocaleString("en-GB")} requests
-              </title>
+              <title>{`${formatUtcDayLabel(point.day)}: ${point.used.toLocaleString("en-GB")} requests`}</title>
             </rect>
           );
         })}
@@ -116,8 +105,8 @@ export function FeedUsageChart({
       </svg>
       <figcaption className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         <span>
-          {history.length > 0 ? dayLabel(history[0].day) : ""} –{" "}
-          {history.length > 0 ? dayLabel(history[history.length - 1].day) : ""}
+          {history.length > 0 ? formatUtcDayLabel(history[0].day) : ""} –{" "}
+          {history.length > 0 ? formatUtcDayLabel(history[history.length - 1].day) : ""}
         </span>
         <span className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1">

@@ -2,6 +2,8 @@ import {
   Activity,
   CreditCard,
   Flag,
+  HeartPulse,
+  Inbox,
   LayoutDashboard,
   Radio,
   Shield,
@@ -48,6 +50,12 @@ export const ADMIN_NAV: AdminNavItem[] = [
     blurb: "Per-desk volume counts. Not another customer’s bets or wallets.",
   },
   {
+    href: "/admin/inbox",
+    label: "Inbox",
+    icon: Inbox,
+    blurb: "Feedback reports from the desk. Read only; filing stays in triage.",
+  },
+  {
     href: "/admin/feeds",
     label: "Feeds",
     icon: Radio,
@@ -58,6 +66,12 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Releases",
     icon: Flag,
     blurb: "PostHog flags and a maintenance banner. No deploy button.",
+  },
+  {
+    href: "/admin/health",
+    label: "Health",
+    icon: HeartPulse,
+    blurb: "Is it up, and which mode. Services, deploy and feed status.",
   },
 ];
 

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import {
   isPublicAssetPath,
@@ -13,12 +13,19 @@ import {
   PUBLIC_DEMO_LIVE_PARAM,
 } from "@/lib/demo/public-demo";
 import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
+import { stampReferralCookie } from "@/lib/referrals/persist";
 
 /**
  * Next.js 16+: file must be named proxy.ts (Clerk + Next convention).
  * Combines Clerk session handling with SITE_SURFACE=waitlist gate.
  */
 export default clerkMiddleware(async (_auth, request) => {
+  const response = await handleSurface(request);
+  stampReferralCookie(request.nextUrl.searchParams.get("ref"), response.cookies);
+  return response;
+});
+
+async function handleSurface(request: NextRequest): Promise<NextResponse> {
   const liveUrl = request.nextUrl.clone();
   if (liveUrl.searchParams.get(PUBLIC_DEMO_LIVE_PARAM) === "1") {
     liveUrl.searchParams.delete(PUBLIC_DEMO_LIVE_PARAM);
@@ -66,7 +73,7 @@ export default clerkMiddleware(async (_auth, request) => {
   home.pathname = "/";
   home.search = "";
   return NextResponse.redirect(home);
-});
+}
 
 export const config = {
   matcher: [

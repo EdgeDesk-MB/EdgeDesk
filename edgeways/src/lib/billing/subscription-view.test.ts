@@ -3,6 +3,7 @@ import {
   billingStatusBadgeVariant,
   billingStatusLabel,
   isCancelling,
+  isComplimentaryAccount,
   planDisplayName,
   showSubscribeActions,
   subscriptionAccountFromUser,
@@ -126,6 +127,26 @@ describe("subscription copy", () => {
         canManage: false,
       })
     ).toBe("Calculators and a manual bet log.");
+    expect(
+      isComplimentaryAccount({
+        plan: "edge",
+        billingStatus: "active",
+        trialEndsAt: null,
+        cancelAt: null,
+        founding: false,
+        canManage: false,
+      })
+    ).toBe(true);
+    expect(
+      subscriptionDetail({
+        plan: "edge",
+        billingStatus: "active",
+        trialEndsAt: null,
+        cancelAt: null,
+        founding: false,
+        canManage: false,
+      })
+    ).toBe("Complimentary Edge. No Stripe billing.");
     expect(
       subscriptionDetail({
         plan: "edge",

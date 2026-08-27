@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { loadFeedMonitor, loadFeedStatus, type FeedMonitorLane } from "@/lib/admin/feeds";
+import { readAllFeedHeartbeats } from "@/lib/admin/feed-heartbeat";
 import {
   FEED_STATE_DESCRIPTION,
   FEED_STATE_LABEL,
@@ -45,7 +46,11 @@ function paceSub(lane: FeedMonitorLane): string {
 }
 
 export default async function AdminFeedsPage() {
-  const [status, monitor] = await Promise.all([loadFeedStatus(), loadFeedMonitor()]);
+  const [status, monitor, heartbeats] = await Promise.all([
+    loadFeedStatus(),
+    loadFeedMonitor(),
+    readAllFeedHeartbeats(),
+  ]);
   const exchangeOk = status.exchange.providers.filter((provider) => provider.ok).length;
   const alerts = (
     [
@@ -194,7 +199,7 @@ export default async function AdminFeedsPage() {
 
       <FeedCapsForm initial={monitor.caps} />
 
-      <FeedsPanel initial={status} />
+      <FeedsPanel initial={status} heartbeats={heartbeats} />
     </AdminPage>
   );
 }

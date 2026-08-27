@@ -119,6 +119,8 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
             <TableRow>
               <TableHead className={tableHeaderCell}>Email</TableHead>
               <TableHead className={tableHeaderCell}>Plan</TableHead>
+              <TableHead className={tableHeaderCell}>Legal</TableHead>
+              <TableHead className={tableHeaderCell}>Onboarded</TableHead>
               <TableHead className={tableHeaderCell}>Last active</TableHead>
               <TableHead className={tableHeaderCell}>Admin</TableHead>
               <TableHead className={cn(tableHeaderCell, "text-right")}>Access</TableHead>
@@ -131,13 +133,37 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
               <TableRow key={user.clerkUserId}>
                 <TableCell className={cn(tableBodyCell, "max-w-[18rem] truncate font-medium")}>
                   {user.email ?? user.clerkUserId}
+                  {user.admin ? (
+                    <span className="ml-1.5 rounded bg-brand/15 px-1 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-brand">
+                      Admin
+                    </span>
+                  ) : null}
                   {user.bootstrap ? (
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                       Bootstrap
                     </span>
                   ) : null}
                 </TableCell>
                 <TableCell className={cn(tableBodyCell, "capitalize")}>{user.plan}</TableCell>
+                <TableCell className={tableBodyCell}>
+                  {user.legalAcceptedAt != null ? (
+                    <span title={formatAdminDateTime(user.legalAcceptedAt)}>
+                      <span className="text-profit">Accepted</span>
+                      {user.legalVersion ? (
+                        <span className="ml-1 text-xs text-muted-foreground">{user.legalVersion}</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="text-warning">Pending</span>
+                  )}
+                </TableCell>
+                <TableCell className={tableBodyCell}>
+                  {user.onboardingProfile ? (
+                    <span className="text-profit">Done</span>
+                  ) : (
+                    <span className="text-muted-foreground">Not yet</span>
+                  )}
+                </TableCell>
                 <TableCell className={tableBodyCell}>{formatAdminDateTime(user.updatedAt)}</TableCell>
                 <TableCell className={tableBodyCell}>
                   {user.admin ? (

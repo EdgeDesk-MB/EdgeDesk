@@ -1,8 +1,22 @@
 import { CreditCard } from "lucide-react";
+import {
+  AdminBarChart,
+  AdminChartCard,
+  AdminChartGrid,
+  AdminCompareStrip,
+  AdminDonutChart,
+} from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
+import { AdminSection } from "@/components/admin/admin-section";
+import { ExcludeAdminsToggle } from "@/components/admin/exclude-admins-toggle";
 import { AdminTableFrame } from "@/components/admin/admin-table";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
+import {
+  buildFoundingShare,
+  chartsFromStripeOverview,
+  formatPenceGbp,
+} from "@/lib/admin/stripe-charts";
 import {
   Table,
   TableBody,
@@ -12,26 +26,53 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatAdminDateTime } from "@/lib/admin/format";
-import { loadStripeOverview } from "@/lib/admin/stripe-overview";
+import { readExcludeAdmins } from "@/lib/admin/exclude-admins-server";
+import { withoutAdmins } from "@/lib/admin/exclude-admins";
+import { buildStripeDrift, stripeDriftNote } from "@/lib/admin/stripe-drift";
+import { loadStripeOverview, stripeInvoiceUrl } from "@/lib/admin/stripe-overview";
+import { StripeModeChip } from "@/components/admin/stripe-mode-chip";
 import { listAppUsers } from "@/lib/services/app-users";
-import { sectionTitle, tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
+import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export default async function AdminPaymentsPage() {
-  const [stripe, users] = await Promise.all([
+  const [stripe, users, excludeAdmins] = await Promise.all([
     loadStripeOverview(),
     listAppUsers(),
+    readExcludeAdmins(),
   ]);
-  const foundingHolders = users.filter((user) => user.founding);
+  const admins = users.filter((user) => user.admin).length;
+  const visibleUsers = withoutAdmins(users, excludeAdmins);
+  const foundingHolders = visibleUsers.filter((user) => user.founding);
+  const charts = chartsFromStripeOverview(stripe);
+  const foundingShare = buildFoundingShare(
+    foundingHolders.length,
+    visibleUsers.length
+  );
+  const drift = stripeDriftNote(
+    buildStripeDrift(visibleUsers, stripe.stripeCustomerIds)
+  );
 
   return (
     <AdminPage
       title="Payments"
-      description="Read-only Stripe view. Refunds and charges stay in the Stripe dashboard."
+      description="Read-only Stripe view. Refunds and charges stay in the Stripe dashboard. Stripe totals still include every customer."
       icon={CreditCard}
+      toolbar={
+        <ExcludeAdminsToggle active={excludeAdmins} hiddenCount={admins} />
+      }
     >
       <StatStrip columns={4}>
-        <StatTile label="MRR" value={stripe.mrrLabel} sub="Active + trial" />
+        <StatTile
+          label="MRR"
+          value={
+            <span className="flex items-center gap-2">
+              {stripe.mrrLabel}
+              {stripe.mode ? <StripeModeChip mode={stripe.mode} /> : null}
+            </span>
+          }
+          sub={drift ?? "Active + trial"}
+        />
         <StatTile label="Active" value={String(stripe.active)} />
         <StatTile label="Trialing" value={String(stripe.trialing)} />
         <StatTile
@@ -41,8 +82,144 @@ export default async function AdminPaymentsPage() {
         />
       </StatStrip>
 
-      <section>
-        <h2 className={sectionTitle}>Founding-rate holders</h2>
+      {stripe.configured ? (
+        <>
+          <AdminCompareStrip
+            heading="Versus last week"
+            items={[
+              {
+                label: "Paid",
+                compare: charts.week.paidVolume,
+                period: "week",
+                formatValue: formatPenceGbp,
+              },
+              {
+                label: "Invoices",
+                compare: charts.week.paidCount,
+                period: "week",
+              },
+              {
+                label: "Subscriptions",
+                compare: charts.week.newSubs,
+                period: "week",
+              },
+              {
+                label: "Refunds",
+                compare: charts.week.refunds,
+                period: "week",
+                formatValue: formatPenceGbp,
+              },
+            ]}
+          />
+          <AdminChartGrid>
+            <AdminChartCard
+              title="Paid invoice volume"
+              description="Stripe amount_paid per UTC day. Not accrued MRR."
+            >
+              <AdminBarChart
+                series={charts.paidVolume30}
+                label="Paid invoice volume"
+                tone="profit"
+                formatValue={formatPenceGbp}
+              />
+            </AdminChartCard>
+            <AdminChartCard
+              title="Stripe status"
+              description="Every subscription Stripe still lists, including cancelled."
+            >
+              <AdminDonutChart slices={charts.statusShare} label="Stripe status" />
+            </AdminChartCard>
+          </AdminChartGrid>
+          <AdminChartGrid>
+            <AdminChartCard
+              title="Subscriptions started"
+              description="Day the Stripe subscription was created, including later cancels."
+            >
+              <AdminBarChart
+                series={charts.newSubs30}
+                label="Subscriptions started"
+              />
+            </AdminChartCard>
+            <AdminChartCard
+              title="Refund volume"
+              description="Stripe refund amounts per UTC day."
+            >
+              <AdminBarChart
+                series={charts.refundVolume30}
+                label="Refund volume"
+                tone="destructive"
+                formatValue={formatPenceGbp}
+              />
+            </AdminChartCard>
+          </AdminChartGrid>
+          <AdminChartGrid>
+            <AdminChartCard
+              title="Founding-rate share"
+              description="Accounts marked founding in app_users, not a Stripe coupon count."
+            >
+              <AdminDonutChart
+                slices={foundingShare}
+                label="Founding-rate share"
+              />
+            </AdminChartCard>
+            <AdminChartCard
+              title="Paid invoices"
+              description="How many invoices Stripe marked paid each UTC day."
+            >
+              <AdminBarChart
+                series={charts.paidCount30}
+                label="Paid invoices"
+                tone="brand"
+              />
+            </AdminChartCard>
+          </AdminChartGrid>
+        </>
+      ) : null}
+
+      {stripe.configured && stripe.failed.length > 0 ? (
+        <AdminSection
+          title="Needs attention"
+          description="Past due, open or uncollectible. Refunds and charges stay in the Stripe dashboard."
+        >
+          <AdminTableFrame>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className={tableHeaderCell}>Email</TableHead>
+                  <TableHead className={tableHeaderCell}>Amount</TableHead>
+                  <TableHead className={tableHeaderCell}>Status</TableHead>
+                  <TableHead className={tableHeaderCell}>When</TableHead>
+                  <TableHead className={cn(tableHeaderCell, "text-right")}>Stripe</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stripe.failed.map((invoice) => (
+                  <TableRow key={invoice.id}>
+                    <TableCell className={tableBodyCell}>{invoice.email ?? "—"}</TableCell>
+                    <TableCell className={tableBodyCell}>{invoice.amountLabel}</TableCell>
+                    <TableCell className={cn(tableBodyCell, "capitalize text-destructive")}>
+                      {invoice.status}
+                    </TableCell>
+                    <TableCell className={tableBodyCell}>{formatAdminDateTime(invoice.createdAt)}</TableCell>
+                    <TableCell className={cn(tableBodyCell, "text-right")}>
+                      <a
+                        href={stripeInvoiceUrl(invoice.id, stripe.mode)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-primary-text hover:underline"
+                      >
+                        Open
+                      </a>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </AdminTableFrame>
+        </AdminSection>
+      ) : null}
+
+      <AdminSection title="Founding-rate holders">
         {foundingHolders.length === 0 ? (
           <EmptyState
             compact
@@ -74,7 +251,7 @@ export default async function AdminPaymentsPage() {
         </Table>
         </AdminTableFrame>
         )}
-      </section>
+      </AdminSection>
 
       {!stripe.configured ? (
         <EmptyState
@@ -83,9 +260,8 @@ export default async function AdminPaymentsPage() {
           description={stripe.message ?? "Set STRIPE_SECRET_KEY to load invoices and MRR."}
         />
       ) : (
-        <div className="flex flex-col gap-8">
-          <section>
-            <h2 className={sectionTitle}>Recent invoices</h2>
+        <>
+          <AdminSection title="Recent invoices">
             {stripe.invoices.length === 0 ? (
               <EmptyState
                 compact
@@ -117,43 +293,8 @@ export default async function AdminPaymentsPage() {
             </Table>
             </AdminTableFrame>
             )}
-          </section>
-          <section>
-            <h2 className={sectionTitle}>Failed / open</h2>
-            {stripe.failed.length === 0 ? (
-              <EmptyState
-                compact
-                icon={CreditCard}
-                title="No open or failed invoices"
-                description="Nothing open or failed on the last Stripe page."
-              />
-            ) : (
-            <AdminTableFrame>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className={tableHeaderCell}>Email</TableHead>
-                  <TableHead className={tableHeaderCell}>Amount</TableHead>
-                  <TableHead className={tableHeaderCell}>Status</TableHead>
-                  <TableHead className={tableHeaderCell}>When</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                  {stripe.failed.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className={tableBodyCell}>{invoice.email ?? "—"}</TableCell>
-                      <TableCell className={tableBodyCell}>{invoice.amountLabel}</TableCell>
-                      <TableCell className={cn(tableBodyCell, "capitalize")}>{invoice.status}</TableCell>
-                      <TableCell className={tableBodyCell}>{formatAdminDateTime(invoice.createdAt)}</TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-            </AdminTableFrame>
-            )}
-          </section>
-          <section>
-            <h2 className={sectionTitle}>Refunds</h2>
+          </AdminSection>
+          <AdminSection title="Refunds">
             {stripe.refunds.length === 0 ? (
               <EmptyState
                 compact
@@ -183,8 +324,8 @@ export default async function AdminPaymentsPage() {
             </Table>
             </AdminTableFrame>
             )}
-          </section>
-        </div>
+          </AdminSection>
+        </>
       )}
     </AdminPage>
   );

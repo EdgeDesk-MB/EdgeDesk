@@ -86,7 +86,19 @@ export function subscriptionDateLabel(ms: number): string {
   return receiptDateLabel(Math.floor(ms / 1000));
 }
 
+/** Edge/Core with no Stripe customer: operator or other complimentary grant. */
+export function isComplimentaryAccount(account: SubscriptionAccount): boolean {
+  return (
+    (account.plan === "edge" || account.plan === "core") &&
+    (account.billingStatus === "active" || account.billingStatus === "trialing") &&
+    !account.canManage
+  );
+}
+
 export function subscriptionDetail(account: SubscriptionAccount): string {
+  if (isComplimentaryAccount(account)) {
+    return "Complimentary Edge. No Stripe billing.";
+  }
   if (isCancelling(account) && account.cancelAt) {
     const ends = `You keep ${planDisplayName(account.plan)} until ${subscriptionDateLabel(account.cancelAt)}.`;
     return account.billingStatus === "trialing"

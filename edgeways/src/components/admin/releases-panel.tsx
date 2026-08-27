@@ -141,7 +141,14 @@ export function ReleasesPanel({
               <div key={flag.id} className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{flag.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{flag.key}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {flag.key}
+                    {flag.rollout != null ? (
+                      <span className="ml-1.5 font-semibold text-warning">
+                        {flag.rollout}% rollout
+                      </span>
+                    ) : null}
+                  </p>
                 </div>
                 <Switch
                   checked={flag.active}

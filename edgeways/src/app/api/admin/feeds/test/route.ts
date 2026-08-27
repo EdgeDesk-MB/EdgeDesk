@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/session";
 import { loadFeedStatus, runFeedTest } from "@/lib/admin/feeds";
+import { recordFeedHeartbeat } from "@/lib/admin/feed-heartbeat";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   }
 
   const result = await runFeedTest(kind);
+  await recordFeedHeartbeat(kind, { ok: result.ok, message: result.message });
   const status = await loadFeedStatus();
   return NextResponse.json({
     ok: result.ok,

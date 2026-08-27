@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import {
   billingStatusIsLive,
@@ -17,10 +18,16 @@ import {
   getStripe,
   stripePortalConfigurationId,
 } from "@/lib/billing/stripe-server";
+import { shouldBlockComplimentaryOperatorCheckout } from "@/lib/billing/operator-complimentary";
 import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
+import { isOperatorAdmin } from "@/lib/admin/emails";
 import { publicCatalogueReady } from "@/lib/billing/stripe-prices";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { claimReferralBestEffort } from "@/lib/referrals/referral-service";
+import {
+  REFERRAL_COOKIE,
+  resolveReferralCode,
+} from "@/lib/referrals/persist";
 import { findAppUserByClerkId } from "@/lib/services/app-users";
 import { isWaitlistFoundingEligible } from "@/lib/services/waitlist";
 
@@ -29,7 +36,11 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = parseCheckoutFrom(url.searchParams.get("from"));
-  const ref = url.searchParams.get("ref");
+  const jar = await cookies();
+  const ref = resolveReferralCode(
+    url.searchParams.get("ref"),
+    jar.get(REFERRAL_COOKIE)?.value
+  );
   const paid = parsePaidCheckout(
     url.searchParams.get("plan"),
     url.searchParams.get("interval") ?? "month"
@@ -48,9 +59,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(signUp);
   }
 
-  // EDGE-67: a signed-in arrival with ?ref= claims the referral before
-  // checkout, so attribution holds even if the code is never typed into
-  // the Stripe promotion-code box.
+  // EDGE-67: a signed-in arrival with ?ref= (or the ew_ref cookie from a
+  // homepage share) claims the referral before checkout, so attribution
+  // holds even if the code is never typed into the Stripe promotion-code box.
   await claimReferralBestEffort(userId, ref);
 
   if (!publicCatalogueReady()) {
@@ -109,6 +120,22 @@ export async function GET(request: Request) {
     // (or Stripe itself, covering webhook lag right after a checkout) shows a
     // live subscription, send them to the portal to switch plans instead.
     const appUser = await findAppUserByClerkId(userId);
+    if (
+      shouldBlockComplimentaryOperatorCheckout({
+        operator: isOperatorAdmin({
+          email: appUser?.email ?? email,
+          role: appUser?.role,
+        }),
+        stripeCustomerId: appUser?.stripeCustomerId,
+        listedStripeCustomerId: customerId,
+      })
+    ) {
+      const redirect = NextResponse.redirect(
+        new URL(SETTINGS_SUBSCRIPTION_HREF, request.url)
+      );
+      redirect.cookies.set(PUBLIC_DEMO_COOKIE, "", { path: "/", maxAge: 0 });
+      return redirect;
+    }
     const portalCustomerId = appUser?.stripeCustomerId ?? customerId ?? null;
     let hasLiveSub = billingStatusIsLive(appUser?.billingStatus);
     // Fetched once when there is a customer and no locally-known live sub:
@@ -138,9 +165,11 @@ export async function GET(request: Request) {
       return redirect;
     }
     if (hasLiveSub) {
-      console.warn(
-        "[subscribe] live subscription but no Stripe customer id; allowing checkout"
+      const redirect = NextResponse.redirect(
+        new URL(SETTINGS_SUBSCRIPTION_HREF, request.url)
       );
+      redirect.cookies.set(PUBLIC_DEMO_COOKIE, "", { path: "/", maxAge: 0 });
+      return redirect;
     }
 
     const session = await stripe.checkout.sessions.create(

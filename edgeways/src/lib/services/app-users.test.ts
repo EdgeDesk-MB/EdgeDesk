@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, appUsers } from "@/lib/db";
+import { DEFAULT_BOOTSTRAP_ADMIN_EMAIL } from "@/lib/admin/emails";
 import { applyStripeSubscription } from "@/lib/billing/handle-stripe-event";
 import {
   applyAppUserEntitlement,
@@ -59,6 +60,40 @@ describe("ensureAppUser", () => {
     await ensureAppUser({ clerkUserId, email: "keep@example.com" });
     const again = await ensureAppUser({ clerkUserId, email: null });
     expect(again.email).toBe("keep@example.com");
+  });
+
+  it("grants complimentary Edge to the bootstrap admin", async () => {
+    const clerkUserId = `user_test_admin_${Date.now()}`;
+    const created = await ensureAppUser({
+      clerkUserId,
+      email: DEFAULT_BOOTSTRAP_ADMIN_EMAIL,
+    });
+    expect(created.plan).toBe("edge");
+    expect(created.billingStatus).toBe("active");
+    expect(created.stripeCustomerId).toBeNull();
+  });
+
+  it("does not overwrite a bootstrap admin who already has Stripe", async () => {
+    const clerkUserId = `user_test_admin_stripe_${Date.now()}`;
+    await ensureAppUser({ clerkUserId, email: DEFAULT_BOOTSTRAP_ADMIN_EMAIL });
+    await applyAppUserEntitlement({
+      clerkUserId,
+      entitlement: {
+        plan: "edge",
+        billingStatus: "trialing",
+        stripeCustomerId: "cus_keep",
+        stripeSubscriptionId: "sub_keep",
+        trialEndsAt: 1_800_000_000_000,
+        cancelAt: null,
+        founding: false,
+      },
+    });
+    const again = await ensureAppUser({
+      clerkUserId,
+      email: DEFAULT_BOOTSTRAP_ADMIN_EMAIL,
+    });
+    expect(again.billingStatus).toBe("trialing");
+    expect(again.stripeCustomerId).toBe("cus_keep");
   });
 });
 

@@ -12,8 +12,37 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { FeedStatus } from "@/lib/admin/feeds";
+import type { FeedHeartbeat, FeedHeartbeatKind } from "@/lib/admin/feed-heartbeat";
+import { formatAdminDateTime } from "@/lib/admin/format";
 
-export function FeedsPanel({ initial }: { initial: FeedStatus }) {
+function HeartbeatLine({ heartbeat }: { heartbeat: FeedHeartbeat }) {
+  if (heartbeat.lastOkAt == null && heartbeat.lastErrorAt == null) {
+    return <p className="text-xs text-muted-foreground">No checks recorded yet.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-0.5 text-xs">
+      {heartbeat.lastOkAt != null ? (
+        <p className="text-success">
+          Last OK {formatAdminDateTime(heartbeat.lastOkAt)}
+        </p>
+      ) : null}
+      {heartbeat.lastErrorAt != null ? (
+        <p className="text-destructive">
+          Last error {formatAdminDateTime(heartbeat.lastErrorAt)}
+          {heartbeat.lastError ? ` — ${heartbeat.lastError}` : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function FeedsPanel({
+  initial,
+  heartbeats,
+}: {
+  initial: FeedStatus;
+  heartbeats: Record<FeedHeartbeatKind, FeedHeartbeat>;
+}) {
   const [status, setStatus] = useState(initial);
   const [testing, setTesting] = useState<"football" | "racing" | "exchange" | null>(
     null
@@ -60,6 +89,7 @@ export function FeedsPanel({ initial }: { initial: FeedStatus }) {
           <p className="text-sm text-muted-foreground">
             Today: {status.football.used}/{status.football.budget} requests
           </p>
+          <HeartbeatLine heartbeat={heartbeats.football} />
           <Button
             type="button"
             variant="outline"
@@ -84,6 +114,7 @@ export function FeedsPanel({ initial }: { initial: FeedStatus }) {
           <p className="text-sm text-muted-foreground">
             Today: {status.racing.used} requests logged
           </p>
+          <HeartbeatLine heartbeat={heartbeats.racing} />
           <Button
             type="button"
             variant="outline"
@@ -113,6 +144,7 @@ export function FeedsPanel({ initial }: { initial: FeedStatus }) {
               </Badge>
             </div>
           ))}
+          <HeartbeatLine heartbeat={heartbeats.exchange} />
           <Button
             type="button"
             variant="outline"

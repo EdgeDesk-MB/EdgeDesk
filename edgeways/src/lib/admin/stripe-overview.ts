@@ -1,11 +1,17 @@
 import "server-only";
 import type Stripe from "stripe";
+import { SERIES_COMPARE_DAYS } from "@/lib/admin/series";
+import type {
+  StripeChartInvoice,
+  StripeChartRefund,
+} from "@/lib/admin/stripe-charts";
 import { formatGbp } from "@/lib/format-money";
-import { getStripe } from "@/lib/billing/stripe-server";
+import { getStripe, stripeMode, type StripeMode } from "@/lib/billing/stripe-server";
 import { listAppUsers } from "@/lib/services/app-users";
 
 export type StripeOverview = {
   configured: boolean;
+  mode: StripeMode | null;
   message?: string;
   mrrLabel: string;
   active: number;
@@ -33,10 +39,21 @@ export type StripeOverview = {
     status: string;
     createdAt: number;
   }>;
+  invoicePoints: StripeChartInvoice[];
+  refundPoints: StripeChartRefund[];
+  subscriptionCreatedAt: number[];
+  /** Customer ids Stripe still lists, for the desk/Stripe drift check. */
+  stripeCustomerIds: string[];
 };
 
 function penceToGbp(pence: number | null | undefined): string {
   return formatGbp((pence ?? 0) / 100);
+}
+
+/** Deep link into the Stripe dashboard for an invoice, mode-aware. */
+export function stripeInvoiceUrl(id: string, mode: StripeMode | null): string {
+  const base = "https://dashboard.stripe.com";
+  return mode === "test" ? `${base}/test/invoices/${id}` : `${base}/invoices/${id}`;
 }
 
 /** Page through every subscription so MRR/counts stay right past 100 subs. */
@@ -59,11 +76,36 @@ async function listAllSubscriptions(
   return subs;
 }
 
+async function listCreatedSince<T extends { id: string }>(
+  fetchPage: (params: {
+    limit: number;
+    created: { gte: number };
+    starting_after?: string;
+  }) => Promise<{ data: T[]; has_more: boolean }>,
+  gteSec: number,
+  maxPages = 5
+): Promise<T[]> {
+  const items: T[] = [];
+  let startingAfter: string | undefined;
+  for (let page = 0; page < maxPages; page += 1) {
+    const batch = await fetchPage({
+      limit: 100,
+      created: { gte: gteSec },
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    });
+    items.push(...batch.data);
+    if (!batch.has_more || batch.data.length === 0) break;
+    startingAfter = batch.data[batch.data.length - 1]!.id;
+  }
+  return items;
+}
+
 export async function loadStripeOverview(): Promise<StripeOverview> {
   const users = await listAppUsers();
   const founding = users.filter((user) => user.founding).length;
   const empty: StripeOverview = {
     configured: false,
+    mode: null,
     mrrLabel: "—",
     active: 0,
     trialing: 0,
@@ -73,15 +115,25 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
     invoices: [],
     refunds: [],
     failed: [],
+    invoicePoints: [],
+    refundPoints: [],
+    subscriptionCreatedAt: [],
+    stripeCustomerIds: [],
   };
 
   try {
     const stripe = getStripe();
-    const [subs, invoices, refunds] = await Promise.all([
-      listAllSubscriptions(stripe),
-      stripe.invoices.list({ limit: 20 }),
-      stripe.refunds.list({ limit: 20 }),
-    ]);
+    const gteSec = Math.floor(
+      (Date.now() - SERIES_COMPARE_DAYS * 24 * 60 * 60 * 1000) / 1000
+    );
+    const [subs, invoices, refunds, invoiceWindow, refundWindow] =
+      await Promise.all([
+        listAllSubscriptions(stripe),
+        stripe.invoices.list({ limit: 20 }),
+        stripe.refunds.list({ limit: 20 }),
+        listCreatedSince((params) => stripe.invoices.list(params), gteSec),
+        listCreatedSince((params) => stripe.refunds.list(params), gteSec),
+      ]);
 
     let mrrPence = 0;
     let active = 0;
@@ -115,6 +167,7 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
 
     return {
       configured: true,
+      mode: stripeMode(),
       mrrLabel: penceToGbp(Math.round(mrrPence)),
       active,
       trialing,
@@ -141,6 +194,23 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
         status: invoice.status ?? "open",
         createdAt: (invoice.created ?? 0) * 1000,
       })),
+      invoicePoints: invoiceWindow.map((invoice) => ({
+        createdAt: (invoice.created ?? 0) * 1000,
+        amountPence: invoice.amount_paid ?? 0,
+        paid: invoice.status === "paid",
+      })),
+      refundPoints: refundWindow.map((refund) => ({
+        createdAt: (refund.created ?? 0) * 1000,
+        amountPence: refund.amount ?? 0,
+      })),
+      subscriptionCreatedAt: subs.map((sub) => (sub.created ?? 0) * 1000),
+      stripeCustomerIds: [
+        ...new Set(
+          subs
+            .map((sub) => sub.customer)
+            .filter((id): id is string => typeof id === "string")
+        ),
+      ],
     };
   } catch (error) {
     const message =

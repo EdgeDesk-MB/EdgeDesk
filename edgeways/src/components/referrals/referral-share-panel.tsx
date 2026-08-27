@@ -56,7 +56,7 @@ export function useReferralShare(surface: string) {
       return true;
     } catch {
       toast.error("Could not copy the link", {
-        description: "Select the sign-up URL below and copy it yourself.",
+        description: "Select the URL below and copy it yourself.",
       });
       return false;
     }

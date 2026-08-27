@@ -1,8 +1,13 @@
+import { cookies } from "next/headers";
 import { SignUpForm } from "./sign-up-form";
 import {
   parseCheckoutFrom,
   signUpRedirectForPlan,
 } from "@/lib/billing/checkout-session";
+import {
+  REFERRAL_COOKIE,
+  resolveReferralCode,
+} from "@/lib/referrals/persist";
 
 export default async function SignUpPage({
   searchParams,
@@ -15,11 +20,16 @@ export default async function SignUpPage({
   }>;
 }) {
   const query = await searchParams;
+  const jar = await cookies();
+  const ref = resolveReferralCode(
+    query.ref,
+    jar.get(REFERRAL_COOKIE)?.value
+  );
   const after = signUpRedirectForPlan(
     query.plan,
     query.interval,
     parseCheckoutFrom(query.from),
-    query.ref
+    ref
   );
   return <SignUpForm afterUrl={after} />;
 }

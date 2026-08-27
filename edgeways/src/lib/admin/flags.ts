@@ -5,6 +5,8 @@ export type PosthogFlag = {
   key: string;
   name: string;
   active: boolean;
+  /** Rollout percentage 0–100 when PostHog reports one, else null. */
+  rollout: number | null;
 };
 
 export type FlagsOverview = {
@@ -85,7 +87,16 @@ export async function loadFlagsOverview(): Promise<FlagsOverview> {
       };
     }
     const body = (await res.json()) as {
-      results?: Array<{ id: number; key: string; name: string; active: boolean }>;
+      results?: Array<{
+        id: number;
+        key: string;
+        name: string;
+        active: boolean;
+        filters?: {
+          groups?: Array<{ rollout_percentage?: number | null }>;
+          multivariate?: unknown;
+        };
+      }>;
     };
     return {
       configured: true,
@@ -95,6 +106,7 @@ export async function loadFlagsOverview(): Promise<FlagsOverview> {
         key: flag.key,
         name: flag.name || flag.key,
         active: Boolean(flag.active),
+        rollout: flagRollout(flag),
       })),
     };
   } catch (error) {
@@ -105,6 +117,22 @@ export async function loadFlagsOverview(): Promise<FlagsOverview> {
       message: error instanceof Error ? error.message : "Could not reach PostHog.",
     };
   }
+}
+
+/**
+ * Rollout percentage for a flag: the first group's rollout_percentage when
+ * set. Multivariate flags and 100%-rollout groups return null (treated as
+ * "everyone" rather than a partial number).
+ */
+function flagRollout(flag: {
+  filters?: { groups?: Array<{ rollout_percentage?: number | null }> };
+}): number | null {
+  const groups = flag.filters?.groups;
+  if (!groups || groups.length === 0) return null;
+  const pct = groups[0]?.rollout_percentage;
+  if (pct == null || !Number.isFinite(pct)) return null;
+  if (pct >= 100) return null;
+  return Math.round(pct);
 }
 
 export async function setPosthogFlagActive(

@@ -70,9 +70,12 @@ describe("generateReferralCode", () => {
 });
 
 describe("referralShareUrl", () => {
-  it("builds the sign-up link with the code", () => {
+  it("builds the homepage link with the code", () => {
     expect(referralShareUrl("K7Q2-9XTM")).toBe(
-      "https://edgeways.app/sign-up?ref=K7Q2-9XTM"
+      "https://edgeways.app/?ref=K7Q2-9XTM"
+    );
+    expect(referralShareUrl("K7Q2-9XTM", "http://localhost:3000")).toBe(
+      "http://localhost:3000/?ref=K7Q2-9XTM"
     );
   });
 });

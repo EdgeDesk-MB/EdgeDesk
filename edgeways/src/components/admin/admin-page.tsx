@@ -7,12 +7,14 @@ export function AdminPage({
   description,
   icon,
   action,
+  toolbar,
   children,
 }: {
   title: string;
   description: string;
   icon?: LucideIcon;
   action?: React.ReactNode;
+  toolbar?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -22,6 +24,7 @@ export function AdminPage({
         description={description}
         icon={icon}
         action={action}
+        toolbar={toolbar}
       />
       <PageBody>{children}</PageBody>
     </PageShell>

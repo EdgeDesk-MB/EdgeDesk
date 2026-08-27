@@ -14,6 +14,15 @@ export function getStripe(): Stripe {
   return client;
 }
 
+export type StripeMode = "test" | "live";
+
+/** Key prefix is the source of truth: sk_test_* vs sk_live_*. */
+export function stripeMode(): StripeMode | null {
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!key) return null;
+  return key.startsWith("sk_live_") ? "live" : "test";
+}
+
 export function stripePortalConfigurationId(): string | null {
   return process.env.STRIPE_PORTAL_CONFIGURATION_ID?.trim() || null;
 }

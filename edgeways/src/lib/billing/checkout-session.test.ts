@@ -90,6 +90,12 @@ describe("checkout session", () => {
       "/subscribe?plan=edge&interval=month&from=setup"
     );
     expect(signUpRedirectForPlan("free", "month")).toBe("/setup?live=1");
+    expect(signUpRedirectForPlan("free", "month", null, "K7Q2-9XTM")).toBe(
+      "/setup?live=1&ref=K7Q2-9XTM"
+    );
+    expect(signUpRedirectForPlan("edge", "month", null, "K7Q2-9XTM")).toBe(
+      "/subscribe?plan=edge&interval=month&ref=K7Q2-9XTM"
+    );
     expect(subscribeSuccessHref("edge", "month")).toBe(
       "/subscribe/success?session_id={CHECKOUT_SESSION_ID}&plan=edge&interval=month"
     );

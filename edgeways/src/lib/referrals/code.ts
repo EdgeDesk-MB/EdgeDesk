@@ -28,7 +28,9 @@ export function generateReferralCode(
   return `${body.slice(0, GROUP_LENGTH)}-${body.slice(GROUP_LENGTH)}`;
 }
 
-/** Share link carried into sign-up: https://edgeways.app/sign-up?ref=CODE. */
+/** Share link lands on the homepage; ?ref= is persisted through to sign-up. */
 export function referralShareUrl(code: string, origin = "https://edgeways.app"): string {
-  return `${origin}/sign-up?ref=${encodeURIComponent(code)}`;
+  const url = new URL("/", origin);
+  url.searchParams.set("ref", code);
+  return url.toString();
 }
