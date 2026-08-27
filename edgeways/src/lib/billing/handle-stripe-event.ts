@@ -15,6 +15,10 @@ import {
   notifyPaymentFailed,
 } from "@/lib/billing/dunning";
 import { getStripe } from "@/lib/billing/stripe-server";
+import {
+  notifyOwnerOfNewCustomer,
+  notifyOwnerOfPaidInvoice,
+} from "@/lib/admin/owner-growth-notify";
 import { grantReferralCreditForInvoice } from "@/lib/referrals/referral-service";
 import {
   applyAppUserEntitlement,
@@ -27,6 +31,9 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       await handleCheckoutCompleted(event.data.object);
       return;
     case "customer.subscription.created":
+      await applyStripeSubscription(event.data.object);
+      await notifyOwnerSubscriptionCreated(event.data.object);
+      return;
     case "customer.subscription.updated":
     case "customer.subscription.deleted":
       await applyStripeSubscription(event.data.object);
@@ -58,6 +65,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // EDGE-6: a successful payment (incl. a recovered retry) quiets the
   // payment_failed prompt on the owner's desk and devices.
   await clearPaymentFailedAlert(invoice);
+  await notifyOwnerInvoicePaid(invoice);
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -152,4 +160,52 @@ export function preferredLiveSubscription(
     .filter((s) => s.id !== incoming.id && stripeSubscriptionIsLive(s.status))
     .sort((a, b) => b.created - a.created);
   return live[0] ?? incoming;
+}
+
+function stripeCustomerId(
+  customer: string | { id?: string } | null | undefined
+): string | null {
+  if (!customer) return null;
+  return typeof customer === "string" ? customer : customer.id ?? null;
+}
+
+async function notifyOwnerSubscriptionCreated(
+  subscription: Stripe.Subscription
+): Promise<void> {
+  try {
+    const customerId = stripeCustomerId(subscription.customer);
+    const user = customerId
+      ? await findAppUserByStripeCustomerId(customerId)
+      : null;
+    const entitlement = entitlementFromSubscription(
+      sourceFromStripeSubscription(subscription),
+      catalogueFromEnv()
+    );
+    await notifyOwnerOfNewCustomer({
+      kind: subscription.status === "trialing" ? "trial" : "subscription",
+      email: user?.email ?? null,
+      plan: entitlement.plan,
+      status: subscription.status,
+      subscriptionId: subscription.id,
+    });
+  } catch (error) {
+    console.error("[billing/webhook] owner subscription notify failed", error);
+  }
+}
+
+async function notifyOwnerInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+  try {
+    const customerId = stripeCustomerId(invoice.customer);
+    const user = customerId
+      ? await findAppUserByStripeCustomerId(customerId)
+      : null;
+    await notifyOwnerOfPaidInvoice({
+      email: user?.email ?? invoice.customer_email ?? null,
+      amountPaid: invoice.amount_paid,
+      currency: invoice.currency,
+      invoiceId: invoice.id,
+    });
+  } catch (error) {
+    console.error("[billing/webhook] owner invoice notify failed", error);
+  }
 }

@@ -19,6 +19,7 @@ import {
   parseAppUserRole,
   type AppUserRole,
 } from "@/lib/admin/emails";
+import { notifyOwnerOfNewUser } from "@/lib/admin/owner-growth-notify";
 import { adminRoleChangeBlock } from "@/lib/admin/roles";
 import type { PlanId } from "@/lib/entitlements/plans";
 import type {
@@ -262,6 +263,7 @@ export async function ensureAppUser(input: {
   const email = normaliseAppUserEmail(input.email);
   const now = Date.now();
   const existing = await findAppUserByClerkId(clerkUserId);
+  const wasNew = !existing;
   const createdAt = existing?.createdAt ?? now;
   const nextEmail = email ?? existing?.email ?? null;
 
@@ -292,6 +294,14 @@ export async function ensureAppUser(input: {
         set: { email: nextEmail, updatedAt: now },
       })
       .run();
+  }
+
+  if (wasNew) {
+    try {
+      await notifyOwnerOfNewUser({ email: nextEmail, clerkUserId });
+    } catch (error) {
+      console.error("[app-users] owner new-user notify failed", error);
+    }
   }
 
   const row = (await findAppUserByClerkId(clerkUserId)) ?? {
