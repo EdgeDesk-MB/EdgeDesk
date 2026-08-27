@@ -9,6 +9,7 @@ import {
   freeBetPlaceTagsFromLinkedBets,
   isRacingDeskOffer,
   isRacingOfferActiveForDate,
+  selectActiveRacingOffers,
 } from "@/lib/services/racing-desk";
 import type { RacingDeskRace } from "@/lib/racing-desk/types";
 
@@ -181,6 +182,55 @@ describe("isRacingDeskOffer", () => {
     expect(isRacingDeskOffer(offer, "2026-08-08")).toBe(true);
     expect(isRacingDeskOffer(offer, "2026-08-09")).toBe(true);
     expect(isRacingDeskOffer(offer, "2026-08-10")).toBe(false);
+  });
+});
+
+describe("selectActiveRacingOffers", () => {
+  const today: OfferRow = {
+    id: 289,
+    bookmaker: "Betfair Sportsbook",
+    title: "Bet £20 get £20 free bet (2nd, 3rd, 4th)",
+    description: null,
+    expectedProfit: null,
+    status: "planned",
+    expiresAt: 1787862600000,
+    createdAt: 1,
+    completedAt: null,
+    seriesId: null,
+    instanceDate: "2026-08-27",
+    startsOn: null,
+    source: null,
+    offerUrl: null,
+    sport: "horse_racing",
+    offerType: "bet_get_free_place",
+    scopeCourse: "uk_ire",
+    scopeRaceId: null,
+    scopeRaceLabel: null,
+    eventDate: "2026-08-27",
+    rules: JSON.stringify({
+      type: "bet_get_free_place",
+      minRunners: 8,
+      regions: ["GB", "IRE"],
+      qualifyingPlaces: [2, 3, 4],
+      betStake: 20,
+      freeBetAmount: 20,
+    }),
+  };
+  const tomorrow = { ...today, id: 290, eventDate: "2026-08-28", instanceDate: "2026-08-28" };
+  const football = { ...today, id: 1, sport: "football" as const, eventDate: null };
+
+  it("keeps today's planned place-refund even when the list is injected (hosted Neon)", () => {
+    const picked = selectActiveRacingOffers([today, tomorrow, football], "2026-08-27");
+    expect(picked.map((o) => o.id)).toEqual([289]);
+  });
+
+  it("drops a campaign once a bet is already linked", () => {
+    const picked = selectActiveRacingOffers(
+      [today],
+      "2026-08-27",
+      new Set([289])
+    );
+    expect(picked).toEqual([]);
   });
 });
 

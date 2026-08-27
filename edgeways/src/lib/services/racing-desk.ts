@@ -2,6 +2,11 @@
  * Assemble Racing Desk payload - racecards, movements, linked bets.
  */
 import { db, bets, events, offers, type BetRow, type EventRow, type OfferRow } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
+import { listNeonEvents } from "@/lib/db/neon-events";
+import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
 import {
   resolveRunnerOdds,
   sortRunnerNamesByOdds,
@@ -324,8 +329,41 @@ export function isRacingDeskOffer(
   return isRacingOfferActiveForDate(offer, date);
 }
 
-function loadActiveRacingOffers(date: string): OfferRow[] {
-  return db.select().from(offers).all().filter((o) => isRacingDeskOffer(o, date));
+/**
+ * Qualifying / Race picks universe for a desk day. Hosted Neon and local
+ * SQLite both pass their offer list in. Never query SQLite here: a hosted
+ * Neon desk opens a throwaway in-memory file.
+ */
+export function selectActiveRacingOffers(
+  allOffers: OfferRow[],
+  date: string,
+  linkedOfferIds: ReadonlySet<number> = new Set()
+): OfferRow[] {
+  return allOffers.filter(
+    (o) => isRacingDeskOffer(o, date) && !linkedOfferIds.has(o.id)
+  );
+}
+
+async function loadRacingDeskStore(): Promise<{
+  allEvents: EventRow[];
+  allBets: BetRow[];
+  allOffers: OfferRow[];
+  hosted: boolean;
+}> {
+  if (isNeonDesk()) {
+    const [allEvents, allBets, allOffers] = await Promise.all([
+      listNeonEvents().catch(() => []),
+      listNeonDeskBets(),
+      listNeonDeskOffers(),
+    ]);
+    return { allEvents, allBets, allOffers, hosted: true };
+  }
+  return {
+    allEvents: db.select().from(events).all(),
+    allBets: db.select().from(bets).all(),
+    allOffers: db.select().from(offers).all(),
+    hosted: false,
+  };
 }
 
 function buildActiveOfferSummaries(activeOffers: OfferRow[]): RacingDeskActiveOffer[] {
@@ -560,9 +598,13 @@ export async function getRacingDesk(
   date: string,
   options?: { exchangeProvider?: ExchangeProvider | null }
 ): Promise<RacingDeskPayload> {
-  // Ensure recurring racing offers for the selected day exist before filtering.
-  syncOfferSeriesInstances();
-  repairMismatchedTitlePlaceRules();
+  // SQLite-only: series spawn and title repair write the Mac file. Hosted
+  // Neon already stores instances; those helpers would mutate empty memory.
+  const hosted = isNeonDesk();
+  if (!hosted) {
+    syncOfferSeriesInstances();
+    repairMismatchedTitlePlaceRules();
+  }
 
   const source = hasRacingApiKey() ? "api" : "demo";
   let error: string | undefined;
@@ -583,13 +625,12 @@ export async function getRacingDesk(
 
   cards.sort((a, b) => a.startTime - b.startTime);
 
-  syncCourseOfferExpiryFromRaces(cards, date);
+  if (!hosted) syncCourseOfferExpiryFromRaces(cards, date);
 
-  const allEvents = db.select().from(events).all();
+  const { allEvents, allBets, allOffers } = await loadRacingDeskStore();
   const eventByExternal = new Map(
     allEvents.filter((e) => e.externalId).map((e) => [e.externalId!, e])
   );
-  const allBets = db.select().from(bets).all();
   const betsById = new Map(allBets.map((b) => [b.id, b]));
   const betsByEvent = new Map<number, BetRow[]>();
   for (const bet of allBets) {
@@ -687,8 +728,10 @@ export async function getRacingDesk(
       .filter((b) => b.offerId != null)
       .map((b) => b.offerId as number)
   );
-  const activeOffers = loadActiveRacingOffers(date).filter(
-    (o) => !offerIdsWithLinkedBets.has(o.id)
+  const activeOffers = selectActiveRacingOffers(
+    allOffers,
+    date,
+    offerIdsWithLinkedBets
   );
   const primaryBookmaker = activeOffers[0]?.bookmaker ?? null;
 
@@ -889,7 +932,9 @@ export async function getRacingDesk(
   const activeOfferSummaries = buildActiveOfferSummaries(activeOffers);
   // Same prior the rest of the app measures against, so an EV shown on the Racing
   // Desk cannot disagree with the same offer's EV on the dashboard.
-  const { tuning } = getAppSettings();
+  const { tuning } = hosted
+    ? await getNeonDeskSettings()
+    : getAppSettings();
   const realizedRetention = getRealizedRetention(undefined, {
     rate: tuning.retentionPrior,
     weight: tuning.retentionPriorWeight,
