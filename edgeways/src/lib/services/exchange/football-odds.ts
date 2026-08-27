@@ -128,7 +128,7 @@ export async function fetchBetfairFootballOdds(
     return emptyResult("unmatched", "Home and away team are required");
   }
   if (!betfairConfigured()) {
-    return emptyResult("not_configured", "Betfair is not connected on this desk.");
+    return emptyResult("not_configured", "Exchange feed is not connected.");
   }
 
   const feedType = betfairFeedType();
@@ -138,7 +138,7 @@ export async function fetchBetfairFootballOdds(
     let stale = catalogue.stale;
     const picked = pickFootballMatchOddsMarket(catalogue.markets, { homeTeam, awayTeam, startTime: query.startTime });
     if (!picked) {
-      return emptyResult("unmatched", "No matching Betfair market", { feedType });
+      return emptyResult("unmatched", "No matching exchange market", { feedType });
     }
 
     const eventId = picked.event?.id;

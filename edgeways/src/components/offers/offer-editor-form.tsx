@@ -1596,7 +1596,7 @@ Expires 12 Aug 2026, 23:59`}
               ) : null}
               {!cardsLoading && courses.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Racecards available for today/tomorrow when Racing API is connected.
+                  Racecards are available for today and tomorrow when the racing feed is connected.
                 </p>
               ) : null}
             </div>

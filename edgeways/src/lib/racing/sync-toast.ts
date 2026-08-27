@@ -4,7 +4,7 @@ export interface RacingSyncToastInput {
   updated: number;
   pending: number;
   tierBlocked?: boolean;
-  /** True when `/v1/results` for a previous day needs Standard. */
+  /** True when results for a previous day are not in the live feed. */
   historicBlocked?: boolean;
   tier?: RacingResultsTier;
 }
@@ -20,34 +20,31 @@ export function racingSyncToast(result: RacingSyncToastInput): RacingSyncToast {
   if (result.updated > 0) {
     return {
       kind: "success",
-      title: `Updated ${result.updated} race${result.updated === 1 ? "" : "s"} from API`,
+      title: `Updated ${result.updated} race${result.updated === 1 ? "" : "s"}`,
       description: "Full finish order saved - place-refund free bets re-check on refresh.",
     };
   }
   if (result.tierBlocked || result.tier === "free") {
     return {
       kind: "info",
-      title: "API results unavailable on Free",
+      title: "Results need a manual settle",
       description:
-        "Stay on Free - use Set result (1st–4th) on Tracked Events or Profit Tracker for place-refund free bets. Basic (~£28/mo) only if you want auto results.",
+        "Use Set result (1st–4th) on Tracked Events or Profit Tracker for place-refund free bets.",
     };
   }
   if (result.historicBlocked && result.pending > 0) {
     return {
       kind: "info",
       title: "Yesterday's races need Set result",
-      description:
-        "Basic plan only covers today's card. Use Set result (1st–4th) for older races, or Racing API Standard for historic results.",
+      description: "Use Set result (1st–4th) on Tracked Events or Profit Tracker for older races.",
     };
   }
   if (result.pending > 0) {
     return {
       kind: "info",
-      title: "No API results yet",
+      title: "No results yet",
       description:
-        result.tier === "basic"
-          ? "Results not published yet - retry Fetch results in a minute, or check the race is in today's GB/IRE card."
-          : "Set Racing API credentials for auto results, or set the winner manually.",
+        "Results may still be publishing. Retry in a minute, or set the winner yourself.",
     };
   }
   return { kind: "info", title: "Nothing to sync" };

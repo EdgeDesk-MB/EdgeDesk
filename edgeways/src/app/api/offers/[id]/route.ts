@@ -83,7 +83,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     // SQLite-only; edit the campaign row directly.
     if (p.stopRecurrence || p.updateSeries || p.mistakeTag !== undefined || p.playbookStepDone) {
       return NextResponse.json(
-        { error: "That offer feature is not available on the hosted desk yet." },
+        { error: "That offer feature is not available yet." },
         { status: 400 }
       );
     }

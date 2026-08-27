@@ -14,9 +14,17 @@ describe("formatExchangeMatchError", () => {
   });
 
   it("extracts error codes from JSON blobs", () => {
-    expect(formatExchangeMatchError('{"errorCode":"INVALID_SESSION_INFORMATION"}')).toBe(
-      "invalid session information"
-    );
+    expect(
+      formatExchangeMatchError('{"errorCode":"INVALID_SESSION_INFORMATION"}')
+    ).toBe("Exchange feed unavailable");
+  });
+
+  it("hides HTML parse failures behind a short note", () => {
+    expect(
+      formatExchangeMatchError(
+        `SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
+      )
+    ).toBe("Exchange feed unavailable");
   });
 });
 

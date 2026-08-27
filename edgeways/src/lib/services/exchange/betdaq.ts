@@ -31,11 +31,7 @@ export function betdaqConnectionStatus(): ExchangeConnectionStatus {
 export async function fetchBetdaqLayOdds(
   races: ExchangeRaceContext[]
 ): Promise<ExchangeRaceOdds[]> {
-  const status = betdaqConnectionStatus();
-  const message =
-    status === "not_configured"
-      ? "Betdaq API requires partner credentials - use Betfair for now"
-      : "Betdaq partner API integration pending - use Betfair for live lay odds";
+  const message = "Live prices are not available for this exchange yet";
 
   return races.map((race) => ({
     externalId: race.externalId,

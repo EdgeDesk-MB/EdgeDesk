@@ -62,7 +62,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (p.stopRecurrence) {
       return NextResponse.json(
-        { error: "Recurrence editing is not available on the hosted desk yet." },
+        { error: "Recurrence editing is not available yet." },
         { status: 400 }
       );
     }

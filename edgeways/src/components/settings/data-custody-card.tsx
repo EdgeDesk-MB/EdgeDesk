@@ -135,8 +135,8 @@ export function DataCustodyCard({
       restoreFileRef.current = null;
       toast.success("Database restored", {
         description: restorePreview.hosted
-          ? "Your hosted desk now matches the backup."
-          : "A pre-restore safety copy was saved in data/backups.",
+          ? "Your desk now matches the backup."
+          : "A pre-restore safety copy was saved.",
       });
       onRestored();
     } catch (e) {
@@ -258,7 +258,7 @@ export function DataCustodyCard({
         </Button>
         <p className="text-xs text-muted-foreground">
           {hosted
-            ? "Restore replaces your hosted desk with the backup contents. Download a JSON backup first if you want a way back."
+            ? "Restore replaces your current desk data with the backup. Download a JSON backup first if you want a way back."
             : "Restores always save a pre-restore copy first."}{" "}
           Imported bets are history only - they never change balances and never count
           towards EV capture. Oddsmonkey import is not affiliated with Oddsmonkey.
@@ -297,11 +297,11 @@ export function DataCustodyCard({
           <DialogContent mobile="center" className="max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                {hosted ? "Replace your hosted desk?" : "Replace your database?"}
+                {hosted ? "Replace your desk data?" : "Replace your database?"}
               </DialogTitle>
               <DialogDescription>
                 {hosted
-                  ? "Restore this backup. Your current hosted offers, wallets, bets and history are replaced by the backup contents."
+                  ? "Restore this backup. Your current offers, wallets, bets and history are replaced by the backup contents."
                   : "Restore this backup. A safety copy is saved first."}
               </DialogDescription>
             </DialogHeader>

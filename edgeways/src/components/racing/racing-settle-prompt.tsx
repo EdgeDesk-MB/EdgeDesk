@@ -97,14 +97,8 @@ export function RacingSettlePrompt({
             <>
               Results sync automatically while the app is open, or set the result on {trackedEventsLink}.
             </>
-          ) : resultsTier === "free" ? (
-            <>
-              Set the result on {trackedEventsLink}, or upgrade to Racing API Basic for automatic results.
-            </>
           ) : (
-            <>
-              Set the result on {trackedEventsLink}, or set Racing API credentials for automatic results.
-            </>
+            <>Set the result on {trackedEventsLink}.</>
           )}
           {moreCount > 0 && <span> +{moreCount} more</span>}
         </p>

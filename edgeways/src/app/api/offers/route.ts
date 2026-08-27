@@ -98,7 +98,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   if (isNeonDesk()) {
     if (input.recurrence) {
       return NextResponse.json(
-        { error: "Recurring offers are not available on the hosted desk yet." },
+        { error: "Recurring offers are not available yet." },
         { status: 400 }
       );
     }

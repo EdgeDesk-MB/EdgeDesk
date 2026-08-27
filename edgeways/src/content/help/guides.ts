@@ -54,7 +54,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         bullets: [
           "Demo fixtures and sample racecards when a feed is not connected",
           "Football simulator plays a full 90 minutes in ~3 real minutes",
-          "Proxy bookie odds on Racing Desk (ORF-based estimates)",
+          "Proxy bookie odds on Racing Desk (labelled estimates, not live bookie prices)",
           "Manual settlement for all sports",
         ],
       },
@@ -64,7 +64,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Racing cards for today and tomorrow, with paste-in bookie odds",
           "Delayed exchange prices for pre-race lays",
           "Football scores when a match is tracked",
-          "Live racing, football and exchange feeds are included. You do not add provider keys.",
+          "Live racing, football and exchange feeds are included with your plan.",
         ],
       },
       {
@@ -123,13 +123,13 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "The live layer: what refreshes when",
         paragraphs: [
-          "The Home dashboard polls the app state every few seconds (tunable in Settings). That poll is also the desk's heartbeat: several background jobs run while the desk is open and stay quiet when it is not.",
+          "Home updates every few seconds while you are on the desk (you can change that in Settings). Digests, acca auto-results and lay-due alerts run while the desk is open, and stay quiet when it is not.",
         ],
         bullets: [
-          "Live football scores refresh at most once per 60s per tracked match; goal timelines only re-fetch when the score changes (the API allows ~95 requests/day, and the budget guard alerts once daily if it runs dry).",
-          "Racing cards cache ~15 minutes; delayed exchange prices run 1-3 minutes behind live.",
-          "Compute-on-poll jobs: the Monday weekly digest (week-key latch so it sends once), acca auto-results and lay-due alerts.",
-          "Alerts write to the inbox with a dedupe key, so a re-firing condition updates the existing alert instead of stacking copies; web push mirrors them to your phone.",
+          "Live football scores refresh about once a minute on a tracked match; goal timelines update when the score changes.",
+          "Racing cards refresh throughout the day; delayed exchange prices run 1-3 minutes behind live.",
+          "While the desk is open it also sends the Monday weekly digest, auto-results acca legs, and lay-due alerts.",
+          "Alerts update in place rather than stacking copies; web push mirrors them to your phone.",
         ],
       },
       {
@@ -238,7 +238,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Checkers and the betslip extension",
         bullets: [
           "Match Checker: paste a bookie price and the exchange back/lay - fair-price verdict in seconds, no feeds.",
-          "Fill slip: buttons on the lay banner, Lock in and acca legs copy the stake AND fill your Betdaq slip via the browser extension (extension/README.md to install). Fill only - you always place the bet yourself; without the extension the stake is still on your clipboard.",
+          "Fill slip: buttons on the lay banner, Lock in and acca legs copy the stake and can fill your exchange slip via the browser extension. Fill only - you always place the bet yourself; without the extension the stake is still on your clipboard.",
         ],
       },
       {
@@ -265,7 +265,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Proxy vs live odds",
         bullets: [
-          "Proxy bookie odds - estimated from ORF ratings when the racing feed has no live bookie prices. Labelled “proxy” in the UI. Good for ranking runners, not for final stake decisions.",
+          "Proxy bookie odds - labelled estimates when live bookie prices are not on the card. Good for ranking runners, not for final stake decisions. Always check the bookie before you place.",
           "Exchange lay odds - real prices when the exchange feed is connected (delayed is fine). Otherwise +3% spread estimates.",
           "Live bookie odds - require the full racing feed. Until then, check the bookie site and enter odds in the Lay calculator.",
         ],
@@ -279,7 +279,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Higher score = better fit, not a guarantee. A 70+ score is worth investigating; below 40 is usually a pass.",
           "Qualifying loss - the small cost if your horse doesn’t place. Compare to the free bet value.",
           "EV estimate - expected profit if you convert the free bet efficiently. Marked as estimate when using proxy odds.",
-          "Proxy confidence - how reliable the ORF estimate is for this runner. Low confidence = verify odds manually.",
+          "Proxy confidence - how reliable the estimate is for this runner. Low confidence = verify odds on the bookie.",
         ],
       },
       {
@@ -288,17 +288,16 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Lay button on a runner → opens Matched Betting calculator with pre-filled odds",
           "Place-refund Back → logs a qualifying bet linked to the offer",
           "Track race → adds to Tracked Events for settlement",
-          "Set winner when the race finishes (manual on free tier)",
+          "Set winner if the result has not landed automatically",
         ],
       },
       {
-        heading: "Free tier limitations",
+        heading: "What the racing feed covers",
         bullets: [
-          "Racecards: today and tomorrow only",
-          "Auto race settlement needs the full racing feed (base feed = Set winner manually)",
-          "The racecard shows exchange lays, not bookie prices. Take the back price from your finder or the bookie.",
-          "No silks images on free racecards",
-          "Steamer/drifter indicators use local snapshot polling, not premium odds history",
+          "Racecards for today and tomorrow",
+          "Results usually land automatically while the desk is open; if not, use Set winner",
+          "The racecard shows exchange lays. Take the back price from your finder or the bookie, unless a live bookie price is already on the row.",
+          "Proxy odds are estimates for ranking, not for staking",
         ],
       },
     ],
@@ -504,7 +503,7 @@ export const HELP_GUIDES: HelpGuide[] = [
   {
     slug: "site-map",
     title: "Site map",
-    description: "Every page and where it lives - rendered live from the navigation structure.",
+    description: "Every page and where it lives in the navigation.",
     /** Content is rendered by the SiteMapView component, not these sections. */
     sections: [],
   },
@@ -514,15 +513,15 @@ export const HELP_GUIDES: HelpGuide[] = [
     description: "Common questions about tiers, odds, and how Edgeways works.",
     sections: [
       {
-        heading: "Do I need API keys?",
+        heading: "Are live feeds included?",
         paragraphs: [
-          "No. You do not add provider keys. Calculators, tracker, offers, settlement and demo data all work without live feeds, and the live racing, football and exchange feeds are included with your plan.",
+          "Yes. Live racing, football and exchange feeds come with your plan. Calculators, tracker, offers and settlement also work when a feed is briefly unavailable, using demo fixtures and sample racecards.",
         ],
       },
       {
         heading: "Why proxy odds?",
         paragraphs: [
-          "The base racing feed doesn't include live bookie prices. Edgeways estimates from ORF ratings so you can rank runners and filter qualifying races. Always verify final odds on the bookie before placing.",
+          "Live bookie prices are not always on the racecard. Edgeways shows labelled proxy estimates so you can rank runners and filter qualifying races. Always verify final odds on the bookie before placing.",
         ],
       },
       {
@@ -532,12 +531,11 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
-        heading: "Football feed limits",
+        heading: "How live football scores work",
         bullets: [
-          "100 requests/day with built-in budget guard at 95",
-          "Fixture lists cache 10 minutes",
-          "Live scores poll at most once per 60s while a tracked event is in play",
-          "Practically: one live-tracked match per day fits comfortably",
+          "Fixture lists refresh through the day",
+          "Live scores update about once a minute while a tracked match is in play",
+          "Track the matches you are working, rather than every league at once",
         ],
       },
       {
@@ -556,7 +554,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "What triggers auto-settlement?",
         bullets: [
           "Football: live score from the football feed or simulator drives derived markets",
-          "Racing: the full racing feed auto-settles while the app is open; the base feed uses Set winner",
+          "Racing: results usually land automatically while the desk is open; otherwise use Set winner",
           "Goalscorer triggers: settle at the decisive goal, not full time",
         ],
       },
@@ -575,3 +573,10 @@ export const HELP_GUIDE_BY_SLUG = Object.fromEntries(
 ) as Record<HelpGuideSlug, HelpGuide>;
 
 export const DEFAULT_HELP_GUIDE: HelpGuideSlug = "getting-started";
+
+/** Nav order: FAQ sits next to Getting started so it is one tap on mobile. */
+export const HELP_GUIDE_NAV: HelpGuide[] = [
+  HELP_GUIDE_BY_SLUG["getting-started"],
+  HELP_GUIDE_BY_SLUG.faq,
+  ...HELP_GUIDES.filter((guide) => guide.slug !== "getting-started" && guide.slug !== "faq"),
+];

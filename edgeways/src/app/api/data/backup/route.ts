@@ -25,7 +25,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     // Hosted desk: there is no .db file to copy - the JSON bundle is the backup.
     if (format !== "json") {
       return NextResponse.json(
-        { error: "On the hosted desk, use the JSON backup." },
+        { error: "Use the JSON backup from Settings." },
         { status: 400 }
       );
     }

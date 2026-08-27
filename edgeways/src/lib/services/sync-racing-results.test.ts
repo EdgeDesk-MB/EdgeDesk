@@ -68,18 +68,19 @@ describe("eventNeedsRaceResult / sync window", () => {
 });
 
 describe("racingSyncToast", () => {
-  it("explains Free tier when blocked", () => {
+  it("asks for a manual settle when auto results are unavailable", () => {
     const toast = racingSyncToast({ updated: 0, pending: 2, tierBlocked: true, tier: "free" });
     expect(toast.kind).toBe("info");
     expect(toast.description).toMatch(/Set result/i);
+    expect(`${toast.title} ${toast.description}`).not.toMatch(/Racing API|Basic|credentials/i);
   });
 
-  it("explains lag when Basic but results not published", () => {
+  it("explains lag when results are not published yet", () => {
     const toast = racingSyncToast({ updated: 0, pending: 1, tier: "basic" });
-    expect(toast.description).toMatch(/not published yet/i);
+    expect(toast.description).toMatch(/publishing|retry/i);
   });
 
-  it("explains Basic cannot fetch yesterday's card", () => {
+  it("explains older cards need a manual settle", () => {
     const toast = racingSyncToast({
       updated: 0,
       pending: 1,
@@ -87,7 +88,8 @@ describe("racingSyncToast", () => {
       historicBlocked: true,
     });
     expect(toast.title).toMatch(/Set result/i);
-    expect(toast.description).toMatch(/yesterday|older|historic/i);
+    expect(toast.description).toMatch(/yesterday|older/i);
+    expect(`${toast.title} ${toast.description}`).not.toMatch(/Racing API|Standard/i);
   });
 
   it("celebrates successful sync", () => {

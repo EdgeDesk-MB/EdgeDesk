@@ -9,8 +9,8 @@ import { SiteMapView } from "@/components/help/site-map";
 import { PageShell } from "@/components/page-shell";
 import {
   DEFAULT_HELP_GUIDE,
-  HELP_GUIDES,
   HELP_GUIDE_BY_SLUG,
+  HELP_GUIDE_NAV,
   type HelpGuideSlug,
 } from "@/content/help/guides";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { listRowSelected } from "@/lib/ui/surface-styles";
 import { BookOpen, Mail, Map, MessageCircleQuestion, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOnboarding } from "@/components/help/onboarding-provider";
 import {
   pagePrimaryButtonProps,
@@ -55,13 +56,13 @@ function HelpPageContent() {
       />
 
       <div className="grid gap-[var(--layout-stack-gap)] lg:grid-cols-12">
-        <aside className="lg:col-span-3">
+        <aside className="hidden lg:col-span-3 lg:block">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle section>Guides</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-0.5 pt-0">
-              {HELP_GUIDES.map((guide) => (
+              {HELP_GUIDE_NAV.map((guide) => (
                 <button
                   key={guide.slug}
                   type="button"
@@ -104,7 +105,27 @@ function HelpPageContent() {
 
         <div className="lg:col-span-9">
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-0 lg:hidden">
+              <Tabs
+                value={activeSlug}
+                onValueChange={(value) => {
+                  if (isValidGuide(value)) setGuide(value);
+                }}
+                className="gap-0"
+              >
+                <TabsLineBar bleed="card">
+                  <TabsList variant="line" className="justify-start">
+                    {HELP_GUIDE_NAV.map((guide) => (
+                      <TabsTrigger key={guide.slug} value={guide.slug}>
+                        {guide.title}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </TabsLineBar>
+              </Tabs>
+              <CardDescription className="pt-3">{activeGuide.description}</CardDescription>
+            </CardHeader>
+            <CardHeader className="hidden lg:grid">
               <CardTitle>{activeGuide.title}</CardTitle>
               <CardDescription>{activeGuide.description}</CardDescription>
             </CardHeader>
@@ -122,10 +143,25 @@ function HelpPageContent() {
               <CardTitle section>Support</CardTitle>
               <CardDescription>
                 Feedback is for bugs, ideas and direct notes. Email is for account and
-                billing — we aim to reply within two working days.
+                billing. We aim to reply within two working days.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap gap-2 lg:hidden">
+                <Button variant="outline" size="sm" className="justify-start" asChild>
+                  <Link href="/roadmap">
+                    <Map className="size-3.5" /> Roadmap
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start"
+                  onClick={resetAndOpenWelcome}
+                >
+                  <MessageCircleQuestion className="size-3.5" /> Take the tour again
+                </Button>
+              </div>
               <Button asChild {...pagePrimaryButtonProps}>
                 <Link href="/feedback">
                   <MessageSquarePlus className="size-4" /> Send feedback

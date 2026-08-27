@@ -6,20 +6,38 @@ export function formatExchangeMatchError(raw?: string | null): string | null {
   if (text.includes("TOO_MUCH_DATA")) {
     return "Using lay estimates for some races";
   }
-  if (text.includes("No matching Betfair market")) {
-    return "No matching Betfair market";
+  if (
+    text.includes("<!DOCTYPE") ||
+    text.includes("Unexpected token '<'") ||
+    text.includes("returned a web page instead of JSON")
+  ) {
+    return "Exchange feed unavailable";
   }
-  if (text.includes("Betfair not configured")) {
-    return "Betfair not configured";
+  if (
+    text.includes("No matching Betfair market") ||
+    text.includes("No matching exchange market")
+  ) {
+    return "No matching exchange market";
+  }
+  if (
+    text.includes("Betfair not configured") ||
+    text.includes("Exchange feed is not connected") ||
+    text.includes("Betfair is not connected")
+  ) {
+    return "Exchange feed is not connected";
+  }
+  if (/partner credentials|partner API|not yet integrated|not yet supported/i.test(text)) {
+    return "Live prices are not available for this exchange yet";
   }
 
   const code = text.match(/"errorCode"\s*:\s*"([^"]+)"/)?.[1];
   if (code) {
-    return code.replace(/_/g, " ").toLowerCase();
+    if (code === "TOO_MUCH_DATA") return "Using lay estimates for some races";
+    return "Exchange feed unavailable";
   }
 
   const fault = text.match(/"faultstring"\s*:\s*"([^"]+)"/)?.[1];
-  if (fault && fault.length <= 48) return fault;
+  if (fault && fault.length <= 48) return "Exchange feed unavailable";
 
   if (text.startsWith("Error: ") && text.length > 80) {
     return "Exchange feed unavailable";

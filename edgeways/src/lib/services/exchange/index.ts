@@ -158,7 +158,7 @@ export function getExchangeProviderStatus(provider: ExchangeProvider): ExchangeP
         feedType: betfairConfigured() ? betfairFeedType() : undefined,
         message:
           status === "not_configured"
-            ? "Betfair is not connected on this desk."
+            ? "Exchange feed is not connected."
             : `Betfair ${betfairFeedType()} feed`,
       };
     }
@@ -167,17 +167,14 @@ export function getExchangeProviderStatus(provider: ExchangeProvider): ExchangeP
       return {
         provider,
         status,
-        message:
-          status === "not_configured"
-            ? "Betdaq is not available yet."
-            : "Betdaq partner API not yet integrated - use Betfair",
+        message: "Live prices are not available for this exchange yet.",
       };
     }
     default:
       return {
         provider,
         status: "unsupported",
-        message: `${provider} exchange API not yet supported`,
+        message: "Live prices are not available for this exchange yet.",
       };
   }
 }

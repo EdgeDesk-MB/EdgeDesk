@@ -38,8 +38,8 @@ function friendlyFixtureError(error: unknown, sport: "football" | "horse_racing"
   const lower = raw.toLowerCase();
   if (lower.includes("plan tier") || lower.includes("auth failed")) {
     return sport === "horse_racing"
-      ? "Standard-tier Racing API endpoint unavailable - free racecards should load after refresh. Check credentials in Settings."
-      : "API authentication failed - check your API key in Settings.";
+      ? "Could not load racecards from the racing feed. Try refresh in a moment."
+      : "Could not load fixtures from the football feed. Try refresh in a moment.";
   }
 
   return raw.replace(/^\d+:\s*/, "").slice(0, 200);

@@ -49,7 +49,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
         fixtures: demoFixtures(),
         date,
         warning:
-          "Football data daily limit reached - showing demo fixtures until the quota resets.",
+          "Football fixtures are temporarily using sample data. Live scores will return shortly.",
       });
     }
     console.error("[fixtures] football feed failed:", error);
@@ -58,7 +58,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
         source: "demo",
         fixtures: demoFixtures(),
         date,
-        warning: "Football data feed unavailable - showing demo fixtures.",
+        warning: "Football fixtures are temporarily using sample data.",
       },
       { status: 200 }
     );
