@@ -4,6 +4,7 @@ import { publicDemoOfferEdge } from "@/lib/demo/public-racing-desk";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
 import { getRacingDesk } from "@/lib/services/racing-desk";
+import { getDeskActor } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
  * hides the panel, this is the server-side guard behind it.
  */
 export const GET = withDeskScope(async function GET(req: NextRequest) {
+  const clerkUserId = getDeskActor().clerkUserId;
   const date =
     req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
   if (
@@ -32,6 +34,6 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     source: "locked",
   });
   if (denied) return denied;
-  const { edgePlays, summary } = await getRacingDesk(date);
+  const { edgePlays, summary } = await getRacingDesk(date, { clerkUserId });
   return NextResponse.json({ date, plays: edgePlays, source: summary.source });
 });

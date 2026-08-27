@@ -54,13 +54,20 @@ export function neonDeskClerkUserId(): string | null {
   return getDeskActor().clerkUserId?.trim() || null;
 }
 
-export async function listNeonDeskBets(): Promise<BetRow[]> {
-  const clerkUserId = neonDeskClerkUserId();
-  if (!clerkUserId) return [];
+function resolveClerkUserId(explicit?: string | null): string | null {
+  const id = explicit?.trim() || neonDeskClerkUserId();
+  return id || null;
+}
+
+export async function listNeonDeskBets(
+  clerkUserId?: string | null
+): Promise<BetRow[]> {
+  const id = resolveClerkUserId(clerkUserId);
+  if (!id) return [];
   const rows = await getNeonDb()
     .select()
     .from(pgBets)
-    .where(eq(pgBets.clerkUserId, clerkUserId))
+    .where(eq(pgBets.clerkUserId, id))
     .orderBy(pgBets.id);
   return rows.map(toSqliteBetRow);
 }

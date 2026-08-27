@@ -35,6 +35,9 @@ export function withDeskScope<TArgs extends unknown[], TResult>(
 ): (...args: TArgs) => Promise<TResult> {
   return async (...args: TArgs) => {
     const actor = await resolveDeskActor();
-    return await runWithDeskActor(actor, () => handler(...args));
+    // Async callback so the actor survives `cookies()` / racecard awaits.
+    // A sync wrapper that merely returns a promise can drop AsyncLocalStorage
+    // on the serverless isolate after the first await.
+    return await runWithDeskActor(actor, async () => handler(...args));
   };
 }

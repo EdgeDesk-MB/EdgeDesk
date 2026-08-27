@@ -133,4 +133,27 @@ describe("desk-scope", () => {
     expect(seen).toEqual({ clerkUserId: "user_1", email: "a@b.com" });
     expect(getDeskActor()).toEqual({ clerkUserId: null, email: null });
   });
+
+  it("keeps the actor across awaits when the callback is async", async () => {
+    const id = await runWithDeskActor(
+      { clerkUserId: "user_1", email: "a@b.com" },
+      async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        return getDeskActor().clerkUserId;
+      }
+    );
+    expect(id).toBe("user_1");
+  });
+
+  it("keeps the actor when a sync wrapper returns the handler promise", async () => {
+    async function handler() {
+      await new Promise((r) => setTimeout(r, 5));
+      return getDeskActor().clerkUserId;
+    }
+    const id = await runWithDeskActor(
+      { clerkUserId: "user_1", email: "a@b.com" },
+      () => handler()
+    );
+    expect(id).toBe("user_1");
+  });
 });

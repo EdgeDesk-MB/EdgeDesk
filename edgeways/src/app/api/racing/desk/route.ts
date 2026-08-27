@@ -6,6 +6,7 @@ import { publicDemoRacingDesk } from "@/lib/demo/public-racing-desk";
 import { getRacingDesk } from "@/lib/services/racing-desk";
 import type { ExchangeProvider } from "@/lib/services/exchange/types";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
+import { getDeskActor } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ const PROVIDERS = new Set<ExchangeProvider>([
 ]);
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
+  const clerkUserId = getDeskActor().clerkUserId;
   const date =
     req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
   const raw = req.nextUrl.searchParams.get("exchange");
@@ -36,6 +38,6 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     ...demo,
   });
   if (denied) return denied;
-  const payload = await getRacingDesk(date, { exchangeProvider });
+  const payload = await getRacingDesk(date, { exchangeProvider, clerkUserId });
   return NextResponse.json(payload);
 });

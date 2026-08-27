@@ -3,10 +3,14 @@
  */
 import { db, bets, events, offers, type BetRow, type EventRow, type OfferRow } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import { getDeskActor } from "@/lib/db/desk-scope";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
 import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
 import { listNeonEvents } from "@/lib/db/neon-events";
-import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
+import {
+  getNeonDeskSettings,
+  getNeonDeskSettingsForUser,
+} from "@/lib/db/neon-desk-settings";
 import {
   resolveRunnerOdds,
   sortRunnerNamesByOdds,
@@ -344,7 +348,7 @@ export function selectActiveRacingOffers(
   );
 }
 
-async function loadRacingDeskStore(): Promise<{
+async function loadRacingDeskStore(clerkUserId?: string | null): Promise<{
   allEvents: EventRow[];
   allBets: BetRow[];
   allOffers: OfferRow[];
@@ -353,8 +357,8 @@ async function loadRacingDeskStore(): Promise<{
   if (isNeonDesk()) {
     const [allEvents, allBets, allOffers] = await Promise.all([
       listNeonEvents().catch(() => []),
-      listNeonDeskBets(),
-      listNeonDeskOffers(),
+      listNeonDeskBets(clerkUserId),
+      listNeonDeskOffers(clerkUserId),
     ]);
     return { allEvents, allBets, allOffers, hosted: true };
   }
@@ -596,8 +600,14 @@ function buildSuggestedRaces(
 
 export async function getRacingDesk(
   date: string,
-  options?: { exchangeProvider?: ExchangeProvider | null }
+  options?: {
+    exchangeProvider?: ExchangeProvider | null;
+    /** Captured before `cookies()` / racecard awaits, which can drop ALS. */
+    clerkUserId?: string | null;
+  }
 ): Promise<RacingDeskPayload> {
+  const clerkUserId =
+    options?.clerkUserId?.trim() || getDeskActor().clerkUserId?.trim() || null;
   // SQLite-only: series spawn and title repair write the Mac file. Hosted
   // Neon already stores instances; those helpers would mutate empty memory.
   const hosted = isNeonDesk();
@@ -605,6 +615,8 @@ export async function getRacingDesk(
     syncOfferSeriesInstances();
     repairMismatchedTitlePlaceRules();
   }
+  // Start Neon reads immediately so the Clerk id is bound before racecards await.
+  const storePromise = loadRacingDeskStore(clerkUserId);
 
   const source = hasRacingApiKey() ? "api" : "demo";
   let error: string | undefined;
@@ -627,7 +639,7 @@ export async function getRacingDesk(
 
   if (!hosted) syncCourseOfferExpiryFromRaces(cards, date);
 
-  const { allEvents, allBets, allOffers } = await loadRacingDeskStore();
+  const { allEvents, allBets, allOffers } = await storePromise;
   const eventByExternal = new Map(
     allEvents.filter((e) => e.externalId).map((e) => [e.externalId!, e])
   );
@@ -933,7 +945,9 @@ export async function getRacingDesk(
   // Same prior the rest of the app measures against, so an EV shown on the Racing
   // Desk cannot disagree with the same offer's EV on the dashboard.
   const { tuning } = hosted
-    ? await getNeonDeskSettings()
+    ? clerkUserId
+      ? await getNeonDeskSettingsForUser(clerkUserId)
+      : await getNeonDeskSettings()
     : getAppSettings();
   const realizedRetention = getRealizedRetention(undefined, {
     rate: tuning.retentionPrior,

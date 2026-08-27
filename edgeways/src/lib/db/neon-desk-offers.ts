@@ -31,13 +31,15 @@ export type NeonDeskOfferValues = {
   createdAt: number;
 };
 
-export async function listNeonDeskOffers(): Promise<OfferRow[]> {
-  const clerkUserId = neonDeskClerkUserId();
-  if (!clerkUserId) return [];
+export async function listNeonDeskOffers(
+  clerkUserId?: string | null
+): Promise<OfferRow[]> {
+  const id = clerkUserId?.trim() || neonDeskClerkUserId();
+  if (!id) return [];
   const rows = await getNeonDb()
     .select()
     .from(pgOffers)
-    .where(eq(pgOffers.clerkUserId, clerkUserId))
+    .where(eq(pgOffers.clerkUserId, id))
     .orderBy(pgOffers.id);
   return rows.map(toSqliteOfferRow);
 }
