@@ -127,6 +127,47 @@ describe("scopeActivityView", () => {
       1
     );
   });
+
+  it("drops excluded test desks and their daily stamps", () => {
+    const scoped = scopeActivityView(
+      {
+        rows: [
+          {
+            clerkUserId: "test_1",
+            email: "test@example.com",
+            admin: false,
+            bets: 9,
+            offers: 0,
+            history: 0,
+          },
+          {
+            clerkUserId: "user_a",
+            email: "a@example.com",
+            admin: false,
+            bets: 2,
+            offers: 1,
+            history: 0,
+          },
+        ],
+        stamps: {
+          bets: [
+            { at: Date.parse("2026-08-25T12:00:00Z"), clerkUserId: "test_1" },
+            { at: Date.parse("2026-08-25T12:00:00Z"), clerkUserId: "user_a" },
+          ],
+          offers: [],
+          history: [],
+        },
+      },
+      false,
+      now,
+      ["test_1"]
+    );
+    expect(scoped.rows).toHaveLength(1);
+    expect(scoped.rows[0]?.clerkUserId).toBe("user_a");
+    expect(scoped.daily.bets.find((point) => point.day === "2026-08-25")?.used).toBe(
+      1
+    );
+  });
 });
 
 describe("buildFlagShare", () => {

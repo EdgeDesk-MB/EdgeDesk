@@ -5,7 +5,12 @@ describe("mapExchangeProviders", () => {
   it("treats connected as ok when ok is omitted", () => {
     expect(
       mapExchangeProviders([
-        { provider: "betfair", status: "connected", message: "Delayed feed" },
+        {
+          provider: "betfair",
+          status: "connected",
+          message: "Delayed feed",
+          feedType: "delayed",
+        },
         { provider: "betdaq", status: "not_configured" },
       ])
     ).toEqual([
@@ -14,6 +19,7 @@ describe("mapExchangeProviders", () => {
         ok: true,
         status: "connected",
         message: "Delayed feed",
+        feedType: "delayed",
       },
       { provider: "betdaq", ok: false, status: "not_configured" },
     ]);

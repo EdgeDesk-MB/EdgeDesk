@@ -22,6 +22,10 @@ import {
 import { appStateFromNeonDesk } from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
+import {
+  getAllExchangeProviderStatuses,
+  getExchangeProviderStatus,
+} from "@/lib/services/exchange";
 import type { AppState } from "@/lib/services/state.types";
 
 export {
@@ -50,7 +54,7 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
       // sync itself is handed to `after()`, so the response is never blocked.
       maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
     ]);
-  return appStateFromNeonDesk({
+  const snapshot = appStateFromNeonDesk({
     bets,
     events,
     offers,
@@ -63,4 +67,12 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     alertsUnread,
     deliveredAlertKeys,
   });
+  // Keys live in Vercel env, not SQLite. The pure mapper cannot read them.
+  return {
+    ...snapshot,
+    exchangeProvider: "betfair",
+    exchangeName: "Betfair",
+    exchangeStatus: getExchangeProviderStatus("betfair"),
+    exchangeProviders: getAllExchangeProviderStatuses(),
+  };
 }

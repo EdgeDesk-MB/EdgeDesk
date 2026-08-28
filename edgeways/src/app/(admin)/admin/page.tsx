@@ -9,7 +9,7 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
-import { ExcludeAdminsToggle } from "@/components/admin/exclude-admins-toggle";
+import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import {
   Table,
@@ -25,8 +25,15 @@ import { StripeModeChip } from "@/components/admin/stripe-mode-chip";
 import { buildActivityCharts, scopeActivityView } from "@/lib/admin/activity-charts";
 import { loadActivityOverview } from "@/lib/admin/activity";
 import { buildAttentionItems } from "@/lib/admin/attention";
-import { readExcludeAdmins } from "@/lib/admin/exclude-admins-server";
-import { hiddenAdminsSub, withoutAdmins } from "@/lib/admin/exclude-admins";
+import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
+import {
+  emailsOfExcludedAccounts,
+  hiddenAccountsSub,
+  hiddenExcludedSub,
+  scopeAdminUsers,
+  withoutExcludedEmails,
+  withoutExcludedFeedback,
+} from "@/lib/admin/exclude-accounts";
 import { buildAccountGrowth } from "@/lib/admin/growth";
 import { ADMIN_NAV } from "@/lib/admin/nav";
 import { buildStripeDrift, stripeDriftNote } from "@/lib/admin/stripe-drift";
@@ -45,7 +52,7 @@ import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export default async function AdminOverviewPage() {
-  const [stripe, users, waitlist, feeds, feedMonitor, banner, activity, excludeAdmins, untriaged] =
+  const [stripe, users, waitlist, feeds, feedMonitor, banner, activity, scope, untriaged] =
     await Promise.all([
       loadStripeOverview(),
       listAppUsers(),
@@ -54,20 +61,29 @@ export default async function AdminOverviewPage() {
       loadFeedMonitor(),
       readMaintenanceBanner(),
       loadActivityOverview(),
-      readExcludeAdmins(),
+      loadAdminAccountScope(),
       listUntriagedFeedbackReports(),
     ]);
+  const { excludeAdmins, excludedIds } = scope;
   const admins = users.filter((user) => user.admin).length;
-  const visibleUsers = withoutAdmins(users, excludeAdmins);
+  const visibleUsers = scopeAdminUsers(users, { excludeAdmins, excludedIds });
+  const excludedEmails = emailsOfExcludedAccounts(users, excludedIds);
+  const visibleWaitlist = withoutExcludedEmails(waitlist, excludedEmails);
+  const visibleUntriaged = withoutExcludedFeedback(untriaged, excludedEmails);
   const paid = visibleUsers.filter(
     (user) => user.plan === "core" || user.plan === "edge"
   ).length;
-  const scopedActivity = scopeActivityView(activity, excludeAdmins);
+  const scopedActivity = scopeActivityView(
+    activity,
+    excludeAdmins,
+    undefined,
+    excludedIds
+  );
   const deskEntries = scopedActivity.rows.reduce(
     (sum, row) => sum + row.bets + row.offers + row.history,
     0
   );
-  const growth = buildAccountGrowth(visibleUsers, waitlist);
+  const growth = buildAccountGrowth(visibleUsers, visibleWaitlist);
   const stripeCharts = chartsFromStripeOverview(stripe);
   const activityCharts = buildActivityCharts(
     scopedActivity.rows,
@@ -78,7 +94,7 @@ export default async function AdminOverviewPage() {
     users: visibleUsers,
     feedMonitor,
     banner,
-    untriaged,
+    untriaged: visibleUntriaged,
   });
   const drift = stripeDriftNote(
     buildStripeDrift(visibleUsers, stripe.stripeCustomerIds)
@@ -87,7 +103,12 @@ export default async function AdminOverviewPage() {
   const nowByHref: Record<string, string> = {
     "/admin/payments": stripe.mrrLabel,
     "/admin/subscribers": `${visibleUsers.length} account${visibleUsers.length === 1 ? "" : "s"}`,
-    "/admin/users": `${admins} admin`,
+    "/admin/users": [
+      `${admins} admin`,
+      hiddenExcludedSub(excludedIds.length),
+    ]
+      .filter(Boolean)
+      .join(" · "),
     "/admin/activity": activity.available
       ? `${deskEntries} entr${deskEntries === 1 ? "y" : "ies"}`
       : "Local desk",
@@ -109,7 +130,11 @@ export default async function AdminOverviewPage() {
       description="Payments, accounts, feeds and flags. Customer desks stay on /desk."
       icon={LayoutDashboard}
       toolbar={
-        <ExcludeAdminsToggle active={excludeAdmins} hiddenCount={admins} />
+        <AdminAccountFilters
+          excludeAdmins={excludeAdmins}
+          adminCount={admins}
+          excludedCount={excludedIds.length}
+        />
       }
     >
       <AttentionStrip items={attention} />
@@ -128,12 +153,16 @@ export default async function AdminOverviewPage() {
         <StatTile
           label="Accounts"
           value={String(visibleUsers.length)}
-          sub={hiddenAdminsSub(admins, excludeAdmins) ?? `${admins} admin`}
+          sub={hiddenAccountsSub(admins, excludeAdmins, excludedIds.length) ?? `${admins} admin`}
         />
-        <StatTile label="Paid plans" value={String(paid)} sub={`${stripe.founding} founding`} />
+        <StatTile
+          label="Paid plans"
+          value={String(paid)}
+          sub={`${visibleUsers.filter((user) => user.founding).length} founding`}
+        />
         <StatTile
           label="Waitlist"
-          value={String(waitlist.length)}
+          value={String(visibleWaitlist.length)}
           sub={banner.enabled ? "Banner on" : "Banner off"}
         />
       </StatStrip>

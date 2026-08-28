@@ -334,7 +334,8 @@ From `src/lib/ui/surface-styles.ts`:
   mark (`sm+` only, see AppTopBarHeader) and Race picks (dialog, confidence
   chip, trigger) share this so invented numbers cannot look live.
   **`adminModeTag`** is the same box; `/admin` uses the label ADMIN so the
-  operator space cannot look like a customer desk.
+  operator space cannot look like a customer desk. **`adminTestTag`** is a
+  muted plate for accounts excluded from admin stats.
 - **`emptyStatePlate`** / **`emptyStateIconWell`** / **`emptyStateCopyInset`**
   - empty-state card, circular icon, and page-level copy inset (32px / 64px).
   Page empties lift to `--card` (lighter than `--page` in both

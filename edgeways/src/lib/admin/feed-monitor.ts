@@ -96,6 +96,90 @@ export const FEED_STATE_LABEL: Record<FeedThresholdState, string> = {
 
 export const FEED_STATE_DESCRIPTION: Record<FeedThresholdState, string> = {
   ok: "Well within today's cap.",
-  warning: "Over 70% of today's cap — plan a provider upgrade.",
-  critical: "Over 90% of today's cap — upgrade the provider plan now.",
+  warning: "Over 70% of today's cap, plan a provider upgrade.",
+  critical: "Over 90% of today's cap, upgrade the provider plan now.",
 };
+
+/** One grouped row from feed_usage_events (feed, actor, operation, count). */
+export type FeedUsageAttributionInput = {
+  feed: "football" | "racing";
+  clerkUserId: string | null;
+  email: string | null;
+  operation: string;
+  count: number;
+};
+
+export type FeedSourceSpend = {
+  /** clerk user id, or "system" for poller / feed-sync spend. */
+  key: string;
+  label: string;
+  isSystem: boolean;
+  total: number;
+  football: number;
+  racing: number;
+  /** Most-spent operations first. */
+  operations: Array<{
+    feed: "football" | "racing";
+    operation: string;
+    count: number;
+  }>;
+};
+
+export const FEED_OPERATION_LABEL: Record<string, string> = {
+  "fixtures-by-date": "Fixture browsing",
+  "live-fixtures": "Live scores poll",
+  "fixture-by-id": "Fixture lookup",
+  "goal-events": "Goal events",
+  "racecards-free": "Racecards (free)",
+  "racecards-standard": "Racecards (standard)",
+  results: "Results",
+  odds: "Odds",
+  other: "Other",
+};
+
+export function feedOperationLabel(operation: string): string {
+  return FEED_OPERATION_LABEL[operation] ?? "Other";
+}
+
+/**
+ * Roll grouped attribution rows up to one row per source (user or system).
+ * Highest spend first; on a tie the system row sorts last, because the
+ * operator's question is "which user is spending?".
+ */
+export function groupFeedUsageBySource(
+  rows: FeedUsageAttributionInput[]
+): FeedSourceSpend[] {
+  const bySource = new Map<string, FeedSourceSpend>();
+  for (const row of rows) {
+    const key = row.clerkUserId ?? "system";
+    let source = bySource.get(key);
+    if (!source) {
+      source = {
+        key,
+        label:
+          row.email ??
+          (row.clerkUserId ? `User …${row.clerkUserId.slice(-6)}` : "System / poller"),
+        isSystem: row.clerkUserId == null,
+        total: 0,
+        football: 0,
+        racing: 0,
+        operations: [],
+      };
+      bySource.set(key, source);
+    }
+    source.total += row.count;
+    source[row.feed] += row.count;
+    source.operations.push({
+      feed: row.feed,
+      operation: row.operation,
+      count: row.count,
+    });
+  }
+  const sources = [...bySource.values()];
+  for (const source of sources) {
+    source.operations.sort((a, b) => b.count - a.count);
+  }
+  return sources.sort(
+    (a, b) => b.total - a.total || Number(a.isSystem) - Number(b.isSystem)
+  );
+}

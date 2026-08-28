@@ -1,4 +1,5 @@
 import { withoutAdmins } from "@/lib/admin/exclude-admins";
+import { excludedIdSet, withoutExcludedAccounts } from "@/lib/admin/exclude-accounts";
 import { fillDailySeries } from "@/lib/admin/feed-monitor";
 import {
   compareTrailingWindows,
@@ -95,22 +96,26 @@ export function scopeActivityView(
     stamps: ActivityStamps;
   },
   excludeAdmins: boolean,
-  now: Date = new Date()
+  now: Date = new Date(),
+  excludedIds: Iterable<string> = []
 ): { rows: ActivityChartRow[]; daily: ActivityDaily } {
-  const rows = withoutAdmins(input.rows, excludeAdmins);
-  const skipIds = excludeAdmins
-    ? new Set(
-        input.rows
-          .filter((row) => row.admin)
-          .map((row) => row.clerkUserId)
-      )
-    : null;
+  const rows = withoutExcludedAccounts(
+    withoutAdmins(input.rows, excludeAdmins),
+    excludedIds
+  );
+  const skipIds = excludedIdSet(excludedIds);
+  if (excludeAdmins) {
+    for (const row of input.rows) {
+      if (row.admin) skipIds.add(row.clerkUserId);
+    }
+  }
+  const skip = skipIds.size > 0 ? skipIds : null;
   return {
     rows,
     daily: {
-      bets: stampsToDaily(input.stamps.bets, skipIds, now),
-      offers: stampsToDaily(input.stamps.offers, skipIds, now),
-      history: stampsToDaily(input.stamps.history, skipIds, now),
+      bets: stampsToDaily(input.stamps.bets, skip, now),
+      offers: stampsToDaily(input.stamps.offers, skip, now),
+      history: stampsToDaily(input.stamps.history, skip, now),
     },
   };
 }

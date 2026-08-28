@@ -9,25 +9,49 @@ import {
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
 import { AdminTableFrame } from "@/components/admin/admin-table";
+import { ExcludedAccountsLink } from "@/components/admin/excluded-accounts-link";
 import { InboxReportsTable } from "@/components/admin/inbox-reports-table";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { buildInboxCharts } from "@/lib/admin/inbox-charts";
+import {
+  emailsOfExcludedAccounts,
+  withoutExcludedFeedback,
+} from "@/lib/admin/exclude-accounts";
+import { readExcludedAccountIds } from "@/lib/admin/exclude-accounts-server";
 import { listFeedbackReports } from "@/lib/feedback/inbox-store";
+import { listAppUsers } from "@/lib/services/app-users";
 
 export default async function AdminInboxPage() {
-  const reports = await listFeedbackReports(100);
-  const unfiled = reports.filter((report) => !report.linearIssueId);
-  const charts = buildInboxCharts(reports);
+  const [reports, users, excludedIds] = await Promise.all([
+    listFeedbackReports(100),
+    listAppUsers(),
+    readExcludedAccountIds(),
+  ]);
+  const visibleReports = withoutExcludedFeedback(
+    reports,
+    emailsOfExcludedAccounts(users, excludedIds)
+  );
+  const unfiled = visibleReports.filter((report) => !report.linearIssueId);
+  const charts = buildInboxCharts(visibleReports);
 
   return (
     <AdminPage
       title="Inbox"
       description="Feedback reports from the desk. Filing to Linear stays in the triage loop."
       icon={Inbox}
+      toolbar={
+        excludedIds.length > 0 ? (
+          <ExcludedAccountsLink count={excludedIds.length} />
+        ) : undefined
+      }
     >
       <StatStrip columns={3}>
-        <StatTile label="Reports" value={String(reports.length)} sub="Last 100" />
+        <StatTile
+          label="Reports"
+          value={String(visibleReports.length)}
+          sub="Last 100"
+        />
         <StatTile
           label="Unfiled"
           value={String(unfiled.length)}
@@ -63,15 +87,19 @@ export default async function AdminInboxPage() {
       </AdminChartGrid>
 
       <AdminSection title="Reports">
-        {reports.length === 0 ? (
+        {visibleReports.length === 0 ? (
           <EmptyState
             icon={Inbox}
-            title="No feedback yet"
-            description="Reports from the in-app feedback form will show here."
+            title={reports.length === 0 ? "No feedback yet" : "No customer reports"}
+            description={
+              reports.length === 0
+                ? "Reports from the in-app feedback form will show here."
+                : "Include test accounts on Users to see reports from those desks."
+            }
           />
         ) : (
           <AdminTableFrame>
-            <InboxReportsTable reports={reports} />
+            <InboxReportsTable reports={visibleReports} />
           </AdminTableFrame>
         )}
       </AdminSection>

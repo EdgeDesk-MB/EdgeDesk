@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
+import { PUBLIC_DEMO_LIVE_PARAM } from "@/lib/demo/public-demo";
 import {
   billingStatusBadgeVariant,
   billingStatusLabel,
   isCancelling,
   isComplimentaryAccount,
   planDisplayName,
+  SETTINGS_SUBSCRIPTION_HREF,
   showSubscribeActions,
   subscriptionAccountFromUser,
   subscriptionDateLabel,
   subscriptionDetail,
 } from "./subscription-view";
+
+describe("SETTINGS_SUBSCRIPTION_HREF", () => {
+  it("exits public demo so Settings is the live desk", () => {
+    expect(SETTINGS_SUBSCRIPTION_HREF).toBe(
+      `/settings?tab=subscription&${PUBLIC_DEMO_LIVE_PARAM}=1`
+    );
+  });
+});
 
 describe("subscriptionAccountFromUser", () => {
   it("defaults a missing row to Free", () => {

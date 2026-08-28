@@ -1,37 +1,46 @@
-import { AlertTriangle, Radio } from "lucide-react";
+import { Radio, Activity } from "lucide-react";
+import {
+  AdminChartCard,
+  AdminChartGrid,
+} from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
+import { AdminSection } from "@/components/admin/admin-section";
+import { AdminTableFrame } from "@/components/admin/admin-table";
 import { FeedCapsForm } from "@/components/admin/feed-caps-form";
 import { FeedUsageChart } from "@/components/admin/feed-usage-chart";
 import { FeedsPanel } from "@/components/admin/feeds-panel";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/help/empty-state";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { loadFeedMonitor, loadFeedStatus, type FeedMonitorLane } from "@/lib/admin/feeds";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { WarningNotice } from "@/components/ui/warning-notice";
+import {
+  loadFeedAttribution,
+  loadFeedMonitor,
+  loadFeedStatus,
+  type FeedMonitorLane,
+} from "@/lib/admin/feeds";
 import { readAllFeedHeartbeats } from "@/lib/admin/feed-heartbeat";
 import {
   FEED_STATE_DESCRIPTION,
   FEED_STATE_LABEL,
+  feedOperationLabel,
   type FeedThresholdState,
 } from "@/lib/admin/feed-monitor";
 import { formatClockTime } from "@/lib/time-format";
+import { surfaceLift, tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 const STATE_VALUE_CLASS: Record<FeedThresholdState, string> = {
   ok: "text-success",
   warning: "text-warning",
   critical: "text-destructive",
-};
-
-const STATE_BADGE_VARIANT: Record<FeedThresholdState, "default" | "outline" | "destructive"> = {
-  ok: "outline",
-  warning: "default",
-  critical: "destructive",
 };
 
 function paceSub(lane: FeedMonitorLane): string {
@@ -46,10 +55,11 @@ function paceSub(lane: FeedMonitorLane): string {
 }
 
 export default async function AdminFeedsPage() {
-  const [status, monitor, heartbeats] = await Promise.all([
+  const [status, monitor, heartbeats, attribution] = await Promise.all([
     loadFeedStatus(),
     loadFeedMonitor(),
     readAllFeedHeartbeats(),
+    loadFeedAttribution(),
   ]);
   const exchangeOk = status.exchange.providers.filter((provider) => provider.ok).length;
   const alerts = (
@@ -61,8 +71,8 @@ export default async function AdminFeedsPage() {
 
   return (
     <AdminPage
-      title="Feed health"
-      description="Operator-held football, racing and exchange feeds. Customers do not add keys."
+      title="Feeds"
+      description="Operator-held football, racing and exchange. One feed serves every Edge desk. Customers do not add keys."
       icon={Radio}
     >
       <StatStrip columns={3}>
@@ -92,6 +102,9 @@ export default async function AdminFeedsPage() {
             status.racing.configured ? (
               <span className={STATE_VALUE_CLASS[monitor.racing.state]}>
                 {monitor.racing.used.toLocaleString("en-GB")}
+                <span className="text-base font-medium text-muted-foreground">
+                  /{monitor.racing.cap.toLocaleString("en-GB")}
+                </span>
               </span>
             ) : (
               "Off"
@@ -111,95 +124,155 @@ export default async function AdminFeedsPage() {
       </StatStrip>
 
       {alerts.length > 0 && (
-        <Card
-          className={cn(
-            "border-warning/60 bg-warning/5",
-            alerts.some(([, lane]) => lane.state === "critical") &&
-              "border-destructive/60 bg-destructive/5"
-          )}
+        <WarningNotice
+          title={
+            alerts.some(([, lane]) => lane.state === "critical")
+              ? "Feed caps need an upgrade"
+              : "Feed caps are on a watch"
+          }
         >
-          <CardContent className="flex items-start gap-3 py-4">
-            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
-            <div className="flex flex-col gap-1">
-              {alerts.map(([name, lane]) => (
-                <p key={name} className="text-sm">
-                  <span className="font-semibold">{name}:</span>{" "}
-                  {FEED_STATE_DESCRIPTION[lane.state]}{" "}
-                  {lane.capReachedAt != null && lane.used < lane.cap && (
-                    <span className="text-muted-foreground">
-                      At the current pace the cap is reached around{" "}
-                      {formatClockTime(lane.capReachedAt)}.
-                    </span>
-                  )}
-                </p>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex flex-col gap-1">
+            {alerts.map(([name, lane]) => (
+              <p key={name}>
+                <span className="font-semibold text-foreground">{name}:</span>{" "}
+                {FEED_STATE_DESCRIPTION[lane.state]}{" "}
+                {lane.capReachedAt != null && lane.used < lane.cap && (
+                  <span>
+                    At the current pace the cap is reached around{" "}
+                    {formatClockTime(lane.capReachedAt)}.
+                  </span>
+                )}
+              </p>
+            ))}
+          </div>
+        </WarningNotice>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base">Football usage</CardTitle>
-              <Badge variant={STATE_BADGE_VARIANT[monitor.football.state]}>
-                {FEED_STATE_LABEL[monitor.football.state]}
-              </Badge>
-            </div>
-            <CardDescription>
-              Daily API requests across all desks — one poll serves every user
-              tracking the same match.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <AdminSection
+        title="Usage"
+        description="Daily API requests across all desks. One poll serves every user tracking the same match."
+      >
+        <AdminChartGrid>
+          <AdminChartCard
+            title="Football usage"
+            description="Provider quota is per day. This ceiling is for spotting growth early."
+          >
             <FeedUsageChart
               label="Football"
               history={monitor.football.history}
               cap={monitor.football.cap}
             />
-          </CardContent>
-        </Card>
+          </AdminChartCard>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base">Racing usage</CardTitle>
-              <Badge variant={STATE_BADGE_VARIANT[monitor.racing.state]}>
-                {FEED_STATE_LABEL[monitor.racing.state]}
-              </Badge>
-            </div>
-            <CardDescription>
-              Daily requests across all desks. The provider limit is per-second;
-              this threshold is for spotting growth early.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <AdminChartCard
+            title="Racing usage"
+            description="The provider limit is per-second. This threshold is for spotting growth early."
+          >
             <FeedUsageChart
               label="Racing"
               history={monitor.racing.history}
               cap={monitor.racing.cap}
             />
-          </CardContent>
-        </Card>
-      </div>
+          </AdminChartCard>
+        </AdminChartGrid>
+      </AdminSection>
 
-      <StatStrip columns={2}>
-        <StatTile
-          label="Live matches now"
-          value={monitor.demand.liveFootball.toLocaleString("en-GB")}
-          sub="Distinct events the poller is polling"
-        />
-        <StatTile
-          label="Matches still to start"
-          value={monitor.demand.upcomingFootball.toLocaleString("en-GB")}
-          sub="API-sourced, before end of day"
-        />
-      </StatStrip>
+      {attribution.hosted && (
+        <AdminSection
+          title="Spend by source"
+          description="Who and what is spending today's requests. Attribution began when this shipped, so today's rows can lag the counters above."
+        >
+          {attribution.sources.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Activity}
+              title="No spend recorded yet today"
+              description="Rows appear here as requests are attributed to a user or the system poller."
+            />
+          ) : (
+            <AdminTableFrame>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className={tableHeaderCell}>Source</TableHead>
+                    <TableHead className={tableHeaderCell}>What they called</TableHead>
+                    <TableHead className={cn(tableHeaderCell, "text-right")}>Football</TableHead>
+                    <TableHead className={cn(tableHeaderCell, "text-right")}>Racing</TableHead>
+                    <TableHead className={cn(tableHeaderCell, "text-right")}>Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attribution.sources.map((source) => (
+                    <TableRow key={source.key}>
+                      <TableCell
+                        className={cn(
+                          tableBodyCell,
+                          "max-w-[16rem] truncate font-medium",
+                          source.isSystem && "text-muted-foreground"
+                        )}
+                        title={source.label}
+                      >
+                        {source.label}
+                      </TableCell>
+                      <TableCell className={cn(tableBodyCell, "min-w-0 text-muted-foreground")}>
+                        {source.operations
+                          .map(
+                            (op) =>
+                              `${feedOperationLabel(op.operation)} ×${op.count.toLocaleString("en-GB")}`
+                          )
+                          .join(" · ")}
+                      </TableCell>
+                      <TableCell className={cn(tableBodyCell, "text-right tabular-nums")}>
+                        {source.football > 0 ? source.football.toLocaleString("en-GB") : "—"}
+                      </TableCell>
+                      <TableCell className={cn(tableBodyCell, "text-right tabular-nums")}>
+                        {source.racing > 0 ? source.racing.toLocaleString("en-GB") : "—"}
+                      </TableCell>
+                      <TableCell className={cn(tableBodyCell, "text-right font-medium tabular-nums")}>
+                        {source.total.toLocaleString("en-GB")}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </AdminTableFrame>
+          )}
+        </AdminSection>
+      )}
 
-      <FeedCapsForm initial={monitor.caps} />
+      <AdminSection
+        title="Football demand"
+        description="What the poller is tracking right now, across every desk."
+      >
+        <StatStrip columns={2}>
+          <StatTile
+            label="Live matches now"
+            value={monitor.demand.liveFootball.toLocaleString("en-GB")}
+            sub="Distinct events the poller is polling"
+          />
+          <StatTile
+            label="Matches still to start"
+            value={monitor.demand.upcomingFootball.toLocaleString("en-GB")}
+            sub="API-sourced, before end of day"
+          />
+        </StatStrip>
+      </AdminSection>
 
-      <FeedsPanel initial={status} heartbeats={heartbeats} />
+      <AdminSection
+        title="Daily caps"
+        description="Raise these when you upgrade a provider plan. Both are hard ceilings, and requests stop for the day when a cap is hit."
+      >
+        <div className={cn(surfaceLift, "rounded-lg px-4 py-4")}>
+          <FeedCapsForm initial={monitor.caps} />
+        </div>
+      </AdminSection>
+
+      <AdminSection
+        title="Connection tests"
+        description="A passing test is the feed every Edge desk receives. If this fails, customers fall back to estimates."
+      >
+        <FeedsPanel initial={status} heartbeats={heartbeats} />
+      </AdminSection>
     </AdminPage>
   );
 }

@@ -336,6 +336,24 @@ export function offerMatchesBetContext(
   return true;
 }
 
+/**
+ * Price used to rank place-refund shape. Hosted free racecards leave bookie/SP
+ * blank, so fall through to the live exchange book the same way Offer Edge does.
+ */
+function runnerRankingPrice(
+  runner: Pick<
+    RacingDeskRace["runners"][number],
+    "bookieDecimal" | "spDecimal" | "exchangeBackDecimal" | "exchangeDecimal"
+  >
+): number | null {
+  const price =
+    runner.bookieDecimal ??
+    runner.spDecimal ??
+    runner.exchangeBackDecimal ??
+    runner.exchangeDecimal;
+  return price != null && price > 1 ? price : null;
+}
+
 /** Heuristic: predictable 2nd/3rd/4th when favourite is clear and place contenders cluster. */
 export function scorePlaceRefundStrategy(
   race: Pick<RacingDeskRace, "runners" | "fieldSize">
@@ -343,7 +361,7 @@ export function scorePlaceRefundStrategy(
   const active = race.runners.filter((r) => !r.nonRunner);
   const priced = active
     .map((r) => ({
-      price: r.bookieDecimal ?? r.spDecimal,
+      price: runnerRankingPrice(r),
       spreadPct: r.spreadPct,
       oddsSource: r.oddsSource,
     }))
@@ -428,7 +446,7 @@ function pricedRunners(race: Pick<RacingDeskRace, "runners">): PricedRunner[] {
     .map((r) => ({
       horseId: r.horseId,
       name: r.name,
-      price: r.bookieDecimal ?? r.spDecimal ?? 0,
+      price: runnerRankingPrice(r) ?? 0,
       rank: 0,
       spreadPct: r.spreadPct,
       oddsSource: r.oddsSource,

@@ -10,14 +10,27 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
-import { ExcludeAdminsToggle } from "@/components/admin/exclude-admins-toggle";
+import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
 import { AdminTableFrame } from "@/components/admin/admin-table";
+import { OnboardingAnswersTable } from "@/components/admin/onboarding-answers-table";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
-import { readExcludeAdmins } from "@/lib/admin/exclude-admins-server";
-import { hiddenAdminsSub, withoutAdmins } from "@/lib/admin/exclude-admins";
+import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
+import {
+  emailsOfExcludedAccounts,
+  hiddenAccountsSub,
+  scopeAdminUsers,
+  withoutExcludedEmails,
+} from "@/lib/admin/exclude-accounts";
 import { buildAccountGrowth } from "@/lib/admin/growth";
-import { buildAttributionShare, buildWaitlistFunnel } from "@/lib/admin/funnel";
+import {
+  buildAttributionShare,
+  buildExperienceShare,
+  buildOnboardingAnswerRows,
+  buildOnboardingCompletion,
+  buildWaitlistFunnel,
+  buildWhyHereShare,
+} from "@/lib/admin/funnel";
 import { buildLeavingRows } from "@/lib/admin/leaving";
 import {
   Table,
@@ -39,25 +52,32 @@ import {
 import { cn } from "@/lib/utils";
 
 export default async function AdminSubscribersPage() {
-  const [users, waitlist, excludeAdmins] = await Promise.all([
+  const [users, waitlist, scope] = await Promise.all([
     listAppUsers(),
     listWaitlistSignups(200),
-    readExcludeAdmins(),
+    loadAdminAccountScope(),
   ]);
+  const { excludeAdmins, excludedIds } = scope;
   const admins = users.filter((user) => user.admin).length;
-  const visibleUsers = withoutAdmins(users, excludeAdmins);
-  const waitlistEmails = new Set(waitlist.map((row) => row.email.toLowerCase()));
+  const visibleUsers = scopeAdminUsers(users, { excludeAdmins, excludedIds });
+  const excludedEmails = emailsOfExcludedAccounts(users, excludedIds);
+  const visibleWaitlist = withoutExcludedEmails(waitlist, excludedEmails);
+  const waitlistEmails = new Set(visibleWaitlist.map((row) => row.email.toLowerCase()));
   const waitlistToPaid = visibleUsers.filter(
     (user) =>
       user.email &&
       waitlistEmails.has(user.email.toLowerCase()) &&
       (user.plan === "core" || user.plan === "edge")
   ).length;
-  const confirmed = waitlist.filter((row) => row.confirmedAt && !row.unsubscribedAt).length;
-  const growth = buildAccountGrowth(visibleUsers, waitlist);
+  const confirmed = visibleWaitlist.filter((row) => row.confirmedAt && !row.unsubscribedAt).length;
+  const growth = buildAccountGrowth(visibleUsers, visibleWaitlist);
   const leaving = buildLeavingRows(visibleUsers);
-  const funnel = buildWaitlistFunnel(waitlist, visibleUsers);
+  const funnel = buildWaitlistFunnel(visibleWaitlist, visibleUsers);
   const attributionShare = buildAttributionShare(visibleUsers);
+  const onboarding = buildOnboardingCompletion(visibleUsers);
+  const experienceShare = buildExperienceShare(visibleUsers);
+  const whyHereShare = buildWhyHereShare(visibleUsers);
+  const onboardingAnswers = buildOnboardingAnswerRows(visibleUsers);
 
   return (
     <AdminPage
@@ -65,20 +85,24 @@ export default async function AdminSubscribersPage() {
       description="Account plans from app_users, plus the waitlist. Last active is the last account sync."
       icon={Users}
       toolbar={
-        <ExcludeAdminsToggle active={excludeAdmins} hiddenCount={admins} />
+        <AdminAccountFilters
+          excludeAdmins={excludeAdmins}
+          adminCount={admins}
+          excludedCount={excludedIds.length}
+        />
       }
     >
       <StatStrip columns={4}>
         <StatTile
           label="Accounts"
           value={String(visibleUsers.length)}
-          sub={hiddenAdminsSub(admins, excludeAdmins)}
+          sub={hiddenAccountsSub(admins, excludeAdmins, excludedIds.length)}
         />
         <StatTile
           label="Core + Edge"
           value={String(visibleUsers.filter((u) => u.plan === "core" || u.plan === "edge").length)}
         />
-        <StatTile label="Waitlist" value={String(waitlist.length)} sub={`${confirmed} confirmed`} />
+        <StatTile label="Waitlist" value={String(visibleWaitlist.length)} sub={`${confirmed} confirmed`} />
         <StatTile label="Waitlist to paid" value={String(waitlistToPaid)} />
       </StatStrip>
 
@@ -153,26 +177,88 @@ export default async function AdminSubscribersPage() {
         </AdminChartCard>
       </AdminChartGrid>
 
-      <AdminChartGrid>
-        <AdminChartCard
-          title="Waitlist funnel"
-          description="Joined to confirmed to paid. Each stage is a subset of the one before."
-        >
-          <AdminShareBars
-            slices={[
-              { key: "joined", label: "Joined", value: funnel.joined, tone: "brand" },
-              { key: "confirmed", label: "Confirmed", value: funnel.confirmed, tone: "edge" },
-              { key: "paid", label: "Paid", value: funnel.paid, tone: "profit" },
-            ]}
-          />
-        </AdminChartCard>
-        <AdminChartCard
-          title="How they heard"
-          description="Onboarding attribution across accounts that answered. Skipped and blank left out."
-        >
-          <AdminDonutChart slices={attributionShare} label="How they heard" />
-        </AdminChartCard>
-      </AdminChartGrid>
+      <AdminChartCard
+        title="Waitlist funnel"
+        description="Joined to confirmed to paid. Each stage is a subset of the one before."
+      >
+        <AdminShareBars
+          slices={[
+            { key: "joined", label: "Joined", value: funnel.joined, tone: "brand" },
+            { key: "confirmed", label: "Confirmed", value: funnel.confirmed, tone: "edge" },
+            { key: "paid", label: "Paid", value: funnel.paid, tone: "profit" },
+          ]}
+        />
+      </AdminChartCard>
+
+      <AdminSection
+        title="Onboarding"
+        description="Answers saved when someone finishes the hosted onboarding questions, newest first. Open a row to replay their screens. The Help tour is device-local and does not appear here."
+      >
+        <div className="flex flex-col gap-4">
+          <StatStrip columns={3}>
+            <StatTile
+              label="Answered"
+              value={String(onboarding.answered)}
+              sub={`${onboarding.total} account${onboarding.total === 1 ? "" : "s"}`}
+            />
+            <StatTile label="Not yet" value={String(onboarding.pending)} />
+            <StatTile
+              label="Completion"
+              value={
+                onboarding.total === 0
+                  ? "—"
+                  : `${Math.round((onboarding.answered / onboarding.total) * 100)}%`
+              }
+            />
+          </StatStrip>
+          <AdminChartGrid>
+            <AdminChartCard
+              title="Experience"
+              description="What they said their matched-betting background was."
+            >
+              <AdminDonutChart
+                slices={experienceShare}
+                label="Experience"
+                emptyTitle="No onboarding answers yet"
+                emptyDescription="Experience mix appears here after someone finishes onboarding."
+              />
+            </AdminChartCard>
+            <AdminChartCard
+              title="How they heard"
+              description="Onboarding attribution across accounts that answered. Skipped and blank left out."
+            >
+              <AdminDonutChart
+                slices={attributionShare}
+                label="How they heard"
+                emptyTitle="No onboarding answers yet"
+                emptyDescription="Attribution appears here after someone finishes onboarding."
+              />
+            </AdminChartCard>
+          </AdminChartGrid>
+          <AdminChartCard
+            title="Why they are here"
+            description="Features they picked during onboarding. People can choose more than one, so counts can exceed answered accounts."
+          >
+            <AdminShareBars
+              slices={whyHereShare}
+              emptyTitle="No onboarding answers yet"
+              emptyDescription="Feature picks appear here after someone finishes onboarding."
+            />
+          </AdminChartCard>
+          {onboardingAnswers.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Users}
+              title="Nobody has finished onboarding yet"
+              description="Answers land here when an account completes the onboarding questions."
+            />
+          ) : (
+            <AdminTableFrame>
+              <OnboardingAnswersTable rows={onboardingAnswers} />
+            </AdminTableFrame>
+          )}
+        </div>
+      </AdminSection>
 
       {leaving.length > 0 ? (
         <AdminSection
@@ -215,7 +301,7 @@ export default async function AdminSubscribersPage() {
             description={
               users.length === 0
                 ? "Accounts appear here after someone signs in."
-                : "Turn off Exclude admins to see operator accounts."
+                : "Turn off Exclude admins, or include test accounts, to see more."
             }
           />
         ) : (
@@ -261,7 +347,7 @@ export default async function AdminSubscribersPage() {
       </AdminSection>
 
       <AdminSection title="Waitlist">
-        {waitlist.length === 0 ? (
+        {visibleWaitlist.length === 0 ? (
           <EmptyState
             compact
             icon={Users}
@@ -280,7 +366,7 @@ export default async function AdminSubscribersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-              {waitlist.map((row) => (
+              {visibleWaitlist.map((row) => (
                 <TableRow key={row.email}>
                   <TableCell className={cn(tableBodyCell, "max-w-[18rem] truncate")}>{row.email}</TableCell>
                   <TableCell className={tableBodyCell}>{formatAdminDateTime(row.createdAt)}</TableCell>

@@ -1,5 +1,10 @@
 import "server-only";
 import type Stripe from "stripe";
+import { readExcludedAccountIds } from "@/lib/admin/exclude-accounts-server";
+import {
+  isExcludedStripeCustomer,
+  stripeSkipSets,
+} from "@/lib/admin/exclude-accounts";
 import { SERIES_COMPARE_DAYS } from "@/lib/admin/series";
 import type {
   StripeChartInvoice,
@@ -100,9 +105,24 @@ async function listCreatedSince<T extends { id: string }>(
   return items;
 }
 
+function stripeCustomerId(value: unknown): string | null {
+  if (typeof value === "string" && value) return value;
+  if (value && typeof value === "object" && "id" in value) {
+    const id = (value as { id: unknown }).id;
+    return typeof id === "string" && id ? id : null;
+  }
+  return null;
+}
+
 export async function loadStripeOverview(): Promise<StripeOverview> {
-  const users = await listAppUsers();
-  const founding = users.filter((user) => user.founding).length;
+  const [users, excludedIds] = await Promise.all([
+    listAppUsers(),
+    readExcludedAccountIds(),
+  ]);
+  const { skipCustomerIds, skipEmails } = stripeSkipSets(users, excludedIds);
+  const founding = users.filter(
+    (user) => user.founding && !excludedIds.includes(user.clerkUserId)
+  ).length;
   const empty: StripeOverview = {
     configured: false,
     mode: null,
@@ -142,6 +162,16 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
     let canceled = 0;
 
     for (const sub of subs) {
+      if (
+        isExcludedStripeCustomer({
+          customerId: stripeCustomerId(sub.customer),
+          email: null,
+          skipCustomerIds,
+          skipEmails,
+        })
+      ) {
+        continue;
+      }
       if (sub.status === "active") active += 1;
       else if (sub.status === "trialing") trialing += 1;
       else if (sub.status === "past_due") pastDue += 1;
@@ -158,7 +188,35 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
       }
     }
 
-    const failed = invoices.data.filter(
+    const visibleInvoices = invoices.data.filter(
+      (invoice) =>
+        !isExcludedStripeCustomer({
+          customerId: stripeCustomerId(invoice.customer),
+          email: invoice.customer_email,
+          skipCustomerIds,
+          skipEmails,
+        })
+    );
+    const visibleInvoiceWindow = invoiceWindow.filter(
+      (invoice) =>
+        !isExcludedStripeCustomer({
+          customerId: stripeCustomerId(invoice.customer),
+          email: invoice.customer_email,
+          skipCustomerIds,
+          skipEmails,
+        })
+    );
+    const visibleSubs = subs.filter(
+      (sub) =>
+        !isExcludedStripeCustomer({
+          customerId: stripeCustomerId(sub.customer),
+          email: null,
+          skipCustomerIds,
+          skipEmails,
+        })
+    );
+
+    const failed = visibleInvoices.filter(
       (invoice) =>
         invoice.status === "open" ||
         invoice.status === "uncollectible" ||
@@ -174,7 +232,7 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
       pastDue,
       canceled,
       founding,
-      invoices: invoices.data.slice(0, 12).map((invoice) => ({
+      invoices: visibleInvoices.slice(0, 12).map((invoice) => ({
         id: invoice.id,
         email: invoice.customer_email,
         amountLabel: penceToGbp(invoice.amount_paid || invoice.amount_due),
@@ -194,7 +252,7 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
         status: invoice.status ?? "open",
         createdAt: (invoice.created ?? 0) * 1000,
       })),
-      invoicePoints: invoiceWindow.map((invoice) => ({
+      invoicePoints: visibleInvoiceWindow.map((invoice) => ({
         createdAt: (invoice.created ?? 0) * 1000,
         amountPence: invoice.amount_paid ?? 0,
         paid: invoice.status === "paid",
@@ -203,10 +261,10 @@ export async function loadStripeOverview(): Promise<StripeOverview> {
         createdAt: (refund.created ?? 0) * 1000,
         amountPence: refund.amount ?? 0,
       })),
-      subscriptionCreatedAt: subs.map((sub) => (sub.created ?? 0) * 1000),
+      subscriptionCreatedAt: visibleSubs.map((sub) => (sub.created ?? 0) * 1000),
       stripeCustomerIds: [
         ...new Set(
-          subs
+          visibleSubs
             .map((sub) => sub.customer)
             .filter((id): id is string => typeof id === "string")
         ),

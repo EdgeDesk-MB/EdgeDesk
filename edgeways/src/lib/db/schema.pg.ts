@@ -6,6 +6,7 @@
 import {
   bigint,
   doublePrecision,
+  index,
   integer,
   pgTable,
   primaryKey,
@@ -86,6 +87,27 @@ export const feedBudget = pgTable(
     used: integer("used").notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.feed, table.day] })]
+);
+
+/**
+ * Per-request feed spend attribution (admin feed monitor). One row per
+ * provider request that claimed budget, keyed by UTC day to match
+ * feed_budget. `clerk_user_id` / `email` are null for system spend (poller,
+ * feed sync); `operation` names the call shape (fixtures-by-date, racecards,
+ * ...). Global coordination data, so rows are never desk-scoped on read.
+ */
+export const feedUsageEvents = pgTable(
+  "feed_usage_events",
+  {
+    id: serial("id").primaryKey(),
+    feed: text("feed").notNull(),
+    day: text("day").notNull(),
+    at: epochMs("at").notNull(),
+    operation: text("operation").notNull(),
+    clerkUserId: text("clerk_user_id"),
+    email: text("email"),
+  },
+  (table) => [index("feed_usage_events_feed_day").on(table.feed, table.day)]
 );
 
 export const exchanges = pgTable("exchanges", {
@@ -902,6 +924,7 @@ export type EventRow = typeof events.$inferSelect;
 export type NewEventRow = typeof events.$inferInsert;
 export type FeedSyncStateRow = typeof feedSyncState.$inferSelect;
 export type FeedBudgetRow = typeof feedBudget.$inferSelect;
+export type FeedUsageEventRow = typeof feedUsageEvents.$inferSelect;
 export type BetRow = typeof bets.$inferSelect;
 export type NewBetRow = typeof bets.$inferInsert;
 export type ExchangeRow = typeof exchanges.$inferSelect;

@@ -9,13 +9,13 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
-import { ExcludeAdminsToggle } from "@/components/admin/exclude-admins-toggle";
+import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
 import { AdminTableFrame } from "@/components/admin/admin-table";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { buildActivityCharts, scopeActivityView, weeklyCountsByUser } from "@/lib/admin/activity-charts";
-import { hiddenAdminsSub } from "@/lib/admin/exclude-admins";
-import { readExcludeAdmins } from "@/lib/admin/exclude-admins-server";
+import { hiddenAccountsSub } from "@/lib/admin/exclude-accounts";
+import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,13 +32,19 @@ import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export default async function AdminActivityPage() {
-  const [activity, excludeAdmins] = await Promise.all([
+  const [activity, scope] = await Promise.all([
     loadActivityOverview(),
-    readExcludeAdmins(),
+    loadAdminAccountScope(),
   ]);
+  const { excludeAdmins, excludedIds } = scope;
   const links = loadFlagsLinks();
   const admins = activity.rows.filter((row) => row.admin).length;
-  const scoped = scopeActivityView(activity, excludeAdmins);
+  const scoped = scopeActivityView(
+    activity,
+    excludeAdmins,
+    undefined,
+    excludedIds
+  );
   const bets = scoped.rows.reduce((sum, row) => sum + row.bets, 0);
   const offers = scoped.rows.reduce((sum, row) => sum + row.offers, 0);
   const history = scoped.rows.reduce((sum, row) => sum + row.history, 0);
@@ -61,14 +67,18 @@ export default async function AdminActivityPage() {
         </Button>
       }
       toolbar={
-        <ExcludeAdminsToggle active={excludeAdmins} hiddenCount={admins} />
+        <AdminAccountFilters
+          excludeAdmins={excludeAdmins}
+          adminCount={admins}
+          excludedCount={excludedIds.length}
+        />
       }
     >
       <StatStrip columns={4}>
         <StatTile
           label="Accounts"
           value={String(scoped.rows.length)}
-          sub={hiddenAdminsSub(admins, excludeAdmins)}
+          sub={hiddenAccountsSub(admins, excludeAdmins, excludedIds.length)}
         />
         <StatTile label="Bets" value={String(bets)} />
         <StatTile label="Offers" value={String(offers)} />
@@ -142,8 +152,8 @@ export default async function AdminActivityPage() {
                 : "No customer accounts"
           }
           description={
-            activity.rows.length > 0 && excludeAdmins
-              ? "Turn off Exclude admins to see operator desks."
+            activity.rows.length > 0 && (excludeAdmins || excludedIds.length > 0)
+              ? "Turn off Exclude admins, or include test accounts on Users, to see more desks."
               : (activity.note ??
                 "Accounts appear here after someone signs in on the hosted desk.")
           }

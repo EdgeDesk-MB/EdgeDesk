@@ -15,6 +15,7 @@
  */
 import "server-only";
 
+import { getDeskActor } from "@/lib/db/desk-scope";
 import { getNeonSql } from "@/lib/db/neon";
 
 export type FeedKind = "football" | "racing";
@@ -100,4 +101,70 @@ export async function neonFeedUsageHistory(
     [feed, days]
   )) as Array<{ day: string; used: string | number }>;
   return rows.map((row) => ({ day: row.day, used: Number(row.used) }));
+}
+
+export const FEED_USAGE_EVENT_INSERT_SQL = `
+INSERT INTO feed_usage_events (feed, day, at, operation, clerk_user_id, email)
+VALUES ($1, $2, $3, $4, $5, $6)
+`.trim();
+
+/**
+ * Attribute one spent request to the current desk actor (null id = system
+ * spend: poller, feed sync). Best-effort by design — attribution must never
+ * block or fail a feed call, so errors are swallowed.
+ */
+export async function logFeedUsageEvent(
+  feed: FeedKind,
+  operation: string,
+  day = feedBudgetDay()
+): Promise<void> {
+  try {
+    const actor = getDeskActor();
+    const sql = getNeonSql();
+    await sql.query(FEED_USAGE_EVENT_INSERT_SQL, [
+      feed,
+      day,
+      Date.now(),
+      operation,
+      actor.clerkUserId,
+      actor.email,
+    ]);
+  } catch {
+    // swallow: see docstring
+  }
+}
+
+export type FeedUsageAttributionRow = {
+  feed: FeedKind;
+  clerkUserId: string | null;
+  email: string | null;
+  operation: string;
+  count: number;
+};
+
+/** Today's spend grouped by actor and operation, for the admin feed monitor. */
+export async function neonFeedUsageAttribution(
+  day = feedBudgetDay()
+): Promise<FeedUsageAttributionRow[]> {
+  const sql = getNeonSql();
+  const rows = (await sql.query(
+    `SELECT feed, clerk_user_id, email, operation, COUNT(*)::int AS count
+       FROM feed_usage_events
+      WHERE day = $1
+      GROUP BY feed, clerk_user_id, email, operation`,
+    [day]
+  )) as Array<{
+    feed: string;
+    clerk_user_id: string | null;
+    email: string | null;
+    operation: string;
+    count: string | number;
+  }>;
+  return rows.map((row) => ({
+    feed: row.feed === "racing" ? "racing" : "football",
+    clerkUserId: row.clerk_user_id,
+    email: row.email,
+    operation: row.operation,
+    count: Number(row.count),
+  }));
 }

@@ -60,6 +60,8 @@ export interface RacingIntelligenceDialogProps {
   onViewOffer: (offerId: number) => void;
   dateLabel: string;
   dataSource?: "demo" | "racing-api" | "error";
+  /** True when Racing Desk already has a place-refund campaign for this day. */
+  hasPlaceRefundOffer?: boolean;
 }
 
 interface OfferOption {
@@ -394,6 +396,7 @@ export function RacingIntelligenceDialog({
   onViewOffer,
   dateLabel,
   dataSource,
+  hasPlaceRefundOffer = false,
 }: RacingIntelligenceDialogProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
@@ -653,7 +656,9 @@ export function RacingIntelligenceDialog({
               title={suggestions.length === 0 ? "No picks yet" : "No picks in this tier"}
               description={
                 suggestions.length === 0
-                  ? "Add a place-refund offer to unlock ranked picks."
+                  ? hasPlaceRefundOffer
+                    ? "Qualifying races need bookie or live lay prices before they can be ranked. Paste a price, or wait for the exchange to match."
+                    : "Add a place-refund offer to unlock ranked picks."
                   : "Try another confidence filter."
               }
             />

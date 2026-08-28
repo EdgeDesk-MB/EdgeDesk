@@ -773,6 +773,7 @@ export function RacingDeskView() {
           const offer = (state?.offers ?? []).find((o) => o.id === offerId);
           if (offer) viewOffer(offer);
         }}
+        hasPlaceRefundOffer={(payload?.activeOffers.length ?? 0) > 0}
         dateLabel={new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
           weekday: "short",
           day: "numeric",
@@ -1000,7 +1001,7 @@ export function RacingDeskView() {
                           ? "Offer Edge has no modelled plays for this date."
                           : raceFilter === "qualifying"
                             ? "None of today's meetings match your open offers."
-                            : "Try another date, or check your Racing API key in Settings."
+                            : "Try another date, or refresh the desk in a moment."
                     }
                     className="shadow-none"
                   />

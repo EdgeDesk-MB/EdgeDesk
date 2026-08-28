@@ -20,15 +20,19 @@ let registered = false;
 export function ensureRacingUsageRecorder(): void {
   if (registered) return;
   registered = true;
-  registerRacingBudgetGate(async () => {
+  registerRacingBudgetGate(async (operation) => {
     if (!isNeonDesk()) return true;
     try {
-      const [{ spendNeonFeedBudget }, { readFeedCaps }] = await Promise.all([
-        import("@/lib/db/neon-feed-budget"),
-        import("@/lib/admin/feed-caps"),
-      ]);
+      const [{ spendNeonFeedBudget, logFeedUsageEvent }, { readFeedCaps }] =
+        await Promise.all([
+          import("@/lib/db/neon-feed-budget"),
+          import("@/lib/admin/feed-caps"),
+        ]);
       const caps = await readFeedCaps();
-      return (await spendNeonFeedBudget(caps.racing, undefined, "racing")) != null;
+      const allowed =
+        (await spendNeonFeedBudget(caps.racing, undefined, "racing")) != null;
+      if (allowed) await logFeedUsageEvent("racing", operation);
+      return allowed;
     } catch {
       return true;
     }

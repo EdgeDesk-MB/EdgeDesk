@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/hooks/use-app-state";
+import { formatAlertHours, formatAlertMinutes } from "@/lib/alerts/toast-age";
 
 type PushDevice = {
   id: number;
@@ -47,14 +48,15 @@ function deviceLabel(): string {
   return `${os} · ${browser}`;
 }
 
-function formatAgo(ms: number | null): string {
-  if (ms == null) return "never delivered";
+function formatLastDelivered(ms: number | null): string {
+  if (ms == null) return "Not delivered yet";
   const mins = Math.round((Date.now() - ms) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
+  if (mins < 1) return "Last delivered just now";
+  if (mins < 60) return `Last delivered ${formatAlertMinutes(mins)} ago`;
   const hours = Math.round(mins / 60);
-  if (hours < 48) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  if (hours < 48) return `Last delivered ${formatAlertHours(hours)} ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "Last delivered 1 day ago" : `Last delivered ${days} days ago`;
 }
 
 function subscriptionJson(sub: PushSubscription): {
@@ -74,7 +76,6 @@ function subscriptionJson(sub: PushSubscription): {
 export function PushDeviceControl() {
   const [secure, setSecure] = useState<boolean | null>(null);
   const [supported, setSupported] = useState<boolean | null>(null);
-  const [origin, setOrigin] = useState("");
   const [permission, setPermission] = useState<NotificationPermission | "unknown">("unknown");
   const [localSub, setLocalSub] = useState(false);
   const [onServer, setOnServer] = useState(false);
@@ -107,8 +108,8 @@ export function PushDeviceControl() {
         });
         await refreshDevices(sub.endpoint);
         return true;
-      } catch (e) {
-        setProbeNote(`Could not sync to server: ${String(e)}`);
+      } catch {
+        setProbeNote("Could not save this device. Try the switch again.");
         return false;
       }
     },
@@ -125,7 +126,6 @@ export function PushDeviceControl() {
     queueMicrotask(() => {
       setSecure(isSecure);
       setSupported(ok);
-      setOrigin(window.location.origin);
       setPermission(typeof Notification !== "undefined" ? Notification.permission : "unknown");
       void refreshDevices();
     });
@@ -231,11 +231,11 @@ export function PushDeviceControl() {
       });
       setLocalSub(true);
       await refreshDevices(sub.endpoint);
-      toast.success(`Push registered (${deviceLabel()})`);
+      toast.success(`Alerts on when Edgeways is closed (${deviceLabel()})`);
     } catch (e) {
       const msg = String(e);
-      setProbeNote(msg);
-      toast.error("Could not enable push", { description: msg });
+      setProbeNote("Could not turn on alerts for this device. Try again.");
+      toast.error("Could not turn on alerts for this device", { description: msg });
     }
     });
   }
@@ -254,9 +254,9 @@ export function PushDeviceControl() {
       setLocalSub(false);
       setOnServer(false);
       await refreshDevices();
-      toast.success("Push disabled on this device");
+      toast.success("Alerts when closed turned off on this device");
     } catch (e) {
-      toast.error("Could not disable push", { description: String(e) });
+      toast.error("Could not turn off alerts for this device", { description: String(e) });
     }
     });
   }
@@ -278,7 +278,7 @@ export function PushDeviceControl() {
       const list = (await refreshDevices(sub?.endpoint)) ?? devices;
       const names = list.map((d) => d.label ?? "Device").join(", ");
       if (res.sent > 0 && res.failed === 0 && res.pruned === 0) {
-        toast.success(`Test push sent to ${res.sent} device${res.sent === 1 ? "" : "s"}`, {
+        toast.success(`Test sent to ${res.sent} device${res.sent === 1 ? "" : "s"}`, {
           description: names || undefined,
         });
       } else if (res.sent > 0) {
@@ -288,60 +288,72 @@ export function PushDeviceControl() {
             .join("; "),
         });
       } else if (res.pruned + res.failed > 0) {
-        toast.error("Test push failed on every device", {
+        toast.error("Test failed on every device", {
           description:
             (res.failures ?? []).map((f) => `${f.label ?? "Device"}: ${f.reason}`).join("; ") ||
-            "Subscriptions may have expired - use Re-register below.",
+            "This device may need to re-register.",
         });
       } else {
-        toast.info("No devices on the server yet", {
-          description: "Tap Register for background push on this phone first.",
+        toast.info("No devices registered yet", {
+          description: "Turn on When Edgeways is closed on this phone first.",
         });
       }
     } catch (e) {
-      toast.error("Test push failed", { description: String(e) });
+      toast.error("Test failed", { description: String(e) });
     }
     });
   }
 
-  if (secure == null || supported == null) return null;
+  const titleBlock = (
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-pretty break-words">When Edgeways is closed</p>
+      <p className="text-xs text-muted-foreground text-pretty break-words">
+        Same alerts on this phone or computer with every tab closed. Turn on once
+        per device.
+      </p>
+    </div>
+  );
+
+  if (secure == null || supported == null) {
+    return (
+      <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2">
+        {titleBlock}
+        <Switch checked={false} disabled aria-label="Get alerts when Edgeways is closed" />
+      </div>
+    );
+  }
 
   const deviceList =
     devices.length > 0 ? (
-      <ul className="flex flex-col gap-1 border-t pt-2">
+      <ul className="flex min-w-0 flex-col gap-1 border-t pt-2">
         {devices.map((d) => (
           <li
             key={d.id}
-            className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground"
+            className="flex min-w-0 items-baseline justify-between gap-2 text-xs text-muted-foreground"
           >
-            <span className="font-medium text-foreground">{d.label ?? "Device"}</span>
-            <span>last ok {formatAgo(d.lastOkAt)}</span>
+            <span className="min-w-0 font-medium text-pretty break-words text-foreground">
+              {d.label ?? "Device"}
+            </span>
+            <span className="shrink-0">{formatLastDelivered(d.lastOkAt)}</span>
           </li>
         ))}
       </ul>
-    ) : (
-      <p className="text-xs text-muted-foreground border-t pt-2">No devices on the server yet.</p>
-    );
+    ) : null;
 
   if (!secure) {
     return (
-      <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
-        <p className="text-sm font-medium">Push needs a secure origin</p>
-        <p className="text-xs text-muted-foreground">
-          This tab is on <span className="font-medium text-foreground">{origin || "http"}</span>.
-          Organic alerts can still appear while the app is open, but background push cannot
-          register. Open{" "}
-          <span className="font-medium text-foreground">
-            https://sams-mac-studio.tail975520.ts.net
-          </span>{" "}
-          in Chrome with Tailscale on, use that Home Screen shortcut, then register push there.
+      <div className="flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2">
+        <p className="text-sm font-medium text-pretty break-words">When Edgeways is closed</p>
+        <p className="text-xs text-muted-foreground text-pretty break-words">
+          Background alerts need a secure connection (HTTPS). In-app alerts still
+          show while Edgeways is open.
         </p>
         {deviceList}
         <Link
           href="/help?guide=mobile"
           className="self-start text-xs text-primary-text underline-offset-2 hover:underline"
         >
-          Mobile &amp; push guide
+          On your phone
         </Link>
       </div>
     );
@@ -349,11 +361,11 @@ export function PushDeviceControl() {
 
   if (!supported) {
     return (
-      <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
-        <p className="text-xs text-muted-foreground">
-          This browser has no PushManager on{" "}
-          <span className="font-medium text-foreground">{origin}</span>. Use Chrome, not an
-          in-app WebView.
+      <div className="flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2">
+        <p className="text-sm font-medium text-pretty break-words">When Edgeways is closed</p>
+        <p className="text-xs text-muted-foreground text-pretty break-words">
+          This browser cannot receive alerts when Edgeways is closed. Use Chrome, not
+          an in-app browser.
         </p>
         {deviceList}
       </div>
@@ -366,77 +378,57 @@ export function PushDeviceControl() {
     devices.length > 0 && !devices.some((d) => /android|ios|iphone|ipad/i.test(d.label ?? ""));
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">Background push</p>
-          <p className="text-xs text-muted-foreground">
-            Separate from organic alerts while the app is open. Register on each device once;
-            Send test push fans out to every device on the list (from Mac or phone).
-          </p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground break-all">{origin}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Permission: {permission}
-            {" · "}
-            Local sub: {localSub ? "yes" : "no"}
-            {" · "}
-            On server: {onServer ? "yes" : "no"}
-          </p>
-        </div>
+    <div className="flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        {titleBlock}
         <Switch
           checked={registered}
           disabled={busy}
-          aria-label="Enable background push on this device"
-          onCheckedChange={(v) => void (v ? registerPush(false) : unsubscribe())}
+          aria-label="Get alerts when Edgeways is closed"
+          onCheckedChange={(v) => void (v ? registerPush(desynced) : unsubscribe())}
         />
       </div>
 
-      {desynced ? (
-        <p className="text-xs text-warning">
-          This browser has a local push subscription that is not on the server (common after a
-          prune or failed save). Tap Re-register below.
+      {permission === "denied" ? (
+        <p className="text-xs text-warning text-pretty break-words">
+          Notifications are blocked in this browser. Allow them in site settings, then
+          try again.
         </p>
       ) : null}
 
-      {probeNote ? <p className="text-xs text-destructive break-words">{probeNote}</p> : null}
+      {desynced ? (
+        <p className="text-xs text-warning text-pretty break-words">
+          This device dropped off the list. Turn the switch on to register it again.
+        </p>
+      ) : null}
+
+      {!registered && !desynced && devices.length > 0 ? (
+        <p className="text-xs text-muted-foreground text-pretty break-words">
+          Not on for this browser yet. Turn the switch on to add it.
+        </p>
+      ) : null}
+
+      {probeNote ? (
+        <p className="text-xs text-destructive text-pretty break-words">{probeNote}</p>
+      ) : null}
 
       {deviceList}
 
       {phoneMissing && !registered ? (
-        <p className="text-xs text-muted-foreground">
-          Server only has a desktop browser. Open this Settings screen on the phone (check the
-          origin line is https://…ts.net) and register push there.{" "}
+        <p className="text-xs text-muted-foreground text-pretty break-words">
+          This list only has a computer so far. Open Settings → Alerts on your phone
+          and turn it on there.{" "}
           <Link
             href="/help?guide=mobile"
             className="text-primary-text underline-offset-2 hover:underline"
           >
-            Setup guide
+            On your phone
           </Link>
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {!registered ? (
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy}
-            onClick={() => void registerPush(desynced)}
-          >
-            {desynced ? "Re-register this device" : "Register for background push"}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={() => void registerPush(true)}
-          >
-            Re-register
-          </Button>
-        )}
-        {devices.length > 0 ? (
+      {devices.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
@@ -444,10 +436,10 @@ export function PushDeviceControl() {
             disabled={busy}
             onClick={() => void sendTest()}
           >
-            Send test push
+            Send a test
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

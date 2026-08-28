@@ -7,15 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spendNeonFeedBudget = vi.fn<(budget: number, day?: string) => Promise<number | null>>();
 const neonFeedBudgetUsed = vi.fn<(day?: string) => Promise<number>>();
+const logFeedUsageEvent = vi.fn<(feed: string, operation: string) => Promise<void>>();
 
 vi.mock("@/lib/db/desk-backend", () => ({ isNeonDesk: () => true }));
 vi.mock("@/lib/db/neon-feed-budget", () => ({
   spendNeonFeedBudget: (budget: number, day?: string) => spendNeonFeedBudget(budget, day),
   neonFeedBudgetUsed: (day?: string) => neonFeedBudgetUsed(day),
+  logFeedUsageEvent: (feed: string, operation: string) =>
+    logFeedUsageEvent(feed, operation),
   feedBudgetDay: () => "2026-08-23",
 }));
 
-const { DAILY_BUDGET, apiUsageTodayAsync, fixturesByDate } = await import(
+const { DAILY_BUDGET, apiUsageTodayAsync, fixturesByDate, footballOperation } = await import(
   "@/lib/services/apifootball"
 );
 
@@ -25,6 +28,8 @@ beforeEach(() => {
   vi.restoreAllMocks();
   spendNeonFeedBudget.mockReset();
   neonFeedBudgetUsed.mockReset();
+  logFeedUsageEvent.mockReset();
+  logFeedUsageEvent.mockResolvedValue(undefined);
   process.env.API_FOOTBALL_KEY = "test-key";
   vi.stubGlobal(
     "fetch",
@@ -82,5 +87,29 @@ describe("hosted API-Football budget", () => {
     const usage = await apiUsageTodayAsync();
     expect(usage.budget).toBe(DAILY_BUDGET);
     expect(usage.used).toBeGreaterThanOrEqual(0);
+  });
+
+  it("logs an attribution event per spent request", async () => {
+    spendNeonFeedBudget.mockResolvedValue(1);
+    await fixturesByDate(nextDate());
+    expect(logFeedUsageEvent).toHaveBeenCalledWith("football", "fixtures-by-date");
+  });
+
+  it("does not log when the shared counter denies the request", async () => {
+    spendNeonFeedBudget.mockResolvedValue(null);
+    await expect(fixturesByDate(nextDate())).rejects.toThrow(
+      /daily request budget exhausted/
+    );
+    expect(logFeedUsageEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("footballOperation", () => {
+  it("derives the operation from the request path", () => {
+    expect(footballOperation("/fixtures?date=2026-08-27")).toBe("fixtures-by-date");
+    expect(footballOperation("/fixtures?live=all")).toBe("live-fixtures");
+    expect(footballOperation("/fixtures?id=12345")).toBe("fixture-by-id");
+    expect(footballOperation("/fixtures/events?fixture=1&type=Goal")).toBe("goal-events");
+    expect(footballOperation("/status")).toBe("other");
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,18 +36,42 @@ import {
   ADMIN_REVOKE_HEADLINE,
   adminGrantLead,
 } from "@/lib/admin/copy";
+import { onboardingProfileSummary } from "@/lib/admin/funnel";
 import { formatAdminDateTime } from "@/lib/admin/format";
 import { adminAccessLock } from "@/lib/admin/roles";
 import type { AdminUserRow } from "@/lib/services/app-users";
 import { Shield } from "lucide-react";
-import { captionHeading, tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
+import {
+  adminModeTag,
+  adminTestTag,
+  captionHeading,
+  tableBodyCell,
+  tableHeaderCell,
+} from "@/lib/ui/surface-styles";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] }) {
+export function UsersManager({
+  initialUsers,
+  initialExcludedIds,
+}: {
+  initialUsers: AdminUserRow[];
+  initialExcludedIds: string[];
+}) {
+  const router = useRouter();
   const [users, setUsers] = useState(initialUsers);
+  const [excludedIds, setExcludedIds] = useState(
+    () => new Set(initialExcludedIds)
+  );
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<AdminUserRow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [excludeBusyId, setExcludeBusyId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -88,7 +113,42 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
     }
   }
 
+  async function toggleExcluded(user: AdminUserRow) {
+    const nextExcluded = !excludedIds.has(user.clerkUserId);
+    setExcludeBusyId(user.clerkUserId);
+    try {
+      const res = await fetch("/api/admin/excluded-accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clerkUserId: user.clerkUserId,
+          excluded: nextExcluded,
+        }),
+      });
+      const body = (await res.json()) as {
+        error?: string;
+        clerkUserIds?: string[];
+      };
+      if (!res.ok || !body.clerkUserIds) {
+        toast.error(body.error ?? "Could not update test accounts.");
+        return;
+      }
+      setExcludedIds(new Set(body.clerkUserIds));
+      toast.success(
+        nextExcluded ? "Marked as a test account." : "Removed the test mark."
+      );
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update test accounts."
+      );
+    } finally {
+      setExcludeBusyId(null);
+    }
+  }
+
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="flex flex-col gap-4">
       <div className="flex max-w-sm flex-col gap-1.5">
         <Label htmlFor="admin-user-search">Search by email</Label>
@@ -120,10 +180,10 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
               <TableHead className={tableHeaderCell}>Email</TableHead>
               <TableHead className={tableHeaderCell}>Plan</TableHead>
               <TableHead className={tableHeaderCell}>Legal</TableHead>
-              <TableHead className={tableHeaderCell}>Onboarded</TableHead>
+              <TableHead className={tableHeaderCell}>Answered</TableHead>
               <TableHead className={tableHeaderCell}>Last active</TableHead>
               <TableHead className={tableHeaderCell}>Admin</TableHead>
-              <TableHead className={cn(tableHeaderCell, "text-right")}>Access</TableHead>
+              <TableHead className={cn(tableHeaderCell, "text-right")}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -131,18 +191,38 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
               const lock = adminAccessLock(user, adminCount);
               return (
               <TableRow key={user.clerkUserId}>
-                <TableCell className={cn(tableBodyCell, "max-w-[18rem] truncate font-medium")}>
-                  {user.email ?? user.clerkUserId}
-                  {user.admin ? (
-                    <span className="ml-1.5 rounded bg-brand/15 px-1 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-brand">
-                      Admin
+                <TableCell className={cn(tableBodyCell, "max-w-[18rem] min-w-0")}>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="min-w-0 truncate font-medium">
+                      {user.email ?? user.clerkUserId}
                     </span>
-                  ) : null}
-                  {user.bootstrap ? (
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                      Bootstrap
-                    </span>
-                  ) : null}
+                    {user.admin ? (
+                      <span className={cn(adminModeTag, "shrink-0")}>ADMIN</span>
+                    ) : null}
+                    {excludedIds.has(user.clerkUserId) ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              adminTestTag,
+                              "shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            )}
+                          >
+                            TEST
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Hidden from other admin pages
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                    {user.bootstrap ? (
+                      <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                        Bootstrap
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell className={cn(tableBodyCell, "capitalize")}>{user.plan}</TableCell>
                 <TableCell className={tableBodyCell}>
@@ -159,7 +239,19 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
                 </TableCell>
                 <TableCell className={tableBodyCell}>
                   {user.onboardingProfile ? (
-                    <span className="text-profit">Done</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="rounded-sm text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Answered
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {onboardingProfileSummary(user.onboardingProfile)}
+                      </TooltipContent>
+                    </Tooltip>
                   ) : (
                     <span className="text-muted-foreground">Not yet</span>
                   )}
@@ -173,20 +265,41 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
                   )}
                 </TableCell>
                 <TableCell className={cn(tableBodyCell, "text-right")}>
-                  {lock === "bootstrap" ? (
-                    <span className="text-xs text-muted-foreground">Locked</span>
-                  ) : lock === "last-admin" ? (
-                    <span className="text-xs text-muted-foreground">Last admin</span>
-                  ) : (
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
                     <Button
                       type="button"
                       size="sm"
-                      variant={user.admin ? "outline" : "default"}
-                      onClick={() => setPending(user)}
+                      variant="outline"
+                      disabled={excludeBusyId === user.clerkUserId}
+                      aria-busy={excludeBusyId === user.clerkUserId}
+                      aria-label={
+                        excludedIds.has(user.clerkUserId)
+                          ? `Remove the test mark from ${user.email ?? user.clerkUserId}`
+                          : `Mark ${user.email ?? user.clerkUserId} as a test account`
+                      }
+                      onClick={() => void toggleExcluded(user)}
                     >
-                      {user.admin ? "Revoke admin" : "Grant admin"}
+                      {excludeBusyId === user.clerkUserId
+                        ? "Saving…"
+                        : excludedIds.has(user.clerkUserId)
+                          ? "Unmark test"
+                          : "Mark as test"}
                     </Button>
-                  )}
+                    {lock === "bootstrap" ? (
+                      <span className="text-xs text-muted-foreground">Locked</span>
+                    ) : lock === "last-admin" ? (
+                      <span className="text-xs text-muted-foreground">Last admin</span>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={user.admin ? "outline" : "default"}
+                        onClick={() => setPending(user)}
+                      >
+                        {user.admin ? "Revoke admin" : "Grant admin"}
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
               );
@@ -247,5 +360,6 @@ export function UsersManager({ initialUsers }: { initialUsers: AdminUserRow[] })
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }

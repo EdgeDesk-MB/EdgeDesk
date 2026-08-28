@@ -556,7 +556,11 @@ function buildSuggestedRaces(
     for (const tag of race.offerTags) {
       if (!tag.qualifies) continue;
       const edge = edgeByRaceOffer.get(`${race.externalId}:${tag.offerId}`);
-      if (!edge && (tag.score == null || tag.score <= 0)) continue;
+      // Heuristic score can be 0 on a weak market shape while still naming
+      // runners. Drop only when there is nothing to rank.
+      if (!edge && !(tag.suggestedRunners?.length) && (tag.score == null || tag.score <= 0)) {
+        continue;
+      }
 
       const topTarget = tag.suggestedRunners?.[0];
       suggestions.push({
@@ -798,13 +802,7 @@ export async function getRacingDesk(
   }
 
   const overridesByRace = listOverridesForRaces(cards.map((c) => c.externalId));
-  const offersById = new Map(
-    db
-      .select()
-      .from(offers)
-      .all()
-      .map((o) => [o.id, o] as const)
-  );
+  const offersById = new Map(allOffers.map((o) => [o.id, o] as const));
 
   const now = Date.now();
   let races: RacingDeskRace[] = cards.map((card) => {
@@ -973,8 +971,8 @@ export async function getRacingDesk(
   let exchangeNote: string | undefined;
   if (liveFeed.status.status === "not_configured") {
     exchangeNote = deskOverride
-      ? `${liveFeed.name} is selected on Racing Desk but its feed is not connected. Check Settings → Data & API, or pick another exchange.`
-      : `The exchange feed is not connected on this desk - live lay odds unavailable. App default exchange is ${settingsName}.`;
+      ? `${liveFeed.name} is selected, but live prices are not available. Showing estimates, or pick another exchange.`
+      : `Live exchange prices are not connected. Showing estimates.`;
   } else if (liveFeed.status.status === "unsupported") {
     exchangeNote = liveFeed.status.message;
   } else if (!hasLiveExchange) {
@@ -984,7 +982,7 @@ export async function getRacingDesk(
     liveFeed.provider !== settingsProvider &&
     settingsStatus.status !== "connected"
   ) {
-    exchangeNote = `Using ${liveFeed.name} for live lays (Settings default ${settingsName} has no connected feed). Override on Racing Desk or set the default to a connected exchange in Settings.`;
+    exchangeNote = `Using ${liveFeed.name} for live lays.`;
   }
 
   const summary: RacingDeskSummary = {

@@ -1,19 +1,20 @@
 "use client";
 
 /**
- * EDGE-82: pricing CTA that respects an existing subscription. SSR renders
- * the normal checkout href; after mount a signed-in subscriber (live
- * billing status) gets Settings → Subscription instead, so the marketing
- * pricing page never sends them into a second Checkout. The /subscribe
- * route also guards server-side — this is the kinder front door.
+ * EDGE-82: pricing CTAs that respect an existing subscription. Guests see
+ * per-card checkout. Live subscribers get one “Manage subscription” under
+ * the cards, with live=1 so a leftover /demo cookie cannot open Settings
+ * as DEMO DATA. CTAs stay pending until that split is known.
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { billingStatusIsLive } from "@/lib/billing/checkout-session";
+import { useAuth } from "@clerk/nextjs";
 import {
-  SETTINGS_SUBSCRIPTION_HREF,
-  type SubscriptionAccount,
-} from "@/lib/billing/subscription-view";
+  isLiveSubscriberAccount,
+  marketingPricingAction,
+  type MarketingPricingAction,
+} from "@/lib/billing/marketing-pricing-action";
+import { type SubscriptionAccount } from "@/lib/billing/subscription-view";
 
 let cache: SubscriptionAccount | null | undefined;
 let inFlight: Promise<SubscriptionAccount | null> | null = null;
@@ -35,6 +36,31 @@ function loadBillingAccount(): Promise<SubscriptionAccount | null> {
   return inFlight;
 }
 
+export function useMarketingPricingAction(): MarketingPricingAction {
+  const { isLoaded, isSignedIn } = useAuth();
+  const [billing, setBilling] = useState<SubscriptionAccount | null | undefined>(
+    () => cache
+  );
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let live = true;
+    void loadBillingAccount().then((account) => {
+      if (live) setBilling(account);
+    });
+    return () => {
+      live = false;
+    };
+  }, [isLoaded, isSignedIn]);
+
+  return marketingPricingAction({
+    authLoaded: isLoaded,
+    signedIn: isSignedIn === true,
+    billingLoaded: !isSignedIn || billing !== undefined,
+    liveSubscriber: isLiveSubscriberAccount(billing),
+  });
+}
+
 export function PricingCta({
   href,
   className,
@@ -44,24 +70,9 @@ export function PricingCta({
   className?: string;
   children: React.ReactNode;
 }) {
-  const [subscriber, setSubscriber] = useState(false);
-
-  useEffect(() => {
-    let live = true;
-    void loadBillingAccount().then((account) => {
-      if (live) setSubscriber(billingStatusIsLive(account?.billingStatus));
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-
   return (
-    <Link
-      href={subscriber ? SETTINGS_SUBSCRIPTION_HREF : href}
-      className={className}
-    >
-      {subscriber ? "Manage subscription" : children}
+    <Link href={href} className={className}>
+      {children}
     </Link>
   );
 }

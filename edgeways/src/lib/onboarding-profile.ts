@@ -137,6 +137,27 @@ export const ONBOARDING_WHY = [
   flag: FeatureFlag;
 }[];
 
+export const ONBOARDING_HOSTED_STEPS = [
+  {
+    id: "experience",
+    title: "What's your experience of matched betting?",
+    body: "So we know how to talk to you.",
+    help: "Edgeways does not send bookie offers.",
+  },
+  {
+    id: "why",
+    title: "What brought you to Edgeways app?",
+    body: "Which features interest you most?",
+    help: "Some sit on Core or Edge. We will say if an upgrade would unlock them.",
+  },
+  {
+    id: "heard",
+    title: "How did you hear about Edgeways app?",
+    body: "Optional. Skip if you would rather not say.",
+    help: "Not used for ads.",
+  },
+] as const;
+
 export const ONBOARDING_HEARD = [
   { id: "reddit", label: "Reddit" },
   { id: "discord", label: "Discord" },
@@ -282,7 +303,7 @@ export function upgradeNudgeTitle(target: PlanId): string {
 }
 
 export function upgradeNudgeBody(): string {
-  return "Upgrade and the features you selected will be available when you land on the desk.";
+  return "You can continue without upgrading. Upgrade and the features you selected will be available when you land on the desk.";
 }
 
 export function planMeetsTarget(current: PlanId, target: PlanId): boolean {

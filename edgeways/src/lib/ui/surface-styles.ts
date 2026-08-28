@@ -282,6 +282,12 @@ export const demoDataTag = `${navTag} bg-warning text-white`;
 export const adminModeTag = demoDataTag;
 
 /**
+ * Test-account mark on /admin user lists — muted plate so it stays distinct
+ * from the warning ADMIN chip.
+ */
+export const adminTestTag = `${navTag} bg-foreground/10 text-muted-foreground`;
+
+/**
  * Settled/open bet mark on Racing Desk runners — same box as `edgeNavTag`
  * (11px, px-1.5 py-0.5, rounded-[3px]); ink plate + canvas type.
  */

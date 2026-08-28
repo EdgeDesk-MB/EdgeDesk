@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   FEED_CRITICAL_RATIO,
   FEED_WARNING_RATIO,
+  feedOperationLabel,
   feedThresholdState,
   fillDailySeries,
+  groupFeedUsageBySource,
   projectDailyPace,
+  type FeedUsageAttributionInput,
 } from "@/lib/admin/feed-monitor";
 
 describe("feedThresholdState", () => {
@@ -93,5 +96,94 @@ describe("fillDailySeries", () => {
 
   it("returns the requested number of days", () => {
     expect(fillDailySeries([], 30, now)).toHaveLength(30);
+  });
+});
+
+describe("groupFeedUsageBySource", () => {
+  const row = (
+    overrides: Partial<FeedUsageAttributionInput>
+  ): FeedUsageAttributionInput => ({
+    feed: "football",
+    clerkUserId: null,
+    email: null,
+    operation: "fixtures-by-date",
+    count: 1,
+    ...overrides,
+  });
+
+  it("rolls operations up per user and labels them by email", () => {
+    const sources = groupFeedUsageBySource([
+      row({ clerkUserId: "user_a", email: "ada@example.com", count: 6 }),
+      row({
+        clerkUserId: "user_a",
+        email: "ada@example.com",
+        operation: "goal-events",
+        count: 2,
+      }),
+      row({ clerkUserId: "user_a", email: "ada@example.com", feed: "racing", operation: "odds", count: 3 }),
+    ]);
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatchObject({
+      key: "user_a",
+      label: "ada@example.com",
+      isSystem: false,
+      total: 11,
+      football: 8,
+      racing: 3,
+    });
+    // Most-spent operation first.
+    expect(sources[0].operations.map((op) => op.operation)).toEqual([
+      "fixtures-by-date",
+      "odds",
+      "goal-events",
+    ]);
+  });
+
+  it("buckets null actors as system spend", () => {
+    const sources = groupFeedUsageBySource([
+      row({ operation: "live-fixtures", count: 4 }),
+      row({ feed: "racing", operation: "racecards-free", count: 1 }),
+    ]);
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatchObject({
+      key: "system",
+      label: "System / poller",
+      isSystem: true,
+      total: 5,
+      football: 4,
+      racing: 1,
+    });
+  });
+
+  it("sorts highest spend first and system last on a tie", () => {
+    const sources = groupFeedUsageBySource([
+      row({ count: 2 }),
+      row({ clerkUserId: "user_a", email: "ada@example.com", count: 2 }),
+      row({ clerkUserId: "user_b", email: "bob@example.com", count: 9 }),
+    ]);
+
+    expect(sources.map((source) => source.label)).toEqual([
+      "bob@example.com",
+      "ada@example.com",
+      "System / poller",
+    ]);
+  });
+
+  it("falls back to a user id fragment when the email is missing", () => {
+    const sources = groupFeedUsageBySource([
+      row({ clerkUserId: "user_2xyz123456", count: 1 }),
+    ]);
+    expect(sources[0].label).toBe("User …123456");
+  });
+});
+
+describe("feedOperationLabel", () => {
+  it("labels known operations and falls back to Other", () => {
+    expect(feedOperationLabel("fixtures-by-date")).toBe("Fixture browsing");
+    expect(feedOperationLabel("racecards-free")).toBe("Racecards (free)");
+    expect(feedOperationLabel("odds")).toBe("Odds");
+    expect(feedOperationLabel("something-new")).toBe("Other");
   });
 });

@@ -6,13 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import type { FeedCaps } from "@/lib/admin/feed-caps";
 
 /**
@@ -49,52 +42,43 @@ export function FeedCapsForm({ initial }: { initial: FeedCaps }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Daily caps</CardTitle>
-        <CardDescription>
-          Raise these when you upgrade a provider plan. Both are hard
-          ceilings — requests stop for the day when a cap is hit.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cap-football">Football requests/day</Label>
-            <Input
-              id="cap-football"
-              type="number"
-              min={1}
-              step={1}
-              inputMode="numeric"
-              value={football}
-              onChange={(event) => setFootball(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cap-racing">Racing requests/day</Label>
-            <Input
-              id="cap-racing"
-              type="number"
-              min={1}
-              step={1}
-              inputMode="numeric"
-              value={racing}
-              onChange={(event) => setRacing(event.target.value)}
-            />
-          </div>
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cap-football">Football requests/day</Label>
+          <Input
+            id="cap-football"
+            type="number"
+            min={1}
+            step={1}
+            inputMode="numeric"
+            value={football}
+            onChange={(event) => setFootball(event.target.value)}
+          />
         </div>
-        <div>
-          <Button
-            type="button"
-            size="sm"
-            disabled={saving}
-            onClick={() => void save()}
-          >
-            {saving ? "Saving…" : "Save caps"}
-          </Button>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cap-racing">Racing requests/day</Label>
+          <Input
+            id="cap-racing"
+            type="number"
+            min={1}
+            step={1}
+            inputMode="numeric"
+            value={racing}
+            onChange={(event) => setRacing(event.target.value)}
+          />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div>
+        <Button
+          type="button"
+          size="sm"
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "Saving…" : "Save caps"}
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,7 +40,6 @@ import {
   type HomeWidgetId,
 } from "@/lib/ui/home-layout";
 import type { ExchangeRow } from "@/lib/db/schema";
-import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { useOnboarding } from "@/components/help/onboarding-provider";
@@ -61,7 +59,6 @@ import { SportLabel } from "@/components/sport-icon";
 import { sectionDescription } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
-import { useAdminSession } from "@/hooks/use-admin-session";
 
 const SETTINGS_TABS = [
   "subscription",
@@ -72,7 +69,6 @@ const SETTINGS_TABS = [
   "targets",
   "home-layout",
   "time",
-  "integrations",
   "data",
 ] as const;
 
@@ -87,20 +83,22 @@ export default function SettingsPage() {
   const { exchanges, refresh: refreshExchanges } = useExchanges();
   const { state, refresh } = useAppState(5000);
   const { active: publicDemo } = usePublicDemo();
-  const { admin, loaded } = useAdminSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const settings = state?.settings;
   const requestedTab = searchParams.get("tab");
   const [tab, setTab] = useState<SettingsTab>(() =>
     requestedTab && isSettingsTab(requestedTab) ? requestedTab : "subscription"
   );
 
-  const visibleTab: SettingsTab =
-    tab === "integrations" && loaded && !admin ? "data" : tab;
+  useEffect(() => {
+    if (searchParams.get("tab") === "integrations") {
+      router.replace("/admin/feeds");
+    }
+  }, [router, searchParams]);
 
   function selectTab(next: string) {
     if (!isSettingsTab(next)) return;
-    if (next === "integrations" && !admin) return;
     setTab(next);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
@@ -206,7 +204,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader className="pb-0">
-          <Tabs value={visibleTab} onValueChange={selectTab} className="gap-0">
+          <Tabs value={tab} onValueChange={selectTab} className="gap-0">
             <TabsLineBar bleed="card">
               <TabsList variant="line" className="justify-start">
                 <TabsTrigger value="subscription">Subscription</TabsTrigger>
@@ -217,23 +215,20 @@ export default function SettingsPage() {
                 <TabsTrigger value="targets">Targets &amp; tuning</TabsTrigger>
                 <TabsTrigger value="home-layout">Home layout</TabsTrigger>
                 <TabsTrigger value="time">Time &amp; region</TabsTrigger>
-                {loaded && admin ? (
-                  <TabsTrigger value="integrations">Integrations</TabsTrigger>
-                ) : null}
                 <TabsTrigger value="data">Data &amp; backup</TabsTrigger>
               </TabsList>
             </TabsLineBar>
           </Tabs>
         </CardHeader>
         <CardContent className="pt-4">
-          {visibleTab === "subscription" && (
+          {tab === "subscription" && (
             <SubscriptionCard
               planPreview={settings?.planPreview ?? "unlocked"}
               onPatch={publicDemo ? undefined : patchSettings}
             />
           )}
 
-          {visibleTab === "appearance" && (
+          {tab === "appearance" && (
             <AppearanceCard
               onPersistFont={
                 publicDemo
@@ -292,7 +287,7 @@ export default function SettingsPage() {
             />
           )}
 
-          {visibleTab === "bet-defaults" && settings && (
+          {tab === "bet-defaults" && settings && (
             <BetDefaultsCard
               settings={settings}
               exchanges={exchanges}
@@ -301,43 +296,30 @@ export default function SettingsPage() {
             />
           )}
 
-          {visibleTab === "automation" && settings && (
+          {tab === "automation" && settings && (
             <AutomationCard settings={settings} onPatch={patchSettings} />
           )}
 
-          {visibleTab === "alerts" && settings && (
+          {tab === "alerts" && settings && (
             <AlertsCard settings={settings} onPatch={patchSettings} />
           )}
 
-          {visibleTab === "targets" && settings && (
+          {tab === "targets" && settings && (
             <div className="flex flex-col gap-4">
               <TargetCard target={settings.monthlyProfitTarget} onPatch={patchSettings} />
               <TuningCard tuning={settings.tuning} onPatch={patchSettings} />
             </div>
           )}
 
-          {visibleTab === "home-layout" && settings && (
+          {tab === "home-layout" && settings && (
             <HomeLayoutCard layout={settings.homeLayout} onPatch={patchSettings} />
           )}
 
-          {visibleTab === "time" && settings && (
+          {tab === "time" && settings && (
             <TimeRegionCard settings={settings} onPatch={patchSettings} />
           )}
 
-          {visibleTab === "integrations" && loaded && admin && (
-            <IntegrationsPanel
-              apiConfigured={state?.apiConfigured}
-              racingApiConfigured={state?.racingApiConfigured}
-              racingResultsTier={state?.racingResultsTier}
-              apiUsage={state?.apiUsage}
-              racingApiUsage={state?.racingApiUsage}
-              exchangeName={state?.exchangeName}
-              exchangeStatus={state?.exchangeStatus}
-              exchangeProviders={state?.exchangeProviders}
-            />
-          )}
-
-          {visibleTab === "data" && (
+          {tab === "data" && (
             <DataBackupPanel onRefresh={refresh} hosted={state?.hostedDesk ?? false} />
           )}
         </CardContent>
@@ -1004,9 +986,9 @@ function AlertsCard({
           <BellRing className="size-4" /> Alerts
         </CardTitle>
         <CardDescription>
-          Background and automation alerts stay until you dismiss them. Settles you
-          confirm yourself auto-dismiss. Browser notifications (permission needed) fire
-          as well when Edgeways is open.
+          Alerts stay until you dismiss them. Settles you confirm yourself dismiss
+          automatically. While you are in Edgeways they appear in the app; the rows
+          below cover banners and alerts when it is closed.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 lg:grid-cols-2">
@@ -1105,8 +1087,8 @@ function AlertsCard({
             onCheckedChange={(v) => onPatch({ digestWeekly: v })}
           />
         </div>
-        <div className="flex flex-col gap-3 lg:col-span-2">
-          <NotificationPermissionButton />
+        <NotificationPermissionButton />
+        <div className="min-w-0 lg:col-span-2">
           <PushDeviceControl />
         </div>
       </CardContent>
@@ -1176,295 +1158,6 @@ function TimeRegionCard({
   );
 }
 
-function IntegrationsPanel({
-  apiConfigured,
-  racingApiConfigured,
-  racingResultsTier,
-  apiUsage,
-  racingApiUsage,
-  exchangeName,
-  exchangeStatus,
-  exchangeProviders,
-}: {
-  apiConfigured?: boolean;
-  racingApiConfigured?: boolean;
-  racingResultsTier?: "basic" | "free" | "none";
-  apiUsage?: { used: number; budget: number };
-  racingApiUsage?: { used: number };
-  exchangeName?: string;
-  exchangeStatus?: ExchangeProviderStatus;
-  exchangeProviders?: ExchangeProviderStatus[];
-}) {
-  const [testingExchange, setTestingExchange] = useState(false);
-  const [testingRacing, setTestingRacing] = useState(false);
-
-  async function testRacingApi() {
-    setTestingRacing(true);
-    try {
-      const res = await api<{
-        tier: "basic" | "free" | "none";
-        resultCount: number;
-        message?: string;
-      }>("/api/racing/test");
-      if (res.tier === "basic") {
-        toast.success("Racing feed connected", {
-          description: res.message ?? `${res.resultCount} results available today`,
-        });
-      } else if (res.tier === "free") {
-        toast.info("Racing feed: racecards only", {
-          description:
-            res.message ??
-            "Racecards work; auto race settlement is not active on this desk.",
-        });
-      } else {
-        toast.error("Racing feed not connected", {
-          description: "Racing cards are not connected on this desk.",
-        });
-      }
-    } catch (e) {
-      toast.error("Racing feed test failed", { description: String(e) });
-    } finally {
-      setTestingRacing(false);
-    }
-  }
-
-  async function testExchangeConnection() {
-    setTestingExchange(true);
-    try {
-      const res = await api<{
-        providers: Array<ExchangeProviderStatus & { ok: boolean; message?: string }>;
-      }>("/api/exchange/test");
-      const betfair = res.providers.find((p) => p.provider === "betfair");
-      if (betfair?.ok) {
-        toast.success("Exchange feed connected", { description: betfair.message });
-      } else {
-        toast.error("Exchange feed connection failed", {
-          description: betfair?.message ?? "The exchange feed is not connected on this desk.",
-        });
-      }
-    } catch (e) {
-      toast.error("Connection test failed", { description: String(e) });
-    } finally {
-      setTestingExchange(false);
-    }
-  }
-
-  function exchangeBadgeVariant(
-    status?: ExchangeProviderStatus["status"]
-  ): "default" | "outline" | "secondary" | "destructive" {
-    if (status === "connected") return "default";
-    if (status === "unsupported") return "secondary";
-    return "outline";
-  }
-
-  function exchangeStatusLabel(status?: ExchangeProviderStatus): string {
-    if (!status) return "Loading…";
-    if (status.status === "connected") {
-      return status.feedType === "delayed" ? "Connected (delayed)" : "Connected";
-    }
-    if (status.status === "not_configured") return "Not connected";
-    if (status.status === "unsupported") return "Partner API required";
-    return "Disconnected";
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Live feeds</CardTitle>
-          <CardDescription>
-            Edgeways connects live racing, football and exchange feeds. You do not add
-            provider keys. Status for each feed is below.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
-            <li>
-              <span className="text-foreground">Racing</span> - today/tomorrow racecards;
-              paste real bookie odds on Racing Desk (click a price)
-            </li>
-            <li>
-              <span className="text-foreground">Exchange (delayed)</span> - real lay prices
-              (~1–3 min delay), fine pre-race
-            </li>
-            <li>
-              <span className="text-foreground">Football</span> - live scores when a match is
-              tracked
-            </li>
-            <li>
-              <span className="text-foreground">Everything else</span> - calculators, offers,
-              tracker, OCR and the simulator work without feeds
-            </li>
-          </ul>
-          <div className="rounded-md border px-3 py-2 space-y-1.5 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">How often feeds update</p>
-            <p>
-              Racing cards: provider ~3 min (today) / ~15 min (tomorrow); Edgeways caches{" "}
-              <span className="text-foreground">15 min</span>. Desk UI reloads every 60s from cache.
-            </p>
-            <p>
-              Exchange prices:{" "}
-              <span className="text-foreground">~1–3 min behind</span> live (fine pre-race).
-            </p>
-            <p>
-              Football: live scores ~<span className="text-foreground">60s</span>; fixtures list ~
-              <span className="text-foreground">10 min</span>.
-            </p>
-            <p>Leave the desk open during sessions. Closing the tab pauses auto sync.</p>
-          </div>
-          <div className="rounded-md border px-3 py-2 space-y-2">
-            <p className="text-xs font-medium text-foreground">On this desk</p>
-            <ul className="space-y-1.5 text-xs text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-                <span>
-                  Racing
-                  {racingApiConfigured ? (
-                    <span className="text-profit"> - connected</span>
-                  ) : (
-                    <span> - not connected</span>
-                  )}
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-                <span>
-                  Football
-                  {apiConfigured ? (
-                    <span className="text-profit"> - connected</span>
-                  ) : (
-                    <span> - not connected (simulator still works)</span>
-                  )}
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-                <span>
-                  Exchange
-                  {exchangeStatus?.status === "connected" ? (
-                    <span className="text-profit"> - connected</span>
-                  ) : (
-                    <span> - not connected</span>
-                  )}
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-                <span>
-                  On Racing Desk: click a bookie price to paste real odds; place-refund remembers
-                  your last stake/bookie per offer
-                </span>
-              </li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Connection status</CardTitle>
-          <CardDescription>
-            Racing, football and exchange feeds. Test a connection if something looks off.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="rounded-md border px-3 py-2 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span>Football feed</span>
-              <Badge variant={apiConfigured ? "default" : "outline"}>
-                {apiConfigured ? "Configured" : "Demo mode"}
-              </Badge>
-            </div>
-            {apiUsage && (
-              <p className="text-xs text-muted-foreground">
-                Today: {apiUsage.used}/{apiUsage.budget} requests (free ~100/day; Edgeways caps
-                below the limit)
-              </p>
-            )}
-          </div>
-          <div className="rounded-md border px-3 py-2 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span>Racing feed</span>
-              <Badge
-                variant={
-                  racingResultsTier === "basic"
-                    ? "default"
-                    : racingApiConfigured
-                      ? "secondary"
-                      : "outline"
-                }
-              >
-                {racingResultsTier === "basic"
-                  ? "Connected (auto settle)"
-                  : racingResultsTier === "free" || racingApiConfigured
-                    ? "Connected (racecards)"
-                    : "Not set"}
-              </Badge>
-            </div>
-            {racingApiUsage && racingApiConfigured && (
-              <p className="text-xs text-muted-foreground">
-                Today: {racingApiUsage.used} requests logged
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Racecards on the standard feed; auto race settlement and live bookie odds on
-              higher feed tiers. Paste-overrides always work.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={testingRacing || !racingApiConfigured}
-              onClick={testRacingApi}
-            >
-              {testingRacing ? "Testing…" : "Test racing feed"}
-            </Button>
-          </div>
-          <div className="rounded-md border px-3 py-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <span>
-                Exchange API
-                {exchangeName ? (
-                  <span className="text-muted-foreground"> · default {exchangeName}</span>
-                ) : null}
-              </span>
-              <Badge variant={exchangeBadgeVariant(exchangeStatus?.status)}>
-                {exchangeStatusLabel(exchangeStatus)}
-              </Badge>
-            </div>
-            {exchangeStatus?.message && (
-              <p className="text-xs text-muted-foreground">{exchangeStatus.message}</p>
-            )}
-          </div>
-          {(exchangeProviders ?? []).map((p) => (
-            <div
-              key={p.provider}
-              className="flex items-center justify-between rounded-md border px-3 py-2 text-xs"
-            >
-              <span className="capitalize">{p.provider}</span>
-              <Badge variant={exchangeBadgeVariant(p.status)} className="text-[11px]">
-                {exchangeStatusLabel(p)}
-              </Badge>
-            </div>
-          ))}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => void testExchangeConnection()}
-            disabled={testingExchange}
-          >
-            {testingExchange ? "Testing…" : "Test exchange connection"}
-          </Button>
-          <p className="text-xs text-muted-foreground pt-1">
-            Delayed exchange prices when connected. Set your default exchange in Bet defaults.
-            Racing Desk can still override for that page only. Betdaq is not available yet.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 function DataBackupPanel({
   onRefresh,
   hosted,
@@ -1507,7 +1200,9 @@ function DataBackupPanel({
 }
 
 function NotificationPermissionButton() {
-  const [status, setStatus] = useState<NotificationPermission | "unsupported">("default");
+  const [status, setStatus] = useState<NotificationPermission | "unsupported" | "unknown">(
+    "unknown"
+  );
 
   useEffect(() => {
     // Client-only API - defer a microtask so hydration settles first.
@@ -1516,41 +1211,52 @@ function NotificationPermissionButton() {
     });
   }, []);
 
-  if (status === "unsupported") {
-    return (
-      <p className="text-xs text-muted-foreground">
-        This browser does not support notifications - background alerts show as sticky
-        in-app toasts; settles you confirm yourself auto-dismiss.
-      </p>
-    );
-  }
-  if (status === "granted") {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Browser notifications enabled. Background alerts also show as sticky toasts when
-        the tab is focused; settles you confirm yourself auto-dismiss.
-      </p>
-    );
-  }
-  if (status === "denied") {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Notifications are blocked for this site - background alerts still show as sticky
-        in-app toasts. Allow notifications in your browser settings to change this.
-      </p>
-    );
-  }
+  const description =
+    status === "denied"
+      ? "Blocked for this site. In-app alerts still show. Allow notifications in the browser to change this."
+      : status === "unsupported"
+        ? "This browser cannot show notification banners. In-app alerts still show."
+        : "Notification banners while Edgeways is open. In-app alerts still show either way.";
+
+  const statusLabel =
+    status === "granted"
+      ? "On"
+      : status === "denied"
+        ? "Blocked"
+        : status === "unsupported"
+          ? "Unavailable"
+          : null;
+
   return (
-    <Button
-      type="button"
-      variant="outline"
-      className="self-start"
-      onClick={async () => {
-        const result = await Notification.requestPermission();
-        setStatus(result);
-      }}
-    >
-      Enable browser notifications
-    </Button>
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-pretty break-words">Browser notifications</p>
+        <p className="text-xs text-muted-foreground text-pretty break-words">{description}</p>
+      </div>
+      {status === "default" ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          aria-label="Allow browser notifications"
+          onClick={async () => {
+            const result = await Notification.requestPermission();
+            setStatus(result);
+          }}
+        >
+          Allow
+        </Button>
+      ) : statusLabel ? (
+        <span
+          className={cn(
+            "shrink-0 text-xs",
+            status === "denied" ? "text-warning" : "text-muted-foreground"
+          )}
+        >
+          {statusLabel}
+        </span>
+      ) : null}
+    </div>
   );
 }

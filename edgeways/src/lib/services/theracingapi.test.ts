@@ -68,6 +68,33 @@ describe("theracingapi tier access", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("passes the derived operation to the budget gate", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ racecards: [] }),
+      })
+    );
+
+    const { racecardsFree, registerRacingBudgetGate } = await import("./theracingapi");
+    const gate = vi.fn(async () => true);
+    registerRacingBudgetGate(gate);
+
+    await racecardsFree("tomorrow");
+    expect(gate).toHaveBeenCalledWith("racecards-free");
+  });
+
+  it("derives operation labels from racing API paths", async () => {
+    const { racingOperation } = await import("./theracingapi");
+    expect(racingOperation("/v1/racecards/free?day=today")).toBe("racecards-free");
+    expect(racingOperation("/v1/racecards/standard?day=today")).toBe("racecards-standard");
+    expect(racingOperation("/v1/results/today?limit=100")).toBe("results");
+    expect(racingOperation("/v1/odds/race-1/horse-2")).toBe("odds");
+    expect(racingOperation("/v1/courses")).toBe("other");
+  });
+
   it("uses free racecards when standard tier is unavailable", async () => {
     const today = localCalendarDate();
     const fetchMock = vi

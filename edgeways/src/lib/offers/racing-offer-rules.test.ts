@@ -357,6 +357,21 @@ describe("scorePlaceRefundStrategy", () => {
     expect(result.score).toBe(0);
   });
 
+  it("ranks from live exchange prices when bookie/SP are blank (hosted free feed)", () => {
+    const result = scorePlaceRefundStrategy({
+      fieldSize: 10,
+      runners: [
+        { horseId: "1", name: "A", number: "1", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 2.0, exchangeBackDecimal: 1.95, exchangeSource: "live" },
+        { horseId: "2", name: "B", number: "2", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 5.0, exchangeBackDecimal: 4.8, exchangeSource: "live" },
+        { horseId: "3", name: "C", number: "3", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 6.0, exchangeBackDecimal: 5.8, exchangeSource: "live" },
+        { horseId: "4", name: "D", number: "4", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 7.0, exchangeBackDecimal: 6.8, exchangeSource: "live" },
+        { horseId: "5", name: "E", number: "5", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 21.0, exchangeBackDecimal: 20.0, exchangeSource: "live" },
+      ],
+    });
+    expect(result.score).toBeGreaterThanOrEqual(70);
+    expect(result.summary).toContain("Clear favourite");
+  });
+
   it("scores capped estimates from proxy odds", () => {
     const result = scorePlaceRefundStrategy({
       fieldSize: 10,
@@ -389,6 +404,21 @@ describe("scorePlaceRefundRunners", () => {
     expect(result.every((r) => r.name !== "Fav")).toBe(true);
     expect(result[0].name).toBe("Second");
     expect(result[0].score).toBeGreaterThanOrEqual(35);
+  });
+
+  it("suggests runners from exchange-only prices", () => {
+    const result = scorePlaceRefundRunners({
+      fieldSize: 10,
+      runners: [
+        { horseId: "1", name: "Fav", number: "1", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 2.0, exchangeBackDecimal: 1.95, exchangeSource: "live" },
+        { horseId: "2", name: "Second", number: "2", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 5.5, exchangeBackDecimal: 5.3, exchangeSource: "live" },
+        { horseId: "3", name: "Third", number: "3", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 6.0, exchangeBackDecimal: 5.8, exchangeSource: "live" },
+        { horseId: "4", name: "Fourth", number: "4", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 7.0, exchangeBackDecimal: 6.8, exchangeSource: "live" },
+        { horseId: "5", name: "Fifth", number: "5", jockey: "", trainer: "", nonRunner: false, exchangeDecimal: 25.0, exchangeBackDecimal: 24.0, exchangeSource: "live" },
+      ],
+    });
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].name).toBe("Second");
   });
 
   it("boosts runners with live exchange lay", () => {

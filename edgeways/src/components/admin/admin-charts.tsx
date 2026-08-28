@@ -241,16 +241,32 @@ export function AdminDonutChart({
   slices,
   label,
   formatValue = defaultFormat,
+  emptyTitle = "Nothing to show yet",
+  emptyDescription = "This mix appears here once there is something to count.",
   className,
 }: {
   slices: ShareSlice[];
   label: string;
   formatValue?: (value: number) => string;
+  emptyTitle?: string;
+  emptyDescription?: string;
   className?: string;
 }) {
   const total = shareTotal(slices);
   const drawable = slices.filter((slice) => slice.value > 0);
   let offset = 0;
+
+  if (drawable.length === 0) {
+    return (
+      <EmptyState
+        compact
+        bare
+        icon={BarChart3}
+        title={emptyTitle}
+        description={emptyDescription}
+      />
+    );
+  }
 
   return (
     <figure
@@ -334,10 +350,14 @@ export function AdminDonutChart({
 export function AdminShareBars({
   slices,
   formatValue = defaultFormat,
+  emptyTitle = "Nothing to rank yet",
+  emptyDescription = "Desks appear here after they record bets, offers, or history.",
   className,
 }: {
   slices: ShareSlice[];
   formatValue?: (value: number) => string;
+  emptyTitle?: string;
+  emptyDescription?: string;
   className?: string;
 }) {
   const max = Math.max(0, ...slices.map((slice) => slice.value));
@@ -348,8 +368,8 @@ export function AdminShareBars({
         compact
         bare
         icon={BarChart3}
-        title="Nothing to rank yet"
-        description="Desks appear here after they record bets, offers, or history."
+        title={emptyTitle}
+        description={emptyDescription}
       />
     );
   }

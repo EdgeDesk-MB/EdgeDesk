@@ -102,7 +102,7 @@ describe("upgrade plan for selected features", () => {
     expect(upgradeNudgeTitle("core")).toBe("Available on Core tier");
     expect(planTierLabel("free")).toBe("Free tier");
     expect(upgradeNudgeBody()).toBe(
-      "Upgrade and the features you selected will be available when you land on the desk."
+      "You can continue without upgrading. Upgrade and the features you selected will be available when you land on the desk."
     );
   });
 

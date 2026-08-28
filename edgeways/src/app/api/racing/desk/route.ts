@@ -10,6 +10,8 @@ import { getDeskActor } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
+/** Betfair identity often challenges US datacentre IPs; prefer London. */
+export const preferredRegion = ["lhr1", "iad1"];
 
 const PROVIDERS = new Set<ExchangeProvider>([
   "betfair",

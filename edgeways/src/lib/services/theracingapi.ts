@@ -108,16 +108,30 @@ export function registerRacingUsageRecorder(recorder: () => void): void {
  * the provider call never happens. Client bundles leave this null (no cap
  * client-side — demo data makes no provider calls anyway).
  */
-let budgetGate: (() => Promise<boolean>) | null = null;
+let budgetGate: ((operation: string) => Promise<boolean>) | null = null;
 
-export function registerRacingBudgetGate(gate: () => Promise<boolean>): void {
+export function registerRacingBudgetGate(
+  gate: (operation: string) => Promise<boolean>
+): void {
   budgetGate = gate;
+}
+
+/**
+ * Operation label for spend attribution (admin → Feeds → Spend by source),
+ * derived from the request path at the single apiGet choke point.
+ */
+export function racingOperation(path: string): string {
+  if (path.startsWith("/v1/racecards/free")) return "racecards-free";
+  if (path.startsWith("/v1/racecards")) return "racecards-standard";
+  if (path.startsWith("/v1/results")) return "results";
+  if (path.startsWith("/v1/odds/")) return "odds";
+  return "other";
 }
 
 export class RacingApiBudgetError extends Error {
   constructor() {
     super(
-      "Daily Racing API request cap reached - racing data resumes tomorrow. The operator can raise the cap in /admin/feeds."
+      "Daily racing feed request cap reached - racing data resumes tomorrow."
     );
     this.name = "RacingApiBudgetError";
   }
@@ -339,7 +353,7 @@ export function isRacingTierAccessError(error: unknown): boolean {
 async function apiGet(path: string): Promise<any> {
   const creds = credentials();
   if (!creds) throw new Error("RACING_API_USERNAME / RACING_API_PASSWORD not configured");
-  if (budgetGate && !(await budgetGate())) throw new RacingApiBudgetError();
+  if (budgetGate && !(await budgetGate(racingOperation(path)))) throw new RacingApiBudgetError();
   trackRequest();
 
   const token = Buffer.from(`${creds.user}:${creds.pass}`).toString("base64");

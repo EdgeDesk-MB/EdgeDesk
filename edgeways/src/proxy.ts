@@ -46,6 +46,17 @@ async function handleSurface(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(dest, 308);
   }
 
+  if (
+    (request.nextUrl.pathname === "/settings" ||
+      request.nextUrl.pathname === "/settings/") &&
+    request.nextUrl.searchParams.get("tab") === "integrations"
+  ) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = "/admin/feeds";
+    dest.search = "";
+    return NextResponse.redirect(dest);
+  }
+
   if (!isWaitlistSurface()) {
     return NextResponse.next();
   }

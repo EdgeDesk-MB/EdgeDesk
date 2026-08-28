@@ -6,7 +6,11 @@ import type { PlanId } from "@/lib/entitlements/plans";
 import type { BillingStatus } from "@/lib/billing/entitlement-from-stripe";
 import { receiptDateLabel } from "@/lib/billing/receipt-view";
 
-export const SETTINGS_SUBSCRIPTION_HREF = "/settings?tab=subscription";
+/**
+ * Settings → Subscription. `live=1` clears the public-demo cookie in proxy
+ * so a marketing “Manage subscription” click never re-enters DEMO DATA.
+ */
+export const SETTINGS_SUBSCRIPTION_HREF = "/settings?tab=subscription&live=1";
 
 export type SubscriptionAccount = {
   plan: PlanId;

@@ -7,42 +7,56 @@ import {
   AdminDonutChart,
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
-import { ExcludeAdminsToggle } from "@/components/admin/exclude-admins-toggle";
+import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
 import { UsersManager } from "@/components/admin/users-manager";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
-import { readExcludeAdmins } from "@/lib/admin/exclude-admins-server";
+import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
+import { scopeAdminUsers } from "@/lib/admin/exclude-accounts";
 import { hiddenAdminsSub, withoutAdmins } from "@/lib/admin/exclude-admins";
 import { buildAccountGrowth } from "@/lib/admin/growth";
 import { listAppUsers } from "@/lib/services/app-users";
 
 export default async function AdminUsersPage() {
-  const [users, excludeAdmins] = await Promise.all([
+  const [users, scope] = await Promise.all([
     listAppUsers(),
-    readExcludeAdmins(),
+    loadAdminAccountScope(),
   ]);
+  const { excludeAdmins, excludedIds } = scope;
   const admins = users.filter((user) => user.admin).length;
-  const visibleUsers = withoutAdmins(users, excludeAdmins);
+  const listedUsers = withoutAdmins(users, excludeAdmins);
+  const visibleUsers = scopeAdminUsers(users, { excludeAdmins, excludedIds });
+  const excludedCount = excludedIds.length;
   const bootstrap = users.filter((user) => user.bootstrap).length;
   const growth = buildAccountGrowth(visibleUsers, []);
   return (
     <AdminPage
       title="User management"
-      description="Grant or revoke the operator role. The bootstrap email cannot be demoted."
+      description="Grant or revoke the operator role, and hide test accounts from every /admin stat. Test accounts stay on this list so you can include them again."
       icon={Shield}
       toolbar={
-        <ExcludeAdminsToggle active={excludeAdmins} hiddenCount={admins} />
+        <AdminAccountFilters
+          excludeAdmins={excludeAdmins}
+          adminCount={admins}
+          excludedCount={excludedCount}
+          showExcludedLink={false}
+        />
       }
     >
-      <StatStrip columns={3}>
+      <StatStrip columns={4}>
         <StatTile
           label="Accounts"
-          value={String(visibleUsers.length)}
+          value={String(listedUsers.length)}
           sub={hiddenAdminsSub(admins, excludeAdmins)}
         />
         <StatTile
           label="Admins"
           value={String(admins)}
           sub={excludeAdmins ? "Hidden from the list" : undefined}
+        />
+        <StatTile
+          label="Test accounts"
+          value={String(excludedCount)}
+          sub={excludedCount > 0 ? "Hidden from other pages" : "None yet"}
         />
         <StatTile label="Bootstrap" value={String(bootstrap)} sub="Cannot demote" />
       </StatStrip>
@@ -75,7 +89,8 @@ export default async function AdminUsersPage() {
       </AdminChartCard>
       <UsersManager
         key={excludeAdmins ? "customers" : "all"}
-        initialUsers={visibleUsers}
+        initialUsers={listedUsers}
+        initialExcludedIds={excludedIds}
       />
     </AdminPage>
   );

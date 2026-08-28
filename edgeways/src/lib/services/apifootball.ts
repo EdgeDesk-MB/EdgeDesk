@@ -211,12 +211,37 @@ function mapFixture(item: any): Fixture {
   };
 }
 
+/**
+ * Operation label for spend attribution (admin → Feeds → Spend by source).
+ * Derived from the request path so every caller of apiGet is covered without
+ * threading context through the service layer.
+ */
+export function footballOperation(pathAndQuery: string): string {
+  if (pathAndQuery.startsWith("/fixtures?date=")) return "fixtures-by-date";
+  if (pathAndQuery.startsWith("/fixtures?live=")) return "live-fixtures";
+  if (pathAndQuery.startsWith("/fixtures?id=")) return "fixture-by-id";
+  if (pathAndQuery.startsWith("/fixtures/events")) return "goal-events";
+  return "other";
+}
+
+/** Hosted desks log one attribution row per spent request; local desks have no shared pool. */
+async function logFootballSpend(pathAndQuery: string): Promise<void> {
+  if (!isNeonDesk()) return;
+  try {
+    const { logFeedUsageEvent } = await import("@/lib/db/neon-feed-budget");
+    await logFeedUsageEvent("football", footballOperation(pathAndQuery));
+  } catch {
+    // best-effort: attribution must never block the feed
+  }
+}
+
 async function apiGet(pathAndQuery: string): Promise<any> {
   const key = apiKey();
   if (!key) throw new Error("API_FOOTBALL_KEY not configured");
   if (!(await spendBudget())) {
     throw new Error("API-Football daily request budget exhausted");
   }
+  await logFootballSpend(pathAndQuery);
   const res = await fetch(`${BASE}${pathAndQuery}`, {
     headers: { "x-apisports-key": key },
     cache: "no-store",

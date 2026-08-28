@@ -41,7 +41,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     href: "/admin/users",
     label: "Users",
     icon: Shield,
-    blurb: "Grant or revoke operator admin. Bootstrap email is locked.",
+    blurb: "Grant or revoke operator admin. Hide test accounts from stats.",
   },
   {
     href: "/admin/activity",
@@ -59,7 +59,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     href: "/admin/feeds",
     label: "Feeds",
     icon: Radio,
-    blurb: "Operator-held football, racing and exchange diagnostics.",
+    blurb: "Operator-held football, racing and exchange. One feed serves every Edge desk.",
   },
   {
     href: "/admin/releases",

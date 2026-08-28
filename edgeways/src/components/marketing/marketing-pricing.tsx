@@ -17,7 +17,11 @@ import {
   type PublicPlan,
 } from "@/lib/billing/public-offer";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
-import { PricingCta } from "@/components/marketing/pricing-cta";
+import {
+  PricingCta,
+  useMarketingPricingAction,
+} from "@/components/marketing/pricing-cta";
+import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
 import { cn } from "@/lib/utils";
 
 function CellMark({
@@ -166,10 +170,12 @@ function PlanCard({
   plan,
   featured,
   interval,
+  showCheckout,
 }: {
   plan: PublicPlan;
   featured?: boolean;
   interval: BillingInterval;
+  showCheckout: boolean;
 }) {
   const paid = plan.monthlyPence > 0;
   const yearly = interval === "year" && paid;
@@ -211,20 +217,24 @@ function PlanCard({
       <p className="mt-3 flex-1 text-sm leading-relaxed text-white/60">
         {plan.blurb}
       </p>
-      <PricingCta
-        href={planCheckoutHref(plan, interval)}
-        className={cn(
-          "mt-5 inline-flex justify-center rounded-[var(--radius-button)] px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
-          plan.id === "edge" &&
-            "bg-edge text-edge-foreground focus-visible:outline-[var(--edge)]",
-          plan.id === "core" &&
-            "bg-[var(--marketing-brand)] text-[var(--marketing-ink)] focus-visible:outline-[var(--marketing-brand)]",
-          plan.id === "free" &&
-            "border border-white/20 text-white transition-colors hover:bg-white/5 hover:opacity-100 focus-visible:outline-[var(--marketing-brand)]"
-        )}
-      >
-        {plan.cta}
-      </PricingCta>
+      <div className="mt-5 min-h-10">
+        {showCheckout ? (
+          <PricingCta
+            href={planCheckoutHref(plan, interval)}
+            className={cn(
+              "inline-flex w-full justify-center rounded-[var(--radius-button)] px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+              plan.id === "edge" &&
+                "bg-edge text-edge-foreground focus-visible:outline-[var(--edge)]",
+              plan.id === "core" &&
+                "bg-[var(--marketing-brand)] text-[var(--marketing-ink)] focus-visible:outline-[var(--marketing-brand)]",
+              plan.id === "free" &&
+                "border border-white/20 text-white transition-colors hover:bg-white/5 hover:opacity-100 focus-visible:outline-[var(--marketing-brand)]"
+            )}
+          >
+            {plan.cta}
+          </PricingCta>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -232,6 +242,8 @@ function PlanCard({
 /** Public offer only. Founding stays off these cards. */
 export function MarketingPricing() {
   const [interval, setInterval] = useState<BillingInterval>("month");
+  const pricingAction = useMarketingPricingAction();
+  const showCheckout = pricingAction === "checkout";
   const rows = comparisonRows();
   const plans = PUBLIC_PLANS;
 
@@ -259,9 +271,22 @@ export function MarketingPricing() {
               plan={plan}
               featured={plan.id === "edge"}
               interval={interval}
+              showCheckout={showCheckout}
             />
           ))}
         </div>
+        {pricingAction !== "checkout" ? (
+          <div className="mt-6 flex min-h-10 justify-center">
+            {pricingAction === "manage" ? (
+              <PricingCta
+                href={SETTINGS_SUBSCRIPTION_HREF}
+                className="inline-flex justify-center rounded-[var(--radius-button)] bg-[var(--marketing-brand)] px-4 py-2.5 text-sm font-semibold text-[var(--marketing-ink)] transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--marketing-brand)]"
+              >
+                Manage subscription
+              </PricingCta>
+            ) : null}
+          </div>
+        ) : null}
 
         <div data-reveal="">
           <ScrollFadeEdges

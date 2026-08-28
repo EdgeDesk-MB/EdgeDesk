@@ -8,7 +8,7 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
-import { ExcludeAdminsToggle } from "@/components/admin/exclude-admins-toggle";
+import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
 import { AdminTableFrame } from "@/components/admin/admin-table";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
@@ -26,8 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatAdminDateTime } from "@/lib/admin/format";
-import { readExcludeAdmins } from "@/lib/admin/exclude-admins-server";
-import { withoutAdmins } from "@/lib/admin/exclude-admins";
+import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
+import { scopeAdminUsers } from "@/lib/admin/exclude-accounts";
 import { buildStripeDrift, stripeDriftNote } from "@/lib/admin/stripe-drift";
 import { loadStripeOverview, stripeInvoiceUrl } from "@/lib/admin/stripe-overview";
 import { StripeModeChip } from "@/components/admin/stripe-mode-chip";
@@ -36,13 +36,14 @@ import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export default async function AdminPaymentsPage() {
-  const [stripe, users, excludeAdmins] = await Promise.all([
+  const [stripe, users, scope] = await Promise.all([
     loadStripeOverview(),
     listAppUsers(),
-    readExcludeAdmins(),
+    loadAdminAccountScope(),
   ]);
+  const { excludeAdmins, excludedIds } = scope;
   const admins = users.filter((user) => user.admin).length;
-  const visibleUsers = withoutAdmins(users, excludeAdmins);
+  const visibleUsers = scopeAdminUsers(users, { excludeAdmins, excludedIds });
   const foundingHolders = visibleUsers.filter((user) => user.founding);
   const charts = chartsFromStripeOverview(stripe);
   const foundingShare = buildFoundingShare(
@@ -56,10 +57,14 @@ export default async function AdminPaymentsPage() {
   return (
     <AdminPage
       title="Payments"
-      description="Read-only Stripe view. Refunds and charges stay in the Stripe dashboard. Stripe totals still include every customer."
+      description="Read-only Stripe view. Refunds and charges stay in the Stripe dashboard. Test accounts are omitted where the Stripe customer or email matches."
       icon={CreditCard}
       toolbar={
-        <ExcludeAdminsToggle active={excludeAdmins} hiddenCount={admins} />
+        <AdminAccountFilters
+          excludeAdmins={excludeAdmins}
+          adminCount={admins}
+          excludedCount={excludedIds.length}
+        />
       }
     >
       <StatStrip columns={4}>

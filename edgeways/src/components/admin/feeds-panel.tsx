@@ -15,6 +15,8 @@ import type { FeedStatus } from "@/lib/admin/feeds";
 import type { FeedHeartbeat, FeedHeartbeatKind } from "@/lib/admin/feed-heartbeat";
 import { formatAdminDateTime } from "@/lib/admin/format";
 
+type ExchangeProviderRow = FeedStatus["exchange"]["providers"][number];
+
 function HeartbeatLine({ heartbeat }: { heartbeat: FeedHeartbeat }) {
   if (heartbeat.lastOkAt == null && heartbeat.lastErrorAt == null) {
     return <p className="text-xs text-muted-foreground">No checks recorded yet.</p>;
@@ -27,13 +29,31 @@ function HeartbeatLine({ heartbeat }: { heartbeat: FeedHeartbeat }) {
         </p>
       ) : null}
       {heartbeat.lastErrorAt != null ? (
-        <p className="text-destructive">
+        <p className="min-w-0 text-pretty break-words text-destructive">
           Last error {formatAdminDateTime(heartbeat.lastErrorAt)}
-          {heartbeat.lastError ? ` — ${heartbeat.lastError}` : ""}
+          {heartbeat.lastError ? `: ${heartbeat.lastError}` : ""}
         </p>
       ) : null}
     </div>
   );
+}
+
+function exchangeBadgeVariant(
+  row: ExchangeProviderRow
+): "default" | "outline" | "secondary" {
+  if (row.status === "connected") return "default";
+  if (row.status === "unsupported") return "secondary";
+  return "outline";
+}
+
+function exchangeStatusLabel(row: ExchangeProviderRow): string {
+  if (row.status === "connected") {
+    return row.feedType === "delayed" ? "Connected (delayed)" : "Connected";
+  }
+  if (row.status === "not_configured") return "Not configured";
+  if (row.status === "unsupported") return "Partner API required";
+  if (row.status === "disconnected") return "Disconnected";
+  return row.status;
 }
 
 export function FeedsPanel({
@@ -75,6 +95,10 @@ export function FeedsPanel({
     }
   }
 
+  const exchangeProviders = status.exchange.providers.length
+    ? status.exchange.providers
+    : [{ provider: "betfair", ok: false, status: "unknown" }];
+
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card>
@@ -84,7 +108,7 @@ export function FeedsPanel({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <Badge variant={status.football.configured ? "default" : "outline"}>
-            {status.football.configured ? "Configured" : "Not connected"}
+            {status.football.configured ? "Configured" : "Not configured"}
           </Badge>
           <p className="text-sm text-muted-foreground">
             Today: {status.football.used}/{status.football.budget} requests
@@ -109,7 +133,7 @@ export function FeedsPanel({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <Badge variant={status.racing.configured ? "default" : "outline"}>
-            {status.racing.configured ? "Configured" : "Not connected"}
+            {status.racing.configured ? "Configured" : "Not configured"}
           </Badge>
           <p className="text-sm text-muted-foreground">
             Today: {status.racing.used} requests logged
@@ -130,18 +154,24 @@ export function FeedsPanel({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Exchange</CardTitle>
-          <CardDescription>Delayed lay prices. No deploy from here.</CardDescription>
+          <CardDescription>
+            Delayed lay prices. One feed serves every Edge desk.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {(status.exchange.providers.length
-            ? status.exchange.providers
-            : [{ provider: "betfair", ok: false, status: "unknown" }]
-          ).map((provider) => (
-            <div key={provider.provider} className="flex items-center justify-between gap-2">
-              <span className="capitalize">{provider.provider}</span>
-              <Badge variant={provider.ok ? "default" : "outline"}>
-                {provider.status}
-              </Badge>
+          {exchangeProviders.map((provider) => (
+            <div key={provider.provider} className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="capitalize">{provider.provider}</span>
+                <Badge variant={exchangeBadgeVariant(provider)}>
+                  {exchangeStatusLabel(provider)}
+                </Badge>
+              </div>
+              {provider.message ? (
+                <p className="min-w-0 text-pretty break-words text-xs text-muted-foreground">
+                  {provider.message}
+                </p>
+              ) : null}
             </div>
           ))}
           <HeartbeatLine heartbeat={heartbeats.exchange} />

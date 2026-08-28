@@ -20,6 +20,7 @@ import { getNeonDb } from "@/lib/db/neon";
 import { events as pgEvents } from "@/lib/db/schema.pg";
 import {
   neonFeedBudgetUsed,
+  neonFeedUsageAttribution,
   neonFeedUsageHistory,
   type FeedUsageDay,
 } from "@/lib/db/neon-feed-budget";
@@ -27,7 +28,9 @@ import { readFeedCaps, type FeedCaps } from "@/lib/admin/feed-caps";
 import {
   feedThresholdState,
   fillDailySeries,
+  groupFeedUsageBySource,
   projectDailyPace,
+  type FeedSourceSpend,
   type FeedThresholdState,
   type FeedUsageDayPoint,
 } from "@/lib/admin/feed-monitor";
@@ -48,18 +51,26 @@ export type FeedStatus = {
       ok: boolean;
       status: string;
       message?: string;
+      feedType?: "live" | "delayed";
     }>;
   };
 };
 
 export function mapExchangeProviders(
-  rows: Array<{ provider: string; status: string; message?: string; ok?: boolean }>
+  rows: Array<{
+    provider: string;
+    status: string;
+    message?: string;
+    ok?: boolean;
+    feedType?: string;
+  }>
 ): FeedStatus["exchange"]["providers"] {
   return rows.map((row) => ({
     provider: row.provider,
     ok: row.ok ?? row.status === "connected",
     status: row.status,
     message: row.message,
+    feedType: row.feedType === "live" || row.feedType === "delayed" ? row.feedType : undefined,
   }));
 }
 
@@ -179,6 +190,21 @@ export async function loadFeedMonitor(): Promise<FeedMonitor> {
     racing: monitorLane(racingUsed, caps.racing, racingHistory, now),
     demand: { liveFootball: live, upcomingFootball: upcoming },
   };
+}
+
+export type FeedAttribution = {
+  hosted: boolean;
+  sources: FeedSourceSpend[];
+};
+
+/**
+ * Today's spend rolled up by source (signed-in user vs system/poller).
+ * Local desks have no shared pool to attribute, so this is hosted-only.
+ */
+export async function loadFeedAttribution(): Promise<FeedAttribution> {
+  if (!isNeonDesk()) return { hosted: false, sources: [] };
+  const rows = await neonFeedUsageAttribution();
+  return { hosted: true, sources: groupFeedUsageBySource(rows) };
 }
 
 export async function runFeedTest(

@@ -7,6 +7,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const store = new Map<string, number>();
 
+type UsageEventRow = {
+  feed: string;
+  day: string;
+  at: number;
+  operation: string;
+  clerk_user_id: string | null;
+  email: string | null;
+};
+const usageEvents: UsageEventRow[] = [];
+
 const keyOf = (feed: string, day: string) => `${feed}:${day}`;
 
 vi.mock("@/lib/db/neon", () => ({
@@ -15,6 +25,7 @@ vi.mock("@/lib/db/neon", () => ({
       const {
         FEED_BUDGET_SPEND_SQL,
         FEED_USAGE_RECORD_SQL,
+        FEED_USAGE_EVENT_INSERT_SQL,
       } = await import("@/lib/db/neon-feed-budget");
       if (text === FEED_BUDGET_SPEND_SQL) {
         const [feed, day, budget] = params as [string, string, number];
@@ -36,6 +47,42 @@ vi.mock("@/lib/db/neon", () => ({
         const used = (store.get(key) ?? 0) + 1;
         store.set(key, used);
         return [{ used }];
+      }
+      if (text === FEED_USAGE_EVENT_INSERT_SQL) {
+        const [feed, day, at, operation, clerk_user_id, email] = params as [
+          string,
+          string,
+          number,
+          string,
+          string | null,
+          string | null,
+        ];
+        usageEvents.push({ feed, day, at, operation, clerk_user_id, email });
+        return [];
+      }
+      if (text.includes("FROM feed_usage_events")) {
+        const [day] = params as [string];
+        const groups = new Map<string, number>();
+        for (const event of usageEvents) {
+          if (event.day !== day) continue;
+          const key = [
+            event.feed,
+            event.clerk_user_id ?? "",
+            event.email ?? "",
+            event.operation,
+          ].join(" ");
+          groups.set(key, (groups.get(key) ?? 0) + 1);
+        }
+        return [...groups.entries()].map(([key, count]) => {
+          const [feed, clerk_user_id, email, operation] = key.split(" ");
+          return {
+            feed,
+            clerk_user_id: clerk_user_id || null,
+            email: email || null,
+            operation,
+            count,
+          };
+        });
       }
       if (text.includes("SELECT used FROM feed_budget")) {
         const [feed, day] = params as [string, string];
@@ -59,14 +106,18 @@ const {
   FEED_BUDGET_SPEND_SQL,
   FEED_USAGE_RECORD_SQL,
   feedBudgetDay,
+  logFeedUsageEvent,
   neonFeedBudgetUsed,
+  neonFeedUsageAttribution,
   neonFeedUsageHistory,
   recordNeonFeedUsage,
   spendNeonFeedBudget,
 } = await import("@/lib/db/neon-feed-budget");
+const { runWithDeskActor } = await import("@/lib/db/desk-scope");
 
 beforeEach(() => {
   store.clear();
+  usageEvents.length = 0;
 });
 
 describe("FEED_BUDGET_SPEND_SQL", () => {
@@ -150,5 +201,75 @@ describe("neonFeedUsageHistory", () => {
       { day: "2026-08-23", used: 1 },
       { day: "2026-08-22", used: 1 },
     ]);
+  });
+});
+
+describe("logFeedUsageEvent", () => {
+  it("attributes the spend to the current desk actor", async () => {
+    await runWithDeskActor(
+      { clerkUserId: "user_abc", email: "ada@example.com" },
+      () => logFeedUsageEvent("football", "fixtures-by-date", "2026-08-23")
+    );
+
+    expect(usageEvents).toHaveLength(1);
+    expect(usageEvents[0]).toMatchObject({
+      feed: "football",
+      day: "2026-08-23",
+      operation: "fixtures-by-date",
+      clerk_user_id: "user_abc",
+      email: "ada@example.com",
+    });
+    expect(typeof usageEvents[0].at).toBe("number");
+  });
+
+  it("records system spend when there is no actor", async () => {
+    await logFeedUsageEvent("racing", "racecards-free", "2026-08-23");
+
+    expect(usageEvents[0]).toMatchObject({
+      feed: "racing",
+      clerk_user_id: null,
+      email: null,
+    });
+  });
+});
+
+describe("neonFeedUsageAttribution", () => {
+  it("groups today's rows by feed, actor and operation", async () => {
+    await runWithDeskActor(
+      { clerkUserId: "user_abc", email: "ada@example.com" },
+      async () => {
+        await logFeedUsageEvent("football", "fixtures-by-date", "2026-08-23");
+        await logFeedUsageEvent("football", "fixtures-by-date", "2026-08-23");
+        await logFeedUsageEvent("football", "goal-events", "2026-08-23");
+      }
+    );
+    await logFeedUsageEvent("football", "live-fixtures", "2026-08-23");
+    await logFeedUsageEvent("racing", "racecards-free", "2026-08-23");
+    // Another day must not leak into today's attribution.
+    await logFeedUsageEvent("football", "fixtures-by-date", "2026-08-22");
+
+    const rows = await neonFeedUsageAttribution("2026-08-23");
+    expect(rows).toHaveLength(4);
+    expect(rows).toContainEqual({
+      feed: "football",
+      clerkUserId: "user_abc",
+      email: "ada@example.com",
+      operation: "fixtures-by-date",
+      count: 2,
+    });
+    expect(rows).toContainEqual({
+      feed: "football",
+      clerkUserId: null,
+      email: null,
+      operation: "live-fixtures",
+      count: 1,
+    });
+    expect(rows).toContainEqual({
+      feed: "racing",
+      clerkUserId: null,
+      email: null,
+      operation: "racecards-free",
+      count: 1,
+    });
   });
 });
