@@ -35,7 +35,8 @@ function fakeBetfair(responses: {
     const href = String(url);
     if (href.includes("identitysso")) {
       calls.login += 1;
-      return { ok: true, status: 200, json: async () => ({ token: "session-token" }) };
+      const payload = JSON.stringify({ token: "session-token" });
+      return { ok: true, status: 200, text: async () => payload };
     }
 
     const method: BetfairMethod = href.includes("listMarketCatalogue")
@@ -49,7 +50,8 @@ function fakeBetfair(responses: {
       return { ok: false, status: 503, text: async () => "upstream unavailable" };
     }
     const data = method === "listMarketCatalogue" ? responses.catalogue(body) : responses.book(body);
-    return { ok: true, status: 200, json: async () => data };
+    const payload = JSON.stringify(data);
+    return { ok: true, status: 200, text: async () => payload };
   });
 
   return { fetch: fetchMock, calls, bodies, fail };

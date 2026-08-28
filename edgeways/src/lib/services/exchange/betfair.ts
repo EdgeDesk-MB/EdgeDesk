@@ -15,6 +15,7 @@ import type {
   ExchangeRaceContext,
   ExchangeRaceOdds,
 } from "./types";
+import { betfairRunsOnVercelNode } from "./betfair-proxy-auth";
 import { chunkMarketIds } from "./format-exchange-error";
 import { matchHorsesByName } from "./horse-match";
 import { cachedFetch, readFresh, writeEntry, type PriceCache } from "./price-cache";
@@ -85,6 +86,65 @@ function loginPassword(creds: {
 }): string {
   if (!creds.totpSecret) return creds.password;
   return `${creds.password}${currentTotpCode(creds.totpSecret)}`;
+}
+
+/**
+ * Cloudflare in front of identitysso often serves an HTML challenge to
+ * datacentre fetches that look like bare Node. A browser UA is enough to
+ * get JSON back from the same host.
+ */
+function betfairHeaders(contentType: string, token?: string): Record<string, string> {
+  const creds = credentials();
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Accept-Language": "en-GB,en;q=0.9",
+    "Content-Type": contentType,
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  };
+  if (creds?.appKey) headers["X-Application"] = creds.appKey;
+  if (token) headers["X-Authentication"] = token;
+  return headers;
+}
+
+function betfairProxyOrigin(): string | null {
+  const url = process.env.VERCEL_URL?.trim();
+  if (url) return url.startsWith("http") ? url : `https://${url}`;
+  const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (prod) return prod.startsWith("http") ? prod : `https://${prod}`;
+  return null;
+}
+
+function headersToRecord(headers: HeadersInit | undefined): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return { ...headers };
+}
+
+/** Hobby Node runs in Washington; Betfair login IP must match betting IP. */
+async function betfairUpstreamFetch(url: string, init: RequestInit): Promise<Response> {
+  if (!betfairRunsOnVercelNode()) {
+    return fetch(url, init);
+  }
+  const origin = betfairProxyOrigin();
+  const appKey = credentials()?.appKey;
+  if (!origin || !appKey) {
+    throw new Error("Betfair edge proxy is not configured.");
+  }
+  return fetch(`${origin}/api/exchange/betfair-proxy`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${appKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url,
+      method: init.method ?? "POST",
+      headers: headersToRecord(init.headers),
+      body: typeof init.body === "string" ? init.body : String(init.body ?? ""),
+    }),
+  });
 }
 
 function formatLoginError(status?: string, error?: string): string {
@@ -162,17 +222,16 @@ async function login(): Promise<string> {
     username: creds.username,
     password: loginPassword(creds),
   });
-  const res = await fetch(IDENTITY_URL, {
+  const res = await betfairUpstreamFetch(IDENTITY_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-      "X-Application": creds.appKey,
-    },
+    headers: betfairHeaders("application/x-www-form-urlencoded"),
     body: body.toString(),
   });
 
-  const data = (await res.json()) as { token?: string; status?: string; error?: string };
+  const data = await readBetfairJson<{ token?: string; status?: string; error?: string }>(
+    res,
+    "login"
+  );
   if (!res.ok || !data.token) {
     cachedToken = null;
     throw new Error(formatLoginError(data.status, data.error) || `Betfair login failed (${res.status})`);
@@ -187,23 +246,40 @@ async function betfairPost<T>(method: string, params: Record<string, unknown>): 
   if (!creds) throw new Error("Betfair credentials not configured");
 
   const token = await login();
-  const res = await fetch(`${BETTING_URL}/${method}/`, {
+  const res = await betfairUpstreamFetch(`${BETTING_URL}/${method}/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Application": creds.appKey,
-      "X-Authentication": token,
-    },
+    headers: betfairHeaders("application/json", token),
     body: JSON.stringify(params),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Betfair ${method} failed (${res.status}): ${text.slice(0, 200)}`);
+    throw new Error(
+      `Betfair ${method} failed (${res.status}): ${summariseBetfairBody(text)}`
+    );
   }
 
-  return res.json() as Promise<T>;
+  return readBetfairJson<T>(res, method);
+}
+
+/** Betfair/Cloudflare sometimes returns an HTML challenge instead of JSON. */
+async function readBetfairJson<T>(res: Response, method: string): Promise<T> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Betfair ${method} returned a web page instead of JSON (${res.status}). ${summariseBetfairBody(text)}`
+    );
+  }
+}
+
+function summariseBetfairBody(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<!") || trimmed.toLowerCase().startsWith("<html")) {
+    return "The login host served HTML (blocked or challenged from this server).";
+  }
+  return trimmed.slice(0, 200);
 }
 
 export interface MarketCatalogueRow {
@@ -374,7 +450,7 @@ export async function fetchBetfairLayOdds(
       externalId: r.externalId,
       quotes: [],
       source: "estimated" as const,
-      error: "Betfair not configured",
+      error: "Exchange feed is not connected",
     }));
   }
 
@@ -425,7 +501,7 @@ export async function fetchBetfairLayOdds(
         externalId: race.externalId,
         quotes: [],
         source: "estimated" as const,
-        error: "No matching Betfair market",
+        error: "No matching exchange market",
       };
     }
 

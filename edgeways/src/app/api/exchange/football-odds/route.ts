@@ -8,6 +8,7 @@ import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = ["lhr1", "iad1"];
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const home = req.nextUrl.searchParams.get("home")?.trim() ?? "";
