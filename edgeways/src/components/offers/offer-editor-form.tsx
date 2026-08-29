@@ -20,6 +20,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectItemRow,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -1663,13 +1664,13 @@ Expires 12 Aug 2026, 23:59`}
                       }
                     />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent matchTrigger>
                     {racesAtCourse.map((r) => (
                       <SelectItem key={r.externalId} value={r.externalId}>
-                        {raceLabel(r)}
-                        <span className="ml-1.5 text-muted-foreground">
-                          · {r.fieldSize} runners
-                        </span>
+                        <SelectItemRow
+                          label={raceLabel(r)}
+                          trailing={`${r.fieldSize} runners`}
+                        />
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyzeOfferIntelligence, enrichImportantTerms } from "./index";
-import { estimateBoostWinningsEv } from "./estimates";
+import { estimateBoostWinningsEv, estimateRiskFreeEv } from "./estimates";
 import { emptyImportantTerms } from "@/lib/offers/offer-terms";
 
 const GOLF_BOOST = `ON ANY GOLF THIS WEEKEND
@@ -11,6 +11,14 @@ Min odds 2.0 (1/1) or greater.
 Maximum stake allowed for the boost is £25.
 Bets placed with free bets do not qualify.
 Cashed out bets do not qualify.`;
+
+describe("estimateRiskFreeEv", () => {
+  it("equalises £100 @ 3.00 / 3.10 with 75% SNR refund (hand-worked)", () => {
+    // win = 200, lose = −100 + 75 = −25, L = 225 / 3.08 = 73.05
+    // ifWin = 200 − 73.05×2.10 = 46.595, ifLose = −25 + 73.05×0.98 = 46.589
+    expect(estimateRiskFreeEv(100, 100)).toBe(46.59);
+  });
+});
 
 describe("estimateBoostWinningsEv", () => {
   it("estimates underlay profit for 18% boost at min odds", () => {
@@ -66,6 +74,28 @@ describe("analyzeOfferIntelligence", () => {
     expect(result.instructions.some((s) => /qualifying/i.test(s))).toBe(true);
     expect(result.instructions.some((s) => /closest back\/lay/i.test(s))).toBe(true);
     expect(result.instructions.some((s) => /reasonably high odds/i.test(s))).toBe(true);
+  });
+
+  it("classifies money-back-if-loses ahead of bet&get amounts", () => {
+    const result = analyzeOfferIntelligence({
+      text: `MONEY BACK AS A FREE BET IF YOUR HORSE LOSES
+BetMGM Second Chance. Max stake £100. Min odds 1/2 (1.50).
+Each way excluded. Free bet expires in 3 days. SNR.
+Money Back as a Free Bet will only occur if your bet loses.`,
+      bookmaker: "BetMGM",
+      category: "horse_racing",
+      betStake: 100,
+      freeBetAmount: 100,
+      important: { ...emptyImportantTerms(), minOdds: 1.5, maxStake: 100 },
+      qualifyingPlaces: [],
+      expiresAt: null,
+      isRacing: true,
+    });
+    expect(result.archetype).toBe("risk_free");
+    expect(result.expectedProfit).toBe(46.59);
+    expect(result.epExplanation).toMatch(/Refund-If underlay/);
+    expect(result.instructions.some((s) => /underlay/i.test(s))).toBe(true);
+    expect(result.instructions.some((s) => /minimise qualifying loss/i.test(s))).toBe(false);
   });
 
   it("classifies racing place refund", () => {

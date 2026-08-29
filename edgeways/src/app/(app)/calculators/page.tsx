@@ -15,7 +15,7 @@ export default function CalculatorsPage() {
         helpId="calculators"
         icon={Calculator}
         title="Calculators"
-        description="The matched betting toolkit. Core calculators open the profit tracker with your numbers pre-filled - review, link an event, and save."
+        description="Work out a lay, then save it to the tracker."
       />
 
       {CALCULATOR_SECTIONS.map((section) => (
@@ -25,22 +25,35 @@ export default function CalculatorsPage() {
             <p className={sectionDescription}>{section.description}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {section.calculators.map((calc) => (
-              <Link
-                key={calc.href}
-                href={calc.href}
-                className="block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
-              >
-                <Card className={cn("h-full", offerCampaignCardInteractive)}>
-                  <CardHeader>
-                    <CardTitle className="text-pretty break-words text-base">{calc.title}</CardTitle>
-                    <CardDescription className="text-pretty break-words">
-                      {calc.description}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
-            ))}
+            {section.calculators.map((calc) => {
+              const Icon = calc.icon;
+              return (
+                <Link
+                  key={calc.href}
+                  href={calc.href}
+                  className="block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+                >
+                  <Card className={cn("h-full", offerCampaignCardInteractive)}>
+                    <CardHeader className="gap-2">
+                      <Icon
+                        className="size-6 shrink-0 text-primary-text"
+                        size={24}
+                        strokeWidth={1.5}
+                        aria-hidden
+                      />
+                      <div className="min-w-0 space-y-1">
+                        <CardTitle className="text-pretty break-words text-base">
+                          {calc.title}
+                        </CardTitle>
+                        <CardDescription className="text-pretty break-words">
+                          {calc.description}
+                        </CardDescription>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         </section>
       ))}

@@ -72,7 +72,7 @@ export default async function AdminFeedsPage() {
   return (
     <AdminPage
       title="Feeds"
-      description="Operator-held football, racing and exchange. One feed serves every Edge desk. Customers do not add keys."
+      description="Football, racing and exchange for every desk."
       icon={Radio}
     >
       <StatStrip columns={3}>

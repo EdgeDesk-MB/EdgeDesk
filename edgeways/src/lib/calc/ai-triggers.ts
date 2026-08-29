@@ -25,6 +25,8 @@ export type AiEffect = {
   amount: number;
   /** Empty = award when bet settles. Otherwise finishing positions, e.g. [2, 3, 4]. */
   positions: number[];
+  /** Refund-If: award only when the bookie bet loses (not on a win). */
+  awardOnLoss?: boolean;
   /**
    * QuinnBet-style: place only counts when the race winner was the SP favourite
    * ("2nd to the SP favourite"). Settled from recorded result SP, never pre-race odds.
@@ -63,6 +65,9 @@ function formatPositions(positions: number[]): string {
 
 export function describeAiEffect(effect: AiEffect): string {
   if (effect.kind !== "free_bet_award") return "";
+  if (effect.awardOnLoss) {
+    return `${formatGbp(effect.amount)} free bet if this bet loses - credits bookie balance (Refund-If)`;
+  }
   if (effect.positions.length === 0) {
     return `${formatGbp(effect.amount)} free bet - credits bookie balance when this bet settles (or mark awarded early if the bookie releases it on placement)`;
   }
@@ -198,8 +203,19 @@ function hasExplicitPlaceCondition(text: string): boolean {
   );
 }
 
+function isLoseConditionalFreeBet(text: string): boolean {
+  return (
+    /\bif\s+(?:the\s+|your\s+)?(?:bet|horse|selection)\s+los/i.test(text) ||
+    /\bif\s+bet\s+los/i.test(text) ||
+    /\bmoney\s+back[\s\S]{0,80}?\blos/i.test(text)
+  );
+}
+
 function freeBetEffect(amount: number, text: string): AiEffect | null {
   if (!(amount > 0)) return null;
+  if (isLoseConditionalFreeBet(text)) {
+    return { kind: "free_bet_award", amount, positions: [], awardOnLoss: true };
+  }
   const winnerMustBeSpFavourite = textRequiresSpFavouriteWinner(text);
   let positions = hasExplicitPlaceCondition(text) ? parsePlacePositionsFromText(text) : [];
   // "2nd to the favourite" is a place-2 constraint even when the clause is sparse.
@@ -234,6 +250,15 @@ export function inferAiEffectsFromText(text: string): AiEffect[] {
   );
   if (betGetMatch) {
     const effect = freeBetEffect(parseFloat(betGetMatch[2]), trimmed);
+    if (effect) effects.push(effect);
+    return effects;
+  }
+
+  const moneyBackLose = trimmed.match(
+    /£?\s*(\d+(?:\.\d{1,2})?)\s*(?:money\s+back|back\s+as\s+a\s+free\s*bet|free\s*bet)/i
+  );
+  if (moneyBackLose && isLoseConditionalFreeBet(trimmed)) {
+    const effect = freeBetEffect(parseFloat(moneyBackLose[1]), trimmed);
     if (effect) effects.push(effect);
     return effects;
   }
@@ -382,6 +407,10 @@ export function isPlaceFreeBetEffect(effect: AiEffect): boolean {
   return effect.kind === "free_bet_award" && effect.positions.length > 0;
 }
 
+export function isLossFreeBetEffect(effect: AiEffect): boolean {
+  return effect.kind === "free_bet_award" && effect.awardOnLoss === true;
+}
+
 export function evaluateFreeBetAward(
   effect: AiEffect & { kind: "free_bet_award" },
   selection: string,
@@ -454,6 +483,12 @@ export function evaluateUnconditionalFreeBet(
   }
   if (betStatus === "open" || betStatus === "void") {
     return { met: false, reason: "Bet not settled yet" };
+  }
+  if (effect.awardOnLoss) {
+    if (betStatus !== "lost" && betStatus !== "half_lose") {
+      return { met: false, reason: "Refund-If: free bet only if the bet loses" };
+    }
+    return { met: true, reason: "Bet lost — money-back free bet" };
   }
   return {
     met: true,

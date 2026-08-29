@@ -118,6 +118,12 @@ export function OfferViewDialog({
           triggerText: p.triggerText,
           offerId,
           quickLogged: true,
+          ...(betType === "risk_free"
+            ? {
+                refundAmount: p.refundAmount,
+                refundRetention: p.refundRetention,
+              }
+            : {}),
         },
       });
       quietOfferPromptToasts(offerId, {

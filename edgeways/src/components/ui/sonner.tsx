@@ -4,9 +4,15 @@ import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-/** Sit just under the header + meta-nav. Include the demo bar when it sits above. */
+/** Sit just under the header + meta-nav. Include the demo bar and site banner when they sit above. */
 const toasterOffset = {
   top: "calc(var(--layout-below-header) + 16px)",
+  right: "var(--overlay-gutter)",
+} as const
+
+/** Admin chrome is shorter than the desk header. Do not reuse --layout-below-header. */
+export const adminToasterOffset = {
+  top: "calc(var(--admin-below-header) + 16px)",
   right: "var(--overlay-gutter)",
 } as const
 

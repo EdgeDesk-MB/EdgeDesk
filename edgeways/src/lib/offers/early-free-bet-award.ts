@@ -54,7 +54,10 @@ export function unconditionalFreeBetEffect(
 ): (AiEffect & { kind: "free_bet_award" }) | null {
   const award = freeBetEffectsForBet(bet, offerTitle).find(
     (e): e is AiEffect & { kind: "free_bet_award" } =>
-      e.kind === "free_bet_award" && e.positions.length === 0 && e.amount > 0
+      e.kind === "free_bet_award" &&
+      e.positions.length === 0 &&
+      !e.awardOnLoss &&
+      e.amount > 0
   );
   return award ?? null;
 }

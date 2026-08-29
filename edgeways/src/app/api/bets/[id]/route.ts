@@ -60,6 +60,8 @@ const patchSchema = z.object({
   homeTeam: z.string().optional(),
   awayTeam: z.string().optional(),
   offerId: z.number().nullable().optional(),
+  refundAmount: z.number().optional(),
+  refundRetention: z.number().optional(),
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -117,6 +119,8 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
       ...(p.market !== undefined ? { market: p.market } : {}),
       ...(p.selection !== undefined ? { selection: p.selection } : {}),
       ...(p.offerId !== undefined ? { offerId: p.offerId } : {}),
+      ...(p.refundAmount !== undefined ? { refundAmount: p.refundAmount } : {}),
+      ...(p.refundRetention !== undefined ? { refundRetention: p.refundRetention } : {}),
       // A mug bet must never stay offer-linked (mirrors the POST guard);
       // placed after the offerId spread so it always wins.
       ...(p.purpose === "mug" ? { offerId: null } : {}),

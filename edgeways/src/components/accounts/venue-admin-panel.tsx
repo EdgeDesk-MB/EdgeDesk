@@ -225,6 +225,10 @@ function ExchangeEditRow({
 }) {
   const [commission, setCommission] = useState(String(exchange.commissionPct));
 
+  useEffect(() => {
+    setCommission(String(exchange.commissionPct));
+  }, [exchange.commissionPct]);
+
   return (
     <TableRow>
       <TableCell>

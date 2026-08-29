@@ -364,6 +364,25 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
   lastOkAt: integer("last_ok_at"),
 });
 
+/**
+ * Shared operator Live log. Same bundles as admin toasts / owner push,
+ * one row per event under the digest threshold, digest rows at 10/50,
+ * feed/health upserted on the coalesce key.
+ */
+export const adminLiveLog = sqliteTable("admin_live_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  dedupe: text("dedupe").notNull().unique(),
+  kind: text("kind").notNull(),
+  tone: text("tone").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  href: text("href").notNull(),
+  count: integer("count").notNull().default(1),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  readAt: integer("read_at"),
+});
+
 /** Persistent alert history (F2) - toasts/notifications deliver, this is the record */
 export const alertsInbox = sqliteTable("alerts_inbox", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -810,6 +829,7 @@ export type NewExchangeRow = typeof exchanges.$inferInsert;
 export type HistoryRow = typeof history.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
 export type NewAccountRow = typeof accounts.$inferInsert;
+export type AdminLiveLogRow = typeof adminLiveLog.$inferSelect;
 export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type UserReminderRow = typeof userReminders.$inferSelect;

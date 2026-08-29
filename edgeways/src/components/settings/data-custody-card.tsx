@@ -301,7 +301,7 @@ export function DataCustodyCard({
               </DialogTitle>
               <DialogDescription>
                 {hosted
-                  ? "Restore this backup. Your current offers, wallets, bets and history are replaced by the backup contents."
+                  ? "Restore this backup. Current offers, wallets, bets and history are replaced."
                   : "Restore this backup. A safety copy is saved first."}
               </DialogDescription>
             </DialogHeader>

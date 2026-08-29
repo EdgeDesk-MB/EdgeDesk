@@ -208,7 +208,7 @@ function OffersContent() {
         helpId="offers"
         icon={Tag}
         title="Campaigns"
-        description="Track offer campaigns, next actions, and pipeline stages. Bets auto-link when the label or trigger looks like an offer."
+        description="Offers, next actions and pipeline."
         action={
           <PageHeaderActions className="gap-6">
             <PageHeaderStatGroup>

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_BOOTSTRAP_ADMIN_EMAIL,
+  DEFAULT_OWNER_ADMIN_EMAIL,
   bootstrapAdminEmails,
   isBootstrapAdminEmail,
   isOperatorAdmin,
+  isOwnerAdmin,
+  ownerAdminEmails,
   parseAppUserRole,
 } from "./emails";
 
@@ -38,5 +41,21 @@ describe("admin emails", () => {
     expect(parseAppUserRole("admin")).toBe("admin");
     expect(parseAppUserRole("super")).toBe("user");
     expect(parseAppUserRole(null)).toBe("user");
+  });
+
+  it("treats only the owner email as master, not extra bootstrap operators", () => {
+    expect(isOwnerAdmin(DEFAULT_OWNER_ADMIN_EMAIL)).toBe(true);
+    expect(isOwnerAdmin("SamHayter.design@gmail.com")).toBe(true);
+    const env = {
+      EDGEWAYS_ADMIN_EMAILS: "ops@example.com",
+      EDGEWAYS_OWNER_EMAILS: " co@edgeways.app ",
+    };
+    expect(ownerAdminEmails(env)).toEqual([
+      DEFAULT_OWNER_ADMIN_EMAIL,
+      "co@edgeways.app",
+    ]);
+    expect(isOwnerAdmin("ops@example.com", env)).toBe(false);
+    expect(isBootstrapAdminEmail("ops@example.com", env)).toBe(true);
+    expect(isOwnerAdmin("co@edgeways.app", env)).toBe(true);
   });
 });

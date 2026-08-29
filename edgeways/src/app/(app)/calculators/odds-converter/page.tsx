@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PercentFlow } from "@/components/money-flow";
+import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import {
   americanToDecimal,
@@ -49,12 +50,10 @@ export default function OddsConverterPage() {
 
   return (
     <CalculatorShell contentClassName="max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Odds Converter</h1>
-        <p className="text-sm text-muted-foreground">
-          Edit any format and the rest follow. Implied probability shows the bookie&apos;s margin baked in.
-        </p>
-      </div>
+      <CalculatorPageHeader
+        title="Odds Converter"
+        description="Edit any format and the rest follow."
+      />
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Convert</CardTitle>

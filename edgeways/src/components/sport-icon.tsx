@@ -29,9 +29,9 @@ export function sportLabel(sport?: string | null): string {
   return sportDisplayLabel(sport);
 }
 
-type SvgIconProps = Pick<LucideProps, "className" | "size">;
+type SvgIconProps = Pick<LucideProps, "className" | "size" | "strokeWidth">;
 
-function svgProps({ className, size = 16 }: SvgIconProps) {
+function svgProps({ className, size = 16, strokeWidth = 2 }: SvgIconProps) {
   return {
     xmlns: "http://www.w3.org/2000/svg",
     width: size,
@@ -39,7 +39,7 @@ function svgProps({ className, size = 16 }: SvgIconProps) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: 2,
+    strokeWidth,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     className: cn("shrink-0", className),

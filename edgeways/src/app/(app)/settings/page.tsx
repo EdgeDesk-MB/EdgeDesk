@@ -570,7 +570,7 @@ function TuningNumberRow({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+    <div className="flex items-center justify-between gap-4 rounded-md border px-4 py-2.5">
       <div className="min-w-0">
         <Label htmlFor={inputId} className="text-sm font-medium">
           {label}
@@ -657,7 +657,7 @@ function TuningCard({
           always behaved - tune them to how you actually operate.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 lg:grid-cols-2">
+      <CardContent className="grid gap-4 lg:grid-cols-2">
         <TuningNumberRow
           label="Unhedged grace period (minutes)"
           hint="Time between logging a back and its lay before the sentinel alerts"
@@ -725,13 +725,13 @@ function TuningCard({
           max={100}
           onCommit={(v) => patchField("edgeReportMinCampaigns", v)}
         />
-        <div className="mt-6 flex flex-col gap-2 lg:col-span-2">
+        <div className="mt-6 flex flex-col lg:col-span-2">
           <p className="text-sm font-medium">Effort per action (minutes)</p>
-          <p className="-mt-1.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Drives the £/hr &ldquo;Rate&rdquo; sort in Do next - lower effort ranks an action
             higher per pound.
           </p>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
             {EFFORT_ROWS.map((row) => (
               <TuningNumberRow
                 key={row.kind}
@@ -881,23 +881,13 @@ function AutomationCard({
   settings: AppSettings;
   onPatch: (patch: Partial<AppSettings>) => void;
 }) {
-  const [pollMs, setPollMs] = useState(String(settings.dashboardPollMs));
-
-  // Adjust-during-render: saved settings coming back from the server refresh
-  // the text field without an effect round-trip.
-  const [prevPoll, setPrevPoll] = useState(settings.dashboardPollMs);
-  if (prevPoll !== settings.dashboardPollMs) {
-    setPrevPoll(settings.dashboardPollMs);
-    setPollMs(String(settings.dashboardPollMs));
-  }
-
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Bell className="size-4" /> Automation
         </CardTitle>
-        <CardDescription>Live dashboard polling, morning tasks digest and OCR matching.</CardDescription>
+        <CardDescription>Morning tasks digest, OCR matching and the mobile Home start card.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 lg:max-w-xl">
         <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
@@ -926,24 +916,6 @@ function AutomationCard({
             aria-label="OCR auto-match events"
             onCheckedChange={(v) => onPatch({ ocrAutoMatchEvents: v })}
           />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label>Dashboard refresh (ms)</Label>
-          <Input
-            type="number"
-            step={500}
-            min={1000}
-            max={60000}
-            value={pollMs}
-            onChange={(e) => setPollMs(e.target.value)}
-            onBlur={() => {
-              const v = parseInt(pollMs, 10);
-              if (Number.isFinite(v)) onPatch({ dashboardPollMs: v });
-            }}
-          />
-          <p className="text-xs text-muted-foreground">
-            Lower = snappier live P&amp;L. The home dashboard picks this up automatically.
-          </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="mobile-deck-pin">Mobile home starts on</Label>

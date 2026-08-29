@@ -326,8 +326,8 @@ export default function AccumulatorCalculatorPage() {
   return (
     <CalculatorShell wide>
       <CalculatorPageHeader
-        title="Accumulator Calculator"
-        description="Doubles through Lucky 63 - back returns for full-cover bets and layered lays for standard accumulators."
+        title="Accumulator"
+        description="Doubles through Lucky 63, plus full-cover returns."
       />
       <Tabs defaultValue="standard">
         <TabsList>

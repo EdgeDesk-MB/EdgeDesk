@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   describeAiEffect,
   evaluateFreeBetAward,
+  evaluateUnconditionalFreeBet,
   inferAiEffectsFromText,
   offerTriggerDetectedInLabel,
   offerTriggerFromLabel,
@@ -10,6 +11,25 @@ import {
 import type { RaceResult } from "@/lib/racing";
 
 describe("inferAiEffectsFromText", () => {
+  it("Bet £100 get £100 free bet if bet loses → award on loss only", () => {
+    const effects = inferAiEffectsFromText("Bet £100 get £100 free bet if bet loses");
+    expect(effects).toHaveLength(1);
+    expect(effects[0]).toMatchObject({
+      kind: "free_bet_award",
+      amount: 100,
+      positions: [],
+      awardOnLoss: true,
+    });
+  });
+
+  it("Money back as a free bet if horse loses with a £100 face → award on loss", () => {
+    const effects = inferAiEffectsFromText(
+      "£100 Money Back as a Free Bet if your horse loses"
+    );
+    expect(effects[0]?.awardOnLoss).toBe(true);
+    expect(effects[0]?.amount).toBe(100);
+  });
+
   it("Bet £50 get £50 → unconditional free bet", () => {
     const effects = inferAiEffectsFromText("Bet £50 get £50");
     expect(effects).toHaveLength(1);
@@ -236,5 +256,20 @@ describe("previewAiTriggersFromInput", () => {
     const preview = previewAiTriggersFromInput({ triggerText: "Bet £50 get £50" });
     expect(preview.recognised).toBe(true);
     expect(preview.lines[0]).toContain("when this bet settles");
+  });
+});
+
+describe("evaluateUnconditionalFreeBet", () => {
+  const refundIf = {
+    kind: "free_bet_award" as const,
+    amount: 100,
+    positions: [] as number[],
+    awardOnLoss: true,
+  };
+
+  it("Refund-If awards only when the bet lost", () => {
+    expect(evaluateUnconditionalFreeBet(refundIf, "lost").met).toBe(true);
+    expect(evaluateUnconditionalFreeBet(refundIf, "won").met).toBe(false);
+    expect(evaluateUnconditionalFreeBet(refundIf, "open").met).toBe(false);
   });
 });

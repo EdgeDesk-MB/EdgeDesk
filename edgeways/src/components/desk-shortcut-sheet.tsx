@@ -44,7 +44,7 @@ export function DeskShortcutSheet({
         <DialogHeader className="shrink-0">
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            Daily chords, desk jumps, and the palette.
+            Daily chords, desk jumps and the palette.
           </DialogDescription>
         </DialogHeader>
         <div className="min-w-0 shrink-0">

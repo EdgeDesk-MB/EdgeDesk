@@ -9,5 +9,13 @@ import { MaintenanceBannerView } from "./maintenance-banner";
 export async function MaintenanceBannerServer() {
   const banner = await readMaintenanceBanner().catch(() => null);
   if (!banner?.enabled || !banner.message) return null;
-  return <MaintenanceBannerView message={banner.message} />;
+  return (
+    <MaintenanceBannerView
+      message={banner.message}
+      kind={banner.kind}
+      href={banner.href}
+      linkLabel={banner.linkLabel}
+      layoutOffset
+    />
+  );
 }

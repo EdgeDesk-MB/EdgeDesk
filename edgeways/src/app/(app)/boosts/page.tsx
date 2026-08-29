@@ -143,7 +143,7 @@ export default function BoostsPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Boosts"
-        description="Found a boosted price or built a bet? Enter it with fair odds - Edgeways gives the verdict and keeps score."
+        description="Enter a boost with fair odds for a verdict."
         helpId="boosts"
         icon={Zap}
       />

@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Stats + buttons in a page header - vertically centred.
- * Default gap is 8px between loose children. When pairing
- * `PageHeaderStatGroup` with `PageHeaderButtonGroup`, pass `className="gap-6"`
- * for the 24px gap between supporting text and the button cluster.
+ * Stats + buttons in a page header. Full width under the title below `md`,
+ * then a compact cluster on the right. Default gap is 8px between loose
+ * children. When pairing `PageHeaderStatGroup` with `PageHeaderButtonGroup`,
+ * pass `className="gap-6"` for the 24px gap between supporting text and the
+ * button cluster.
  */
 export function PageHeaderActions({
   children,
@@ -14,7 +15,7 @@ export function PageHeaderActions({
   className?: string;
 }) {
   return (
-    <div className={cn("flex shrink-0 flex-wrap items-center gap-2", className)}>
+    <div className={cn("flex w-full flex-wrap items-center gap-2 md:w-auto md:shrink-0", className)}>
       {children}
     </div>
   );
@@ -60,7 +61,7 @@ export function PageHeaderButtonGroup({
   className?: string;
 }) {
   return (
-    <div className={cn("flex shrink-0 flex-wrap items-center gap-2", className)}>
+    <div className={cn("flex w-full flex-wrap items-center gap-2 md:w-auto md:shrink-0", className)}>
       {children}
     </div>
   );
@@ -77,6 +78,6 @@ export const pageSecondaryButtonProps = { size: "default" as const };
 
 /**
  * Cluster for two or more outline (non-ghost) action buttons.
- * Uses gap-2.5 (10px) — 4px more than the default inline action gap (gap-1.5 / 6px).
+ * Uses gap-2.5 (10px), 4px more than the default inline action gap (gap-1.5 / 6px).
  */
 export const outlineButtonGroup = "flex flex-wrap items-center gap-2.5";

@@ -34,7 +34,7 @@ const FILL: Record<AdminChartTone, string> = {
   warning: "fill-warning",
   success: "fill-success",
   destructive: "fill-destructive",
-  profit: "fill-profit",
+  profit: "fill-profit/70",
 };
 
 const STROKE: Record<AdminChartTone, string> = {
@@ -54,7 +54,7 @@ const SWATCH: Record<AdminChartTone, string> = {
   warning: "bg-warning",
   success: "bg-success",
   destructive: "bg-destructive",
-  profit: "bg-profit",
+  profit: "bg-profit/70",
 };
 
 const AREA: Record<AdminChartTone, string> = {
@@ -351,7 +351,7 @@ export function AdminShareBars({
   slices,
   formatValue = defaultFormat,
   emptyTitle = "Nothing to rank yet",
-  emptyDescription = "Desks appear here after they record bets, offers, or history.",
+  emptyDescription = "Desks appear here after they record bets, sports offers, or casino campaigns.",
   className,
 }: {
   slices: ShareSlice[];

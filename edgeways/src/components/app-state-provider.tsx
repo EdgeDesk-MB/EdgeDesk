@@ -117,7 +117,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const pollMs = state?.settings.dashboardPollMs ?? FALLBACK_POLL_MS;
+  const pollMs = FALLBACK_POLL_MS;
   const pollingPaused = pauseCount > 0;
 
   useEffect(() => {
@@ -162,7 +162,7 @@ export function usePauseAppStatePolling(paused: boolean) {
   }, [paused, pausePolling]);
 }
 
-/** @param _intervalMs Ignored - poll interval comes from Settings → dashboard poll (shared). */
+/** @param _intervalMs Ignored. Shared poll is a product default (3s), not a user setting. */
 export function useAppStateContext(_intervalMs?: number): AppStateContextValue {
   const ctx = useContext(AppStateContext);
   if (!ctx) {

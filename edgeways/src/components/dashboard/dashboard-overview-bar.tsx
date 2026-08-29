@@ -178,8 +178,8 @@ export function DashboardOverviewBar({
         title="Summary"
         description={
           withChart
-            ? "Profit, pace, campaign totals and the running P&L chart."
-            : "Profit, pace and campaign totals at a glance."
+            ? "Profit, pace, campaigns and the P&L chart."
+            : "Profit, pace and campaign totals."
         }
         icon={hasLiveEvent ? Radio : undefined}
         iconClassName={

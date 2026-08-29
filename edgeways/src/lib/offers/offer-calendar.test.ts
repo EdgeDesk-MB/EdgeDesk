@@ -284,6 +284,24 @@ describe("buildOfferCalendarDays", () => {
     );
     expect(days.flatMap((d) => d.items).some((i) => i.offerId === 9)).toBe(false);
   });
+
+  it("excludes past instance dates even when series_id is missing", () => {
+    const days = buildOfferCalendarDays(
+      [
+        offer({
+          id: 16,
+          title: "Stale racing day",
+          status: "active",
+          betCount: 0,
+          instanceDate: "2026-07-07",
+          eventDate: "2026-07-07",
+          expiresAt: new Date(2026, 6, 20, 23, 0, 0).getTime(),
+        }),
+      ],
+      { now, horizonDays: 14 }
+    );
+    expect(days.flatMap((d) => d.items).some((i) => i.offerId === 16)).toBe(false);
+  });
 });
 
 describe("buildOfferCalendarBoard", () => {
@@ -395,6 +413,47 @@ describe("buildOfferCalendarBoard", () => {
     expect(today.items.some((i) => i.offerId === 40 && i.actionKind === "place_qualifying")).toBe(
       true
     );
+  });
+
+  it("puts future instance dates in This week even without a series", () => {
+    const columns = buildOfferCalendarBoard(
+      [
+        offer({
+          id: 14,
+          title: "Bet £20 get £20 free bet (2nd, 3rd, 4th)",
+          bookmaker: "Betfair Sportsbook",
+          status: "planned",
+          betCount: 0,
+          instanceDate: "2026-07-11",
+          eventDate: "2026-07-11",
+          expiresAt: new Date(2026, 6, 11, 23, 0, 0).getTime(),
+        }),
+      ],
+      { now, horizonDays: 14 }
+    );
+    const today = columns.find((c) => c.id === "today");
+    const thisWeek = columns.find((c) => c.id === "this_week");
+    expect(today?.items.some((i) => i.offerId === 14)).toBe(false);
+    expect(thisWeek?.items.some((i) => i.offerId === 14)).toBe(true);
+  });
+
+  it("keeps a same-day scoped offer in Today", () => {
+    const columns = buildOfferCalendarBoard(
+      [
+        offer({
+          id: 15,
+          title: "Money back if bet loses",
+          bookmaker: "BetMGM",
+          status: "active",
+          betCount: 0,
+          eventDate: "2026-07-08",
+          expiresAt: new Date(2026, 6, 8, 20, 0, 0).getTime(),
+        }),
+      ],
+      { now, horizonDays: 14 }
+    );
+    const today = columns.find((c) => c.id === "today");
+    expect(today?.items.some((i) => i.offerId === 15)).toBe(true);
   });
 
   it("keeps future recurring instances out of Today column", () => {

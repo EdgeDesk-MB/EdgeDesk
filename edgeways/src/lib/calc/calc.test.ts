@@ -13,8 +13,12 @@ import {
   luckyLayMatrix,
   expectedValue,
   fractionalToDecimal,
+  matchedBackReturns,
   matchedBet,
   noVig,
+  bonusLoseBookieBreakdown,
+  riskFreeBookieBreakdown,
+  riskFreeRefundCash,
   settleBet,
   settleFromOutcome,
   settlePartialOutcome,
@@ -76,6 +80,99 @@ describe("matched betting calculator", () => {
     });
     expect(Math.abs(r.profitIfBackWins - r.profitIfLayWins)).toBeLessThan(0.02);
     expect(r.guaranteed).toBeGreaterThan(0); // risk-free bets are +EV both sides at close odds
+  });
+
+  it("risk-free bookie lose row is stake lost plus refund cash (hand-worked)", () => {
+    // £10 stake, £10 free-bet refund at 70% → cash equivalent £7, net bookie −£3
+    const input = { backStake: 10, refundAmount: 10, refundRetention: 0.7 };
+    expect(riskFreeRefundCash(input)).toBe(7);
+    expect(riskFreeBookieBreakdown(input)).toEqual({
+      lines: [
+        { value: -10, label: "stake lost" },
+        { value: 7, label: "refund at 70%" },
+      ],
+    });
+    const { lose } = matchedBackReturns({
+      mode: "risk_free",
+      backOdds: 4,
+      ...input,
+    });
+    expect(lose).toBe(-10 + 7);
+  });
+
+  it("risk-free 100% retention labels a cash refund", () => {
+    expect(
+      riskFreeBookieBreakdown({
+        backStake: 10,
+        refundAmount: 10,
+        refundRetention: 1,
+      })?.lines[1]
+    ).toEqual({ value: 10, label: "cash refund" });
+  });
+
+  it("risk-free zero refund has no bookie breakdown", () => {
+    expect(
+      riskFreeBookieBreakdown({
+        backStake: 10,
+        refundAmount: 10,
+        refundRetention: 0,
+      })
+    ).toBeNull();
+  });
+
+  it("free bet on lose unpacks stake lost plus FB retention (hand-worked)", () => {
+    // £10 stake, £10 FB at 70% → +£7 credit, same composition as risk-free
+    expect(
+      bonusLoseBookieBreakdown({
+        backStake: 10,
+        backOdds: 3,
+        specialBonus: { kind: "free_bet_on_lose", amount: 10, freeBetRetention: 0.7 },
+      })
+    ).toEqual({
+      lines: [
+        { value: -10, label: "stake lost" },
+        { value: 7, label: "FB at 70%" },
+      ],
+    });
+  });
+
+  it("cash bonus on lose unpacks stake lost plus cash credit", () => {
+    expect(
+      bonusLoseBookieBreakdown({
+        backStake: 10,
+        backOdds: 3,
+        specialBonus: { kind: "bonus_cash_on_lose", amount: 4 },
+      })
+    ).toEqual({
+      lines: [
+        { value: -10, label: "stake lost" },
+        { value: 4, label: "cash bonus" },
+      ],
+    });
+  });
+
+  it("Refund-If £100 @ 3.00 / 3.10 underlays vs a full match (hand-worked)", () => {
+    // Refund-If: win = 200, lose = −100 + 75 = −25, L = 225 / 3.08 = 73.05
+    // Full match: win = 200, lose = −100, L = 300 / 3.08 ≈ 97.40
+    const rf = matchedBet({
+      mode: "risk_free",
+      backStake: 100,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      refundAmount: 100,
+      refundRetention: 0.75,
+    });
+    const full = matchedBet({
+      mode: "qualifying",
+      backStake: 100,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+    });
+    expect(rf.layStake).toBe(73.05);
+    expect(rf.layStake).toBeLessThan(full.layStake);
+    expect(rf.guaranteed).toBeCloseTo(46.59, 2);
   });
 
   it("special bonus: free bet on lose equalises with retention", () => {
@@ -162,6 +259,24 @@ describe("partial settlement (Ultimatcher Pending)", () => {
       settleFromOutcome(qual, false).profit,
       6
     );
+  });
+
+  it("risk_free settlement is cash only (no phantom refund)", () => {
+    // Same lay as the Refund-If equalise: £73.05 @ 3.10, 2%.
+    // Lose: bookie −100, exchange +73.05×0.98 = +71.589 → −28.411
+    const rf = {
+      ...base,
+      betType: "risk_free" as const,
+      backStake: 100,
+      backOdds: 3,
+      layStake: 73.05,
+      layOdds: 3.1,
+      refundAmount: 100,
+      refundRetention: 0.75,
+    };
+    expect(settleFromOutcome(rf, false).profit).toBeCloseTo(-28.411, 3);
+    // Win: bookie +200, liability 73.05 × 2.1 = 153.405 → 46.595
+    expect(settleFromOutcome(rf, true).profit).toBeCloseTo(46.595, 3);
   });
 });
 

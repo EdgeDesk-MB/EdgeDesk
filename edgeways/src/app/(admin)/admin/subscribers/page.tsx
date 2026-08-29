@@ -82,7 +82,7 @@ export default async function AdminSubscribersPage() {
   return (
     <AdminPage
       title="Subscribers"
-      description="Account plans from app_users, plus the waitlist. Last active is the last account sync."
+      description="Plans, waitlist and last active."
       icon={Users}
       toolbar={
         <AdminAccountFilters

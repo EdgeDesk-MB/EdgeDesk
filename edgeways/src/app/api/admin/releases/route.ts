@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/session";
 import { setPosthogFlagActive } from "@/lib/admin/flags";
 import { writeMaintenanceBanner } from "@/lib/admin/operator-settings";
+import {
+  isInvalidBannerHrefInput,
+  isSiteBannerKind,
+} from "@/lib/admin/maintenance-banner-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +14,13 @@ export async function PATCH(request: Request) {
   if (!gate.ok) return gate.response;
 
   let body: {
-    banner?: { enabled?: boolean; message?: string };
+    banner?: {
+      enabled?: boolean;
+      message?: string;
+      kind?: string;
+      href?: string | null;
+      linkLabel?: string | null;
+    };
     flag?: { id?: number; active?: boolean };
   };
   try {
@@ -27,9 +37,47 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
+    if (body.banner.kind != null && !isSiteBannerKind(body.banner.kind)) {
+      return NextResponse.json(
+        { error: "Pick maintenance, notice, or offer." },
+        { status: 400 }
+      );
+    }
+    if (
+      body.banner.href != null &&
+      typeof body.banner.href !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Banner link must be text." },
+        { status: 400 }
+      );
+    }
+    if (isInvalidBannerHrefInput(body.banner.href)) {
+      return NextResponse.json(
+        {
+          error:
+            "Enter a valid http(s) link, or a path starting with /, or clear the field.",
+        },
+        { status: 400 }
+      );
+    }
+    if (
+      body.banner.linkLabel != null &&
+      typeof body.banner.linkLabel !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Link label must be text." },
+        { status: 400 }
+      );
+    }
     const banner = await writeMaintenanceBanner({
       enabled: Boolean(body.banner.enabled),
       message: message ?? "",
+      kind: isSiteBannerKind(body.banner.kind)
+        ? body.banner.kind
+        : undefined,
+      href: body.banner.href ?? null,
+      linkLabel: body.banner.linkLabel ?? null,
     });
     return NextResponse.json({ banner });
   }

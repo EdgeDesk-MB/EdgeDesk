@@ -108,7 +108,7 @@ describe("buildAttentionItems", () => {
       stripe: stripe({}),
       users: [user({})],
       feedMonitor: monitor("ok", "ok"),
-      banner: { enabled: false, message: "" },
+      banner: { enabled: false, message: "", kind: "maintenance", href: null, linkLabel: null },
       untriaged: [],
       now: NOW,
     });
@@ -120,7 +120,7 @@ describe("buildAttentionItems", () => {
       stripe: stripe({ pastDue: 1 }),
       users: [],
       feedMonitor: monitor("ok", "ok"),
-      banner: { enabled: false, message: "" },
+      banner: { enabled: false, message: "", kind: "maintenance", href: null, linkLabel: null },
       untriaged: [],
       now: NOW,
     });
@@ -137,7 +137,7 @@ describe("buildAttentionItems", () => {
       stripe: stripe({}),
       users: [user({ trialEndsAt: NOW + DAY })],
       feedMonitor: monitor("critical", "ok"),
-      banner: { enabled: true, message: "Down" },
+      banner: { enabled: true, message: "Down", kind: "maintenance", href: null, linkLabel: null },
       untriaged: [{ id: 1 } as never],
       now: NOW,
     });
@@ -148,5 +148,29 @@ describe("buildAttentionItems", () => {
       "feedback",
     ]);
     expect(items.every((item) => item.tone === "warning")).toBe(true);
+    expect(items.find((item) => item.key === "banner")?.label).toBe("Maintenance");
+  });
+
+  it("labels a live offer banner as Offer", () => {
+    const items = buildAttentionItems({
+      stripe: stripe({}),
+      users: [],
+      feedMonitor: monitor("ok", "ok"),
+      banner: {
+        enabled: true,
+        message: "New reload.",
+        kind: "offer",
+        href: "/offers",
+        linkLabel: "View offer",
+      },
+      untriaged: [],
+      now: NOW,
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      key: "banner",
+      label: "Offer",
+      href: "/admin/releases",
+    });
   });
 });

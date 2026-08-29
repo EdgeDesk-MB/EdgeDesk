@@ -38,7 +38,7 @@ export default async function AdminInboxPage() {
   return (
     <AdminPage
       title="Inbox"
-      description="Feedback reports from the desk. Filing to Linear stays in the triage loop."
+      description="Feedback from the desk."
       icon={Inbox}
       toolbar={
         excludedIds.length > 0 ? (

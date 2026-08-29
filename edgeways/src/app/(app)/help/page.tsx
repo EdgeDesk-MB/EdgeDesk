@@ -51,7 +51,7 @@ function HelpPageContent() {
     <PageShell>
       <PageHeader
         title="Guides"
-        description="Guides, FAQs and support for getting the most from Edgeways."
+        description="How to use the desk."
         icon={BookOpen}
       />
 

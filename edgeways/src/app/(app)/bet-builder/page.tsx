@@ -120,7 +120,7 @@ export default function BetBuilderDeskPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Bet Builder Desk"
-        description="Same-event builders: one kick-off, combined lay or deliberate no lay - every trade is a real tracker bet."
+        description="Same-event builders, logged as real bets."
         helpId="bet-builder"
         icon={Puzzle}
         action={<CreateBetBuilderRunDialog onCreated={load} />}

@@ -1,7 +1,7 @@
-import { isBootstrapAdminEmail, isOperatorAdmin } from "./emails";
+import { isBootstrapAdminEmail, isOperatorAdmin, isOwnerAdmin } from "./emails";
 import type { AppUserRole } from "./emails";
 
-export type AdminRoleBlock = "bootstrap" | "last-admin";
+export type AdminRoleBlock = "owner" | "bootstrap" | "last-admin";
 
 export function adminRoleChangeBlock(input: {
   email: string | null | undefined;
@@ -10,6 +10,7 @@ export function adminRoleChangeBlock(input: {
   adminCount: number;
 }): AdminRoleBlock | null {
   if (input.nextRole === "admin") return null;
+  if (isOwnerAdmin(input.email)) return "owner";
   if (isBootstrapAdminEmail(input.email)) return "bootstrap";
   const currentlyAdmin = isOperatorAdmin({
     email: input.email,
@@ -19,11 +20,12 @@ export function adminRoleChangeBlock(input: {
   return null;
 }
 
-/** UI lock for grant/revoke. Bootstrap and the last admin cannot be demoted. */
+/** UI lock for grant/revoke. Owner, bootstrap, and the last admin cannot be demoted. */
 export function adminAccessLock(
-  user: { admin: boolean; bootstrap: boolean },
+  user: { admin: boolean; bootstrap: boolean; owner?: boolean },
   adminCount: number
 ): AdminRoleBlock | null {
+  if (user.owner) return "owner";
   if (user.bootstrap) return "bootstrap";
   if (user.admin && adminCount <= 1) return "last-admin";
   return null;

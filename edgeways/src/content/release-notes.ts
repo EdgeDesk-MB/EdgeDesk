@@ -32,6 +32,88 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-08-29",
+    title: "Refund-If offers and calculator polish",
+    summary:
+      "Money-back-if-you-lose campaigns get the right underlay path, and the calculators and menus are easier to read.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Money back as a free bet if it loses is now its own campaign type (Refund-If), not a tight-match qualifier. Step 1 is Place refund-if bet: underlay on the exchange using the free-bet value, then convert only if the bet loses. A win already locked the profit, so convert is skipped.",
+      },
+      {
+        kind: "fix",
+        area: "Offers",
+        href: "/offers",
+        text: "A lost risk-free bet records the cash from the back and lay only. The free bet is awarded and converted as usual, instead of counting an anticipated refund as cash on the day.",
+      },
+      {
+        kind: "feature",
+        area: "Calculators",
+        href: "/calculators/refund-if",
+        text: "Refund-If joins the calculators index. On Refund-If and Risk-free, the lose-row bookie cell unpacks stake lost, refund at your retention (or cash refund), then the net.",
+      },
+      {
+        kind: "improvement",
+        area: "Calculators",
+        href: "/calculators",
+        text: "Every calculator card has an icon, so Core vs Tools is easier to scan.",
+      },
+      {
+        kind: "improvement",
+        area: "Offers",
+        href: "/offers",
+        text: "Long race names in the offer Race menu stay inside the field: the title truncates, runner counts stay right-aligned.",
+      },
+      {
+        kind: "fix",
+        area: "Mobile",
+        href: "/desk",
+        text: "Tab strips on small screens pan when labels overflow, instead of clipping the last tab, and they hug the label width.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-26",
+    title: "Refer a friend, payment recovery, and Racing Desk",
+    summary:
+      "Share Edgeways from Settings, get a clear prompt if a card payment fails, and Racing Desk shows your offers on the signed-in account.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings",
+        text: "Refer a friend: your share code lives in Settings, and a prompt can appear on Home. They get 50% off their first paid month; you get £10 when they first pay.",
+      },
+      {
+        kind: "feature",
+        area: "Alerts",
+        href: "/alerts",
+        text: "If a subscription payment fails, you get an inbox alert and an email with the amount, the next retry, and a link to update your card. When the payment recovers, the alert clears.",
+      },
+      {
+        kind: "fix",
+        area: "Alerts",
+        href: "/alerts",
+        text: "Push and the alerts inbox follow your Edgeways account, so they work on every device you sign in on, the same way as bets and offers.",
+      },
+      {
+        kind: "fix",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Race picks and qualifying offers now show on Racing Desk for your signed-in account.",
+      },
+      {
+        kind: "improvement",
+        area: "Guides",
+        href: "/help",
+        text: "FAQ sits on the mobile Guides tab row, instead of buried under the guide cards.",
+      },
+    ],
+  },
+  {
     date: "2026-08-25",
     title: "Mobile fit and finish",
     summary:

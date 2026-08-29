@@ -8,8 +8,7 @@ import { canUseBetBuilderDesk } from "@/lib/entitlements/bet-builder-desk";
 import { deriveOfferNextAction } from "@/lib/offers/next-actions";
 import {
   currentPlaybookStep,
-  readPlaybookFromRulesJson,
-  syncPlaybookFromOfferProfit,
+  playbookFromOffer,
 } from "@/lib/offers/offer-playbook";
 import {
   betTypeUsesOfferVenueScope,
@@ -34,7 +33,8 @@ import {
 } from "@/lib/services/settings-shared";
 import { isKnownSport } from "@/lib/sports";
 import type { OfferSummary } from "@/lib/services/offers.types";
-import { deskKindLabel } from "@/lib/offers/offer-desk-progress";
+import { FREE_BET_EV_RETENTION } from "@/lib/offers/offer-intelligence/estimates";
+import { isRefundIfOffer } from "@/lib/offers/refund-if";
 
 function ctaLabelForAction(
   action: ReturnType<typeof deriveOfferNextAction>,
@@ -46,6 +46,7 @@ function ctaLabelForAction(
     return "Convert free bet";
   }
   if (action?.kind === "start_planned") return "Start campaign";
+  if (betType === "risk_free") return "Place refund-if bet";
   if (action?.kind === "place_qualifying" || action?.kind === "review_expiry") {
     return "Place qualifying bet";
   }
@@ -61,6 +62,15 @@ export function qualifyingOfferTriggerText(
   offer: Pick<OfferSummary, "title" | "offerType" | "rules">
 ): string | null {
   const rules = parseOfferRules(offer);
+  if (isRefundIfOffer(offer) || rules?.refundIf) {
+    const stake = rules?.betStake;
+    const refund = rules?.freeBetAmount ?? stake;
+    if (stake != null && refund != null) {
+      return `Bet £${stake} get £${refund} free bet if bet loses`;
+    }
+    const title = offer.title.trim();
+    return title || "Money back if bet loses";
+  }
   if (rules) return placeRefundTriggerText(rules);
   const title = offer.title.trim();
   if (title && offerTriggerDetectedInLabel(title)) return title;
@@ -277,9 +287,17 @@ function buildAddBetPrefill(input: {
         : `Qualify · ${bookmaker ?? offer.title}`,
   };
 
-  if (betType === "qualifying") {
+  if (betType === "qualifying" || betType === "risk_free") {
     const trigger = qualifyingOfferTriggerText(offer);
     if (trigger) prefill.triggerText = trigger;
+  }
+
+  if (betType === "risk_free") {
+    const rules = parseOfferRules(offer);
+    const refund = rules?.freeBetAmount ?? rules?.betStake ?? stake;
+    prefill.refundAmount = refund;
+    prefill.refundRetention = FREE_BET_EV_RETENTION;
+    prefill.labelSuggestion = `Refund-if · ${bookmaker ?? offer.title}`;
   }
 
   if (offer.sport === "horse_racing") {
@@ -565,10 +583,7 @@ export function deriveTrackBetAction(
     action?.kind === "playbook_opt_in" ||
     action?.kind === "playbook_clear_wagering"
   ) {
-    const rawPb = readPlaybookFromRulesJson(offer.rules);
-    const step = rawPb
-      ? currentPlaybookStep(syncPlaybookFromOfferProfit(rawPb, profit))
-      : null;
+    const step = currentPlaybookStep(playbookFromOffer(offer));
     if (!step) {
       return disabled(action.title, action.detail || action.title);
     }
@@ -599,10 +614,7 @@ export function deriveTrackBetAction(
   }
 
   if (action?.kind === "playbook_await_award") {
-    const rawPb = readPlaybookFromRulesJson(offer.rules);
-    const step = rawPb
-      ? currentPlaybookStep(syncPlaybookFromOfferProfit(rawPb, profit))
-      : null;
+    const step = currentPlaybookStep(playbookFromOffer(offer));
     if (!step) {
       return disabled(action.title, action.detail || action.title);
     }
@@ -644,11 +656,11 @@ export function deriveTrackBetAction(
     action?.kind === "start_planned" ||
     (offer.betCount === 0 && profit.freeBetStage === "none")
   ) {
-    betType = "qualifying";
-    label = ctaLabelForAction(action, "qualifying", true);
+    betType = isRefundIfOffer(offer) || rules?.refundIf ? "risk_free" : "qualifying";
+    label = ctaLabelForAction(action, betType, true);
   } else if (action?.kind === "review_expiry" && offer.betCount === 0) {
-    betType = "qualifying";
-    label = ctaLabelForAction(action, "qualifying", true);
+    betType = isRefundIfOffer(offer) || rules?.refundIf ? "risk_free" : "qualifying";
+    label = ctaLabelForAction(action, betType, true);
   } else {
     return disabled(
       ctaLabelForAction(action, "qualifying", false),
@@ -657,7 +669,11 @@ export function deriveTrackBetAction(
   }
 
   // Prefer Important min stake when racing rules have no betStake (qualify only).
-  if (betType === "qualifying" && stakeSource == null && important.minStake != null) {
+  if (
+    (betType === "qualifying" || betType === "risk_free") &&
+    stakeSource == null &&
+    important.minStake != null
+  ) {
     stakeSource = important.minStake;
   }
 

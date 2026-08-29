@@ -2,7 +2,7 @@ import "server-only";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import { NextResponse } from "next/server";
-import { isOperatorAdmin } from "@/lib/admin/emails";
+import { isOperatorAdmin, isOwnerAdmin } from "@/lib/admin/emails";
 import { primaryClerkEmail } from "@/lib/db/desk-scope";
 import { ensureAppUser, type AppUser } from "@/lib/services/app-users";
 
@@ -10,6 +10,7 @@ export type AdminSession = {
   clerkUserId: string;
   email: string | null;
   user: AppUser;
+  owner: boolean;
 };
 
 export async function readAdminSession(): Promise<{
@@ -28,10 +29,11 @@ export async function readAdminSession(): Promise<{
   if (!admin) {
     return { signedIn: true, admin: false, session: null };
   }
+  const owner = isOwnerAdmin(user.email ?? email);
   return {
     signedIn: true,
     admin: true,
-    session: { clerkUserId: userId, email: user.email ?? email, user },
+    session: { clerkUserId: userId, email: user.email ?? email, user, owner },
   };
 }
 
@@ -57,4 +59,18 @@ export async function requireAdminApi(): Promise<
     };
   }
   return { ok: true, session };
+}
+
+export async function requireOwnerApi(): Promise<
+  { ok: true; session: AdminSession } | { ok: false; response: NextResponse }
+> {
+  const gate = await requireAdminApi();
+  if (!gate.ok) return gate;
+  if (!gate.session.owner) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Not found." }, { status: 404 }),
+    };
+  }
+  return gate;
 }

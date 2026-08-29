@@ -29,7 +29,7 @@ export function PageHeader({
       helpId={helpId}
       icon={icon}
       action={action}
-        toolbar={toolbar ? <ToolbarRow>{toolbar}</ToolbarRow> : undefined}
+      toolbar={toolbar ? <ToolbarRow>{toolbar}</ToolbarRow> : undefined}
       className={cn("shrink-0", className)}
     />
   );

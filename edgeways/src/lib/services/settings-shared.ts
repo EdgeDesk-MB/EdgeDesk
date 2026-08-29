@@ -43,6 +43,7 @@ export interface AppSettings {
   /** Last used stake/bookie per offer id (string keys). */
   offerBetPrefs: Record<string, OfferBetPref>;
   ocrAutoMatchEvents: boolean;
+  /** Shared /api/state poll interval. Product default, not a Settings control. */
   dashboardPollMs: number;
   /** IANA timezone for fixture kickoffs and event times in the UI. */
   displayTimezone: string;

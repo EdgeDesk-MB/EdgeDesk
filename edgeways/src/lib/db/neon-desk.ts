@@ -51,7 +51,8 @@ export type NeonDeskBetValues = {
 };
 
 export function neonDeskClerkUserId(): string | null {
-  return getDeskActor().clerkUserId?.trim() || null;
+  const actor = getDeskActor();
+  return actor.neonClerkUserId?.trim() || actor.clerkUserId?.trim() || null;
 }
 
 function resolveClerkUserId(explicit?: string | null): string | null {

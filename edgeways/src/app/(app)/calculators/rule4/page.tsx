@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackPanel, PanelInput } from "@/components/calc/bet-panels";
 import { MoneyFlow } from "@/components/money-flow";
+import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { RULE4_PRESETS, rule4Adjust, rule4EffectiveOdds } from "@/lib/calc/rule4";
 import { cn } from "@/lib/utils";
@@ -20,13 +21,10 @@ export default function Rule4CalculatorPage() {
 
   return (
     <CalculatorShell contentClassName="max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Rule 4 Calculator</h1>
-        <p className="text-sm text-muted-foreground">
-          When a horse is withdrawn, bookies apply a Rule 4 deduction to your winnings. Enter the
-          original odds and deduction (pence in the £) to get effective odds and adjusted returns.
-        </p>
-      </div>
+      <CalculatorPageHeader
+        title="Rule 4"
+        description="Effective odds after a Rule 4 deduction."
+      />
 
       <BackPanel title="Your bet">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

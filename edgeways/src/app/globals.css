@@ -114,7 +114,9 @@
   --color-negative: var(--negative);
   --color-success: var(--success);
   --color-profit: var(--profit);
+  --color-profit-foreground: var(--profit-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-edge: var(--edge);
   --color-edge-foreground: var(--edge-foreground);
   --color-accent-foreground: var(--accent-foreground);
@@ -270,8 +272,12 @@
   --success: oklch(0.45 0.12 150);
   /* P&L / “it paid” type. Distinct from --success (eligibility). AA on canvas. */
   --profit: oklch(0.42 0.13 155);
+  /* Type on solid `bg-profit` plates (Admin Activity casino FilterPill) */
+  --profit-foreground: oklch(1 0 0);
   /* Dark enough for 12px titles on warning/10 washes (EDGE-32). */
   --warning: oklch(0.48 0.18 68);
+  /* Type on solid `bg-warning` plates (site banner, warning FilterPill) */
+  --warning-foreground: oklch(1 0 0);
   /* Offer Edge / Race picks / pro-tier signature (violet family, not caution amber) */
   --edge: oklch(0.5 0.2 295);
   /* Type on solid `bg-edge` plates (`edgeNavTag`) — white on mid-dark edge */
@@ -338,8 +344,12 @@
   --layout-header-h: calc(6.25rem + var(--layout-meta-nav-gap));
   /* Public /demo viewing bar above the top nav. 0 when the bar is off. */
   --layout-demo-bar-h: 0px;
+  /* Operator site banner above the top bar. 0 when the banner is off. */
+  --layout-site-banner-h: 0px;
   /* Viewport offset to the bottom of the header (alerts / toasts start here). */
-  --layout-below-header: calc(var(--layout-demo-bar-h) + var(--layout-header-h));
+  --layout-below-header: calc(
+    var(--layout-demo-bar-h) + var(--layout-site-banner-h) + var(--layout-header-h)
+  );
   --layout-page-min-h: calc(
     100dvh - var(--layout-below-header) - 2 * var(--layout-page-x) - 0.5rem
   );
@@ -351,6 +361,10 @@
   --chrome-tab-r-hang-bottom: 12px;
   /* Top accent stripe above the header */
   --topbar-stripe-h: 4px;
+  /* Admin chrome: stripe + h-14 row. Mobile also has the md:hidden nav strip. */
+  --admin-below-header: calc(
+    var(--topbar-stripe-h) + 3.5rem + var(--layout-site-banner-h)
+  );
   /* Segmented control — 2px track inset all sides + full pill radius */
   --segmented-track-pad: 2px;
   --segmented-track-pad-x: 2px;
@@ -361,6 +375,14 @@
   :root {
     --layout-page-x: 1.5rem;
     --layout-shell-gap: 0.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --admin-below-header: calc(
+      var(--topbar-stripe-h) + 3.5rem + 2rem + var(--layout-site-banner-h)
+    );
   }
 }
 
@@ -435,7 +457,11 @@
   --negative: oklch(0.78 0.15 22.216);
   --success: oklch(0.70 0.14 150);
   --profit: oklch(0.75 0.15 160);
+  /* Ink on lifted dark-theme profit plate */
+  --profit-foreground: oklch(0.178 0 0);
   --warning: oklch(0.72 0.13 75);
+  /* Ink on lifted dark-theme warning plate */
+  --warning-foreground: oklch(0.178 0 0);
   --edge: oklch(0.72 0.16 295);
   /* Ink on lifted dark-theme edge plate */
   --edge-foreground: oklch(0.178 0 0);
@@ -495,6 +521,7 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-profit: var(--profit);
+  --color-profit-foreground: var(--profit-foreground);
 }
 
 @layer base {
@@ -853,6 +880,21 @@ html[data-font="figtree"] {
     transform: translate(-50%, -50%) scale(1.2);
   }
 
+  .chart-bet-marker:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chart-bet-marker {
+      transition: none;
+    }
+
+    .chart-bet-marker:hover {
+      transform: translate(-50%, -50%);
+    }
+  }
+
   .dark .chart-bet-marker {
     background: rgba(40, 40, 40, 0.95);
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
@@ -883,6 +925,26 @@ html[data-font="figtree"] {
 
   .chart-bet-marker--neutral .chart-bet-marker__inner {
     background-color: #94a3b8;
+  }
+
+  .chart-bet-marker--brand .chart-bet-marker__inner {
+    background-color: var(--brand-highlight);
+  }
+
+  .dark .chart-bet-marker--brand .chart-bet-marker__inner {
+    background-color: var(--brand);
+  }
+
+  .chart-bet-marker--edge .chart-bet-marker__inner {
+    background-color: var(--edge);
+  }
+
+  .chart-bet-marker--muted .chart-bet-marker__inner {
+    background-color: var(--muted-foreground);
+  }
+
+  .chart-bet-marker--profit .chart-bet-marker__inner {
+    background-color: var(--profit);
   }
 
   /**
@@ -1667,7 +1729,8 @@ html[data-font="figtree"] {
 
 /**
  * Stacking: toasts (40) < top bar (45) < modals/overlays (50+).
- * Top offset is --layout-below-header + 16px (demo bar, then header + meta-nav).
+ * Top offset is 16px under the active shell header: desk uses
+ * --layout-below-header; admin uses --admin-below-header.
  * Sonner defaults to z-index: 999999999 — unlayered + !important required.
  *
  * Sonner ≤600px stretches the toaster full-bleed (left + right + width 100%).
@@ -2364,6 +2427,135 @@ html[data-font="figtree"] {
     0 0 0 4px color-mix(in oklch, var(--edge) 65%, transparent);
 }
 
+/* Active profit tone — casino FilterPill plate + contrast type */
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit {
+  --button-tertiary-color: var(--profit);
+  --button-tertiary-color-dark: var(--profit);
+  --button-tertiary-color-light: var(--profit-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--profit) 88%, black);
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit {
+  --button-tertiary-color: var(--profit);
+  --button-tertiary-color-dark: var(--profit);
+  --button-tertiary-color-light: var(--profit-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--profit) 88%, white);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit:hover .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit.aws-btn--active:hover .aws-btn__content {
+  color: var(--profit-foreground);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit:focus-visible .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit.aws-btn--active:focus-visible .aws-btn__content {
+  color: var(--profit-foreground);
+  box-shadow:
+    var(--ew-chip-shadow),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--profit) 65%, transparent);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit.aws-btn--active:hover .aws-btn__content {
+  box-shadow: var(--ew-btn-shadow-pressed);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--profit.aws-btn--active:focus-visible .aws-btn__content {
+  box-shadow:
+    var(--ew-btn-shadow-pressed),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--profit) 65%, transparent);
+}
+
+/* Active warning tone — maintenance / caution plate + contrast type */
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning {
+  --button-tertiary-color: var(--warning);
+  --button-tertiary-color-dark: var(--warning);
+  --button-tertiary-color-light: var(--warning-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--warning) 88%, black);
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning {
+  --button-tertiary-color: var(--warning);
+  --button-tertiary-color-dark: var(--warning);
+  --button-tertiary-color-light: var(--warning-foreground);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--warning) 88%, white);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning:hover .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning.aws-btn--active:hover .aws-btn__content {
+  color: var(--warning-foreground);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning:focus-visible .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning.aws-btn--active:focus-visible .aws-btn__content {
+  color: var(--warning-foreground);
+  box-shadow:
+    var(--ew-chip-shadow),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--warning) 65%, transparent);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning.aws-btn--active:hover .aws-btn__content {
+  box-shadow: var(--ew-btn-shadow-pressed);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--warning.aws-btn--active:focus-visible .aws-btn__content {
+  box-shadow:
+    var(--ew-btn-shadow-pressed),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--warning) 65%, transparent);
+}
+
+/* Active ink tone — notice plate + contrast type */
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink {
+  --button-tertiary-color: var(--foreground);
+  --button-tertiary-color-dark: var(--foreground);
+  --button-tertiary-color-light: var(--background);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--foreground) 88%, black);
+}
+
+.dark .aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink {
+  --button-tertiary-color: var(--foreground);
+  --button-tertiary-color-dark: var(--foreground);
+  --button-tertiary-color-light: var(--background);
+  --button-tertiary-color-hover: color-mix(in oklch, var(--foreground) 88%, white);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink:hover .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink.aws-btn--active:hover .aws-btn__content {
+  color: var(--background);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink:focus-visible .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink.aws-btn--active:focus-visible .aws-btn__content {
+  color: var(--background);
+  box-shadow:
+    var(--ew-chip-shadow),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--foreground) 65%, transparent);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink.aws-btn--active .aws-btn__content,
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink.aws-btn--active:hover .aws-btn__content {
+  box-shadow: var(--ew-btn-shadow-pressed);
+}
+
+.aws-btn.edgeways-btn-3d.edgeways-filter-pill--active.edgeways-filter-pill--ink.aws-btn--active:focus-visible .aws-btn__content {
+  box-shadow:
+    var(--ew-btn-shadow-pressed),
+    0 0 0 2px var(--page),
+    0 0 0 4px color-mix(in oklch, var(--foreground) 65%, transparent);
+}
+
 /*
  * Focus ring on the rounded face (not the outer aws-btn — that paints a
  * square). Brand accent, with a page-gap so it sits outside the control.
@@ -2485,7 +2677,9 @@ html[data-font="figtree"] {
   /* Desk dark-mode positive £ (MoneyFlow --profit) */
   --marketing-money: #34d399;
   --profit: oklch(0.75 0.15 160);
+  --profit-foreground: oklch(0.178 0 0);
   --color-profit: var(--profit);
+  --color-profit-foreground: var(--profit-foreground);
   --marketing-money-soft: color-mix(
     in srgb,
     var(--marketing-money) 15%,

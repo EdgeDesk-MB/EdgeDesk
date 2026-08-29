@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumField } from "@/components/calc/num-field";
 import { MoneyFlow, NumFlow, PercentFlow } from "@/components/money-flow";
+import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { expectedValue, noVig } from "@/lib/calc/ev";
 import { Plus, Trash2 } from "lucide-react";
@@ -29,13 +30,10 @@ export default function EvCalculatorPage() {
 
   return (
     <CalculatorShell wide>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">EV &amp; No-Vig Calculator</h1>
-        <p className="text-sm text-muted-foreground">
-          Strip the margin out of a full market to find fair odds, then measure your edge on
-          the price you&apos;re being offered.
-        </p>
-      </div>
+      <CalculatorPageHeader
+        title="EV & No-Vig"
+        description="Fair odds with the margin stripped out, then your edge."
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

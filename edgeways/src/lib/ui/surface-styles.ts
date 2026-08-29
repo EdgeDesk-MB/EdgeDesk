@@ -103,6 +103,10 @@ export const emptyStateCopyInset = "px-8 sm:px-16";
 export const pageTitle =
   "min-w-0 text-pretty break-words text-xl font-bold tracking-tight text-foreground";
 
+/** Page-header supporting line. 14px so it sits under `pageTitle` without looking like a caption. */
+export const pageDescription =
+  "min-w-0 text-pretty break-words text-sm leading-snug text-muted-foreground";
+
 /**
  * Modal header band — title, concise description, full-bleed hairline.
  * DialogHeader / DialogTitle / DialogDescription already apply these.
@@ -282,6 +286,11 @@ export const demoDataTag = `${navTag} bg-warning text-white`;
 export const adminModeTag = demoDataTag;
 
 /**
+ * Owner (master) mark on /admin user lists, distinct from the warning ADMIN chip.
+ */
+export const adminOwnerTag = edgeNavTag;
+
+/**
  * Test-account mark on /admin user lists — muted plate so it stays distinct
  * from the warning ADMIN chip.
  */
@@ -307,8 +316,8 @@ export const filterPillCount =
 
 /**
  * Counter chip for filter pills — same box either state so selection doesn’t jump.
- * Active sits on the brand or edge plate: ink plate + off-white type in both
- * themes (never brand-on-brand, brand-on-edge, or dark-mode brand-text).
+ * Active sits on the brand, edge, or profit plate: ink plate + off-white type in both
+ * themes (never brand-on-brand, brand-on-edge, profit-on-profit, or dark-mode brand-text).
  */
 export function filterPillCountState(active: boolean) {
   return cn(
@@ -335,15 +344,29 @@ export const monoAccentActive = brandChipActive;
  */
 export function filterPillState(
   active: boolean,
-  opts?: { hasCount?: boolean; compact?: boolean; tone?: "default" | "edge" }
+  opts?: {
+    hasCount?: boolean;
+    compact?: boolean;
+    tone?: "default" | "edge" | "profit" | "warning" | "ink";
+  }
 ) {
-  const edgeActive = active && opts?.tone === "edge";
+  const tone = opts?.tone ?? "default";
+  const edgeActive = active && tone === "edge";
+  const profitActive = active && tone === "profit";
+  const warningActive = active && tone === "warning";
+  const inkActive = active && tone === "ink";
   return cn(
     "inline-flex items-center gap-1.5 rounded-full font-semibold transition-colors",
     "outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-page",
     edgeActive
       ? "focus-visible:ring-edge/60"
-      : "focus-visible:ring-brand/60",
+      : profitActive
+        ? "focus-visible:ring-profit/60"
+        : warningActive
+          ? "focus-visible:ring-warning/60"
+          : inkActive
+            ? "focus-visible:ring-foreground/60"
+            : "focus-visible:ring-brand/60",
     opts?.compact
       ? "min-h-0 px-2.5 py-[6px] text-[11px] leading-none"
       : cn(
@@ -356,7 +379,22 @@ export function filterPillState(
             "skeuo-solid skeuo-sm bg-edge font-semibold text-edge-foreground",
             "hover:bg-edge hover:text-edge-foreground focus-visible:text-edge-foreground active:bg-edge active:text-edge-foreground"
           )
-        : cn(
+        : profitActive
+          ? cn(
+              "skeuo-solid skeuo-sm bg-profit font-semibold text-profit-foreground",
+              "hover:bg-profit hover:text-profit-foreground focus-visible:text-profit-foreground active:bg-profit active:text-profit-foreground"
+            )
+          : warningActive
+            ? cn(
+                "skeuo-solid skeuo-sm bg-warning font-semibold text-warning-foreground",
+                "hover:bg-warning hover:text-warning-foreground focus-visible:text-warning-foreground active:bg-warning active:text-warning-foreground"
+              )
+            : inkActive
+              ? cn(
+                  "skeuo-solid skeuo-sm bg-foreground font-semibold text-background",
+                  "hover:bg-foreground hover:text-background focus-visible:text-background active:bg-foreground active:text-background"
+                )
+              : cn(
             "skeuo-solid skeuo-sm bg-brand font-semibold text-brand-foreground",
             "hover:bg-brand hover:text-brand-foreground focus-visible:text-brand-foreground active:bg-brand active:text-brand-foreground"
           )
@@ -503,6 +541,21 @@ export const destructivePanel = cn(
 export const warningNotice = cn(
   "rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
 );
+
+/** Operator site banner plates. Type maps to tokens, never a free colour. */
+export type SiteBannerPlateKind = "maintenance" | "notice" | "offer";
+
+export function siteBannerPlate(kind: SiteBannerPlateKind): string {
+  if (kind === "offer") return "bg-edge text-edge-foreground";
+  if (kind === "notice") return "bg-foreground text-background";
+  return "bg-warning text-warning-foreground";
+}
+
+export function siteBannerSwatch(kind: SiteBannerPlateKind): string {
+  if (kind === "offer") return "bg-edge";
+  if (kind === "notice") return "bg-foreground";
+  return "bg-warning";
+}
 
 /**
  * In-page success note (onboarding upgrade confirmation).

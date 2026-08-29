@@ -14,7 +14,46 @@ import path from "node:path";
 export type DeskActor = {
   clerkUserId: string | null;
   email: string | null;
+  /**
+   * Hosted Neon desk id. Clerk Development and Production issue different
+   * user ids for the same email; when set, bets/offers follow this id.
+   */
+  neonClerkUserId?: string | null;
 };
+
+export type NeonDeskCandidate = {
+  clerkUserId: string;
+  createdAt: number;
+  offerCount: number;
+};
+
+/**
+ * When the same email exists on more than one Clerk instance, pick the desk
+ * that already has the data. Prefer an explicit owner id when it is one of
+ * the candidates, otherwise the busiest desk, then the newest account row.
+ */
+export function pickCanonicalNeonClerkUserId(input: {
+  signedInUserId: string;
+  preferredUserId?: string | null;
+  candidates: NeonDeskCandidate[];
+}): string {
+  const signedIn = input.signedInUserId.trim();
+  const candidates = input.candidates.filter((row) => row.clerkUserId.trim());
+  if (!signedIn) return signedIn;
+  if (candidates.length === 0) return signedIn;
+  if (candidates.length === 1) return candidates[0]!.clerkUserId.trim();
+
+  const preferred = input.preferredUserId?.trim();
+  if (preferred && candidates.some((row) => row.clerkUserId.trim() === preferred)) {
+    return preferred;
+  }
+
+  return [...candidates].sort((a, b) => {
+    if (b.offerCount !== a.offerCount) return b.offerCount - a.offerCount;
+    if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
+    return a.clerkUserId.localeCompare(b.clerkUserId);
+  })[0]!.clerkUserId.trim();
+}
 
 export const DEFAULT_DESK_OWNER_EMAIL = "samhayter.design@gmail.com";
 
@@ -51,14 +90,23 @@ export function isDeskOwner(actor: DeskActor): boolean {
 }
 
 export function getDeskActor(): DeskActor {
-  return storage.getStore() ?? { clerkUserId: null, email: null };
+  return (
+    storage.getStore() ?? {
+      clerkUserId: null,
+      email: null,
+      neonClerkUserId: null,
+    }
+  );
 }
 
 export function runWithDeskActor<T>(actor: DeskActor, fn: () => T): T {
+  const clerkUserId = actor.clerkUserId?.trim() || null;
+  const neonClerkUserId = actor.neonClerkUserId?.trim() || null;
   return storage.run(
     {
-      clerkUserId: actor.clerkUserId?.trim() || null,
+      clerkUserId,
       email: normaliseDeskEmail(actor.email),
+      neonClerkUserId: neonClerkUserId || clerkUserId,
     },
     fn
   );

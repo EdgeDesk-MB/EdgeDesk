@@ -35,7 +35,7 @@ export interface LivePnlPoint {
   value: number;
 }
 
-const ALL_WINDOW_SECS = 0;
+export const ALL_WINDOW_SECS = 0;
 
 const CHART_WINDOWS: ReadonlyArray<{
   label: string;
@@ -54,16 +54,18 @@ export const DEFAULT_CHART_WINDOW = ALL_WINDOW_SECS;
 export function PnlChartWindowPills({
   value,
   onChange,
+  fadeClassName = "from-page",
 }: {
   value: number;
   onChange: (secs: number) => void;
+  fadeClassName?: string;
 }) {
   const isAllSelected = value === ALL_WINDOW_SECS;
   return (
     <ScrollFadeEdges
       orientation="horizontal"
       className="min-w-0 w-full flex-none"
-      fadeClassName="from-page"
+      fadeClassName={fadeClassName}
       scrollClassName="flex justify-end gap-1"
     >
       {CHART_WINDOWS.map((w) => (
@@ -106,14 +108,17 @@ function pnlChartColor(value: number, dark: boolean): string {
 }
 
 /** Span from first data point through now (All), padded so the first point clears Liveline's left fade. */
-function allTimeWindowSecs(points: LivePnlPoint[], nowSec = Date.now() / 1000): number {
+export function allTimeWindowSecs(
+  points: Array<{ time: number }>,
+  nowSec = Date.now() / 1000
+): number {
   const first = points[0]?.time;
   if (first == null) return 86_400;
   const dataSpan = Math.max(300, Math.ceil(nowSec - first) + 120);
   return Math.ceil(dataSpan / (1 - LIVELINE_TIME_BUFFER - LIVELINE_LEFT_EDGE_MARGIN));
 }
 
-function formatChartTime(secs: number, t: number): string {
+export function formatChartTime(secs: number, t: number): string {
   const d = new Date(t * 1000);
   if (secs >= 604_800) {
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -141,7 +146,7 @@ function prefersReducedMotion(): boolean {
  * Keep the previous (wider) series on screen while Liveline zooms the viewport
  * in. Set during render so the first frame of a shrink is not already clipped.
  */
-function useChartPlotCover(chartWindowSecs: number, effectiveWindowSecs: number) {
+export function useChartPlotCover(chartWindowSecs: number, effectiveWindowSecs: number) {
   const isAllSelected = chartWindowSecs === ALL_WINDOW_SECS;
   const [prev, setPrev] = useState({
     userWindow: chartWindowSecs,
@@ -322,7 +327,7 @@ export const LivePnlChart = memo(function LivePnlChart({
               : undefined
           }
           title={hasLiveEvent ? "Live chart" : "Chart"}
-          description="P&L after exchange commission. Streams while tracked events are in play."
+          description="P&L after commission, live while events are in play."
           action={windowPills}
         />
       ) : embed ? null : (

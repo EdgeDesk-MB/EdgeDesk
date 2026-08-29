@@ -27,6 +27,8 @@ export interface BetGetFreePlaceRules {
    * Default / absent = one-time (no twin).
    */
   repeatSameDay?: boolean;
+  /** Money-back-if-loses (Refund-If): underlay, convert only if the back loses. */
+  refundIf?: boolean;
 }
 
 export function normalizeCourseName(name: string): string {
@@ -154,7 +156,9 @@ export function formatBetGetFreePlaceSummary(
 ): string {
   const stakeClause = `Bet £${rules.betStake} get £${rules.freeBetAmount} free`;
   let rewardClause = stakeClause;
-  if (offerHasResultTrigger(rules)) {
+  if (rules.refundIf) {
+    rewardClause = `£${rules.freeBetAmount} back as free bet if the bet loses`;
+  } else if (offerHasResultTrigger(rules)) {
     const places = rules.qualifyingPlaces.join(", ");
     let placeClause = rules.winnerMustBeSpFavourite
       ? `${rules.qualifyingPlaces.map(placeOrdinal).join(", ")} to SP favourite`
@@ -176,6 +180,9 @@ export function formatBetGetFreePlaceSummary(
 }
 
 export function placeRefundTriggerText(rules: BetGetFreePlaceRules): string {
+  if (rules.refundIf) {
+    return `Bet £${rules.betStake} get £${rules.freeBetAmount} free bet if bet loses`;
+  }
   if (!offerHasResultTrigger(rules)) {
     return `Bet £${rules.betStake} get £${rules.freeBetAmount} FB`;
   }

@@ -50,12 +50,12 @@ export default async function AdminReleasesPage() {
     { label: "Desk surface", value: surface === "app" ? "App" : "Waitlist", on: surface === "app" },
     { label: "Landing", value: landing === "launch" ? "Launch" : "Waitlist", on: landing === "launch" },
     { label: "Stripe live", value: envSet("STRIPE_SECRET_KEY") ? (process.env.STRIPE_SECRET_KEY!.startsWith("sk_live_") ? "Live" : "Test") : "Unset", on: process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ?? false },
-    { label: "Maintenance", value: banner.enabled ? "On" : "Off", on: banner.enabled },
+    { label: "Banner", value: banner.enabled ? "On" : "Off", on: banner.enabled },
   ];
   return (
     <AdminPage
       title="Releases"
-      description="PostHog flags and an optional maintenance banner. There is no deploy button."
+      description="Flags and the site banner."
       icon={Flag}
     >
       <AdminSection title="This deploy">

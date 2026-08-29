@@ -7,6 +7,7 @@ import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
 import { BackPanel, PanelInput, PanelTextInput } from "@/components/calc/bet-panels";
 import { DutchOutcomesBuilder, inferMatchOddsSelection } from "@/components/calc/dutch-outcomes-builder";
 import { MoneyFlow } from "@/components/money-flow";
+import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { twoUpDutchScenarios, type DutchLeg, type DutchResult } from "@/lib/calc/dutching";
@@ -15,13 +16,10 @@ import { cn } from "@/lib/utils";
 export default function DutchingCalculatorPage() {
   return (
     <CalculatorShell wide>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dutching Calculator</h1>
-        <p className="text-sm text-muted-foreground">
-          Split one total stake across every outcome for the same profit whatever happens -
-          or run the 2UP dutch for early-payout windfalls.
-        </p>
-      </div>
+      <CalculatorPageHeader
+        title="Dutching"
+        description="Split a stake across outcomes for the same profit."
+      />
       <Tabs defaultValue="standard">
         <TabsList>
           <TabsTrigger value="standard">Standard dutch</TabsTrigger>

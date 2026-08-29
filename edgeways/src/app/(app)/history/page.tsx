@@ -147,7 +147,7 @@ export default function HistoryPage() {
         helpId="history"
         icon={HistoryIcon}
         title="History"
-        description="Full timeline of bets, settlements, promos and live match moments - times aligned to when events happened."
+        description="Bets, settlements and match moments."
         action={
           <Tabs
             value={viewDensity}

@@ -1,5 +1,11 @@
 {
   "buildCommand": "npm run db:migrate && next build",
+  "crons": [
+    {
+      "path": "/api/cron/admin-live",
+      "schedule": "* * * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/",

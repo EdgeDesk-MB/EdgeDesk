@@ -17,12 +17,13 @@ import type { OfferImportantTerms } from "@/lib/offers/offer-terms";
 import { emptyImportantTerms, formatImportantTermsSummary } from "@/lib/offers/offer-terms";
 import type { BetGetFreePlaceRules } from "@/lib/offers/racing-offer-rules";
 import { formatBetGetFreePlaceSummary } from "@/lib/offers/racing-offer-rules";
+import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
 import {
   analyzeOfferIntelligence,
   enrichImportantTerms,
   type OfferIntelligenceResult,
 } from "@/lib/offers/offer-intelligence";
-import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
+import { isRefundIfText } from "@/lib/offers/refund-if";
 import {
   deriveOfferPlaybook,
   playbookFactsFromImportant,
@@ -1170,6 +1171,28 @@ function extractBetGetStakes(text: string): {
     }
   }
 
+  // Refund-If: "Max stake £100" / "£100 Money Back" with lose-conditional copy.
+  if (isRefundIfText(text)) {
+    const { maxStake } = parseMinMaxStake(text);
+    const face =
+      text.match(
+        new RegExp(
+          String.raw`${MONEY_PREFIX}${MONEY_AMOUNT}\s*(?:money\s+back|fb\b)`,
+          "i"
+        )
+      ) ||
+      text.match(
+        new RegExp(
+          String.raw`\bmoney\s+back\s+${MONEY_PREFIX}${MONEY_AMOUNT}`,
+          "i"
+        )
+      );
+    const amount = maxStake ?? (face ? parseMoney(face[1]) : null);
+    if (amount != null) {
+      return { betStake: amount, freeBetAmount: amount };
+    }
+  }
+
   // Money-back / refund: "up to £10 back", "up to £/€10 in Tote Credit".
   // Suffix (or "same value …") is required — bare "up to 5 (five) free bet
   // bonus per month" must never become a £5 money-back offer.
@@ -1379,6 +1402,11 @@ function buildOfferTitle(
   const moneyBackTitle = extractMoneyBackTitle(text);
   if (moneyBackTitle) return moneyBackTitle;
 
+  if (isRefundIfText(text)) {
+    if (/\bif\s+your\s+horse\s+los/i.test(text)) return "Money back if horse loses";
+    return "Money back if bet loses";
+  }
+
   if (category === "casino" && freeBetAmount != null) {
     return `£${freeBetAmount} casino reward`;
   }
@@ -1575,6 +1603,7 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
       freeBetAmount,
       bookmaker,
       optInRequired: /\bopt[- ]?in\b/i.test(text) && !enrichedImportant.depositRequired,
+      refundIf: intelligence.archetype === "risk_free",
     })
   );
 
@@ -1591,7 +1620,11 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
     notes.push(`Min deposit £${enrichedImportant.minDeposit}`);
   }
   if (betStake != null && freeBetAmount != null) {
-    notes.push(`Bet £${betStake} → £${freeBetAmount} free bet`);
+    if (intelligence.archetype === "risk_free") {
+      notes.push(`£${freeBetAmount} back as SNR free bet if the bet loses`);
+    } else {
+      notes.push(`Bet £${betStake} → £${freeBetAmount} free bet`);
+    }
   } else if (freeBetAmount != null) {
     notes.push(`Free bet £${freeBetAmount}`);
   }
@@ -1656,6 +1689,7 @@ export function parseOfferFromText(raw: string, now = new Date()): ParsedOfferDr
         places.length > 0 ? places : winnerMustBeSpFavourite ? [2] : [],
       betStake,
       freeBetAmount,
+      ...(intelligence.archetype === "risk_free" ? { refundIf: true } : {}),
       ...(winnerMustBeSpFavourite ? { winnerMustBeSpFavourite: true } : {}),
       ...(minFavouriteSpOdds != null && minFavouriteSpOdds > 1
         ? { minFavouriteSpOdds }

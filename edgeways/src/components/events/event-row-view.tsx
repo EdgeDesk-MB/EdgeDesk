@@ -412,7 +412,7 @@ function CorrectResultDialog({
         <DialogHeader>
           <DialogTitle>Correct result</DialogTitle>
           <DialogDescription>
-            Update the full-time score. Settled bets will re-settle.
+            Update the score. Settled bets re-settle.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">

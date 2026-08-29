@@ -16,6 +16,7 @@ import {
   withPlaybookOnRules,
   type OfferPlaybook,
 } from "@/lib/offers/offer-playbook";
+import { isRefundIfText } from "@/lib/offers/refund-if";
 import type { BetGetFreePlaceRules } from "@/lib/offers/racing-offer-rules";
 
 export function buildRulesJsonWithPlaybook(input: {
@@ -39,6 +40,9 @@ export function buildRulesJsonWithPlaybook(input: {
         betStake: betStake ?? important.minStake,
         freeBetAmount: freeBetAmount ?? null,
         bookmaker: bookmaker ?? null,
+        refundIf:
+          racingRules?.refundIf === true ||
+          isRefundIfText(important.importantNotes),
       })
     );
 

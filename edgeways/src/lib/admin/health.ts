@@ -6,7 +6,11 @@ import { getSiteSurface, type SiteSurface } from "@/lib/site-surface";
 import { loadFeedStatus, type FeedStatus } from "@/lib/admin/feeds";
 import { loadFeedMonitor, type FeedMonitor } from "@/lib/admin/feeds";
 import { FEED_STATE_LABEL } from "@/lib/admin/feed-monitor";
-import { readMaintenanceBanner, type MaintenanceBanner } from "@/lib/admin/operator-settings";
+import {
+  SITE_BANNER_KIND_LABEL,
+  type MaintenanceBanner,
+} from "@/lib/admin/maintenance-banner-shared";
+import { readMaintenanceBanner } from "@/lib/admin/operator-settings";
 
 export type HealthStatus = "ok" | "warn" | "down";
 
@@ -40,7 +44,7 @@ function configured(value: string | undefined): boolean {
   return Boolean(value?.trim());
 }
 
-async function checkNeon(): Promise<HealthCheck> {
+async function checkNeon(ping: boolean): Promise<HealthCheck> {
   if (!configured(process.env.DATABASE_URL)) {
     return {
       key: "neon",
@@ -48,6 +52,15 @@ async function checkNeon(): Promise<HealthCheck> {
       status: "down",
       value: "Not configured",
       detail: "DATABASE_URL is not set.",
+    };
+  }
+  if (!ping) {
+    return {
+      key: "neon",
+      label: "Neon Postgres",
+      status: "ok",
+      value: "Configured",
+      detail: isNeonDesk() ? "Hosted desk live" : "Desk still local SQLite",
     };
   }
   try {
@@ -172,9 +185,12 @@ function deployInfo(): HealthReport["deploy"] {
   return { env, sha: sha ? sha.slice(0, 7) : null, url };
 }
 
-export async function loadHealthReport(): Promise<HealthReport> {
+export async function loadHealthReport(options?: {
+  pingNeon?: boolean;
+}): Promise<HealthReport> {
+  const pingNeon = options?.pingNeon !== false;
   const [neon, feeds, feedMonitor, banner] = await Promise.all([
-    checkNeon(),
+    checkNeon(pingNeon),
     loadFeedStatus(),
     loadFeedMonitor(),
     readMaintenanceBanner(),
@@ -204,9 +220,9 @@ export async function loadHealthReport(): Promise<HealthReport> {
     ),
     {
       key: "banner",
-      label: "Maintenance banner",
-      status: banner.enabled ? "warn" : "ok",
-      value: banner.enabled ? "Live" : "Off",
+      label: "Site banner",
+      status: banner.enabled && banner.kind === "maintenance" ? "warn" : "ok",
+      value: banner.enabled ? SITE_BANNER_KIND_LABEL[banner.kind] : "Off",
       detail: banner.enabled ? banner.message : undefined,
     },
   ];

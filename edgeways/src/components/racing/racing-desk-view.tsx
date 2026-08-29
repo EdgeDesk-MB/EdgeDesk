@@ -720,7 +720,7 @@ export function RacingDeskView() {
       <PageHeader
         helpId="racing"
         title="Racing Desk"
-        description="UK & IRE racecards with live exchange lays."
+        description="UK and Irish racecards with live lays."
         action={
           <>
             {canOfferEdge ? (

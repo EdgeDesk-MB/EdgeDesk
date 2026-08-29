@@ -406,10 +406,10 @@ function AddBalanceForm({
                     <SelectContent>
                       {accounts.map((a) => (
                         <SelectItem key={a.id} value={String(a.id)}>
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate">{a.name}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span>{a.name}</span>
                             <AccountTypeBadge type={a.type} />
-                            <span className="text-muted-foreground">
+                            <span className="shrink-0 text-muted-foreground">
                               · {formatGbp(a.balance)}
                               {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
                                 <> · FB {formatGbp(a.freeBets ?? 0)}</>

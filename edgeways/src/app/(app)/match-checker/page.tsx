@@ -95,7 +95,7 @@ export default function MatchCheckerPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Match Checker"
-        description="Found a price? Enter the back and the lay - Edgeways gives the verdict. It checks your match; it doesn't go looking for them."
+        description="Enter a back and a lay for a verdict."
         icon={Scale}
       />
 

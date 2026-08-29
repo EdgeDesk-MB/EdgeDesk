@@ -19,7 +19,7 @@ export default function RoadmapPage() {
     <PageShell>
       <PageHeader
         title="Roadmap"
-        description="What's shipped, what's in progress, and what's planned."
+        description="Shipped, in progress and planned."
         icon={Map}
       />
 
@@ -28,7 +28,7 @@ export default function RoadmapPage() {
           <CardTitle className="text-base">Where we are</CardTitle>
           <CardDescription>
             Edgeways is in <Badge variant="secondary">{ROADMAP_VERSION.currentLabel}</Badge>{" "}
-            today. <Badge>{ROADMAP_VERSION.targetLabel}</Badge> is the first public release —
+            today. <Badge>{ROADMAP_VERSION.targetLabel}</Badge> is the first public release,
             the full desk, billing and support included.
           </CardDescription>
         </CardHeader>

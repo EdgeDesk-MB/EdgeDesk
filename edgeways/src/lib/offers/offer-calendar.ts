@@ -69,21 +69,35 @@ export function isOfferInCalendar(offer: OfferSummary, now = Date.now()): boolea
   if (isOfferEffectivelyExpired(offer, now)) return false;
 
   const todayKey = dateKeyLocal(startOfLocalDay(new Date(now)).getTime());
-  if (offer.recurrence?.enabled && offer.instanceDate && offer.instanceDate < todayKey) {
+  const instanceDate =
+    offer.instanceDate?.trim() || offer.recurrence?.instanceDate?.trim() || null;
+  // Hosted Neon rows keep instance_date after a SQLite copy even when series_id
+  // is null. Yesterday's racing day must not sit on Today's board.
+  if (instanceDate && instanceDate < todayKey) {
     return false;
   }
 
   return true;
 }
 
-/** Recurring instances belong on their occurrence day; otherwise use the fallback. */
+function offerCalendarDayKey(offer: OfferSummary): string | null {
+  const instance =
+    offer.instanceDate?.trim() || offer.recurrence?.instanceDate?.trim() || "";
+  if (instance) return instance;
+  const eventDate = offer.eventDate?.trim();
+  if (eventDate) return eventDate;
+  const startsOn = offer.startsOn?.trim();
+  if (startsOn) return startsOn;
+  return null;
+}
+
+/** Occurrence day from instance / event / start, else the fallback. */
 function calendarOccurrenceMs(
   offer: OfferSummary,
   fallbackMs: number
 ): number {
-  if (offer.recurrence?.enabled && offer.instanceDate) {
-    return new Date(offer.instanceDate + "T00:00:00").getTime();
-  }
+  const ymd = offerCalendarDayKey(offer);
+  if (ymd) return new Date(`${ymd}T00:00:00`).getTime();
   return fallbackMs;
 }
 
@@ -333,7 +347,7 @@ function columnForItem(item: OfferCalendarItem, now: number): OfferCalendarColum
   const today = startOfLocalDay(new Date(now)).getTime();
   const occurrenceMs = calendarOccurrenceMs(item.offer, today);
 
-  if (item.offer.recurrence?.enabled && item.offer.instanceDate && occurrenceMs > today) {
+  if (occurrenceMs > today) {
     const daysOut = (occurrenceMs - today) / DAY_MS;
     if (daysOut <= 7) return "this_week";
     return "later";

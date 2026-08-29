@@ -48,7 +48,7 @@ export default async function AdminHealthPage() {
   return (
     <AdminPage
       title="Health"
-      description="One URL for “is it up, and which mode is it in”. Read-only checks."
+      description="Is it up, and which mode is it in?"
       icon={HeartPulse}
     >
       <section

@@ -21,8 +21,14 @@ export function addBetLayCalcKey(input: {
   /** Exchange commission as a fraction (0.02 = 2%) */
   commission: number;
   mode: string;
+  refundAmount?: number;
+  refundRetention?: number;
 }): string {
-  return `${input.mode}:${input.backStake}:${input.backOdds}:${input.layOdds}:${input.commission}`;
+  const base = `${input.mode}:${input.backStake}:${input.backOdds}:${input.layOdds}:${input.commission}`;
+  if (input.mode === "risk_free") {
+    return `${base}:${input.refundAmount ?? ""}:${input.refundRetention ?? ""}`;
+  }
+  return base;
 }
 
 export function commitLayStakeOverride(

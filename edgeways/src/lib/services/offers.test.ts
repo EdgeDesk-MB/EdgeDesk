@@ -153,6 +153,36 @@ describe("computeOfferProfitBreakdown", () => {
     expect(isOfferCampaignComplete(linked, breakdown)).toBe(false);
   });
 
+  it("Refund-If win skips convert (not_awarded, no phantom FB)", () => {
+    const linked = [
+      bet({
+        id: 1,
+        betType: "risk_free",
+        status: "won",
+        actualProfit: 46.6,
+        triggerText: "Bet £100 get £100 free bet if bet loses",
+      }),
+    ];
+    const breakdown = computeOfferProfitBreakdown(linked, {});
+    expect(breakdown.freeBetAwarded).toBe(false);
+    expect(breakdown.freeBetStage).toBe("not_awarded");
+  });
+
+  it("Refund-If loss without wallet credit stays awaiting_result", () => {
+    const linked = [
+      bet({
+        id: 1,
+        betType: "risk_free",
+        status: "lost",
+        actualProfit: -28.41,
+        triggerText: "Bet £100 get £100 free bet if bet loses",
+      }),
+    ];
+    const breakdown = computeOfferProfitBreakdown(linked, {});
+    expect(breakdown.freeBetAwarded).toBe(false);
+    expect(breakdown.freeBetStage).toBe("awaiting_result");
+  });
+
   it("shows not awarded when place-refund qualifying settles without promo", () => {
     const linked = [
       bet({

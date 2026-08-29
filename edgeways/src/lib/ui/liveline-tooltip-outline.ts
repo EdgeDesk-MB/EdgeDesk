@@ -76,7 +76,8 @@ export function resolveChartBackdrop(from: HTMLElement): string {
   return resolveCssColor("var(--page)");
 }
 
-function resolveCssColor(value: string): string {
+/** Resolve a CSS colour (token or hex) to a computed rgb/rgba string. */
+export function resolveCssColor(value: string): string {
   const probe = document.createElement("span");
   probe.style.backgroundColor = value;
   document.body.appendChild(probe);

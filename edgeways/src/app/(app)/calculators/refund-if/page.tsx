@@ -13,14 +13,16 @@ import {
 } from "@/components/calc/bet-panels";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { PercentFlow } from "@/components/money-flow";
+import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { matchedBet } from "@/lib/calc/matched";
+import { matchedBet, riskFreeBookieBreakdown, riskFreeRefundCash } from "@/lib/calc/matched";
 import type { ExchangeRow } from "@/lib/db/schema";
 
 const RETENTION_PRESETS = [
-  { pct: 70, label: "70% (typical free bet)" },
+  { pct: 70, label: "70%" },
+  { pct: 75, label: "75% (typical SNR)" },
   { pct: 80, label: "80%" },
   { pct: 100, label: "100% (cash refund)" },
 ];
@@ -34,7 +36,7 @@ export default function RefundIfCalculatorPage() {
   const [layOdds, setLayOdds] = useState(3.1);
   const [commission, setCommission] = useState(2);
   const [refundAmount, setRefundAmount] = useState(10);
-  const [refundRetention, setRefundRetention] = useState(70);
+  const [refundRetention, setRefundRetention] = useState(75);
 
   useEffect(() => {
     if (!exchange && defaultExchange) {
@@ -62,7 +64,11 @@ export default function RefundIfCalculatorPage() {
     });
   }, [backStake, backOdds, layOdds, commission, refundAmount, refundRetention]);
 
-  const refundCash = refundAmount * (refundRetention / 100);
+  const refundCash = riskFreeRefundCash({
+    backStake,
+    refundAmount,
+    refundRetention: refundRetention / 100,
+  });
 
   const displayRows = useMemo(() => {
     if (!result) return [];
@@ -75,24 +81,25 @@ export default function RefundIfCalculatorPage() {
         accent: "back" as const,
       },
       {
-        label: "If back bet loses (refund triggers)",
+        label: "If back bet loses (refund)",
         bookie: -backStake + refundCash,
         exchange: layWinnings,
         accent: "lay" as const,
+        bookieBreakdown: riskFreeBookieBreakdown({
+          backStake,
+          refundAmount,
+          refundRetention: refundRetention / 100,
+        })?.lines,
       },
     ];
-  }, [result, backStake, backOdds, refundCash, commission]);
+  }, [result, backStake, backOdds, refundCash, refundAmount, refundRetention, commission]);
 
   return (
     <CalculatorShell>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Refund-If Calculator</h1>
-        <p className="text-sm text-muted-foreground">
-          Money-back-if-you-lose offers: back at the bookie, lay at the exchange, and model the
-          refund as cash or a free bet (adjust retention). You lock in a small qualifying profit or
-          near-zero loss either way.
-        </p>
-      </div>
+      <CalculatorPageHeader
+        title="Refund-If"
+        description="Money-back-if-you-lose: cash or free-bet refund."
+      />
 
       <BackPanel title="Back bet (refund offer)" exchange={exchange} venue={bookmaker}>
         <div className="grid grid-cols-2 gap-3">
@@ -112,7 +119,7 @@ export default function RefundIfCalculatorPage() {
           />
           <div className="col-span-2 flex flex-col gap-1.5">
             <PanelInput
-              label="Refund retention (cash value)"
+              label="Refund retention"
               suffix="%"
               value={refundRetention}
               onChange={setRefundRetention}
@@ -195,9 +202,7 @@ export default function RefundIfCalculatorPage() {
 
       {result && (
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-center text-xs text-muted-foreground">
-          Refund worth{" "}
-          <span className="font-semibold text-foreground">£{refundCash.toFixed(2)}</span> cash
-          equivalent · Spread vs stake:{" "}
+          Spread vs stake:{" "}
           <PercentFlow
             value={backStake > 0 ? (result.guaranteed / backStake) * 100 : 0}
             digits={1}
@@ -218,6 +223,8 @@ export default function RefundIfCalculatorPage() {
           exchangeId: exchange?.id,
           bookmaker: bookmaker || undefined,
           expectedProfit: result ? Number(result.guaranteed.toFixed(2)) : undefined,
+          refundAmount,
+          refundRetention: refundRetention / 100,
         }}
       />
     </CalculatorShell>

@@ -1,7 +1,7 @@
-/** Grant / revoke copy. Full operator role, no half-admin. */
+/** Grant / revoke copy. Operator admin is not the owner (master) role. */
 
 export const ADMIN_GRANT_HEADLINE =
-  "This is a full operator role. There is no half-admin in v1.";
+  "There is no half-admin. This is operator admin. The owner stays a separate role.";
 
 export const ADMIN_GRANT_CAN_LABEL = "They will be able to";
 export const ADMIN_GRANT_CANNOT_LABEL = "They will not be able to";
@@ -10,12 +10,15 @@ export const ADMIN_REVOKE_CANNOT_LABEL = "They never had";
 
 export const ADMIN_GRANT_CAN: string[] = [
   "Open /admin and see payments, subscribers, desk activity, feed health, and release flags",
-  "Grant or revoke admin for other accounts (except the bootstrap operator and the last admin)",
+  "See live charts, in-app toasts, and the Live log while Admin is open",
+  "Grant or revoke operator admin for other accounts (except the owner, bootstrap operators, and the last admin)",
   "Run feed connection tests and see provider budgets",
   "Toggle PostHog flags used for staged rollouts",
 ];
 
 export const ADMIN_GRANT_CANNOT: string[] = [
+  "Receive owner web push",
+  "Change live alerts",
   "Place refunds or charges (Stripe dashboard)",
   "Deploy (Vercel)",
   "Sign in as a customer or edit another desk",

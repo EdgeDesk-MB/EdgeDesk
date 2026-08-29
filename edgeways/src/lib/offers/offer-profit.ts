@@ -5,7 +5,7 @@
  * default lives on the services/offers.ts wrapper.
  */
 import type { BetRow, OfferRow } from "@/lib/db/schema";
-import { aiEffectsForBet, isPlaceFreeBetEffect } from "@/lib/calc/ai-triggers";
+import { aiEffectsForBet, isLossFreeBetEffect, isPlaceFreeBetEffect } from "@/lib/calc/ai-triggers";
 import type {
   FreeBetStage,
   OfferProfitBreakdown,
@@ -56,8 +56,13 @@ function betHasPlaceFreeBetTrigger(bet: BetRow): boolean {
 
 function betHasUnconditionalFreeBet(bet: BetRow): boolean {
   return freeBetEffectsForBet(bet).some(
-    (e) => e.kind === "free_bet_award" && e.positions.length === 0
+    (e) =>
+      e.kind === "free_bet_award" && e.positions.length === 0 && !e.awardOnLoss
   );
+}
+
+function betHasLossRefundTrigger(bet: BetRow): boolean {
+  return bet.betType === "risk_free" || freeBetEffectsForBet(bet).some(isLossFreeBetEffect);
 }
 
 function betTimeKey(bet: Pick<BetRow, "id" | "createdAt">): number {
@@ -151,6 +156,7 @@ export function computeOfferProfitBreakdown(
 
   let freeBetStage: FreeBetStage = "none";
   const hasPlaceTrigger = qualifying.some(betHasPlaceFreeBetTrigger);
+  const hasLossRefundTrigger = qualifying.some(betHasLossRefundTrigger);
   const hasAnyFreeBetTrigger = qualifying.some((b) => expectedFreeBetAmountFromBet(b) != null);
 
   if (freeBetOpen.length > 0) {
@@ -166,6 +172,17 @@ export function computeOfferProfitBreakdown(
     freeBetStage = "awaiting_result";
   } else if (hasPlaceTrigger && qualifyingSettled.length > 0) {
     freeBetStage = "not_awarded";
+  } else if (hasLossRefundTrigger && qualifyingOpen.length > 0) {
+    freeBetStage = "awaiting_result";
+  } else if (
+    hasLossRefundTrigger &&
+    qualifyingSettled.length > 0 &&
+    qualifyingOpen.length === 0
+  ) {
+    const lost = qualifyingSettled.some(
+      (b) => b.status === "lost" || b.status === "half_lose"
+    );
+    freeBetStage = lost ? "awaiting_result" : "not_awarded";
   } else if (hasAnyFreeBetTrigger && qualifyingOpen.length > 0) {
     freeBetStage = "awaiting_result";
   }

@@ -476,7 +476,7 @@ function EpDeskContent() {
       <DeskPageHeader
         bordered={false}
         title={`${s.homeTeam || "Home"} v ${s.awayTeam || "Away"}`}
-        description="2UP Desk - Dixon-Coles early-payout model. Ranks dutch (incl. mixed 2UP/1UP) vs lay hedges on the same stake basis."
+        description="Dixon-Coles 2UP model, dutch versus lay on the same stake."
         action={
           <Button variant="outline" {...pageSecondaryButtonProps} onClick={() => setPlaybookOpen(true)}>
             <Flag className="size-4" /> Scouting Playbook

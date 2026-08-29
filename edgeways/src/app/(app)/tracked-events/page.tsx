@@ -212,12 +212,11 @@ export default function TrackedEventsPage() {
         title="Tracked Events"
         description={
           <>
-            Matches and races you&apos;re following, grouped by kick-off day. Live scores
-            refresh automatically (~once a minute). Add more from the{" "}
+            Matches and races you are following, with more on{" "}
             <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
               Fixtures
-            </Link>{" "}
-            browser.
+            </Link>
+            .
           </>
         }
         action={

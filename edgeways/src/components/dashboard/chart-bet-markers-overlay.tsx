@@ -56,6 +56,10 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   referenceValue = 0,
   padding,
   nowSec,
+  hrefForMarker,
+  classNameForMarker,
+  tooltipDetail,
+  ariaLabelForMarker,
 }: {
   bets?: BetRow[];
   adjustments?: PnlAdjustment[];
@@ -79,6 +83,14 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
   padding: PnlChartPadding;
   /** Same clock Liveline / the window series used. Defaults to now. */
   nowSec?: number;
+  /**
+   * Return a desk href, or `null` for a non-navigating marker (admin
+   * activity). Omit to keep Home / Racing tracker links.
+   */
+  hrefForMarker?: (marker: ChartBetMarker) => string | null;
+  classNameForMarker?: (marker: ChartBetMarker) => string;
+  tooltipDetail?: (marker: ChartBetMarker) => string | null;
+  ariaLabelForMarker?: (marker: ChartBetMarker) => string;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -189,29 +201,50 @@ export const ChartBetMarkersOverlay = memo(function ChartBetMarkersOverlay({
       <TooltipProvider delayDuration={200}>
         {projected.map(({ marker, x, y }) => {
           const statusLabel = markerStatusLabel(marker);
+          const href = hrefForMarker ? hrefForMarker(marker) : markerHref(marker);
+          const className =
+            classNameForMarker?.(marker) ??
+            cn(
+              chartBetMarkerClassName(marker.tone),
+              marker.tone === "win" && "chart-bet-marker--up",
+              marker.tone === "loss" && "chart-bet-marker--down"
+            );
+          const detail =
+            tooltipDetail != null
+              ? tooltipDetail(marker)
+              : `${statusLabel} · ${formatGbp(marker.betProfit, { signed: true })}`;
+          const ariaLabel =
+            ariaLabelForMarker?.(marker) ??
+            `${marker.label} - ${statusLabel} ${formatGbp(marker.betProfit, { signed: true })}`;
+          const inner = <span className="chart-bet-marker__inner" />;
+          const trigger = href ? (
+            <Link
+              href={href}
+              className={className}
+              style={{ left: x, top: y }}
+              aria-label={ariaLabel}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              tabIndex={-1}
+              className={cn(className, "appearance-none border-0 p-0 cursor-pointer")}
+              style={{ left: x, top: y }}
+              aria-label={ariaLabel}
+            >
+              {inner}
+            </button>
+          );
           return (
             <Tooltip key={`${marker.kind ?? "bet"}:${marker.id}`}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={markerHref(marker)}
-                  className={cn(
-                    chartBetMarkerClassName(marker.tone),
-                    marker.tone === "win" && "chart-bet-marker--up",
-                    marker.tone === "loss" && "chart-bet-marker--down"
-                  )}
-                  style={{ left: x, top: y }}
-                  aria-label={`${marker.label} - ${statusLabel} ${formatGbp(marker.betProfit, { signed: true })}`}
-                >
-                  <span className="chart-bet-marker__inner" />
-                </Link>
-              </TooltipTrigger>
+              <TooltipTrigger asChild>{trigger}</TooltipTrigger>
               <TooltipContent side="top" className="max-w-[min(14rem,calc(100vw-var(--overlay-gutter)))] text-xs">
                 <p className="font-medium text-pretty break-words">{marker.label}</p>
-                <p className="text-background/80">
-                  {statusLabel}
-                  {" · "}
-                  {formatGbp(marker.betProfit, { signed: true })}
-                </p>
+                {detail ? (
+                  <p className="text-background/80">{detail}</p>
+                ) : null}
               </TooltipContent>
             </Tooltip>
           );

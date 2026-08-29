@@ -114,7 +114,7 @@ export function DashboardFeedPanel({
         className="bg-page"
         titleHref="/history"
         title="History feed"
-        description="Goals, results, bet and casino settlements in real time."
+        description="Goals, results and settlements."
         action={
           <ScrollFadeEdges
             orientation="horizontal"

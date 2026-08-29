@@ -89,7 +89,7 @@ export function DemoNoticeDialog({ suppressed = false }: { suppressed?: boolean 
           <DialogDescription>
             {account
               ? live.status === "ready" && !live.started
-                ? "You are signed in, but this is still sample data, not your bookies or bets."
+                ? "Sample data. Your bookies and bets are on your own desk."
                 : "Sample data only. Your bookies and bets are on your own desk."
               : "A look at a filled desk. Nothing here is yours yet."}
           </DialogDescription>

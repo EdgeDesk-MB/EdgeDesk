@@ -121,6 +121,25 @@ export const exchanges = pgTable("exchanges", {
   createdAt: epochMs("created_at").notNull(),
 });
 
+/**
+ * Per-desk commission overlay. Catalog `exchanges` rows are shared; VIP 0%
+ * must not leak to other accounts, and 0 is a real rate (not a missing value).
+ */
+export const deskExchangeRates = pgTable(
+  "desk_exchange_rates",
+  {
+    clerkUserId: text("clerk_user_id").notNull(),
+    exchangeId: integer("exchange_id").notNull(),
+    commissionPct: doublePrecision("commission_pct").notNull(),
+    isDefault: integer("is_default").notNull().default(0),
+    updatedAt: epochMs("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.clerkUserId, table.exchangeId] }),
+    index("desk_exchange_rates_user_idx").on(table.clerkUserId),
+  ]
+);
+
 export const bets = pgTable("bets", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id"),
@@ -446,6 +465,31 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: epochMs("created_at").notNull(),
   lastOkAt: epochMs("last_ok_at"),
 });
+
+/**
+ * Shared operator Live log. Same bundles as admin toasts / owner push.
+ * Hosted when DATABASE_URL is set, same as Activity volume.
+ */
+export const adminLiveLog = pgTable(
+  "admin_live_log",
+  {
+    id: serial("id").primaryKey(),
+    dedupe: text("dedupe").notNull(),
+    kind: text("kind").notNull(),
+    tone: text("tone").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    href: text("href").notNull(),
+    count: integer("count").notNull().default(1),
+    createdAt: epochMs("created_at").notNull(),
+    updatedAt: epochMs("updated_at").notNull(),
+    readAt: epochMs("read_at"),
+  },
+  (t) => [
+    uniqueIndex("admin_live_log_dedupe_unique").on(t.dedupe),
+    index("admin_live_log_updated_idx").on(t.updatedAt),
+  ]
+);
 
 /** Persistent alert history (F2) - toasts/notifications deliver, this is the record */
 export const alertsInbox = pgTable(
@@ -932,6 +976,7 @@ export type NewExchangeRow = typeof exchanges.$inferInsert;
 export type HistoryRow = typeof history.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
 export type NewAccountRow = typeof accounts.$inferInsert;
+export type AdminLiveLogRow = typeof adminLiveLog.$inferSelect;
 export type AlertsInboxRow = typeof alertsInbox.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type UserReminderRow = typeof userReminders.$inferSelect;

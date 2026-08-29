@@ -108,6 +108,14 @@ export function compareTrailingWindows(
   return { current, previous, delta, pct };
 }
 
+export function addPeriodCompares(...parts: PeriodCompare[]): PeriodCompare {
+  const current = parts.reduce((sum, part) => sum + part.current, 0);
+  const previous = parts.reduce((sum, part) => sum + part.previous, 0);
+  const delta = current - previous;
+  const pct = previous === 0 ? (current === 0 ? 0 : null) : (delta / previous) * 100;
+  return { current, previous, delta, pct };
+}
+
 export function cumulativeSeries(series: DayCount[]): DayCount[] {
   let total = 0;
   return series.map((point) => {

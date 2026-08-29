@@ -5,6 +5,7 @@ import {
   deriveOfferPlaybook,
   emptyPlaybookFacts,
   findDepositEvidence,
+  hydrateRefundIfPlaybook,
   markPlaybookStepDone,
   mergePlaybookProgress,
   playbookProgress,
@@ -63,6 +64,25 @@ describe("deriveOfferPlaybook", () => {
     });
     expect(pb.steps[0]?.kind).toBe("qualify");
     expect(pb.steps.some((s) => s.kind === "deposit")).toBe(false);
+  });
+
+  it("uses Refund-If underlay copy instead of a tight match", () => {
+    const pb = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      betStake: 100,
+      freeBetAmount: 100,
+      minOdds: 1.5,
+      bookmaker: "BetMGM",
+      refundIf: true,
+    });
+    expect(pb.refundIf).toBe(true);
+    const qualify = pb.steps.find((s) => s.kind === "qualify");
+    expect(qualify?.title).toBe("Place £100 refund-if bet (min odds 1.5)");
+    expect(qualify?.detail).toMatch(/Underlay on the exchange/);
+    expect(qualify?.detail).not.toMatch(/qualifying loss tiny/);
+    const awaitStep = pb.steps.find((s) => s.kind === "await_award");
+    expect(awaitStep?.title).toBe("Await the result");
+    expect(awaitStep?.detail).toMatch(/underlay already locked/);
   });
 
   it("puts min odds once on the qualify title, not again in the detail", () => {
@@ -327,5 +347,44 @@ describe("syncPlaybookFromOfferProfit", () => {
     expect(optInSynced.steps.find((s) => s.kind === "opt_in")?.status).toBe("done");
     expect(optInSynced.steps.find((s) => s.kind === "qualify")?.status).toBe("done");
     expect(currentPlaybookStep(optInSynced)?.kind).toBe("await_award");
+  });
+
+  it("skips convert when a Refund-If qualifier wins (no free bet)", () => {
+    const pb = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      betStake: 100,
+      freeBetAmount: 100,
+      refundIf: true,
+    });
+    const synced = syncPlaybookFromOfferProfit(
+      pb,
+      profit({
+        qualifyingSettledCount: 1,
+        freeBetStage: "not_awarded",
+      })
+    );
+    expect(synced.steps.find((s) => s.id === "qualify")?.status).toBe("done");
+    expect(synced.steps.find((s) => s.id === "await_award")?.status).toBe("skipped");
+    expect(synced.steps.find((s) => s.id === "convert")?.status).toBe("skipped");
+    expect(synced.steps.find((s) => s.id === "done")?.status).toBe("done");
+  });
+});
+
+describe("hydrateRefundIfPlaybook", () => {
+  it("rewrites stored bet&get copy when the title is money-back-if-loses", () => {
+    const pb = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      betStake: 100,
+      freeBetAmount: 100,
+      minOdds: 1.5,
+    });
+    const hydrated = hydrateRefundIfPlaybook(pb, {
+      title: "Money back if bet loses",
+    });
+    expect(hydrated.refundIf).toBe(true);
+    expect(hydrated.steps.find((s) => s.kind === "qualify")?.detail).toMatch(/Underlay/);
+    expect(hydrated.steps.find((s) => s.kind === "qualify")?.title).toBe(
+      "Place £100 refund-if bet (min odds 1.5)"
+    );
   });
 });

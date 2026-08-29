@@ -40,6 +40,12 @@ export async function PATCH(request: Request) {
     if (code === "not-found") {
       return NextResponse.json({ error: "Account not found." }, { status: 404 });
     }
+    if (code === "owner") {
+      return NextResponse.json(
+        { error: "The owner cannot be demoted." },
+        { status: 400 }
+      );
+    }
     if (code === "bootstrap") {
       return NextResponse.json(
         { error: "The bootstrap admin cannot be demoted." },

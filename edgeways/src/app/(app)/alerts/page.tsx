@@ -107,7 +107,7 @@ export default function AlertsPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Alerts"
-        description="Every alert Edgeways has raised, kept. Notifications deliver; this is the record."
+        description="Every alert we have raised."
         icon={BellRing}
         toolbar={
           unread > 0 ? (

@@ -5,12 +5,12 @@ import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatAwaitingResultLabel } from "@/lib/offers/pipeline";
 import {
   currentPlaybookStep,
-  readPlaybookFromRulesJson,
-  syncPlaybookFromOfferProfit,
+  playbookFromOffer,
   type OfferPlaybookStepKind,
 } from "@/lib/offers/offer-playbook";
 import { formatDecimalOdds } from "@/lib/racing/odds";
 import { formatClockTime } from "@/lib/time-format";
+import { isRefundIfOffer } from "@/lib/offers/refund-if";
 
 export type OfferNextActionKind =
   | "place_qualifying"
@@ -121,9 +121,8 @@ export function deriveOfferNextAction(
 
   // O1 playbook soft gates (deposit / opt-in / WR) — including planned campaigns
   {
-    const rawPb = readPlaybookFromRulesJson(offer.rules);
-    if (rawPb) {
-      const synced = syncPlaybookFromOfferProfit(rawPb, profit, now);
+    const synced = playbookFromOffer(offer, now);
+    if (synced) {
       const step = currentPlaybookStep(synced);
       const softKind = (k: OfferPlaybookStepKind): OfferNextActionKind | null => {
         if (k === "deposit") return "playbook_deposit";
@@ -265,12 +264,12 @@ export function deriveOfferNextAction(
       ...base,
       kind: "place_qualifying",
       priority: expiringSoon ? 8 : 30,
-      title: "Place qualifying bet",
+      title: isRefundIfOffer(offer) ? "Place refund-if bet" : "Place qualifying bet",
       detail: edge
         ? formatEdgeDetail(edge)
         : bookmaker
-          ? `No bets linked yet - start the qualifying leg at ${bookmaker}.`
-          : "No bets linked yet - start the qualifying leg.",
+          ? `No bets linked yet - start the ${isRefundIfOffer(offer) ? "refund-if" : "qualifying"} leg at ${bookmaker}.`
+          : `No bets linked yet - start the ${isRefundIfOffer(offer) ? "refund-if" : "qualifying"} leg.`,
       href: `/tracker?offer=${offer.id}&queue=offers&action=qualify`,
       edge,
     };

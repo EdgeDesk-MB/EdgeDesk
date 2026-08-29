@@ -88,6 +88,14 @@ describe("unconditionalFreeBetEffect", () => {
     ).toBeNull();
   });
 
+  it("ignores award-on-loss Refund-If triggers", () => {
+    expect(
+      unconditionalFreeBetEffect(
+        bet({ triggerText: "Bet £100 get £100 free bet if bet loses" })
+      )
+    ).toBeNull();
+  });
+
   it("prefers stored trigger rule over label", () => {
     const effect = unconditionalFreeBetEffect(
       bet({
@@ -118,6 +126,16 @@ describe("showEarlyFreeBetAwardButton", () => {
         amount: 10,
         reason: "Awarded on placement",
       })
+    ).toBe(false);
+  });
+
+  it("hides for Refund-If (award on loss only)", () => {
+    expect(
+      showEarlyFreeBetAwardButton(
+        placed,
+        bet({ triggerText: "Bet £100 get £100 free bet if bet loses" }),
+        undefined
+      )
     ).toBe(false);
   });
 

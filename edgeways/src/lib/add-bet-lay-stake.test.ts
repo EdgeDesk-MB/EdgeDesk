@@ -100,6 +100,44 @@ describe("addBetMatchedSaveEnabled", () => {
   });
 });
 
+describe("addBetLayCalcKey", () => {
+  it("keys Refund-If refund face and retention so an underlay is not stale", () => {
+    const a = addBetLayCalcKey({
+      mode: "risk_free",
+      backStake: 100,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      refundAmount: 100,
+      refundRetention: 0.75,
+    });
+    const b = addBetLayCalcKey({
+      mode: "risk_free",
+      backStake: 100,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      refundAmount: 100,
+      refundRetention: 0.7,
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it("does not put refund fields on a qualifying key", () => {
+    expect(
+      addBetLayCalcKey({
+        mode: "qualifying",
+        backStake: 10,
+        backOdds: 5.5,
+        layOdds: 6,
+        commission: 0,
+        refundAmount: 10,
+        refundRetention: 0.75,
+      })
+    ).toBe(screenshotKey);
+  });
+});
+
 describe("addBetPlanMode", () => {
   it("maps UI-only types onto qualifying maths", () => {
     expect(addBetPlanMode("no_lay")).toBe("qualifying");

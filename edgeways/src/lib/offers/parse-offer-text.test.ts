@@ -189,6 +189,26 @@ Online only. Eligibility restrictions apply. Opt-in required. Place a cash win o
     expect(draft.rules?.qualifyingPlaces).toEqual([2, 3]);
   });
 
+  it("parses BetMGM money-back-if-loses as Refund-If, not bet&get", () => {
+    const draft = parseOfferFromText(`
+BetMGM
+MONEY BACK AS A FREE BET IF YOUR HORSE LOSES
+13:25 Goodwood. Max stake £100. Min odds 1/2 (1.50).
+Each way excluded. Free bet valid 3 days. Cash out voids offer. SNR.
+Money Back as a Free Bet will only occur if your bet loses. Second Chance Offer.
+`);
+    expect(draft.intelligence?.archetype).toBe("risk_free");
+    expect(draft.title).toMatch(/Money back if/i);
+    expect(draft.betStake).toBe(100);
+    expect(draft.freeBetAmount).toBe(100);
+    expect(draft.playbook?.refundIf).toBe(true);
+    expect(draft.playbook?.steps.find((s) => s.kind === "qualify")?.detail).toMatch(
+      /Underlay/
+    );
+    expect(draft.rules?.refundIf).toBe(true);
+    expect(draft.expectedProfit).toBe(46.59);
+  });
+
   it("detects golf from bet boost style paste", () => {
     const now = new Date(2026, 6, 9, 12, 0, 0);
     const draft = parseOfferFromText(

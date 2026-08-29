@@ -72,7 +72,7 @@ export default function OfferCalendarPage() {
         helpId="offers"
         icon={CalendarDays}
         title="Offer calendar"
-        description="What to do today, this week, and later - priority and expected value first."
+        description="What to do today, this week and later."
         action={
           <Button {...pagePrimaryButtonProps} onClick={() => openOffer()}>
             <Plus className="size-4" /> New offer

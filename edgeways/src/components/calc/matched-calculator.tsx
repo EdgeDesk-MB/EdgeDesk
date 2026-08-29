@@ -30,6 +30,8 @@ import {
   layBounds,
   layPlanOutcome,
   executableLayStake,
+  bonusLoseBookieBreakdown,
+  riskFreeBookieBreakdown,
   specialBonusExtras,
   SPECIAL_BONUS_HINTS,
   SPECIAL_BONUS_LABELS,
@@ -77,7 +79,7 @@ export function MatchedCalculator({
   const [layOdds, setLayOdds] = useState(3.1);
   const [commission, setCommission] = useState(2);
   const [refundAmount, setRefundAmount] = useState(10);
-  const [refundRetention, setRefundRetention] = useState(70);
+  const [refundRetention, setRefundRetention] = useState(75);
   const [bonusKind, setBonusKind] = useState<SpecialBonusKind>("none");
   const [bonusAmount, setBonusAmount] = useState(10);
   const [bonusMaxStake, setBonusMaxStake] = useState(10);
@@ -193,21 +195,45 @@ export function MatchedCalculator({
 
   const rows = useMemo(() => {
     if (!result) return [];
+    const loseBreakdown =
+      mode === "risk_free"
+        ? riskFreeBookieBreakdown({
+            backStake,
+            refundAmount,
+            refundRetention: refundRetention / 100,
+          })?.lines
+        : bonusLoseBookieBreakdown({
+            backStake,
+            backOdds,
+            specialBonus,
+          })?.lines;
     return [
       {
-        label: "If back (bookie) bet wins",
+        label: mode === "risk_free" ? "If back bet wins" : "If back (bookie) bet wins",
         bookie: result.ifBackWins.bookie,
         exchange: result.ifBackWins.exchange,
         accent: "back" as const,
       },
       {
-        label: "If lay (exchange) bet wins",
+        label:
+          mode === "risk_free"
+            ? "If back bet loses (refund)"
+            : "If lay (exchange) bet wins",
         bookie: result.ifBackLoses.bookie,
         exchange: result.ifBackLoses.exchange,
         accent: "lay" as const,
+        bookieBreakdown: loseBreakdown,
       },
     ];
-  }, [result]);
+  }, [
+    result,
+    mode,
+    backStake,
+    backOdds,
+    refundAmount,
+    refundRetention,
+    specialBonus,
+  ]);
 
   const showBonus = mode === "qualifying";
 
@@ -424,7 +450,13 @@ export function MatchedCalculator({
         guaranteed={result?.guaranteed ?? 0}
         exchange={exchange}
         venue={bookmaker}
-        totalLabel={mode === "qualifying" && bonusKind === "none" ? "Qualifying loss" : "Total profit"}
+        totalLabel={
+          mode === "qualifying" && bonusKind === "none"
+            ? "Qualifying loss"
+            : mode === "risk_free"
+              ? "Locked-in profit"
+              : "Total profit"
+        }
       />
 
       {(mode === "free_snr" || mode === "free_sr") && result && (
@@ -455,6 +487,12 @@ export function MatchedCalculator({
           layStakeOverride,
           bookmaker: bookmaker || undefined,
           expectedProfit: result ? Number(result.guaranteed.toFixed(2)) : undefined,
+          ...(mode === "risk_free"
+            ? {
+                refundAmount,
+                refundRetention: refundRetention / 100,
+              }
+            : {}),
         }}
       />
 

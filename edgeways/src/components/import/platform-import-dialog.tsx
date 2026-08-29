@@ -168,7 +168,7 @@ export function PlatformImportDialog({
                 </DialogExplainer>
               }
             >
-              Profit history only. We do not rebuild live bets or touch wallets.
+              Profit history only.
             </DialogDescription>
           </DialogHeader>
 

@@ -56,7 +56,7 @@ export function OfferDialog({
         <DialogHeader className="mx-0 mt-0 shrink-0">
           <DialogTitle>{editing ? "Edit offer" : "New offer"}</DialogTitle>
           <DialogDescription>
-            {editing ? "Update the details. Linked bets stay put." : "Paste a promo or fill the form."}
+            {editing ? "Update the details without moving linked bets." : "Paste a promo or fill the form."}
           </DialogDescription>
         </DialogHeader>
         <OfferEditorForm

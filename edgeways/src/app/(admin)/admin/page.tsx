@@ -7,6 +7,7 @@ import {
   AdminCompareStrip,
   AdminDonutChart,
 } from "@/components/admin/admin-charts";
+import { AdminActivityMix } from "@/components/admin/admin-activity-mix";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
 import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
@@ -23,6 +24,8 @@ import { AdminTableFrame } from "@/components/admin/admin-table";
 import { AttentionStrip } from "@/components/admin/attention-strip";
 import { StripeModeChip } from "@/components/admin/stripe-mode-chip";
 import { buildActivityCharts, scopeActivityView } from "@/lib/admin/activity-charts";
+import { buildActivityMixCharts } from "@/lib/admin/activity-mix";
+import { addPeriodCompares } from "@/lib/admin/series";
 import { loadActivityOverview } from "@/lib/admin/activity";
 import { buildAttentionItems } from "@/lib/admin/attention";
 import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
@@ -44,6 +47,7 @@ import {
 } from "@/lib/admin/stripe-charts";
 import { listAppUsers } from "@/lib/services/app-users";
 import { listUntriagedFeedbackReports } from "@/lib/feedback/inbox-store";
+import { listAdminLiveLog } from "@/lib/admin/live-log";
 import { listWaitlistSignups } from "@/lib/services/waitlist-store";
 import { loadFeedMonitor, loadFeedStatus } from "@/lib/admin/feeds";
 import { FEED_STATE_LABEL } from "@/lib/admin/feed-monitor";
@@ -52,7 +56,7 @@ import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export default async function AdminOverviewPage() {
-  const [stripe, users, waitlist, feeds, feedMonitor, banner, activity, scope, untriaged] =
+  const [stripe, users, waitlist, feeds, feedMonitor, banner, activity, scope, untriaged, liveLog] =
     await Promise.all([
       loadStripeOverview(),
       listAppUsers(),
@@ -63,6 +67,7 @@ export default async function AdminOverviewPage() {
       loadActivityOverview(),
       loadAdminAccountScope(),
       listUntriagedFeedbackReports(),
+      listAdminLiveLog(),
     ]);
   const { excludeAdmins, excludedIds } = scope;
   const admins = users.filter((user) => user.admin).length;
@@ -80,7 +85,7 @@ export default async function AdminOverviewPage() {
     excludedIds
   );
   const deskEntries = scopedActivity.rows.reduce(
-    (sum, row) => sum + row.bets + row.offers + row.history,
+    (sum, row) => sum + row.bets + row.offers + row.casino,
     0
   );
   const growth = buildAccountGrowth(visibleUsers, visibleWaitlist);
@@ -89,6 +94,7 @@ export default async function AdminOverviewPage() {
     scopedActivity.rows,
     scopedActivity.daily
   );
+  const activityMix = buildActivityMixCharts(scopedActivity.mix);
   const attention = buildAttentionItems({
     stripe,
     users: visibleUsers,
@@ -112,6 +118,12 @@ export default async function AdminOverviewPage() {
     "/admin/activity": activity.available
       ? `${deskEntries} entr${deskEntries === 1 ? "y" : "ies"}`
       : "Local desk",
+    "/admin/live":
+      liveLog.unread > 0
+        ? `${liveLog.unread} unread`
+        : liveLog.rows.length > 0
+          ? `${liveLog.rows.length} kept`
+          : "Quiet",
     "/admin/feeds": feeds.football.configured
       ? `${feedMonitor.football.used}/${feedMonitor.football.cap} football${
           feedMonitor.football.state === "ok"
@@ -127,7 +139,7 @@ export default async function AdminOverviewPage() {
   return (
     <AdminPage
       title="Operator admin"
-      description="Payments, accounts, feeds and flags. Customer desks stay on /desk."
+      description="Payments, accounts, feeds and flags."
       icon={LayoutDashboard}
       toolbar={
         <AdminAccountFilters
@@ -185,8 +197,12 @@ export default async function AdminOverviewPage() {
           ...(activity.available
             ? [
                 {
-                  label: "Bets",
-                  compare: activityCharts.week.bets,
+                  label: "Desk volume",
+                  compare: addPeriodCompares(
+                    activityCharts.week.bets,
+                    activityCharts.week.offers,
+                    activityCharts.week.casino
+                  ),
                   period: "week" as const,
                 },
               ]
@@ -232,20 +248,23 @@ export default async function AdminOverviewPage() {
       ) : null}
 
       {activity.available ? (
-        <AdminChartGrid>
-          <AdminChartCard
-            title="Bets placed"
-            description="Hosted desk bet rows per UTC day. Counts only."
-          >
-            <AdminBarChart series={activityCharts.bets30} label="Bets placed" />
-          </AdminChartCard>
-          <AdminChartCard
-            title="Desk volume mix"
-            description="Lifetime bets, offers and history rows across accounts."
-          >
-            <AdminDonutChart slices={activityCharts.kindShare} label="Desk volume mix" />
-          </AdminChartCard>
-        </AdminChartGrid>
+        <>
+          <AdminChartGrid>
+            <AdminChartCard
+              title="Bets placed"
+              description="Hosted desk bet rows per UTC day. Counts only."
+            >
+              <AdminBarChart series={activityCharts.bets30} label="Bets placed" />
+            </AdminChartCard>
+            <AdminChartCard
+              title="Desk volume mix"
+              description="Lifetime bets, sports offers, and casino campaigns across accounts."
+            >
+              <AdminDonutChart slices={activityCharts.kindShare} label="Desk volume mix" />
+            </AdminChartCard>
+          </AdminChartGrid>
+          <AdminActivityMix charts={activityMix} variant="preview" />
+        </>
       ) : null}
 
       <AdminSection title="Sections">

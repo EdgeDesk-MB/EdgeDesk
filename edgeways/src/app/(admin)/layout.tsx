@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster, adminToasterOffset } from "@/components/ui/sonner";
+import { AdminLiveProvider } from "@/components/admin/admin-live-provider";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { MaintenanceBannerServer } from "@/components/admin/maintenance-banner-server";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
@@ -16,11 +17,18 @@ export default async function AdminLayout({
 }) {
   await requireAdminPage();
   return (
-    <div className="flex h-dvh max-w-full flex-col overflow-hidden">
-      <MaintenanceBannerServer />
-      <AdminTopBar />
-      <AdminShell>{children}</AdminShell>
-      <Toaster richColors position="top-right" />
-    </div>
+    <AdminLiveProvider>
+      <div className="flex h-dvh max-w-full flex-col overflow-hidden">
+        <MaintenanceBannerServer />
+        <AdminTopBar />
+        <AdminShell>{children}</AdminShell>
+        <Toaster
+          richColors
+          position="top-right"
+          offset={adminToasterOffset}
+          mobileOffset={adminToasterOffset}
+        />
+      </div>
+    </AdminLiveProvider>
   );
 }

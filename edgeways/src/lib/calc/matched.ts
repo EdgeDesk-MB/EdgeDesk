@@ -4,7 +4,7 @@
  */
 
 import { roundPence } from "./money";
-import { applySpecialBonus, type SpecialBonus } from "./special-bonus";
+import { applySpecialBonus, specialBonusExtras, type SpecialBonus } from "./special-bonus";
 
 export type BetMode = "qualifying" | "free_snr" | "free_sr" | "risk_free";
 
@@ -35,6 +35,66 @@ export interface MatchedResult {
   qualifyingLossPct: number;
 }
 
+export interface RiskFreeRefundInput {
+  backStake: number;
+  refundAmount?: number;
+  refundRetention?: number;
+}
+
+/** Cash equivalent of a risk-free refund (face × retention). Same formula the lay uses. */
+export function riskFreeRefundCash(input: RiskFreeRefundInput): number {
+  return (input.refundAmount ?? input.backStake) * (input.refundRetention ?? 0.7);
+}
+
+export interface BookieBreakdownLine {
+  value: number;
+  label: string;
+}
+
+/**
+ * Stake lost vs refund credit for the lose-row Bookie cell.
+ * Null when there is nothing to unpack (zero refund).
+ */
+export function riskFreeBookieBreakdown(
+  input: RiskFreeRefundInput
+): { lines: BookieBreakdownLine[] } | null {
+  const refundCash = riskFreeRefundCash(input);
+  if (!(refundCash > 0) || !(input.backStake > 0)) return null;
+  const pct = Math.round((input.refundRetention ?? 0.7) * 100);
+  return {
+    lines: [
+      { value: -input.backStake, label: "stake lost" },
+      { value: refundCash, label: pct >= 100 ? "cash refund" : `refund at ${pct}%` },
+    ],
+  };
+}
+
+/**
+ * Stake lost vs bonus credit for a qualifying lose-row Bookie cell.
+ * Null when the bonus does not credit the lose side.
+ */
+export function bonusLoseBookieBreakdown(input: {
+  backStake: number;
+  backOdds: number;
+  specialBonus?: SpecialBonus;
+}): { lines: BookieBreakdownLine[] } | null {
+  const extras = specialBonusExtras(input.backStake, input.backOdds, input.specialBonus);
+  if (!(extras.onLose > 0) || !(input.backStake > 0)) return null;
+  const pct = Math.round((input.specialBonus?.freeBetRetention ?? 0.7) * 100);
+  return {
+    lines: [
+      { value: -input.backStake, label: "stake lost" },
+      {
+        value: extras.onLose,
+        label:
+          input.specialBonus?.kind === "bonus_cash_on_lose"
+            ? "cash bonus"
+            : `FB at ${pct}%`,
+      },
+    ],
+  };
+}
+
 /** Bookie-side P&L before any lay (shared with layplan). */
 export function matchedBackReturns(input: {
   mode: BetMode;
@@ -61,9 +121,8 @@ export function matchedBackReturns(input: {
       lose = 0;
       break;
     case "risk_free": {
-      const refund = (input.refundAmount ?? backStake) * (input.refundRetention ?? 0.7);
       win = backStake * (backOdds - 1);
-      lose = -backStake + refund;
+      lose = -backStake + riskFreeRefundCash(input);
       break;
     }
   }

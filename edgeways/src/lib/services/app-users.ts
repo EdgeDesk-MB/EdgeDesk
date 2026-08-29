@@ -16,6 +16,7 @@ import {
   bootstrapAdminEmails,
   isBootstrapAdminEmail,
   isOperatorAdmin,
+  isOwnerAdmin,
   parseAppUserRole,
   type AppUserRole,
 } from "@/lib/admin/emails";
@@ -429,6 +430,7 @@ export async function saveAppUserOnboardingProfile(input: {
 export type AdminUserRow = AppUser & {
   admin: boolean;
   bootstrap: boolean;
+  owner: boolean;
 };
 
 export async function listAppUsers(): Promise<AdminUserRow[]> {
@@ -455,6 +457,7 @@ function toAdminUserRow(user: AppUser): AdminUserRow {
     ...user,
     admin: isOperatorAdmin({ email: user.email, role: user.role }),
     bootstrap: isBootstrapAdminEmail(user.email),
+    owner: isOwnerAdmin(user.email),
   };
 }
 
@@ -478,6 +481,7 @@ export async function setAppUserRole(input: {
     nextRole: input.role,
     adminCount: await countOperatorAdmins(),
   });
+  if (block === "owner") throw new Error("owner");
   if (block === "bootstrap") throw new Error("bootstrap");
   if (block === "last-admin") throw new Error("last-admin");
 

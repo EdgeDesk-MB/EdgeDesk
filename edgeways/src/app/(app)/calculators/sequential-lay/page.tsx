@@ -13,6 +13,7 @@ import {
   ProfitTable,
 } from "@/components/calc/bet-panels";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
+import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
@@ -93,14 +94,10 @@ export default function SequentialLayCalculatorPage() {
 
   return (
     <CalculatorShell>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sequential Lay Calculator</h1>
-        <p className="text-sm text-muted-foreground">
-          Lay in stages as the market moves - add part lays already matched, then work out the
-          remaining lay at current odds. Standard equalises profit; underlay keeps all upside on
-          the bookie win (boosted-odds play).
-        </p>
-      </div>
+      <CalculatorPageHeader
+        title="Sequential Lay"
+        description="Part lays first, then the rest at current odds."
+      />
 
       <div className={cn(panelSurface, "p-4")}>
         <div className="mb-2 text-sm font-semibold">Back bet type</div>

@@ -1,0 +1,323 @@
+import { rankShare, shareSlices, type ShareSlice } from "@/lib/admin/series";
+import { sportDisplayLabel } from "@/lib/sports";
+
+export const ACTIVITY_UNSET_KEY = "unset";
+
+export type ActivityKeyedCount = {
+  clerkUserId: string;
+  key: string;
+  n: number;
+};
+
+export type ActivityMix = {
+  betTypes: ActivityKeyedCount[];
+  betSports: ActivityKeyedCount[];
+  betStatuses: ActivityKeyedCount[];
+  betPurposes: ActivityKeyedCount[];
+  betSources: ActivityKeyedCount[];
+  betCampaigns: ActivityKeyedCount[];
+  betBookmakers: ActivityKeyedCount[];
+  offerSports: ActivityKeyedCount[];
+  offerTypes: ActivityKeyedCount[];
+  offerStatuses: ActivityKeyedCount[];
+  offerSources: ActivityKeyedCount[];
+  offerBookmakers: ActivityKeyedCount[];
+  casinoBrands: ActivityKeyedCount[];
+  casinoStatuses: ActivityKeyedCount[];
+};
+
+export type ActivityMixCharts = {
+  betTypes: ShareSlice[];
+  betSports: ShareSlice[];
+  betStatuses: ShareSlice[];
+  betPurposes: ShareSlice[];
+  betSources: ShareSlice[];
+  betCampaigns: ShareSlice[];
+  betBookmakers: ShareSlice[];
+  offerSports: ShareSlice[];
+  offerTypes: ShareSlice[];
+  offerStatuses: ShareSlice[];
+  offerSources: ShareSlice[];
+  offerBookmakers: ShareSlice[];
+  casinoBrands: ShareSlice[];
+  casinoStatuses: ShareSlice[];
+};
+
+const MIX_TONES = [
+  "brand",
+  "edge",
+  "success",
+  "warning",
+  "profit",
+  "destructive",
+  "muted",
+] as const;
+
+const BET_TYPE_ORDER = [
+  "qualifying",
+  "free_snr",
+  "free_sr",
+  "risk_free",
+  "back_only",
+  "lay_only",
+  "dutch",
+  "boost",
+] as const;
+
+const BET_TYPE_LABEL: Record<string, string> = {
+  qualifying: "Qualifying",
+  free_snr: "Free bet (SNR)",
+  free_sr: "Free bet (SR)",
+  risk_free: "Risk-free",
+  back_only: "No lay",
+  lay_only: "Lay only",
+  dutch: "Dutch",
+  boost: "Boost",
+};
+
+const BET_STATUS_ORDER = [
+  "open",
+  "won",
+  "lost",
+  "void",
+  "early_payout",
+  "half_win",
+  "half_lose",
+  "push",
+] as const;
+
+const BET_STATUS_LABEL: Record<string, string> = {
+  open: "Open",
+  won: "Won",
+  lost: "Lost",
+  void: "Void",
+  early_payout: "Early payout",
+  half_win: "Half win",
+  half_lose: "Half lose",
+  push: "Push",
+};
+
+const OFFER_STATUS_ORDER = ["planned", "active", "completed", "expired"] as const;
+
+const OFFER_TYPE_LABEL: Record<string, string> = {
+  bet_get_free_place: "Place refund",
+  promo_terms: "Promo terms",
+  general: "General",
+};
+
+const SPORT_ORDER = [
+  "horse_racing",
+  "football",
+  "sports",
+  "casino",
+  "tennis",
+  "greyhounds",
+] as const;
+
+export function emptyActivityMix(): ActivityMix {
+  return {
+    betTypes: [],
+    betSports: [],
+    betStatuses: [],
+    betPurposes: [],
+    betSources: [],
+    betCampaigns: [],
+    betBookmakers: [],
+    offerSports: [],
+    offerTypes: [],
+    offerStatuses: [],
+    offerSources: [],
+    offerBookmakers: [],
+    casinoBrands: [],
+    casinoStatuses: [],
+  };
+}
+
+export function normaliseActivityKey(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : ACTIVITY_UNSET_KEY;
+}
+
+export function activitySportLabel(key: string): string {
+  if (key === ACTIVITY_UNSET_KEY) return "Not set";
+  if (key === "sports") return "Sports";
+  if (key === "casino") return "Casino";
+  return sportDisplayLabel(key);
+}
+
+export function activityBetTypeLabel(key: string): string {
+  if (key === ACTIVITY_UNSET_KEY) return "Not set";
+  return BET_TYPE_LABEL[key] ?? titleCaseKey(key);
+}
+
+export function activityBetStatusLabel(key: string): string {
+  if (key === ACTIVITY_UNSET_KEY) return "Not set";
+  return BET_STATUS_LABEL[key] ?? titleCaseKey(key);
+}
+
+export function activityPurposeLabel(key: string): string {
+  if (key === "mug") return "Mug";
+  return "Edge";
+}
+
+export function activityBetSourceLabel(key: string): string {
+  if (key === "import") return "Imported";
+  if (key === "quick") return "Quick log";
+  return "Typed";
+}
+
+export function activityCampaignLabel(key: string): string {
+  return key === "linked" ? "On a campaign" : "Not on a campaign";
+}
+
+export function activityOfferTypeLabel(key: string): string {
+  if (key === ACTIVITY_UNSET_KEY) return "Not set";
+  return OFFER_TYPE_LABEL[key] ?? titleCaseKey(key);
+}
+
+export function activityOfferStatusLabel(key: string): string {
+  if (key === ACTIVITY_UNSET_KEY) return "Not set";
+  return titleCaseKey(key);
+}
+
+export function activityOfferSourceLabel(key: string): string {
+  if (key === "email") return "Email intake";
+  return "Typed";
+}
+
+export function activityBookmakerLabel(key: string): string {
+  if (key === ACTIVITY_UNSET_KEY) return "Not set";
+  return key;
+}
+
+export function filterActivityMix(
+  mix: ActivityMix,
+  skipIds: Set<string> | null
+): ActivityMix {
+  if (!skipIds || skipIds.size === 0) return mix;
+  const keep = (row: ActivityKeyedCount) => !skipIds.has(row.clerkUserId);
+  return {
+    betTypes: mix.betTypes.filter(keep),
+    betSports: mix.betSports.filter(keep),
+    betStatuses: mix.betStatuses.filter(keep),
+    betPurposes: mix.betPurposes.filter(keep),
+    betSources: mix.betSources.filter(keep),
+    betCampaigns: mix.betCampaigns.filter(keep),
+    betBookmakers: mix.betBookmakers.filter(keep),
+    offerSports: mix.offerSports.filter(keep),
+    offerTypes: mix.offerTypes.filter(keep),
+    offerStatuses: mix.offerStatuses.filter(keep),
+    offerSources: mix.offerSources.filter(keep),
+    offerBookmakers: mix.offerBookmakers.filter(keep),
+    casinoBrands: mix.casinoBrands.filter(keep),
+    casinoStatuses: mix.casinoStatuses.filter(keep),
+  };
+}
+
+export function buildActivityMixCharts(mix: ActivityMix): ActivityMixCharts {
+  return {
+    betTypes: slicesFromKeyed(mix.betTypes, activityBetTypeLabel, [...BET_TYPE_ORDER]),
+    betSports: slicesFromKeyed(mix.betSports, activitySportLabel, [...SPORT_ORDER]),
+    betStatuses: slicesFromKeyed(
+      mix.betStatuses,
+      activityBetStatusLabel,
+      [...BET_STATUS_ORDER]
+    ),
+    betPurposes: slicesFromKeyed(mix.betPurposes, activityPurposeLabel, [
+      "edge",
+      "mug",
+    ]),
+    betSources: slicesFromKeyed(mix.betSources, activityBetSourceLabel, [
+      "typed",
+      "quick",
+      "import",
+    ]),
+    betCampaigns: slicesFromKeyed(mix.betCampaigns, activityCampaignLabel, [
+      "linked",
+      "none",
+    ]),
+    betBookmakers: rankKeyed(mix.betBookmakers, activityBookmakerLabel),
+    offerSports: slicesFromKeyed(mix.offerSports, activitySportLabel, [...SPORT_ORDER]),
+    offerTypes: slicesFromKeyed(mix.offerTypes, activityOfferTypeLabel, [
+      "bet_get_free_place",
+      "promo_terms",
+      "general",
+      ACTIVITY_UNSET_KEY,
+    ]),
+    offerStatuses: slicesFromKeyed(
+      mix.offerStatuses,
+      activityOfferStatusLabel,
+      [...OFFER_STATUS_ORDER]
+    ),
+    offerSources: slicesFromKeyed(mix.offerSources, activityOfferSourceLabel, [
+      "typed",
+      "email",
+    ]),
+    offerBookmakers: rankKeyed(mix.offerBookmakers, activityBookmakerLabel),
+    casinoBrands: rankKeyed(mix.casinoBrands, activityBookmakerLabel),
+    casinoStatuses: slicesFromKeyed(
+      mix.casinoStatuses,
+      activityOfferStatusLabel,
+      [...OFFER_STATUS_ORDER]
+    ),
+  };
+}
+
+function titleCaseKey(key: string): string {
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function totalsByKey(rows: ActivityKeyedCount[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.clerkUserId || !Number.isFinite(row.n) || row.n <= 0) continue;
+    const key = normaliseActivityKey(row.key);
+    totals.set(key, (totals.get(key) ?? 0) + row.n);
+  }
+  return totals;
+}
+
+function slicesFromKeyed(
+  rows: ActivityKeyedCount[],
+  labelOf: (key: string) => string,
+  order: string[]
+): ShareSlice[] {
+  const totals = totalsByKey(rows);
+  const items: Array<{ key: string; label: string; value: number }> = [];
+  const seen = new Set<string>();
+  for (const key of order) {
+    const value = totals.get(key) ?? 0;
+    if (value <= 0) continue;
+    items.push({ key, label: labelOf(key), value });
+    seen.add(key);
+  }
+  for (const [key, value] of totals) {
+    if (seen.has(key) || value <= 0) continue;
+    items.push({ key, label: labelOf(key), value });
+  }
+  return shareSlices(
+    items.map((item, index) => ({
+      ...item,
+      tone: MIX_TONES[index % MIX_TONES.length] ?? "muted",
+    }))
+  );
+}
+
+function rankKeyed(
+  rows: ActivityKeyedCount[],
+  labelOf: (key: string) => string
+): ShareSlice[] {
+  const totals = totalsByKey(rows);
+  return rankShare(
+    [...totals.entries()].map(([key, value]) => ({
+      key,
+      label: labelOf(key),
+      value,
+    })),
+    [...MIX_TONES]
+  );
+}

@@ -14,7 +14,7 @@ describe("adminRoleChangeBlock", () => {
     ).toBeNull();
   });
 
-  it("blocks demoting the bootstrap email", () => {
+  it("blocks demoting the owner email", () => {
     expect(
       adminRoleChangeBlock({
         email: DEFAULT_BOOTSTRAP_ADMIN_EMAIL,
@@ -22,7 +22,7 @@ describe("adminRoleChangeBlock", () => {
         nextRole: "user",
         adminCount: 3,
       })
-    ).toBe("bootstrap");
+    ).toBe("owner");
   });
 
   it("blocks demoting the last admin", () => {
@@ -49,12 +49,22 @@ describe("adminRoleChangeBlock", () => {
 });
 
 describe("adminAccessLock", () => {
-  it("locks the bootstrap row", () => {
-    expect(adminAccessLock({ admin: true, bootstrap: true }, 3)).toBe("bootstrap");
+  it("locks the owner row ahead of bootstrap", () => {
+    expect(
+      adminAccessLock({ admin: true, bootstrap: true, owner: true }, 3)
+    ).toBe("owner");
+  });
+
+  it("locks a spare bootstrap operator", () => {
+    expect(
+      adminAccessLock({ admin: true, bootstrap: true, owner: false }, 3)
+    ).toBe("bootstrap");
   });
 
   it("locks the last remaining admin", () => {
-    expect(adminAccessLock({ admin: true, bootstrap: false }, 1)).toBe("last-admin");
+    expect(adminAccessLock({ admin: true, bootstrap: false }, 1)).toBe(
+      "last-admin"
+    );
   });
 
   it("lets a spare admin be revoked", () => {

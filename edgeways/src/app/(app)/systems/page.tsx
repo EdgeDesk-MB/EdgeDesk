@@ -113,7 +113,7 @@ export default function SystemsDeskPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Systems Desk"
-        description="Full-cover tickets: Lucky 15s, Yankees, Trixies. Log what you placed, settle legs, track P&L - not a finder."
+        description="Log Lucky 15s, Yankees and Trixies."
         helpId="systems"
         icon={Grid2x2}
         action={<CreateSystemRunDialog onCreated={load} />}

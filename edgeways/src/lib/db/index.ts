@@ -356,6 +356,20 @@ CREATE TABLE IF NOT EXISTS alerts_inbox (
   updated_at INTEGER NOT NULL,
   read_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS admin_live_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dedupe TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL,
+  tone TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  href TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  read_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_admin_live_log_updated ON admin_live_log(updated_at);
 CREATE TABLE IF NOT EXISTS user_reminders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   note TEXT NOT NULL,

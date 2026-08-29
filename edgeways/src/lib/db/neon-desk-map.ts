@@ -8,6 +8,7 @@ import type {
   CasinoOfferSeriesComponentRow,
   CasinoOfferSeriesRow,
   EventRow,
+  ExchangeRow,
   HistoryRow,
   OfferRow,
 } from "@/lib/db/schema";
@@ -21,6 +22,7 @@ import type {
   CasinoOfferSeriesComponentRow as PgCasinoOfferSeriesComponentRow,
   CasinoOfferSeriesRow as PgCasinoOfferSeriesRow,
   EventRow as PgEventRow,
+  ExchangeRow as PgExchangeRow,
   HistoryRow as PgHistoryRow,
   OfferRow as PgOfferRow,
 } from "@/lib/db/schema.pg";
@@ -119,6 +121,19 @@ export function toSqliteOfferRow(row: PgOfferRow): OfferRow {
     instanceDate: row.instanceDate,
     source: row.source,
     offerUrl: row.offerUrl,
+  };
+}
+
+export function toSqliteExchangeRow(row: PgExchangeRow): ExchangeRow {
+  return {
+    id: row.id,
+    name: row.name,
+    commissionPct: row.commissionPct,
+    brandColor: row.brandColor,
+    backColor: row.backColor,
+    layColor: row.layColor,
+    isDefault: row.isDefault,
+    createdAt: row.createdAt,
   };
 }
 

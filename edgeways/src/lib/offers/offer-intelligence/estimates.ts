@@ -1,3 +1,4 @@
+import { matchedBet } from "@/lib/calc/matched";
 import { roundPence } from "@/lib/calc/money";
 
 /** Typical SNR free-bet cash extraction (~75%). */
@@ -60,14 +61,36 @@ export function estimatePlaceRefundEv(
   return roundPence(fbEv + qualLoss);
 }
 
-/** Risk-free / money-back if loses: refund as SNR free bet. */
+/**
+ * Refund-If (money back as free bet if the back loses).
+ *
+ * Lay is sized to equalise both outcomes including the anticipated SNR
+ * extraction, which is an underlay vs a normal qualifier. Typical play uses
+ * odds 3.0 (or the offer minimum when higher), not the 1.50 T&C floor.
+ *
+ * Worked example: £100 back @ 3.00, lay 3.10, 2% commission, £100 refund at
+ * 75% retention → win = 200, lose = −25, L = 225 / 3.08 = 73.05,
+ * guaranteed ≈ £46.59.
+ */
 export function estimateRiskFreeEv(
   betStake: number | null,
-  refundAmount: number | null
+  refundAmount: number | null,
+  minOdds?: number | null
 ): number | null {
+  const stake = betStake ?? refundAmount;
   const refund = refundAmount ?? betStake;
-  if (refund == null || refund <= 0) return null;
-  return roundPence(refund * FREE_BET_EV_RETENTION * 0.92);
+  if (stake == null || stake <= 0 || refund == null || refund <= 0) return null;
+  const backOdds = Math.max(minOdds ?? 3, 3);
+  const result = matchedBet({
+    mode: "risk_free",
+    backStake: stake,
+    backOdds,
+    layOdds: backOdds + 0.1,
+    commission: DEFAULT_COMMISSION,
+    refundAmount: refund,
+    refundRetention: FREE_BET_EV_RETENTION,
+  });
+  return roundPence(result.guaranteed);
 }
 
 /** Deposit match (casino/sports): very rough until wagering known. */

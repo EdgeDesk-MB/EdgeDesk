@@ -134,6 +134,27 @@
       "when": 1787864400000,
       "tag": "0018_feed_usage_events",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787995200000,
+      "tag": "0019_admin_live_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788002400000,
+      "tag": "0020_desk_exchange_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788002700000,
+      "tag": "0021_desk_exchange_default",
+      "breakpoints": true
     }
   ]
 }

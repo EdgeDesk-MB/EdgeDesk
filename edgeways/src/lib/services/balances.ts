@@ -33,6 +33,7 @@ import {
   EARLY_FREE_BET_AWARD_REASON,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
+import { historyNoteFromManualTx } from "@/lib/services/balances-manual-note";
 
 /** Bet ids whose promo free-bet credits belong to the same offer as `bet`. */
 function preferBetIdsForFreeBetUsage(bet: Pick<BetRow, "id" | "offerId">): number[] {
@@ -467,20 +468,6 @@ export function backfillMissingCasinoOfferBalances(): number {
     if (syncCasinoOfferBalance(offer)) n += 1;
   }
   return n;
-}
-
-/** Keep auto-generated ledger notes off the History subtitle line. */
-function historyNoteFromManualTx(
-  note: string | undefined,
-  category: "top_up" | "withdrawal" | "adjustment" | "free_bet"
-): string | null {
-  const trimmed = note?.trim();
-  if (!trimmed) return null;
-  if (trimmed === category.replace("_", " ")) return null;
-  if (trimmed === "Opening balance") return null;
-  if (trimmed === "Manual free bet top-up") return null;
-  if (/^Balance set to /.test(trimmed)) return null;
-  return trimmed;
 }
 
 /** Record top-up, withdrawal, adjustment, or free-bet credit. */

@@ -101,7 +101,7 @@ export default function EdgeReportPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Edge Report"
-        description="Cumulative expected edge vs realised P&L - tracking together means you're capturing your edge."
+        description="Expected edge versus actual profit."
         icon={BarChart3}
         toolbar={
           <div className="flex flex-wrap items-center gap-3">

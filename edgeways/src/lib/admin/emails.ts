@@ -4,6 +4,7 @@
  */
 
 export const DEFAULT_BOOTSTRAP_ADMIN_EMAIL = "samhayter.design@gmail.com";
+export const DEFAULT_OWNER_ADMIN_EMAIL = DEFAULT_BOOTSTRAP_ADMIN_EMAIL;
 
 export type AppUserRole = "user" | "admin";
 
@@ -44,4 +45,27 @@ export function isOperatorAdmin(input: {
   role: string | null | undefined;
 }): boolean {
   return isBootstrapAdminEmail(input.email) || parseAppUserRole(input.role) === "admin";
+}
+
+/**
+ * Master / owner: owner web push and live alerts. Not every bootstrap
+ * operator. Extra addresses: EDGEWAYS_OWNER_EMAILS (comma-separated).
+ */
+export function ownerAdminEmails(
+  env: Record<string, string | undefined> = process.env
+): string[] {
+  const extra = (env.EDGEWAYS_OWNER_EMAILS ?? "")
+    .split(",")
+    .map((part) => normaliseAdminEmail(part))
+    .filter((part): part is string => Boolean(part));
+  return Array.from(new Set([DEFAULT_OWNER_ADMIN_EMAIL, ...extra]));
+}
+
+export function isOwnerAdmin(
+  email: string | null | undefined,
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const normalised = normaliseAdminEmail(email);
+  if (!normalised) return false;
+  return ownerAdminEmails(env).includes(normalised);
 }

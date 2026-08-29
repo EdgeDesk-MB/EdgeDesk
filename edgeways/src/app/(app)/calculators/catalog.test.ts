@@ -30,4 +30,12 @@ describe("calculator catalog", () => {
       expect(section.calculators.length).toBeGreaterThan(0);
     }
   });
+
+  it("gives each calculator a unique icon", () => {
+    const icons = CALCULATOR_SECTIONS.flatMap((section) =>
+      section.calculators.map((calc) => calc.icon)
+    );
+    expect(icons.every(Boolean)).toBe(true);
+    expect(new Set(icons).size).toBe(icons.length);
+  });
 });

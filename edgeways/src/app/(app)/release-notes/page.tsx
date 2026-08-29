@@ -13,7 +13,6 @@ import {
   RELEASE_NOTE_KIND_LABELS,
   type ReleaseNoteKind,
 } from "@/content/release-notes";
-import { ROADMAP_VERSION } from "@/content/roadmap";
 import { filterPillState } from "@/lib/ui/surface-styles";
 import { ArrowUpRight, ScrollText } from "lucide-react";
 
@@ -37,7 +36,7 @@ export default function ReleaseNotesPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Release notes"
-        description={`Edgeways is currently in ${ROADMAP_VERSION.currentLabel.toLowerCase()} — what's new, improved and fixed.`}
+        description="What's new, improved and fixed."
         icon={ScrollText}
       />
 

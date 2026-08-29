@@ -12,8 +12,7 @@ import {
 } from "@/lib/offers/offer-terms";
 import {
   currentPlaybookStep,
-  readPlaybookFromRulesJson,
-  syncPlaybookFromOfferProfit,
+  playbookFromOffer,
 } from "@/lib/offers/offer-playbook";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import { normalizeOfferDetailsText } from "@/lib/offers/offer-odds-text";
@@ -215,10 +214,10 @@ export function buildCampaignDetailsContext(offer: OfferSummary) {
     ? formatBetGetFreePlaceSummary(racingRules, { includeRegions: !isUkIreScope })
     : null;
 
-  const rawPb = readPlaybookFromRulesJson(offer.rules);
+  const rawPb = playbookFromOffer(offer);
   const playbookStep =
     rawPb && offer.status !== "completed" && offer.status !== "expired"
-      ? currentPlaybookStep(syncPlaybookFromOfferProfit(rawPb, offer.profit))
+      ? currentPlaybookStep(rawPb)
       : null;
   const playbookActive =
     playbookStep != null && playbookStep.kind !== "done";

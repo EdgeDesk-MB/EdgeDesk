@@ -1,5 +1,6 @@
 import {
   Activity,
+  Bell,
   CreditCard,
   Flag,
   HeartPulse,
@@ -41,13 +42,19 @@ export const ADMIN_NAV: AdminNavItem[] = [
     href: "/admin/users",
     label: "Users",
     icon: Shield,
-    blurb: "Grant or revoke operator admin. Hide test accounts from stats.",
+    blurb: "Grant or revoke operator admin. Hide test accounts. Owner live alerts.",
   },
   {
     href: "/admin/activity",
     label: "Activity",
     icon: Activity,
-    blurb: "Per-desk volume counts. Not another customer’s bets or wallets.",
+    blurb: "Per-desk volume and category mix. Not another customer’s bets or wallets.",
+  },
+  {
+    href: "/admin/live",
+    label: "Live",
+    icon: Bell,
+    blurb: "When it happened, as rows. The same bundles as toasts, kept here.",
   },
   {
     href: "/admin/inbox",
@@ -65,7 +72,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     href: "/admin/releases",
     label: "Releases",
     icon: Flag,
-    blurb: "PostHog flags and a maintenance banner. No deploy button.",
+    blurb: "PostHog flags and a site banner. No deploy button.",
   },
   {
     href: "/admin/health",

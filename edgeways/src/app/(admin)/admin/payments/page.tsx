@@ -57,7 +57,7 @@ export default async function AdminPaymentsPage() {
   return (
     <AdminPage
       title="Payments"
-      description="Read-only Stripe view. Refunds and charges stay in the Stripe dashboard. Test accounts are omitted where the Stripe customer or email matches."
+      description="Read-only Stripe view. Refunds stay in Stripe."
       icon={CreditCard}
       toolbar={
         <AdminAccountFilters

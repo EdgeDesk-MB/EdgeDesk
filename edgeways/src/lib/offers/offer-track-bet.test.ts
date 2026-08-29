@@ -172,6 +172,36 @@ describe("deriveTrackBetAction", () => {
     expect(action.prefill?.triggerText).toMatch(/Bet £50/);
   });
 
+  it("opens Refund-If (risk_free underlay) for money-back-if-loses campaigns", () => {
+    const action = deriveTrackBetAction(
+      offer({
+        id: 42,
+        title: "Money back if bet loses",
+        bookmaker: "BetMGM",
+        sport: "horse_racing",
+        offerType: "bet_get_free_place",
+        rules: JSON.stringify({
+          type: "bet_get_free_place",
+          minRunners: 8,
+          regions: ["GB"],
+          qualifyingPlaces: [],
+          betStake: 100,
+          freeBetAmount: 100,
+          refundIf: true,
+          minOdds: 1.5,
+        }),
+        betCount: 0,
+      })
+    );
+    expect(action.enabled).toBe(true);
+    expect(action.label).toBe("Place refund-if bet");
+    expect(action.prefill?.betType).toBe("risk_free");
+    expect(action.prefill?.backStake).toBe(100);
+    expect(action.prefill?.refundAmount).toBe(100);
+    expect(action.prefill?.refundRetention).toBe(0.75);
+    expect(action.prefill?.triggerText).toMatch(/if bet loses/i);
+  });
+
   it("prefills Offer trigger from title for General bet&get campaigns", () => {
     const general = offer({
       id: 10,

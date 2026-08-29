@@ -6,6 +6,7 @@ import {
   deskFileToken,
   deskOwnerEmail,
   isDeskOwnerEmail,
+  pickCanonicalNeonClerkUserId,
   resolveScopedDbPath,
   runWithDeskActor,
   getDeskActor,
@@ -125,13 +126,41 @@ describe("desk-scope", () => {
   });
 
   it("exposes the actor only inside runWithDeskActor", () => {
-    expect(getDeskActor()).toEqual({ clerkUserId: null, email: null });
+    expect(getDeskActor()).toEqual({
+      clerkUserId: null,
+      email: null,
+      neonClerkUserId: null,
+    });
     const seen = runWithDeskActor(
       { clerkUserId: "user_1", email: "A@B.com" },
       () => getDeskActor()
     );
-    expect(seen).toEqual({ clerkUserId: "user_1", email: "a@b.com" });
-    expect(getDeskActor()).toEqual({ clerkUserId: null, email: null });
+    expect(seen).toEqual({
+      clerkUserId: "user_1",
+      email: "a@b.com",
+      neonClerkUserId: "user_1",
+    });
+    expect(getDeskActor()).toEqual({
+      clerkUserId: null,
+      email: null,
+      neonClerkUserId: null,
+    });
+  });
+
+  it("keeps the signed-in Clerk id when the Neon desk is aliased", () => {
+    const seen = runWithDeskActor(
+      {
+        clerkUserId: "user_local",
+        email: "a@b.com",
+        neonClerkUserId: "user_live",
+      },
+      () => getDeskActor()
+    );
+    expect(seen).toEqual({
+      clerkUserId: "user_local",
+      email: "a@b.com",
+      neonClerkUserId: "user_live",
+    });
   });
 
   it("keeps the actor across awaits when the callback is async", async () => {
@@ -155,5 +184,62 @@ describe("desk-scope", () => {
       () => handler()
     );
     expect(id).toBe("user_1");
+  });
+});
+
+describe("pickCanonicalNeonClerkUserId", () => {
+  const live = "user_3IT7V2FQfFhC2ZNg9Q4FjAbDEgQ";
+  const local = "user_3HqzZ0vGHKdHGozq8a064YzgQWk";
+
+  it("keeps the signed-in id when there is no other account", () => {
+    expect(
+      pickCanonicalNeonClerkUserId({
+        signedInUserId: local,
+        candidates: [],
+      })
+    ).toBe(local);
+    expect(
+      pickCanonicalNeonClerkUserId({
+        signedInUserId: local,
+        candidates: [{ clerkUserId: local, createdAt: 1, offerCount: 0 }],
+      })
+    ).toBe(local);
+  });
+
+  it("prefers an explicit owner id when it is one of the accounts", () => {
+    expect(
+      pickCanonicalNeonClerkUserId({
+        signedInUserId: local,
+        preferredUserId: live,
+        candidates: [
+          { clerkUserId: local, createdAt: 2, offerCount: 200 },
+          { clerkUserId: live, createdAt: 1, offerCount: 1 },
+        ],
+      })
+    ).toBe(live);
+  });
+
+  it("picks the desk with more offers so localhost follows Live", () => {
+    expect(
+      pickCanonicalNeonClerkUserId({
+        signedInUserId: local,
+        candidates: [
+          { clerkUserId: local, createdAt: 1, offerCount: 159 },
+          { clerkUserId: live, createdAt: 2, offerCount: 160 },
+        ],
+      })
+    ).toBe(live);
+  });
+
+  it("breaks a tie with the newer account row", () => {
+    expect(
+      pickCanonicalNeonClerkUserId({
+        signedInUserId: local,
+        candidates: [
+          { clerkUserId: local, createdAt: 1, offerCount: 10 },
+          { clerkUserId: live, createdAt: 9, offerCount: 10 },
+        ],
+      })
+    ).toBe(live);
   });
 });

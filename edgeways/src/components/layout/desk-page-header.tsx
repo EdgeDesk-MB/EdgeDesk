@@ -4,7 +4,7 @@ import { PageHelp } from "@/components/help/page-help";
 import type { PageHelpId } from "@/content/help/page-help";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { pageSectionBar, pageSectionMeta } from "@/lib/ui/layout-spacing";
-import { pageTitle } from "@/lib/ui/surface-styles";
+import { pageDescription, pageTitle } from "@/lib/ui/surface-styles";
 
 export function DeskPageHeader({
   title,
@@ -33,8 +33,8 @@ export function DeskPageHeader({
   const band = (
     <>
       <div className={cn(meta ? pageSectionMeta : pageSectionBar)}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0 md:flex-1">
             <div className="flex min-w-0 items-start gap-2">
               {Icon && (
                 <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
@@ -43,12 +43,14 @@ export function DeskPageHeader({
               {helpId && <PageHelp pageId={helpId} />}
             </div>
             {description && (
-              <p className="mt-0.5 min-w-0 text-pretty break-words text-xs leading-snug text-muted-foreground">
+              <p className={cn("mt-0.5", pageDescription)}>
                 {description}
               </p>
             )}
           </div>
-          {action && <PageHeaderActions>{action}</PageHeaderActions>}
+          {action && (
+            <PageHeaderActions className="w-full md:w-auto">{action}</PageHeaderActions>
+          )}
         </div>
       </div>
       {toolbar}

@@ -228,6 +228,8 @@ export function settleFromOutcome(
     case "back_only":
     case "risk_free":
     case "dutch":
+      // risk_free: anticipated FB value is for lay sizing / expectedProfit only.
+      // Actual cash is the back+lay P&L; the free bet is awarded and converted.
       backProfit = paid ? bet.backStake * (bet.backOdds - 1) : -bet.backStake;
       break;
     case "free_snr":
@@ -239,10 +241,6 @@ export function settleFromOutcome(
     case "lay_only":
       backProfit = 0;
       break;
-  }
-
-  if (bet.betType === "risk_free" && !paid) {
-    backProfit += (bet.refundAmount ?? bet.backStake) * (bet.refundRetention ?? 0.7);
   }
 
   const layProfit = bet.betType === "back_only" ? 0 : layLoses ? -liability : layWinnings;
@@ -279,6 +277,8 @@ export function settlementSidePnL(
     case "back_only":
     case "risk_free":
     case "dutch":
+      // risk_free: anticipated FB value is for lay sizing / expectedProfit only.
+      // Actual cash is the back+lay P&L; the free bet is awarded and converted.
       backProfit = paid ? bet.backStake * (bet.backOdds - 1) : -bet.backStake;
       break;
     case "free_snr":
@@ -290,10 +290,6 @@ export function settlementSidePnL(
     case "lay_only":
       backProfit = 0;
       break;
-  }
-
-  if (bet.betType === "risk_free" && !paid) {
-    backProfit += (bet.refundAmount ?? bet.backStake) * (bet.refundRetention ?? 0.7);
   }
 
   const layProfit = bet.betType === "back_only" ? 0 : layLoses ? -liability : layWinnings;

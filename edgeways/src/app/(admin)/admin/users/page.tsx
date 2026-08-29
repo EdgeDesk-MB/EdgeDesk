@@ -8,18 +8,23 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
+import { AdminLiveSettingsCard } from "@/components/admin/admin-live-settings-card";
 import { UsersManager } from "@/components/admin/users-manager";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
 import { scopeAdminUsers } from "@/lib/admin/exclude-accounts";
 import { hiddenAdminsSub, withoutAdmins } from "@/lib/admin/exclude-admins";
 import { buildAccountGrowth } from "@/lib/admin/growth";
+import { readAdminLiveSettings } from "@/lib/admin/live-settings";
+import { requireAdminPage } from "@/lib/admin/session";
 import { listAppUsers } from "@/lib/services/app-users";
 
 export default async function AdminUsersPage() {
-  const [users, scope] = await Promise.all([
+  const [session, users, scope, liveSettings] = await Promise.all([
+    requireAdminPage(),
     listAppUsers(),
     loadAdminAccountScope(),
+    readAdminLiveSettings(),
   ]);
   const { excludeAdmins, excludedIds } = scope;
   const admins = users.filter((user) => user.admin).length;
@@ -27,11 +32,12 @@ export default async function AdminUsersPage() {
   const visibleUsers = scopeAdminUsers(users, { excludeAdmins, excludedIds });
   const excludedCount = excludedIds.length;
   const bootstrap = users.filter((user) => user.bootstrap).length;
+  const owners = users.filter((user) => user.owner).length;
   const growth = buildAccountGrowth(visibleUsers, []);
   return (
     <AdminPage
       title="User management"
-      description="Grant or revoke the operator role, and hide test accounts from every /admin stat. Test accounts stay on this list so you can include them again."
+      description="Grant admin, hide test accounts and tune live alerts."
       icon={Shield}
       toolbar={
         <AdminAccountFilters
@@ -42,7 +48,7 @@ export default async function AdminUsersPage() {
         />
       }
     >
-      <StatStrip columns={4}>
+      <StatStrip columns={5}>
         <StatTile
           label="Accounts"
           value={String(listedUsers.length)}
@@ -52,6 +58,11 @@ export default async function AdminUsersPage() {
           label="Admins"
           value={String(admins)}
           sub={excludeAdmins ? "Hidden from the list" : undefined}
+        />
+        <StatTile
+          label="Owner"
+          value={String(owners)}
+          sub="Cannot demote"
         />
         <StatTile
           label="Test accounts"
@@ -76,7 +87,7 @@ export default async function AdminUsersPage() {
         </AdminChartCard>
         <AdminChartCard
           title="Admins"
-          description="Admin is the operator role. Bootstrap cannot be demoted."
+          description="Operator admin versus customer. The owner and bootstrap operators cannot be demoted."
         >
           <AdminDonutChart slices={growth.roleShare} label="Admins" />
         </AdminChartCard>
@@ -87,6 +98,7 @@ export default async function AdminUsersPage() {
       >
         <AdminBarChart series={growth.signups30} label="Account signups" />
       </AdminChartCard>
+      {session.owner ? <AdminLiveSettingsCard initial={liveSettings} /> : null}
       <UsersManager
         key={excludeAdmins ? "customers" : "all"}
         initialUsers={listedUsers}

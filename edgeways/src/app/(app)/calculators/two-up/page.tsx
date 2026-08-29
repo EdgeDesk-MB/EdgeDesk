@@ -64,12 +64,10 @@ export default function TwoUpCalculatorPage() {
   return (
     <CalculatorShell>
       <CalculatorPageHeader
-        title="Early Payout (2UP) Calculator"
+        title="Early Payout (2UP)"
         description={
           <>
-            Back at a bookie that pays out at 2 goals ahead, lay at the exchange. Small qualifying
-            loss, big windfall when the payout triggers and the result flips. For the full
-            model-driven desk, see the{" "}
+            Back a 2UP bookie and lay the exchange, with the full model on{" "}
             <Link href="/calculators/ep-desk" className="text-primary-text underline-offset-2 hover:underline">
               2UP Desk
             </Link>

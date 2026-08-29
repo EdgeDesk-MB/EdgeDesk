@@ -17,9 +17,10 @@ export type FilterPillProps = {
   hasCount?: boolean;
   /**
    * Active plate tone. `"edge"` keeps Offer Edge violet (`--edge`) instead of
-   * the default ink + brand-type chip.
+   * the default ink + brand-type chip. `"profit"` is Admin Activity casino.
+   * `"warning"` / `"ink"` are site-banner type chips (amber / foreground).
    */
-  tone?: "default" | "edge";
+  tone?: "default" | "edge" | "profit" | "warning" | "ink";
   type?: "button" | "submit" | "reset";
   title?: string;
   /** Accessible name when visible label is abbreviated or truncated. */
@@ -85,6 +86,9 @@ export const FilterPill = React.forwardRef<HTMLButtonElement, FilterPillProps>(
           hasCount && "edgeways-filter-pill--count",
           active && "edgeways-filter-pill--active",
           tone === "edge" && "edgeways-filter-pill--edge",
+          tone === "profit" && "edgeways-filter-pill--profit",
+          tone === "warning" && "edgeways-filter-pill--warning",
+          tone === "ink" && "edgeways-filter-pill--ink",
           className
         )}
         containerProps={{

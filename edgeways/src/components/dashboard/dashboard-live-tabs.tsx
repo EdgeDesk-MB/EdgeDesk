@@ -752,11 +752,7 @@ export function DashboardLiveTabs({
             : undefined
         }
         title="Live"
-        description={
-          docked
-            ? "In-play events and open positions. Collapse to free History space; lock rows to keep them in view."
-            : "In-play events and open positions."
-        }
+        description="In-play events and open positions."
         action={
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             <Tabs value={tab} onValueChange={setTab} activationMode="manual">

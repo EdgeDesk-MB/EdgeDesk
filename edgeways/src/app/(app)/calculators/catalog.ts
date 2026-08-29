@@ -1,9 +1,34 @@
 /** In-page calculator cards. Every href must have a matching `page.tsx`. */
 
+import type { ComponentType } from "react";
+import {
+  ArrowLeftRight,
+  ChartPie,
+  Layers,
+  ListOrdered,
+  Medal,
+  Percent,
+  Repeat,
+  Scale,
+  Scissors,
+  Timer,
+  Undo2,
+} from "lucide-react";
+import { FootballIcon } from "@/components/sport-icon";
+
+/** Lucide or a stroke-matched custom mark (FootballIcon for 2UP Desk). Same API as nav icons. */
+export type CalculatorIcon = ComponentType<{
+  className?: string;
+  strokeWidth?: number;
+  size?: number;
+}>;
+
 export type CalculatorCard = {
   href: string;
   title: string;
   description: string;
+  /** Leading mark: same recipe as welcome Get started tiles. */
+  icon: CalculatorIcon;
 };
 
 export type CalculatorSection = {
@@ -18,75 +43,86 @@ export const CALCULATOR_SECTIONS: CalculatorSection[] = [
     id: "core",
     title: "Core",
     description:
-      "Everyday matched betting - back/lay, dutching and offer types. All push to the profit tracker.",
+      "Everyday matched betting. All save to the tracker.",
     calculators: [
       {
         href: "/calculators/matched",
         title: "Matched Betting",
-        description: "Back/lay for qualifiers, free bets (SNR & SR) and risk-free offers.",
+        description: "Qualifiers, free bets and money-back offers.",
+        icon: ArrowLeftRight,
       },
       {
         href: "/calculators/dutching",
         title: "Dutching",
-        description: "Split a stake across outcomes for equal profit - includes 2UP Dutch mode.",
+        description: "Split a stake across outcomes for equal profit.",
+        icon: ChartPie,
       },
       {
         href: "/calculators/two-up",
         title: "Early Payout (2UP)",
-        description: "Back a 2UP bookie, lay the exchange, and see the windfall scenarios.",
+        description: "Back a 2UP bookie and lay the exchange.",
+        icon: Timer,
       },
       {
         href: "/calculators/ep-desk",
         title: "2UP Desk",
-        description:
-          "Model-driven 2UP/1UP desk with Dixon-Coles probabilities, Dutch vs lay ranking and live settlement.",
+        description: "Dixon-Coles 2UP desk with dutch versus lay ranking.",
+        icon: FootballIcon,
       },
       {
         href: "/calculators/accumulator",
         title: "Accumulator",
-        description: "Doubles through Lucky 63 - layered lays on standard accas, full-cover returns.",
+        description: "Doubles through Lucky 63 and full-cover returns.",
+        icon: Layers,
       },
       {
         href: "/calculators/each-way",
         title: "Each Way & Extra Place",
-        description: "Lay win and place separately - standard each-way arbs and extra-place offers.",
+        description: "Lay win and place separately, including extra places.",
+        icon: Medal,
       },
       {
         href: "/calculators/sequential-lay",
         title: "Sequential Lay",
-        description: "Part lays at earlier odds, then finish at the current market - underlay or standard.",
+        description: "Part lays, then finish at the current market.",
+        icon: ListOrdered,
       },
       {
         href: "/calculators/refund-if",
         title: "Refund-If",
-        description: "Money-back-if-you-lose offers with free-bet or cash refund retention.",
+        description: "Money-back-if-you-lose, cash or free bet.",
+        icon: Undo2,
       },
     ],
   },
   {
     id: "tools",
     title: "Tools",
-    description: "Quick reference calculators - no tracker hand-off needed.",
+    description: "Quick reference with no tracker hand-off.",
     calculators: [
       {
         href: "/calculators/odds-converter",
         title: "Odds Converter",
         description: "Decimal ↔ fractional ↔ American ↔ implied probability.",
+        icon: Repeat,
       },
       {
         href: "/calculators/ev",
         title: "EV & No-Vig",
-        description: "Expected value, edge % and fair odds with the vig stripped out.",
+        description: "Expected value, edge and fair odds with vig stripped.",
+        icon: Percent,
       },
       {
         href: "/calculators/rule4",
         title: "Rule 4",
-        description: "Effective odds and adjusted winnings after a Rule 4 deduction.",
+        description: "Odds and returns after a Rule 4 deduction.",
+        icon: Scissors,
       },
       {
         href: "/match-checker",
         title: "Match Checker",
-        description: "Enter a back and lay price for a good/ok/poor verdict, lay stake and both outcomes.",
+        description: "Back and lay for a verdict, lay stake and both outcomes.",
+        icon: Scale,
       },
     ],
   },

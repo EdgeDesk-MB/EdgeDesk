@@ -43,6 +43,7 @@ import type { AdminUserRow } from "@/lib/services/app-users";
 import { Shield } from "lucide-react";
 import {
   adminModeTag,
+  adminOwnerTag,
   adminTestTag,
   captionHeading,
   tableBodyCell,
@@ -196,7 +197,9 @@ export function UsersManager({
                     <span className="min-w-0 truncate font-medium">
                       {user.email ?? user.clerkUserId}
                     </span>
-                    {user.admin ? (
+                    {user.owner ? (
+                      <span className={cn(adminOwnerTag, "shrink-0")}>OWNER</span>
+                    ) : user.admin ? (
                       <span className={cn(adminModeTag, "shrink-0")}>ADMIN</span>
                     ) : null}
                     {excludedIds.has(user.clerkUserId) ? (
@@ -285,7 +288,21 @@ export function UsersManager({
                           ? "Unmark test"
                           : "Mark as test"}
                     </Button>
-                    {lock === "bootstrap" ? (
+                    {lock === "owner" ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="rounded-sm text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            Owner
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Cannot demote the owner
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : lock === "bootstrap" ? (
                       <span className="text-xs text-muted-foreground">Locked</span>
                     ) : lock === "last-admin" ? (
                       <span className="text-xs text-muted-foreground">Last admin</span>

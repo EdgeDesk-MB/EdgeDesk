@@ -1,5 +1,6 @@
 import { offerCategoryById } from "@/lib/offers/offer-categories";
 import { formatQualifyingPlacesPhrase } from "@/lib/offers/offer-odds-text";
+import { isRefundIfText } from "@/lib/offers/refund-if";
 import { formatClockTime } from "@/lib/time-format";
 import type {
   ArchetypeMatch,
@@ -54,10 +55,11 @@ export function classifyOfferArchetype(
     (/\bwinnings?\s+boost\b/i.test(text) ? 2 : 0);
   scores.push({ archetype: "bet_boost", score: boostScore });
 
+  const refundIf = isRefundIfText(text);
   const betGetScore =
-    (betStake != null && freeBetAmount != null ? 5 : 0) +
-    (/\bbet\s+£?\d+\s+get\s+£?\d+/i.test(text) ? 4 : 0) +
-    (/\bqualifying\s+bet\b/i.test(text) && freeBetAmount != null ? 2 : 0);
+    (refundIf ? 0 : betStake != null && freeBetAmount != null ? 5 : 0) +
+    (refundIf ? 0 : /\bbet\s+£?\d+\s+get\s+£?\d+/i.test(text) ? 4 : 0) +
+    (/\bqualifying\s+bet\b/i.test(text) && freeBetAmount != null && !refundIf ? 2 : 0);
   scores.push({ archetype: "bet_get_free_bet", score: betGetScore });
 
   const placeScore =
@@ -72,6 +74,7 @@ export function classifyOfferArchetype(
   scores.push({ archetype: "place_refund", score: placeScore });
 
   const riskFreeScore =
+    (refundIf ? 8 : 0) +
     (/\brisk[- ]?free\b/i.test(text) ? 4 : 0) +
     (/\bmoney\s+back\s+if\s+(?:your\s+)?(?:bet\s+)?los/i.test(text) ? 4 : 0) +
     (/\brefund(?:ed)?\s+as\s+(?:a\s+)?free\s*bet\b/i.test(text) ? 3 : 0) +
@@ -159,11 +162,16 @@ export function buildExpectedProfit(
       };
     }
     case "risk_free": {
-      const profit = estimateRiskFreeEv(betStake, freeBetAmount ?? betStake);
+      const playOdds = Math.max(important.minOdds ?? 3, 3);
+      const profit = estimateRiskFreeEv(
+        betStake,
+        freeBetAmount ?? betStake,
+        important.minOdds
+      );
       if (profit == null) return { profit: null, explanation: null };
       return {
         profit,
-        explanation: `Est. ~£${profit} (refund as SNR free bet)`,
+        explanation: `Est. ~£${profit} (Refund-If underlay at ${playOdds}, ${Math.round(FREE_BET_EV_RETENTION * 100)}% SNR retention)`,
       };
     }
     case "deposit_match": {
@@ -254,9 +262,9 @@ export function buildInstructions(
 
     case "risk_free":
       return [
-        `Place first cash bet on ${bookie}${ctx.betStake != null ? ` (£${ctx.betStake})` : ""}.`,
-        "Lay to minimise qualifying loss (often near £0 on close odds).",
-        "If it loses, extract the refund as an SNR free bet.",
+        `Place the qualifying bet on ${bookie}${ctx.betStake != null ? ` (£${ctx.betStake})` : ""}${minOdds != null ? ` at min odds ${minOdds}` : ""}.`,
+        "Open the Refund-If calculator and underlay on the exchange so both outcomes include the anticipated free-bet value.",
+        "If the bet wins, the underlay already locked the profit. If it loses, convert the SNR free bet.",
       ];
 
     case "deposit_match":

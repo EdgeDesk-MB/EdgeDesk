@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { Fragment, memo, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { NumberFlowGroup } from "@number-flow/react";
 import { MoneyFlow } from "@/components/money-flow";
@@ -26,6 +26,8 @@ import {
   formatLayStake,
   layStakeStepHandlers,
 } from "@/lib/calc/exchange-stake-step";
+import type { BookieBreakdownLine } from "@/lib/calc/matched";
+import { formatGbp } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { Copy, ChevronDown } from "lucide-react";
 
@@ -578,6 +580,53 @@ export interface OutcomeRow {
   bookie: number;
   exchange: number;
   accent?: "back" | "lay";
+  /**
+   * Stake vs refund (or similar credit) that compose `bookie`.
+   * Rendered above the net so risk-free retention is visible in the table.
+   */
+  bookieBreakdown?: BookieBreakdownLine[] | null;
+}
+
+function BookieCell({
+  net,
+  breakdown,
+}: {
+  net: number;
+  breakdown?: BookieBreakdownLine[] | null;
+}) {
+  if (!breakdown?.length) {
+    return <MoneyFlow value={net} signColor signDisplay />;
+  }
+  const summary = [
+    ...breakdown.map((line) => `${formatGbp(line.value, { signed: true })} ${line.label}`),
+    `net ${formatGbp(net, { signed: true })}`,
+  ].join(", ");
+  return (
+    <div
+      role="group"
+      aria-label={`Bookie: ${summary}`}
+      className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 gap-y-0.5"
+    >
+      {breakdown.map((line) => (
+        <Fragment key={line.label}>
+          <span className="min-w-0 text-pretty break-words text-left text-xs font-medium leading-tight text-muted-foreground">
+            {line.label}
+          </span>
+          <MoneyFlow
+            value={line.value}
+            signColor
+            signDisplay
+            className="text-xs font-medium"
+          />
+        </Fragment>
+      ))}
+      <span className="col-span-2 mt-0.5 block h-px bg-border/80" aria-hidden />
+      <span className="text-left text-xs font-medium leading-tight text-muted-foreground">
+        net
+      </span>
+      <MoneyFlow value={net} signColor signDisplay />
+    </div>
+  );
 }
 
 /**
@@ -606,8 +655,8 @@ export const ProfitTable = memo(function ProfitTable({
   const layBase = exchange?.layColor ?? PANEL_NEUTRAL;
   return (
     <NumberFlowGroup>
-      <div className="flex flex-col gap-3">
-        <div className="overflow-hidden rounded-lg border">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="min-w-0 max-w-full overflow-hidden rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/60 text-xs text-muted-foreground">
@@ -626,11 +675,15 @@ export const ProfitTable = memo(function ProfitTable({
                 // can't parse that `color-mix(...)` string, so skip it here.
                 const chevText = isBack && hasVenueTint ? "#1a1a1a" : contrastText(accent);
                 return (
-                  <tr key={row.label} className="border-t">
-                    <td className="py-2 pr-3">
+                  <tr
+                    key={row.label}
+                    className={cn("border-t", row.bookieBreakdown?.length ? "h-px" : "")}
+                  >
+                    <td className={cn("min-w-0 py-2 pr-3", row.bookieBreakdown?.length ? "h-full align-top" : "")}>
                       <span
                         className={cn(
-                          "flex min-h-9 items-center bg-[var(--chev)] py-1 pl-3 pr-6 text-[13px] font-bold leading-tight text-[var(--chev-text)] dark:bg-[var(--chev-dark)] dark:text-white/95",
+                          "flex min-h-9 min-w-0 items-center bg-[var(--chev)] py-1 pl-3 pr-6 text-[13px] font-bold leading-tight text-pretty break-words text-[var(--chev-text)] dark:bg-[var(--chev-dark)] dark:text-white/95",
+                          row.bookieBreakdown?.length ? "h-full" : "",
                           PANEL_TINT_TRANSITION
                         )}
                         style={
@@ -646,13 +699,28 @@ export const ProfitTable = memo(function ProfitTable({
                         {row.label}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums">
-                      <MoneyFlow value={row.bookie} signColor signDisplay />
+                    <td
+                      className={cn(
+                        "min-w-0 px-3 text-right text-[15px] font-semibold tabular-nums",
+                        row.bookieBreakdown?.length ? "align-top py-2" : "py-2.5"
+                      )}
+                    >
+                      <BookieCell net={row.bookie} breakdown={row.bookieBreakdown} />
                     </td>
-                    <td className="px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums">
+                    <td
+                      className={cn(
+                        "px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums",
+                        row.bookieBreakdown?.length ? "align-bottom" : ""
+                      )}
+                    >
                       <MoneyFlow value={row.exchange} signColor signDisplay />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-[15px] font-extrabold tabular-nums">
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-3 py-2.5 text-right text-[15px] font-extrabold tabular-nums",
+                        row.bookieBreakdown?.length ? "align-bottom" : ""
+                      )}
+                    >
                       <span className="mr-0.5 text-muted-foreground">=</span>
                       <MoneyFlow value={row.bookie + row.exchange} signColor signDisplay />
                     </td>

@@ -406,7 +406,7 @@ function TrackerContent() {
       <PageHeader
         helpId="tracker"
         title="Profit Tracker"
-        description="Organise positions by queue and offer campaign. Results settle derived markets automatically."
+        description="Open bets, grouped by queue and campaign."
         action={
           <>
             <Button variant="outline" {...pageSecondaryButtonProps} asChild>

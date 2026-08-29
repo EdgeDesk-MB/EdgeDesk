@@ -68,7 +68,7 @@ export function DashboardNextActions({
         prominent
         icon={ListChecks}
         title="Next actions"
-        description="Open actions across your offers."
+        description="Open actions on your offers."
         action={
           <Link
             href="/offers"

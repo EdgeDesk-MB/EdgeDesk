@@ -111,7 +111,7 @@ export default function CasinoPage() {
     <PageShell className="gap-5">
       <PageHeader
         title="Casino Campaigns"
-        description="Wagering offers with honest EV - an expectation across many attempts, never a lock."
+        description="Wagering offers and expected value."
         helpId="casino"
         icon={Dices}
         action={

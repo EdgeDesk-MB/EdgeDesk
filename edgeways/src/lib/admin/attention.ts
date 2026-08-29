@@ -1,7 +1,10 @@
 import type { AdminUserRow } from "@/lib/services/app-users";
 import type { FeedMonitor } from "@/lib/admin/feeds";
 import type { StripeOverview } from "@/lib/admin/stripe-overview";
-import type { MaintenanceBanner } from "@/lib/admin/operator-settings";
+import {
+  SITE_BANNER_KIND_LABEL,
+  type MaintenanceBanner,
+} from "@/lib/admin/maintenance-banner-shared";
 import type { FeedbackListItem } from "@/lib/feedback/types";
 
 export type AttentionTone = "warning" | "destructive";
@@ -96,7 +99,7 @@ export function buildAttentionItems(input: {
   if (input.banner.enabled) {
     items.push({
       key: "banner",
-      label: "Maintenance",
+      label: SITE_BANNER_KIND_LABEL[input.banner.kind],
       value: "On",
       sub: "Banner is live",
       href: "/admin/releases",

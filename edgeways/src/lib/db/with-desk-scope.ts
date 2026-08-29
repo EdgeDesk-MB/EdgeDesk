@@ -1,11 +1,13 @@
 import "server-only";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { isNeonDesk } from "@/lib/db/desk-backend";
 import {
   primaryClerkEmail,
   runWithDeskActor,
   type DeskActor,
 } from "@/lib/db/desk-scope";
+import { resolveCanonicalNeonClerkUserId } from "@/lib/db/neon-desk-alias";
 import { syncLegalAcceptanceFromClerkUser } from "@/lib/legal/record-acceptance";
 
 const emailByUserId = new Map<string, string | null>();
@@ -35,9 +37,16 @@ export function withDeskScope<TArgs extends unknown[], TResult>(
 ): (...args: TArgs) => Promise<TResult> {
   return async (...args: TArgs) => {
     const actor = await resolveDeskActor();
+    const neonClerkUserId =
+      isNeonDesk() && actor.clerkUserId
+        ? await resolveCanonicalNeonClerkUserId(actor)
+        : actor.clerkUserId;
     // Async callback so the actor survives `cookies()` / racecard awaits.
     // A sync wrapper that merely returns a promise can drop AsyncLocalStorage
     // on the serverless isolate after the first await.
-    return await runWithDeskActor(actor, async () => handler(...args));
+    return await runWithDeskActor(
+      { ...actor, neonClerkUserId },
+      async () => handler(...args)
+    );
   };
 }

@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/button";
 import { apiGet } from "@/hooks/use-app-state";
 import {
   currentPlaybookStep,
+  playbookFromOffer,
   playbookProgress,
-  readPlaybookFromRulesJson,
-  syncPlaybookFromOfferProfit,
 } from "@/lib/offers/offer-playbook";
 import { readImportantTerms } from "@/lib/offers/offer-terms";
 import type { AccountBalance } from "@/lib/services/balances.types";
@@ -39,15 +38,14 @@ export function OfferPlaybookPanel({
   const important = readImportantTerms(offer);
 
   const { playbook, step, progress } = useMemo(() => {
-    const raw = readPlaybookFromRulesJson(offer.rules);
-    if (!raw) return { playbook: null, step: null, progress: null };
-    const synced = syncPlaybookFromOfferProfit(raw, offer.profit);
+    const synced = playbookFromOffer(offer);
+    if (!synced) return { playbook: null, step: null, progress: null };
     return {
       playbook: synced,
       step: currentPlaybookStep(synced),
       progress: playbookProgress(synced),
     };
-  }, [offer.rules, offer.profit]);
+  }, [offer]);
 
   const wrBookie =
     step?.kind === "clear_wagering" && offer.bookmaker?.trim()
@@ -158,9 +156,9 @@ export function OfferPlaybookPanel({
 /** True when the playbook is the primary “what now” UI (soften pipeline chrome). */
 export function offerPlaybookIsPrimary(offer: OfferSummary): boolean {
   if (offer.deskProgress) return false;
-  const raw = readPlaybookFromRulesJson(offer.rules);
+  const raw = playbookFromOffer(offer);
   if (!raw) return false;
   if (offer.status === "completed" || offer.status === "expired") return false;
-  const step = currentPlaybookStep(syncPlaybookFromOfferProfit(raw, offer.profit));
+  const step = currentPlaybookStep(raw);
   return step != null && step.kind !== "done";
 }

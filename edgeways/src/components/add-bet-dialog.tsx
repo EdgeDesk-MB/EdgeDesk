@@ -85,6 +85,7 @@ import {
   offerTriggerDetectedInLabel,
   offerTriggerFromLabel,
   previewAiTriggersFromInput,
+  riskFreeBookieBreakdown,
   type BetMode,
   type DutchLeg,
   type PartLay,
@@ -232,6 +233,10 @@ export interface AddBetPrefill {
   notes?: string;
   offerId?: number;
   triggerText?: string;
+  /** Refund-If: face value refunded if the back loses (usually = back stake). */
+  refundAmount?: number;
+  /** Refund-If: cash extraction of the refund (0–1). Default 0.75. */
+  refundRetention?: number;
   /** Mobile quick-log capture - the bet is flagged for later desktop review */
   quickLogged?: boolean;
   /** J5: pre-set the Mug bet toggle (camouflage, excluded from edge analytics) */
@@ -507,6 +512,8 @@ export function AddBetDialog({
   const [mugBet, setMugBet] = useState(false);
   const [backStake, setBackStake] = useState(appSettings?.defaultBackStake ?? NaN);
   const [backOdds, setBackOdds] = useState(NaN);
+  const [refundAmount, setRefundAmount] = useState(NaN);
+  const [refundRetentionPct, setRefundRetentionPct] = useState(75);
   /** Boost type: opt-in % on base back odds (winnings-only → effective price). */
   const [useBoostPct, setUseBoostPct] = useState(false);
   const [boostPct, setBoostPct] = useState(NaN);
@@ -547,6 +554,8 @@ export function AddBetDialog({
     setBackStake(appSettings?.defaultBackStake ?? NaN);
     setBookmaker(appSettings?.defaultBookmaker ?? "");
     setBackOdds(NaN);
+    setRefundAmount(NaN);
+    setRefundRetentionPct(75);
     setUseBoostPct(false);
     setBoostPct(NaN);
     setLayOdds(NaN);
@@ -698,6 +707,12 @@ export function AddBetDialog({
       setMugBet(editBet.purpose === "mug" && !unhedgedFree);
       setBackStake(editBet.backStake);
       setBackOdds(editBet.backOdds);
+      setRefundAmount(editBet.refundAmount ?? editBet.backStake);
+      setRefundRetentionPct(
+        editBet.refundRetention != null && Number.isFinite(editBet.refundRetention)
+          ? Math.round(editBet.refundRetention * 100)
+          : 75
+      );
       setLayOdds(editBet.layOdds);
       setMarket(editBet.market);
       setSelection(editBet.selection);
@@ -719,6 +734,8 @@ export function AddBetDialog({
             layOdds: editBet.layOdds,
             commission: editBet.commission,
             mode: addBetPlanMode(editBet.betType),
+            refundAmount: editBet.refundAmount ?? undefined,
+            refundRetention: editBet.refundRetention ?? undefined,
           })
         )
       );
@@ -784,6 +801,13 @@ export function AddBetDialog({
       }
       if (prefill.backStake !== undefined) setBackStake(prefill.backStake);
       if (prefill.backOdds !== undefined) setBackOdds(prefill.backOdds);
+      if (prefill.refundAmount !== undefined) setRefundAmount(prefill.refundAmount);
+      else if (prefill.betType === "risk_free" && prefill.backStake !== undefined) {
+        setRefundAmount(prefill.backStake);
+      }
+      if (prefill.refundRetention !== undefined) {
+        setRefundRetentionPct(Math.round(prefill.refundRetention * 100));
+      }
       if (prefill.layOdds !== undefined) setLayOdds(prefill.layOdds);
       if (prefill.advanced !== undefined) setAdvanced(prefill.advanced);
       if (prefill.partLays) setPartLays(prefill.partLays);
@@ -800,6 +824,8 @@ export function AddBetDialog({
         layOdds: prefill.layOdds ?? NaN,
         commission: prefillCommissionPct / 100,
         mode: addBetPlanMode(prefill.betType ?? "qualifying"),
+        refundAmount: prefill.refundAmount,
+        refundRetention: prefill.refundRetention,
       });
       if (prefill.layStakeOverride !== undefined) {
         setLayStakeOverride(
@@ -919,6 +945,15 @@ export function AddBetDialog({
     return applyAccaBoost(backOdds, boostPct);
   }, [isBoost, useBoostPct, boostPct, backOdds]);
 
+  const refundFace =
+    calcBetType === "risk_free"
+      ? Number.isFinite(refundAmount) && refundAmount > 0
+        ? refundAmount
+        : backStake
+      : undefined;
+  const refundRetention =
+    calcBetType === "risk_free" ? refundRetentionPct / 100 : undefined;
+
   const planInput = useMemo(() => {
     if (noLay || isDutch) return null;
     if (!(backStake > 0 && effectiveBackOdds > 1 && layOdds > 1)) return null;
@@ -929,8 +964,11 @@ export function AddBetDialog({
       layOdds,
       commission: commission / 100,
       partLays: advanced ? partLays.filter((p) => p.odds > 1 && p.stake > 0) : [],
+      ...(calcBetType === "risk_free"
+        ? { refundAmount: refundFace, refundRetention }
+        : {}),
     };
-  }, [betType, noLay, isDutch, calcBetType, backStake, effectiveBackOdds, layOdds, commission, advanced, partLays]);
+  }, [betType, noLay, isDutch, calcBetType, backStake, effectiveBackOdds, layOdds, commission, advanced, partLays, refundFace, refundRetention]);
 
   const layCalcKey = addBetLayCalcKey({
     backStake,
@@ -938,6 +976,8 @@ export function AddBetDialog({
     layOdds,
     commission: commission / 100,
     mode: calcBetType,
+    refundAmount: refundFace,
+    refundRetention,
   });
 
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
@@ -953,19 +993,33 @@ export function AddBetDialog({
   const outcomeRows = useMemo(
     () => [
       {
-        label: "If back (bookie) bet wins",
+        label:
+          calcBetType === "risk_free"
+            ? "If back bet wins"
+            : "If back (bookie) bet wins",
         bookie: preview?.ifBackWins.bookie ?? 0,
         exchange: preview?.ifBackWins.exchange ?? 0,
         accent: "back" as const,
       },
       {
-        label: "If lay (exchange) bet wins",
+        label:
+          calcBetType === "risk_free"
+            ? "If back bet loses (refund)"
+            : "If lay (exchange) bet wins",
         bookie: preview?.ifBackLoses.bookie ?? 0,
         exchange: preview?.ifBackLoses.exchange ?? 0,
         accent: "lay" as const,
+        bookieBreakdown:
+          calcBetType === "risk_free"
+            ? riskFreeBookieBreakdown({
+                backStake,
+                refundAmount: refundFace,
+                refundRetention,
+              })?.lines
+            : undefined,
       },
     ],
-    [preview]
+    [preview, calcBetType, backStake, refundFace, refundRetention]
   );
 
   /** Course/race-scoped campaign CTA: stay on that meeting, no freehand escape. */
@@ -1642,6 +1696,8 @@ export function AddBetDialog({
               layOdds: fields.layOdds ?? layOdds,
               commission: commission / 100,
               mode: calcBetType,
+              refundAmount: refundFace,
+              refundRetention,
             })
           )
         );
@@ -2056,6 +2112,12 @@ export function AddBetDialog({
         notes: prefill?.notes ?? (!noLay && exchange ? `Exchange: ${exchange.name}` : undefined),
         offerId: resolvedOfferId,
         quickLogged: prefill?.quickLogged ?? undefined,
+        ...(calcBetType === "risk_free"
+          ? {
+              refundAmount: refundFace,
+              refundRetention,
+            }
+          : {}),
         ...(editBet || prefill?.boostDiaryId == null
           ? {}
           : { boostDiaryId: prefill.boostDiaryId }),
@@ -2129,7 +2191,7 @@ export function AddBetDialog({
           <DialogTitle>{editBet ? "Edit bet" : "Add bet"}</DialogTitle>
           <DialogDescription>
             {editBet
-              ? "Update the details, or delete it from your log."
+              ? "Update or delete this bet."
               : "Link an event and the result settles it."}
           </DialogDescription>
         </DialogHeader>
@@ -2733,6 +2795,25 @@ export function AddBetDialog({
                   inputClassName={ring(!(backOdds > 1))}
                 />
               </div>
+              {calcBetType === "risk_free" ? (
+                <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+                  <PanelInput
+                    label="Refund amount"
+                    prefix="£"
+                    value={refundFace ?? 0}
+                    onChange={setRefundAmount}
+                    min={0}
+                  />
+                  <PanelInput
+                    label="Refund retention"
+                    suffix="%"
+                    value={refundRetentionPct}
+                    onChange={setRefundRetentionPct}
+                    min={0}
+                    step={5}
+                  />
+                </div>
+              ) : null}
               {isBoost ? (
                 <div className="flex flex-col gap-1.5">
                   <div className="flex flex-wrap items-center gap-2">
@@ -2913,9 +2994,9 @@ export function AddBetDialog({
           </div>
         </div>
 
-        <div className="shrink-0 border-t">
+        <div className="min-w-0 shrink-0 border-t">
           {!isDutch && (
-          <div className="px-6 pt-4 pb-2">
+          <div className="min-w-0 px-6 pt-4 pb-2">
             {noLay ? (
               <div className="overflow-hidden rounded-lg border text-sm">
                 <div className="flex items-center justify-between border-b px-4 py-2.5">
@@ -2948,7 +3029,9 @@ export function AddBetDialog({
                   ? advanced
                     ? "Worst case"
                     : "Qualifying loss"
-                  : advanced
+                  : betType === "risk_free"
+                    ? "Locked-in profit"
+                    : advanced
                     ? "Worst case"
                     : "Total profit"
               }

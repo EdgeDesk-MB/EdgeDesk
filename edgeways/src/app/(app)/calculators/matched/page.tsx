@@ -8,8 +8,8 @@ export default function MatchedCalculatorPage() {
   return (
     <CalculatorShell>
       <CalculatorPageHeader
-        title="Matched Betting Calculator"
-        description="Work out the exact lay stake and locked-in profit for any back/lay pair."
+        title="Matched Betting"
+        description="Lay stake and locked-in profit for a back and lay."
       />
       <MatchedCalculator />
     </CalculatorShell>

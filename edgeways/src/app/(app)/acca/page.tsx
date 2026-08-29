@@ -160,7 +160,7 @@ export default function AccaDeskPage() {
         <PageShell className="gap-5">
           <PageHeader
             title="Acca Desk"
-            description="Run acca offers leg by leg - the desk tells you when and how much to lay, and every trade is a real tracker bet."
+            description="Lay each acca leg, logged as real bets."
             helpId="acca"
             icon={Layers}
           />
@@ -205,7 +205,7 @@ function AccaDeskContent() {
     <PageShell className="gap-5">
       <PageHeader
         title="Acca Desk"
-        description="Run acca offers leg by leg - the desk tells you when and how much to lay, and every trade is a real tracker bet."
+        description="Lay each acca leg, logged as real bets."
         helpId="acca"
         icon={Layers}
         action={<CreateRunDialog onCreated={load} />}

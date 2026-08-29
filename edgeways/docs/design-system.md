@@ -31,6 +31,7 @@ Defined in `src/app/globals.css`:
 | `--success` | Qualifying / completed / positive eligibility (not P&L) |
 | `--profit` | **P&L / “it paid” type** (`text-profit`, `moneyPositiveClass`). Light is a deeper green so 12px figures clear `--canvas`. Dark is the old emerald-400 lift. Do not reuse `--success` for money |
 | `--warning` | Caution and execution risk only (near-min fields, NR traps, real warnings). Light = mid amber (`oklch` 0.54 / 0.18 / 68) so type and 10% washes stay amber, not khaki. Dark = lifted gold (`oklch` 0.72 / 0.13 / 75) for canvas contrast |
+| `--warning-foreground` | Type **on** solid `bg-warning` plates (site banner maintenance, warning FilterPill). White in light, ink in dark, same flip as `--edge-foreground` |
 | `--edge` | **Offer Edge / free-bet campaign signature** (violet). Race picks, recommended markers, Edge today, side-nav `Pro` mark (`proNavTag` = same plate as `edgeNavTag`) with `--edge-foreground` on the plate. Also: FB badge, Convert CTA, campaign pipeline **awarded / converting** label + bar (`text-edge` / `bg-edge`). Gift / promo-balance rows may still use historical `violet-*`; Zap there is the shared lightning motif. Marketing Edge plan: mixed rim, shine, and trial button use `--edge`. Choose Core uses `--marketing-brand`. |
 
 Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrome only.
@@ -50,7 +51,7 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 
 **Pressable buttons (react-3d-button).** `default` / `pagePrimary` / `outline` / `secondary` / `destructive` / `success` on `Button` render through `PressButton` (`components/ui/button-3d.tsx`). Depth is **Shopify-style** (Polaris `shadow-button` via `--ew-btn-shadow`): no chunky extruded colour slab — a 1px inset bottom lip + top shine on the face. Press switches to `--ew-btn-shadow-pressed` and shunts content **0.25px** down. Hover is a **stable** 0.5px content shunt (no left/right skew tracking — that jittered icon+label lock-ups). Ghost / link / `asChild` stay flat (no pack press), but share the same face shadow tokens. **Never put `DialogTrigger asChild` / `PopoverTrigger asChild` on a pressable `Button`** — Radix trigger props force the flat path, so the control ends up taller / differently faced than Press siblings. Use controlled `open` + `Button onClick` (dialogs) or `PopoverAnchor` (DatePicker) instead. Icon + label use a **6px** gap (`0.375rem`) on the pack’s inner content span. Campaign-card outline clusters (`outlineButtonGroup`) must keep every outline `sm` control on the Press path at the same height. Toggle: `toggle` + `active` / `onToggleChange` (Racing Desk Track race / Tracked; success when on). Prefer `size="lg"` (`h-9`) for page-header action clusters. **Disabled** keeps the fill family (primary stays a quiet brand mix, not charcoal) and readable type. Do not stack `opacity: 0.5` on `--muted` / `--secondary`. Shortcut keycaps inherit the label colour so they stay visible on the plate.
 
-**Filter pills & segmented tabs.** Page filters use `<FilterPill>` (`components/ui/filter-pill.tsx`) — PressButton + `rounded="full"`, inactive outline face, active solid `--brand` plate + `--brand-foreground` type (same filled-accent pattern as `tone="edge"` violet). `TabsList variant="segmented"` (e.g. Do next Priority / Edge / Rate) uses the same active brand plate. The active fill is a shared sliding plate (`useSlidingIndicator`, same spring as line-tab underlines) — do not snap a per-trigger background. Per-tab plate colour via `data-plate` on the trigger (`edge`, `ink`; default `--brand`). The track is `bg-foreground/8` in light so it reads on canvas and cards (`dark:bg-input/30`). **Counts** via `filterPillCountState()`: inactive = muted fill; active = ink `#111` + off-white `#fafafa` in both themes so the number stays white on any user brand and on edge violet (never brand-on-brand, brand-on-edge, or dark-mode `--brand-text`). Faces use `--ew-chip-shadow`: soft **white** inset rims in dark mode (nailed — do not change), soft **dark** inset rims in light mode (same geometry, inverted polarity). Ink plates (Login on #111) use `--ew-ink-plate-shadow` instead. Home compact chips share that recipe via `filterPillState()`. Segmented roots use `activationMode="manual"` (arrows move focus; Enter/Space commits) so arrowing does not thrash content. Focus ring is inset (no offset) so the active pill does not balloon in the track.
+**Filter pills & segmented tabs.** Page filters use `<FilterPill>` (`components/ui/filter-pill.tsx`) — PressButton + `rounded="full"`, inactive outline face, active solid `--brand` plate + `--brand-foreground` type (same filled-accent pattern as `tone="edge"` violet). Extra active tones: `profit` (Admin Activity casino), `warning` (maintenance / caution), `ink` (foreground plate, e.g. site-banner Notice). `TabsList variant="segmented"` (e.g. Do next Priority / Edge / Rate) uses the same active brand plate. The active fill is a shared sliding plate (`useSlidingIndicator`, same spring as line-tab underlines) — do not snap a per-trigger background. Per-tab plate colour via `data-plate` on the trigger (`edge`, `ink`; default `--brand`). The track is `bg-foreground/8` in light so it reads on canvas and cards (`dark:bg-input/30`). **Counts** via `filterPillCountState()`: inactive = muted fill; active = ink `#111` + off-white `#fafafa` in both themes so the number stays white on any user brand and on edge violet (never brand-on-brand, brand-on-edge, or dark-mode `--brand-text`). Faces use `--ew-chip-shadow`: soft **white** inset rims in dark mode (nailed — do not change), soft **dark** inset rims in light mode (same geometry, inverted polarity). Ink plates (Login on #111) use `--ew-ink-plate-shadow` instead. Home compact chips share that recipe via `filterPillState()`. Segmented roots use `activationMode="manual"` (arrows move focus; Enter/Space commits) so arrowing does not thrash content. Focus ring is inset (no offset) so the active pill does not balloon in the track.
 
 **Raised fields / chips (skeuo).** Same Shopify face as buttons (`--shadow-skeuo` = `--ew-btn-shadow`). Works on native inputs. Compact `.skeuo-sm` in light keeps a soft bloom; dark chips share `--ew-btn-shadow` with no extra bloom. Plate `#eeeeee`.
 
@@ -65,6 +66,8 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 **Mobile quick-actions FAB.** The floating brand bolt (`.quick-actions-fab`, same `BOLT_PATH` as the mobile top-bar mark) is the one skeuo exception that also takes an outer drop: `--shadow-skeuo` + `--fab-shadow`. Inset face stays Shopify; the drop keeps a brand plate from melting into brand page chrome. Do not flatten it with `shadow-none`. Do not swap the mark for Lucide `Zap` — that icon is boosts only.
 
 **Warning notices.** In-page execution warnings use `<WarningNotice>` (`components/ui/warning-notice.tsx`) on the `warningNotice` token (`surface-styles.ts`): `border-warning/40 bg-warning/10`, title `font-semibold text-warning`, body muted 12px. Same plate as Acca / Bet Builder offer requirements. Softer `warningPanel` (`/25` `/5` + wash) is for tinted cards, not this copy block. `--warning` is for caution and execution risk only. Bold selection names in the body (`<strong>`), not colour alone. Blocked or failed tinted plates use `destructivePanel` (same `/25` `/5` wash as Qualifying / Warning). Neutral inset notes (setup copy, Core upgrade nudge) use `quietPanel`. Edge-tier nudges use `edgePanel`. Onboarding upgrade confirmation uses `successNotice` (`border-success/40 bg-success/10`, no mix-blend wash) with a solid success tick and ink title. Do not use washed `qualifyPanel` plus `text-success` type: that reads muddy in dark.
+
+**Site banner.** Operator-set full-bleed bar above the top bar (`MaintenanceBannerView`). Type maps to tokens via `siteBannerPlate` in `surface-styles.ts`, no free colour: **maintenance** `bg-warning text-warning-foreground`, **notice** `bg-foreground text-background`, **offer** `bg-edge text-edge-foreground`. Optional link keeps the plate type colour (underline + currentColor focus ring), never `text-primary-text`. Height is measured into `--layout-site-banner-h` (0 when off) so toasts sit 16px under demo bar + banner + header.
 
 **Control radius.** `--radius-button` (global − 2px, 10→8) on buttons, fields, and selects via `fieldControl`. Sm/xs share the same radius. Cards / popovers keep `rounded-lg` (`--radius`).
 
@@ -93,7 +96,7 @@ Plan subscribe buttons stay off for signed-in users (Settings → Subscription).
 Plan line ends
 with a double space and **View plans** → `https://edgeways.app/#pricing`.
 Toast and in-app alert `top` is `--layout-below-header + 16px` (demo bar +
-header). Page height subtracts `--layout-below-header` so the desk still fills
+site banner + header). Page height subtracts `--layout-below-header` so the desk still fills
 the leftover viewport. The first look at public `/demo` opens `DemoNoticeDialog`
 with the same single signed-in action. `?live=1` clears `ew_public_demo` so
 sign-up and login do not stay on the canned desk.
@@ -178,7 +181,9 @@ Meta-nav details:
   strip so the tabs clear the hang balance pill. Desktop keeps the gap at 0.
   `--layout-header-h` includes the gap so page height and toast offset stay
   aligned. Toasts stay top-right at every breakpoint, sitting 16px under that
-  offset. On viewports ≤600px they cap at `--overlay-max` so they read as a
+  offset. **Admin** uses `--admin-below-header` (stripe + `h-14`, plus the
+  mobile nav strip below `md`) instead of the desk token, still 16px under
+  the chrome. On viewports ≤600px they cap at `--overlay-max` so they read as a
   card, not a full-bleed banner. Do not let Sonner stretch them full-width.
 
 ## Page headers
@@ -190,6 +195,12 @@ Meta-nav details:
 **Header stats + CTAs** - pair `PageHeaderStatGroup` with `PageHeaderButtonGroup` inside
 `PageHeaderActions className="gap-6"` (24px between supporting text and the contained button
 cluster). Stats stay at 8px; buttons inside the cluster stay at 8px.
+
+**Mobile stacking.** Below `md`, the action slot sits under the title and description, full
+width. Do not keep CTAs on the same row as the heading: `flex-1` plus `min-w-0` on the copy
+lets the title shrink into the buttons. From `md` up, title left / actions right, `items-start`.
+Keep the description to one short sentence. Description type uses `pageDescription`
+(`text-sm` / 14px), not `sectionDescription` (`text-xs`).
 
 **Ending date/time shortcuts** - expiry fields pass `shortcuts="ending"` to `DatePicker`
 (Tomorrow, 7 days), `TimePicker` / `EventTimeInput` (End of day → `23:59`), and the combined
@@ -205,15 +216,19 @@ stay on-screen. Collision padding matches `--overlay-gutter` (16px).
 
 **Tooltips.** Prefer short copy. That is content guidance only — when a name or sentence needs more room the tooltip **wraps** (`text-pretty break-words` on `TooltipContent`). Never `truncate`, `whitespace-nowrap`, or `line-clamp-1` inside a tooltip. Chart marker labels follow the same rule. Overlay width is capped at `--overlay-max` (`min(20rem, 100vw − 1rem)`). Row-action icon tooltips sit **above** the control (`side="top"` on `TooltipContent`, the primitive default). Do not pin them left of a trailing action cluster.
 
+**Chart markers.** Home / Racing P&L dots use win / loss / neutral (`chart-bet-marker--win|loss|neutral`) and, for money moves, the up / down triangles. Count charts that are not P&L (Admin Activity) use kind tones instead: `--brand-highlight` bets in light / `--brand` in dark, `--edge` sports offers, `--profit` casino (`chart-bet-marker--brand|edge|profit`). Do not reuse win/loss on a volume line. Marker labels wrap like other tooltips. Admin activity markers are tooltip-only (no link into another desk, not in the tab order). Focus-visible uses `--ring`. Hover scale respects `prefers-reduced-motion`.
+
 **Overflow (go-live gate).** Nothing may paint outside the viewport or its containing plate. This is a launch blocker.
 
 - **Wrap first.** Titles, descriptions, tooltip/popover copy, and dialog headers use `min-w-0 text-pretty break-words`. Short copy is guidance, not a nowrap mandate.
 - **Contain, then scroll.** Tables and chip rows may scroll *inside* their plate (`overflow-x-auto` + `min-w-0 max-w-full`). Page-level horizontal scroll is forbidden.
 - **Flex children shrink.** Any `flex-1` / row child that holds copy needs `min-w-0` or it will blow the page.
 - **Overlays stay on-screen.** Tooltip, popover, dropdown, and toast cap at `calc(100vw − var(--overlay-gutter))` and wrap. Do not give them a raw `w-*` without a viewport max. `DateTimePicker` uses `--overlay-datetime-max` so the plate wraps both columns; it still uses that viewport cap, plus available height so Done stays on-screen.
+- **Select menus hug content by default.** Popper `SelectContent` is `w-max`, never narrower than the trigger, capped at the tighter of Radix available width and `calc(100vw − var(--overlay-gutter))`. Names, type badges, balances, and other identity UI must stay fully readable. Do not pin every select to the trigger. Truncation is for title-style copy only.
+- **`matchTrigger` is opt-in.** Use it only on full-width title lists (offer Race). Then the menu matches the field, the title truncates via `SelectItemRow`, and trailing meta (runner count) stays `shrink-0` on the right. Never use `matchTrigger` on Account, venue, exchange, or other pickers where the label is how the user identifies the row.
 - **Clip the shell.** `html` / `body` / `.app-scroll` / `PageShell` use `overflow-x: clip`. Do not remove that to “fix” a wide child — fix the child. Nested panels that must show a standing scrollbar use `.app-scroll-always` (same thin thumb as `.app-scroll-nested` hover).
 - **Fade clipped scroll.** Any nested region that scrolls (dialog body, max-height panel, card list, tab strip, select/dropdown/command list) uses `ScrollFadeEdges` (`src/components/ui/scroll-fade-edges.tsx`). Soft start/end fades appear only while more content is clipped. Vertical is the default; tab strips and card decks use `orientation="horizontal"`. Pass `fadeClassName` to match the surface (`from-page`, `from-card`, `from-popover`, `from-page dark:from-card`, …). Nested thumbs stay on `.app-scroll-nested` / `.app-scroll-overlay` via `scrollClassName`. Do **not** invent a second mask or a one-off gradient. Radix Select must not render scroll chevrons: they remount on first scroll and jump the list. Overlay fades with `scrollAsChild` on the Viewport instead. Exempt: the page-level `.app-scroll` shell, and time wheels (those keep their existing mask).
-- List-row `truncate` is allowed only on fixed-height chrome (nav, feed rows) where the full string is available elsewhere. Never use it as the overflow strategy for tooltips, dialogs, or page titles.
+- List-row `truncate` is allowed only on fixed-height chrome (nav, feed rows, select items) where the full string is available elsewhere (trigger, `title`, or another surface). Never use it as the overflow strategy for tooltips, dialogs, or page titles.
 
 **`CalculatorPageHeader`** - borderless meta band for calculator shells.
 
@@ -225,10 +240,11 @@ Compact sports-desk density is fine; **illegible micro type is not**.
 
 | Role | Preferred | Absolute minimum |
 |------|-----------|------------------|
+| Page header description (`pageDescription`) | **14px** (`text-sm`) | 14px |
 | XSmall / captions / dense meta | **12px** (`text-xs`) | 11px (`text-[11px]`) |
 | Inline icons in text lock-ups at this scale | match type (~12px / `size-3`) | 11px |
 
-**Do not use 10px or smaller** for UI copy, badges, counters, table captions, or tier tags (`text-[10px]`, `text-[9px]`, etc.). Prefer shared tokens in `src/lib/ui/surface-styles.ts` (`sectionDescription`, `captionHeading`, `tableHeaderCell`, `filterPillState`, `brandChipCount`, `navTag` / `proNavTag` / `edgeNavTag` / `demoDataTag`) over one-off pixel sizes.
+**Do not use 10px or smaller** for UI copy, badges, counters, table captions, or tier tags (`text-[10px]`, `text-[9px]`, etc.). Prefer shared tokens in `src/lib/ui/surface-styles.ts` (`pageDescription`, `sectionDescription`, `captionHeading`, `tableHeaderCell`, `filterPillState`, `brandChipCount`, `navTag` / `proNavTag` / `edgeNavTag` / `demoDataTag`) over one-off pixel sizes.
 
 When bumping micro labels, bump sibling lock-up icons (`size-2.5` → `size-3`) so the pair stays balanced. Decorative chrome (tooltip arrows, wheel gutters) is exempt.
 
@@ -277,7 +293,8 @@ From `src/lib/ui/surface-styles.ts`:
   line-tab section (e.g. Tracker queues, Racing Desk All / Qualifying / Race picks). Inactive pills
   use muted fill (`bg-muted/60` / `dark:bg-input/30`); active is solid brand
   (`bg-brand text-brand-foreground`). Pass `tone="edge"` for Offer Edge filters so the active
-  plate stays violet (`--edge` / `--edge-foreground`).
+  plate stays violet (`--edge` / `--edge-foreground`). Pass `tone="profit"` for Casino
+  filters so the active plate is `--profit` with `--profit-foreground` type.
   Prefer line tabs for page-level section switching.
 - **`toolbarSelectTrigger`** - quiet rounded-full select / combobox beside
   FilterPills (Offers category, fixture competition filter). Transparent rest,
@@ -338,7 +355,9 @@ From `src/lib/ui/surface-styles.ts`:
   mark (`sm+` only, see AppTopBarHeader) and Race picks (dialog, confidence
   chip, trigger) share this so invented numbers cannot look live.
   **`adminModeTag`** is the same box; `/admin` uses the label ADMIN so the
-  operator space cannot look like a customer desk. **`adminTestTag`** is a
+  operator space cannot look like a customer desk. **`adminOwnerTag`** uses the
+  Edge plate (`edgeNavTag`) and the label OWNER so the master account is
+  distinct from operator admin. **`adminTestTag`** is a
   muted plate for accounts excluded from admin stats.
 - **`emptyStatePlate`** / **`emptyStateIconWell`** / **`emptyStateCopyInset`**
   - empty-state card, circular icon, and page-level copy inset (32px / 64px).
@@ -403,6 +422,10 @@ surface. The plate switches via `in-data-[slot=card]` and
   Render it in a growing `PageShell` (not `fullHeight`) so the app shell scrolls
   like History.
   Do not wrap it in `<EmptyState>`. Setup-missing Home still uses `<EmptyState>`.
+- **Calculator index cards** - `/calculators` hub cards use the same leading
+  mark as welcome Get started tiles: Lucide or a stroke-matched custom mark
+  (`size-6 text-primary-text`, stroke 1.5, `size={24}`), stacked above the
+  title. One distinct glyph per calculator. 2UP Desk uses `FootballIcon`.
 - **Loading the same plate** - reuse `<EmptyState busy>` with a spinning
   icon well and a “Loading …” title. Say the list will appear here. Do not
   show the empty copy, or mention Refresh, while the request is in flight.
@@ -476,6 +499,7 @@ Agent rule: `edgeways/.cursor/rules/lay-fields.mdc`.
 
 - **`PageShell`** - `max-w-7xl` content width
 - **`CalculatorShell`** - centred narrow column for forms
+- **`ProfitTable`** - Bookie | Exchange | Total outcome rows. Risk-free / refund-if lose rows unpack the Bookie cell into stake lost, refund cash equivalent (at the entered retention), then net. Labels sit left of a single right-aligned money column; a full-width hairline sits above net. Exchange and Total align with that net. Clip overflow (`overflow-hidden`) so NumberFlow ticks cannot flash a scrollbar. Do not hide retention in a footnote.
 - **`SectionHeader`** - in-card list panel titles (Racing Desk courses, history groups)
 - **Home mobile deck headers** (`DashboardSectionHeader`) — `--home-deck-header-h` (`4rem`) below `sm`. Every swipe-card header uses this height so Do next (title + segmented sort tabs) and title-only cards share one bar. Title and header actions sit vertically centred. Token: `homeDeckSectionHeader` in `layout-spacing.ts`. The P&L chart is not its own mobile card; it sits on Summary, with window pills in the Summary header `action` slot (same as Feed / desktop Chart). Plot floor: `--home-deck-chart-min-h`. Desktop still has a separate chart panel. In Settings, Chart is visibility-only (no deck reorder); showing it requires Summary.
 
@@ -485,7 +509,7 @@ Agent rule: `edgeways/.cursor/rules/lay-fields.mdc`.
 <PageShell className="gap-5">
   <PageHeader
     title="Page title"
-    description="One-line context"
+    description="One short sentence"
     helpId="dashboard"
     action={<Button {...pagePrimaryButtonProps}>Action</Button>}
   />
@@ -511,10 +535,6 @@ Agent rule: `edgeways/.cursor/rules/lay-fields.mdc`.
 
 ## Marketing canvas
 
-<<<<<<< HEAD
 Waitlist / launch pages live on `.marketing-root` (`--marketing-brand` yellow, `--marketing-canvas` `#0c0c0c` page plate, `--marketing-ink` for type on yellow, `--marketing-band` / `--marketing-band-deep`, `--marketing-rule` for how-it-helps and legal `h2` hairlines). Doc pages (`/contact`, `/terms`, `/privacy`, `/refund`) share `MarketingDocPage` on that canvas. Auth (`/login`, `/sign-up`) uses the same canvas. The desk does not. They pin `--edge` / `--edge-foreground` to the **dark-theme** Offer Edge plate so tags read on ink and do not follow the user’s desk accent. Shared FAQ and How-it-helps copy lives in `src/lib/marketing/landing-faq.ts`: we supplement finders, we do not send bookie offers, and the public offer stays Free / Core / Edge. FAQ answers use the section rail, not a nested `max-w-3xl`. Below-fold blocks settle in once (`[data-reveal]`, same 10px rise as `.marketing-fade-up`). Hide only after `html.marketing-reveal-armed` (client, after hash and on-screen marks), so no-JS and `#section` landings stay visible. Re-bind on each marketing pathname: the layout stays mounted, and a client nav (Refunds logo → home) would otherwise leave new reveal nodes at opacity 0. Peer columns (how-it-helps, plan cards) stagger 70ms from `sm` up via `[data-reveal-stagger]`. Hash links use `html.marketing-smooth-scroll { scroll-behavior: smooth }` after first paint so a `#section` landing still jumps. `scroll-padding-top` 1.5rem only (no extra `scroll-mt`). Off under `prefers-reduced-motion`. Hero stays the load fade, not a scroll reveal. Footer stays still. Legal nav is Terms, Privacy, Contact, Refunds. Post-checkout success (`/subscribe/success`) is a still thermal slip on `--marketing-fg` (`.marketing-receipt`, serrated teeth cut to `--marketing-canvas`, dashed `Paid today` rule). Not a printer animation and not a replacement for hosted Stripe Checkout. Paint the slip from the plan immediately; hydrate Stripe ref and email after first paint. Signature is the paid-today line. Yellow CTA is the only accent: **Set up the desk** → `/setup` (waitlist: **Back to Edgeways**). Launch homepage **Try the desk** → `/demo` (read-only fixture, Core/Edge bar). Full-page `/setup` is desk canvas + `panelSurface`, no side nav. Trust copy: subscription confirmed, manage billing (also Settings → Subscription), prices in GBP. No fake lock badges. No “confirming” after Checkout has returned.
-=======
-Waitlist / launch pages live on `.marketing-root` (`--marketing-brand` yellow, `--marketing-ink`, `--marketing-band` / `--marketing-band-deep`). They pin `--edge` / `--edge-foreground` to the **dark-theme** Offer Edge plate so tags read on ink and do not follow the user’s desk accent. Shared FAQ and How-it-helps copy lives in `src/lib/marketing/landing-faq.ts`: we supplement finders, we do not send bookie offers, and the public offer stays Free / Core / Edge.
->>>>>>> origin/main
 
 Product peeks use `.marketing-panel` + `.marketing-panel-shine` (border-only conic shine; off under `prefers-reduced-motion`). Plan cards share `.marketing-panel`. The featured **Edge** plan adds `.marketing-panel-plan`: rim mixed from `--edge` into the default white/10 (not a solid chroma frame), shine, and a purple trial button. **Choose Core** is the yellow fill CTA. Free stays outline (`hover:bg-white/5`). Card titles are the same species: `text-lg font-semibold` white type, no plates. “Recommended” is `text-xs` sentence case, `text-edge` violet, on the right of the Edge title row. Core gets “Popular” in the same spot, muted grey (`text-white/55`). Comparison ticks follow the column (`size-6`): Free white, Core `--marketing-brand`, Edge `--edge`. Crosses stay muted white so colour means included. Table headers are coloured type (Core yellow, Edge `--edge`), not tags. The monthly/yearly control is centred under the heading: a silver chip (“2 months free with yearly”), then the supplied doodle arrow in the gap pointing at **Bill yearly**, then flanking labels plus a recessed track with a **solid** silver thumb (`--marketing-silver` + `--marketing-silver-face`), `radiogroup` / `radio`. Monthly is the default. The chip is a shortcut onto yearly. Sentence case, not brand yellow or money green. Do not override `edgeNavTag` with brand colours. The logo Beta chip stays on the scaled lockup box (`text-xs` + `scale-[0.625]`).

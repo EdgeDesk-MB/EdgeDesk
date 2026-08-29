@@ -111,7 +111,7 @@ function PlanHeader() {
       prominent
       className="bg-page"
       title="Today's plan"
-      description="Deadlines, races and kick-offs in time order."
+      description="Deadlines, races and kick-offs."
     />
   );
 }

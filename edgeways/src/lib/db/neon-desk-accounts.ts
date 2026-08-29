@@ -9,10 +9,13 @@ import { and, eq } from "drizzle-orm";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
+import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import {
   toSqliteAccountRow,
   toSqliteBalanceTransactionRow,
+  toSqliteExchangeRow,
 } from "@/lib/db/neon-desk-map";
+import { historyNoteFromManualTx } from "@/lib/services/balances-manual-note";
 import {
   accounts as pgAccounts,
   balanceTransactions as pgBalanceTransactions,
@@ -20,11 +23,11 @@ import {
   exchanges as pgExchanges,
   offers as pgOffers,
 } from "@/lib/db/schema.pg";
-import type { AccountRow, BalanceTransactionRow } from "@/lib/db/schema";
+import type { AccountRow, BalanceTransactionRow, ExchangeRow } from "@/lib/db/schema";
 
 let neonExchangesSeeded = false;
 
-/** Exchanges are global reference data (not user-scoped); seed presets once. */
+/** Shared catalog of exchange brands. Commission is overlaid per desk. */
 export async function ensureNeonExchanges(): Promise<void> {
   if (neonExchangesSeeded) return;
   const db = getNeonDb();
@@ -50,6 +53,42 @@ export async function ensureNeonExchanges(): Promise<void> {
       .onConflictDoNothing();
   }
   neonExchangesSeeded = true;
+}
+
+export async function listNeonExchanges(): Promise<ExchangeRow[]> {
+  await ensureNeonExchanges();
+  const rows = await getNeonDb().select().from(pgExchanges).orderBy(pgExchanges.id);
+  return rows.map(toSqliteExchangeRow);
+}
+
+export async function insertNeonExchange(input: {
+  name: string;
+  commissionPct: number;
+  brandColor: string;
+  backColor: string;
+  layColor: string;
+  isDefault: boolean;
+}): Promise<ExchangeRow> {
+  await ensureNeonExchanges();
+  const db = getNeonDb();
+  if (input.isDefault) {
+    await db.update(pgExchanges).set({ isDefault: 0 });
+  }
+  const rows = await db
+    .insert(pgExchanges)
+    .values({
+      name: input.name,
+      commissionPct: input.commissionPct,
+      brandColor: input.brandColor,
+      backColor: input.backColor,
+      layColor: input.layColor,
+      isDefault: input.isDefault ? 1 : 0,
+      createdAt: Date.now(),
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("Neon did not return the saved exchange.");
+  return toSqliteExchangeRow(row);
 }
 
 export async function neonExchangeExists(id: number): Promise<boolean> {
@@ -197,6 +236,44 @@ export async function renameNeonDeskAccount(
     betsUpdated,
     offersUpdated,
   };
+}
+
+export async function recordNeonManualTransaction(input: {
+  account: AccountRow;
+  amount: number;
+  category: "top_up" | "withdrawal" | "adjustment" | "free_bet";
+  note?: string;
+  affectPnl?: boolean;
+}): Promise<void> {
+  const now = Date.now();
+  const note = input.note ?? input.category.replace("_", " ");
+  await insertNeonDeskTransaction({
+    accountId: input.account.id,
+    amount: input.amount,
+    category: input.category,
+    note,
+    affectPnl: input.affectPnl ? 1 : 0,
+    createdAt: now,
+  });
+
+  if (
+    input.affectPnl &&
+    input.amount !== 0 &&
+    (input.category === "adjustment" || input.category === "top_up")
+  ) {
+    const isTopUp = input.category === "top_up";
+    const sign = input.amount > 0 ? "+" : "";
+    const formattedAmount = `${sign}GBP ${Math.abs(input.amount).toFixed(2)}`;
+    await insertNeonDeskHistory({
+      dedupe: `${isTopUp ? "topup" : "adj"}:${input.account.id}:${now}`,
+      kind: "balance_adjustment",
+      title: isTopUp ? "Top-up" : "Balance correction",
+      detail: `${input.account.name} - ${formattedAmount}`,
+      note: historyNoteFromManualTx(input.note, input.category),
+      amount: input.amount,
+      createdAt: now,
+    });
+  }
 }
 
 export type NeonDeskTransactionValues = {  accountId: number;

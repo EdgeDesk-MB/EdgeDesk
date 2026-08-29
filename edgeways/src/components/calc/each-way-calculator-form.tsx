@@ -281,16 +281,6 @@ export function EachWayCalculatorForm({
 
   return (
     <div className={cn("flex flex-col gap-4", embedded && "gap-3")}>
-      {!embedded && (
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Each Way Calculator</h1>
-          <p className="text-sm text-muted-foreground">
-            Lay the win and place parts separately - standard each-way arbs or extra-place offers when
-            the bookie pays more places than the exchange.
-          </p>
-        </div>
-      )}
-
       <Tabs value={mode} onValueChange={(v) => setMode(v as EachWayCalcMode)}>
         <TabsList>
           <TabsTrigger value="each_way">Each way</TabsTrigger>

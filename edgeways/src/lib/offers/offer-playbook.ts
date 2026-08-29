@@ -6,6 +6,12 @@
 
 import type { OfferImportantTerms } from "@/lib/offers/offer-terms";
 import type { OfferProfitBreakdown } from "@/lib/services/offers.types";
+import {
+  isRefundIfOffer,
+  REFUND_IF_AWAIT_DETAIL,
+  REFUND_IF_AWAIT_TITLE,
+  REFUND_IF_QUALIFY_DETAIL,
+} from "@/lib/offers/refund-if";
 
 export type OfferPlaybookStepKind =
   | "deposit"
@@ -38,6 +44,8 @@ export interface OfferPlaybookStep {
 
 export interface OfferPlaybook {
   version: 1;
+  /** Money-back-if-loses: underlay qualify, convert only if the bet loses. */
+  refundIf?: boolean;
   steps: OfferPlaybookStep[];
 }
 
@@ -56,6 +64,8 @@ export interface OfferPlaybookFacts {
   freeBetAmount: number | null;
   minOdds: number | null;
   bookmaker: string | null;
+  /** Refund-If / money-back-if-loses: underlay instead of a tight match. */
+  refundIf: boolean;
 }
 
 export function emptyPlaybookFacts(): OfferPlaybookFacts {
@@ -73,6 +83,7 @@ export function emptyPlaybookFacts(): OfferPlaybookFacts {
     freeBetAmount: null,
     minOdds: null,
     bookmaker: null,
+    refundIf: false,
   };
 }
 
@@ -84,6 +95,7 @@ export function playbookFactsFromImportant(
     freeBetAmount?: number | null;
     bookmaker?: string | null;
     optInRequired?: boolean;
+    refundIf?: boolean;
   }
 ): OfferPlaybookFacts {
   return {
@@ -102,6 +114,7 @@ export function playbookFactsFromImportant(
     freeBetAmount: extras?.freeBetAmount ?? null,
     minOdds: important.minOdds,
     bookmaker: extras?.bookmaker ?? null,
+    refundIf: extras?.refundIf === true,
   };
 }
 
@@ -133,18 +146,20 @@ function depositDetail(facts: OfferPlaybookFacts): string {
 
 function qualifyTitle(facts: OfferPlaybookFacts): string {
   const stake = money(facts.betStake);
+  const kind = facts.refundIf ? "refund-if bet" : "qualifying bet";
   if (stake && facts.minOdds != null) {
-    return `Place £${stake} qualifying bet (min odds ${facts.minOdds})`;
+    return `Place £${stake} ${kind} (min odds ${facts.minOdds})`;
   }
-  if (stake) return `Place £${stake} qualifying bet`;
+  if (stake) return `Place £${stake} ${kind}`;
   if (facts.minOdds != null) {
-    return `Place the qualifying bet (min odds ${facts.minOdds})`;
+    return `Place the ${kind} (min odds ${facts.minOdds})`;
   }
-  return "Place the qualifying bet";
+  return `Place the ${kind}`;
 }
 
 /** Tip only — constraints (stake / min odds) live in the title once. */
-function qualifyDetail(_facts: OfferPlaybookFacts): string {
+function qualifyDetail(facts: OfferPlaybookFacts): string {
+  if (facts.refundIf) return REFUND_IF_QUALIFY_DETAIL;
   return "Match on the exchange to keep qualifying loss tiny.";
 }
 
@@ -222,10 +237,12 @@ export function deriveOfferPlaybook(facts: OfferPlaybookFacts): OfferPlaybook {
   steps.push({
     id: "await_award",
     kind: "await_award",
-    title: "Await free bet award",
-    detail: needsDeposit
-      ? "Bonus often stays pending until the qualifying turnover clears."
-      : "Wait for the free bet token to land, then convert.",
+    title: facts.refundIf ? REFUND_IF_AWAIT_TITLE : "Await free bet award",
+    detail: facts.refundIf
+      ? REFUND_IF_AWAIT_DETAIL
+      : needsDeposit
+        ? "Bonus often stays pending until the qualifying turnover clears."
+        : "Wait for the free bet token to land, then convert.",
     sortOrder: order++,
     status: "pending",
     completion: null,
@@ -272,7 +289,7 @@ export function deriveOfferPlaybook(facts: OfferPlaybookFacts): OfferPlaybook {
     completedAt: null,
   });
 
-  return { version: 1, steps };
+  return { version: 1, refundIf: facts.refundIf || undefined, steps };
 }
 
 /** Keep completion state when regenerating titles/details from new facts. */
@@ -284,6 +301,7 @@ export function mergePlaybookProgress(
   const prevById = new Map(previous.steps.map((s) => [s.id, s]));
   return {
     version: 1,
+    ...(next.refundIf || previous.refundIf ? { refundIf: true } : {}),
     steps: next.steps.map((step) => {
       const prev = prevById.get(step.id);
       if (!prev) return step;
@@ -305,6 +323,7 @@ export function markPlaybookStepDone(
 ): OfferPlaybook {
   return {
     version: 1,
+    ...(playbook.refundIf ? { refundIf: true } : {}),
     steps: playbook.steps.map((s) =>
       s.id === stepId
         ? {
@@ -519,6 +538,19 @@ export function syncPlaybookFromOfferProfit(
     profit.freeBetAwarded;
   const converting = stages === "in_use" || stages === "settled";
   const settled = stages === "settled";
+  const refundIfWon =
+    playbook.refundIf === true &&
+    stages === "not_awarded" &&
+    qualSettled &&
+    profit.qualifyingOpenCount === 0 &&
+    !profit.freeBetAwarded &&
+    profit.freeBetOpenCount === 0 &&
+    profit.freeBetSettledCount === 0;
+
+  const skipIfWon = (step: OfferPlaybookStep): OfferPlaybookStep => {
+    if (!refundIfWon || step.status === "done") return step;
+    return { ...step, status: "skipped" };
+  };
 
   const steps = playbook.steps.map((step) => {
     switch (step.kind) {
@@ -529,18 +561,16 @@ export function syncPlaybookFromOfferProfit(
       case "qualify":
         return qualStarted ? setStepDone(step, now, "auto") : step;
       case "await_award":
-        return awarded || (qualSettled && awarded)
-          ? setStepDone(step, now, "auto")
-          : awarded
-            ? setStepDone(step, now, "auto")
-            : step;
+        if (awarded) return setStepDone(step, now, "auto");
+        return skipIfWon(step);
       case "convert":
-        return converting ? setStepDone(step, now, "auto") : step;
+        if (converting) return setStepDone(step, now, "auto");
+        return skipIfWon(step);
       case "done": {
         const othersDone = playbook.steps
           .filter((s) => s.kind !== "done")
           .every((s) => s.status === "done" || s.status === "skipped");
-        return settled || othersDone ? setStepDone(step, now, "auto") : step;
+        return settled || othersDone || refundIfWon ? setStepDone(step, now, "auto") : step;
       }
       default:
         return step;
@@ -555,7 +585,11 @@ export function syncPlaybookFromOfferProfit(
     return step;
   });
 
-  return { version: 1, steps: synced };
+  return {
+    version: 1,
+    ...(playbook.refundIf ? { refundIf: true } : {}),
+    steps: synced,
+  };
 }
 
 /** First incomplete non-done step; null when playbook finished. */
@@ -594,6 +628,37 @@ export function isOfferPlaybook(value: unknown): value is OfferPlaybook {
   return p.version === 1 && Array.isArray(p.steps);
 }
 
+/** Rewrite qualify/await copy on existing campaigns detected as Refund-If. */
+export function hydrateRefundIfPlaybook(
+  playbook: OfferPlaybook,
+  offer: { title?: string | null; description?: string | null; rules?: string | null }
+): OfferPlaybook {
+  if (!playbook.refundIf && !isRefundIfOffer(offer)) return playbook;
+  const qualify = playbook.steps.find((s) => s.kind === "qualify");
+  const titleAlready =
+    qualify != null && !/qualifying bet/i.test(qualify.title);
+  if (playbook.refundIf && qualify?.detail === REFUND_IF_QUALIFY_DETAIL && titleAlready) {
+    return playbook;
+  }
+  return {
+    version: 1,
+    refundIf: true,
+    steps: playbook.steps.map((s) => {
+      if (s.kind === "qualify") {
+        return {
+          ...s,
+          title: s.title.replace(/qualifying bet/gi, "refund-if bet"),
+          detail: REFUND_IF_QUALIFY_DETAIL,
+        };
+      }
+      if (s.kind === "await_award") {
+        return { ...s, title: REFUND_IF_AWAIT_TITLE, detail: REFUND_IF_AWAIT_DETAIL };
+      }
+      return s;
+    }),
+  };
+}
+
 export function readPlaybookFromRulesJson(
   rules: string | null | undefined
 ): OfferPlaybook | null {
@@ -604,6 +669,24 @@ export function readPlaybookFromRulesJson(
   } catch {
     return null;
   }
+}
+
+/** Read, rewrite Refund-If copy, then sync completion from campaign profit. */
+export function playbookFromOffer(
+  offer: {
+    title?: string | null;
+    description?: string | null;
+    rules?: string | null;
+    profit?: OfferProfitBreakdown;
+  },
+  now = Date.now()
+): OfferPlaybook | null {
+  const raw = readPlaybookFromRulesJson(offer.rules);
+  if (!raw) return null;
+  const hydrated = hydrateRefundIfPlaybook(raw, offer);
+  return offer.profit
+    ? syncPlaybookFromOfferProfit(hydrated, offer.profit, now)
+    : hydrated;
 }
 
 /** Attach or replace playbook on a rules JSON object (racing or promo_terms). */

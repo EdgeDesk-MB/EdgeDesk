@@ -8,7 +8,7 @@ export default function FeedbackPage() {
     <PageShell>
       <PageHeader
         title="Feedback"
-        description="Report a bug, share an idea, or send a general note. We'll review every report."
+        description="Report a bug or share an idea."
         icon={MessageSquarePlus}
       />
 

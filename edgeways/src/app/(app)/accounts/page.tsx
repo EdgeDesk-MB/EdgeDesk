@@ -50,7 +50,7 @@ import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import {
-  PageHeaderActions,
+  PageHeaderButtonGroup,
   pagePrimaryButtonProps,
   pageSecondaryButtonProps,
 } from "@/components/layout/page-header-actions";
@@ -163,9 +163,9 @@ function AccountsContent() {
       <PageHeader
         helpId="accounts"
         title="Accounts"
-        description="Banks, bookies and exchanges. First bet creates a bookie wallet; transfer from a bank to fund it."
+        description="Banks, bookies and exchanges."
         action={
-          <PageHeaderActions>
+          <PageHeaderButtonGroup>
             <Button variant="outline" {...pageSecondaryButtonProps} asChild>
               <a href="/api/export/csv?type=balances" download>
                 Export ledger
@@ -188,7 +188,7 @@ function AccountsContent() {
             <Button {...pagePrimaryButtonProps} onClick={() => openAddBalance()}>
               <Plus className="size-4" /> Adjust balance
             </Button>
-          </PageHeaderActions>
+          </PageHeaderButtonGroup>
         }
       />
 

@@ -201,7 +201,9 @@ export async function sendPushToUser(
   clerkUserId: string,
   alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
 ): Promise<PushFanoutResult> {
-  if (!isNeonDesk()) return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  if (!process.env.DATABASE_URL?.trim()) {
+    return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  }
   const { fanoutNeonPushToUser } = await import("@/lib/db/neon-push");
   return fanoutNeonPushToUser(clerkUserId, buildAlertPayload(alert), 60 * 60);
 }
@@ -224,7 +226,9 @@ export async function dismissPushForUser(
   clerkUserId: string,
   tags: string[]
 ): Promise<PushFanoutResult> {
-  if (!isNeonDesk()) return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  if (!process.env.DATABASE_URL?.trim()) {
+    return { sent: 0, pruned: 0, failed: 0, failures: [] };
+  }
   const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))].slice(0, 50);
   if (clean.length === 0) return { sent: 0, pruned: 0, failed: 0, failures: [] };
   const { fanoutNeonPushToUser } = await import("@/lib/db/neon-push");

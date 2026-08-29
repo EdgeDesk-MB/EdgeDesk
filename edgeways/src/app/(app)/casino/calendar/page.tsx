@@ -53,7 +53,7 @@ export default function CasinoCalendarPage() {
         helpId="casino"
         icon={CalendarDays}
         title="Casino calendar"
-        description="What expires when, over the next 14 days."
+        description="What expires over the next 14 days."
         action={
           <Button {...pagePrimaryButtonProps} onClick={openCasinoLog}>
             <Plus className="size-4" /> Log offer
