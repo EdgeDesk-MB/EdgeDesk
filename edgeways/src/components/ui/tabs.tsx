@@ -20,7 +20,7 @@ function Tabs({
       data-slot="tabs"
       data-orientation={orientation}
       className={cn(
-        "group/tabs flex gap-2 data-horizontal:flex-col",
+        "group/tabs flex min-w-0 gap-2 data-horizontal:w-full data-horizontal:flex-col",
         className
       )}
       {...props}
@@ -52,8 +52,9 @@ const tabsListVariants = cva(
 )
 
 /**
- * Horizontal tab strips scroll with drag-to-pan + edge fades when they
- * overflow; no scrollbar. When every tab fits, overflow is inert (no fade).
+ * Horizontal tab strips scroll inside a bounded plate (native touch pan +
+ * mouse drag-to-pan) with edge fades when they overflow; no scrollbar.
+ * When every tab fits, overflow is inert (no fade).
  */
 function TabsScrollList({
   className,
@@ -102,7 +103,7 @@ function TabsScrollList({
         isSegmented && "rounded-[var(--segmented-radius)]"
       )}
       scrollClassName={cn(
-        "app-scroll-overlay overflow-x-auto",
+        "app-scroll-overlay overflow-x-auto overflow-y-clip overscroll-x-contain touch-pan-x",
         // TabsLineBar sets --tabs-line-inset (card vs dialog). Fallback
         // keeps Racing Desk / unbled strips on --card-spacing.
         isLine ? "px-[var(--tabs-line-inset,var(--card-spacing))]" : undefined,
@@ -232,6 +233,7 @@ function TabsTrigger({
   children,
   onMouseDown,
   onClick,
+  onPointerDown,
   onPointerMove,
   onPointerUp,
   onPointerCancel,
@@ -240,12 +242,13 @@ function TabsTrigger({
   const downRef = React.useRef<{ t: number; x: number; y: number } | null>(null)
   const cancelRef = React.useRef(false)
   const commitRef = React.useRef(false)
+  const pointerTypeRef = React.useRef<string>("mouse")
 
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group/tab-trigger relative inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:flex-1 group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:w-auto group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:shrink-0 group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
+        "group/tab-trigger relative inline-flex touch-pan-x items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:flex-1 group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:w-auto group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:shrink-0 group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
         segmentedTrigger,
         "group-data-[variant=default]/tabs-list:data-active:bg-background group-data-[variant=default]/tabs-list:data-active:text-foreground dark:group-data-[variant=default]/tabs-list:data-active:border-input dark:group-data-[variant=default]/tabs-list:data-active:bg-input/30 dark:group-data-[variant=default]/tabs-list:data-active:text-foreground",
         // Line tabs use a shared sliding spring underline on TabsList — hide per-trigger after.
@@ -253,15 +256,23 @@ function TabsTrigger({
         className
       )}
       {...props}
+      onPointerDown={(e) => {
+        onPointerDown?.(e)
+        pointerTypeRef.current = e.pointerType
+        if (e.pointerType === "mouse" && e.button !== 0) return
+        downRef.current = { t: performance.now(), x: e.clientX, y: e.clientY }
+        cancelRef.current = false
+      }}
       onMouseDown={(e) => {
         onMouseDown?.(e)
         // Allow one synthetic mousedown through so Radix can commit a clean click.
         if (commitRef.current) return
-        // Block Radix select-on-press; hold/drag must not change the tab.
-        if (e.button === 0 && !e.ctrlKey) {
+        if (e.button !== 0 || e.ctrlKey) return
+        // Mouse: block Radix select-on-press so hold/drag does not change tab.
+        // Touch: a cancelled pan must not select; a clean tap may. Never
+        // preventDefault on an in-progress touch or iOS cancels overflow pan.
+        if (pointerTypeRef.current === "mouse" || cancelRef.current) {
           e.preventDefault()
-          downRef.current = { t: performance.now(), x: e.clientX, y: e.clientY }
-          cancelRef.current = false
         }
       }}
       onPointerMove={(e) => {
@@ -353,7 +364,7 @@ export function TabsLineBar({
     <div
       data-slot="tabs-line-bar"
       className={cn(
-        "border-b border-border/60",
+        "min-w-0 border-b border-border/60",
         // Negative margins alone do not widen a w-full box - the right edge
         // stays short by 2× the bleed. Expand width explicitly so the hairline
         // reaches both module edges.

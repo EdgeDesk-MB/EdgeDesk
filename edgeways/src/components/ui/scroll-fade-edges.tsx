@@ -224,7 +224,7 @@ export function ScrollFadeEdges({
             // `flex-1` / `max-h-*` (height: auto), so the list grew, the
             // wrapper clipped, and nothing scrolled.
             horizontal
-              ? "h-full overflow-x-auto overflow-y-hidden"
+              ? "h-full overflow-x-auto overflow-y-clip overscroll-x-contain"
               : "min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
             // Stop the browser shifting scrollLeft when cards are prepended
             // (lots/edge arriving after first paint).

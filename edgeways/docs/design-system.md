@@ -247,9 +247,13 @@ Page section navigation (Settings, Profit Tracker, Fixtures, Racing Desk courses
 (`src/components/ui/tabs.tsx`). Active tab is bold with a brand underline
 (`--highlight` → `--brand-highlight` in light) on a full-width hairline, not a filled pill.
 
-All horizontal `TabsList` variants (line / segmented / default) scroll with drag-to-pan via
-`ScrollFadeEdges` — no scrollbar; left/right fades only when content overflows. When every
-tab fits, scrolling is inert and fades stay off. Pass `fadeClassName` to match the strip’s
+All horizontal `TabsList` variants (line / segmented / default) scroll inside their plate
+via `ScrollFadeEdges` — native touch pan, mouse drag-to-pan, no scrollbar; left/right fades
+only when content overflows. The scroller is `overflow-x-auto overflow-y-clip` (not
+`overflow-y-hidden`, which blocks touch pan on iOS). Triggers use `touch-pan-x` so a swipe
+on the label pans the strip rather than eating the gesture. The strip must not expand its
+ancestors: `min-w-0` on `Tabs`, `TabsLineBar`, and `CardHeader`. When every tab fits,
+scrolling is inert and fades stay off. Pass `fadeClassName` to match the strip’s
 surface (`from-card`, `from-popover`, …). Segmented `size="sm"` is 28px pills
 (`h-7`, 11px type) for chrome such as the public demo viewing bar. The viewing
 switcher (Free / Core / Edge) uses `data-plate` so the sliding plate is ink,
