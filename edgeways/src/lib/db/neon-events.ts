@@ -19,6 +19,92 @@ export async function listNeonEvents(): Promise<EventRow[]> {
   return rows.map(toSqliteEventRow);
 }
 
+export async function findNeonEventByExternalId(
+  externalId: string
+): Promise<EventRow | null> {
+  const trimmed = externalId.trim();
+  if (!trimmed) return null;
+  const rows = await getNeonDb()
+    .select()
+    .from(pgEvents)
+    .where(eq(pgEvents.externalId, trimmed))
+    .limit(1);
+  return rows[0] ? toSqliteEventRow(rows[0]) : null;
+}
+
+export async function getNeonEvent(id: number): Promise<EventRow | null> {
+  const rows = await getNeonDb()
+    .select()
+    .from(pgEvents)
+    .where(eq(pgEvents.id, id))
+    .limit(1);
+  return rows[0] ? toSqliteEventRow(rows[0]) : null;
+}
+
+export type NeonEventValues = {
+  sport: string;
+  externalId?: string | null;
+  competition?: string | null;
+  homeTeam: string;
+  awayTeam: string;
+  startTime: number;
+  status?: EventRow["status"];
+  homeScore?: number;
+  awayScore?: number;
+  minute?: number;
+  homeLed2?: number;
+  awayLed2?: number;
+  source?: EventRow["source"];
+  goals?: string | null;
+  ftHomeScore?: number | null;
+  ftAwayScore?: number | null;
+  matchEnding?: string | null;
+  period?: string | null;
+  simScript?: string | null;
+  simStartedAt?: number | null;
+  createdAt: number;
+};
+
+export async function insertNeonEvent(values: NeonEventValues): Promise<EventRow> {
+  const rows = await getNeonDb()
+    .insert(pgEvents)
+    .values({
+      sport: values.sport,
+      externalId: values.externalId ?? null,
+      competition: values.competition ?? null,
+      homeTeam: values.homeTeam,
+      awayTeam: values.awayTeam,
+      startTime: values.startTime,
+      status: values.status ?? "upcoming",
+      homeScore: values.homeScore ?? 0,
+      awayScore: values.awayScore ?? 0,
+      minute: values.minute ?? 0,
+      homeLed2: values.homeLed2 ?? 0,
+      awayLed2: values.awayLed2 ?? 0,
+      source: values.source ?? "manual",
+      goals: values.goals ?? null,
+      ftHomeScore: values.ftHomeScore ?? null,
+      ftAwayScore: values.ftAwayScore ?? null,
+      matchEnding: values.matchEnding ?? null,
+      period: values.period ?? null,
+      simScript: values.simScript ?? null,
+      simStartedAt: values.simStartedAt ?? null,
+      createdAt: values.createdAt,
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("Neon did not return the saved fixture.");
+  return toSqliteEventRow(row);
+}
+
+export async function deleteNeonEvent(id: number): Promise<boolean> {
+  const rows = await getNeonDb()
+    .delete(pgEvents)
+    .where(eq(pgEvents.id, id))
+    .returning({ id: pgEvents.id });
+  return rows.length > 0;
+}
+
 export async function listNeonEventsByIds(ids: number[]): Promise<EventRow[]> {
   if (ids.length === 0) return [];
   const rows = await getNeonDb()
@@ -28,7 +114,7 @@ export async function listNeonEventsByIds(ids: number[]): Promise<EventRow[]> {
   return rows.map(toSqliteEventRow);
 }
 
-/** Fields the feed poller is allowed to write onto a global event row. */
+/** Fields the feed poller or hosted tracker may write onto a global event row. */
 export type NeonEventFeedPatch = Partial<{
   status: EventRow["status"];
   homeScore: number;
@@ -41,12 +127,22 @@ export type NeonEventFeedPatch = Partial<{
   matchEnding: string | null;
   ftHomeScore: number | null;
   ftAwayScore: number | null;
+  competition: string | null;
+  homeTeam: string;
+  awayTeam: string;
 }>;
 
 export async function updateNeonEvent(
   id: number,
   patch: NeonEventFeedPatch
-): Promise<void> {
-  if (Object.keys(patch).length === 0) return;
-  await getNeonDb().update(pgEvents).set(patch).where(eq(pgEvents.id, id));
+): Promise<EventRow | null> {
+  if (Object.keys(patch).length === 0) {
+    return getNeonEvent(id);
+  }
+  const rows = await getNeonDb()
+    .update(pgEvents)
+    .set(patch)
+    .where(eq(pgEvents.id, id))
+    .returning();
+  return rows[0] ? toSqliteEventRow(rows[0]) : null;
 }

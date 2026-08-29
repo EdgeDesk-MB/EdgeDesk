@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, accounts, bets, events, mugPlans } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonDeskBet,
+  getNeonDeskBet,
+  patchNeonDeskBet,
+  type NeonDeskBetPatch,
+} from "@/lib/db/neon-desk";
+import { purgeNeonDeskHistoryForBet } from "@/lib/db/neon-desk-history";
+import {
+  ledgerNeonBetSettlement,
+  purgeNeonDeskLedgerForBet,
+} from "@/lib/db/neon-desk-ledger";
+import { purgeNeonDeskSettlementTransactionsForBet } from "@/lib/db/neon-desk-accounts";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import {
   ledgerFromSettledBet,
@@ -17,6 +30,7 @@ import {
 } from "@/lib/services/offers";
 import { syncBoostDiaryFromBet, unlinkBoostDiaryForBet } from "@/lib/services/boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import type { BetRow } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +78,55 @@ const patchSchema = z.object({
   refundRetention: z.number().optional(),
 });
 
+type PatchBody = z.infer<typeof patchSchema>;
+
+function betPatchValues(
+  p: PatchBody,
+  existing: Pick<BetRow, "source">,
+  triggerFields?: { triggerText: string | null; triggerRule: string | null }
+): NeonDeskBetPatch {
+  return {
+    ...(p.status ? { status: p.status } : {}),
+    ...(p.actualProfit !== undefined ? { actualProfit: p.actualProfit } : {}),
+    ...(p.label !== undefined ? { label: p.label } : {}),
+    ...(p.betType !== undefined ? { betType: p.betType } : {}),
+    ...(p.bookmaker !== undefined ? { bookmaker: p.bookmaker } : {}),
+    ...(p.exchangeId !== undefined ? { exchangeId: p.exchangeId } : {}),
+    ...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
+    ...(p.legs !== undefined ? { legs: p.legs ? JSON.stringify(p.legs) : null } : {}),
+    ...(p.backStake !== undefined ? { backStake: p.backStake } : {}),
+    ...(p.backOdds !== undefined ? { backOdds: p.backOdds } : {}),
+    ...(p.layStake !== undefined ? { layStake: p.layStake } : {}),
+    ...(p.layOdds !== undefined ? { layOdds: p.layOdds } : {}),
+    ...(p.commission !== undefined ? { commission: p.commission } : {}),
+    ...(p.earlyPayout !== undefined ? { earlyPayout: p.earlyPayout ? 1 : 0 } : {}),
+    ...(p.expectedProfit !== undefined ? { expectedProfit: p.expectedProfit } : {}),
+    ...(p.notes !== undefined ? { notes: p.notes } : {}),
+    ...(p.eventId !== undefined ? { eventId: p.eventId } : {}),
+    ...(p.market !== undefined ? { market: p.market } : {}),
+    ...(p.selection !== undefined ? { selection: p.selection } : {}),
+    ...(p.offerId !== undefined ? { offerId: p.offerId } : {}),
+    ...(p.refundAmount !== undefined ? { refundAmount: p.refundAmount } : {}),
+    ...(p.refundRetention !== undefined ? { refundRetention: p.refundRetention } : {}),
+    ...(p.purpose === "mug" ? { offerId: null } : {}),
+    ...(triggerFields ?? {}),
+    ...(p.status && p.status !== "open" ? { settledAt: Date.now() } : {}),
+    ...(p.status === "open"
+      ? {
+          settledAt: null,
+          actualProfit: null,
+          ...(existing.source === "import" ? {} : { balanceSettled: 0 }),
+        }
+      : {}),
+  };
+}
+
+function neonWriteError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Could not save the bet.";
+  const status = message.startsWith("Sign in") ? 401 : 500;
+  return NextResponse.json({ error: message }, { status });
+}
+
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
@@ -71,8 +134,12 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const p = parsed.data;
+  const betId = Number(id);
+  const hostedDesk = isNeonDesk();
 
-  const existing = db.select().from(bets).where(eq(bets.id, Number(id))).get();
+  const existing = hostedDesk
+    ? await getNeonDeskBet(betId)
+    : db.select().from(bets).where(eq(bets.id, betId)).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const nextLabel = p.label !== undefined ? p.label : existing.label;
@@ -96,49 +163,25 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     });
   }
 
-  const updated = db
-    .update(bets)
-    .set({
-      ...(p.status ? { status: p.status } : {}),
-      ...(p.actualProfit !== undefined ? { actualProfit: p.actualProfit } : {}),
-      ...(p.label !== undefined ? { label: p.label } : {}),
-      ...(p.betType !== undefined ? { betType: p.betType } : {}),
-      ...(p.bookmaker !== undefined ? { bookmaker: p.bookmaker } : {}),
-      ...(p.exchangeId !== undefined ? { exchangeId: p.exchangeId } : {}),
-      ...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
-      ...(p.legs !== undefined ? { legs: p.legs ? JSON.stringify(p.legs) : null } : {}),
-      ...(p.backStake !== undefined ? { backStake: p.backStake } : {}),
-      ...(p.backOdds !== undefined ? { backOdds: p.backOdds } : {}),
-      ...(p.layStake !== undefined ? { layStake: p.layStake } : {}),
-      ...(p.layOdds !== undefined ? { layOdds: p.layOdds } : {}),
-      ...(p.commission !== undefined ? { commission: p.commission } : {}),
-      ...(p.earlyPayout !== undefined ? { earlyPayout: p.earlyPayout ? 1 : 0 } : {}),
-      ...(p.expectedProfit !== undefined ? { expectedProfit: p.expectedProfit } : {}),
-      ...(p.notes !== undefined ? { notes: p.notes } : {}),
-      ...(p.eventId !== undefined ? { eventId: p.eventId } : {}),
-      ...(p.market !== undefined ? { market: p.market } : {}),
-      ...(p.selection !== undefined ? { selection: p.selection } : {}),
-      ...(p.offerId !== undefined ? { offerId: p.offerId } : {}),
-      ...(p.refundAmount !== undefined ? { refundAmount: p.refundAmount } : {}),
-      ...(p.refundRetention !== undefined ? { refundRetention: p.refundRetention } : {}),
-      // A mug bet must never stay offer-linked (mirrors the POST guard);
-      // placed after the offerId spread so it always wins.
-      ...(p.purpose === "mug" ? { offerId: null } : {}),
-      ...(triggerFields ?? {}),
-      ...(p.status && p.status !== "open" ? { settledAt: Date.now() } : {}),
-      // Imported history keeps balanceSettled=1 - its stake was never
-      // debited, so a re-settle must never credit a payout (E3).
-      ...(p.status === "open"
-        ? {
-            settledAt: null,
-            actualProfit: null,
-            ...(existing.source === "import" ? {} : { balanceSettled: 0 }),
-          }
-        : {}),
-    })
-    .where(eq(bets.id, Number(id)))
-    .returning()
-    .get();
+  const set = betPatchValues(p, existing, triggerFields);
+
+  if (hostedDesk) {
+    try {
+      if (p.status === "open" && existing.status !== "open") {
+        await purgeNeonDeskSettlementTransactionsForBet(betId);
+      }
+      const updated = await patchNeonDeskBet(betId, set);
+      if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      if (updated.status !== "open") {
+        await ledgerNeonBetSettlement(updated).catch(() => {});
+      }
+      return NextResponse.json({ bet: updated });
+    } catch (error) {
+      return neonWriteError(error);
+    }
+  }
+
+  const updated = db.update(bets).set(set).where(eq(bets.id, betId)).returning().get();
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Editing a bet into a mug stamps the cadence plan with the bet's
@@ -190,6 +233,19 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const betId = Number(id);
+
+  if (isNeonDesk()) {
+    try {
+      const deleted = await deleteNeonDeskBet(betId);
+      if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      await purgeNeonDeskLedgerForBet(betId);
+      await purgeNeonDeskHistoryForBet(betId);
+      return NextResponse.json({ ok: true });
+    } catch (error) {
+      return neonWriteError(error);
+    }
+  }
+
   unlinkBoostDiaryForBet(betId);
   purgeHistoryForBet(betId);
   purgeLedgerForDeletedBet(betId);

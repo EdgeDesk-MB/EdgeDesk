@@ -7,6 +7,7 @@ import {
 } from "@/lib/accounts/free-bet-lots";
 import { quietFreeBetAlerts } from "@/lib/services/quiet-alerts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 import {
   denyPublicDemoWrite,
   isPublicDemoRequest,
@@ -28,6 +29,8 @@ const removeSchema = z.object({
 
 /** Remove (write off) remaining balance on a free-bet lot. */
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Free-bet lots");
+  if (blocked) return blocked;
   const demoBlock = await denyPublicDemoWrite();
   if (demoBlock) return demoBlock;
   const parsed = removeSchema.safeParse(await req.json());
@@ -50,6 +53,8 @@ const expirySchema = z.object({
 
 /** Set or clear the conversion deadline on an open free-bet lot. */
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Free-bet lots");
+  if (blocked) return blocked;
   const demoBlock = await denyPublicDemoWrite();
   if (demoBlock) return demoBlock;
   const parsed = expirySchema.safeParse(await req.json());

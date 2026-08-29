@@ -1,7 +1,7 @@
 /**
  * Hosted desk wallets on Neon (EDGE-47): accounts plus the balance ledger.
- * Free-bet lots, transfers and pending-credit workflows stay SQLite-only until
- * their own cutover.
+ * Transfers and pending-credit confirmation write here too; free-bet lots stay
+ * SQLite-only until their own cutover.
  */
 import "server-only";
 
@@ -111,8 +111,9 @@ export type NeonDeskAccountValues = {
   createdAt: number;
 };
 
-export async function listNeonDeskAccounts(): Promise<AccountRow[]> {
-  const clerkUserId = neonDeskClerkUserId();
+export async function listNeonDeskAccounts(
+  clerkUserId = neonDeskClerkUserId()
+): Promise<AccountRow[]> {
   if (!clerkUserId) return [];
   const rows = await getNeonDb()
     .select()
@@ -143,6 +144,7 @@ export async function insertNeonDeskAccount(
 export type NeonDeskAccountPatch = Partial<{
   isActive: number;
   brandColor: string;
+  exchangeId: number | null;
   accessStatus: "available" | "gubbed" | "closed";
   owner: string;
   notes: string | null;
@@ -276,7 +278,8 @@ export async function recordNeonManualTransaction(input: {
   }
 }
 
-export type NeonDeskTransactionValues = {  accountId: number;
+export type NeonDeskTransactionValues = {
+  accountId: number;
   amount: number;
   category: BalanceTransactionRow["category"];
   betId?: number | null;
@@ -284,12 +287,15 @@ export type NeonDeskTransactionValues = {  accountId: number;
   affectPnl?: number;
   note?: string | null;
   createdAt: number;
+  pending?: number;
+  transferGroupId?: string | null;
+  confirmedAt?: number | null;
 };
 
 export async function insertNeonDeskTransaction(
-  values: NeonDeskTransactionValues
+  values: NeonDeskTransactionValues,
+  clerkUserId = neonDeskClerkUserId()
 ): Promise<BalanceTransactionRow> {
-  const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) {
     throw new Error("Sign in to save a transaction.");
   }
@@ -302,4 +308,148 @@ export async function insertNeonDeskTransaction(
     throw new Error("Neon did not return the saved transaction.");
   }
   return toSqliteBalanceTransactionRow(row);
+}
+
+export async function purgeNeonDeskTransactionsForBet(
+  betId: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<void> {
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgBalanceTransactions)
+    .where(
+      and(
+        eq(pgBalanceTransactions.betId, betId),
+        eq(pgBalanceTransactions.clerkUserId, clerkUserId)
+      )
+    );
+}
+
+/** Drop settlement credits so a reopened hosted bet can re-ledger cleanly. */
+export async function purgeNeonDeskSettlementTransactionsForBet(
+  betId: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<void> {
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgBalanceTransactions)
+    .where(
+      and(
+        eq(pgBalanceTransactions.betId, betId),
+        eq(pgBalanceTransactions.clerkUserId, clerkUserId),
+        eq(pgBalanceTransactions.category, "bet_settlement")
+      )
+    );
+}
+
+export async function listNeonPendingTransactions(limit = 50) {
+  const rows = await listNeonDeskBalanceTransactions();
+  return rows
+    .filter((t) => t.pending)
+    .sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
+    .slice(0, limit);
+}
+
+export async function confirmNeonPendingTransaction(txId: number): Promise<boolean> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) {
+    throw new Error("Sign in to confirm a transfer.");
+  }
+  const rows = await getNeonDb()
+    .update(pgBalanceTransactions)
+    .set({ pending: 0, confirmedAt: Date.now() })
+    .where(
+      and(
+        eq(pgBalanceTransactions.id, txId),
+        eq(pgBalanceTransactions.clerkUserId, clerkUserId),
+        eq(pgBalanceTransactions.pending, 1)
+      )
+    )
+    .returning({ id: pgBalanceTransactions.id });
+  return rows.length > 0;
+}
+
+export async function transferNeonBetweenAccounts(input: {
+  bankAccountId: number;
+  venueAccountId: number;
+  amount: number;
+  direction: "to_venue" | "to_bank";
+  fee?: number;
+  note?: string;
+  pendingBankCredit?: boolean;
+}): Promise<{ transferGroupId: string }> {
+  const amount = Math.abs(input.amount);
+  if (!(amount > 0)) throw new Error("Amount must be positive");
+
+  const accounts = await listNeonDeskAccounts();
+  const bank = accounts.find((a) => a.id === input.bankAccountId);
+  const venue = accounts.find((a) => a.id === input.venueAccountId);
+  if (!bank || !bank.isActive || bank.type !== "bank") {
+    throw new Error("Bank account not found");
+  }
+  if (!venue || !venue.isActive || (venue.type !== "bookie" && venue.type !== "exchange")) {
+    throw new Error("Bookie/exchange account not found");
+  }
+
+  const fee = Math.max(0, input.fee ?? 0);
+  if (fee >= amount && input.direction === "to_bank") {
+    throw new Error("Fee must be less than withdrawal amount");
+  }
+
+  const groupId = `xfer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const noteBase = input.note?.trim();
+  const now = Date.now();
+
+  if (input.direction === "to_venue") {
+    await insertNeonDeskTransaction({
+      accountId: bank.id,
+      amount: -amount,
+      category: "transfer",
+      note: noteBase ?? `Deposit to ${venue.name}`,
+      transferGroupId: groupId,
+      createdAt: now,
+    });
+    if (fee > 0) {
+      await insertNeonDeskTransaction({
+        accountId: bank.id,
+        amount: -fee,
+        category: "fee",
+        note: "Deposit fee",
+        transferGroupId: groupId,
+        createdAt: now,
+      });
+    }
+    await insertNeonDeskTransaction({
+      accountId: venue.id,
+      amount,
+      category: "transfer",
+      note: noteBase ?? `Deposit from ${bank.name}`,
+      transferGroupId: groupId,
+      createdAt: now,
+    });
+  } else {
+    const pending = input.pendingBankCredit !== false;
+    const net = amount - fee;
+    await insertNeonDeskTransaction({
+      accountId: venue.id,
+      amount: -amount,
+      category: "transfer",
+      note: noteBase ?? `Withdraw to ${bank.name}`,
+      transferGroupId: groupId,
+      createdAt: now,
+    });
+    await insertNeonDeskTransaction({
+      accountId: bank.id,
+      amount: net,
+      category: "transfer",
+      note: noteBase
+        ? `${noteBase}${fee > 0 ? ` (−£${fee.toFixed(2)} fee)` : ""}`
+        : `Withdraw from ${venue.name}${fee > 0 ? ` (−£${fee.toFixed(2)} fee)` : ""}`,
+      transferGroupId: groupId,
+      pending: pending ? 1 : 0,
+      createdAt: now,
+    });
+  }
+
+  return { transferGroupId: groupId };
 }

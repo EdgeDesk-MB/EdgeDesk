@@ -4,11 +4,14 @@ import { db, bets, offers } from "@/lib/db";
 import { awardUnconditionalFreeBetEarly, getPromoAwardsByBetId } from "@/lib/services/balances";
 import { syncOfferStatuses } from "@/lib/services/offers";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
 /** Credit an unconditional free bet early (bookie released it on placement). */
 export const POST = withDeskScope(async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const blocked = blockHostedDeskMutation("Promo free-bet awards");
+  if (blocked) return blocked;
   const { id } = await ctx.params;
   const betId = Number(id);
   if (!Number.isFinite(betId) || betId <= 0) {

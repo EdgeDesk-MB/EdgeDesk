@@ -25,10 +25,9 @@
  *   single-operator nudge rather than customer-facing. Hosted usage is still
  *   visible via `apiUsageTodayAsync`. (Customer-facing result_settled alerts
  *   ARE emitted here - EDGE-110 - via the per-user Neon inbox + push.)
- * - Wallet ledger rows on settlement. Hosted bet placement does not ledger
- *   (`balance_ledgered` stays 0), and local `ledgerBetSettlement` is itself a
- *   no-op for such a bet, so writing wallet rows here would invent money moves
- *   the hosted desk never debited.
+ * - Free-bet lots and wagering on settlement. Cash stake/payout rows now
+ *   ledger when placement marked `balance_ledgered`; older un-ledgered bets
+ *   still skip wallet rows so we do not invent money the desk never debited.
  */
 import "server-only";
 
@@ -61,7 +60,7 @@ import { shouldFetchGoalTimeline } from "@/lib/live-poll-rules";
 import { formatEventTitle, formatRacingEventTitle, localCalendarDate } from "@/lib/events";
 import { parseRaceResults } from "@/lib/racing";
 import { settledResultAlert, type SettledBetNotice } from "@/lib/alerts/rules";
-import type { EventRow } from "@/lib/db/schema";
+import type { BetRow, EventRow } from "@/lib/db/schema";
 import type { NeonEventFeedPatch } from "@/lib/db/neon-events";
 import type {
   NeonBetSettlement,
@@ -71,7 +70,10 @@ import type {
 
 export type NeonFeedSyncDeps = {
   listEvents: () => Promise<EventRow[]>;
-  updateEvent: (id: number, patch: NeonEventFeedPatch) => Promise<void>;
+  updateEvent: (
+    id: number,
+    patch: NeonEventFeedPatch
+  ) => Promise<void | EventRow | null>;
   listOpenBetsForEvents: (eventIds: number[]) => Promise<OwnedBet[]>;
   settleBet: (settlement: NeonBetSettlement) => Promise<boolean>;
   insertHistory: (values: OwnedHistoryValues) => Promise<void>;
@@ -86,6 +88,8 @@ export type NeonFeedSyncDeps = {
    * push devices. Default respects the owner's alertsResultSettled pref.
    */
   notifySettlement: (clerkUserId: string, notice: SettledBetNotice) => Promise<void>;
+  /** Cash wallet credits for a hosted bet that was ledgered at placement. */
+  ledgerSettlement?: (bet: BetRow, clerkUserId: string) => Promise<void>;
 };
 
 export type NeonFeedSyncResult = {
@@ -160,6 +164,10 @@ async function defaultDeps(): Promise<NeonFeedSyncDeps> {
     hasRacingApiKey: realHasRacingApiKey,
     now: Date.now,
     notifySettlement: defaultNotifySettlement,
+    ledgerSettlement: async (bet, clerkUserId) => {
+      const { ledgerNeonBetSettlement } = await import("@/lib/db/neon-desk-ledger");
+      await ledgerNeonBetSettlement(bet, clerkUserId);
+    },
   };
 }
 
@@ -335,6 +343,20 @@ async function settleOpenBets(
     if (!applied) continue;
     settled += 1;
     if (!synced.has(bet.eventId!)) sweepSettled += 1;
+    if (clerkUserId) {
+      await deps
+        .ledgerSettlement?.(
+          {
+            ...bet,
+            status: outcome.status,
+            actualProfit: outcome.profit,
+            settledAt,
+            notes: outcome.notes,
+          },
+          clerkUserId
+        )
+        .catch(() => {});
+    }
     if (!clerkUserId) continue;
 
     await deps

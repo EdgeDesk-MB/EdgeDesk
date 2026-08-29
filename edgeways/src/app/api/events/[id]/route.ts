@@ -5,6 +5,8 @@ import { db, events, bets, balanceTransactions, history } from "@/lib/db";
 import type { GoalEvent } from "@/lib/calc";
 import { serializeRaceResults, withPreservedRaceDisplayMeta } from "@/lib/racing";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { patchHostedNeonEvent } from "@/lib/db/neon-event-write";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,11 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  if (isNeonDesk()) {
+    const result = await patchHostedNeonEvent(Number(id), parsed.data);
+    if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(result);
   }
   const existing = db.select().from(events).where(eq(events.id, Number(id))).get();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -228,6 +235,12 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  if (isNeonDesk()) {
+    return NextResponse.json(
+      { error: "Deleting a shared fixture is not available on the hosted desk." },
+      { status: 400 }
+    );
+  }
   const { id } = await ctx.params;
   db.delete(events).where(eq(events.id, Number(id))).run();
   return NextResponse.json({ ok: true });

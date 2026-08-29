@@ -5,6 +5,8 @@ import { searchFixtureByTeams } from "@/lib/services/apifootball";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isFeedDenied } from "@/lib/entitlements/feed-guard";
 import { rateLimitResponse } from "@/lib/api-rate-limit";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { findOpenNeonEventByTeams, insertNeonEvent } from "@/lib/db/neon-event-write";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,44 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const { homeTeam, awayTeam, sport, startTime, competition } = parsed.data;
+
+  if (isNeonDesk()) {
+    const existing = await findOpenNeonEventByTeams(sport, homeTeam, awayTeam);
+    if (existing) {
+      return NextResponse.json({ event: existing, mode: "existing" });
+    }
+    const now = Date.now();
+    const fixture = await searchFixtureByTeams(homeTeam, awayTeam);
+    if (fixture) {
+      const inserted = await insertNeonEvent({
+        sport: "football",
+        competition: fixture.competition,
+        homeTeam: fixture.homeTeam,
+        awayTeam: fixture.awayTeam,
+        startTime: fixture.startTime,
+        source: "api",
+        externalId: fixture.externalId,
+        status: fixture.status,
+        homeScore: fixture.homeScore,
+        awayScore: fixture.awayScore,
+        minute: fixture.minute,
+        period: fixture.period ?? null,
+        createdAt: now,
+      });
+      return NextResponse.json({ event: inserted, mode: "api" });
+    }
+    const inserted = await insertNeonEvent({
+      sport,
+      competition: competition ?? null,
+      homeTeam,
+      awayTeam,
+      startTime: startTime ?? now,
+      source: "manual",
+      status: "upcoming",
+      createdAt: now,
+    });
+    return NextResponse.json({ event: inserted, mode: "manual" });
+  }
 
   // 1. An event we're already tracking (don't duplicate) - fuzzy team match
   const existing = db

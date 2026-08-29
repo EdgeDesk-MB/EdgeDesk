@@ -19,12 +19,9 @@ import {
   toSqliteCasinoOfferSeriesComponentRow,
   toSqliteCasinoOfferSeriesRow,
 } from "@/lib/db/neon-desk-map";
-import {
-  insertNeonDeskAccount,
-  insertNeonDeskTransaction,
-  listNeonDeskAccounts,
-  patchNeonDeskAccount,
-} from "@/lib/db/neon-desk-accounts";
+import { insertNeonDeskTransaction } from "@/lib/db/neon-desk-accounts";
+import { ensureNeonVenueAccount } from "@/lib/db/neon-desk-ensure-venue";
+
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import { getNeonDb } from "@/lib/db/neon";
 import {
@@ -45,7 +42,6 @@ import type {
 } from "@/lib/db/schema";
 import { sumCampaignEv } from "@/lib/calc/casino-reward-ev";
 import { roundPence } from "@/lib/calc/money";
-import { bookieBrandColor } from "@/lib/brands/bookies";
 import { SEED_GAMES } from "@/lib/casino/game-library";
 import type { EvBasis } from "@/lib/offers/advantage";
 import { getCasinoOfferRecurrenceMeta } from "@/lib/offers/casino-offer-recurrence";
@@ -522,34 +518,6 @@ export async function clearNeonCasinoOfferBalance(
     );
 }
 
-/** Find or create the bookie wallet for a free-typed casino name. */
-async function ensureNeonVenueAccount(name: string) {
-  const trimmed = name.trim();
-  const q = trimmed.toLowerCase();
-  const accounts = await listNeonDeskAccounts();
-  const active = accounts.find(
-    (a) => a.type === "bookie" && a.isActive === 1 && a.name.toLowerCase() === q
-  );
-  if (active) return active;
-  const inactive = accounts.find(
-    (a) => a.type === "bookie" && a.name.toLowerCase() === q
-  );
-  if (inactive) {
-    const updated = await patchNeonDeskAccount(inactive.id, {
-      isActive: 1,
-      brandColor: inactive.brandColor ?? bookieBrandColor(trimmed),
-    });
-    if (updated) return updated;
-  }
-  return insertNeonDeskAccount({
-    name: trimmed,
-    type: "bookie",
-    brandColor: bookieBrandColor(trimmed),
-    isActive: 1,
-    createdAt: Date.now(),
-  });
-}
-
 /**
  * Full casino ledger sync on Neon: bookie wallet + History/Home feed row.
  * Mirrors syncCasinoOfferBalance in services/balances.ts.
@@ -582,7 +550,7 @@ export async function syncNeonCasinoOfferBalance(
   // Zero net or missing venue: feed row still stands; wallet only moves when
   // there is both a named bookie and a non-zero amount.
   if (casino && amount !== 0) {
-    const bookie = await ensureNeonVenueAccount(casino);
+    const { account: bookie } = await ensureNeonVenueAccount(casino, "bookie");
     await insertNeonDeskTransaction({
       accountId: bookie.id,
       amount,

@@ -4,7 +4,7 @@
  */
 import "server-only";
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
 import { toSqliteHistoryRow } from "@/lib/db/neon-desk-map";
@@ -48,4 +48,54 @@ export async function insertNeonDeskHistory(
     .onConflictDoNothing({
       target: [pgHistory.clerkUserId, pgHistory.dedupe],
     });
+}
+
+/** Edit a balance-correction note. Clerk-scoped. */
+export async function patchNeonDeskHistoryNote(
+  id: number,
+  note: string | null
+): Promise<HistoryRow | null> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) {
+    throw new Error("Sign in to save a note.");
+  }
+  const next = note?.trim() ? note.trim() : null;
+  const rows = await getNeonDb()
+    .update(pgHistory)
+    .set({ note: next })
+    .where(
+      and(
+        eq(pgHistory.id, id),
+        eq(pgHistory.clerkUserId, clerkUserId),
+        eq(pgHistory.kind, "balance_adjustment")
+      )
+    )
+    .returning();
+  return rows[0] ? toSqliteHistoryRow(rows[0]) : null;
+}
+
+/** Drop feed rows for a deleted hosted bet. Clerk-scoped. */
+export async function purgeNeonDeskHistoryForBet(betId: number): Promise<void> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgHistory)
+    .where(and(eq(pgHistory.betId, betId), eq(pgHistory.clerkUserId, clerkUserId)));
+}
+
+/** Drop settlement rows so a result correction can re-settle this login's bet. */
+export async function purgeNeonDeskSettlementHistoryForBet(
+  betId: number
+): Promise<void> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgHistory)
+    .where(
+      and(
+        eq(pgHistory.betId, betId),
+        eq(pgHistory.clerkUserId, clerkUserId),
+        eq(pgHistory.kind, "settlement")
+      )
+    );
 }

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, mugPlans } from "@/lib/db";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ const upsertSchema = z.object({
 
 /** Upsert by accountId - one cadence plan per bookie. */
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Mug betting plans");
+  if (blocked) return blocked;
   const parsed = upsertSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

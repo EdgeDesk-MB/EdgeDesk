@@ -127,6 +127,25 @@ function accountPendingInFromRows(
     .reduce((s, t) => s + t.amount, 0);
 }
 
+/** Bookie wallets with cash now or any ledger history, including archived. */
+export function settingsBookiesFromRows(
+  accounts: AccountRow[],
+  transactions: BalanceTransactionRow[],
+  bets: BetRow[]
+): AccountBalance[] {
+  const hasLedger = new Set(transactions.map((t) => t.accountId));
+  return accounts
+    .filter((a) => a.type === "bookie")
+    .map((a) => ({
+      ...a,
+      balance: accountCashBalanceFromRows(a.id, transactions, bets),
+      freeBets: 0,
+      pendingIn: accountPendingInFromRows(a.id, transactions),
+    }))
+    .filter((a) => a.isActive || a.balance !== 0 || hasLedger.has(a.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function balanceSummaryFromRows(
   accounts: AccountRow[],
   transactions: BalanceTransactionRow[],

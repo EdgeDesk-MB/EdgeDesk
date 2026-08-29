@@ -11,6 +11,12 @@ import {
 import { buildSeasonReport, seasonYears } from "@/lib/report/season-report";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskAccounts } from "@/lib/db/neon-desk-accounts";
+import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
+import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
+import type { AccountRow, BetRow, OfferRow } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -19,17 +25,23 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   if (denied) return denied;
   let snapshots = getAllSnapshots() as EvSnapshotRow[];
 
+  const hosted = isNeonDesk();
+  const [accountRows, betRows, offerRows]: [AccountRow[], BetRow[], OfferRow[]] = hosted
+    ? await Promise.all([listNeonDeskAccounts(), listNeonDeskBets(), listNeonDeskOffers()])
+    : [
+        db.select().from(accounts).all(),
+        db.select().from(bets).all(),
+        db.select().from(offers).all(),
+      ];
+
   // J8: ?owner= scopes both inputs through the bookmaker→account mapping.
   const owner = req.nextUrl.searchParams.get("owner");
-  const ownerScope = owner
-    ? bookieNamesForOwner(db.select().from(accounts).all(), owner)
-    : null;
-  const scopeBets = (rows: (typeof bets.$inferSelect)[]) =>
+  const ownerScope = owner ? bookieNamesForOwner(accountRows, owner) : null;
+  const scopeBets = (rows: BetRow[]) =>
     ownerScope
       ? rows.filter((b) => b.bookmaker && ownerScope.has(b.bookmaker.trim().toLowerCase()))
       : rows;
   if (ownerScope) {
-    const offerRows = db.select().from(offers).all();
     const offerOk = new Set(
       offerRows
         .filter((o) => o.bookmaker && ownerScope.has(o.bookmaker.trim().toLowerCase()))
@@ -38,9 +50,13 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     snapshots = snapshots.filter((s) => offerOk.has(s.offerId));
   }
 
+  const minCampaigns = hosted
+    ? (await getNeonDeskSettings()).tuning.edgeReportMinCampaigns
+    : getAppSettings().tuning.edgeReportMinCampaigns;
+
   // G3: season (year) view
   if (req.nextUrl.searchParams.get("view") === "year") {
-    const allBets = scopeBets(db.select().from(bets).all());
+    const allBets = scopeBets(betRows);
     const years = seasonYears(snapshots, allBets);
     const requestedYear = Number(req.nextUrl.searchParams.get("year"));
     const year = years.includes(requestedYear) ? requestedYear : (years[0] ?? null);
@@ -60,12 +76,12 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     return NextResponse.json({ months: [], report: null });
   }
 
-  const allBets = scopeBets(db.select().from(bets).all());
+  const allBets = scopeBets(betRows);
   const report = buildEdgeReport({
     snapshots,
     bets: allBets,
     month,
-    minCampaigns: getAppSettings().tuning.edgeReportMinCampaigns,
+    minCampaigns,
   });
   return NextResponse.json({ months, report });
 });

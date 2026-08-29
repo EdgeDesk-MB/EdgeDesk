@@ -4,6 +4,16 @@ import { formatEventTitle } from "@/lib/events";
 import { MARKET_LABELS } from "@/lib/markets";
 import { computeMonthlyBreakdown, computeAccountBreakdown } from "@/lib/pnl/monthly-breakdown";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import {
+  listNeonDeskAccounts,
+  listNeonDeskBalanceTransactions,
+} from "@/lib/db/neon-desk-accounts";
+import { listNeonDeskCasinoOffers } from "@/lib/db/neon-desk-casino";
+import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
+import { listNeonEvents } from "@/lib/db/neon-events";
+import type { AccountRow, BalanceTransactionRow, BetRow, CasinoOfferRow, EventRow, OfferRow } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +40,32 @@ function csvResponse(filename: string, body: string) {
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const type = new URL(req.url).searchParams.get("type") ?? "bets";
 
+  let accts: AccountRow[];
+  let txs: BalanceTransactionRow[];
+  let allBets: BetRow[];
+  let allOffers: OfferRow[];
+  let allCasino: CasinoOfferRow[];
+  let allEvents: EventRow[];
+
+  if (isNeonDesk()) {
+    [accts, txs, allBets, allOffers, allCasino, allEvents] = await Promise.all([
+      listNeonDeskAccounts(),
+      listNeonDeskBalanceTransactions(),
+      listNeonDeskBets(),
+      listNeonDeskOffers(),
+      listNeonDeskCasinoOffers(),
+      listNeonEvents(),
+    ]);
+  } else {
+    accts = db.select().from(accounts).all();
+    txs = db.select().from(balanceTransactions).all();
+    allBets = db.select().from(bets).all();
+    allOffers = db.select().from(offers).all();
+    allCasino = db.select().from(casinoOffers).all();
+    allEvents = db.select().from(events).all();
+  }
+
   if (type === "balances") {
-    const accts = db.select().from(accounts).all();
-    const txs = db.select().from(balanceTransactions).all();
     const acctName = new Map(accts.map((a) => [a.id, a.name]));
     const lines = [
       row(["Date", "Account", "Category", "Amount", "Note", "Bet ID"]),
@@ -51,11 +84,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   }
 
   if (type === "monthly") {
-    const allBets = db.select().from(bets).all();
-    const casinoSettlements = db
-      .select()
-      .from(casinoOffers)
-      .all()
+    const casinoSettlements = allCasino
       .filter((o) => o.status === "completed" && o.actualProfit != null)
       .map((o) => ({
         time: o.completedAt ?? o.createdAt,
@@ -76,7 +105,6 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   }
 
   if (type === "offers") {
-    const allOffers = db.select().from(offers).all();
     const lines = [
       row([
         "ID",
@@ -106,8 +134,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     return csvResponse("edgeways-offers.csv", lines.join("\n"));
   }
 
-  const eventById = new Map(db.select().from(events).all().map((e) => [e.id, e]));
-  const allBets = db.select().from(bets).all();
+  const eventById = new Map(allEvents.map((e) => [e.id, e]));
 
   const lines = [
     row([

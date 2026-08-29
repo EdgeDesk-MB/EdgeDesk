@@ -8,6 +8,7 @@ import {
 } from "@/lib/services/systems-desk";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,8 @@ export const PATCH = withDeskScope(async function PATCH(
 ) {
   const denied = await deniedFeatureResponse("systems_desk");
   if (denied) return denied;
+  const blocked = blockHostedDeskMutation("Systems Desk");
+  if (blocked) return blocked;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -92,6 +95,8 @@ export const DELETE = withDeskScope(async function DELETE(
 ) {
   const denied = await deniedFeatureResponse("systems_desk");
   if (denied) return denied;
+  const blocked = blockHostedDeskMutation("Systems Desk");
+  if (blocked) return blocked;
   const { id } = await ctx.params;
   const ok = deleteSystemRun(Number(id));
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });

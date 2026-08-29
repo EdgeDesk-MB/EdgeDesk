@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, offerEffortSamples } from "@/lib/db";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,8 @@ const createSchema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Effort tracking");
+  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -62,6 +65,8 @@ const patchSchema = z.object({
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Effort tracking");
+  if (blocked) return blocked;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

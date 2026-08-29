@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   balanceSummaryFromRows,
   openBetInBetsAmountFromRow,
+  settingsBookiesFromRows,
 } from "@/lib/services/balance-summary";
 import type {
   AccountRow,
@@ -169,5 +170,18 @@ describe("balanceSummaryFromRows", () => {
     const summary = balanceSummaryFromRows([exchange], txs, bets);
     expect(summary.accounts[0]?.balance).toBe(-252);
     expect(summary.inBets).toBe(252);
+  });
+});
+
+describe("settingsBookiesFromRows", () => {
+  it("keeps an archived bookie that still has ledger history", () => {
+    const bookies = settingsBookiesFromRows(
+      [account({ id: 30, name: "Paddy Power", type: "bookie", isActive: 0 })],
+      [tx({ id: 1, accountId: 30, amount: 50, category: "top_up" })],
+      []
+    );
+    expect(bookies).toHaveLength(1);
+    expect(bookies[0]?.id).toBe(30);
+    expect(bookies[0]?.balance).toBe(50);
   });
 });

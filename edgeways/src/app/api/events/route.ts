@@ -12,6 +12,9 @@ import {
 } from "@/lib/racing";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
+import { createOrRefreshNeonEvent, listNeonEvents } from "@/lib/db/neon-event-write";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +62,9 @@ function raceMetaFromInput(input: {
 }
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    return NextResponse.json({ events: await listNeonEvents() });
+  }
   return NextResponse.json({ events: db.select().from(events).all() });
 });
 
@@ -68,6 +74,17 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+  if (isNeonDesk()) {
+    if (input.source === "sim") {
+      const blocked = blockHostedDeskMutation("Simulations");
+      if (blocked) return blocked;
+    }
+    const { event, existing } = await createOrRefreshNeonEvent({
+      ...input,
+      raceMeta: raceMetaFromInput(input),
+    });
+    return NextResponse.json({ event, existing: existing || undefined });
+  }
   const now = Date.now();
 
   if (input.externalId) {

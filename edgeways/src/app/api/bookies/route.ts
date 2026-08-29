@@ -5,6 +5,10 @@ import { bookieBrandColor } from "@/lib/brands/bookies";
 import { getSettingsBookies, recordManualTransaction } from "@/lib/services/balances";
 import { eq } from "drizzle-orm";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { ensureNeonVenueAccount } from "@/lib/db/neon-desk-ensure-venue";
+import { getNeonDeskSettingsBookies } from "@/lib/db/neon-desk-balance-summary";
+import { recordNeonManualTransaction } from "@/lib/db/neon-desk-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +19,9 @@ const createSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    return NextResponse.json({ bookies: await getNeonDeskSettingsBookies() });
+  }
   return NextResponse.json({ bookies: getSettingsBookies() });
 });
 
@@ -25,6 +32,38 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   }
   const input = parsed.data;
   const name = input.name.trim();
+
+  if (isNeonDesk()) {
+    try {
+      const { listNeonDeskAccounts, patchNeonDeskAccount } = await import(
+        "@/lib/db/neon-desk-accounts"
+      );
+      const existed = (await listNeonDeskAccounts()).some(
+        (a) => a.type === "bookie" && a.name.toLowerCase() === name.toLowerCase()
+      );
+      const { account } = await ensureNeonVenueAccount(name, "bookie");
+      const nextColor = input.brandColor ?? account.brandColor ?? bookieBrandColor(name);
+      let bookie = account;
+      if (nextColor !== account.brandColor) {
+        bookie = (await patchNeonDeskAccount(account.id, { brandColor: nextColor })) ?? account;
+      }
+      const created = !existed;
+      if (created && input.openingBalance !== 0) {
+        await recordNeonManualTransaction({
+          account: bookie,
+          amount: input.openingBalance,
+          category: "top_up",
+          note: "Opening balance",
+        });
+      }
+      return NextResponse.json({ bookie, created });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the bookie.";
+      const status = message.startsWith("Sign in") ? 401 : 400;
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
 
   const dup = db
     .select()

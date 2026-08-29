@@ -7,7 +7,9 @@ import {
   listPendingRemindersForCasino,
   listPendingRemindersForOffer,
 } from "@/lib/services/user-reminders";
+import { isNeonDesk } from "@/lib/db/desk-backend";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,9 @@ const cancelSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
+  if (isNeonDesk()) {
+    return NextResponse.json({ fired: 0, pending: [] });
+  }
   const fired = fireDueUserReminders();
   const casinoOfferId = Number(req.nextUrl.searchParams.get("casinoOfferId"));
   const offerId = Number(req.nextUrl.searchParams.get("offerId"));
@@ -38,6 +43,8 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Reminders");
+  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -51,6 +58,8 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
 });
 
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Reminders");
+  if (blocked) return blocked;
   const parsed = cancelSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBoostDiary, listBoostDiary } from "@/lib/services/boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ const createSchema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
+  const blocked = blockHostedDeskMutation("Odds boosts");
+  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

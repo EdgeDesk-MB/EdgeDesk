@@ -11,6 +11,12 @@ import {
   type RacingRacecard,
 } from "@/lib/services/theracingapi";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  findNeonEventByExternalId,
+  insertNeonEvent,
+  listNeonEvents,
+} from "@/lib/db/neon-events";
 
 function normaliseCourse(name: string): string {
   return name
@@ -50,6 +56,84 @@ function findExistingEvent(course: string, startTime: number): EventRow | undefi
     );
 }
 
+function racingEventMatch(e: EventRow, course: string, startTime: number): boolean {
+  return (
+    e.sport === "horse_racing" &&
+    !!e.startTime &&
+    Math.abs(e.startTime - startTime) < 6 * 60 * 1000 &&
+    coursesMatch(e.competition ?? "", course)
+  );
+}
+
+async function findOrCreateNeonRacingEvent(opts: {
+  course: string;
+  startTime: number;
+  raceName?: string;
+}): Promise<{ event: EventRow; mode: "existing" | "api" | "manual" }> {
+  const course = opts.course.trim();
+  const all = await listNeonEvents();
+  const existing = all.find((e) => racingEventMatch(e, course, opts.startTime));
+  if (existing) {
+    return { event: existing, mode: "existing" };
+  }
+
+  if (hasRacingApiKey()) {
+    try {
+      let card = matchRacecard(await racecardsFree("today"), course, opts.startTime);
+      if (!card) card = matchRacecard(await racecardsFree("tomorrow"), course, opts.startTime);
+      if (card) {
+        const byExternal = await findNeonEventByExternalId(card.externalId);
+        if (byExternal) {
+          return { event: byExternal, mode: "existing" };
+        }
+        const inserted = await insertNeonEvent({
+          sport: "horse_racing",
+          competition: card.course,
+          homeTeam: opts.raceName?.trim() || card.raceName,
+          awayTeam: formatEventTime(card.startTime),
+          startTime: card.startTime,
+          source: "api",
+          externalId: card.externalId,
+          status: card.status,
+          goals: card.runners.length
+            ? serializeRacecardRunners(card.runners, {
+                type: card.type,
+                distance: card.distance,
+                raceClass: card.raceClass,
+                prize: card.prize,
+                going: card.going,
+                fieldSize: card.fieldSize,
+              })
+            : null,
+          createdAt: Date.now(),
+        });
+        return { event: inserted, mode: "api" };
+      }
+    } catch {
+      // fall through to manual tracking below
+    }
+  }
+
+  const now = Date.now();
+  const status =
+    opts.startTime <= now - 5 * 60_000
+      ? "finished"
+      : opts.startTime <= now
+        ? "live"
+        : "upcoming";
+  const inserted = await insertNeonEvent({
+    sport: "horse_racing",
+    competition: course,
+    homeTeam: opts.raceName?.trim() || "Race",
+    awayTeam: formatEventTime(opts.startTime),
+    startTime: opts.startTime,
+    source: "manual",
+    status,
+    createdAt: now,
+  });
+  return { event: inserted, mode: "manual" };
+}
+
 export async function findOrCreateRacingEvent(opts: {
   course: string;
   startTime: number;
@@ -57,6 +141,10 @@ export async function findOrCreateRacingEvent(opts: {
 }): Promise<{ event: EventRow; mode: "existing" | "api" | "manual" }> {
   const course = opts.course.trim();
   if (!course) throw new Error("Course is required");
+
+  if (isNeonDesk()) {
+    return findOrCreateNeonRacingEvent({ ...opts, course });
+  }
 
   const existing = findExistingEvent(course, opts.startTime);
   if (existing) {

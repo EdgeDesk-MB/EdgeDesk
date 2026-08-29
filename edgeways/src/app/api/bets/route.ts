@@ -10,8 +10,9 @@ import {
 } from "@/lib/db/neon-desk";
 import { getNeonDeskOffer } from "@/lib/db/neon-desk-offers";
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
+import { ledgerNeonBetPlacement } from "@/lib/db/neon-desk-ledger";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
-import { ledgerBetPlacement, ledgerFromSettledBet } from "@/lib/services/balances";
+import { ledgerBetPlacement } from "@/lib/services/balances";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { resolveOfferForBet, resolveOfferForFreeBetUsage } from "@/lib/services/offers";
 import { linkBoostDiaryBet } from "@/lib/services/boosts";
@@ -164,6 +165,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         detail: inserted.label,
         createdAt: inserted.createdAt,
       }).catch(() => {});
+      await ledgerNeonBetPlacement(inserted).catch(() => {});
       return NextResponse.json({ bet: inserted });
     } catch (error) {
       const message =

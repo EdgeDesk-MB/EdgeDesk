@@ -7,6 +7,7 @@ import {
   settleBoostDiary,
 } from "@/lib/services/boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ const patchSchema = z.union([
 ]);
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const blocked = blockHostedDeskMutation("Odds boosts");
+  if (blocked) return blocked;
   const { id } = await ctx.params;
   const diaryId = Number(id);
   if (!Number.isFinite(diaryId)) {
@@ -46,6 +49,8 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const blocked = blockHostedDeskMutation("Odds boosts");
+  if (blocked) return blocked;
   const { id } = await ctx.params;
   const ok = deleteBoostDiary(Number(id));
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
