@@ -156,7 +156,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     bullets: [
       "Events are grouped by kick-off day, same Today / Yesterday split as Campaigns.",
       "All, Today, Upcoming, Past, or Jump to day to open a past date.",
-      "Simulate a 2UP match for the 60-second demo loop - no live feeds needed.",
+      "Add a match or race from Fixtures with +, or add one manually.",
       "Goal timelines fetch only when you have an open trigger bet on the match.",
       "Racing results usually land automatically while the desk is open; if not, use Set winner.",
       "Finished events stay here until you remove them.",

@@ -9,14 +9,31 @@ export type OfferCompleteInput = {
   };
 };
 
+const FREE_BET_STAGES_BLOCKING_COMPLETE = new Set([
+  "awarded",
+  "in_use",
+  "awaiting_result",
+]);
+
+/** True when every linked bet is settled and no free-bet stage is still in flight. */
+export function campaignBetsAreComplete(
+  betCount: number,
+  hasOpenBets: boolean,
+  freeBetStage: string
+): boolean {
+  if (betCount === 0) return false;
+  if (hasOpenBets) return false;
+  return !FREE_BET_STAGES_BLOCKING_COMPLETE.has(freeBetStage);
+}
+
 /** Whether the user can manually mark an active campaign complete from the offers page. */
 export function canManuallyCompleteOffer(offer: OfferCompleteInput): boolean {
   if (offer.status !== "active") return false;
-  if (offer.betCount === 0) return false;
-  if (offer.openBets > 0) return false;
-  const stage = offer.profit.freeBetStage;
-  if (stage === "awarded" || stage === "in_use" || stage === "awaiting_result") return false;
-  return true;
+  return campaignBetsAreComplete(
+    offer.betCount,
+    offer.openBets > 0,
+    offer.profit.freeBetStage
+  );
 }
 
 export function offerManualCompleteBlockedReason(offer: OfferCompleteInput): string | null {

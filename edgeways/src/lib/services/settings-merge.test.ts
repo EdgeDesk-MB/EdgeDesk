@@ -16,6 +16,22 @@ describe("parseStoredSettings", () => {
     });
     expect(settings.ageConfirmedAt).toBe(1_754_870_400_000);
   });
+
+  it("keeps hosted digest latches across parse and merge", () => {
+    const settings = parseStoredSettings({
+      ...DEFAULT_SETTINGS,
+      digestLastSentWeek: "2026-W34",
+      dailyTasksLastSentDay: "2026-08-24",
+    });
+    expect(settings.digestLastSentWeek).toBe("2026-W34");
+    expect(settings.dailyTasksLastSentDay).toBe("2026-08-24");
+    const patched = mergeAppSettings(settings, { digestWeekly: true });
+    expect(patched.digestLastSentWeek).toBe("2026-W34");
+    expect(patched.dailyTasksLastSentDay).toBe("2026-08-24");
+    expect(mergeAppSettings(patched, { digestLastSentWeek: "2026-W35" }).digestLastSentWeek).toBe(
+      "2026-W35"
+    );
+  });
 });
 
 describe("mergeAppSettings", () => {

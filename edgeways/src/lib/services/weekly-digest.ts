@@ -45,6 +45,35 @@ function mondayStart(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysSinceMonday);
 }
 
+/** Due window for the Monday morning digest. Latch is the caller's job. */
+export function weeklyDigestDueWindow(nowMs: number): {
+  weekKey: string;
+  weekStartMs: number;
+  weekEndMs: number;
+  due: boolean;
+} {
+  const now = new Date(nowMs);
+  const currentMonday = mondayStart(now);
+  const weekKey = isoWeekKey(currentMonday);
+  const dueAt = new Date(
+    currentMonday.getFullYear(),
+    currentMonday.getMonth(),
+    currentMonday.getDate(),
+    SEND_HOUR
+  ).getTime();
+  const weekStartMs = new Date(
+    currentMonday.getFullYear(),
+    currentMonday.getMonth(),
+    currentMonday.getDate() - 7
+  ).getTime();
+  return {
+    weekKey,
+    weekStartMs,
+    weekEndMs: currentMonday.getTime(),
+    due: nowMs >= dueAt,
+  };
+}
+
 /**
  * Send the weekly digest if enabled, due and not yet sent this week.
  * Returns true only when a digest actually landed in the inbox.
@@ -53,26 +82,13 @@ export function maybeSendWeeklyDigest(nowMs = Date.now()): boolean {
   const settings = getAppSettings();
   if (!settings.digestWeekly) return false;
 
-  const now = new Date(nowMs);
-  const currentMonday = mondayStart(now);
-  const weekKey = isoWeekKey(currentMonday);
+  const window = weeklyDigestDueWindow(nowMs);
+  const weekKey = window.weekKey;
   if (readSetting(LATCH_KEY) === weekKey) return false;
+  if (!window.due) return false;
 
-  const dueAt = new Date(
-    currentMonday.getFullYear(),
-    currentMonday.getMonth(),
-    currentMonday.getDate(),
-    SEND_HOUR
-  ).getTime();
-  if (nowMs < dueAt) return false;
-
-  // Completed week: [previous Monday 00:00, this Monday 00:00)
-  const weekStart = new Date(
-    currentMonday.getFullYear(),
-    currentMonday.getMonth(),
-    currentMonday.getDate() - 7
-  ).getTime();
-  const weekEnd = currentMonday.getTime();
+  const weekStart = window.weekStartMs;
+  const weekEnd = window.weekEndMs;
 
   const allBets = db.select().from(bets).all();
   const league = computeBookmakerStats({

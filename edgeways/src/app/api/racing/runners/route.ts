@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, events } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { getNeonEvent } from "@/lib/db/neon-events";
 import { localCalendarDate } from "@/lib/events";
 import { parseRacecardRunners } from "@/lib/racing";
 import { titleCaseHorse } from "@/lib/racing/parse-race-result-text";
@@ -29,7 +31,9 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   }
 
   const event = hasEventId
-    ? db.select().from(events).where(eq(events.id, eventId)).get()
+    ? isNeonDesk()
+      ? await getNeonEvent(eventId)
+      : db.select().from(events).where(eq(events.id, eventId)).get()
     : null;
   if (hasEventId && !event) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

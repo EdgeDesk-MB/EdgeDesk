@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createSystemRun, listSystemRuns } from "@/lib/services/systems-desk";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  createNeonSystemRun,
+  listNeonSystemRuns,
+} from "@/lib/db/neon-desk-systems";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
   const denied = await deniedFeatureResponse("systems_desk");
   if (denied) return denied;
+  if (isNeonDesk()) {
+    return NextResponse.json({ runs: await listNeonSystemRuns() });
+  }
   return NextResponse.json({ runs: listSystemRuns() });
 });
 
@@ -50,18 +57,19 @@ const createSchema = z.object({
 export const POST = withDeskScope(async function POST(req: NextRequest) {
   const denied = await deniedFeatureResponse("systems_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Systems Desk");
-  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   try {
+    if (isNeonDesk()) {
+      return NextResponse.json(await createNeonSystemRun(parsed.data));
+    }
     return NextResponse.json(createSystemRun(parsed.data));
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Could not create system run" },
-      { status: 400 }
-    );
+    const message =
+      e instanceof Error ? e.message : "Could not create system run";
+    const status = message.startsWith("Sign in") ? 401 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 });

@@ -1,0 +1,29 @@
+---
+description: Hosted (Vercel) desk data must persist to Neon, never the empty SQLite :memory: file
+globs: edgeways/src/app/api/**/*.ts,edgeways/src/lib/db/**/*.ts,edgeways/src/lib/services/**/*.ts
+alwaysApply: true
+---
+
+# Hosted desk is Neon
+
+Vercel `getDb()` is `:memory:`, not Sam's Mac `data/edgeways.db`. A hosted
+write that only hits SQLite looks successful, then vanishes. Home already
+reads Neon, so the desk looks empty. This shipped once. It must not ship again.
+
+## Do
+
+- Dual-path every customer desk read/write: `if (isNeonDesk()) { neon } else { sqlite }`.
+- Put new hosted tables on Neon with `clerk_user_id` and a clerk-scoped unique key.
+- Add or extend `hosted-desk-cutover.test.ts` in the same change. Customer
+  mutation routes that import `@/lib/db` must contain `isNeonDesk`.
+- If a feature is not ready on Neon, return an explicit 400. Do not write
+  SQLite and return 200.
+
+## Do not
+
+- Ship a hosted mutation that only inserts/updates/deletes SQLite.
+- Treat localhost SQLite success as proof the live desk works.
+- Enable the Free Profit Tracker site banner until this branch is production.
+- Expand hosted backup/restore to new tables unless restore is tested.
+
+`EDGEWAYS_DESK_BACKEND=neon` plus `DATABASE_URL` is what `isNeonDesk()` checks.

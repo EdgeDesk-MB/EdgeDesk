@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  clearNeonOddsOverride,
+  upsertNeonOddsOverride,
+} from "@/lib/db/neon-desk-racing-overrides";
 import {
   clearOddsOverride,
   upsertOddsOverride,
@@ -30,18 +35,20 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       return NextResponse.json({ error: "raceId and horseId required" }, { status: 400 });
     }
 
-    const override = upsertOddsOverride({
+    const payload = {
       raceId,
       horseId,
       bookieDecimal: parseDecimal(body.bookieDecimal),
       exchangeDecimal: parseDecimal(body.exchangeDecimal),
-    });
+    };
+    const override = isNeonDesk()
+      ? await upsertNeonOddsOverride(payload)
+      : upsertOddsOverride(payload);
     return NextResponse.json({ override });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 500 }
-    );
+    const message = e instanceof Error ? e.message : String(e);
+    const status = message.startsWith("Sign in") ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 });
 
@@ -52,6 +59,10 @@ export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
   if (!raceId || !horseId) {
     return NextResponse.json({ error: "raceId and horseId required" }, { status: 400 });
   }
-  clearOddsOverride(raceId, horseId);
+  if (isNeonDesk()) {
+    await clearNeonOddsOverride(raceId, horseId);
+  } else {
+    clearOddsOverride(raceId, horseId);
+  }
   return NextResponse.json({ ok: true });
 });

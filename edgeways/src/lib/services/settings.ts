@@ -140,6 +140,8 @@ export function getAppSettings(): AppSettings {
     alertsNakedExposure: readRaw("alertsNakedExposure") !== "false",
     alertsTwoUpLock: readRaw("alertsTwoUpLock") !== "false",
     digestWeekly: readRaw("digestWeekly") === "true",
+    digestLastSentWeek: null,
+    dailyTasksLastSentDay: null,
     tuning: parseTuning(readRaw("tuning")),
     homeLayout: parseHomeLayout(readRaw("homeLayout")),
     monthlyProfitTarget: parseMonthlyTarget(readRaw("monthlyProfitTarget")),

@@ -4,7 +4,6 @@
  */
 import "server-only";
 
-import { generateScript, type SimPreset } from "@/lib/services/sim";
 import {
   parseRaceResults,
   serializeRacecardRunners,
@@ -74,9 +73,10 @@ export async function createOrRefreshNeonEvent(input: {
   homeScore?: number;
   awayScore?: number;
   minute?: number;
-  simPreset?: SimPreset;
-  simStars?: { homeStar?: string; awayStar?: string };
 }): Promise<{ event: EventRow; existing: boolean }> {
+  if (input.source === "sim") {
+    throw new Error("Match simulation is no longer available.");
+  }
   const now = Date.now();
   if (input.externalId) {
     const existing = await findNeonEventByExternalId(input.externalId);
@@ -116,11 +116,6 @@ export async function createOrRefreshNeonEvent(input: {
     }
   }
 
-  const isSim = input.source === "sim";
-  const script = isSim
-    ? generateScript((input.simPreset ?? "random") as SimPreset, input.simStars)
-    : null;
-
   const values: NeonEventValues = {
     sport: input.sport,
     competition: input.competition,
@@ -129,7 +124,7 @@ export async function createOrRefreshNeonEvent(input: {
     startTime: input.startTime ?? now,
     source: input.source,
     externalId: input.externalId,
-    status: input.status ?? (isSim ? "live" : "upcoming"),
+    status: input.status ?? "upcoming",
     homeScore: input.homeScore ?? 0,
     awayScore: input.awayScore ?? 0,
     minute: input.minute ?? 0,
@@ -137,8 +132,8 @@ export async function createOrRefreshNeonEvent(input: {
       input.sport === "horse_racing" && input.runners?.length
         ? serializeRacecardRunners(input.runners, raceMetaFromTrackInput(input))
         : null,
-    simScript: script ? JSON.stringify(script) : null,
-    simStartedAt: isSim ? now : null,
+    simScript: null,
+    simStartedAt: null,
     createdAt: now,
   };
   return { event: await withFollow(await insertNeonEvent(values)), existing: false };

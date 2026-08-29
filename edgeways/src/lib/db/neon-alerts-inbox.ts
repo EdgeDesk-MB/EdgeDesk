@@ -5,18 +5,21 @@
  * neonDeskClerkUserId(); the system feed poller uses the explicit-owner
  * recordNeonAlertsForUser.
  *
- * NOT PORTED: pruneOrphanConditionAlerts. Condition alerts (naked_exposure,
- * offer_expiring, race_off_soon, ...) are not raised on hosted yet, so there
- * are no orphan rows to prune. Port it with the rules engine when those
- * kinds ship on hosted.
+ * Condition alerts are raised client-side via POST /api/alerts. Orphans
+ * (deleted bet / offer / event) are pruned on inbox read, same as local.
  */
 import "server-only";
 
 import { and, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import { plainAlertBody } from "@/lib/alerts/plain-body";
+import {
+  conditionAlertSubject,
+  orphanConditionDedupes,
+} from "@/lib/alerts/inbox-orphans";
 import { settledResultAlertCopy } from "@/lib/alerts/rules";
 import { getNeonDb } from "@/lib/db/neon";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
+import { listNeonEvents } from "@/lib/db/neon-events";
 import {
   alertsInbox as pgAlertsInbox,
   bets as pgBets,
@@ -158,9 +161,66 @@ async function reconcileNeonVoidedSettlementAlerts(
   }
 }
 
+export async function pruneNeonOrphanConditionAlerts(): Promise<number> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return 0;
+  const rows = await getNeonDb()
+    .select({ dedupe: pgAlertsInbox.dedupe })
+    .from(pgAlertsInbox)
+    .where(eq(pgAlertsInbox.clerkUserId, clerkUserId));
+  const subjects = rows
+    .map((row) => ({
+      dedupe: row.dedupe,
+      subject: conditionAlertSubject(row.dedupe),
+    }))
+    .filter(
+      (row): row is { dedupe: string; subject: NonNullable<typeof row.subject> } =>
+        row.subject != null
+    );
+  if (subjects.length === 0) return 0;
+
+  const idsFor = (table: "bets" | "offers" | "events"): number[] => [
+    ...new Set(subjects.filter((row) => row.subject.table === table).map((row) => row.subject.id)),
+  ];
+  const betIds = idsFor("bets");
+  const offerIds = idsFor("offers");
+  const eventIds = idsFor("events");
+
+  const [betRows, offerRows, events] = await Promise.all([
+    betIds.length > 0
+      ? getNeonDb()
+          .select({ id: pgBets.id })
+          .from(pgBets)
+          .where(and(eq(pgBets.clerkUserId, clerkUserId), inArray(pgBets.id, betIds)))
+      : Promise.resolve([]),
+    offerIds.length > 0
+      ? getNeonDb()
+          .select({ id: pgOffers.id })
+          .from(pgOffers)
+          .where(and(eq(pgOffers.clerkUserId, clerkUserId), inArray(pgOffers.id, offerIds)))
+      : Promise.resolve([]),
+    eventIds.length > 0 ? listNeonEvents().catch(() => []) : Promise.resolve([]),
+  ]);
+  const gone = orphanConditionDedupes(
+    subjects.map((row) => row.dedupe),
+    {
+      bets: new Set(betRows.map((r) => r.id)),
+      offers: new Set(offerRows.map((r) => r.id)),
+      events: new Set(events.map((e) => e.id)),
+    }
+  );
+  if (gone.length === 0) return 0;
+  const deleted = await getNeonDb()
+    .delete(pgAlertsInbox)
+    .where(and(eq(pgAlertsInbox.clerkUserId, clerkUserId), inArray(pgAlertsInbox.dedupe, gone)))
+    .returning({ id: pgAlertsInbox.id });
+  return deleted.length;
+}
+
 export async function listNeonInbox(limit = 100): Promise<AlertsInboxRow[]> {
   const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return [];
+  await pruneNeonOrphanConditionAlerts().catch(() => 0);
   await reconcileNeonVoidedSettlementAlerts(clerkUserId, Date.now()).catch(() => {});
   const rows = await getNeonDb()
     .select()
@@ -175,6 +235,7 @@ export async function listNeonInbox(limit = 100): Promise<AlertsInboxRow[]> {
 export async function listNeonInboxDedupes(): Promise<string[]> {
   const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return [];
+  await pruneNeonOrphanConditionAlerts().catch(() => 0);
   const rows = await getNeonDb()
     .select({ dedupe: pgAlertsInbox.dedupe })
     .from(pgAlertsInbox)

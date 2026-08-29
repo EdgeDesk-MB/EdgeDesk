@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logLegLay, setLegResult } from "@/lib/services/acca-desk";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { logNeonLegLay, setNeonLegResult } from "@/lib/db/neon-desk-acca";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,21 +27,24 @@ const patchSchema = z.object({
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const denied = await deniedFeatureResponse("acca_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Acca Desk");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const p = parsed.data;
+  const hosted = isNeonDesk();
   if (p.lay) {
-    const leg = logLegLay(Number(id), p.lay.layOdds, p.lay.layStake, p.lay.exchangeId);
+    const leg = hosted
+      ? await logNeonLegLay(Number(id), p.lay.layOdds, p.lay.layStake, p.lay.exchangeId)
+      : logLegLay(Number(id), p.lay.layOdds, p.lay.layStake, p.lay.exchangeId);
     if (!leg) return NextResponse.json({ error: "Cannot log lay" }, { status: 400 });
     return NextResponse.json({ leg });
   }
   if (p.result) {
-    const out = setLegResult(Number(id), p.result);
+    const out = hosted
+      ? await setNeonLegResult(Number(id), p.result)
+      : setLegResult(Number(id), p.result);
     if (!out) return NextResponse.json({ error: "Cannot set result" }, { status: 400 });
     return NextResponse.json(out);
   }

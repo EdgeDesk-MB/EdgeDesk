@@ -6,8 +6,14 @@ import {
   linkBoostDiaryBet,
   settleBoostDiary,
 } from "@/lib/services/boosts";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonBoostDiary,
+  getNeonBoostDiary,
+  linkNeonBoostDiaryBet,
+  settleNeonBoostDiary,
+} from "@/lib/db/neon-desk-boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +27,6 @@ const patchSchema = z.union([
 ]);
 
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const blocked = blockHostedDeskMutation("Odds boosts");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
   const diaryId = Number(id);
   if (!Number.isFinite(diaryId)) {
@@ -32,6 +36,20 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  if (isNeonDesk()) {
+    if ("betId" in parsed.data) {
+      const row = await linkNeonBoostDiaryBet(diaryId, parsed.data.betId);
+      if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const entry = await getNeonBoostDiary(diaryId);
+      return NextResponse.json({ entry });
+    }
+    const result = await settleNeonBoostDiary(diaryId, parsed.data.outcome);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json({ entry: result.entry, bet: result.bet });
   }
 
   if ("betId" in parsed.data) {
@@ -49,10 +67,10 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const blocked = blockHostedDeskMutation("Odds boosts");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
-  const ok = deleteBoostDiary(Number(id));
+  const ok = isNeonDesk()
+    ? await deleteNeonBoostDiary(Number(id))
+    : deleteBoostDiary(Number(id));
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 });

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, events } from "@/lib/db";
-import { generateScript, type SimPreset } from "@/lib/services/sim";
 import {
   parseRaceResults,
   serializeRacecardRunners,
@@ -13,7 +12,6 @@ import {
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isNeonDesk } from "@/lib/db/desk-backend";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 import { listNeonEventsForDesk } from "@/lib/db/neon-desk-tracked-events";
 import { createOrRefreshNeonEvent } from "@/lib/db/neon-event-write";
 
@@ -75,11 +73,13 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+  if (input.source === "sim") {
+    return NextResponse.json(
+      { error: "Match simulation is no longer available. Track a live fixture instead." },
+      { status: 410 }
+    );
+  }
   if (isNeonDesk()) {
-    if (input.source === "sim") {
-      const blocked = blockHostedDeskMutation("Simulations");
-      if (blocked) return blocked;
-    }
     const { event, existing } = await createOrRefreshNeonEvent({
       ...input,
       raceMeta: raceMetaFromInput(input),
@@ -133,11 +133,6 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
     }
   }
 
-  const isSim = input.source === "sim";
-  const script = isSim
-    ? generateScript((input.simPreset ?? "random") as SimPreset, input.simStars)
-    : null;
-
   const inserted = db
     .insert(events)
     .values({
@@ -148,7 +143,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       startTime: input.startTime ?? now,
       source: input.source,
       externalId: input.externalId,
-      status: input.status ?? (isSim ? "live" : "upcoming"),
+      status: input.status ?? "upcoming",
       homeScore: input.homeScore ?? 0,
       awayScore: input.awayScore ?? 0,
       minute: input.minute ?? 0,
@@ -156,8 +151,8 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         input.sport === "horse_racing" && input.runners?.length
           ? serializeRacecardRunners(input.runners, raceMetaFromInput(input))
           : null,
-      simScript: script ? JSON.stringify(script) : null,
-      simStartedAt: isSim ? now : null,
+      simScript: null,
+      simStartedAt: null,
       createdAt: now,
     })
     .returning()

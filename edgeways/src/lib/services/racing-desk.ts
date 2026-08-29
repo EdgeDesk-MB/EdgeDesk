@@ -44,6 +44,9 @@ import {
   deskRunnerMarksForEvent,
   isRacingDeskHiddenBet,
 } from "@/lib/racing-desk/desk-active-bets";
+import { listNeonAccaRuns } from "@/lib/db/neon-desk-acca";
+import { listNeonBetBuilderRuns } from "@/lib/db/neon-desk-bet-builder";
+import { listNeonSystemRuns } from "@/lib/db/neon-desk-systems";
 import { listAccaRuns } from "@/lib/services/acca-desk";
 import { listBetBuilderRuns } from "@/lib/services/bet-builder-desk";
 import { listSystemRuns } from "@/lib/services/systems-desk";
@@ -72,6 +75,11 @@ import {
   priceMovementFor,
   recordOddsSnapshots,
 } from "@/lib/services/racing-odds-snapshots";
+import { listNeonOverridesForRaces } from "@/lib/db/neon-desk-racing-overrides";
+import {
+  neonPriceMovementsForRaces,
+  recordNeonOddsSnapshots,
+} from "@/lib/db/neon-desk-racing-snapshots";
 import { listOverridesForRaces } from "@/lib/services/racing-odds-overrides";
 import {
   demoRacecards,
@@ -667,9 +675,11 @@ export async function getRacingDesk(
     list.push(bet);
     betsByEvent.set(bet.eventId, list);
   }
-  const accaBundles = listAccaRuns();
-  const betBuilderBundles = listBetBuilderRuns();
-  const systemBundles = listSystemRuns();
+  const accaBundles = hosted ? await listNeonAccaRuns() : listAccaRuns();
+  const betBuilderBundles = hosted
+    ? await listNeonBetBuilderRuns()
+    : listBetBuilderRuns();
+  const systemBundles = hosted ? await listNeonSystemRuns() : listSystemRuns();
   const deskMarkInput = {
     acca: accaBundles.map(({ run, legs, backBetType }) => {
       const back = run.backBetId != null ? betsById.get(run.backBetId) : undefined;
@@ -813,7 +823,10 @@ export async function getRacingDesk(
     }
   }
 
-  const overridesByRace = listOverridesForRaces(cards.map((c) => c.externalId));
+  const raceIds = cards.map((c) => c.externalId);
+  const overridesByRace = hosted
+    ? await listNeonOverridesForRaces(raceIds)
+    : listOverridesForRaces(raceIds);
   const offersById = new Map(allOffers.map((o) => [o.id, o] as const));
 
   const now = Date.now();
@@ -940,15 +953,31 @@ export async function getRacingDesk(
   );
   const snapshotInputs = [...bookieSnapshots, ...exchangeSnapshots];
   if (snapshotInputs.length > 0) {
-    recordOddsSnapshots(snapshotInputs);
-    races = races.map((race) => ({
-      ...race,
-      runners: race.runners.map((r) => ({
-        ...r,
-        movement: priceMovementFor(race.externalId, r.horseId, "bookie"),
-        exchangeMovement: priceMovementFor(race.externalId, r.horseId, "exchange"),
-      })),
-    }));
+    if (hosted) {
+      await recordNeonOddsSnapshots(snapshotInputs);
+      const moves = await neonPriceMovementsForRaces(races.map((r) => r.externalId));
+      races = races.map((race) => ({
+        ...race,
+        runners: race.runners.map((r) => ({
+          ...r,
+          movement:
+            moves.get(race.externalId)?.get("bookie")?.get(r.horseId) ?? r.movement,
+          exchangeMovement:
+            moves.get(race.externalId)?.get("exchange")?.get(r.horseId) ??
+            r.exchangeMovement,
+        })),
+      }));
+    } else {
+      recordOddsSnapshots(snapshotInputs);
+      races = races.map((race) => ({
+        ...race,
+        runners: race.runners.map((r) => ({
+          ...r,
+          movement: priceMovementFor(race.externalId, r.horseId, "bookie"),
+          exchangeMovement: priceMovementFor(race.externalId, r.horseId, "exchange"),
+        })),
+      }));
+    }
   }
 
   const activeOfferSummaries = buildActiveOfferSummaries(activeOffers);

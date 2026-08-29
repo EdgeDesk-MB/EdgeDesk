@@ -8,9 +8,17 @@ import {
   settleBetBuilderRun,
   updateBetBuilderRun,
 } from "@/lib/services/bet-builder-desk";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonBetBuilderRun,
+  logNeonBetBuilderWholeLay,
+  markNeonBetBuilderNoLay,
+  patchNeonBetBuilderRunFlags,
+  settleNeonBetBuilderRun,
+  updateNeonBetBuilderRun,
+} from "@/lib/db/neon-desk-bet-builder";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -54,17 +62,66 @@ const patchSchema = z.object({
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const denied = await deniedFeatureResponse("bet_builder_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Bet Builder Desk");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const p = parsed.data;
+  const runId = Number(id);
+  if (isNeonDesk()) {
+    if (p.wholeLay) {
+      const run = await logNeonBetBuilderWholeLay(
+        runId,
+        p.wholeLay.layOdds,
+        p.wholeLay.layStake,
+        p.wholeLay.exchangeId
+      );
+      if (!run) return NextResponse.json({ error: "Cannot log whole lay" }, { status: 400 });
+      return NextResponse.json({ run });
+    }
+    if (p.noLay) {
+      const run = await markNeonBetBuilderNoLay(runId);
+      if (!run) return NextResponse.json({ error: "Cannot mark no lay" }, { status: 400 });
+      return NextResponse.json({ run });
+    }
+    if (p.result) {
+      const run = await settleNeonBetBuilderRun(runId, p.result);
+      if (!run) return NextResponse.json({ error: "Cannot settle bet builder" }, { status: 400 });
+      return NextResponse.json({ run });
+    }
+    if (p.label != null && p.selections != null) {
+      const view = await updateNeonBetBuilderRun(runId, {
+        label: p.label,
+        bookmaker: p.bookmaker,
+        stake: p.stake,
+        backOdds: p.backOdds,
+        commission: p.commission,
+        eventLabel: p.eventLabel,
+        eventId: p.eventId,
+        sport: p.sport,
+        scheduledAt: p.scheduledAt,
+        backBetType: p.backBetType,
+        selections: p.selections,
+      });
+      if (!view) {
+        return NextResponse.json(
+          { error: "Cannot update bet builder - check selections, or money fields after lay/results" },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(view);
+    }
+    const run = await patchNeonBetBuilderRunFlags(runId, {
+      muteAlerts: p.muteAlerts,
+      status: p.status,
+    });
+    if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ run });
+  }
   if (p.wholeLay) {
     const run = logBetBuilderWholeLay(
-      Number(id),
+      runId,
       p.wholeLay.layOdds,
       p.wholeLay.layStake,
       p.wholeLay.exchangeId
@@ -73,17 +130,17 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     return NextResponse.json({ run });
   }
   if (p.noLay) {
-    const run = markBetBuilderNoLay(Number(id));
+    const run = markBetBuilderNoLay(runId);
     if (!run) return NextResponse.json({ error: "Cannot mark no lay" }, { status: 400 });
     return NextResponse.json({ run });
   }
   if (p.result) {
-    const run = settleBetBuilderRun(Number(id), p.result);
+    const run = settleBetBuilderRun(runId, p.result);
     if (!run) return NextResponse.json({ error: "Cannot settle bet builder" }, { status: 400 });
     return NextResponse.json({ run });
   }
   if (p.label != null && p.selections != null) {
-    const view = updateBetBuilderRun(Number(id), {
+    const view = updateBetBuilderRun(runId, {
       label: p.label,
       bookmaker: p.bookmaker,
       stake: p.stake,
@@ -110,7 +167,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
       ...(p.muteAlerts !== undefined ? { muteAlerts: p.muteAlerts ? 1 : 0 } : {}),
       ...(p.status ? { status: p.status } : {}),
     })
-    .where(eq(betBuilderRuns.id, Number(id)))
+    .where(eq(betBuilderRuns.id, runId))
     .returning()
     .get();
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -120,10 +177,14 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const denied = await deniedFeatureResponse("bet_builder_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Bet Builder Desk");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
-  const run = db.select().from(betBuilderRuns).where(eq(betBuilderRuns.id, Number(id))).get();
+  const runId = Number(id);
+  if (isNeonDesk()) {
+    const ok = await deleteNeonBetBuilderRun(runId);
+    if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+  const run = db.select().from(betBuilderRuns).where(eq(betBuilderRuns.id, runId)).get();
   const linkedBetIds = [run?.backBetId, run?.wholeLayBetId].filter(
     (x): x is number => x != null
   );
@@ -133,7 +194,7 @@ export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx
       .where(and(eq(bets.id, betId), eq(bets.status, "open")))
       .run();
   }
-  db.delete(betBuilderSelections).where(eq(betBuilderSelections.runId, Number(id))).run();
-  db.delete(betBuilderRuns).where(eq(betBuilderRuns.id, Number(id))).run();
+  db.delete(betBuilderSelections).where(eq(betBuilderSelections.runId, runId)).run();
+  db.delete(betBuilderRuns).where(eq(betBuilderRuns.id, runId)).run();
   return NextResponse.json({ ok: true });
 });

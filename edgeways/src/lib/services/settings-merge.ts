@@ -175,6 +175,14 @@ export function parseStoredSettings(raw: unknown): AppSettings {
     alertsNakedExposure: o.alertsNakedExposure !== false,
     alertsTwoUpLock: o.alertsTwoUpLock !== false,
     digestWeekly: o.digestWeekly === true,
+    digestLastSentWeek:
+      typeof o.digestLastSentWeek === "string" && o.digestLastSentWeek.trim()
+        ? o.digestLastSentWeek.trim()
+        : null,
+    dailyTasksLastSentDay:
+      typeof o.dailyTasksLastSentDay === "string" && o.dailyTasksLastSentDay.trim()
+        ? o.dailyTasksLastSentDay.trim()
+        : null,
     tuning: normalizeTuning(o.tuning ?? DEFAULT_TUNING),
     homeLayout: normalizeHomeLayout(o.homeLayout),
     monthlyProfitTarget: parseMonthlyTarget(o.monthlyProfitTarget),
@@ -236,6 +244,18 @@ export function mergeAppSettings(
   if (patch.alertsNakedExposure != null) next.alertsNakedExposure = patch.alertsNakedExposure;
   if (patch.alertsTwoUpLock != null) next.alertsTwoUpLock = patch.alertsTwoUpLock;
   if (patch.digestWeekly != null) next.digestWeekly = patch.digestWeekly;
+  if (patch.digestLastSentWeek !== undefined) {
+    next.digestLastSentWeek =
+      typeof patch.digestLastSentWeek === "string" && patch.digestLastSentWeek.trim()
+        ? patch.digestLastSentWeek.trim()
+        : null;
+  }
+  if (patch.dailyTasksLastSentDay !== undefined) {
+    next.dailyTasksLastSentDay =
+      typeof patch.dailyTasksLastSentDay === "string" && patch.dailyTasksLastSentDay.trim()
+        ? patch.dailyTasksLastSentDay.trim()
+        : null;
+  }
   if (patch.tuning != null) {
     next.tuning = normalizeTuning({ ...next.tuning, ...patch.tuning });
   }

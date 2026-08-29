@@ -304,26 +304,27 @@ export function FixtureBrowserContent({
         <Button
           variant="outline"
           size="sm"
-          disabled={fixtureSport !== "horse_racing" || syncingRacing}
-          onClick={syncRacingResults}
-          className={cn(
-            "gap-1.5",
-            fixtureSport !== "horse_racing" && "pointer-events-none invisible"
-          )}
-          aria-hidden={fixtureSport !== "horse_racing"}
-          tabIndex={fixtureSport !== "horse_racing" ? -1 : undefined}
-        >
-          <RefreshCw className={syncingRacing ? "size-3.5 motion-safe:animate-spin" : "size-3.5"} />
-          Sync
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadFixtures}
-          disabled={loadingFixtures}
+          onClick={async () => {
+            await loadFixtures();
+            if (fixtureSport === "horse_racing") {
+              await syncRacingResults();
+            }
+          }}
+          disabled={loadingFixtures || syncingRacing}
           className="gap-1.5"
+          aria-label={
+            fixtureSport === "horse_racing"
+              ? "Refresh racecards and results"
+              : "Refresh fixtures"
+          }
         >
-          <RefreshCw className={loadingFixtures ? "size-3.5 motion-safe:animate-spin" : "size-3.5"} />
+          <RefreshCw
+            className={
+              loadingFixtures || syncingRacing
+                ? "size-3.5 motion-safe:animate-spin"
+                : "size-3.5"
+            }
+          />
           Refresh
         </Button>
       </div>

@@ -224,6 +224,7 @@ export const mugPlans = pgTable("mug_plans", {
   lastMugAt: epochMs("last_mug_at"),
   notes: text("notes"),
   createdAt: epochMs("created_at").notNull(),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Acca desk run (J7) - a guided multi-day acca workflow. */
@@ -256,6 +257,7 @@ export const accaRuns = pgTable("acca_runs", {
     .default("active"),
   createdAt: epochMs("created_at").notNull(),
   settledAt: epochMs("settled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** One leg of an acca run; placed lays are REAL bets rows via layBetId. */
@@ -278,6 +280,7 @@ export const accaLegs = pgTable("acca_legs", {
     .notNull()
     .default("pending"),
   scheduledAt: epochMs("scheduled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Bet Builder desk run — same-event combo, one kick-off, combined lay or no lay. */
@@ -307,6 +310,7 @@ export const betBuilderRuns = pgTable("bet_builder_runs", {
     .default("active"),
   createdAt: epochMs("created_at").notNull(),
   settledAt: epochMs("settled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** One selection inside a bet builder (checklist; no per-selection lay). */
@@ -320,6 +324,7 @@ export const betBuilderSelections = pgTable("bet_builder_selections", {
   result: text("result", { enum: ["pending", "won", "lost", "void"] })
     .notNull()
     .default("pending"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /**
@@ -360,6 +365,7 @@ export const systemRuns = pgTable("system_runs", {
     .default("active"),
   createdAt: epochMs("created_at").notNull(),
   settledAt: epochMs("settled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 export const systemLegs = pgTable("system_legs", {
@@ -380,6 +386,7 @@ export const systemLegs = pgTable("system_legs", {
     .notNull()
     .default("pending"),
   scheduledAt: epochMs("scheduled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Matched betting offer / promo pipeline (sign-up, reload, racing refund, etc.) */
@@ -439,6 +446,7 @@ export const offerEvSnapshots = pgTable("offer_ev_snapshots", {
   settledAt: epochMs("settled_at"),
   /** B7 mistake ledger: laid_late | wrong_market | odds_moved | bookie_voided | other */
   mistakeTag: text("mistake_tag"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Recurring offer template - instances are materialised as separate offer rows */
@@ -547,6 +555,7 @@ export const userReminders = pgTable("user_reminders", {
   createdAt: epochMs("created_at").notNull(),
   firedAt: epochMs("fired_at"),
   cancelledAt: epochMs("cancelled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /**
@@ -789,6 +798,7 @@ export const boostDiary = pgTable("boost_diary", {
   actualProfit: doublePrecision("actual_profit"),
   createdAt: epochMs("created_at").notNull(),
   settledAt: epochMs("settled_at"),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /** Measured execution effort per offer action (J1) - powers real £/hr. */
@@ -801,6 +811,7 @@ export const offerEffortSamples = pgTable("offer_effort_samples", {
   durationMin: doublePrecision("duration_min").notNull(),
   edited: integer("edited").notNull().default(0),
   createdAt: epochMs("created_at").notNull(),
+  clerkUserId: text("clerk_user_id"),
 });
 
 /**
@@ -979,6 +990,7 @@ export const racingOddsOverrides = pgTable("racing_odds_overrides", {
   bookieDecimal: doublePrecision("bookie_decimal"),
   exchangeDecimal: doublePrecision("exchange_decimal"),
   updatedAt: epochMs("updated_at").notNull(),
+  clerkUserId: text("clerk_user_id"),
 });
 
 export type EventRow = typeof events.$inferSelect;

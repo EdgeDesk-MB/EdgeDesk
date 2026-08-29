@@ -27,6 +27,11 @@ the app derives every market and auto-settles linked bets.
 
 ## Hard rules
 - British English. Commas, never em dashes.
+- Hosted desk is Neon. Vercel SQLite is `:memory:`. Never ship a customer
+  mutation that writes SQLite on `isNeonDesk()`. Dual-path or return 400.
+  `hosted-desk-cutover.test.ts` must stay green. Localhost success is not
+  live proof. Do not enable the Free Profit Tracker site banner until
+  production.
 - NEVER weaken or delete a passing calc/settlement test to make code pass.
 - Money maths is exact: no floating-point shortcuts in stake/lay/commission logic.
 - Respect the result-centric model: derive market outcomes, do not hardcode them.

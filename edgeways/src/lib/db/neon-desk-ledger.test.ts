@@ -127,6 +127,20 @@ vi.mock("@/lib/db/neon-desk-accounts", () => ({
     mocks.txs.push(values);
     return { id: mocks.txs.length, ...values };
   },
+  patchNeonDeskAccount: async (id: number, patch: Record<string, unknown>) => {
+    const row = mocks.accounts.find((a) => a.id === id);
+    if (!row) return null;
+    Object.assign(row, patch);
+    return row;
+  },
+  deleteNeonDeskFreeBetUsageForBet: async (betId: number) => {
+    const idx = mocks.txs.findIndex(
+      (t) => t.betId === betId && t.category === "free_bet" && Number(t.amount ?? 0) < 0
+    );
+    if (idx < 0) return false;
+    mocks.txs.splice(idx, 1);
+    return true;
+  },
   purgeNeonDeskTransactionsForBet: async () => {},
   purgeNeonDeskPlacementTransactionsForBet: async (betId: number) => {
     mocks.txs = mocks.txs.filter((t) => {
@@ -192,14 +206,53 @@ describe("ledgerNeonBetPlacement", () => {
     });
   });
 
-  it("skips the cash debit on a free bet", async () => {
+  it("debits a free-bet usage row instead of cash on a free bet", async () => {
     mocks.accounts.push(account({ id: 30, name: "Bet365", type: "bookie" }));
     await ledgerNeonBetPlacement(bet({ betType: "free_snr", exchangeId: null }));
-    expect(mocks.txs).toEqual([]);
+    expect(mocks.txs).toEqual([
+      expect.objectContaining({
+        accountId: 30,
+        amount: -10,
+        category: "free_bet",
+        betId: 10,
+        note: "Free bet used - Arsenal",
+      }),
+    ]);
     expect(mocks.patches).toContainEqual({
       id: 10,
       patch: { balanceLedgered: 1 },
     });
+  });
+
+  it("debits free-bet legs on a dutch ticket", async () => {
+    mocks.accounts.push(account({ id: 30, name: "Bet365", type: "bookie" }));
+    await ledgerNeonBetPlacement(
+      bet({
+        betType: "dutch",
+        exchangeId: null,
+        backStake: 0,
+        legs: JSON.stringify([
+          { label: "Home", market: "match_odds", selection: "home", odds: 2, stake: 8, freeBet: "snr", bookmaker: "Bet365" },
+          { label: "Away", market: "match_odds", selection: "away", odds: 3.5, stake: 5, bookmaker: "Bet365" },
+        ]),
+      })
+    );
+    expect(mocks.txs).toEqual([
+      expect.objectContaining({
+        accountId: 30,
+        amount: -8,
+        category: "free_bet",
+        note: "Free bet used - Arsenal (Home)",
+      }),
+    ]);
+  });
+
+  it("burns outstanding WR on a cash back stake", async () => {
+    mocks.accounts.push(
+      account({ id: 30, name: "Bet365", type: "bookie", wrRemaining: 40, wrType: "stake" })
+    );
+    await ledgerNeonBetPlacement(bet({ exchangeId: null, backStake: 10 }));
+    expect(mocks.accounts[0]?.wrRemaining).toBe(30);
   });
 
   it("is idempotent when another worker already claimed the placement", async () => {
@@ -365,6 +418,30 @@ describe("ledgerNeonBetSettlement", () => {
         category: "bet_settlement",
       })
     );
+  });
+
+  it("restores a free-bet usage debit on void instead of inventing a credit", async () => {
+    mocks.txs.push({
+      accountId: 30,
+      amount: -10,
+      category: "free_bet",
+      betId: 10,
+    });
+    await expect(
+      ledgerNeonBetSettlement(
+        bet({
+          status: "void",
+          betType: "free_snr",
+          exchangeId: null,
+          balanceLedgered: 1,
+        })
+      )
+    ).resolves.toBe(true);
+    expect(mocks.txs).toEqual([]);
+    expect(mocks.patches).toContainEqual({
+      id: 10,
+      patch: { balanceSettled: 1 },
+    });
   });
 
   it("does not credit a refund-if free bet when the back wins", async () => {

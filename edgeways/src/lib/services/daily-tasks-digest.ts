@@ -39,6 +39,22 @@ export function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+/** Due window for the 09:00 daily-tasks briefing. Latch is the caller's job. */
+export function dailyTasksDigestDueWindow(nowMs: number): {
+  dayKey: string;
+  due: boolean;
+} {
+  const now = new Date(nowMs);
+  const dayKey = localDayKey(now);
+  const dueAt = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    SEND_HOUR
+  ).getTime();
+  return { dayKey, due: nowMs >= dueAt };
+}
+
 /**
  * Send the daily tasks digest if enabled, due and not yet sent today.
  * Returns true only when a digest actually landed in the inbox.
@@ -47,17 +63,10 @@ export function maybeSendDailyTasksDigest(nowMs = Date.now()): boolean {
   const settings = getAppSettings();
   if (!settings.offerRemindersEnabled) return false;
 
-  const now = new Date(nowMs);
-  const dayKey = localDayKey(now);
+  const window = dailyTasksDigestDueWindow(nowMs);
+  const dayKey = window.dayKey;
   if (readSetting(LATCH_KEY) === dayKey) return false;
-
-  const dueAt = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    SEND_HOUR
-  ).getTime();
-  if (nowMs < dueAt) return false;
+  if (!window.due) return false;
 
   const offers = listOfferSummaries();
   const lots = listAllOpenFreeBetLots().map((lot) => ({

@@ -5,7 +5,7 @@
  */
 import "server-only";
 
-import { and, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
@@ -323,6 +323,35 @@ export async function purgeNeonDeskTransactionsForBet(
         eq(pgBalanceTransactions.clerkUserId, clerkUserId)
       )
     );
+}
+
+/** Delete the latest free-bet usage debit for a void/push restore. */
+export async function deleteNeonDeskFreeBetUsageForBet(
+  betId: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<boolean> {
+  if (!clerkUserId) return false;
+  const rows = await getNeonDb()
+    .select()
+    .from(pgBalanceTransactions)
+    .where(
+      and(
+        eq(pgBalanceTransactions.betId, betId),
+        eq(pgBalanceTransactions.clerkUserId, clerkUserId),
+        eq(pgBalanceTransactions.category, "free_bet"),
+        lt(pgBalanceTransactions.amount, 0)
+      )
+    )
+    .orderBy(desc(pgBalanceTransactions.createdAt), desc(pgBalanceTransactions.id))
+    .limit(1);
+  const usage = rows[0];
+  if (!usage) return false;
+  await getNeonDb()
+    .delete(pgBalanceTransactions)
+    .where(
+      and(eq(pgBalanceTransactions.id, usage.id), eq(pgBalanceTransactions.clerkUserId, clerkUserId))
+    );
+  return true;
 }
 
 /** Drop cash stake / free-bet usage debits so an open bet can be re-ledgered. */

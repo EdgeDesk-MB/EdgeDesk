@@ -1,6 +1,7 @@
 /**
  * Hosted-desk mutation guard. Features that still only write SQLite must not
  * return success against a Neon-backed Home snapshot.
+ * No remaining desk writers; match simulation is gone (410), not guarded.
  */
 import { NextResponse } from "next/server";
 import { isNeonDesk } from "@/lib/db/desk-backend";

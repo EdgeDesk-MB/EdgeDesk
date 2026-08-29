@@ -60,6 +60,16 @@ export interface AppSettings {
   alertsTwoUpLock: boolean;
   /** Weekly digest (H1) - Monday morning summary of last week; opt-in. */
   digestWeekly: boolean;
+  /**
+   * Hosted latch for the last ISO week a weekly digest was sent.
+   * Not a Settings control; the localhost desk stores this in app_settings.
+   */
+  digestLastSentWeek: string | null;
+  /**
+   * Hosted latch for the last local day a daily-tasks digest was sent.
+   * Not a Settings control; the localhost desk stores this in app_settings.
+   */
+  dailyTasksLastSentDay: string | null;
   /** Tunable behaviour thresholds (E1) - see TuningSettings */
   tuning: TuningSettings;
   /** Home widget order and visibility (E2) */
@@ -191,6 +201,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alertsNakedExposure: true,
   alertsTwoUpLock: true,
   digestWeekly: false,
+  digestLastSentWeek: null,
+  dailyTasksLastSentDay: null,
   tuning: DEFAULT_TUNING,
   homeLayout: DEFAULT_HOME_LAYOUT,
   monthlyProfitTarget: null,

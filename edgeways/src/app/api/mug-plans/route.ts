@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, mugPlans } from "@/lib/db";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonMugPlans, upsertNeonMugPlan } from "@/lib/db/neon-desk-mug-plans";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    return NextResponse.json({ plans: await listNeonMugPlans() });
+  }
   return NextResponse.json({ plans: db.select().from(mugPlans).all() });
 });
 
@@ -20,11 +24,24 @@ const upsertSchema = z.object({
 
 /** Upsert by accountId - one cadence plan per bookie. */
 export const POST = withDeskScope(async function POST(req: NextRequest) {
-  const blocked = blockHostedDeskMutation("Mug betting plans");
-  if (blocked) return blocked;
   const parsed = upsertSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  if (isNeonDesk()) {
+    try {
+      const plan = await upsertNeonMugPlan(parsed.data);
+      return NextResponse.json({ plan });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the mug plan.";
+      const status = message.startsWith("Sign in")
+        ? 401
+        : message.includes("not found")
+          ? 404
+          : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
   }
   const input = parsed.data;
   const existing = db

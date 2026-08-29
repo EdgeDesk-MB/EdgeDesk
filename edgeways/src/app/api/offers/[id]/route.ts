@@ -24,11 +24,19 @@ import {
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskBalanceTransactions } from "@/lib/db/neon-desk-accounts";
+import {
+  fillNeonSettlementSnapshot,
+  writeNeonEvLock,
+} from "@/lib/db/neon-desk-ev-snapshots";
 import {
   deleteNeonDeskOffer,
   getNeonDeskOffer,
   patchNeonDeskOffer,
 } from "@/lib/db/neon-desk-offers";
+import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
+import { summariseOffer as summariseOfferPure } from "@/lib/offers/offer-profit";
 
 export const dynamic = "force-dynamic";
 
@@ -79,8 +87,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   const offerId = Number(id);
 
   if (isNeonDesk()) {
-    // Hosted desk: series recurrence, EV snapshots and playbooks are still
-    // SQLite-only; edit the campaign row directly.
+    // Hosted desk: series recurrence and playbooks are still SQLite-only.
     if (p.stopRecurrence || p.updateSeries || p.mistakeTag !== undefined || p.playbookStepDone) {
       return NextResponse.json(
         { error: "That offer feature is not available yet." },
@@ -116,6 +123,47 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
         ...hostedExpireStamp,
       });
       if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const activated = p.status === "active" && hostedExisting.status === "planned";
+      if (p.expectedProfit !== undefined || activated) {
+        const [linked, txs] = await Promise.all([
+          listNeonDeskBets(),
+          listNeonDeskBalanceTransactions(),
+        ]);
+        const summary = summariseOfferPure(
+          updated,
+          linked.filter((b) => b.offerId === offerId),
+          promoAwardsFromTransactions(txs)
+        );
+        const stage = deriveOfferPipelineStage(summary);
+        if (stage !== "settled" && stage !== "expired") {
+          await writeNeonEvLock(
+            summary,
+            p.expectedProfit !== undefined
+              ? { expectedProfit: p.expectedProfit }
+              : { onlyIfUnlocked: true }
+          ).catch(() => null);
+        }
+      }
+      if (
+        (p.status === "completed" || p.status === "expired") &&
+        hostedExisting.status !== p.status
+      ) {
+        quietOfferAlerts(offerId);
+        if (p.status === "completed") {
+          const [linked, txs] = await Promise.all([
+            listNeonDeskBets(),
+            listNeonDeskBalanceTransactions(),
+          ]);
+          const summary = summariseOfferPure(
+            updated,
+            linked.filter((b) => b.offerId === offerId),
+            promoAwardsFromTransactions(txs)
+          );
+          await fillNeonSettlementSnapshot(offerId, summary.profit.totalProfit, 0).catch(
+            () => {}
+          );
+        }
+      }
       return NextResponse.json({ offer: updated });
     } catch (error) {
       const message =
@@ -243,6 +291,7 @@ export const DELETE = withDeskScope(async function DELETE(req: NextRequest, ctx:
     // No recurring series on the hosted desk yet - scope is always "instance".
     const deleted = await deleteNeonDeskOffer(offerId);
     if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    quietOfferAlerts(offerId);
     return NextResponse.json({ ok: true });
   }
 

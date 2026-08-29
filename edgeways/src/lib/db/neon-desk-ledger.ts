@@ -1,16 +1,22 @@
 /**
  * Hosted cash ledger for bet place/settle, plus promo free-bet credits
- * (awardOnLoss / unconditional unlock). free_snr/free_sr still skip cash
- * stake debit; lot FIFO is derived from the free_bet rows.
+ * (awardOnLoss / unconditional unlock). free_snr/free_sr debit a free_bet
+ * usage row; lot FIFO is derived from those rows. Dutch free legs and WR
+ * burn match the local balances helpers.
  */
 import "server-only";
 
+import { wrContributionForBet } from "@/lib/accounts/wagering";
+import { freeBetUsageNote } from "@/lib/accounts/free-bet-lot-balance";
+import type { DutchLegRecord } from "@/lib/calc/settlement";
 import { ensureNeonVenueAccount } from "@/lib/db/neon-desk-ensure-venue";
 import {
+  deleteNeonDeskFreeBetUsageForBet,
   insertNeonDeskTransaction,
   listNeonDeskAccounts,
   listNeonDeskBalanceTransactions,
   listNeonExchanges,
+  patchNeonDeskAccount,
   purgeNeonDeskPlacementTransactionsForBet,
   purgeNeonDeskTransactionsForBet,
 } from "@/lib/db/neon-desk-accounts";
@@ -22,8 +28,10 @@ import {
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import { evaluateUnconditionalFreeBet, isPlaceFreeBetEffect } from "@/lib/calc/ai-triggers";
 import {
+  EARLY_FREE_BET_AWARD_REASON,
   FREE_BET_EARNED_PHRASE,
   freeBetEffectsForBet,
+  unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
 import type { AccountRow, BetRow } from "@/lib/db/schema";
 
@@ -62,18 +70,85 @@ export function logNeonLedgerFailure(stage: string, betId: number, error: unknow
   console.error(`[neon-ledger] ${stage} failed for bet ${betId}: ${message}`);
 }
 
-/** Debit back stake and lay liability when a hosted bet is saved. */
+function parseDutchLegs(bet: BetRow): DutchLegRecord[] {
+  if (!bet.legs) return [];
+  try {
+    const parsed = JSON.parse(bet.legs) as DutchLegRecord[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function ledgerNeonFreeBetUsageDebit(
+  accountId: number,
+  stake: number,
+  label: string,
+  betId: number,
+  owner: string
+): Promise<void> {
+  await insertNeonDeskTransaction(
+    {
+      accountId,
+      amount: -stake,
+      category: "free_bet",
+      note: freeBetUsageNote(label, null),
+      betId,
+      createdAt: Date.now(),
+    },
+    owner
+  );
+}
+
+async function applyNeonWageringRequirement(
+  bet: BetRow,
+  bookie: AccountRow,
+  owner: string
+): Promise<void> {
+  const burn = wrContributionForBet(bet, bookie);
+  if (!(burn > 0)) return;
+  const next = Math.max(0, Math.round((bookie.wrRemaining - burn) * 100) / 100);
+  await patchNeonDeskAccount(bookie.id, { wrRemaining: next }, owner);
+  bookie.wrRemaining = next;
+}
+
+async function ledgerNeonDutchFreeLegs(bet: BetRow, owner: string): Promise<void> {
+  for (const leg of parseDutchLegs(bet)) {
+    if (!leg.freeBet || !leg.bookmaker?.trim() || !(leg.stake > 0)) continue;
+    const { account } = await ensureNeonVenueAccount(leg.bookmaker, "bookie", owner);
+    await ledgerNeonFreeBetUsageDebit(
+      account.id,
+      leg.stake,
+      `${bet.label} (${leg.label})`,
+      bet.id,
+      owner
+    );
+  }
+}
+
+/** Debit back stake, free-bet usage, WR, and lay liability when a hosted bet is saved. */
 export async function ledgerNeonBetPlacement(
   bet: BetRow,
-  clerkUserId = neonDeskClerkUserId()
+  clerkUserId = neonDeskClerkUserId(),
+  opts?: { applyWagering?: boolean }
 ): Promise<boolean> {
   const owner = resolveOwner(clerkUserId);
   if (!owner) return false;
   // Idempotent: already written, or another worker holds the claim.
   if (bet.balanceLedgered) return true;
+  const applyWagering = opts?.applyWagering !== false;
+
   if (bet.betType === "dutch") {
-    await patchNeonDeskBet(bet.id, { balanceLedgered: 1 }, owner);
-    return true;
+    const claimed = await claimNeonBetPlacementLedger(bet.id, owner);
+    if (!claimed) return true;
+    try {
+      await ledgerNeonDutchFreeLegs(bet, owner);
+      return true;
+    } catch (error) {
+      await purgeNeonDeskPlacementTransactionsForBet(bet.id, owner);
+      await patchNeonDeskBet(bet.id, { balanceLedgered: 0 }, owner);
+      throw error;
+    }
   }
 
   const isFree = bet.betType === "free_snr" || bet.betType === "free_sr";
@@ -89,6 +164,9 @@ export async function ledgerNeonBetPlacement(
     const liability = bet.layStake * (bet.layOdds - 1);
     const now = Date.now();
 
+    if (bookie && bet.backStake > 0 && isFree) {
+      await ledgerNeonFreeBetUsageDebit(bookie.id, bet.backStake, bet.label, bet.id, owner);
+    }
     if (bookie && bet.backStake > 0 && !isFree) {
       await insertNeonDeskTransaction(
         {
@@ -101,6 +179,7 @@ export async function ledgerNeonBetPlacement(
         },
         owner
       );
+      if (applyWagering) await applyNeonWageringRequirement(bet, bookie, owner);
     }
     if (exchange && liability > 0) {
       await insertNeonDeskTransaction(
@@ -160,7 +239,9 @@ async function ledgerNeonCashSettlement(
   const now = Date.now();
 
   if (bet.status === "void" || bet.status === "push") {
-    if (bookie && bet.backStake > 0 && !isFree) {
+    if (bookie && bet.backStake > 0 && isFree) {
+      await deleteNeonDeskFreeBetUsageForBet(bet.id, owner);
+    } else if (bookie && bet.backStake > 0 && !isFree) {
       await insertNeonDeskTransaction(
         {
           accountId: bookie.id,
@@ -355,6 +436,48 @@ export async function awardNeonUnconditionalFreeBetsDue(
   return n;
 }
 
+/**
+ * Manual early credit (bookie released the free bet on placement).
+ * Same gates as awardUnconditionalFreeBetEarly; wallets via Neon ledger.
+ */
+export async function awardNeonUnconditionalFreeBetEarly(
+  bet: BetRow,
+  offerTitle?: string | null,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<{ ok: true; amount: number } | { ok: false; error: string }> {
+  const owner = resolveOwner(clerkUserId);
+  if (!owner) return { ok: false, error: "Sign in to award a free bet" };
+  if (bet.status === "void") {
+    return { ok: false, error: "Void bets cannot award a free bet" };
+  }
+  if (bet.betType === "free_snr" || bet.betType === "free_sr") {
+    return { ok: false, error: "Conversion bets cannot award a free bet" };
+  }
+  const effect = unconditionalFreeBetEffect(bet, offerTitle);
+  if (!effect) {
+    return { ok: false, error: "Bet has no unconditional free-bet reward" };
+  }
+  if (!bet.bookmaker?.trim()) {
+    return { ok: false, error: "Bookmaker is required to credit the free bet" };
+  }
+  if (!bet.balanceLedgered) {
+    const placed = await ledgerNeonBetPlacement(bet, owner);
+    if (!placed) {
+      return { ok: false, error: "Could not reserve the qualifying stake" };
+    }
+  }
+  const credited = await ledgerNeonPromoAward(
+    bet,
+    effect.amount,
+    EARLY_FREE_BET_AWARD_REASON,
+    owner
+  );
+  if (!credited) {
+    return { ok: false, error: "Free bet already credited for this bet" };
+  }
+  return { ok: true, amount: effect.amount };
+}
+
 export async function purgeNeonDeskLedgerForBet(
   betId: number,
   clerkUserId = neonDeskClerkUserId()
@@ -372,10 +495,11 @@ export async function reledgerNeonOpenBetPlacement(
   const owner = resolveOwner(clerkUserId);
   if (!owner) return;
   if (next.status !== "open" || next.balanceSettled) return;
-  if (next.betType === "dutch") return;
   await purgeNeonDeskPlacementTransactionsForBet(next.id, owner);
   await patchNeonDeskBet(next.id, { balanceLedgered: 0 }, owner);
-  await ledgerNeonBetPlacement({ ...next, balanceLedgered: 0 }, owner);
+  await ledgerNeonBetPlacement({ ...next, balanceLedgered: 0 }, owner, {
+    applyWagering: false,
+  });
 }
 
 /** Place-ledger open bets, and cash-settle rows that already have a result. */

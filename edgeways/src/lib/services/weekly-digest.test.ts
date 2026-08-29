@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { db, alertsInbox, appSettings, bets, offers, offerEvSnapshots } from "@/lib/db";
-import { maybeSendWeeklyDigest, isoWeekKey } from "./weekly-digest";
+import { maybeSendWeeklyDigest, isoWeekKey, weeklyDigestDueWindow } from "./weekly-digest";
 
 // Wed 15 Jul 2026 10:00 local. Current ISO week starts Mon 13 Jul; the
 // digest window is the COMPLETED week Mon 6 Jul 00:00 → Mon 13 Jul 00:00.
@@ -42,6 +42,17 @@ beforeEach(() => {
   db.delete(bets).run();
   db.delete(offers).run();
   db.delete(appSettings).run();
+});
+
+describe("weeklyDigestDueWindow", () => {
+  it("is not due before Monday 09:00 and due after", () => {
+    expect(weeklyDigestDueWindow(MONDAY_0800).due).toBe(false);
+    expect(weeklyDigestDueWindow(MONDAY_0930).due).toBe(true);
+    expect(weeklyDigestDueWindow(WEDNESDAY).due).toBe(true);
+    expect(weeklyDigestDueWindow(MONDAY_0930).weekKey).toBe(
+      weeklyDigestDueWindow(WEDNESDAY).weekKey
+    );
+  });
 });
 
 describe("isoWeekKey", () => {

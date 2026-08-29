@@ -8,8 +8,14 @@ import {
   listPendingRemindersForOffer,
 } from "@/lib/services/user-reminders";
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  cancelNeonUserReminder,
+  createNeonUserReminder,
+  fireDueNeonUserReminders,
+  listNeonPendingRemindersForCasino,
+  listNeonPendingRemindersForOffer,
+} from "@/lib/db/neon-desk-reminders";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +33,19 @@ const cancelSchema = z.object({
 });
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
-  if (isNeonDesk()) {
-    return NextResponse.json({ fired: 0, pending: [] });
-  }
-  const fired = fireDueUserReminders();
   const casinoOfferId = Number(req.nextUrl.searchParams.get("casinoOfferId"));
   const offerId = Number(req.nextUrl.searchParams.get("offerId"));
+  if (isNeonDesk()) {
+    const fired = await fireDueNeonUserReminders();
+    const pending =
+      Number.isFinite(casinoOfferId) && casinoOfferId > 0
+        ? await listNeonPendingRemindersForCasino(casinoOfferId)
+        : Number.isFinite(offerId) && offerId > 0
+          ? await listNeonPendingRemindersForOffer(offerId)
+          : [];
+    return NextResponse.json({ fired, pending });
+  }
+  const fired = fireDueUserReminders();
   const pending =
     Number.isFinite(casinoOfferId) && casinoOfferId > 0
       ? listPendingRemindersForCasino(casinoOfferId)
@@ -43,14 +56,14 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
-  const blocked = blockHostedDeskMutation("Reminders");
-  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   try {
-    const reminder = createUserReminder(parsed.data);
+    const reminder = isNeonDesk()
+      ? await createNeonUserReminder(parsed.data)
+      : createUserReminder(parsed.data);
     return NextResponse.json({ reminder });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
@@ -58,13 +71,13 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
 });
 
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
-  const blocked = blockHostedDeskMutation("Reminders");
-  if (blocked) return blocked;
   const parsed = cancelSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const ok = cancelUserReminder(parsed.data.id);
+  const ok = isNeonDesk()
+    ? await cancelNeonUserReminder(parsed.data.id)
+    : cancelUserReminder(parsed.data.id);
   if (!ok) return NextResponse.json({ error: "Reminder not found or already used" }, { status: 404 });
   return NextResponse.json({ ok: true });
 });

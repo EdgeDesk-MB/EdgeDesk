@@ -11,11 +11,16 @@ import {
 } from "@/lib/db/neon-desk";
 import { purgeNeonDeskHistoryForBet } from "@/lib/db/neon-desk-history";
 import {
+  syncNeonBoostDiaryFromBet,
+  unlinkNeonBoostDiaryForBet,
+} from "@/lib/db/neon-desk-boosts";
+import {
   ledgerNeonBetSettlement,
   logNeonLedgerFailure,
   purgeNeonDeskLedgerForBet,
   reledgerNeonOpenBetPlacement,
 } from "@/lib/db/neon-desk-ledger";
+import { stampNeonMugPlansForBookmaker } from "@/lib/db/neon-desk-mug-plans";
 import { purgeNeonDeskSettlementTransactionsForBet } from "@/lib/db/neon-desk-accounts";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import {
@@ -191,6 +196,13 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
           logNeonLedgerFailure("settlement", updated.id, error);
         });
       }
+      if (p.purpose === "mug" && updated.bookmaker) {
+        await stampNeonMugPlansForBookmaker(
+          updated.bookmaker,
+          updated.createdAt
+        ).catch(() => {});
+      }
+      await syncNeonBoostDiaryFromBet(updated).catch(() => {});
       return NextResponse.json({ bet: updated });
     } catch (error) {
       return neonWriteError(error);
@@ -254,6 +266,7 @@ export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx
     try {
       const deleted = await deleteNeonDeskBet(betId);
       if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      await unlinkNeonBoostDiaryForBet(betId).catch(() => {});
       await purgeNeonDeskLedgerForBet(betId);
       await purgeNeonDeskHistoryForBet(betId);
       return NextResponse.json({ ok: true });

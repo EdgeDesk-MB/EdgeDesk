@@ -29,7 +29,7 @@ export const HELP_GUIDES: HelpGuide[] = [
   {
     slug: "getting-started",
     title: "Getting started",
-    description: "What Edgeways is, first-run setup, demo data, and the 60-second loop.",
+    description: "What Edgeways is, first-run setup, demo data, and the daily loop.",
     sections: [
       {
         heading: "What is Edgeways?",
@@ -49,11 +49,10 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Demo data vs live feeds",
         paragraphs: [
-          "Calculators, tracker, offers, settlement and the football simulator work without live feeds. When the racing, football or exchange feeds are not connected, the desk uses demo fixtures and sample racecards.",
+          "Calculators, tracker, offers and settlement work without live feeds. When the racing, football or exchange feeds are not connected, the desk uses demo fixtures and sample racecards.",
         ],
         bullets: [
           "Demo fixtures and sample racecards when a feed is not connected",
-          "Football simulator plays a full 90 minutes in ~3 real minutes",
           "Proxy bookie odds on Racing Desk (labelled estimates, not live bookie prices)",
           "Manual settlement for all sports",
         ],
@@ -68,13 +67,13 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
-        heading: "The 60-second demo loop",
-        paragraphs: ["Try the full live experience without waiting for live feeds:"],
+        heading: "The daily loop",
+        paragraphs: ["Try the full live experience on a real fixture:"],
         bullets: [
-          "Tracked Events → Simulate match → “2UP drama” → Kick off",
+          "Fixtures → add a live match or race to Tracked Events",
           "Calculators → Dutching → 2UP early payout dutch → Add to profit tracker",
-          "Tracker → link the bet to the simulated event",
-          "Live Dashboard → watch the Liveline chart move as goals go in",
+          "Tracker → link the bet to the event",
+          "Home → watch the live chart as the score updates",
         ],
       },
       {
@@ -553,7 +552,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "What triggers auto-settlement?",
         bullets: [
-          "Football: live score from the football feed or simulator drives derived markets",
+          "Football: live score from the football feed on a tracked match drives derived markets",
           "Racing: results usually land automatically while the desk is open; otherwise use Set winner",
           "Goalscorer triggers: settle at the decisive goal, not full time",
         ],

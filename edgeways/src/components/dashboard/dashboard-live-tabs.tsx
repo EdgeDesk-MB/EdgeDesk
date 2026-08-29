@@ -186,7 +186,7 @@ function PositionList({
         compact
         icon={Target}
         title="No live positions"
-        description="Attach bets to in-play events in the tracker, or start a simulated match."
+        description="Attach bets to in-play events in the tracker."
         action={{ label: "Open tracker", href: "/tracker" }}
         className="shadow-none"
       />
@@ -493,7 +493,7 @@ function EventsList({
         compact
         icon={Radio}
         title="Nothing in play"
-        description="Browse fixtures or run a simulation to see live scores here."
+        description="Browse fixtures and hit + on a match or race."
         action={{ label: "Browse fixtures", href: "/fixtures" }}
         className="shadow-none"
       />

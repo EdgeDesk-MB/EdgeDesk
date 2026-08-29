@@ -226,6 +226,61 @@ describe("appStateFromNeonDesk", () => {
     expect(summary.actualProfit).toBe(-0.4);
   });
 
+  it("attaches hosted offer desk progress from acca runs", () => {
+    const state = appStateFromNeonDesk({
+      bets: [],
+      offers: [offer({ id: 7, title: "Acca" })],
+      deskRuns: {
+        acca: [
+          {
+            run: {
+              id: 1,
+              offerId: 7,
+              label: "Acca",
+              method: "sequential",
+              stake: 10,
+              bookmaker: "Bet365",
+              commission: 0.02,
+              refundAmount: null,
+              backBetId: null,
+              wholeLayBetId: null,
+              wholeLayStake: null,
+              wholeLayOdds: null,
+              boostPct: null,
+              noLay: 0,
+              muteAlerts: 0,
+              status: "active",
+              createdAt: 1_700_000_000_000,
+              settledAt: null,
+            },
+            legs: [
+              {
+                id: 1,
+                runId: 1,
+                seq: 1,
+                label: "Arsenal",
+                eventId: null,
+                sport: "football",
+                market: "match_odds",
+                selection: "home",
+                backOdds: 2,
+                layOdds: null,
+                layStake: null,
+                layBetId: null,
+                result: "pending",
+                scheduledAt: null,
+              },
+            ],
+            backBetType: null,
+          },
+        ],
+      },
+    });
+    expect(state.offers[0]?.deskProgress?.kind).toBe("acca");
+    expect(state.offers[0]?.deskProgress?.needsAction).toBe(true);
+    expect(state.offers[0]?.deskProgress?.actionTitle).toBe("Lay 1st leg");
+  });
+
   it("builds hosted balances from accounts and the ledger", () => {
     const state = appStateFromNeonDesk({
       bets: [],

@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAccaRun, listAccaRuns } from "@/lib/services/acca-desk";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import { createNeonAccaRun, listNeonAccaRuns } from "@/lib/db/neon-desk-acca";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
   const denied = await deniedFeatureResponse("acca_desk");
   if (denied) return denied;
+  if (isNeonDesk()) {
+    return NextResponse.json({ runs: await listNeonAccaRuns() });
+  }
   return NextResponse.json({ runs: listAccaRuns() });
 });
 
@@ -40,11 +44,19 @@ const createSchema = z.object({
 export const POST = withDeskScope(async function POST(req: NextRequest) {
   const denied = await deniedFeatureResponse("acca_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Acca Desk");
-  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  if (isNeonDesk()) {
+    try {
+      return NextResponse.json(await createNeonAccaRun(parsed.data));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the acca.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
   }
   return NextResponse.json(createAccaRun(parsed.data));
 });

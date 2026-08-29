@@ -162,6 +162,27 @@
       "when": 1788009000000,
       "tag": "0022_desk_tracked_events",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788012600000,
+      "tag": "0023_desk_remaining_clerk_user_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788016200000,
+      "tag": "0024_desk_racing_odds_overrides_clerk",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788019800000,
+      "tag": "0025_desk_offer_ev_snapshots_clerk",
+      "breakpoints": true
     }
   ]
 }

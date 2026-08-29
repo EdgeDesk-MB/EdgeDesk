@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBoostDiary, listBoostDiary } from "@/lib/services/boosts";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  createNeonBoostDiary,
+  listNeonBoostDiary,
+} from "@/lib/db/neon-desk-boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withDeskScope(async function GET() {
+  if (isNeonDesk()) {
+    return NextResponse.json({ entries: await listNeonBoostDiary() });
+  }
   return NextResponse.json({ entries: listBoostDiary() });
 });
 
@@ -27,11 +34,20 @@ const createSchema = z.object({
 });
 
 export const POST = withDeskScope(async function POST(req: NextRequest) {
-  const blocked = blockHostedDeskMutation("Odds boosts");
-  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  if (isNeonDesk()) {
+    try {
+      const entry = await createNeonBoostDiary(parsed.data);
+      return NextResponse.json({ entry });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the boost.";
+      const status = message.startsWith("Sign in") ? 401 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
   }
   const entry = createBoostDiary(parsed.data);
   return NextResponse.json({ entry });

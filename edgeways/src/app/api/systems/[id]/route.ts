@@ -6,9 +6,15 @@ import {
   setSystemLegResult,
   updateSystemRun,
 } from "@/lib/services/systems-desk";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  deleteNeonSystemRun,
+  patchNeonSystemRun,
+  setNeonSystemLegResult,
+  updateNeonSystemRun,
+} from "@/lib/db/neon-desk-systems";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -47,32 +53,44 @@ export const PATCH = withDeskScope(async function PATCH(
 ) {
   const denied = await deniedFeatureResponse("systems_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Systems Desk");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const p = parsed.data;
+  const hosted = isNeonDesk();
   if (p.legId != null && p.result != null) {
-    const out = setSystemLegResult(p.legId, p.result);
+    const out = hosted
+      ? await setNeonSystemLegResult(p.legId, p.result)
+      : setSystemLegResult(p.legId, p.result);
     if (!out) {
       return NextResponse.json({ error: "Could not update leg" }, { status: 400 });
     }
     return NextResponse.json(out);
   }
   if (p.label != null && p.legs != null) {
-    const view = updateSystemRun(Number(id), {
-      label: p.label,
-      bookmaker: p.bookmaker,
-      unitStake: p.unitStake,
-      eachWay: p.eachWay,
-      placeFraction: p.placeFraction,
-      classification: p.classification,
-      backBetType: p.backBetType,
-      legs: p.legs,
-    });
+    const view = hosted
+      ? await updateNeonSystemRun(Number(id), {
+          label: p.label,
+          bookmaker: p.bookmaker,
+          unitStake: p.unitStake,
+          eachWay: p.eachWay,
+          placeFraction: p.placeFraction,
+          classification: p.classification,
+          backBetType: p.backBetType,
+          legs: p.legs,
+        })
+      : updateSystemRun(Number(id), {
+          label: p.label,
+          bookmaker: p.bookmaker,
+          unitStake: p.unitStake,
+          eachWay: p.eachWay,
+          placeFraction: p.placeFraction,
+          classification: p.classification,
+          backBetType: p.backBetType,
+          legs: p.legs,
+        });
     if (!view) {
       return NextResponse.json(
         { error: "Cannot update system - check legs, or money fields after results" },
@@ -82,7 +100,9 @@ export const PATCH = withDeskScope(async function PATCH(
     return NextResponse.json(view);
   }
   if (p.classification != null) {
-    const run = patchSystemRun(Number(id), { classification: p.classification });
+    const run = hosted
+      ? await patchNeonSystemRun(Number(id), { classification: p.classification })
+      : patchSystemRun(Number(id), { classification: p.classification });
     if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ run });
   }
@@ -95,10 +115,10 @@ export const DELETE = withDeskScope(async function DELETE(
 ) {
   const denied = await deniedFeatureResponse("systems_desk");
   if (denied) return denied;
-  const blocked = blockHostedDeskMutation("Systems Desk");
-  if (blocked) return blocked;
   const { id } = await ctx.params;
-  const ok = deleteSystemRun(Number(id));
+  const ok = isNeonDesk()
+    ? await deleteNeonSystemRun(Number(id))
+    : deleteSystemRun(Number(id));
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 });

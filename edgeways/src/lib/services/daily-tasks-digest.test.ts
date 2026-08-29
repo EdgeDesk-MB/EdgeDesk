@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, alertsInbox, appSettings, offers } from "@/lib/db";
-import { localDayKey, maybeSendDailyTasksDigest } from "./daily-tasks-digest";
+import { dailyTasksDigestDueWindow, localDayKey, maybeSendDailyTasksDigest } from "./daily-tasks-digest";
 
 const DAY_MS = 86_400_000;
 // 2026-08-06 10:00 local — after the 09:00 gate.
@@ -23,6 +23,19 @@ beforeEach(() => {
 describe("localDayKey", () => {
   it("formats local calendar day", () => {
     expect(localDayKey(new Date(2026, 7, 6, 10, 0))).toBe("2026-08-06");
+  });
+});
+
+describe("dailyTasksDigestDueWindow", () => {
+  it("is not due before 09:00 and due after", () => {
+    expect(dailyTasksDigestDueWindow(BEFORE_NINE)).toEqual({
+      dayKey: "2026-08-06",
+      due: false,
+    });
+    expect(dailyTasksDigestDueWindow(AFTER_NINE)).toEqual({
+      dayKey: "2026-08-06",
+      due: true,
+    });
   });
 });
 

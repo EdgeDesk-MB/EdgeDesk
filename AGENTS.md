@@ -9,7 +9,9 @@ belongs in the app vs parent `docs/`.
 
 Before doing any work:
 1. Read `edgeways/AGENTS.md`. It holds the product context, hard rules and the
-   mandatory pre-flight checklist.
+   mandatory pre-flight checklist. Hosted (Vercel) desk data is Neon, not
+   SQLite. Do not ship a customer mutation that only writes the empty
+   `:memory:` file.
 2. For repo conventions (git paths, tests, DB bootstrap, data shapes), read
    section 0 of `edgeways/docs/roadmap/implementation-briefs.md`.
 

@@ -10,7 +10,9 @@ import {
 } from "@/lib/db/neon-desk";
 import { getNeonDeskOffer } from "@/lib/db/neon-desk-offers";
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
+import { linkNeonBoostDiaryBet } from "@/lib/db/neon-desk-boosts";
 import { ledgerNeonBetPlacement, logNeonLedgerFailure } from "@/lib/db/neon-desk-ledger";
+import { stampNeonMugPlansForBookmaker } from "@/lib/db/neon-desk-mug-plans";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import { ledgerBetPlacement } from "@/lib/services/balances";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
@@ -168,6 +170,15 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       await ledgerNeonBetPlacement(inserted).catch((error) => {
         logNeonLedgerFailure("placement", inserted.id, error);
       });
+      if (input.boostDiaryId != null) {
+        await linkNeonBoostDiaryBet(input.boostDiaryId, inserted.id).catch(() => {});
+      }
+      if (inserted.purpose === "mug" && inserted.bookmaker) {
+        await stampNeonMugPlansForBookmaker(
+          inserted.bookmaker,
+          inserted.createdAt
+        ).catch(() => {});
+      }
       return NextResponse.json({ bet: inserted });
     } catch (error) {
       const message =

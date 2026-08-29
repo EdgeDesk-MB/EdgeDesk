@@ -5,7 +5,13 @@
  */
 import "server-only";
 
+import { listNeonAccaRuns } from "@/lib/db/neon-desk-acca";
+import { listNeonBetBuilderRuns } from "@/lib/db/neon-desk-bet-builder";
+import { listNeonSystemRuns } from "@/lib/db/neon-desk-systems";
+import { countNeonBoostsNeedingAction } from "@/lib/db/neon-desk-boosts";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { neonEffortMeasured } from "@/lib/db/neon-desk-effort";
+import { listNeonMugPlansForState } from "@/lib/db/neon-desk-mug-plans";
 import { listNeonDeskCasinoOffers } from "@/lib/db/neon-desk-casino";
 import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
 import {
@@ -22,6 +28,12 @@ import {
   unreadNeonCount,
 } from "@/lib/db/neon-alerts-inbox";
 import { awardNeonUnconditionalFreeBetsDue, healNeonDeskLedgers } from "@/lib/db/neon-desk-ledger";
+import {
+  maybeSendNeonDailyTasksDigest,
+  maybeSendNeonWeeklyDigest,
+} from "@/lib/db/neon-desk-digests";
+import { runNeonDeskLiveness } from "@/lib/db/neon-desk-liveness";
+import { syncNeonOfferStatuses } from "@/lib/db/neon-desk-offer-liveness";
 import { appStateFromNeonDesk } from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
@@ -60,6 +72,27 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     ]);
   const events = filterEventsForDesk(feedEvents, followedIds, bets);
   try {
+    const resolved = await runNeonDeskLiveness(events);
+    if (resolved > 0) {
+      bets = await listNeonDeskBets();
+    }
+  } catch {
+    // Auto-result and lay-due alerts are best-effort; the snapshot still renders.
+  }
+  try {
+    const statusChanged = await syncNeonOfferStatuses();
+    if (statusChanged > 0) {
+      const [nextOffers, nextBets] = await Promise.all([
+        listNeonDeskOffers(),
+        listNeonDeskBets(),
+      ]);
+      offers = nextOffers;
+      bets = nextBets;
+    }
+  } catch {
+    // Offer status tick is best-effort; the snapshot still renders.
+  }
+  try {
     const healed = await healNeonDeskLedgers(bets);
     if (healed > 0) {
       const [nextBets, nextAccounts, nextTxs] = await Promise.all([
@@ -87,6 +120,25 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
   } catch {
     // Award is best-effort; the snapshot still renders.
   }
+  try {
+    await maybeSendNeonWeeklyDigest();
+  } catch {
+    // Digest is best-effort; the snapshot still renders.
+  }
+  try {
+    await maybeSendNeonDailyTasksDigest();
+  } catch {
+    // Digest is best-effort; the snapshot still renders.
+  }
+  const [effortMeasured, mugPlanRows, boostsOpen, accaBundles, systemBundles, bbBundles] =
+    await Promise.all([
+      neonEffortMeasured().catch(() => ({})),
+      listNeonMugPlansForState().catch(() => []),
+      countNeonBoostsNeedingAction().catch(() => 0),
+      listNeonAccaRuns().catch(() => []),
+      listNeonSystemRuns().catch(() => []),
+      listNeonBetBuilderRuns().catch(() => []),
+    ]);
   const snapshot = appStateFromNeonDesk({
     bets,
     events,
@@ -99,6 +151,14 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     apiUsage,
     alertsUnread,
     deliveredAlertKeys,
+    effortMeasured,
+    mugPlans: mugPlanRows,
+    boostsOpen,
+    deskRuns: {
+      acca: accaBundles,
+      systems: systemBundles,
+      betBuilder: bbBundles,
+    },
   });
   // Keys live in Vercel env, not SQLite. The pure mapper cannot read them.
   return {

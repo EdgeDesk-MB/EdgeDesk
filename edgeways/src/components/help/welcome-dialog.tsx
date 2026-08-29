@@ -41,8 +41,8 @@ const STEPS = [
   },
   {
     icon: LayoutDashboard,
-    title: "The 60-second loop",
-    body: "Simulate, dutch, add, watch.",
+    title: "The daily loop",
+    body: "Track, dutch, add, watch.",
     help: "The same loop you will run every day.",
   },
   {

@@ -92,13 +92,13 @@ export function priceMovementFor(
       .map((r) => r.spDecimal)
       .filter((v) => v > 1);
 
-    return movementFromHistory(legacy);
+    return priceMovementFromHistory(legacy);
   }
 
-  return movementFromHistory(history);
+  return priceMovementFromHistory(history);
 }
 
-function movementFromHistory(history: number[]): PriceMovement {
+export function priceMovementFromHistory(history: number[]): PriceMovement {
   if (history.length === 0) {
     return {
       open: null,

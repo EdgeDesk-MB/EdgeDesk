@@ -123,6 +123,7 @@ export type NeonDeskBetPatch = Partial<{
   expectedProfit: number | null;
   notes: string | null;
   eventId: number | null;
+  sport: string | null;
   market: string;
   selection: string;
   offerId: number | null;

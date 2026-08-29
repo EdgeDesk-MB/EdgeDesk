@@ -27,9 +27,8 @@ Log: `data/dev-keep.log`. One-shot without the supervisor: `npm run dev:once`.
 
 ## Live football data (optional)
 
-Without a key the app runs on demo fixtures plus the built-in match simulator
-(Events → Simulate match), which plays a full 90 minutes in ~3 real minutes -
-including the classic 2UP scenario (2-0 up, pegged back to 2-2).
+Without a key the app runs on demo fixtures and sample racecards. Track a
+real match or race from Fixtures to see live scores and results.
 
 ### Free tier setup (API-Football)
 
@@ -52,16 +51,15 @@ code changes. Alternative free option: [football-data.org](https://www.football-
 no lower-league coverage; the app would need a second client written for it, so start with
 API-Football.
 
-## The 60-second demo loop
+## The daily loop
 
-1. **Events** → *Simulate match* → "2UP drama" → Kick off.
+1. **Fixtures** → add a live match or race to Tracked Events.
 2. **Calculators** → *Dutching* → *2UP early payout dutch* → Add to profit tracker.
-3. **Tracker** → link the new bet to the simulated event (Link event dropdown).
-4. **Live Dashboard** → watch the Liveline chart and provisional P&L move as the goals go in,
-   and the windfall settle automatically at full time.
+3. **Tracker** → link the bet to the event.
+4. **Home** → watch the live chart as the score updates.
 
-With an API key, steps 1–3 collapse into one: the EP Edge Desk and 2UP calculators'
-"Add to tracker" find-or-create the real fixture and link the bet automatically.
+The EP Edge Desk and 2UP calculators' "Add to tracker" find-or-create the fixture
+and link the bet automatically when a feed is connected.
 
 ## Advanced lay mode (part lays + underlay/overlay)
 

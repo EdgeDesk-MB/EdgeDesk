@@ -3,6 +3,7 @@ import { db, accounts, bets, offers } from "@/lib/db";
 import { bookieNamesForOwner } from "@/lib/accounts/owners";
 import { getAppSettings } from "@/lib/services/settings";
 import { getAllSnapshots } from "@/lib/services/ev-snapshot";
+import { listNeonAllSnapshots } from "@/lib/db/neon-desk-ev-snapshots";
 import type { EvSnapshotRow } from "@/lib/offers/ev-capture";
 import {
   buildEdgeReport,
@@ -23,9 +24,10 @@ export const dynamic = "force-dynamic";
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const denied = await deniedFeatureResponse("do_next");
   if (denied) return denied;
-  let snapshots = getAllSnapshots() as EvSnapshotRow[];
-
   const hosted = isNeonDesk();
+  let snapshots = (
+    hosted ? await listNeonAllSnapshots() : getAllSnapshots()
+  ) as EvSnapshotRow[];
   const [accountRows, betRows, offerRows]: [AccountRow[], BetRow[], OfferRow[]] = hosted
     ? await Promise.all([listNeonDeskAccounts(), listNeonDeskBets(), listNeonDeskOffers()])
     : [

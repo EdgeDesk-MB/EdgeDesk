@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,8 +17,6 @@ import {
 } from "@/components/ui/tooltip";
 import { EventRowView } from "@/components/events/event-row-view";
 import { ManualEventDialog } from "@/components/events/manual-event-dialog";
-import { SimDialog } from "@/components/events/sim-dialog";
-import { toastAddedToTrackedEvents } from "@/components/events/track-toast";
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
@@ -48,7 +45,6 @@ import { RefreshCw, Radio } from "lucide-react";
 const DAY_FILTERS: EventListDayFilter[] = ["all", "today", "upcoming", "past"];
 
 export default function TrackedEventsPage() {
-  const router = useRouter();
   const { state, refresh } = useAppState(2000);
   const now = useNow(60_000);
   const [syncingRacing, setSyncingRacing] = useState(false);
@@ -151,33 +147,6 @@ export default function TrackedEventsPage() {
     }
   }, [refresh]);
 
-  async function startSim(preset: string, stars: { homeStar?: string; awayStar?: string }) {
-    const names: Record<string, [string, string]> = {
-      two_up_drama: ["Simulated United", "Comeback City"],
-      btts_thriller: ["Goals FC", "Chaos Athletic"],
-      bore_draw: ["Sleepy Town", "Cagey Rovers"],
-      random: ["Random Rangers", "Dice United"],
-    };
-    const [home, away] = names[preset] ?? names.random;
-    try {
-      await api("/api/events", {
-        method: "POST",
-        json: {
-          homeTeam: home,
-          awayTeam: away,
-          competition: "Simulation",
-          source: "sim",
-          simPreset: preset,
-          simStars: stars,
-        },
-      });
-      toastAddedToTrackedEvents(`${home} v ${away}`, () => router.push("/tracked-events"));
-      refresh();
-    } catch (e) {
-      toast.error("Could not start simulation", { description: String(e) });
-    }
-  }
-
   async function patchEvent(id: number, json: Record<string, unknown>) {
     try {
       await api(`/api/events/${id}`, { method: "PATCH", json });
@@ -233,7 +202,6 @@ export default function TrackedEventsPage() {
                 Sync racing results
               </Button>
             )}
-            <SimDialog onStart={startSim} />
             <ManualEventDialog onSaved={refresh} />
           </PageHeaderButtonGroup>
         }
@@ -302,7 +270,7 @@ export default function TrackedEventsPage() {
           <EmptyState
             icon={Radio}
             title="Nothing tracked yet"
-            description="Browse fixtures and hit + on a match or race, simulate a 2UP demo match, or add a manual event."
+            description="Browse fixtures and hit + on a match or race, or add one manually."
             action={{ label: "Browse fixtures", href: "/fixtures" }}
             secondaryAction={{ label: "Getting started", href: "/help?guide=getting-started" }}
           />

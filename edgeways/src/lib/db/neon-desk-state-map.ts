@@ -21,6 +21,19 @@ import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
 import { summariseOffer } from "@/lib/offers/offer-profit";
 import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
 import { hostedEventDerivations } from "@/lib/db/neon-desk-state-events";
+import {
+  DEFAULT_LAY_LEAD_MINUTES,
+  LAY_DUE_EXPIRY_MS,
+  wholeComboLay,
+} from "@/lib/calc/bet-builder-workflow";
+import { indexOfferDeskProgress } from "@/lib/offers/offer-desk-progress";
+import { legDueState, type AccaRunView } from "@/lib/services/acca-desk";
+import type {
+  BetBuilderRunRow,
+  BetBuilderSelectionRow,
+  SystemLegRow,
+  SystemRunRow,
+} from "@/lib/db/schema";
 import type { AppState } from "@/lib/services/state.types";
 
 export type NeonDeskSnapshot = {
@@ -39,6 +52,16 @@ export type NeonDeskSnapshot = {
   /** Hosted alerts inbox badge + watcher seen-set (EDGE-110). */
   alertsUnread?: number;
   deliveredAlertKeys?: string[];
+  effortMeasured?: AppState["effortMeasured"];
+  mugPlans?: AppState["mugPlans"];
+  boostsOpen?: number;
+  accaLayDue?: AppState["accaLayDue"];
+  betBuilderLayDue?: AppState["betBuilderLayDue"];
+  deskRuns?: {
+    acca?: AccaRunView[];
+    systems?: Array<{ run: SystemRunRow; legs: SystemLegRow[] }>;
+    betBuilder?: Array<{ run: BetBuilderRunRow; selections: BetBuilderSelectionRow[] }>;
+  };
 };
 
 export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
@@ -98,8 +121,89 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
   const provisional = sumOpenWorstCaseProfit(bets);
 
   const promoAwards = promoAwardsFromTransactions(transactions);
+  const deskByOffer = indexOfferDeskProgress({
+    acca: (input.deskRuns?.acca ?? []).map(({ run, legs }) => ({
+      id: run.id,
+      offerId: run.offerId,
+      status: run.status,
+      method: run.method,
+      noLay: run.noLay,
+      wholeLayStake: run.wholeLayStake,
+      legs: legs.map((l) => ({
+        seq: l.seq,
+        label: l.label,
+        result: l.result,
+        layStake: l.layStake,
+      })),
+    })),
+    betBuilder: (input.deskRuns?.betBuilder ?? []).map(({ run, selections }) => ({
+      id: run.id,
+      offerId: run.offerId,
+      status: run.status,
+      method: run.method,
+      wholeLayStake: run.wholeLayStake,
+      selectionCount: selections.length,
+    })),
+    systems: (input.deskRuns?.systems ?? []).map(({ run, legs }) => ({
+      id: run.id,
+      offerId: run.offerId,
+      status: run.status,
+      legs: legs.map((l) => ({
+        seq: l.seq,
+        label: l.label,
+        result: l.result,
+      })),
+    })),
+  });
+  const nowMs = Date.now();
+  const accaLayDue =
+    input.accaLayDue ??
+    (input.deskRuns?.acca ?? []).flatMap(({ run, legs }) =>
+      legs
+        .map((leg) => ({ leg, due: legDueState(run, legs, leg, nowMs) }))
+        .filter(({ due }) => due.due)
+        .map(({ leg, due }) => ({
+          legId: leg.id,
+          runLabel: run.label,
+          legLabel: leg.label,
+          seq: leg.seq,
+          scheduledAt: leg.scheduledAt,
+          suggestedStake: due.suggestedStake,
+        }))
+    );
+  const betBuilderLayDue =
+    input.betBuilderLayDue ??
+    (input.deskRuns?.betBuilder ?? []).flatMap(({ run }) => {
+      if (run.status !== "active" || run.method !== "combined" || run.wholeLayBetId != null) {
+        return [];
+      }
+      if (run.muteAlerts) return [];
+      if (run.scheduledAt != null && run.scheduledAt - nowMs > DEFAULT_LAY_LEAD_MINUTES * 60_000) {
+        return [];
+      }
+      if (run.scheduledAt != null && run.scheduledAt < nowMs - LAY_DUE_EXPIRY_MS) return [];
+      const suggestion =
+        run.backOdds > 1
+          ? wholeComboLay({
+              stake: run.stake,
+              combinedOdds: run.backOdds,
+              layOdds: run.backOdds,
+              commission: run.commission,
+            })
+          : null;
+      return [
+        {
+          runId: run.id,
+          label: run.label,
+          suggestedStake: suggestion?.layStake ?? null,
+        },
+      ];
+    });
   const offers = allOffers
-    .map((o) => summariseOffer(o, allBets.filter((b) => b.offerId === o.id), promoAwards))
+    .map((o) => ({
+      ...summariseOffer(o, allBets.filter((b) => b.offerId === o.id), promoAwards),
+      deskProgress: deskByOffer.get(o.id) ?? null,
+    }))
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const balances = balanceSummaryFromRows(
@@ -127,13 +231,13 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     planRaces: derived.planRaces,
     planFixtures: derived.planFixtures,
     retention: { rate: DEFAULT_SETTINGS.tuning.retentionPrior, sampleSize: 0 },
-    effortMeasured: {},
-    mugPlans: [],
-    accaLayDue: [],
-    betBuilderLayDue: [],
+    effortMeasured: input.effortMeasured ?? {},
+    mugPlans: input.mugPlans ?? [],
+    accaLayDue,
+    betBuilderLayDue,
     alertsUnread: input.alertsUnread ?? 0,
     deliveredAlertKeys: input.deliveredAlertKeys ?? [],
-    boostsOpen: 0,
+    boostsOpen: input.boostsOpen ?? 0,
     casinoNeedsAction: allCasinoOffers.filter((o) => isCasinoInMainFeed(o)).length,
     demoMode: false,
     hostedDesk: true,

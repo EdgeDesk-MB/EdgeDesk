@@ -4,10 +4,13 @@ import { z } from "zod";
 import { db, offers } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskBalanceTransactions } from "@/lib/db/neon-desk-accounts";
 import {
   insertNeonDeskOffer,
   listNeonDeskOffers,
 } from "@/lib/db/neon-desk-offers";
+import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
+import { writeNeonEvLock } from "@/lib/db/neon-desk-ev-snapshots";
 import { summariseOffer as summariseOfferPure } from "@/lib/offers/offer-profit";
 import {
   createOfferSeriesWithInstance,
@@ -68,13 +71,15 @@ export const GET = withDeskScope(async function GET() {
   if (isNeonDesk()) {
     // Hosted desk: no series sync / backfill (SQLite-only machinery). Plain
     // campaign list with profit summaries computed from Neon rows.
-    const [offerRows, betRows] = await Promise.all([
+    const [offerRows, betRows, txRows] = await Promise.all([
       listNeonDeskOffers(),
       listNeonDeskBets(),
+      listNeonDeskBalanceTransactions(),
     ]);
+    const promoAwards = promoAwardsFromTransactions(txRows);
     const hosted = offerRows
       .map((o) =>
-        summariseOfferPure(o, betRows.filter((b) => b.offerId === o.id), {})
+        summariseOfferPure(o, betRows.filter((b) => b.offerId === o.id), promoAwards)
       )
       .sort((a, b) => b.createdAt - a.createdAt);
     return NextResponse.json({ offers: hosted });
@@ -124,6 +129,12 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         offerUrl,
         createdAt: Date.now(),
       });
+      if (row.status === "active") {
+        await writeNeonEvLock(
+          summariseOfferPure(row, [], {}),
+          row.expectedProfit != null ? { expectedProfit: row.expectedProfit } : undefined
+        ).catch(() => null);
+      }
       return NextResponse.json({ offer: row });
     } catch (error) {
       const message =
