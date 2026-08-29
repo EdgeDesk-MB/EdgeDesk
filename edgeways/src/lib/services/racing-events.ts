@@ -12,6 +12,7 @@ import {
 } from "@/lib/services/theracingapi";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import { followNeonEvent } from "@/lib/db/neon-desk-tracked-events";
 import {
   findNeonEventByExternalId,
   insertNeonEvent,
@@ -74,6 +75,7 @@ async function findOrCreateNeonRacingEvent(opts: {
   const all = await listNeonEvents();
   const existing = all.find((e) => racingEventMatch(e, course, opts.startTime));
   if (existing) {
+    await followNeonEvent(existing.id);
     return { event: existing, mode: "existing" };
   }
 
@@ -84,6 +86,7 @@ async function findOrCreateNeonRacingEvent(opts: {
       if (card) {
         const byExternal = await findNeonEventByExternalId(card.externalId);
         if (byExternal) {
+          await followNeonEvent(byExternal.id);
           return { event: byExternal, mode: "existing" };
         }
         const inserted = await insertNeonEvent({
@@ -107,6 +110,7 @@ async function findOrCreateNeonRacingEvent(opts: {
             : null,
           createdAt: Date.now(),
         });
+        await followNeonEvent(inserted.id);
         return { event: inserted, mode: "api" };
       }
     } catch {
@@ -131,6 +135,7 @@ async function findOrCreateNeonRacingEvent(opts: {
     status,
     createdAt: now,
   });
+  await followNeonEvent(inserted.id);
   return { event: inserted, mode: "manual" };
 }
 

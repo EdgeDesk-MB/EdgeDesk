@@ -25,6 +25,12 @@ import type { EventRow } from "@/lib/db/schema";
 import { listNeonDeskBets, patchNeonDeskBet } from "@/lib/db/neon-desk";
 import { purgeNeonDeskSettlementTransactionsForBet } from "@/lib/db/neon-desk-accounts";
 import { purgeNeonDeskSettlementHistoryForBet } from "@/lib/db/neon-desk-history";
+import { followNeonEvent } from "@/lib/db/neon-desk-tracked-events";
+
+async function withFollow(event: EventRow): Promise<EventRow> {
+  await followNeonEvent(event.id);
+  return event;
+}
 
 export function raceMetaFromTrackInput(input: {
   raceMeta?: {
@@ -88,7 +94,7 @@ export async function createOrRefreshNeonEvent(input: {
             raceMetaFromTrackInput(input)
           ),
         });
-        return { event: refreshed ?? existing, existing: true };
+        return { event: await withFollow(refreshed ?? existing), existing: true };
       }
       if (
         existing.sport === "horse_racing" &&
@@ -104,9 +110,9 @@ export async function createOrRefreshNeonEvent(input: {
             )
           ),
         });
-        return { event: refreshed ?? existing, existing: true };
+        return { event: await withFollow(refreshed ?? existing), existing: true };
       }
-      return { event: existing, existing: true };
+      return { event: await withFollow(existing), existing: true };
     }
   }
 
@@ -135,7 +141,7 @@ export async function createOrRefreshNeonEvent(input: {
     simStartedAt: isSim ? now : null,
     createdAt: now,
   };
-  return { event: await insertNeonEvent(values), existing: false };
+  return { event: await withFollow(await insertNeonEvent(values)), existing: false };
 }
 
 export async function findOpenNeonEventByTeams(

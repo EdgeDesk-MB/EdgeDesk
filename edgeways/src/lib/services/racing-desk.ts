@@ -6,7 +6,9 @@ import { isNeonDesk } from "@/lib/db/desk-backend";
 import { getDeskActor } from "@/lib/db/desk-scope";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
 import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
+import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
 import { listNeonEvents } from "@/lib/db/neon-events";
+import { filterEventsForDesk } from "@/lib/events/desk-tracked-events";
 import {
   getNeonDeskSettings,
   getNeonDeskSettingsForUser,
@@ -350,20 +352,30 @@ export function selectActiveRacingOffers(
 
 async function loadRacingDeskStore(clerkUserId?: string | null): Promise<{
   allEvents: EventRow[];
+  feedEvents: EventRow[];
   allBets: BetRow[];
   allOffers: OfferRow[];
   hosted: boolean;
 }> {
   if (isNeonDesk()) {
-    const [allEvents, allBets, allOffers] = await Promise.all([
+    const [feedEvents, followedIds, allBets, allOffers] = await Promise.all([
       listNeonEvents().catch(() => []),
+      listNeonDeskTrackedEventIds().catch(() => []),
       listNeonDeskBets(clerkUserId),
       listNeonDeskOffers(clerkUserId),
     ]);
-    return { allEvents, allBets, allOffers, hosted: true };
+    return {
+      allEvents: filterEventsForDesk(feedEvents, followedIds, allBets),
+      feedEvents,
+      allBets,
+      allOffers,
+      hosted: true,
+    };
   }
+  const sqliteEvents = db.select().from(events).all();
   return {
-    allEvents: db.select().from(events).all(),
+    allEvents: sqliteEvents,
+    feedEvents: sqliteEvents,
     allBets: db.select().from(bets).all(),
     allOffers: db.select().from(offers).all(),
     hosted: false,
@@ -643,7 +655,7 @@ export async function getRacingDesk(
 
   if (!hosted) syncCourseOfferExpiryFromRaces(cards, date);
 
-  const { allEvents, allBets, allOffers } = await storePromise;
+  const { allEvents, feedEvents, allBets, allOffers } = await storePromise;
   const eventByExternal = new Map(
     allEvents.filter((e) => e.externalId).map((e) => [e.externalId!, e])
   );
@@ -990,7 +1002,7 @@ export async function getRacingDesk(
     upcomingCount: races.filter((r) => r.status === "upcoming").length,
     trackedCount,
     openPositions: 0,
-    racingPnlToday: racingPnlToday(allBets, allEvents, date),
+    racingPnlToday: racingPnlToday(allBets, feedEvents, date),
     source: error ? "error" : source === "demo" ? "demo" : "racing-api",
     oddsSnapshotsEnabled: true,
     premiumOddsApi: hasRacingApiKey(),
@@ -1100,7 +1112,7 @@ export async function getRacingDesk(
   );
   summary.openPositions = activeBets.length;
 
-  const racingPnlDay = racingPnlByRace(allBets, allEvents, date);
+  const racingPnlDay = racingPnlByRace(allBets, feedEvents, date);
   for (const row of racingPnlDay.rows) {
     const race = row.raceExternalId
       ? raceByExternal.get(row.raceExternalId)

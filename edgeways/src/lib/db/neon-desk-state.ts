@@ -1,7 +1,7 @@
 /**
  * Hosted Home snapshot (EDGE-47). Neon bets, offers, wallets, history, casino
- * and the global feed events (EDGE-81b). Never opens SQLite: Vercel cannot
- * mkdir the Mac `data/` folder.
+ * and this login's tracked fixtures (plus any still needed for an open bet).
+ * Never opens SQLite: Vercel cannot mkdir the Mac `data/` folder.
  */
 import "server-only";
 
@@ -15,6 +15,8 @@ import {
 import { listNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
 import { listNeonEvents } from "@/lib/db/neon-events";
+import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
+import { filterEventsForDesk } from "@/lib/events/desk-tracked-events";
 import {
   listNeonInboxDedupes,
   unreadNeonCount,
@@ -34,10 +36,11 @@ export {
 } from "@/lib/db/neon-desk-state-map";
 
 export async function buildNeonDeskAppState(): Promise<AppState> {
-  const [bets, events, offers, accounts, transactions, history, casinoOffers, settings, apiUsage, alertsUnread, deliveredAlertKeys] =
+  const [bets, feedEvents, followedIds, offers, accounts, transactions, history, casinoOffers, settings, apiUsage, alertsUnread, deliveredAlertKeys] =
     await Promise.all([
       listNeonDeskBets(),
       listNeonEvents().catch(() => []),
+      listNeonDeskTrackedEventIds().catch(() => []),
       listNeonDeskOffers(),
       listNeonDeskAccounts(),
       listNeonDeskBalanceTransactions(),
@@ -54,6 +57,7 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
       // sync itself is handed to `after()`, so the response is never blocked.
       maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
     ]);
+  const events = filterEventsForDesk(feedEvents, followedIds, bets);
   const snapshot = appStateFromNeonDesk({
     bets,
     events,

@@ -110,6 +110,23 @@ export const feedUsageEvents = pgTable(
   (table) => [index("feed_usage_events_feed_day").on(table.feed, table.day)]
 );
 
+/**
+ * Per-desk follows of the shared events feed. Tracked Events is this login's
+ * list; the fixture row stays so live scores and other desks are untouched.
+ */
+export const deskTrackedEvents = pgTable(
+  "desk_tracked_events",
+  {
+    clerkUserId: text("clerk_user_id").notNull(),
+    eventId: integer("event_id").notNull(),
+    createdAt: epochMs("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.clerkUserId, table.eventId] }),
+    index("desk_tracked_events_user_idx").on(table.clerkUserId),
+  ]
+);
+
 export const exchanges = pgTable("exchanges", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

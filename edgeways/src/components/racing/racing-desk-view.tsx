@@ -523,8 +523,8 @@ export function RacingDeskView() {
       await api(`/api/events/${race.trackedEventId}`, { method: "DELETE" });
       toast.success("Race untracked");
       await load({ soft: true });
-    } catch (e) {
-      toast.error("Could not untrack race", { description: String(e) });
+    } catch {
+      toast.error("Could not untrack this race. Try again.");
     }
   }
 

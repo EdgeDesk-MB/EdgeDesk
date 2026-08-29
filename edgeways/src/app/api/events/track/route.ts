@@ -6,6 +6,7 @@ import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isFeedDenied } from "@/lib/entitlements/feed-guard";
 import { rateLimitResponse } from "@/lib/api-rate-limit";
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import { followNeonEvent } from "@/lib/db/neon-desk-tracked-events";
 import { findOpenNeonEventByTeams, insertNeonEvent } from "@/lib/db/neon-event-write";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   if (isNeonDesk()) {
     const existing = await findOpenNeonEventByTeams(sport, homeTeam, awayTeam);
     if (existing) {
+      await followNeonEvent(existing.id);
       return NextResponse.json({ event: existing, mode: "existing" });
     }
     const now = Date.now();
@@ -73,6 +75,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         period: fixture.period ?? null,
         createdAt: now,
       });
+      await followNeonEvent(inserted.id);
       return NextResponse.json({ event: inserted, mode: "api" });
     }
     const inserted = await insertNeonEvent({
@@ -85,6 +88,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       status: "upcoming",
       createdAt: now,
     });
+    await followNeonEvent(inserted.id);
     return NextResponse.json({ event: inserted, mode: "manual" });
   }
 

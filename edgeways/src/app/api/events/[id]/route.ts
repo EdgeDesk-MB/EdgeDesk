@@ -6,6 +6,7 @@ import type { GoalEvent } from "@/lib/calc";
 import { serializeRaceResults, withPreservedRaceDisplayMeta } from "@/lib/racing";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import { unfollowNeonEvent } from "@/lib/db/neon-desk-tracked-events";
 import { patchHostedNeonEvent } from "@/lib/db/neon-event-write";
 
 export const dynamic = "force-dynamic";
@@ -235,13 +236,14 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 });
 
 export const DELETE = withDeskScope(async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  if (isNeonDesk()) {
-    return NextResponse.json(
-      { error: "Deleting a shared fixture is not available on the hosted desk." },
-      { status: 400 }
-    );
-  }
   const { id } = await ctx.params;
-  db.delete(events).where(eq(events.id, Number(id))).run();
+  const eventId = Number(id);
+  if (isNeonDesk()) {
+    // Stop following for this login. The fixture stays for live scores and
+    // everyone else; customers never delete a shared row.
+    await unfollowNeonEvent(eventId);
+    return NextResponse.json({ ok: true });
+  }
+  db.delete(events).where(eq(events.id, eventId)).run();
   return NextResponse.json({ ok: true });
 });

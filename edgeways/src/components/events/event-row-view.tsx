@@ -293,7 +293,7 @@ export function EventRowView({
             size="icon"
             className="size-8 text-destructive hover:text-destructive"
             onClick={() => onDelete(event.id)}
-            aria-label="Remove event"
+            aria-label="Stop tracking"
           >
             <Trash2 className="size-3.5" />
           </Button>

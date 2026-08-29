@@ -14,7 +14,8 @@ import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
-import { createOrRefreshNeonEvent, listNeonEvents } from "@/lib/db/neon-event-write";
+import { listNeonEventsForDesk } from "@/lib/db/neon-desk-tracked-events";
+import { createOrRefreshNeonEvent } from "@/lib/db/neon-event-write";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ function raceMetaFromInput(input: {
 
 export const GET = withDeskScope(async function GET() {
   if (isNeonDesk()) {
-    return NextResponse.json({ events: await listNeonEvents() });
+    return NextResponse.json({ events: await listNeonEventsForDesk() });
   }
   return NextResponse.json({ events: db.select().from(events).all() });
 });

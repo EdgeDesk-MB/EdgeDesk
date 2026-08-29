@@ -192,8 +192,8 @@ export default function TrackedEventsPage() {
       await api(`/api/events/${id}`, { method: "DELETE" });
       toast.success("Removed from Tracked Events");
       refresh();
-    } catch (e) {
-      toast.error("Delete failed", { description: String(e) });
+    } catch {
+      toast.error("Could not remove this from Tracked Events. Try again.");
     }
   }
 
