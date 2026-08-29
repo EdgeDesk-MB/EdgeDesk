@@ -34,6 +34,7 @@ import {
 import { isKnownSport } from "@/lib/sports";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import { FREE_BET_EV_RETENTION } from "@/lib/offers/offer-intelligence/estimates";
+import { deskKindLabel } from "@/lib/offers/offer-desk-progress";
 import { isRefundIfOffer } from "@/lib/offers/refund-if";
 
 function ctaLabelForAction(
