@@ -108,6 +108,17 @@ export function sumFreeBetLotBalanceFromTransactions(
   return Math.round(total * 100) / 100;
 }
 
+/** Audit debit note when writing off an open lot. */
+export function freeBetRemoveNote(lotId: number, note: string | null | undefined): string {
+  const label =
+    note
+      ?.replace(/^Free bet promo - /, "")
+      .replace(/^Free bet removed - /, "")
+      .replace(/\[\[lot:\d+\]\]\s*/g, "")
+      .trim() || "Free bet";
+  return `Free bet removed - [[lot:${lotId}]] ${label}`;
+}
+
 export function freeBetBalanceByAccountFromTransactions(
   accounts: ReadonlyArray<{ id: number; type: string }>,
   txs: ReadonlyArray<FreeBetLotTx>

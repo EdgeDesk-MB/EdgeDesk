@@ -12,12 +12,11 @@ import {
   sumFreeBetLotBalance,
   type FreeBetLot,
 } from "@/lib/accounts/free-bet-lot-balance";
+import { freeBetRemoveNote } from "@/lib/accounts/free-bet-lot-math";
 import { recordManualTransaction } from "@/lib/services/balances";
 
 export type { FreeBetLot };
 export { listFreeBetLots, sumFreeBetLotBalance };
-
-const LOT_MARKER_RE = /\[\[lot:(\d+)\]\]/;
 
 export function listAllOpenFreeBetLots(): Array<FreeBetLot & { accountName: string }> {
   const bookies = db
@@ -51,17 +50,11 @@ export function removeFreeBetLot(lotId: number): FreeBetLot {
     throw new Error("Free bet already used or removed");
   }
 
-  const label =
-    lot.note
-      ?.replace(/^Free bet promo - /, "")
-      .replace(/^Free bet removed - /, "")
-      .replace(LOT_MARKER_RE, "")
-      .trim() || "Free bet";
   recordManualTransaction(
     credit.accountId,
     -lot.remaining,
     "free_bet",
-    `Free bet removed - [[lot:${lotId}]] ${label}`
+    freeBetRemoveNote(lotId, lot.note)
   );
   return { ...lot, remaining: 0 };
 }

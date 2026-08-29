@@ -16,7 +16,7 @@ import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/services/settings-shared";
 import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
 import { hasRacingApiKey, racingApiUsageToday } from "@/lib/services/theracingapi";
-import { sumFreeBetLotBalanceFromTransactions } from "@/lib/accounts/free-bet-lot-math";
+import { freeBetBalanceByAccountFromTransactions } from "@/lib/accounts/free-bet-lot-math";
 import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
 import { summariseOffer } from "@/lib/offers/offer-profit";
 import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
@@ -102,17 +102,11 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     .map((o) => summariseOffer(o, allBets.filter((b) => b.offerId === o.id), promoAwards))
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  const freeBetBalanceByAccount: Record<number, number> = {};
-  for (const account of accounts) {
-    if (account.type !== "bookie") continue;
-    const fb = sumFreeBetLotBalanceFromTransactions(account.id, transactions);
-    if (fb > 0) freeBetBalanceByAccount[account.id] = fb;
-  }
   const balances = balanceSummaryFromRows(
     accounts,
     transactions,
     allBets,
-    freeBetBalanceByAccount
+    freeBetBalanceByAccountFromTransactions(accounts, transactions)
   );
 
   const history = [...historyRows].sort(

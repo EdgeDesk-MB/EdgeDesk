@@ -5,9 +5,14 @@ import {
   removeFreeBetLot,
   setFreeBetLotExpiry,
 } from "@/lib/accounts/free-bet-lots";
+import { isNeonDesk } from "@/lib/db/desk-backend";
+import {
+  listNeonOpenFreeBetLots,
+  removeNeonFreeBetLot,
+  setNeonFreeBetLotExpiry,
+} from "@/lib/db/neon-desk-free-bet-lots";
 import { quietFreeBetAlerts } from "@/lib/services/quiet-alerts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
-import { blockHostedDeskMutation } from "@/lib/db/hosted-desk-guard";
 import {
   denyPublicDemoWrite,
   isPublicDemoRequest,
@@ -20,6 +25,9 @@ export const GET = withDeskScope(async function GET() {
   if (await isPublicDemoRequest()) {
     return NextResponse.json(publicDemoApiGet("/api/accounts/free-bets"));
   }
+  if (isNeonDesk()) {
+    return NextResponse.json({ lots: await listNeonOpenFreeBetLots() });
+  }
   return NextResponse.json({ lots: listAllOpenFreeBetLots() });
 });
 
@@ -29,8 +37,6 @@ const removeSchema = z.object({
 
 /** Remove (write off) remaining balance on a free-bet lot. */
 export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
-  const blocked = blockHostedDeskMutation("Free-bet lots");
-  if (blocked) return blocked;
   const demoBlock = await denyPublicDemoWrite();
   if (demoBlock) return demoBlock;
   const parsed = removeSchema.safeParse(await req.json());
@@ -38,7 +44,9 @@ export const DELETE = withDeskScope(async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   try {
-    const removed = removeFreeBetLot(parsed.data.lotId);
+    const removed = isNeonDesk()
+      ? await removeNeonFreeBetLot(parsed.data.lotId)
+      : removeFreeBetLot(parsed.data.lotId);
     quietFreeBetAlerts(parsed.data.lotId);
     return NextResponse.json({ ok: true, removed });
   } catch (e) {
@@ -53,8 +61,6 @@ const expirySchema = z.object({
 
 /** Set or clear the conversion deadline on an open free-bet lot. */
 export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
-  const blocked = blockHostedDeskMutation("Free-bet lots");
-  if (blocked) return blocked;
   const demoBlock = await denyPublicDemoWrite();
   if (demoBlock) return demoBlock;
   const parsed = expirySchema.safeParse(await req.json());
@@ -62,7 +68,9 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   try {
-    const lot = setFreeBetLotExpiry(parsed.data.lotId, parsed.data.expiresAt);
+    const lot = isNeonDesk()
+      ? await setNeonFreeBetLotExpiry(parsed.data.lotId, parsed.data.expiresAt)
+      : setFreeBetLotExpiry(parsed.data.lotId, parsed.data.expiresAt);
     return NextResponse.json({ ok: true, lot });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });

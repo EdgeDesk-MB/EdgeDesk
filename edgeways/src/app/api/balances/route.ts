@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { recordManualTransaction, getBalanceSummary } from "@/lib/services/balances";
+import { freeBetBalanceByAccountFromTransactions } from "@/lib/accounts/free-bet-lot-math";
 import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
 import { db, accounts } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
@@ -35,7 +36,12 @@ async function neonBalanceSummary() {
     listNeonDeskBalanceTransactions(),
     listNeonDeskBets(),
   ]);
-  return balanceSummaryFromRows(accountRows, transactionRows, betRows);
+  return balanceSummaryFromRows(
+    accountRows,
+    transactionRows,
+    betRows,
+    freeBetBalanceByAccountFromTransactions(accountRows, transactionRows)
+  );
 }
 
 export const GET = withDeskScope(async function GET() {
