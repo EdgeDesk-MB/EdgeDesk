@@ -38,9 +38,9 @@ export type NeonDeskHistoryValues = {
 
 /** Idempotent: a re-fired dedupe key is a no-op. */
 export async function insertNeonDeskHistory(
-  values: NeonDeskHistoryValues
+  values: NeonDeskHistoryValues,
+  clerkUserId = neonDeskClerkUserId()
 ): Promise<void> {
-  const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return;
   await getNeonDb()
     .insert(pgHistory)

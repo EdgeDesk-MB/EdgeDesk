@@ -94,7 +94,7 @@ export function publicDemoWriteMessage(): string {
 
 export function publicDemoBarLine(view: PublicDemoView): string {
   if (view === "free") {
-    return "Free: calculators and a manual bet log.";
+    return "Free: calculators, a bet log you can settle, wallets that follow results, and basic P&L.";
   }
   if (view === "core") {
     return "Core: offers, Do Next, Daily Plan, and the Edge Report.";

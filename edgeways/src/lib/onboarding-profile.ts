@@ -46,13 +46,13 @@ export const ONBOARDING_WHY = [
   {
     id: "bet_log",
     label: "Bet log",
-    description: "Log every bet by hand.",
+    description: "Log every bet by hand, settle it, and move the wallets.",
     flag: "calculators",
   },
   {
     id: "profit_tracking",
     label: "Profit tracking",
-    description: "Basic P&L from the bets you have logged.",
+    description: "Basic P&L and account balances from the bets you have logged and settled.",
     flag: "calculators",
   },
   {

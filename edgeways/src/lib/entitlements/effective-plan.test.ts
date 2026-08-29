@@ -75,6 +75,7 @@ describe("canDesk", () => {
       planPreview: "unlocked",
     } as const;
     expect(canDesk(free, "calculators")).toBe(true);
+    expect(canDesk(free, "offers_pipeline")).toBe(false);
     expect(canDesk(free, "acca_desk")).toBe(false);
     expect(canDesk(free, "offer_edge")).toBe(false);
 

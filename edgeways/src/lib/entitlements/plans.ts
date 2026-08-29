@@ -4,6 +4,10 @@
  * "which plan can use which feature". Core must stay useful without feeds;
  * Edge is where API cost and modelled picks live.
  *
+ * Profit Tracker (`/tracker`) is the Free bet log: list, settle, wallets,
+ * and basic P&L. It is gated on `calculators`, not `offers_pipeline`. Core
+ * still owns campaigns, lots, Do Next, and the combo desks.
+ *
  * `PlanPreview` adds "unlocked" — Sam's daily default until billing exists —
  * which allows everything. Real enforcement replaces the preview in EDGE-22.
  */

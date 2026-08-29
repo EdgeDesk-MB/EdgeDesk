@@ -136,7 +136,7 @@ describe("subscription copy", () => {
         founding: false,
         canManage: false,
       })
-    ).toBe("Calculators and a manual bet log.");
+    ).toBe("Calculators, a bet log you can settle, wallets that follow results, and basic P&L.");
     expect(
       isComplimentaryAccount({
         plan: "edge",

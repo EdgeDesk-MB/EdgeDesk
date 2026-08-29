@@ -5,6 +5,7 @@ import { db, accounts } from "@/lib/db";
 import { getAccountTransactions } from "@/lib/services/balances";
 import { renameVenueAccount } from "@/lib/accounts/rename-venue";
 import { listFreeBetLots } from "@/lib/accounts/free-bet-lots";
+import { listFreeBetLotsFromTransactions } from "@/lib/accounts/free-bet-lot-balance";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import {
   listNeonDeskAccounts,
@@ -79,7 +80,10 @@ export const GET = withDeskScope(async function GET(_req: NextRequest, ctx: { pa
         .filter((t) => t.accountId === accountId)
         .sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
         .slice(0, 50),
-      freeBetLots: [],
+      freeBetLots:
+        account.type === "bookie"
+          ? listFreeBetLotsFromTransactions(accountId, transactionRows)
+          : [],
     });
   }
 

@@ -400,7 +400,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Add to tracker",
         paragraphs: [
-          "Core and Pro calculators have an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, and save. When football fixtures are connected, 2UP Desk and 2UP can find-or-create the real fixture automatically.",
+          "Every calculator has an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, save, then settle from Profit Tracker. Bookie and exchange wallets move when you place and when you settle. When football fixtures are connected, 2UP Desk and 2UP can find-or-create the real fixture automatically.",
         ],
       },
       {

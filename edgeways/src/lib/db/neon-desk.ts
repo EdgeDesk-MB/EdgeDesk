@@ -151,6 +151,29 @@ export async function patchNeonDeskBet(
   return rows[0] ? toSqliteBetRow(rows[0]) : null;
 }
 
+/**
+ * One worker wins the right to write placement ledger rows. Dashboard heal
+ * and settle-heal can otherwise debit the same open bet twice.
+ */
+export async function claimNeonBetPlacementLedger(
+  id: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<boolean> {
+  if (!clerkUserId) return false;
+  const rows = await getNeonDb()
+    .update(pgBets)
+    .set({ balanceLedgered: 1 })
+    .where(
+      and(
+        eq(pgBets.id, id),
+        eq(pgBets.clerkUserId, clerkUserId),
+        eq(pgBets.balanceLedgered, 0)
+      )
+    )
+    .returning({ id: pgBets.id });
+  return rows.length > 0;
+}
+
 /** Deletes one bet for this login. Throws when signed out. */
 export async function deleteNeonDeskBet(id: number): Promise<boolean> {
   const clerkUserId = neonDeskClerkUserId();

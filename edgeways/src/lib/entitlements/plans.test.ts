@@ -10,8 +10,10 @@ import {
 
 /**
  * Literal expectation table, transcribed from the N0 brief matrix
- * (implementation-briefs.md N0 / product-roadmap.md §7.5). Written out by hand
- * so the test fails if the matrix in plans.ts drifts from the brief.
+ * (implementation-briefs.md N0 / product-roadmap.md §7.5). The Profit Tracker
+ * page is the Free `calculators` log (list / settle / wallets / basic P&L);
+ * `offers_pipeline` is campaigns and lots only. Written out by hand so the
+ * test fails if the matrix in plans.ts drifts from the brief.
  */
 const MATRIX: Record<FeatureFlag, { free: boolean; core: boolean; edge: boolean }> = {
   calculators: { free: true, core: true, edge: true },

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, accounts, exchanges } from "@/lib/db";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { getBalanceSummary } from "@/lib/services/balances";
+import { sumFreeBetLotBalanceFromTransactions } from "@/lib/accounts/free-bet-lot-math";
 import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
@@ -43,8 +44,14 @@ export const GET = withDeskScope(async function GET() {
       listNeonDeskBalanceTransactions(),
       listNeonDeskBets(),
     ]);
+    const freeBetBalanceByAccount: Record<number, number> = {};
+    for (const account of accountRows) {
+      if (account.type !== "bookie") continue;
+      const fb = sumFreeBetLotBalanceFromTransactions(account.id, transactionRows);
+      if (fb > 0) freeBetBalanceByAccount[account.id] = fb;
+    }
     return NextResponse.json(
-      balanceSummaryFromRows(accountRows, transactionRows, betRows)
+      balanceSummaryFromRows(accountRows, transactionRows, betRows, freeBetBalanceByAccount)
     );
   }
   return NextResponse.json(getBalanceSummary());

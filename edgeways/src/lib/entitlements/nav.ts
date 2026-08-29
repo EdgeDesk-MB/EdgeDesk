@@ -7,7 +7,9 @@ import { requiredPlan, type PlanId } from "./plans";
 
 export function featureForDeskPath(pathname: string): FeatureFlag | null {
   if (pathname.startsWith("/offers")) return "offers_pipeline";
-  if (pathname.startsWith("/tracker")) return "offers_pipeline";
+  // Profit Tracker is the Free bet log (list, settle, wallets, basic P&L).
+  // Campaigns and lots stay on offers_pipeline / Core.
+  if (pathname.startsWith("/tracker")) return "calculators";
   if (pathname.startsWith("/acca")) return "acca_desk";
   if (pathname.startsWith("/bet-builder")) return "bet_builder_desk";
   if (pathname.startsWith("/systems")) return "systems_desk";

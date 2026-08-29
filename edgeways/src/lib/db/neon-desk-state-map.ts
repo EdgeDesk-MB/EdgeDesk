@@ -16,6 +16,8 @@ import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/services/settings-shared";
 import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
 import { hasRacingApiKey, racingApiUsageToday } from "@/lib/services/theracingapi";
+import { sumFreeBetLotBalanceFromTransactions } from "@/lib/accounts/free-bet-lot-math";
+import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
 import { summariseOffer } from "@/lib/offers/offer-profit";
 import { balanceSummaryFromRows } from "@/lib/services/balance-summary";
 import { hostedEventDerivations } from "@/lib/db/neon-desk-state-events";
@@ -95,12 +97,23 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
 
   const provisional = sumOpenWorstCaseProfit(bets);
 
-  // No promo ledger on Neon yet: pass {} so the pure summary never touches SQLite.
+  const promoAwards = promoAwardsFromTransactions(transactions);
   const offers = allOffers
-    .map((o) => summariseOffer(o, allBets.filter((b) => b.offerId === o.id), {}))
+    .map((o) => summariseOffer(o, allBets.filter((b) => b.offerId === o.id), promoAwards))
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  const balances = balanceSummaryFromRows(accounts, transactions, allBets);
+  const freeBetBalanceByAccount: Record<number, number> = {};
+  for (const account of accounts) {
+    if (account.type !== "bookie") continue;
+    const fb = sumFreeBetLotBalanceFromTransactions(account.id, transactions);
+    if (fb > 0) freeBetBalanceByAccount[account.id] = fb;
+  }
+  const balances = balanceSummaryFromRows(
+    accounts,
+    transactions,
+    allBets,
+    freeBetBalanceByAccount
+  );
 
   const history = [...historyRows].sort(
     (a, b) => b.createdAt - a.createdAt || b.id - a.id
@@ -135,7 +148,7 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     series,
     history,
     chartHistory: [],
-    promoAwards: {},
+    promoAwards,
     apiConfigured: hasApiKey(),
     racingApiConfigured: hasRacingApiKey(),
     racingResultsTier: hasRacingApiKey() ? "free" : "none",

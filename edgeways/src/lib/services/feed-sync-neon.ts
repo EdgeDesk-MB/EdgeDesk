@@ -25,9 +25,9 @@
  *   single-operator nudge rather than customer-facing. Hosted usage is still
  *   visible via `apiUsageTodayAsync`. (Customer-facing result_settled alerts
  *   ARE emitted here - EDGE-110 - via the per-user Neon inbox + push.)
- * - Free-bet lots and wagering on settlement. Cash stake/payout rows now
- *   ledger when placement marked `balance_ledgered`; older un-ledgered bets
- *   still skip wallet rows so we do not invent money the desk never debited.
+ * - Free-bet lots and wagering on settlement. Cash stake/payout rows ledger
+ *   on place and settle (including a placement heal for older un-ledgered
+ *   bets). Lots/WR stay on the SQLite Core path.
  */
 import "server-only";
 

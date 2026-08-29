@@ -174,6 +174,43 @@ function historyRow(
 }
 
 describe("appStateFromNeonDesk", () => {
+  it("treats a hosted refund-if promo credit as the awarded free bet", () => {
+    const state = appStateFromNeonDesk({
+      bets: [
+        bet({
+          id: 541,
+          label: "Goodwood 1:25",
+          status: "lost",
+          betType: "risk_free",
+          actualProfit: -35,
+          offerId: 479,
+          triggerText: "Bet £100 get £100 free bet if bet loses",
+        }),
+      ],
+      offers: [offer({ id: 479, title: "Money back if bet loses", bookmaker: "BetMGM" })],
+      accounts: [account({ id: 70, name: "BetMGM", type: "bookie" })],
+      transactions: [
+        tx({
+          id: 9,
+          accountId: 70,
+          amount: 100,
+          category: "free_bet",
+          betId: 541,
+          note: "Free bet promo - Bet lost — money-back free bet (Goodwood 1:25)",
+        }),
+      ],
+    });
+    const summary = state.offers[0]!;
+    expect(summary.profit.freeBetAwarded).toBe(true);
+    expect(summary.profit.freeBetAwardAmount).toBe(100);
+    expect(summary.profit.freeBetStage).toBe("awarded");
+    expect(state.promoAwards[541]).toEqual({
+      amount: 100,
+      reason: "Bet lost — money-back free bet",
+    });
+    expect(state.balances.accounts.find((a) => a.id === 70)?.freeBets).toBe(100);
+  });
+
   it("summarises hosted offers with linked bets", () => {
     const state = appStateFromNeonDesk({
       bets: [

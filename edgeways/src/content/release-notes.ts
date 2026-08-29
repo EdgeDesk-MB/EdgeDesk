@@ -33,6 +33,32 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
     date: "2026-08-29",
+    title: "Free bet log and wallets",
+    summary:
+      "Free includes Profit Tracker, Set result, and bookie wallets that move with the result.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Profit Tracker",
+        href: "/tracker",
+        text: "On Free, Profit Tracker is open. Log a bet from a calculator, Set result, and see basic P&L.",
+      },
+      {
+        kind: "feature",
+        area: "Accounts",
+        href: "/accounts",
+        text: "Placing a bet reserves the back stake and lay liability. Set result pays the bookie and exchange wallets.",
+      },
+      {
+        kind: "improvement",
+        area: "Free",
+        href: "/settings?tab=subscription&live=1",
+        text: "The public plan table now says Free includes the settleable log and wallets. Offers, lots, and Do Next stay on Core.",
+      },
+    ],
+  },
+  {
+    date: "2026-08-29",
     title: "Refund-If offers and calculator polish",
     summary:
       "Money-back-if-you-lose campaigns get the right underlay path, and the calculators and menus are easier to read.",

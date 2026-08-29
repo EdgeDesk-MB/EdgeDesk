@@ -23,9 +23,9 @@ export type FeatureFlag = (typeof FEATURES)[number];
 
 /** Human-facing label per flag, used for lock copy and Settings display. */
 export const FEATURE_LABELS: Record<FeatureFlag, string> = {
-  calculators: "Calculators + manual bet log",
+  calculators: "Calculators, bet log, wallets, and basic P&L",
   demo_data: "Demo Racing Desk / demo data",
-  offers_pipeline: "Offers pipeline, tracker, free-bet lots",
+  offers_pipeline: "Offers pipeline and free-bet lots",
   do_next: "Do Next / Daily Plan / Edge Report / EV analytics",
   acca_desk: "Acca Desk + offer to Acca qualifier routing",
   bet_builder_desk: "Bet Builder Desk",

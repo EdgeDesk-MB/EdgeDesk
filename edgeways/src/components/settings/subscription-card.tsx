@@ -268,7 +268,7 @@ function planTileSub(
   if (account.billingStatus === "past_due") return "Update the card";
   if (account.founding) return "Founding rate";
   if (account.billingStatus === "canceled") return "Until period ends";
-  if (account.plan === "free") return "Manual bet log";
+  if (account.plan === "free") return "Bet log and wallets";
   return undefined;
 }
 

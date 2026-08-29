@@ -123,7 +123,7 @@ export function subscriptionDetail(account: SubscriptionAccount): string {
     return "Access continues until the period ends.";
   }
   if (account.founding) return "You are on the founding rate.";
-  if (account.plan === "free") return "Calculators and a manual bet log.";
+  if (account.plan === "free") return "Calculators, a bet log you can settle, wallets that follow results, and basic P&L.";
   return "Card, invoices and cancel live with Stripe.";
 }
 

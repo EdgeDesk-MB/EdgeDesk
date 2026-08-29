@@ -1,11 +1,11 @@
 /**
  * Hosted desk wallets on Neon (EDGE-47): accounts plus the balance ledger.
- * Transfers and pending-credit confirmation write here too; free-bet lots stay
- * SQLite-only until their own cutover.
+ * Transfers and pending-credit confirmation write here too. Promo free-bet
+ * credits live on this ledger; FIFO lots are derived from the rows.
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt, or } from "drizzle-orm";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
@@ -124,9 +124,9 @@ export async function listNeonDeskAccounts(
 }
 
 export async function insertNeonDeskAccount(
-  values: NeonDeskAccountValues
+  values: NeonDeskAccountValues,
+  clerkUserId = neonDeskClerkUserId()
 ): Promise<AccountRow> {
-  const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) {
     throw new Error("Sign in to save an account.");
   }
@@ -159,9 +159,9 @@ export type NeonDeskAccountPatch = Partial<{
 
 export async function patchNeonDeskAccount(
   id: number,
-  patch: NeonDeskAccountPatch
+  patch: NeonDeskAccountPatch,
+  clerkUserId = neonDeskClerkUserId()
 ): Promise<AccountRow | null> {
-  const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) {
     throw new Error("Sign in to save an account.");
   }
@@ -173,9 +173,9 @@ export async function patchNeonDeskAccount(
   return rows[0] ? toSqliteAccountRow(rows[0]) : null;
 }
 
-export async function listNeonDeskBalanceTransactions(): Promise<
-  BalanceTransactionRow[]
-> {  const clerkUserId = neonDeskClerkUserId();
+export async function listNeonDeskBalanceTransactions(
+  clerkUserId = neonDeskClerkUserId()
+): Promise<BalanceTransactionRow[]> {
   if (!clerkUserId) return [];
   const rows = await getNeonDb()
     .select()
@@ -321,6 +321,29 @@ export async function purgeNeonDeskTransactionsForBet(
       and(
         eq(pgBalanceTransactions.betId, betId),
         eq(pgBalanceTransactions.clerkUserId, clerkUserId)
+      )
+    );
+}
+
+/** Drop cash stake / free-bet usage debits so an open bet can be re-ledgered. */
+export async function purgeNeonDeskPlacementTransactionsForBet(
+  betId: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<void> {
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgBalanceTransactions)
+    .where(
+      and(
+        eq(pgBalanceTransactions.betId, betId),
+        eq(pgBalanceTransactions.clerkUserId, clerkUserId),
+        or(
+          eq(pgBalanceTransactions.category, "bet_stake"),
+          and(
+            eq(pgBalanceTransactions.category, "free_bet"),
+            lt(pgBalanceTransactions.amount, 0)
+          )
+        )
       )
     );
 }

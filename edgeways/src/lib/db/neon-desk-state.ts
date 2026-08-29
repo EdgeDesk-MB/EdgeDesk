@@ -21,6 +21,7 @@ import {
   listNeonInboxDedupes,
   unreadNeonCount,
 } from "@/lib/db/neon-alerts-inbox";
+import { awardNeonUnconditionalFreeBetsDue, healNeonDeskLedgers } from "@/lib/db/neon-desk-ledger";
 import { appStateFromNeonDesk } from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
@@ -36,7 +37,7 @@ export {
 } from "@/lib/db/neon-desk-state-map";
 
 export async function buildNeonDeskAppState(): Promise<AppState> {
-  const [bets, feedEvents, followedIds, offers, accounts, transactions, history, casinoOffers, settings, apiUsage, alertsUnread, deliveredAlertKeys] =
+  let [bets, feedEvents, followedIds, offers, accounts, transactions, history, casinoOffers, settings, apiUsage, alertsUnread, deliveredAlertKeys] =
     await Promise.all([
       listNeonDeskBets(),
       listNeonEvents().catch(() => []),
@@ -58,6 +59,34 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
       maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
     ]);
   const events = filterEventsForDesk(feedEvents, followedIds, bets);
+  try {
+    const healed = await healNeonDeskLedgers(bets);
+    if (healed > 0) {
+      const [nextBets, nextAccounts, nextTxs] = await Promise.all([
+        listNeonDeskBets(),
+        listNeonDeskAccounts(),
+        listNeonDeskBalanceTransactions(),
+      ]);
+      bets = nextBets;
+      accounts = nextAccounts;
+      transactions = nextTxs;
+    }
+  } catch {
+    // Heal is best-effort; the snapshot still renders.
+  }
+  try {
+    const awarded = await awardNeonUnconditionalFreeBetsDue(bets, transactions);
+    if (awarded > 0) {
+      const [nextTxs, nextHistory] = await Promise.all([
+        listNeonDeskBalanceTransactions(),
+        listNeonDeskHistory(),
+      ]);
+      transactions = nextTxs;
+      history = nextHistory;
+    }
+  } catch {
+    // Award is best-effort; the snapshot still renders.
+  }
   const snapshot = appStateFromNeonDesk({
     bets,
     events,

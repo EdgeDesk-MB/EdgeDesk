@@ -64,6 +64,24 @@ describe("public offer", () => {
       expect(row.title.length).toBeGreaterThan(0);
       expect(row.description.length).toBeGreaterThan(20);
     }
+    const calcs = rows.find((r) => r.flag === "calculators");
+    expect(calcs?.title).toBe("Calculators and bet log");
+    expect(calcs?.included).toEqual({
+      free: true,
+      core: true,
+      edge: true,
+    });
+    expect(calcs?.description.toLowerCase()).toContain("settle");
+    expect(calcs?.description.toLowerCase()).toContain("wallet");
+    const pipeline = rows.find((r) => r.flag === "offers_pipeline");
+    expect(pipeline?.included).toEqual({
+      free: false,
+      core: true,
+      edge: true,
+    });
+    expect(`${pipeline?.title} ${pipeline?.description}`.toLowerCase()).not.toContain(
+      "profit tracker"
+    );
     const lay = rows.find((r) => r.flag === "exchange_lay");
     expect(lay?.title).toBe("Live exchange prices");
     // D8: customer-facing copy never names data providers.

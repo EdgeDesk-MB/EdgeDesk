@@ -60,7 +60,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   tracker: {
     title: "Profit Tracker",
-    summary: "Positions linked to events. Results settle automatically.",
+    summary: "Log, settle, and see wallets and basic P&L. Link an event and the result can settle it.",
     bullets: [
       "Add bets manually, from calculators, or via OCR screenshot import.",
       "Placing a deliberate back-only bet (e.g. a mug bet)? Pick the No lay bet type - the lay panel disappears and the outcomes show the bookie side only.",

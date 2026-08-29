@@ -8,6 +8,7 @@ import "server-only";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import type { EnsureVenueResult, VenueKind } from "@/lib/accounts/ensure-venue";
+import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import {
   insertNeonDeskAccount,
   insertNeonExchange,
@@ -42,12 +43,14 @@ async function ensureNeonExchangeRow(name: string): Promise<ExchangeRow> {
  */
 export async function ensureNeonVenueAccount(
   name: string,
-  kind: VenueKind
+  kind: VenueKind,
+  clerkUserId = neonDeskClerkUserId()
 ): Promise<EnsureVenueResult> {
+  if (!clerkUserId) throw new Error("Sign in to save an account.");
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Name is required");
   const q = trimmed.toLowerCase();
-  const accounts = await listNeonDeskAccounts();
+  const accounts = await listNeonDeskAccounts(clerkUserId);
 
   const active = accounts.find(
     (a) => a.type === kind && a.isActive === 1 && a.name.toLowerCase() === q
@@ -68,37 +71,47 @@ export async function ensureNeonVenueAccount(
   );
   if (inactive) {
     const exchange = kind === "exchange" ? await ensureNeonExchangeRow(trimmed) : null;
-    const account = await patchNeonDeskAccount(inactive.id, {
-      isActive: 1,
-      brandColor:
-        kind === "bookie"
-          ? inactive.brandColor ?? bookieBrandColor(trimmed)
-          : inactive.brandColor ?? exchange?.brandColor ?? undefined,
-      ...(kind === "exchange" && exchange ? { exchangeId: exchange.id } : {}),
-    });
+    const account = await patchNeonDeskAccount(
+      inactive.id,
+      {
+        isActive: 1,
+        brandColor:
+          kind === "bookie"
+            ? inactive.brandColor ?? bookieBrandColor(trimmed)
+            : inactive.brandColor ?? exchange?.brandColor ?? undefined,
+        ...(kind === "exchange" && exchange ? { exchangeId: exchange.id } : {}),
+      },
+      clerkUserId
+    );
     if (!account) throw new Error("Could not reactivate the account.");
     return { account, exchange, created: true };
   }
 
   if (kind === "exchange") {
     const exchange = await ensureNeonExchangeRow(trimmed);
-    const account = await insertNeonDeskAccount({
-      name: trimmed,
-      type: "exchange",
-      exchangeId: exchange.id,
-      brandColor: exchange.brandColor,
-      isActive: 1,
-      createdAt: Date.now(),
-    });
+    const account = await insertNeonDeskAccount(
+      {
+        name: trimmed,
+        type: "exchange",
+        exchangeId: exchange.id,
+        brandColor: exchange.brandColor,
+        isActive: 1,
+        createdAt: Date.now(),
+      },
+      clerkUserId
+    );
     return { account, exchange, created: true };
   }
 
-  const account = await insertNeonDeskAccount({
-    name: trimmed,
-    type: "bookie",
-    brandColor: bookieBrandColor(trimmed),
-    isActive: 1,
-    createdAt: Date.now(),
-  });
+  const account = await insertNeonDeskAccount(
+    {
+      name: trimmed,
+      type: "bookie",
+      brandColor: bookieBrandColor(trimmed),
+      isActive: 1,
+      createdAt: Date.now(),
+    },
+    clerkUserId
+  );
   return { account, exchange: null, created: true };
 }

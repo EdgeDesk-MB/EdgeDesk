@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/neon-desk";
 import { getNeonDeskOffer } from "@/lib/db/neon-desk-offers";
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
-import { ledgerNeonBetPlacement } from "@/lib/db/neon-desk-ledger";
+import { ledgerNeonBetPlacement, logNeonLedgerFailure } from "@/lib/db/neon-desk-ledger";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
 import { ledgerBetPlacement } from "@/lib/services/balances";
 import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
@@ -165,7 +165,9 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         detail: inserted.label,
         createdAt: inserted.createdAt,
       }).catch(() => {});
-      await ledgerNeonBetPlacement(inserted).catch(() => {});
+      await ledgerNeonBetPlacement(inserted).catch((error) => {
+        logNeonLedgerFailure("placement", inserted.id, error);
+      });
       return NextResponse.json({ bet: inserted });
     } catch (error) {
       const message =

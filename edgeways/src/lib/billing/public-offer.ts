@@ -32,7 +32,7 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
     name: "Free",
     monthlyPence: 0,
     annualPence: 0,
-    blurb: "Calculators and a manual bet log. No card required.",
+    blurb: "Calculators, a bet log you can settle, wallets that follow results, and basic P&L. No card required.",
     cta: "Create a free account",
     href: "/sign-up",
   },
@@ -64,7 +64,7 @@ export const COMPARISON_FEATURES: Record<
   calculators: {
     title: "Calculators and bet log",
     description:
-      "Qualifying, free-bet, Dutching, and the rest of the matched-bet maths. Log every bet by hand.",
+      "Qualifying, free-bet, Dutching, and the rest of the matched-bet maths. Log every bet by hand, settle it, and bookie and exchange wallets move with the result.",
   },
   demo_data: {
     title: "Demo Racing Desk",

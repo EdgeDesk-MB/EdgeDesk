@@ -12,7 +12,9 @@ import {
 import { purgeNeonDeskHistoryForBet } from "@/lib/db/neon-desk-history";
 import {
   ledgerNeonBetSettlement,
+  logNeonLedgerFailure,
   purgeNeonDeskLedgerForBet,
+  reledgerNeonOpenBetPlacement,
 } from "@/lib/db/neon-desk-ledger";
 import { purgeNeonDeskSettlementTransactionsForBet } from "@/lib/db/neon-desk-accounts";
 import { resolveTriggerFields } from "@/lib/services/bet-triggers";
@@ -172,8 +174,22 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
       }
       const updated = await patchNeonDeskBet(betId, set);
       if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const placementTouched =
+        p.betType !== undefined ||
+        p.backStake !== undefined ||
+        p.layStake !== undefined ||
+        p.layOdds !== undefined ||
+        p.bookmaker !== undefined ||
+        p.exchangeId !== undefined;
+      if (placementTouched && updated.status === "open") {
+        await reledgerNeonOpenBetPlacement(updated).catch((error) => {
+          logNeonLedgerFailure("reledger", updated.id, error);
+        });
+      }
       if (updated.status !== "open") {
-        await ledgerNeonBetSettlement(updated).catch(() => {});
+        await ledgerNeonBetSettlement(updated).catch((error) => {
+          logNeonLedgerFailure("settlement", updated.id, error);
+        });
       }
       return NextResponse.json({ bet: updated });
     } catch (error) {

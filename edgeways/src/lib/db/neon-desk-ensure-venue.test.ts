@@ -27,6 +27,10 @@ function account(partial: Partial<AccountRow> & Pick<AccountRow, "id" | "name" |
   };
 }
 
+vi.mock("@/lib/db/neon-desk", () => ({
+  neonDeskClerkUserId: () => "user_live",
+}));
+
 vi.mock("@/lib/db/neon-desk-accounts", () => ({
   listNeonDeskAccounts: async () => mocks.accounts,
   listNeonExchanges: async () => mocks.exchanges,
@@ -112,5 +116,11 @@ describe("ensureNeonVenueAccount", () => {
 
   it("rejects an empty name", async () => {
     await expect(ensureNeonVenueAccount("  ", "bookie")).rejects.toThrow("Name is required");
+  });
+
+  it("creates the wallet for the explicit owner, not only the ALS clerk", async () => {
+    const r = await ensureNeonVenueAccount("Smarkets", "exchange", "user_customer");
+    expect(r.created).toBe(true);
+    expect(r.account.name).toBe("Smarkets");
   });
 });

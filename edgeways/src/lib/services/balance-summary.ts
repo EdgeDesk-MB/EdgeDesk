@@ -3,7 +3,8 @@
  * import services/balances.ts (it opens SQLite at module load), so the ledger
  * maths is mirrored here row-for-row: accountCashBalance, accountPendingIn,
  * sharedLiabilityReturn and getOpenInBetsTotal. Free-bet lots stay SQLite-only
- * until their own cutover; callers pass `freeBetBalanceByAccount` ({} on Neon).
+ * until a caller passes `freeBetBalanceByAccount` (hosted derives it from
+ * free_bet ledger rows).
  */
 import { roundPence } from "@/lib/calc/money";
 import type {

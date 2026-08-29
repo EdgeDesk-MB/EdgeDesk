@@ -33,6 +33,7 @@ import {
   EARLY_FREE_BET_AWARD_REASON,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
+import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
 import { historyNoteFromManualTx } from "@/lib/services/balances-manual-note";
 
 /** Bet ids whose promo free-bet credits belong to the same offer as `bet`. */
@@ -922,15 +923,5 @@ export function getAccountTransactions(accountId: number, limit = 50) {
 
 /** Free bet promo credits keyed by bet id (for tracker, events, dashboard). */
 export function getPromoAwardsByBetId(): Record<number, { amount: number; reason: string }> {
-  const map: Record<number, { amount: number; reason: string }> = {};
-  for (const tx of db.select().from(balanceTransactions).all()) {
-    if (tx.category !== "free_bet" || tx.betId == null || tx.amount <= 0) continue;
-    if (map[tx.betId]) continue;
-    const reasonMatch = tx.note?.match(/Free bet promo - (.+?) \(/);
-    map[tx.betId] = {
-      amount: tx.amount,
-      reason: reasonMatch?.[1]?.trim() ?? "Free bet awarded",
-    };
-  }
-  return map;
+  return promoAwardsFromTransactions(db.select().from(balanceTransactions).all());
 }

@@ -178,7 +178,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/tracker",
         label: "Profit Tracker",
         icon: NotebookPen,
-        feature: "offers_pipeline",
+        feature: "calculators",
         quickAction: "addBet",
       },
       { kind: "link", href: "/match-checker", label: "Match Checker", icon: Scale },
