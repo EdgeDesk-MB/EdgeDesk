@@ -15,12 +15,7 @@ import { getPromoAwardsByBetId } from "@/lib/services/balances";
 import { deriveOfferPipelineStage } from "@/lib/offers/pipeline";
 import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { retireUnusedSameDayOfferSiblings } from "@/lib/offers/course-offer-sync";
-import {
-  markPlaybookStepDone,
-  readPlaybookFromRulesJson,
-  syncPlaybookFromOfferProfit,
-  withPlaybookOnRules,
-} from "@/lib/offers/offer-playbook";
+import { rulesAfterPlaybookStep } from "@/lib/offers/offer-playbook";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 import { isNeonDesk } from "@/lib/db/desk-backend";
@@ -28,6 +23,7 @@ import { listNeonDeskBets } from "@/lib/db/neon-desk";
 import { listNeonDeskBalanceTransactions } from "@/lib/db/neon-desk-accounts";
 import {
   fillNeonSettlementSnapshot,
+  setNeonMistakeTag,
   writeNeonEvLock,
 } from "@/lib/db/neon-desk-ev-snapshots";
 import {
@@ -87,8 +83,8 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   const offerId = Number(id);
 
   if (isNeonDesk()) {
-    // Hosted desk: series recurrence and playbooks are still SQLite-only.
-    if (p.stopRecurrence || p.updateSeries || p.mistakeTag !== undefined || p.playbookStepDone) {
+    // Recurrence writers still need clerk-scoped offer_series (slice 2).
+    if (p.stopRecurrence || p.updateSeries) {
       return NextResponse.json(
         { error: "That offer feature is not available yet." },
         { status: 400 }
@@ -98,12 +94,43 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     if (!hostedExisting) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (p.mistakeTag !== undefined) {
+      await setNeonMistakeTag(offerId, p.mistakeTag as MistakeTag | null);
+    }
+    let hostedRulesFromPlaybook: string | undefined;
+    if (p.playbookStepDone) {
+      const [linked, txs] = await Promise.all([
+        listNeonDeskBets(),
+        listNeonDeskBalanceTransactions(),
+      ]);
+      const summary = summariseOfferPure(
+        hostedExisting,
+        linked.filter((b) => b.offerId === offerId),
+        promoAwardsFromTransactions(txs)
+      );
+      const built = rulesAfterPlaybookStep(
+        hostedExisting.rules,
+        summary.profit,
+        p.playbookStepDone
+      );
+      if (!built.ok) {
+        return NextResponse.json(
+          {
+            error:
+              built.error === "no_playbook"
+                ? "Offer has no completion playbook"
+                : "Could not update playbook",
+          },
+          { status: 400 }
+        );
+      }
+      hostedRulesFromPlaybook = built.rules;
+    }
     const hostedExpireStamp =
       p.status === "expired" && p.expiresAt === undefined
         ? { expiresAt: Date.now(), completedAt: null as number | null }
         : {};
-    try {
-      const updated = await patchNeonDeskOffer(offerId, {
+    const hostedPatch = {
         ...(p.bookmaker !== undefined ? { bookmaker: p.bookmaker || null } : {}),
         ...(p.title !== undefined ? { title: p.title } : {}),
         ...(p.description !== undefined ? { description: p.description || null } : {}),
@@ -117,11 +144,20 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
         ...(p.eventDate !== undefined ? { eventDate: p.eventDate } : {}),
         ...(p.scopeRaceId !== undefined ? { scopeRaceId: p.scopeRaceId } : {}),
         ...(p.scopeRaceLabel !== undefined ? { scopeRaceLabel: p.scopeRaceLabel } : {}),
-        ...(p.rules !== undefined ? { rules: p.rules } : {}),
+        ...(p.rules !== undefined
+          ? { rules: p.rules }
+          : hostedRulesFromPlaybook !== undefined
+            ? { rules: hostedRulesFromPlaybook }
+            : {}),
         ...(p.offerUrl !== undefined ? { offerUrl: normalizeOfferUrl(p.offerUrl) } : {}),
         ...(p.status === "completed" ? { completedAt: Date.now() } : {}),
         ...hostedExpireStamp,
-      });
+    };
+    if (Object.keys(hostedPatch).length === 0) {
+      return NextResponse.json({ offer: hostedExisting });
+    }
+    try {
+      const updated = await patchNeonDeskOffer(offerId, hostedPatch);
       if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
       const activated = p.status === "active" && hostedExisting.status === "planned";
       if (p.expectedProfit !== undefined || activated) {
@@ -186,25 +222,25 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
 
   let rulesFromPlaybook: string | undefined;
   if (p.playbookStepDone) {
-    try {
-      const parsedRules = existing.rules
-        ? (JSON.parse(existing.rules) as Record<string, unknown>)
-        : { type: "promo_terms" };
-      const pb = readPlaybookFromRulesJson(existing.rules);
-      if (!pb) {
-        return NextResponse.json(
-          { error: "Offer has no completion playbook" },
-          { status: 400 }
-        );
-      }
-      const linked = db.select().from(bets).where(eq(bets.offerId, offerId)).all();
-      const summary = summariseOffer(existing, linked, getPromoAwardsByBetId());
-      const synced = syncPlaybookFromOfferProfit(pb, summary.profit);
-      const marked = markPlaybookStepDone(synced, p.playbookStepDone);
-      rulesFromPlaybook = JSON.stringify(withPlaybookOnRules(parsedRules, marked));
-    } catch {
-      return NextResponse.json({ error: "Could not update playbook" }, { status: 400 });
+    const linked = db.select().from(bets).where(eq(bets.offerId, offerId)).all();
+    const summary = summariseOffer(existing, linked, getPromoAwardsByBetId());
+    const built = rulesAfterPlaybookStep(
+      existing.rules,
+      summary.profit,
+      p.playbookStepDone
+    );
+    if (!built.ok) {
+      return NextResponse.json(
+        {
+          error:
+            built.error === "no_playbook"
+              ? "Offer has no completion playbook"
+              : "Could not update playbook",
+        },
+        { status: 400 }
+      );
     }
+    rulesFromPlaybook = built.rules;
   }
 
   // Manual expire: stamp a past deadline so syncOfferStatuses does not revive

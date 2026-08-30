@@ -66,6 +66,16 @@ describe("hosted desk cutover", () => {
     }
   });
 
+  it("writes hosted playbook steps and mistake tags, still blocks recurrence", () => {
+    const src = routeSource("offers/[id]/route.ts");
+    expect(src).toMatch(/setNeonMistakeTag/);
+    expect(src).toMatch(/rulesAfterPlaybookStep/);
+    expect(src).toMatch(/p\.stopRecurrence \|\| p\.updateSeries/);
+    expect(src).not.toMatch(
+      /p\.mistakeTag !== undefined \|\| p\.playbookStepDone/
+    );
+  });
+
   it("reads Edge report baselines from Neon on the hosted desk", () => {
     expect(routeSource("report/route.ts")).toMatch(/listNeonAllSnapshots/);
     expect(routeSource("offers/route.ts")).toMatch(/writeNeonEvLock/);

@@ -1,7 +1,8 @@
 /**
- * Hosted desk offers on Neon (EDGE-47). Recurrence series, EV snapshots and
- * playbook sync stay SQLite-only until their own cutover; the hosted path
- * covers single campaigns: list, create, edit, delete.
+ * Hosted desk offers on Neon (EDGE-47). Recurrence series stay SQLite-only
+ * until their own cutover; playbook steps and EV tags write this table /
+ * offer_ev_snapshots. The hosted path covers single campaigns: list, create,
+ * edit, delete.
  */
 import "server-only";
 

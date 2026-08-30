@@ -11,6 +11,7 @@ import { getNeonDb } from "@/lib/db/neon";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { offerEvSnapshots as pgSnapshots } from "@/lib/db/schema.pg";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import type { MistakeTag } from "@/lib/services/ev-snapshot";
 
 function requireClerk(action: string): string {
   const clerkUserId = neonDeskClerkUserId();
@@ -130,4 +131,31 @@ export async function fillNeonSettlementSnapshot(
         eq(pgSnapshots.version, latest.version)
       )
     );
+}
+
+/**
+ * Tag (or clear) the latest SETTLED snapshot. Same rules as localhost
+ * `setMistakeTag`: no write when nothing is settled yet.
+ */
+export async function setNeonMistakeTag(
+  offerId: number,
+  tag: MistakeTag | null
+): Promise<boolean> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return false;
+  const snapshots = await listNeonSnapshotsForOffer(offerId);
+  if (snapshots.length === 0) return false;
+  const latest = snapshots.reduce((best, s) => (s.version > best.version ? s : best));
+  if (latest.settledAt == null) return false;
+  await getNeonDb()
+    .update(pgSnapshots)
+    .set({ mistakeTag: tag })
+    .where(
+      and(
+        eq(pgSnapshots.clerkUserId, clerkUserId),
+        eq(pgSnapshots.offerId, offerId),
+        eq(pgSnapshots.version, latest.version)
+      )
+    );
+  return true;
 }

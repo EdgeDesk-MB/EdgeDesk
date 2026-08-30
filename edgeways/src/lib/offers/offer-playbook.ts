@@ -316,6 +316,27 @@ export function mergePlaybookProgress(
   };
 }
 
+/** Hosted and localhost PATCH: mark a step and return the next rules JSON. */
+export function rulesAfterPlaybookStep(
+  rules: string | null | undefined,
+  profit: OfferProfitBreakdown,
+  stepId: string,
+  now = Date.now()
+): { ok: true; rules: string } | { ok: false; error: "no_playbook" | "invalid" } {
+  try {
+    const parsedRules = rules
+      ? (JSON.parse(rules) as Record<string, unknown>)
+      : { type: "promo_terms" };
+    const pb = readPlaybookFromRulesJson(rules);
+    if (!pb) return { ok: false, error: "no_playbook" };
+    const synced = syncPlaybookFromOfferProfit(pb, profit, now);
+    const marked = markPlaybookStepDone(synced, stepId, now);
+    return { ok: true, rules: JSON.stringify(withPlaybookOnRules(parsedRules, marked)) };
+  } catch {
+    return { ok: false, error: "invalid" };
+  }
+}
+
 export function markPlaybookStepDone(
   playbook: OfferPlaybook,
   stepId: string,

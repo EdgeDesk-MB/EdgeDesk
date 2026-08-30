@@ -9,8 +9,10 @@ import {
   markPlaybookStepDone,
   mergePlaybookProgress,
   playbookProgress,
+  rulesAfterPlaybookStep,
   syncClearWageringFromBookieWr,
   syncPlaybookFromOfferProfit,
+  withPlaybookOnRules,
 } from "@/lib/offers/offer-playbook";
 import type { OfferProfitBreakdown } from "@/lib/services/offers.types";
 
@@ -117,6 +119,34 @@ describe("deriveOfferPlaybook", () => {
     );
     expect(convert?.detail).toMatch(/Hull City vs Manchester United/);
     expect(convert?.detail).toMatch(/2026-08-22/);
+  });
+});
+
+describe("rulesAfterPlaybookStep", () => {
+  it("writes the marked step into rules JSON", () => {
+    const pb = deriveOfferPlaybook({
+      ...emptyPlaybookFacts(),
+      promoCode: "UEFA",
+      minDeposit: 30,
+      depositRequired: true,
+      betStake: 20,
+      freeBetAmount: 10,
+    });
+    const rules = JSON.stringify(withPlaybookOnRules({ type: "promo_terms" }, pb));
+    const out = rulesAfterPlaybookStep(rules, profit({}), "deposit", 1_700_000_000_000);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    const parsed = JSON.parse(out.rules) as {
+      playbook: { steps: Array<{ id: string; status: string }> };
+    };
+    expect(parsed.playbook.steps.find((s) => s.id === "deposit")?.status).toBe("done");
+  });
+
+  it("returns no_playbook when rules have no playbook", () => {
+    expect(rulesAfterPlaybookStep(null, profit({}), "deposit")).toEqual({
+      ok: false,
+      error: "no_playbook",
+    });
   });
 });
 

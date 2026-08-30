@@ -53,6 +53,7 @@ vi.mock("@/lib/offers/advantage", () => ({
 
 import {
   fillNeonSettlementSnapshot,
+  setNeonMistakeTag,
   writeNeonEvLock,
 } from "@/lib/db/neon-desk-ev-snapshots";
 
@@ -161,5 +162,38 @@ describe("fillNeonSettlementSnapshot", () => {
     await fillNeonSettlementSnapshot(9, 6, 0);
     await fillNeonSettlementSnapshot(9, 99, 0);
     expect(mocks.updates).toHaveLength(1);
+  });
+});
+
+describe("setNeonMistakeTag", () => {
+  beforeEach(() => {
+    mocks.clerkUserId = "user_live";
+    mocks.rows = [];
+    mocks.inserts = [];
+    mocks.updates = [];
+  });
+
+  it("refuses to tag an unsettled lock", async () => {
+    await writeNeonEvLock(offer(), { expectedProfit: 8 });
+    const ok = await setNeonMistakeTag(9, "laid_late");
+    expect(ok).toBe(false);
+    expect(mocks.updates).toHaveLength(0);
+  });
+
+  it("tags the latest settled snapshot", async () => {
+    await writeNeonEvLock(offer(), { expectedProfit: 8 });
+    await fillNeonSettlementSnapshot(9, 6, 0);
+    const ok = await setNeonMistakeTag(9, "laid_late");
+    expect(ok).toBe(true);
+    expect(mocks.updates.at(-1)).toMatchObject({ mistakeTag: "laid_late" });
+  });
+
+  it("clears a tag with null", async () => {
+    await writeNeonEvLock(offer(), { expectedProfit: 8 });
+    await fillNeonSettlementSnapshot(9, 6, 0);
+    await setNeonMistakeTag(9, "odds_moved");
+    const ok = await setNeonMistakeTag(9, null);
+    expect(ok).toBe(true);
+    expect(mocks.updates.at(-1)).toMatchObject({ mistakeTag: null });
   });
 });
