@@ -46,7 +46,7 @@ describe("subscriptionAccountFromUser", () => {
     expect(showSubscribeActions(account)).toBe(false);
   });
 
-  it("hides Manage billing until Stripe has a customer", () => {
+  it("hides Manage subscription until Stripe has a customer", () => {
     const account = subscriptionAccountFromUser({
       plan: "edge",
       billingStatus: "trialing",
@@ -59,7 +59,7 @@ describe("subscriptionAccountFromUser", () => {
     expect(showSubscribeActions(account)).toBe(false);
   });
 
-  it("keeps Manage billing after cancel when Stripe still has the customer", () => {
+  it("keeps Manage subscription after cancel when Stripe still has the customer", () => {
     const account = subscriptionAccountFromUser({
       plan: "free",
       billingStatus: "canceled",
@@ -157,6 +157,16 @@ describe("subscription copy", () => {
         canManage: false,
       })
     ).toBe("Complimentary Edge. No Stripe billing.");
+    expect(
+      subscriptionDetail({
+        plan: "core",
+        billingStatus: "active",
+        trialEndsAt: null,
+        cancelAt: null,
+        founding: false,
+        canManage: false,
+      })
+    ).toBe("Complimentary Core. No Stripe billing.");
     expect(
       subscriptionDetail({
         plan: "edge",

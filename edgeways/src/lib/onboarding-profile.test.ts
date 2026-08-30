@@ -98,8 +98,8 @@ describe("upgrade plan for selected features", () => {
   });
 
   it("writes a factual nudge for the required tier", () => {
-    expect(upgradeNudgeTitle("edge")).toBe("Available on Edge tier");
-    expect(upgradeNudgeTitle("core")).toBe("Available on Core tier");
+    expect(upgradeNudgeTitle("edge")).toBe("Available on Edge subscription");
+    expect(upgradeNudgeTitle("core")).toBe("Available on Core subscription");
     expect(planTierLabel("free")).toBe("Free tier");
     expect(upgradeNudgeBody()).toBe(
       "You can continue without upgrading. Upgrade and the features you selected will be available when you land on the desk."

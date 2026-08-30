@@ -38,7 +38,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     status: "unmatched",
     odds: {},
     missing: ALL_FOOTBALL_ODDS_MISSING,
-    error: "Live exchange prices sit on Edge.",
+    error: "Available on Edge subscription.",
   });
   if (denied) return denied;
 

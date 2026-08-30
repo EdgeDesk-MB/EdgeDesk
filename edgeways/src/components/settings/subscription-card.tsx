@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CreditCard } from "lucide-react";
+import { Check, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,15 @@ import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { ReferralSharePanel } from "@/components/referrals/referral-share-panel";
+import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { requestBillingPortal } from "@/lib/billing/open-portal";
-import { planCheckoutHref, PUBLIC_PLANS } from "@/lib/billing/public-offer";
+import {
+  monthlyLabel,
+  planCheckoutHref,
+  PUBLIC_PLANS,
+  SETTINGS_PLAN_HIGHLIGHTS,
+  TRIAL_DAYS,
+} from "@/lib/billing/public-offer";
 import {
   billingStatusBadgeVariant,
   billingStatusLabel,
@@ -22,8 +29,10 @@ import {
   subscriptionDateLabel,
 } from "@/lib/billing/subscription-view";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
+import { availableOnSubscriptionTitle } from "@/lib/entitlements/nav";
 import type { PlanPreview } from "@/lib/entitlements/plans";
 import type { AppSettings } from "@/lib/services/settings-shared";
+import { cn } from "@/lib/utils";
 import { quietPanel, edgePanel, sectionDescription } from "@/lib/ui/surface-styles";
 
 const TILE_VALUE = "h-8 min-w-0 gap-2 text-lg";
@@ -91,9 +100,6 @@ export function SubscriptionCard({
     }
   }
 
-  const core = PUBLIC_PLANS.find((plan) => plan.id === "core");
-  const edge = PUBLIC_PLANS.find((plan) => plan.id === "edge");
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -102,7 +108,7 @@ export function SubscriptionCard({
           <Label className="text-sm font-semibold">Subscription</Label>
         </div>
         <p className={sectionDescription}>
-          Plan, trial and billing. Card, invoices and cancel live with Stripe.
+          Plan, trial and billing.
         </p>
       </div>
 
@@ -161,40 +167,30 @@ export function SubscriptionCard({
             </p>
           ) : null}
 
-          <PlanPreviewInvite
+          {account.canManage ? (
+            <div>
+              <Button
+                disabled={pending}
+                aria-busy={pending || undefined}
+                onClick={() => void openPortal()}
+                {...pagePrimaryButtonProps}
+              >
+                Manage subscription
+              </Button>
+            </div>
+          ) : isComplimentaryAccount(account) ? (
+            <p className={sectionDescription}>No Stripe portal.</p>
+          ) : null}
+
+          {showSubscribeActions(account) ? (
+            <PlanChoiceGrid publicDemo={publicDemo} />
+          ) : null}
+          <PlanPreviewStatus
             planPreview={planPreview}
             billedPlan={account.plan}
             publicDemo={publicDemo}
             onPatch={onPatch}
           />
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {account.canManage ? (
-              <Button
-                disabled={pending}
-                aria-busy={pending || undefined}
-                onClick={() => void openPortal()}
-              >
-                Manage billing
-              </Button>
-            ) : null}
-            {showSubscribeActions(account) && edge ? (
-              <Button
-                variant="edge"
-                onClick={() => window.location.assign(planCheckoutHref(edge, "month"))}
-              >
-                {edge.cta}
-              </Button>
-            ) : null}
-            {showSubscribeActions(account) && core ? (
-              <Button
-                variant="outline"
-                onClick={() => window.location.assign(planCheckoutHref(core, "month"))}
-              >
-                {core.cta}
-              </Button>
-            ) : null}
-          </div>
         </div>
       )}
 
@@ -203,7 +199,69 @@ export function SubscriptionCard({
   );
 }
 
-function PlanPreviewInvite({
+function PlanChoiceGrid({ publicDemo }: { publicDemo: boolean }) {
+  const core = PUBLIC_PLANS.find((plan) => plan.id === "core");
+  const edge = PUBLIC_PLANS.find((plan) => plan.id === "edge");
+  if (!core || !edge) return null;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+        <article className={cn(quietPanel, "flex flex-col gap-3 p-4")}>
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-semibold">{availableOnSubscriptionTitle("core")}</p>
+            <p className="text-lg font-semibold tabular-nums">{monthlyLabel(core)}</p>
+          </div>
+          <ul className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+            {SETTINGS_PLAN_HIGHLIGHTS.core.map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <Check className="mt-0.5 size-3.5 shrink-0 text-primary-text" aria-hidden />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+          {publicDemo ? null : (
+            <Button
+              className="mt-auto w-full"
+              {...pagePrimaryButtonProps}
+              onClick={() => window.location.assign(planCheckoutHref(core, "month"))}
+            >
+              {core.cta}
+            </Button>
+          )}
+        </article>
+        <article className={cn(edgePanel, "flex flex-col gap-3 p-4")}>
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-semibold">{availableOnSubscriptionTitle("edge")}</p>
+            <p className="text-lg font-semibold tabular-nums">
+              {monthlyLabel(edge)}
+              <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                after {TRIAL_DAYS} days free
+              </span>
+            </p>
+          </div>
+          <ul className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+            {SETTINGS_PLAN_HIGHLIGHTS.edge.map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <Check className="mt-0.5 size-3.5 shrink-0 text-edge" aria-hidden />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+          {publicDemo ? null : (
+            <Button
+              className="mt-auto w-full"
+              variant="edge"
+              onClick={() => window.location.assign(planCheckoutHref(edge, "month"))}
+            >
+              {edge.cta}
+            </Button>
+          )}
+        </article>
+      </div>
+  );
+}
+
+function PlanPreviewStatus({
   planPreview,
   billedPlan,
   publicDemo,
@@ -215,45 +273,21 @@ function PlanPreviewInvite({
   onPatch?: (patch: Partial<Pick<AppSettings, "planPreview">>) => void;
 }) {
   if (publicDemo || billedPlan === "edge" || onPatch == null) return null;
-
-  const patch = onPatch;
-  const previewing = planPreview === "edge" || planPreview === "unlocked";
-  const billedName = planDisplayName(billedPlan);
-
-  function startPreview() {
-    patch({ planPreview: "edge" });
-  }
-
-  function stopPreview() {
-    patch({ planPreview: billedPlan === "core" ? "core" : "free" });
-  }
-
-  if (previewing) {
-    return (
-      <div className={`${edgePanel} flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between`}>
-        <div className="min-w-0">
-          <p className="text-sm font-medium">Previewing Edge</p>
-          <p className={sectionDescription}>
-            Live racing and Offer Edge picks are on. Start a trial to keep them.
-          </p>
-        </div>
-        <Button size="sm" variant="outline" onClick={stopPreview}>
-          Back to {billedName}
-        </Button>
-      </div>
-    );
-  }
+  if (planPreview !== "edge") return null;
 
   return (
-    <div className={`${quietPanel} flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between`}>
-      <div className="min-w-0">
-        <p className="text-sm font-medium">Try Edge</p>
-        <p className={sectionDescription}>
-          Walk the full desk for a look. Your billed plan does not change.
-        </p>
-      </div>
-      <Button size="sm" variant="edge" onClick={startPreview}>
-        Try Edge
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <p className={sectionDescription}>
+        Previewing Edge. Live racing and Offer Edge picks are on.
+      </p>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          onPatch({ planPreview: billedPlan === "core" ? "core" : "free" })
+        }
+      >
+        Back to {planDisplayName(billedPlan)}
       </Button>
     </div>
   );
@@ -264,7 +298,7 @@ function planTileSub(
   publicDemo: boolean
 ): string | undefined {
   if (publicDemo) return "Public demo";
-  if (isComplimentaryAccount(account)) return "Operator account";
+  if (isComplimentaryAccount(account)) return "Complimentary grant";
   if (account.billingStatus === "past_due") return "Update the card";
   if (account.founding) return "Founding rate";
   if (account.billingStatus === "canceled") return "Until period ends";

@@ -9,6 +9,8 @@ describe("customer roadmap copy", () => {
     const blobs = [
       ROADMAP_VERSION.currentLabel,
       ROADMAP_VERSION.targetLabel,
+      ROADMAP_VERSION.currentNote,
+      ROADMAP_VERSION.targetLead,
       ROADMAP_VERSION.targetNote,
       ...ROADMAP_CATEGORIES.flatMap((category) =>
         category.items.flatMap((item) => [item.title, item.description ?? ""])
@@ -17,5 +19,17 @@ describe("customer roadmap copy", () => {
     for (const text of blobs) {
       expect(text, text).not.toMatch(INTERNAL);
     }
+  });
+
+  it("states beta with paid plans live, not billing arriving at launch", () => {
+    expect(ROADMAP_VERSION.currentLabel).toBe("Beta");
+    expect(ROADMAP_VERSION.currentNote).toMatch(/paid plans are open/i);
+    expect(`${ROADMAP_VERSION.targetLead} ${ROADMAP_VERSION.targetNote}`).not.toMatch(
+      /billing|support included/i
+    );
+    const billing = ROADMAP_CATEGORIES.flatMap((category) => category.items).find(
+      (item) => item.id === "ux-billing"
+    );
+    expect(billing?.status).toBe("done");
   });
 });

@@ -14,9 +14,11 @@ import {
 } from "@/components/ui/card";
 import { DatePicker } from "@/components/date-picker";
 import { MoneyFlow } from "@/components/money-flow";
+import { PageLoading } from "@/components/page-loading";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
+import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { ActiveBetsStrip } from "@/components/racing/active-bets-strip";
 import { DeskRacecard } from "@/components/racing/desk-racecard";
 import { RacingPnlTodayView } from "@/components/racing/racing-pnl-today-view";
@@ -44,6 +46,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { deskRunnerLayPrices } from "@/lib/racing/desk-bet-prefill";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
@@ -64,7 +67,6 @@ import { ukPlaceTerms } from "@/lib/racing/place-terms";
 import {
   ExternalLink,
   HelpCircle,
-  Loader2,
   Plus,
   RefreshCw,
   Trophy,
@@ -134,6 +136,11 @@ export function RacingDeskView() {
   const { defaultExchange, exchanges } = useExchanges();
   const { state } = useAppState();
   const canOfferEdge = canUseOfferEdge(state?.settings);
+  const canLiveRacing = canDesk(state?.settings, "racing_live_feeds");
+  const showEdgeRacingPromo =
+    !canLiveRacing ||
+    !canOfferEdge ||
+    !canDesk(state?.settings, "exchange_lay");
   const offerBetPrefs = state?.settings?.offerBetPrefs ?? {};
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payload, setPayload] = useState<RacingDeskPayload | null>(null);
@@ -356,7 +363,6 @@ export function RacingDeskView() {
       });
     }
   }
-  if (!canOfferEdge && raceFilter === "recommended") setRaceFilter("all");
   if (!canOfferEdge && intelligenceOpen) setIntelligenceOpen(false);
 
   const selected = useMemo(
@@ -702,17 +708,10 @@ export function RacingDeskView() {
   // Match home: hold the desk until the first racecard payload lands.
   if (loading && payload == null) {
     return (
-      <PageShell fullHeight>
-        <div
-          className="flex min-h-[var(--layout-page-min-h)] flex-1 flex-col items-center justify-center"
-          role="status"
-          aria-live="polite"
-          aria-label="Loading racing desk"
-        >
-          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
-          <p className="mt-3 text-sm text-muted-foreground">Fetching today&apos;s racecards…</p>
-        </div>
-      </PageShell>
+      <PageLoading
+        label="Loading Racing Desk"
+        description="Fetching today's racecards…"
+      />
     );
   }
 
@@ -782,6 +781,13 @@ export function RacingDeskView() {
         })}
         dataSource={summary?.source}
       />
+
+      {showEdgeRacingPromo &&
+      showRaceBoard &&
+      raceFilter !== "recommended" &&
+      (payload?.races.length ?? 0) > 0 ? (
+        <PlanLockEmpty promo="racing" />
+      ) : null}
 
       {pendingSettleRaces.length > 0 && (
         <RacingSettlePrompt
@@ -861,22 +867,28 @@ export function RacingDeskView() {
         </p>
       )}
 
-      {showRaceBoard && !loading && (payload?.races.length ?? 0) === 0 && (
-        <EmptyState
-          icon={Trophy}
-          title={summary?.source === "demo" ? "Demo racecards" : "No races for this date"}
-          description={
-            summary?.source === "demo"
-              ? "Sample racecards until the racing feed is connected. Add an active place-refund offer to see Intelligence in action."
-              : "Try today's date, or add a place-refund offer to put the desk to work."
-          }
-          action={{
-            label: "Add racing offer",
-            onClick: () => openOffer({ category: "horse_racing", eventDate: date }),
-          }}
-          secondaryAction={{ label: "Racing Desk guide", href: "/help?guide=racing-desk" }}
-        />
-      )}
+      {showRaceBoard &&
+        raceFilter !== "recommended" &&
+        !loading &&
+        (payload?.races.length ?? 0) === 0 &&
+        (!canLiveRacing ? (
+          <PlanLockEmpty feature="racing_live_feeds" />
+        ) : (
+          <EmptyState
+            icon={Trophy}
+            title={summary?.source === "demo" ? "Demo racecards" : "No races for this date"}
+            description={
+              summary?.source === "demo"
+                ? "Sample racecards until the racing feed is connected. Add an active place-refund offer to see Intelligence in action."
+                : "Try today's date, or add a place-refund offer to put the desk to work."
+            }
+            action={{
+              label: "Add racing offer",
+              onClick: () => openOffer({ category: "horse_racing", eventDate: date }),
+            }}
+            secondaryAction={{ label: "Racing Desk guide", href: "/help?guide=racing-desk" }}
+          />
+        ))}
 
       <RacingDeskSettingsDialog
         open={settingsOpen}
@@ -919,8 +931,13 @@ export function RacingDeskView() {
             onSettingsClick={() => setSettingsOpen(true)}
             qualifyingCount={qualifyingRaceTotal}
             racePicksCount={racePicksTotal}
-            showRacePicks={canOfferEdge}
+            showRacePicks
+            racePicksLocked={!canOfferEdge}
           />
+          {!canOfferEdge && raceFilter === "recommended" ? (
+            <PlanLockEmpty feature="offer_edge" />
+          ) : (
+          <>
           <div className="bg-selection-subtle/50">
           <CardHeader className="gap-0 pt-4 pb-0">
             <CardTitle section className="flex items-center gap-1.5 text-lg">
@@ -1096,6 +1113,8 @@ export function RacingDeskView() {
             defaultGuideExpanded={raceFilter !== "all"}
             dataSource={summary?.source}
           />
+          </>
+          )}
         </Card>
       )}
     </PageShell>

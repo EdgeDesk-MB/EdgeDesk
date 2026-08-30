@@ -24,7 +24,8 @@ import {
 import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddBetDialog } from "@/components/add-bet-dialog";
 import { useAddBet } from "@/components/add-bet-provider";
-import { PAGE_SHELL_CLASS, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
+import { PageLoading, PlateLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { EmptyState } from "@/components/help/empty-state";
@@ -54,8 +55,7 @@ import {
 } from "@/lib/bets/desk-queues";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { filterPillCountState } from "@/lib/ui/surface-styles";
-import { cn } from "@/lib/utils";
-import { Plus, Trash2, Download, NotebookPen, Loader2 } from "lucide-react";
+import { Plus, Trash2, Download, NotebookPen } from "lucide-react";
 
 /** First paint budgets for large queues (All / Offer campaigns). */
 const INITIAL_CAMPAIGN_GROUPS = 6;
@@ -70,7 +70,7 @@ function parseDeskQueue(raw: string | null): BetDeskQueue {
 
 export default function TrackerPage() {
   return (
-    <Suspense fallback={<div className={cn(PAGE_SHELL_CLASS, "text-sm text-muted-foreground")}>Loading…</div>}>
+    <Suspense fallback={<PageLoading label="Loading Profit Tracker" />}>
       <TrackerContent />
     </Suspense>
   );
@@ -102,23 +102,34 @@ function TrackerContent() {
   const [accaRuns, setAccaRuns] = useState<AccaRunViewLite[]>([]);
   const [betBuilderRuns, setBetBuilderRuns] = useState<BetBuilderRunViewLite[]>([]);
   const [systemRuns, setSystemRuns] = useState<SystemRunViewLite[]>([]);
+  const [deskRunsReady, setDeskRunsReady] = useState(false);
+  const [listPainted, setListPainted] = useState(false);
   const now = useNow(30_000);
   // Yield one tick on heavy queues so the spinner can paint before tables mount.
   const [listReady, setListReady] = useState(true);
   const actionApplied = useRef(false);
 
   const { state, refresh } = useAppState(2000);
+  const deskReady = state != null;
 
   useEffect(() => {
-    api<{ runs: AccaRunViewLite[] }>("/api/acca")
-      .then((r) => setAccaRuns(r.runs))
-      .catch(() => setAccaRuns([]));
-    api<{ runs: BetBuilderRunViewLite[] }>("/api/bet-builder")
-      .then((r) => setBetBuilderRuns(r.runs ?? []))
-      .catch(() => setBetBuilderRuns([]));
-    api<{ runs: SystemRunViewLite[] }>("/api/systems")
-      .then((r) => setSystemRuns(r.runs ?? []))
-      .catch(() => setSystemRuns([]));
+    let live = true;
+    Promise.all([
+      api<{ runs: AccaRunViewLite[] }>("/api/acca")
+        .then((r) => setAccaRuns(r.runs))
+        .catch(() => setAccaRuns([])),
+      api<{ runs: BetBuilderRunViewLite[] }>("/api/bet-builder")
+        .then((r) => setBetBuilderRuns(r.runs ?? []))
+        .catch(() => setBetBuilderRuns([])),
+      api<{ runs: SystemRunViewLite[] }>("/api/systems")
+        .then((r) => setSystemRuns(r.runs ?? []))
+        .catch(() => setSystemRuns([])),
+    ]).finally(() => {
+      if (live) setDeskRunsReady(true);
+    });
+    return () => {
+      live = false;
+    };
   }, [state?.bets?.length]);
 
   const [prevUrlDeskQueue, setPrevUrlDeskQueue] = useState(urlDeskQueue);
@@ -208,7 +219,24 @@ function TrackerContent() {
   }, [listPending, deferredDeskQueue, heavyListTarget]);
 
   const showListSpinner =
-    listPending || (heavyListTarget && !listReady);
+    (!(deskReady && bets.length === 0) && !listPainted) ||
+    (bets.length > 0 && !deskRunsReady) ||
+    listPending ||
+    (heavyListTarget && !listReady);
+
+  useEffect(() => {
+    if (!deskReady) {
+      setListPainted(false);
+      return;
+    }
+    if (bets.length === 0) {
+      setListPainted(true);
+      return;
+    }
+    if (listPainted) return;
+    const t = window.setTimeout(() => setListPainted(true), 0);
+    return () => clearTimeout(t);
+  }, [deskReady, bets.length, listPainted]);
 
   // Heavy filter/group work follows the deferred queue so pills stay snappy.
   const scopedBets = useMemo(() => {
@@ -400,6 +428,10 @@ function TrackerContent() {
     activeTab === "pnl" ? "/api/export/csv?type=monthly" : "/api/export/csv?type=bets";
   const exportLabel = activeTab === "pnl" ? "Export" : "Export CSV";
 
+  if (!deskReady) {
+    return <PageLoading label="Loading Profit Tracker" />;
+  }
+
   return (
     <TooltipProvider delayDuration={200}>
     <PageShell>
@@ -542,15 +574,11 @@ function TrackerContent() {
           {activeTab === "pnl" ? (
             <MonthlyPnlSection variant="plain" />
           ) : showListSpinner ? (
-            <div
-              className="flex min-h-[12rem] flex-col items-center justify-center gap-2 py-10"
-              role="status"
-              aria-live="polite"
-              aria-label="Loading bet log"
-            >
-              <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
-              <p className="text-sm text-muted-foreground">Loading bets…</p>
-            </div>
+            <PlateLoading
+              nested
+              label="Loading bets…"
+              description="Your bet log will appear here."
+            />
           ) : scopedBets.length === 0 ? (
             <EmptyState
               compact

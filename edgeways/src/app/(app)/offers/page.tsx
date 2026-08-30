@@ -14,6 +14,7 @@ import {
   pagePrimaryButtonProps,
 } from "@/components/layout/page-header-actions";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { useAppState } from "@/hooks/use-app-state";
 import {
   groupOffersByListDay,
@@ -51,13 +52,7 @@ import { Gift, Plus, Tag } from "lucide-react";
 
 export default function OffersPage() {
   return (
-    <Suspense
-      fallback={
-        <PageShell>
-          <p className="p-6 text-sm text-muted-foreground">Loading…</p>
-        </PageShell>
-      }
-    >
+    <Suspense fallback={<PageLoading label="Loading campaigns" />}>
       <OffersContent />
     </Suspense>
   );
@@ -201,6 +196,10 @@ function OffersContent() {
     }, 100);
     return () => clearTimeout(scrollTimer);
   }, [offers, highlightId]);
+
+  if (state == null) {
+    return <PageLoading label="Loading campaigns" />;
+  }
 
   return (
     <PageShell>

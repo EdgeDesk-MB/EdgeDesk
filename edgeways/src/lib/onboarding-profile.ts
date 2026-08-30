@@ -108,7 +108,7 @@ export const ONBOARDING_WHY = [
   {
     id: "racing_live",
     label: "Live racing cards",
-    description: "Today's UK and Irish racecards, not the demo set.",
+    description: "Today's UK and Irish racecards. Demo cards are shown on Racing Desk.",
     flag: "racing_live_feeds",
   },
   {
@@ -148,7 +148,7 @@ export const ONBOARDING_HOSTED_STEPS = [
     id: "why",
     title: "What brought you to Edgeways app?",
     body: "Which features interest you most?",
-    help: "Some sit on Core or Edge. We will say if an upgrade would unlock them.",
+    help: "Some are available on a Core or Edge subscription. We will say if an upgrade would unlock them.",
   },
   {
     id: "heard",
@@ -299,7 +299,7 @@ export function planTierLabel(plan: PlanId): string {
 }
 
 export function upgradeNudgeTitle(target: PlanId): string {
-  return `Available on ${planTierLabel(target)}`;
+  return `Available on ${planDisplayName(target)} subscription`;
 }
 
 export function upgradeNudgeBody(): string {

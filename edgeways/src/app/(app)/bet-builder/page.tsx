@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import {
@@ -116,6 +117,10 @@ export default function BetBuilderDeskPage() {
     [runs]
   );
 
+  if (runs == null) {
+    return <PageLoading label="Loading Bet Builder Desk" />;
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -126,9 +131,7 @@ export default function BetBuilderDeskPage() {
         action={<CreateBetBuilderRunDialog onCreated={load} />}
       />
       <div className="flex flex-col gap-3 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
-        {runs == null ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : runs.length === 0 ? (
+        {runs.length === 0 ? (
           <EmptyState
             icon={Puzzle}
             title="No bet builder added yet"

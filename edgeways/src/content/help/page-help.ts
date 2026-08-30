@@ -41,7 +41,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary: "Browse today, then track what you care about.",
     bullets: [
       "Hit + on any row to add it to Tracked Events.",
-      "Without live feeds you get demo fixtures and sample racecards.",
+      "Football stays on this page on every plan. Live UK and Irish racecards are on Edge.",
       "Football: live scores update about once a minute on a tracked match.",
       "Racing feed: today and tomorrow racecards with proxy bookie odds.",
     ],
@@ -167,7 +167,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     title: "Settings",
     summary: "Defaults, appearance, and data export.",
     bullets: [
-      "Subscription: plan, trial, Preview Edge and Manage billing. Card, invoices and cancel open in Stripe.",
+      "Subscription: plan, trial, Preview Edge and Manage subscription. Card, invoices and cancel open in Stripe.",
       "Default bookie and exchange are set in Preferences - saved as you pick them.",
       "Exchanges and bookie status: Accounts → Manage venues.",
       "Racing cards refresh about every 15 minutes. Exchange prices are delayed about 1–3 minutes. Football live scores update about once a minute.",

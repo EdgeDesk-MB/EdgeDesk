@@ -569,3 +569,12 @@ export const edgePanelStrong = cn(
   "rounded-md border border-edge/45 bg-edge/10 ring-1 ring-edge/30",
   tintCardWash
 );
+
+/**
+ * Full-width Edge lock banner on a desk that still works (Racing, 2UP).
+ * Stronger than {@link edgePanel}. Pair with `variant="edge"` View plans
+ * and a solid `--edge` bolt well. Core page locks stay on `<EmptyState>`.
+ */
+export const edgeLockBanner = cn(
+  "w-full min-w-0 rounded-lg border border-edge/40 bg-edge/20 px-4 py-3.5 sm:px-5"
+);

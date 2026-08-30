@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
@@ -103,6 +104,10 @@ export default function AlertsPage() {
     load();
   }
 
+  if (alerts == null) {
+    return <PageLoading label="Loading alerts" />;
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -119,9 +124,7 @@ export default function AlertsPage() {
       />
 
       <div className="flex flex-col gap-2 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
-        {alerts == null ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : alerts.length === 0 ? (
+        {alerts.length === 0 ? (
           <EmptyState
             icon={BellRing}
             title="No alerts yet"

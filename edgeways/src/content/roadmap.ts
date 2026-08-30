@@ -23,6 +23,10 @@ export const ROADMAP_VERSION = {
   currentLabel: "Beta",
   target: "1.0.0",
   targetLabel: "Launch",
+  /** After the Beta badge. Must stay true of the live product. */
+  currentNote: "Paid plans are open.",
+  /** After the Launch badge. Launch is leaving beta, not when billing starts. */
+  targetLead: "is the first public release, when we leave beta.",
   targetNote:
     "Everything marked Done is in your desk today. In progress and Planned are what we're finishing for launch; Future is what we're considering after.",
 } as const;
@@ -202,6 +206,13 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       {
         id: "ux-design",
         title: "Dark and light themes, polished on phone and desktop",
+        status: "done",
+      },
+      {
+        id: "ux-billing",
+        title: "Paid plans, trial and billing",
+        description:
+          "Free, Core and Edge. Subscribe from the site, manage the plan in Settings.",
         status: "done",
       },
     ],

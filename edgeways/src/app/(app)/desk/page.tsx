@@ -34,8 +34,9 @@ import {
   applyDeckLayout,
   isChartOnMobileSummary,
 } from "@/lib/ui/home-layout";
+import { PageLoading } from "@/components/page-loading";
 import { cn } from "@/lib/utils";
-import { Loader2, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 
 function MobileHomeSummary({
@@ -86,18 +87,7 @@ export default function DashboardPage() {
 
   // Wait for /api/state so profit never paints as £0.00 before real figures land.
   if (state == null) {
-    return (
-      <PageShell fullHeight>
-        <div
-          className={cn(dashboardPage, "items-center justify-center")}
-          role="status"
-          aria-live="polite"
-          aria-label="Loading desk"
-        >
-          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
-        </div>
-      </PageShell>
-    );
+    return <PageLoading label="Loading Desk" />;
   }
 
   const settled = state.settledProfit;

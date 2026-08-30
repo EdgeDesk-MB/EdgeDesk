@@ -35,6 +35,7 @@ import {
   demoDataTag,
   dialogTicketSurface,
   dialogTitleIcon,
+  edgeNavTag,
   filterPillCountState,
   filterPillGroup,
   listRowInteractive,
@@ -46,6 +47,7 @@ import {
   ChevronRight,
   ExternalLink,
   Gift,
+  Lock,
   Settings2,
   Zap,
 } from "lucide-react";
@@ -739,8 +741,10 @@ export function DeskFilterPills({
   racePicksCount = 0,
   /** Inside a parent card — no own plate; use a light bottom rule. */
   embedded = false,
-  /** Edge-only. Core / Free hide the Race picks pill. */
+  /** Hide only when the desk has no Race picks concept (tests / embeds). */
   showRacePicks = true,
+  /** Core / Free: keep the pill so Edge is discoverable. */
+  racePicksLocked = false,
 }: {
   filter: DeskRaceFilter;
   onFilterChange: (v: DeskRaceFilter) => void;
@@ -751,6 +755,7 @@ export function DeskFilterPills({
   racePicksCount?: number;
   embedded?: boolean;
   showRacePicks?: boolean;
+  racePicksLocked?: boolean;
 }) {
   return (
     <div
@@ -782,16 +787,35 @@ export function DeskFilterPills({
             tone="edge"
             active={filter === "recommended"}
             onClick={() => onFilterChange("recommended")}
-            hasCount
+            hasCount={!racePicksLocked}
+            aria-label={
+              racePicksLocked ? "Race picks, available on Edge subscription" : undefined
+            }
           >
-            <Zap
-              className={cn("size-3", filter !== "recommended" && "text-edge")}
-              aria-hidden
-            />
+            {racePicksLocked ? (
+              <Lock className="size-3" aria-hidden />
+            ) : (
+              <Zap
+                className={cn("size-3", filter !== "recommended" && "text-edge")}
+                aria-hidden
+              />
+            )}
             Race picks
-            <span className={filterPillCountState(filter === "recommended")}>
-              {racePicksCount}
-            </span>
+            {racePicksLocked ? (
+              <span
+                className={
+                  filter === "recommended"
+                    ? filterPillCountState(true)
+                    : edgeNavTag
+                }
+              >
+                Edge
+              </span>
+            ) : (
+              <span className={filterPillCountState(filter === "recommended")}>
+                {racePicksCount}
+              </span>
+            )}
           </FilterPill>
         ) : null}
       </div>

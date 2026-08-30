@@ -268,7 +268,14 @@ const navTrailingSlot =
 /** Flatten sections/groups to plain links - shared by palette and drawer. */
 export function flattenNavEntries(
   navEntries: NavEntry[]
-): Array<{ href: string; label: string; icon: NavIcon; feature?: FeatureFlag }> {
+): Array<{
+  href: string;
+  label: string;
+  icon: NavIcon;
+  feature?: FeatureFlag;
+  /** Group children. Plan mark stays on the parent row only. */
+  isSubNav?: boolean;
+}> {
   return navEntries.flatMap((entry) =>
     entry.kind === "link"
       ? [{ href: entry.href, label: entry.label, icon: entry.icon, feature: entry.feature }]
@@ -277,6 +284,7 @@ export function flattenNavEntries(
           label: `${entry.label} · ${child.label}`,
           icon: child.icon,
           feature: child.feature ?? entry.feature,
+          isSubNav: true,
         }))
   );
 }
@@ -618,17 +626,6 @@ export function AppNav() {
         <Link
           href={href}
           prefetch
-          aria-disabled={locked || undefined}
-          onClick={
-            locked && item.feature
-              ? (e) => {
-                  e.preventDefault();
-                  toastPlanLock(item.feature!, {
-                    real: state?.settings?.billing != null,
-                  });
-                }
-              : undefined
-          }
           className={cn(navLinkState(active), quickAction && !locked && "pr-10")}
         >
           <Icon
@@ -696,13 +693,6 @@ export function AppNav() {
     );
 
     function onParentClick(e: MouseEvent<HTMLAnchorElement>) {
-      if (locked && entry.feature) {
-        e.preventDefault();
-        toastPlanLock(entry.feature, {
-          real: state?.settings?.billing != null,
-        });
-        return;
-      }
       if (expanded) {
         e.preventDefault();
         setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: true }));
@@ -723,7 +713,6 @@ export function AppNav() {
             href={firstChildHref}
             prefetch
             onClick={onParentClick}
-            aria-disabled={locked || undefined}
             className={cn(navLinkState(parentActive), onQuickAction && !locked && "pr-10")}
             aria-expanded={expanded}
           >
@@ -771,26 +760,12 @@ export function AppNav() {
                   key={child.href}
                   href={child.href}
                   prefetch
-                  aria-disabled={childLocked || undefined}
-                  onClick={
-                    childLocked && childFeature
-                      ? (e) => {
-                          e.preventDefault();
-                          toastPlanLock(childFeature, {
-                            real: state?.settings?.billing != null,
-                          });
-                        }
-                      : undefined
-                  }
                   className={cn(navLinkState(active), "py-1.5 pl-9 text-[13px]")}
                   tabIndex={expanded ? undefined : -1}
                 >
                   <ChildIcon className="size-3.5 shrink-0" />
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate">{child.label}</span>
-                    {childFeature ? (
-                      <PlanNavMark feature={childFeature} locked={childLocked} />
-                    ) : null}
                     {!childLocked ? <ActionBadge count={childBadge} /> : null}
                   </span>
                 </Link>

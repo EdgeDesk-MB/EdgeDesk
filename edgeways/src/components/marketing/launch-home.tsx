@@ -5,7 +5,7 @@ import { MarketingGlimpseRail } from "@/components/marketing/marketing-glimpse-r
 import { MarketingPricing } from "@/components/marketing/marketing-pricing";
 import { MarketingSiteFooter } from "@/components/marketing/marketing-site-footer";
 import { moneyPositiveClass } from "@/components/money-flow";
-import { TRIAL_DAYS, betaOfferSummary } from "@/lib/billing/public-offer";
+import { TRIAL_DAYS, trialOfferSummary } from "@/lib/billing/public-offer";
 import {
   HERO_LEAD,
   HOW_IT_HELPS_LEAD,
@@ -17,11 +17,7 @@ const FAQ = [
   ...POSITIONING_FAQ,
   {
     q: "What does the trial include?",
-    a: `${TRIAL_DAYS} days of Edge, the top tier. One trial per person. Cancel before it ends and you are not charged. After that, Edge billing starts unless you cancel.`,
-  },
-  {
-    q: "What do beta testers get?",
-    a: betaOfferSummary(),
+    a: `${TRIAL_DAYS} days of Edge, the top tier. One trial per person. Cancel before it ends and you are not charged. After that, Edge billing starts unless you cancel. Core is billed from the day you subscribe.`,
   },
   {
     q: "Who is it for?",
@@ -315,10 +311,10 @@ export function LaunchHome() {
         <section className="border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-5xl text-center" data-reveal="">
             <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Join the beta waitlist
+              Join the waitlist
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-white/60 sm:text-base">
-              {betaOfferSummary()}
+              {trialOfferSummary()}
             </p>
             <div className="mx-auto mt-8 w-full max-w-lg">
               <WaitlistForm id="waitlist-footer" />

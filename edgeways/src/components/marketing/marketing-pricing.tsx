@@ -9,7 +9,7 @@ import {
   planCheckoutHref,
   PUBLIC_PLANS,
   TRIAL_DAYS,
-  betaOfferSummary,
+  trialOfferSummary,
   yearlyBillingSummary,
   yearlyDealCue,
   yearlyDealLabel,
@@ -345,7 +345,7 @@ export function MarketingPricing() {
           </table>
           </ScrollFadeEdges>
           <p className="mt-6 text-sm text-white/55">
-            {yearlyBillingSummary()} {betaOfferSummary()}
+            {yearlyBillingSummary()} {trialOfferSummary()}
           </p>
         </div>
       </div>

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,9 +58,13 @@ import { DISPLAY_TIMEZONE_OPTIONS } from "@/lib/display-timezone";
 import { TIME_FORMAT_OPTIONS, normalizeTimeFormat } from "@/lib/time-format";
 import { SPORTS } from "@/lib/sports";
 import { SportLabel } from "@/components/sport-icon";
-import { sectionDescription } from "@/lib/ui/surface-styles";
+import { edgePanel, sectionDescription } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
+import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
+import { publicDemoPlansHref } from "@/lib/demo/public-demo";
+import { canDesk } from "@/lib/entitlements/effective-plan";
+import { FEATURE_LOCK_BODIES } from "@/lib/entitlements/nav";
 
 const SETTINGS_TABS = [
   "subscription",
@@ -951,6 +957,11 @@ function AlertsCard({
   settings: AppSettings;
   onPatch: (patch: Partial<AppSettings>) => void;
 }) {
+  const { active: publicDemo } = usePublicDemo();
+  const canTwoUpAlerts = canDesk(settings, "push_alerts");
+  const twoUpPlansHref = publicDemo
+    ? publicDemoPlansHref()
+    : SETTINGS_SUBSCRIPTION_HREF;
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -1033,18 +1044,31 @@ function AlertsCard({
             onCheckedChange={(v) => onPatch({ alertsNakedExposure: v })}
           />
         </div>
-        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-          <div>
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-md border px-3 py-2",
+            !canTwoUpAlerts && edgePanel
+          )}
+        >
+          <div className="min-w-0">
             <p className="text-sm font-medium">2UP triggered</p>
             <p className="text-xs text-muted-foreground">
-              Your team goes two up - early payout is in, with a lock-in suggestion
+              {canTwoUpAlerts
+                ? "Your team goes two up, early payout is in, with a lock-in suggestion"
+                : FEATURE_LOCK_BODIES.push_alerts}
             </p>
           </div>
-          <Switch
-            checked={settings.alertsTwoUpLock}
-            aria-label="Alert when a 2UP triggers"
-            onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
-          />
+          {canTwoUpAlerts ? (
+            <Switch
+              checked={settings.alertsTwoUpLock}
+              aria-label="Alert when a 2UP triggers"
+              onCheckedChange={(v) => onPatch({ alertsTwoUpLock: v })}
+            />
+          ) : (
+            <Button asChild {...pagePrimaryButtonProps}>
+              <Link href={twoUpPlansHref}>View plans</Link>
+            </Button>
+          )}
         </div>
         <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
           <div>

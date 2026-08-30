@@ -5,6 +5,7 @@ import { HistoryEntryCard } from "@/components/history/history-feed";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { apiGet } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
@@ -127,6 +128,10 @@ export default function HistoryPage() {
 
   const now = useNow(60_000);
 
+  if (loading && !data) {
+    return <PageLoading label="Loading history" />;
+  }
+
   // Plain derivation - the React Compiler memoizes this better than a manual
   // useMemo it cannot preserve.
   const grouped = (() => {
@@ -177,10 +182,6 @@ export default function HistoryPage() {
           </>
         }
       />
-
-      {loading && !data && (
-        <p className="text-sm text-muted-foreground">Loading history…</p>
-      )}
 
       {!loading && grouped.length === 0 && (
         <EmptyState

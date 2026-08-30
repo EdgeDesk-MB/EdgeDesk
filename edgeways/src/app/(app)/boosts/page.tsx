@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/help/empty-state";
+import { PlateLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import {
@@ -156,10 +157,17 @@ export default function BoostsPage() {
           then +12px so EV banked sits just below the Back Bet panel top.
         */}
         <section className="flex min-w-0 flex-col gap-2 lg:pt-[calc(2.25rem+0.75rem+0.75rem)]">
+          {entries == null ? (
+            <PlateLoading
+              label="Loading boosts…"
+              description="Your boost diary will appear here."
+            />
+          ) : (
+            <>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="flex items-center gap-1.5 text-sm font-semibold">
               EV banked <MoneyFlow value={totals.evBanked} signColor estimate className="inline" />
-              {entries && entries.length > 0 ? (
+              {entries.length > 0 ? (
                 <EvBasisBadge
                   basis={totals.basis}
                   description={
@@ -181,8 +189,8 @@ export default function BoostsPage() {
             {BOOST_DIARY_QUEUES.map((q) => {
               const count =
                 q.id === "all"
-                  ? (entries?.length ?? 0)
-                  : filterBoostDiaryByQueue(entries ?? [], q.id).length;
+                  ? entries.length
+                  : filterBoostDiaryByQueue(entries, q.id).length;
               const active = queue === q.id;
               const hasCount = q.id !== "all";
               return (
@@ -201,9 +209,7 @@ export default function BoostsPage() {
             })}
           </div>
 
-          {entries == null ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-          ) : visible.length === 0 ? (
+          {visible.length === 0 ? (
             <EmptyState
               icon={Zap}
               title={
@@ -348,6 +354,8 @@ export default function BoostsPage() {
                 </div>
               );
             })
+          )}
+            </>
           )}
         </section>
       </div>

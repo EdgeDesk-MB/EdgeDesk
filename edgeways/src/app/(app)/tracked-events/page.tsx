@@ -20,6 +20,7 @@ import { ManualEventDialog } from "@/components/events/manual-event-dialog";
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
+import { PageLoading } from "@/components/page-loading";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
@@ -173,6 +174,10 @@ export default function TrackedEventsPage() {
 
   const filteredEmpty = myEvents.length > 0 && grouped.length === 0;
 
+  if (state == null) {
+    return <PageLoading label="Loading Tracked Events" />;
+  }
+
   return (
     <TooltipProvider delayDuration={200}>
     <PageShell>
@@ -259,14 +264,7 @@ export default function TrackedEventsPage() {
       )}
 
       <div className="flex flex-col gap-8">
-        {state == null ? (
-          <EmptyState
-            busy
-            icon={Radio}
-            title="Loading tracked events…"
-            description="Your matches and races will appear here."
-          />
-        ) : myEvents.length === 0 ? (
+        {myEvents.length === 0 ? (
           <EmptyState
             icon={Radio}
             title="Nothing tracked yet"

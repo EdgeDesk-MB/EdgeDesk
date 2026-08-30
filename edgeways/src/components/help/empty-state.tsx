@@ -54,7 +54,7 @@ export function EmptyState({
         )}
       >
         <TitleTag className="text-base font-semibold">{title}</TitleTag>
-        <p className="text-pretty break-words text-sm leading-snug text-muted-foreground">
+        <p className="text-pretty break-words whitespace-pre-line text-sm leading-snug text-muted-foreground">
           {description}
         </p>
       </div>

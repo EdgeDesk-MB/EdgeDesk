@@ -41,6 +41,8 @@ function blobsFromRoadmap(): string[] {
   return [
     ROADMAP_VERSION.currentLabel,
     ROADMAP_VERSION.targetLabel,
+    ROADMAP_VERSION.currentNote,
+    ROADMAP_VERSION.targetLead,
     ROADMAP_VERSION.targetNote,
     ...ROADMAP_CATEGORIES.flatMap((category) =>
       category.items.flatMap((item) => [item.title, item.description ?? ""])

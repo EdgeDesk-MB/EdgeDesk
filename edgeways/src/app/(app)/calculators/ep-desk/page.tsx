@@ -29,7 +29,9 @@ import { PageShell } from "@/components/page-shell";
 import { DeskPageHeader } from "@/components/layout/desk-page-header";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
+import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { moneyPositiveClass } from "@/components/money-flow";
 import { useBookieAccounts } from "@/hooks/use-bookie-accounts";
@@ -201,7 +203,11 @@ function EpDeskContent() {
   const searchParams = useSearchParams();
   const { exchanges, defaultExchange } = useExchanges();
   const { options: bookieWallets } = useBookieAccounts();
-  const { refresh } = useAppState(5000);
+  const { refresh, state } = useAppState(5000);
+  const showEdgeTwoUpPromo =
+    state != null &&
+    (!canDesk(state.settings, "push_alerts") ||
+      !canDesk(state.settings, "exchange_lay"));
   const [exchange, setExchange] = useState<ExchangeRow | null>(null);
   const [s, setS] = useState<DeskState>(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
@@ -483,6 +489,10 @@ function EpDeskContent() {
           </Button>
         }
       />
+
+      {showEdgeTwoUpPromo ? (
+        <PlanLockEmpty promo="twoUp" />
+      ) : null}
 
       {gubbedWarning.length > 0 && (
         <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">

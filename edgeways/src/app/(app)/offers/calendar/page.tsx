@@ -27,6 +27,7 @@ import {
 } from "@/lib/offers/offer-categories";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { filterPillCountState, toolbarSelectTrigger } from "@/lib/ui/surface-styles";
+import { PageLoading } from "@/components/page-loading";
 import { CalendarDays, Plus } from "lucide-react";
 
 export default function OfferCalendarPage() {
@@ -65,6 +66,10 @@ export default function OfferCalendarPage() {
     if (effectiveCategory === "all") return bookieScoped;
     return bookieScoped.filter((o) => offerCategoryFromSport(o.sport) === effectiveCategory);
   }, [bookieScoped, effectiveCategory]);
+
+  if (state == null) {
+    return <PageLoading label="Loading offer calendar" />;
+  }
 
   return (
     <PageShell>

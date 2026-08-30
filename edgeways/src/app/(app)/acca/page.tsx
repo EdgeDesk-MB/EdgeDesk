@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
@@ -155,21 +156,7 @@ function combined(legs: AccaLegRow[]): number {
 
 export default function AccaDeskPage() {
   return (
-    <Suspense
-      fallback={
-        <PageShell className="gap-5">
-          <PageHeader
-            title="Acca Desk"
-            description="Lay each acca leg, logged as real bets."
-            helpId="acca"
-            icon={Layers}
-          />
-          <p className="px-[var(--layout-page-x)] py-10 text-center text-sm text-muted-foreground sm:px-0">
-            Loading…
-          </p>
-        </PageShell>
-      }
-    >
+    <Suspense fallback={<PageLoading label="Loading Acca Desk" />}>
       <AccaDeskContent />
     </Suspense>
   );
@@ -201,6 +188,10 @@ function AccaDeskContent() {
   const activeRuns = useMemo(() => runs?.filter((r) => r.run.status === "active") ?? [], [runs]);
   const historyRuns = useMemo(() => runs?.filter((r) => r.run.status !== "active") ?? [], [runs]);
 
+  if (runs == null) {
+    return <PageLoading label="Loading Acca Desk" />;
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -211,9 +202,7 @@ function AccaDeskContent() {
         action={<CreateRunDialog onCreated={load} />}
       />
       <div className="flex flex-col gap-3 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
-        {runs == null ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : runs.length === 0 ? (
+        {runs.length === 0 ? (
           <EmptyState
             icon={Layers}
             title="No acca runs yet"

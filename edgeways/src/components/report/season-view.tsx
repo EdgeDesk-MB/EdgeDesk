@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/help/empty-state";
+import { PlateLoading } from "@/components/page-loading";
 import { MoneyFlow } from "@/components/money-flow";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { api } from "@/hooks/use-app-state";
@@ -68,7 +69,12 @@ export function SeasonView({ owner }: { owner?: string | null } = {}) {
   }, [year, owner]);
 
   if (loading && !season) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">Building season…</p>;
+    return (
+      <PlateLoading
+        label="Loading season…"
+        description="Your season will appear here."
+      />
+    );
   }
   if (!season) {
     return (

@@ -32,6 +32,49 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-08-30",
+    title: "Plans you can open, and a live desk that stays",
+    summary:
+      "Locked desks explain the upgrade in place, Settings shows Core and Edge side by side, and what you save on the live desk is still there after a refresh.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Settings",
+        href: "/settings?tab=subscription&live=1",
+        text: "Settings → Subscription shows Core and Edge as choice cards: what each includes, the monthly price, and a 14-day Edge trial. Paid accounts open Manage subscription for the card, invoices and cancel.",
+      },
+      {
+        kind: "improvement",
+        area: "Navigation",
+        text: "A locked desk no longer blocks the click. You open the page and get an Available on Core/Edge subscription plate, with what the plan includes and View plans. 2UP Desk and Settings → Alerts do the same for lock-in alerts.",
+      },
+      {
+        kind: "improvement",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Race picks stays on the filter row on Free and Core, marked Edge. Live UK and Irish cards, Offer Edge picks and live lays share one Edge banner. Football fixtures stay on every plan.",
+      },
+      {
+        kind: "improvement",
+        area: "Edge Report",
+        href: "/report",
+        text: "A month with settled bets but no campaign EV locks yet now shows that month's Profit Tracker P&L, instead of a blank report.",
+      },
+      {
+        kind: "improvement",
+        area: "Accounts",
+        href: "/accounts",
+        text: "Opening a wallet splits Details and Ledger. The ledger lists the full history, not the last 25 rows.",
+      },
+      {
+        kind: "fix",
+        area: "Home",
+        href: "/desk",
+        text: "The live desk keeps offers, bets, wallets, free-bet lots, recurring series, playbook steps and mistake tags after a refresh.",
+      },
+    ],
+  },
+  {
     date: "2026-08-29",
     title: "Free bet log and wallets",
     summary:

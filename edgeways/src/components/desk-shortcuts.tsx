@@ -6,7 +6,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toastPlanLock } from "@/components/app-nav";
 import { useAddBet } from "@/components/add-bet-provider";
 import { DeskShortcutSheet } from "@/components/desk-shortcut-sheet";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
@@ -57,9 +56,7 @@ export function DeskShortcuts() {
       }
       if (id === "new-offer") {
         if (!canDesk(state?.settings, "offers_pipeline")) {
-          toastPlanLock("offers_pipeline", {
-            real: state?.settings?.billing != null,
-          });
+          router.push("/offers");
           return;
         }
         openOffer();

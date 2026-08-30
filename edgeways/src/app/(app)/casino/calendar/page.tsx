@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PageLoading } from "@/components/page-loading";
 import { CalendarDays, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
@@ -47,6 +48,10 @@ export default function CasinoCalendarPage() {
     return list.filter((o) => offerMatchesAvailableBookies(o.casino, availableNames));
   }, [offers, availableOnly, availableNames]);
 
+  if (offers == null) {
+    return <PageLoading label="Loading casino calendar" />;
+  }
+
   return (
     <PageShell>
       <PageHeader
@@ -80,15 +85,11 @@ export default function CasinoCalendarPage() {
         }
       />
 
-      {offers == null ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <CasinoDayCalendar
-          offers={bookieScoped}
-          standalone
-          onOfferClick={viewCasino}
-        />
-      )}
+      <CasinoDayCalendar
+        offers={bookieScoped}
+        standalone
+        onOfferClick={viewCasino}
+      />
     </PageShell>
   );
 }

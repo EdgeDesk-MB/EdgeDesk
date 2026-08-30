@@ -28,8 +28,8 @@ export default function RoadmapPage() {
           <CardTitle className="text-base">Where we are</CardTitle>
           <CardDescription>
             Edgeways is in <Badge variant="secondary">{ROADMAP_VERSION.currentLabel}</Badge>{" "}
-            today. <Badge>{ROADMAP_VERSION.targetLabel}</Badge> is the first public release,
-            the full desk, billing and support included.
+            today. {ROADMAP_VERSION.currentNote}{" "}
+            <Badge>{ROADMAP_VERSION.targetLabel}</Badge> {ROADMAP_VERSION.targetLead}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">

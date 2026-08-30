@@ -118,9 +118,9 @@ export function ManageVenuesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="mx-0 mt-0">
-          <DialogTitle>Manage venues</DialogTitle>
+          <DialogTitle>Manage exchanges and bookies</DialogTitle>
           <DialogDescription>
-            Set colours, commission, and bookie status.
+            Set colours, commission, and status.
           </DialogDescription>
         </DialogHeader>
         <div className="app-scroll-nested flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
@@ -478,7 +478,7 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
               omitExistingWallets
             />
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Brand colour</Label>
+              <Label className="text-xs text-muted-foreground">Colour</Label>
               <input
                 type="color"
                 value={brandColor}
@@ -588,7 +588,7 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
             <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
               {(
                 [
-                  ["Brand", brandColor, setBrandColor],
+                  ["Colour", brandColor, setBrandColor],
                   ["Back", backColor, setBackColor],
                   ["Lay", layColor, setLayColor],
                 ] as const

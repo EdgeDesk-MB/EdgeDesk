@@ -14,7 +14,7 @@ export const GET = withDeskScope(async function GET() {
     source: "locked",
     tier: "none" as const,
     resultCount: 0,
-    message: "Live racing feeds sit on Edge.",
+    message: "Available on Edge subscription.",
   });
   if (denied) return denied;
 

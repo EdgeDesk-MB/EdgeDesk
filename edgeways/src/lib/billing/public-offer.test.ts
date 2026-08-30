@@ -7,13 +7,14 @@ import {
   FOUNDING_MONTHS_AT_CORE,
   planCheckoutHref,
   PUBLIC_PLANS,
+  SETTINGS_PLAN_HIGHLIGHTS,
   TRIAL_DAYS,
   TRIAL_PLAN,
   YEARLY_MONTHS_FREE,
   yearlyBillingSummary,
   yearlyDealLabel,
   yearlyDealCue,
-  betaOfferSummary,
+  trialOfferSummary,
 } from "@/lib/billing/public-offer";
 
 describe("public offer", () => {
@@ -106,12 +107,27 @@ describe("public offer", () => {
     );
   });
 
-  it("states yearly and beta deals in plain language", () => {
+  it("states yearly and trial deals in plain language", () => {
     expect(yearlyBillingSummary()).toBe(
       "Yearly billing is 2 months free: 12 months for the price of 10."
     );
-    expect(betaOfferSummary()).toBe(
-      "Waitlist and invited beta testers get 14 days of Edge free, then 3 months of Edge for £9.99 a month. After that, Edge is £24.99 a month."
+    expect(trialOfferSummary()).toBe(
+      "Everyone gets 14 days of Edge free. One trial per person. Cancel before it ends and you are not charged. After that, Edge is £24.99 a month, or Core is £9.99 a month."
+    );
+    expect(trialOfferSummary()).not.toMatch(/beta tester|founding|waitlist/i);
+  });
+
+  it("settings choice plates name Core and Edge without provider names", () => {
+    expect(SETTINGS_PLAN_HIGHLIGHTS.core).toContain(
+      "Offers pipeline and free-bet lots"
+    );
+    expect(SETTINGS_PLAN_HIGHLIGHTS.edge[0]).toBe("Everything in Core");
+    const copy = [
+      ...SETTINGS_PLAN_HIGHLIGHTS.core,
+      ...SETTINGS_PLAN_HIGHLIGHTS.edge,
+    ].join(" ");
+    expect(copy.toLowerCase()).not.toMatch(
+      /betfair|smarkets|matchbook|racing api|api-football/
     );
   });
 });

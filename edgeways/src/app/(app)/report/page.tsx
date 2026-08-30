@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { SeasonView } from "@/components/report/season-view";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, useAppState } from "@/hooks/use-app-state";
@@ -97,6 +98,10 @@ export default function EdgeReportPage() {
     };
   }, [report]);
 
+  if (view === "month" && loading && !report) {
+    return <PageLoading label="Loading Edge Report" />;
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -140,8 +145,6 @@ export default function EdgeReportPage() {
       <div className="flex flex-col gap-4 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
         {view === "year" ? (
           <SeasonView owner={owner !== ALL_OWNERS ? owner : null} />
-        ) : loading && !report ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Building report…</p>
         ) : !report ? (
           <EmptyState
             icon={BarChart3}

@@ -101,7 +101,7 @@ export function isComplimentaryAccount(account: SubscriptionAccount): boolean {
 
 export function subscriptionDetail(account: SubscriptionAccount): string {
   if (isComplimentaryAccount(account)) {
-    return "Complimentary Edge. No Stripe billing.";
+    return `Complimentary ${planDisplayName(account.plan)}. No Stripe billing.`;
   }
   if (isCancelling(account) && account.cancelAt) {
     const ends = `You keep ${planDisplayName(account.plan)} until ${subscriptionDateLabel(account.cancelAt)}.`;

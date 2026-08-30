@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { PageShell } from "@/components/page-shell";
 import { CreateSystemRunDialog, EditSystemRunDialog } from "@/components/systems/create-run-dialog";
@@ -109,6 +110,10 @@ export default function SystemsDeskPage() {
   const activeFiltered = filterFamily(activeRuns);
   const historyFiltered = filterFamily(historyRuns);
 
+  if (runs == null) {
+    return <PageLoading label="Loading Systems Desk" />;
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -119,9 +124,7 @@ export default function SystemsDeskPage() {
         action={<CreateSystemRunDialog onCreated={load} />}
       />
       <div className="flex flex-col gap-3 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
-        {runs == null ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : runs.length === 0 ? (
+        {runs.length === 0 ? (
           <EmptyState
             icon={Grid2x2}
             title="No system bets yet"

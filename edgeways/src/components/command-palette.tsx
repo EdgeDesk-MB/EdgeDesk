@@ -16,7 +16,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { flatNavLinks, toastPlanLock } from "@/components/app-nav";
+import { PlanNavMark, flatNavLinks } from "@/components/app-nav";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
@@ -80,9 +80,7 @@ export function CommandPalette() {
             onSelect={() =>
               run(() => {
                 if (!canDesk(state?.settings, "offers_pipeline")) {
-                  toastPlanLock("offers_pipeline", {
-                    real: state?.settings?.billing != null,
-                  });
+                  router.push("/offers");
                   return;
                 }
                 openOffer();
@@ -105,25 +103,30 @@ export function CommandPalette() {
           </CommandItem>
         </CommandGroup>
         <CommandGroup heading="Pages">
-          {flatNavLinks.map((link) => (
-            <CommandItem
-              key={link.href}
-              value={`page ${link.label}`}
-              onSelect={() =>
-                run(() => {
-                  if (link.feature && !canDesk(state?.settings, link.feature)) {
-                    toastPlanLock(link.feature, {
-                      real: state?.settings?.billing != null,
-                    });
-                    return;
-                  }
-                  router.push(link.href);
-                })
-              }
-            >
-              <link.icon /> {link.label}
-            </CommandItem>
-          ))}
+          {flatNavLinks.map((link) => {
+            const locked = Boolean(
+              link.feature && !canDesk(state?.settings, link.feature)
+            );
+            return (
+              <CommandItem
+                key={link.href}
+                value={`page ${link.label}`}
+                onSelect={() =>
+                  run(() => {
+                    router.push(link.href);
+                  })
+                }
+              >
+                <link.icon />
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{link.label}</span>
+                  {link.feature && !link.isSubNav ? (
+                    <PlanNavMark feature={link.feature} locked={locked} />
+                  ) : null}
+                </span>
+              </CommandItem>
+            );
+          })}
         </CommandGroup>
         {offers.length > 0 ? (
           <CommandGroup heading="Offers">
@@ -134,9 +137,7 @@ export function CommandPalette() {
                 onSelect={() =>
                   run(() => {
                     if (!canDesk(state?.settings, "offers_pipeline")) {
-                      toastPlanLock("offers_pipeline", {
-                        real: state?.settings?.billing != null,
-                      });
+                      router.push("/offers");
                       return;
                     }
                     viewOffer(offer);

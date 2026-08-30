@@ -221,7 +221,8 @@ function FixtureActions({
   );
 }
 
-const sectionHeaderBar = cn(sectionBar, "bg-selection-subtle/80");
+const sectionHeaderBar = cn(sectionBar, "bg-page dark:bg-selection-subtle/80");
+const sectionBody = "bg-selection-subtle dark:bg-transparent";
 
 function CollapsibleSectionHeader({
   open,
@@ -239,7 +240,7 @@ function CollapsibleSectionHeader({
       aria-expanded={open}
       className={cn(
         sectionHeaderBar,
-        "flex w-full cursor-pointer items-center justify-between gap-2 text-left transition-colors hover:bg-selection-subtle"
+        "flex w-full cursor-pointer items-center justify-between gap-2 text-left transition-colors hover:bg-muted dark:hover:bg-selection-subtle"
       )}
     >
       <div className="min-w-0 flex-1">{children}</div>
@@ -330,7 +331,7 @@ function FootballCompetitionSection({
         </p>
       </CollapsibleSectionHeader>
       {open ? (
-        <div className="pb-6">
+        <div className={cn(sectionBody, "pb-6")}>
           {dayGroups.map((day) => {
             const headingId = fixtureDayHeadingId(scopeId, day.dayKey);
             return (
@@ -440,7 +441,7 @@ function RacingCourseSection({
       </CollapsibleSectionHeader>
 
       {open ? (
-        <div className="pb-6">
+        <div className={cn(sectionBody, "pb-6")}>
           {dayGroups.map((day) => {
             const headingId = fixtureDayHeadingId(course, day.dayKey);
             return (
@@ -517,6 +518,7 @@ export function DeskFixtureBoard({
   loading = false,
   loadFailed = false,
   displayTimezone = DEFAULT_DISPLAY_TIMEZONE,
+  emptyCompact = true,
 }: {
   sport: "football" | "horse_racing";
   football: Fixture[];
@@ -532,6 +534,7 @@ export function DeskFixtureBoard({
   loading?: boolean;
   loadFailed?: boolean;
   displayTimezone?: string;
+  emptyCompact?: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>("all");
   const [scopeFilter, setScopeFilter] = useState("all");
@@ -690,7 +693,7 @@ export function DeskFixtureBoard({
 
         {loading ? (
           <EmptyState
-            compact
+            compact={emptyCompact}
             busy
             title={sport === "horse_racing" ? "Loading racecards…" : "Loading fixtures…"}
             description={
@@ -701,7 +704,7 @@ export function DeskFixtureBoard({
           />
         ) : visibleCount === 0 ? (
           <EmptyState
-            compact
+            compact={emptyCompact}
             icon={CalendarDays}
             title={emptyCopy.title}
             description={emptyCopy.description}

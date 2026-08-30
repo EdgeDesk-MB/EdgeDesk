@@ -18,7 +18,6 @@ import {
   PlanNavMark,
   flattenNavEntries,
   isLinkActive,
-  toastPlanLock,
 } from "@/components/app-nav";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import { ThemeSelect } from "@/components/theme-select";
@@ -142,13 +141,7 @@ function MobileNavDrawer() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      aria-disabled={locked || undefined}
-                      onClick={(e) => {
-                        if (locked && item.feature) {
-                          e.preventDefault();
-                          toastPlanLock(item.feature);
-                          return;
-                        }
+                      onClick={() => {
                         close();
                       }}
                       className={cn(
@@ -161,7 +154,7 @@ function MobileNavDrawer() {
                       <item.icon className="size-4.5 shrink-0 text-muted-foreground" />
                       <span className="flex min-w-0 flex-1 items-center gap-1.5">
                         <span className="truncate">{item.label}</span>
-                        {item.feature ? (
+                        {item.feature && !item.isSubNav ? (
                           <PlanNavMark feature={item.feature} locked={locked} />
                         ) : null}
                         {!locked && item.href === "/tracker" ? (

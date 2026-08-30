@@ -22,6 +22,7 @@ import { CasinoGameLibraryDialog } from "@/components/casino/casino-game-library
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
 import { CASINO_CHANGED_EVENT } from "@/components/casino/casino-ui";
 import { EmptyState } from "@/components/help/empty-state";
+import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import {
   PageHeaderActions,
@@ -107,6 +108,10 @@ export default function CasinoPage() {
     offers.length > 0 &&
     filtered.length === 0;
 
+  if (offers == null) {
+    return <PageLoading label="Loading casino campaigns" />;
+  }
+
   return (
     <PageShell className="gap-5">
       <PageHeader
@@ -159,9 +164,7 @@ export default function CasinoPage() {
       />
 
       <div className="flex flex-col gap-8 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
-        {offers == null ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : offers.length === 0 ? (
+        {offers.length === 0 ? (
           <EmptyState
             icon={Dices}
             title="No casino offers yet"

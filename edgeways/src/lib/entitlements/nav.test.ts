@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
+import { publicDemoPlansHref } from "@/lib/demo/public-demo";
 import { canDesk } from "./effective-plan";
-import { featureForDeskPath, planLockCopy } from "./nav";
+import {
+  EDGE_DESK_PROMOS,
+  featureForDeskPath,
+  planLockCopy,
+  planLockEmptyCopy,
+  planLockPlansHref,
+} from "./nav";
 
 const freeDesk = {
   billing: { plan: "free" as const, billingStatus: "none" as const },
@@ -36,13 +44,64 @@ describe("featureForDeskPath", () => {
 
 describe("planLockCopy", () => {
   it("names Core for pipeline desks and Edge for Offer Edge", () => {
-    expect(planLockCopy("offers_pipeline").title).toBe("Core plan");
-    expect(planLockCopy("acca_desk").title).toBe("Core plan");
-    expect(planLockCopy("offer_edge").title).toBe("Edge plan");
+    expect(planLockCopy("offers_pipeline").title).toBe(
+      "Available on Core subscription"
+    );
+    expect(planLockCopy("acca_desk").title).toBe("Available on Core subscription");
+    expect(planLockCopy("offer_edge").title).toBe("Available on Edge subscription");
     expect(planLockCopy("offers_pipeline").description).toContain("Core and Edge");
     expect(planLockCopy("offers_pipeline").description).toContain(
       "Offers pipeline and free-bet lots"
     );
     expect(planLockCopy("offers_pipeline").description).not.toMatch(/tracker/i);
+  });
+});
+
+describe("planLockEmptyCopy", () => {
+  it("invites upgrade on the page, not via toast wording", () => {
+    const offers = planLockEmptyCopy("offers_pipeline", { real: true });
+    expect(offers.title).toBe("Available on Core subscription");
+    expect(offers.description).toBe(
+      "Track bookie offers as campaigns. Qualifiers through to free bet payouts.\nIncluded on Core and Edge."
+    );
+    expect(offers.action).toEqual({
+      label: "View plans",
+      href: SETTINGS_SUBSCRIPTION_HREF,
+    });
+    expect(offers.secondaryAction.href).toBe("/tracker");
+    expect(offers.description).not.toMatch(/Upgrade in Settings/);
+
+    expect(planLockEmptyCopy("do_next").title).toBe(
+      "Available on Core subscription"
+    );
+
+    const picks = planLockEmptyCopy("offer_edge", { publicDemo: true });
+    expect(picks.title).toBe("Available on Edge subscription");
+    expect(picks.action.href).toBe(publicDemoPlansHref());
+    expect(picks.secondaryAction.href).toBe("/calculators");
+
+    const racing = planLockEmptyCopy("racing_live_feeds");
+    expect(racing.description).toBe(
+      "Today's UK and Irish racecards and results. Demo cards are shown on Racing Desk."
+    );
+    expect(racing.description).not.toMatch(/set/i);
+  });
+
+  it("sends public demo View plans to the marketing table", () => {
+    expect(planLockPlansHref({ publicDemo: true })).toBe(publicDemoPlansHref());
+    expect(planLockPlansHref()).toBe(SETTINGS_SUBSCRIPTION_HREF);
+  });
+
+  it("keeps desk promos as a title-and-body pair for bundled Edge flags", () => {
+    expect(EDGE_DESK_PROMOS.racing.title).toBe("Available on Edge subscription");
+    expect(EDGE_DESK_PROMOS.racing.description).toMatch(/Offer Edge picks/);
+    expect(EDGE_DESK_PROMOS.racing.description).toBe(
+      "Today's UK and Irish cards, Offer Edge picks, and live exchange lays."
+    );
+    expect(EDGE_DESK_PROMOS.racing.description).not.toMatch(/Demo cards below/);
+    expect(EDGE_DESK_PROMOS.twoUp.title).toBe("Available on Edge subscription");
+    expect(EDGE_DESK_PROMOS.twoUp.description).toBe(
+      "Get notified when a 2UP position needs a decision. Live exchange prices on this desk are Edge too."
+    );
   });
 });

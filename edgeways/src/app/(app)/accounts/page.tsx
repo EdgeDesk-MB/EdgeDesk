@@ -32,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { TransferFundsDialog } from "@/components/accounts/transfer-funds-dialog";
 import { ManageVenuesDialog } from "@/components/accounts/venue-admin-panel";
@@ -48,7 +49,10 @@ import { useNow } from "@/hooks/use-now";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { EmptyState } from "@/components/help/empty-state";
 import { PageHeader } from "@/components/help/page-header";
+import { PageLoading, PlateLoading } from "@/components/page-loading";
 import { PageShell } from "@/components/page-shell";
+import { DialogSaveButton } from "@/components/ui/dialog-save-button";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import {
   PageHeaderButtonGroup,
   pagePrimaryButtonProps,
@@ -62,7 +66,7 @@ import {
   type BookmakerStatsBet,
   type BookmakerStatsOffer,
 } from "@/lib/accounts/bookmaker-stats";
-import { dialogTitleIcon } from "@/lib/ui/surface-styles";
+import { dialogTitleIcon, listRow, listRowGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ArrowLeftRight, Building2, Check, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
@@ -79,7 +83,7 @@ type PendingTx = TxRow & { accountName: string };
 
 export default function AccountsPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+    <Suspense fallback={<PageLoading label="Loading accounts" />}>
       <AccountsContent />
     </Suspense>
   );
@@ -156,6 +160,10 @@ function AccountsContent() {
     } catch (e) {
       toast.error("Could not confirm", { description: String(e) });
     }
+  }
+
+  if (state == null) {
+    return <PageLoading label="Loading accounts" />;
   }
 
   return (
@@ -1164,6 +1172,7 @@ function AccountDetailBody({
   const [saving, setSaving] = useState(false);
   const [loadingTx, setLoadingTx] = useState(true);
   const [removingLotId, setRemovingLotId] = useState<number | null>(null);
+  const [tab, setTab] = useState<"details" | "ledger">("details");
 
   useEffect(() => {
     void loadLedger(account.id, { silent: true });
@@ -1272,9 +1281,9 @@ function AccountDetailBody({
       : 0;
 
   return (
-    <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="mx-0 mt-0">
-          <DialogTitle className="flex items-center gap-2.5">
+    <DialogContent className="flex h-[min(36rem,90vh)] max-w-lg flex-col gap-0 overflow-hidden p-0 max-sm:h-[min(36rem,92dvh)] max-sm:overflow-hidden max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <DialogHeader className="mx-0 mt-0 shrink-0 border-b-0 pb-0">
+          <DialogTitle className="flex min-w-0 items-center gap-2.5">
             {account.type === "bookie" ? (
               <span
                 className={cn(dialogTitleIcon, "rounded-full")}
@@ -1287,12 +1296,38 @@ function AccountDetailBody({
             ) : (
               <Wallet className={cn(dialogTitleIcon, "text-muted-foreground")} />
             )}
-            {account.name}
+            <span className="min-w-0 text-pretty break-words">{account.name}</span>
           </DialogTitle>
-          <DialogDescription>Edit this wallet.</DialogDescription>
+          <DialogDescription className={account.type === "bookie" ? "invisible" : undefined}>
+            Edit this wallet.
+          </DialogDescription>
         </DialogHeader>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTab(value as "details" | "ledger")}
+          activationMode="manual"
+          className="flex min-h-0 flex-1 flex-col gap-0"
+        >
+        <TabsLineBar className="shrink-0 [--tabs-line-inset:1.5rem]">
+          <TabsList
+            variant="line"
+            className="justify-start"
+            fadeClassName="from-page dark:from-card"
+          >
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="ledger">Ledger</TabsTrigger>
+          </TabsList>
+        </TabsLineBar>
 
-        <div className="app-scroll-nested min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-5 py-4">
+        <TabsContent
+          value="details"
+          className="flex min-h-0 flex-1 flex-col outline-none"
+        >
+          <ScrollFadeEdges
+            className="min-h-0 flex-1"
+            fadeClassName="from-page dark:from-card"
+            scrollClassName="app-scroll-nested space-y-4 px-6 py-4"
+          >
           <p className="text-sm text-muted-foreground">
             Cash <MoneyFlow value={account.balance} className="inline font-semibold" />
             {account.type === "bookie" ? (
@@ -1481,60 +1516,74 @@ function AccountDetailBody({
               className="min-h-[4rem] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
             />
           </div>
+          </ScrollFadeEdges>
+        </TabsContent>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Recent ledger
-            </p>
-            {loadingTx ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : txs.length === 0 ? (
-              <EmptyState
-                compact
-                oneLine
-                icon={ArrowLeftRight}
-                title="No transactions yet"
-                description="Top-ups, withdrawals, and settlements list here."
-              />
-            ) : (
-              <ul className="space-y-1.5 text-sm">
-                {txs.slice(0, 25).map((tx) => (
-                  <li
-                    key={tx.id}
-                    className="flex min-w-0 items-start justify-between gap-3 border-b border-border/50 py-1.5 last:border-0"
-                  >
-                    <span className="min-w-0 flex-1 overflow-hidden">
-                      <span className="block text-xs font-medium uppercase text-muted-foreground">
-                        {tx.category.replace(/_/g, " ")}
-                        {tx.pending ? " · pending" : ""}
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {tx.note || "-"}
-                      </span>
+        <TabsContent
+          value="ledger"
+          className="flex min-h-0 flex-1 flex-col outline-none"
+        >
+          <ScrollFadeEdges
+            className="min-h-0 flex-1"
+            fadeClassName="from-page dark:from-card"
+            scrollClassName="app-scroll-nested px-6 py-4"
+          >
+          {loadingTx ? (
+            <PlateLoading
+              label="Loading ledger"
+              description="Top-ups, withdrawals, and settlements will list here."
+            />
+          ) : txs.length === 0 ? (
+            <EmptyState
+              compact
+              oneLine
+              icon={ArrowLeftRight}
+              title="No transactions yet"
+              description="Top-ups, withdrawals, and settlements list here."
+            />
+          ) : (
+            <ul className={cn(listRowGroup, "text-sm")}>
+              {txs.map((tx) => (
+                <li
+                  key={tx.id}
+                  className={cn(
+                    listRow,
+                    "flex min-w-0 items-start justify-between gap-3 py-1.5"
+                  )}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-medium uppercase text-muted-foreground">
+                      {tx.category.replace(/_/g, " ")}
+                      {tx.pending ? " · pending" : ""}
                     </span>
-                    <MoneyFlow
-                      value={tx.amount}
-                      signColor
-                      signDisplay
-                      className={cn(
-                        "shrink-0 font-semibold tabular-nums",
-                        tx.pending && "text-amber-700 dark:text-amber-400"
-                      )}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+                    <span className="block text-pretty break-words text-xs text-muted-foreground">
+                      {tx.note || "-"}
+                    </span>
+                  </span>
+                  <MoneyFlow
+                    value={tx.amount}
+                    signColor
+                    signDisplay
+                    className={cn(
+                      "shrink-0 font-semibold tabular-nums",
+                      tx.pending && "text-warning"
+                    )}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          </ScrollFadeEdges>
+        </TabsContent>
+        </Tabs>
 
-        <div className="flex justify-end gap-2 border-t px-5 py-3">
+        <div className="flex shrink-0 justify-end gap-2 border-t px-6 py-3">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={saving || !name.trim()}>
+          <DialogSaveButton onClick={save} disabled={saving || !name.trim()}>
             Save
-          </Button>
+          </DialogSaveButton>
         </div>
     </DialogContent>
   );

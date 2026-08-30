@@ -56,6 +56,20 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
   },
 ] as const;
 
+/** Settings → Subscription choice plates. Short, scannable, no provider names. */
+export const SETTINGS_PLAN_HIGHLIGHTS = {
+  core: [
+    "Offers pipeline and free-bet lots",
+    "Acca, Bet Builder, and Systems desks",
+    "Daily Plan and Edge Report",
+  ],
+  edge: [
+    "Everything in Core",
+    "Live UK and Irish racecards",
+    "Offer Edge picks and 2UP alerts",
+  ],
+} as const;
+
 /** Homepage comparison copy. Inclusion still comes from `can(plan, flag)`. */
 export const COMPARISON_FEATURES: Record<
   FeatureFlag,
@@ -104,7 +118,7 @@ export const COMPARISON_FEATURES: Record<
   racing_live_feeds: {
     title: "Live racing cards",
     description:
-      "Today's UK and Irish racecards and results, not the demo set.",
+      "Today's UK and Irish racecards and results. Demo cards are shown on Racing Desk.",
   },
   push_alerts: {
     title: "2UP alerts",
@@ -183,10 +197,11 @@ export function yearlyBillingSummary(): string {
   return `Yearly billing is ${yearlyDealLabel()}: 12 months for the price of ${ANNUAL_MONTHS_CHARGED}.`;
 }
 
-export function betaOfferSummary(): string {
+/** Public list offer under the comparison table. No founding / beta price. */
+export function trialOfferSummary(): string {
   const core = PUBLIC_PLANS.find((p) => p.id === "core");
   const edge = PUBLIC_PLANS.find((p) => p.id === "edge");
   const coreMo = formatGbpFromPence(core?.monthlyPence ?? 0);
   const edgeMo = formatGbpFromPence(edge?.monthlyPence ?? 0);
-  return `Waitlist and invited beta testers get ${TRIAL_DAYS} days of Edge free, then ${FOUNDING_MONTHS_AT_CORE} months of Edge for ${coreMo} a month. After that, Edge is ${edgeMo} a month.`;
+  return `Everyone gets ${TRIAL_DAYS} days of Edge free. One trial per person. Cancel before it ends and you are not charged. After that, Edge is ${edgeMo} a month, or Core is ${coreMo} a month.`;
 }

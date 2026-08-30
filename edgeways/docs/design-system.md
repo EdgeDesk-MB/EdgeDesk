@@ -38,7 +38,7 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 
 **Brand on light surfaces.** Brand accent fails contrast on white/page backgrounds. Light-mode primary buttons are ink + brand type (same recipe as chips). Use `text-primary-text` for non-button accent text (links, icons, sublines). Do not use `text-primary` for body copy in light mode.
 
-**Subscription.** Settings → Subscription (first tab, `/settings?tab=subscription`): live plan and status from `app_users` (EDGE-5), **Manage billing** into Stripe Customer Portal, return lands on this tab. Free or cancelled shows Start 14-day Edge trial / Choose Core. **Try Edge** is a button on this tab (not Appearance, not a switch), visible only to Free and Core. It turns on an Edge entitlement preview so they can walk the full desk, then Start trial sits underneath to convert. **Back to Free / Core** exits the preview. Hidden for Edge subscribers and on the public demo (viewing bar). Clerk is identity only. Do not build a custom card form. Test portal can switch Core↔Edge list prices. Founding is invite-only, not a portal product.
+**Subscription.** Settings → Subscription (first tab, `/settings?tab=subscription`): live plan and status from `app_users` (EDGE-5). A Stripe customer sees **Manage subscription** (`pagePrimary`) into the Customer Portal; return lands on this tab. Complimentary Core/Edge (no Stripe customer) hides the portal button and adds “No Stripe portal.” Tiles keep the grant status. Tab intro stays “Plan, trial and billing.” for every account. Free or cancelled shows two choice plates, not a pair of loose buttons: Core (`quietPanel`) and Edge (`edgePanel`). Each plate title is `Available on {plan} subscription` at `text-base font-semibold` (same string and scale as `PlanLockEmpty`), then `monthlyLabel`, then `SETTINGS_PLAN_HIGHLIGHTS` ticks, then the CTA: **Choose Core** as `pagePrimary`, **Start 14-day Edge trial** as `variant="edge"`. Do not add **Try Edge** or **Walk the desk first** on this tab. Upgrade prompts live on locked desks. If a preview is already on, a bare strip (not a plate) with **Back to Free / Core** exits it. Hidden for Edge subscribers and on the public demo (viewing bar). Clerk is identity only. Do not build a custom card form. Test portal can switch Core↔Edge list prices. Founding is invite-only, not a portal product.
 
 **Appearance.** Settings → Appearance: Light/Dark (`ThemeSelect`), UI font dropdown (`UiFontSelect`: Noto Sans (default), Figtree), header pattern picker (`HeaderPatternSelect`: twelve [Hero Patterns](https://heropatterns.com/) tiles, default Diagonal lines), plus brand accent presets (Amber, Viridian, Coral, Azure, Orchid, Citrine, Rose) and Custom colour picker. Default keeps next/font on `--font-sans` (Noto); Figtree sets `html[data-font="figtree"]` so `--font-sans` / `--font-heading` resolve to `--font-figtree` (persisted in localStorage, SSR cookie `edgeways-ui-font`, and `AppSettings.uiFont`; FOUC script in `<head>`). Accent apply sets `--brand` plus contrast tokens; swatches show a loader until settle, then the selected style. Non-default accent/font/pattern persist in localStorage, an SSR cookie, and `AppSettings`. Choosing the product defaults (Amber, Noto, diagonal lines) **clears** those stores so a hard refresh paints CSS defaults. Public demo never reads or writes appearance prefs (always Amber + Noto). A blocking head script mirrors localStorage/cookie before paint; brand colour transitions only run after `html.brand-accent-ready` (avoids Amber → selected flash).
 
@@ -340,7 +340,10 @@ From `src/lib/ui/surface-styles.ts`:
   cards, table, or fixture rows. Tokens: `listDaySectionLabel` /
   `listDaySectionContent`. Inside a competition/course plate with hairline
   rows, use `listDaySectionContentNested` (`mt-1.5 gap-0`) instead of the
-  campaign-card stack. Labels from `formatOfferListGroupLabel` (or the
+  campaign-card stack. Light-mode fixture accordions invert the band: the
+  header sinks to `--page` so it reads as the surrounding grey; expanded
+  rows use `bg-selection-subtle` (the old header face). Dark keeps the wash
+  on the header. Labels from `formatOfferListGroupLabel` (or the
   display-timezone wrapper `formatFixtureListDayLabel`). Do not invent a
   second day-header treatment.
 - **`tableHeaderCell` / `tableBodyCell`** - compact table density
@@ -348,9 +351,11 @@ From `src/lib/ui/surface-styles.ts`:
   strip above a bet ledger (`bg-selection-subtle` / dark `bg-input/50`) so the
   workflow block reads against the untinted table
 - **`coreNavTag`** / **`edgeNavTag`** / **`PlanNavMark`** — side-nav plan locks.
-  Locked N0 rows stay visible with a lock icon plus Core (brand plate) or Edge
-  (`--edge` plate). Do not put a section-level Pro tag on Combo Desk or Edge
+  Locked N0 **parent** rows stay visible with a lock icon plus Core (brand plate)
+  or Edge (`--edge` plate). Do not repeat the mark on Calendar / Campaigns /
+  Combo Desk children. Do not put a section-level Pro tag on Combo Desk or Edge
   Report; those are Core. Offer Edge chrome (Race picks count) stays Edge-only.
+  In-page lock titles use `Available on {plan} subscription`.
 - **`demoDataTag`** — solid `--warning` plate + white type. Header Demo data
   mark (`sm+` only, see AppTopBarHeader) and Race picks (dialog, confidence
   chip, trigger) share this so invented numbers cannot look live.
@@ -397,9 +402,12 @@ surface. The plate switches via `in-data-[slot=card]` and
   32px from the left and right edges on mobile (`px-8`), 64px from `sm` up
   (`sm:px-16`). Do not cap page empty copy with `max-w-sm` / `max-w-md`.
   Compact and modal empties keep the narrower `max-w-md` measure.
-- **Modal** - `compact` so the plate fits the dialog. Keep the plate
+- **Modal** - `compact` so the plate fits the dialog, except Browse
+  fixtures: the lock and board empties are full-width page empties so they
+  match the fixture list measure. Keep the plate
   (do not flatten with `shadow-none` unless the empty sits inside another
-  lifted card).
+  lifted card). 16px (`pb-4`) under the Football / Racing line bar before
+  the board or lock.
 - **In-feed** - `bare` (History feed and any similar live feed). Icon well
   and copy sit on the page background: no plate or radius.
   Page-level History (`/history`) still uses the plate.
@@ -426,11 +434,40 @@ surface. The plate switches via `in-data-[slot=card]` and
   mark as welcome Get started tiles: Lucide or a stroke-matched custom mark
   (`size-6 text-primary-text`, stroke 1.5, `size={24}`), stacked above the
   title. One distinct glyph per calculator. 2UP Desk uses `FootballIcon`.
-- **Loading the same plate** - reuse `<EmptyState busy>` with a spinning
-  icon well and a “Loading …” title. Say the list will appear here. Do not
-  show the empty copy, or mention Refresh, while the request is in flight.
+- **First load (page)** - while we do not yet know whether Neon (or the
+  page API) has line items, use `<PageLoading>` (`src/components/page-loading.tsx`):
+  a centred `Loader2` on `PageShell fullHeight`, with a short visible line
+  (the label, or a description when one is passed). Gated Core/Edge routes
+  use the same spinner from `PlanRouteGate` until `/api/state` lands. Do
+  not flash £0.00, “No bets logged yet”, or any other empty copy. Home,
+  Profit Tracker, Offers, History, and the other list desks use this until
+  the first payload lands.
+- **Summary then list (Profit Tracker)** - once headline figures are on
+  `/api/state`, paint the Summary strip immediately. Keep `<PlateLoading>`
+  on the Bet log plate until the rows (and desk-run enrichment) are ready.
+- **Loading the same plate** - chrome is already visible, the list is not.
+  Use `<PlateLoading>` (thin wrapper on `<EmptyState busy compact>`):
+  spinning icon well, “Loading …” title, and a line that the list will
+  appear here. Do not show the empty copy, or mention Refresh, while the
+  request is in flight. Reach for `<EmptyState busy>` directly when the
+  plate needs a feature icon after load (Fixtures).
 - **Not this pattern** - dropdown “no matches”, drop-zones, inline row
   hints (“No wallet”), command palette empty.
+- **Plan lock** - a gated Core/Edge *page* uses the same `<EmptyState>` via
+  `<PlanLockEmpty>` (`src/components/plan-lock-empty.tsx`): lock well for
+  Core, zap for Edge. Title is `Available on {plan} subscription`. Primary is
+  **View plans** with `pagePrimary` (brand), the same as other empties.
+  Do not use `variant="edge"` on that page plate. Do not toast and block
+  navigation to a page. Keep
+  `toastPlanLock` for gated clicks that are not a page or a modal.
+  In-page Edge features on a desk that still works (Racing live cards,
+  2UP alerts) use `edgeLockBanner`: full-width `--edge/20` rectangle,
+  solid `--edge` bolt well + Zap, **View plans** `variant="edge"`. Not
+  an `<EmptyState>` plate. `promo="racing"` / `promo="twoUp"`. Race picks
+  inside the courses card stays the page empty. Fixtures → Racing (page
+  and Browse fixtures modal) uses the same full-width page empty when live
+  racecards are locked, not “No live or upcoming races”. Settings 2UP row stays
+  `edgePanel` + `pagePrimary` View plans.
 
 Copy: British English, sentence case, commas. Title names the gap; description
 invites the next action.

@@ -19,7 +19,9 @@ import { epDeskFixtureHref } from "@/lib/calc/ep/fixture-query";
 import { isCurrentOrFutureFixture, sortFixturesByKickoff } from "@/lib/events";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
 import { racingSyncToast } from "@/lib/racing/sync-toast";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { SportIcon } from "@/components/sport-icon";
+import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 
@@ -235,6 +237,8 @@ export function FixtureBrowserContent({
   const trackedExternalIds = new Set(
     myEvents.filter((e) => e.externalId).map((e) => e.externalId!)
   );
+  const canLiveRacing = canDesk(state?.settings, "racing_live_feeds");
+  const racingLocked = fixtureSport === "horse_racing" && !canLiveRacing;
 
   const filteredFixtures = useMemo(() => {
     if (fixtureSport !== "football") return [];
@@ -261,9 +265,10 @@ export function FixtureBrowserContent({
     );
   }
 
-  const sourceHint =
-    fixtureSport === "horse_racing"
-      ? "UK & IRE racecards."
+  const sourceHint = racingLocked
+    ? "Live UK and Irish racecards are on Edge."
+    : fixtureSport === "horse_racing"
+      ? "UK and Irish racecards."
       : "Live and upcoming football.";
 
   const header = (
@@ -274,13 +279,14 @@ export function FixtureBrowserContent({
         ) : null}
         <p
           className={cn(
-            "text-sm text-muted-foreground",
+            "min-w-0 text-pretty break-words text-sm text-muted-foreground",
             variant === "page" ? "" : "mt-0"
           )}
         >
-          {sourceHint} Use + to track.{" "}
-          {variant === "page" ? (
+          {sourceHint}
+          {racingLocked ? (
             <>
+              {" "}
               Open{" "}
               <Link
                 href="/tracked-events"
@@ -288,18 +294,36 @@ export function FixtureBrowserContent({
               >
                 Tracked Events
               </Link>{" "}
-              for the ones you have added.
+              for races you already added.
             </>
           ) : (
             <>
-              <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
-                Open Fixtures page
-              </Link>{" "}
-              for the full list.
+              {" "}
+              Use + to track.{" "}
+              {variant === "page" ? (
+                <>
+                  Open{" "}
+                  <Link
+                    href="/tracked-events"
+                    className="text-primary-text underline-offset-2 hover:underline"
+                  >
+                    Tracked Events
+                  </Link>{" "}
+                  for the ones you have added.
+                </>
+              ) : (
+                <>
+                  <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
+                    Open Fixtures page
+                  </Link>{" "}
+                  for the full list.
+                </>
+              )}
             </>
           )}
         </p>
       </div>
+      {racingLocked ? null : (
       <div className="flex shrink-0 gap-1.5">
         <Button
           variant="outline"
@@ -328,6 +352,7 @@ export function FixtureBrowserContent({
           Refresh
         </Button>
       </div>
+      )}
     </div>
   );
 
@@ -376,7 +401,9 @@ export function FixtureBrowserContent({
     fixtureSport === "horse_racing" ? racingFixtures.length > 0 : fixtures.length > 0;
   const showLoadingEmpty = loadingFixtures && !hasSportData;
 
-  const board = (
+  const board = racingLocked ? (
+    <PlanLockEmpty feature="racing_live_feeds" />
+  ) : (
     <DeskFixtureBoard
       sport={fixtureSport}
       football={filteredFixtures}
@@ -392,6 +419,7 @@ export function FixtureBrowserContent({
       loading={showLoadingEmpty}
       loadFailed={Boolean(sportError) && !hasSportData}
       displayTimezone={normalizeDisplayTimezone(state?.settings?.displayTimezone)}
+      emptyCompact={variant !== "dialog"}
     />
   );
 
@@ -399,7 +427,7 @@ export function FixtureBrowserContent({
     return (
       <div className={cn("flex min-h-0 flex-col", className)}>
         <div className="shrink-0 px-6 pt-4">{header}</div>
-        <div className="shrink-0 px-6 pb-2">{tabs}</div>
+        <div className="shrink-0 px-6 pb-4">{tabs}</div>
         <ScrollFadeEdges
           className="min-h-0 flex-1"
           fadeClassName="from-page dark:from-card"
@@ -413,7 +441,7 @@ export function FixtureBrowserContent({
 
   return (
     <Card className={className}>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-4">
         {header}
         {tabs}
       </CardHeader>
