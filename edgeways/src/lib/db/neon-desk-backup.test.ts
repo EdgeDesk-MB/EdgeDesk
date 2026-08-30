@@ -52,6 +52,9 @@ import {
 } from "@/lib/db/neon-desk-backup";
 import {
   bets as pgBets,
+  offerEvSnapshots as pgOfferEvSnapshots,
+  offerSeries as pgOfferSeries,
+  offers as pgOffers,
 } from "@/lib/db/schema.pg";
 
 const BET_ROW = {
@@ -115,5 +118,138 @@ describe("hosted backup/restore bet fingerprints (EDGE-98)", () => {
     const betInsert = mocks.inserts.find((i) => i.table === pgBets);
     expect(betInsert?.values.importFingerprint).toBeNull();
     expect(betInsert?.values.importMeta).toBeNull();
+  });
+});
+
+const SERIES_ROW = {
+  id: 4,
+  clerkUserId: "user_a",
+  recurrenceEnabled: 1,
+  recurrenceStoppedFrom: null,
+  skippedDatesJson: '["2026-08-01"]',
+  ruleJson: '{"freq":"daily"}',
+  templateExpiresAt: 1,
+  horizonDays: 14,
+  bookmaker: "Sky",
+  title: "Daily extra",
+  description: null,
+  expectedProfit: 2.5,
+  sport: "horse_racing",
+  offerType: "extra_place",
+  scopeCourse: null,
+  scopeRaceId: null,
+  scopeRaceLabel: null,
+  rules: '{"steps":[]}',
+  offerUrl: "https://example.test/promo",
+  createdAt: 1,
+  updatedAt: 2,
+};
+
+const SNAPSHOT_ROW = {
+  id: 9,
+  clerkUserId: "user_a",
+  offerId: 12,
+  version: 1,
+  lockedAt: 100,
+  expectedProfit: 4.2,
+  basis: "live",
+  inputsJson: '{"autoLocked":true}',
+  realizedProfit: 3.8,
+  capturePct: 90,
+  commissionDrag: 0.1,
+  settledAt: 200,
+  mistakeTag: "laid_late",
+};
+
+describe("hosted backup/restore series and EV snapshots", () => {
+  beforeEach(() => {
+    mocks.clerkUserId = "user_a";
+    mocks.rowsByTable = new Map();
+    mocks.inserts = [];
+    mocks.idSeq = 0;
+  });
+
+  it("backup serialises offer_series and offer_ev_snapshots", async () => {
+    mocks.rowsByTable.set(pgOfferSeries, [SERIES_ROW]);
+    mocks.rowsByTable.set(pgOfferEvSnapshots, [SNAPSHOT_ROW]);
+    const bundle = await neonDeskBackupBundle();
+    expect(bundle.tables.offer_series).toHaveLength(1);
+    expect(bundle.tables.offer_series[0].rule_json).toBe('{"freq":"daily"}');
+    expect(bundle.tables.offer_series[0].skipped_dates_json).toBe('["2026-08-01"]');
+    expect(bundle.tables.offer_ev_snapshots).toHaveLength(1);
+    expect(bundle.tables.offer_ev_snapshots[0].mistake_tag).toBe("laid_late");
+    expect(bundle.tables.offer_ev_snapshots[0].expected_profit).toBe(4.2);
+  });
+
+  it("restore remaps series onto offers and snapshots onto new offer ids", async () => {
+    const counts = await restoreNeonDeskBackup({
+      offer_series: [
+        {
+          id: 4,
+          title: "Daily extra",
+          rule_json: '{"freq":"daily"}',
+          skipped_dates_json: '["2026-08-01"]',
+        },
+      ],
+      offers: [
+        { id: 12, title: "Tuesday extra", series_id: 4, instance_date: "2026-08-04" },
+      ],
+      offer_ev_snapshots: [
+        {
+          offer_id: 12,
+          version: 1,
+          locked_at: 100,
+          expected_profit: 4.2,
+          basis: "live",
+          mistake_tag: "laid_late",
+          settled_at: 200,
+        },
+      ],
+    });
+    expect(counts.offer_series).toBe(1);
+    expect(counts.offers).toBe(1);
+    expect(counts.offer_ev_snapshots).toBe(1);
+
+    const seriesInsert = mocks.inserts.find((i) => i.table === pgOfferSeries);
+    expect(seriesInsert?.values.clerkUserId).toBe("user_a");
+    expect(seriesInsert?.values.ruleJson).toBe('{"freq":"daily"}');
+    expect(seriesInsert?.values.skippedDatesJson).toBe('["2026-08-01"]');
+
+    const offerInsert = mocks.inserts.find((i) => i.table === pgOffers);
+    expect(offerInsert?.values.seriesId).toBe(1);
+    expect(offerInsert?.values.instanceDate).toBe("2026-08-04");
+
+    const snapInsert = mocks.inserts.find((i) => i.table === pgOfferEvSnapshots);
+    expect(snapInsert?.values.clerkUserId).toBe("user_a");
+    expect(snapInsert?.values.offerId).toBe(2);
+    expect(snapInsert?.values.mistakeTag).toBe("laid_late");
+    expect(snapInsert?.values.settledAt).toBe(200);
+  });
+
+  it("restore skips a snapshot whose offer did not restore", async () => {
+    const counts = await restoreNeonDeskBackup({
+      offer_ev_snapshots: [
+        {
+          offer_id: 99,
+          version: 1,
+          locked_at: 100,
+          expected_profit: 1,
+          basis: "live",
+        },
+      ],
+    });
+    expect(counts.offer_ev_snapshots).toBe(0);
+    expect(mocks.inserts.some((i) => i.table === pgOfferEvSnapshots)).toBe(false);
+  });
+
+  it("restore tolerates older backups without series or snapshots", async () => {
+    const counts = await restoreNeonDeskBackup({
+      offers: [{ id: 1, title: "One-off" }],
+    });
+    expect(counts.offer_series).toBe(0);
+    expect(counts.offer_ev_snapshots).toBe(0);
+    expect(counts.offers).toBe(1);
+    const offerInsert = mocks.inserts.find((i) => i.table === pgOffers);
+    expect(offerInsert?.values.seriesId).toBeNull();
   });
 });

@@ -22,12 +22,16 @@ import {
   casinoOfferSeriesComponents as pgCasinoOfferSeriesComponents,
   casinoOffers as pgCasinoOffers,
   history as pgHistory,
+  offerEvSnapshots as pgOfferEvSnapshots,
+  offerSeries as pgOfferSeries,
   offers as pgOffers,
 } from "@/lib/db/schema.pg";
 import { APP_VERSION } from "@/lib/app-version";
 
 export const HOSTED_BACKUP_TABLES = [
+  "offer_series",
   "offers",
+  "offer_ev_snapshots",
   "accounts",
   "bets",
   "balance_transactions",
@@ -163,6 +167,28 @@ const CASINO_GAME_KEYS: Array<[string, string]> = [
   ["source", "source"], ["updatedAt", "updated_at"],
 ];
 
+const OFFER_SERIES_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["recurrenceEnabled", "recurrence_enabled"],
+  ["recurrenceStoppedFrom", "recurrence_stopped_from"],
+  ["skippedDatesJson", "skipped_dates_json"], ["ruleJson", "rule_json"],
+  ["templateExpiresAt", "template_expires_at"], ["horizonDays", "horizon_days"],
+  ["bookmaker", "bookmaker"], ["title", "title"], ["description", "description"],
+  ["expectedProfit", "expected_profit"], ["sport", "sport"],
+  ["offerType", "offer_type"], ["scopeCourse", "scope_course"],
+  ["scopeRaceId", "scope_race_id"], ["scopeRaceLabel", "scope_race_label"],
+  ["rules", "rules"], ["offerUrl", "offer_url"],
+  ["createdAt", "created_at"], ["updatedAt", "updated_at"],
+];
+
+const EV_SNAPSHOT_KEYS: Array<[string, string]> = [
+  ["id", "id"], ["offerId", "offer_id"], ["version", "version"],
+  ["lockedAt", "locked_at"], ["expectedProfit", "expected_profit"],
+  ["basis", "basis"], ["inputsJson", "inputs_json"],
+  ["realizedProfit", "realized_profit"], ["capturePct", "capture_pct"],
+  ["commissionDrag", "commission_drag"], ["settledAt", "settled_at"],
+  ["mistakeTag", "mistake_tag"],
+];
+
 export async function neonDeskBackupBundle(): Promise<{
   app: string;
   exportedAt: string;
@@ -173,27 +199,43 @@ export async function neonDeskBackupBundle(): Promise<{
     throw new Error("Sign in to download a backup.");
   }
   const db = getNeonDb();
-  const [offers, accounts, bets, txs, history, cOffers, cSeries, cComponents, cSeriesComponents, cGames] =
-    await Promise.all([
-      db.select().from(pgOffers).where(eq(pgOffers.clerkUserId, clerkUserId)),
-      db.select().from(pgAccounts).where(eq(pgAccounts.clerkUserId, clerkUserId)),
-      db.select().from(pgBets).where(eq(pgBets.clerkUserId, clerkUserId)),
-      db
-        .select()
-        .from(pgBalanceTransactions)
-        .where(eq(pgBalanceTransactions.clerkUserId, clerkUserId)),
-      db.select().from(pgHistory).where(eq(pgHistory.clerkUserId, clerkUserId)),
-      db.select().from(pgCasinoOffers).where(eq(pgCasinoOffers.clerkUserId, clerkUserId)),
-      db.select().from(pgCasinoOfferSeries).where(eq(pgCasinoOfferSeries.clerkUserId, clerkUserId)),
-      db.select().from(pgCasinoOfferComponents).where(eq(pgCasinoOfferComponents.clerkUserId, clerkUserId)),
-      db.select().from(pgCasinoOfferSeriesComponents).where(eq(pgCasinoOfferSeriesComponents.clerkUserId, clerkUserId)),
-      db.select().from(pgCasinoGames).where(eq(pgCasinoGames.clerkUserId, clerkUserId)),
-    ]);
+  const [
+    series,
+    offers,
+    snapshots,
+    accounts,
+    bets,
+    txs,
+    history,
+    cOffers,
+    cSeries,
+    cComponents,
+    cSeriesComponents,
+    cGames,
+  ] = await Promise.all([
+    db.select().from(pgOfferSeries).where(eq(pgOfferSeries.clerkUserId, clerkUserId)),
+    db.select().from(pgOffers).where(eq(pgOffers.clerkUserId, clerkUserId)),
+    db.select().from(pgOfferEvSnapshots).where(eq(pgOfferEvSnapshots.clerkUserId, clerkUserId)),
+    db.select().from(pgAccounts).where(eq(pgAccounts.clerkUserId, clerkUserId)),
+    db.select().from(pgBets).where(eq(pgBets.clerkUserId, clerkUserId)),
+    db
+      .select()
+      .from(pgBalanceTransactions)
+      .where(eq(pgBalanceTransactions.clerkUserId, clerkUserId)),
+    db.select().from(pgHistory).where(eq(pgHistory.clerkUserId, clerkUserId)),
+    db.select().from(pgCasinoOffers).where(eq(pgCasinoOffers.clerkUserId, clerkUserId)),
+    db.select().from(pgCasinoOfferSeries).where(eq(pgCasinoOfferSeries.clerkUserId, clerkUserId)),
+    db.select().from(pgCasinoOfferComponents).where(eq(pgCasinoOfferComponents.clerkUserId, clerkUserId)),
+    db.select().from(pgCasinoOfferSeriesComponents).where(eq(pgCasinoOfferSeriesComponents.clerkUserId, clerkUserId)),
+    db.select().from(pgCasinoGames).where(eq(pgCasinoGames.clerkUserId, clerkUserId)),
+  ]);
   return {
     app: APP_VERSION,
     exportedAt: new Date().toISOString(),
     tables: {
+      offer_series: series.map((r) => snake(r as unknown as Row, OFFER_SERIES_KEYS)),
       offers: offers.map((r) => snake(r as unknown as Row, OFFER_KEYS)),
+      offer_ev_snapshots: snapshots.map((r) => snake(r as unknown as Row, EV_SNAPSHOT_KEYS)),
       accounts: accounts.map((r) => snake(r as unknown as Row, ACCOUNT_KEYS)),
       bets: bets.map((r) => snake(r as unknown as Row, BET_KEYS)),
       balance_transactions: txs.map((r) => snake(r as unknown as Row, TX_KEYS)),
@@ -226,9 +268,9 @@ export function isHostedBackupTables(tables: unknown): tables is BackupTables {
 
 /**
  * Replace this login's hosted desk with the bundle contents. Ids are
- * reassigned by Neon; offer/account/bet/casino references are remapped.
- * Feed-scoped ids that do not exist on the hosted desk (events, racing
- * scope ids, sports-offer series) are nulled.
+ * reassigned by Neon; offer/account/bet/casino/series/snapshot
+ * references are remapped. Feed-scoped ids that do not exist on the
+ * hosted desk (events, racing scope ids) are nulled.
  */
 export async function restoreNeonDeskBackup(
   tables: BackupTables
@@ -239,7 +281,9 @@ export async function restoreNeonDeskBackup(
   }
   const db = getNeonDb();
 
+  const seriesRows = tables.offer_series ?? [];
   const offerRows = tables.offers ?? [];
+  const snapshotRows = tables.offer_ev_snapshots ?? [];
   const accountRows = tables.accounts ?? [];
   const betRows = tables.bets ?? [];
   const txRows = tables.balance_transactions ?? [];
@@ -250,11 +294,47 @@ export async function restoreNeonDeskBackup(
   const casinoSeriesComponentRows = tables.casino_offer_series_components ?? [];
   const casinoGameRows = tables.casino_games ?? [];
 
-  // 1. Offers
+  // 1. Sports series (before offers so series_id remaps)
+  const seriesIdMap = new Map<number, number>();
+  for (const r of seriesRows) {
+    const title = str(r.title);
+    const ruleJson = str(r.rule_json);
+    if (!title || !ruleJson) continue;
+    const inserted = await db
+      .insert(pgOfferSeries)
+      .values({
+        clerkUserId,
+        recurrenceEnabled: num(r.recurrence_enabled) ?? 1,
+        recurrenceStoppedFrom: str(r.recurrence_stopped_from),
+        skippedDatesJson: str(r.skipped_dates_json),
+        ruleJson,
+        templateExpiresAt: num(r.template_expires_at),
+        horizonDays: num(r.horizon_days) ?? 14,
+        bookmaker: str(r.bookmaker),
+        title,
+        description: str(r.description),
+        expectedProfit: num(r.expected_profit),
+        sport: str(r.sport),
+        offerType: str(r.offer_type),
+        scopeCourse: str(r.scope_course),
+        scopeRaceId: null,
+        scopeRaceLabel: str(r.scope_race_label),
+        rules: str(r.rules),
+        offerUrl: str(r.offer_url),
+        createdAt: num(r.created_at) ?? Date.now(),
+        updatedAt: num(r.updated_at) ?? Date.now(),
+      })
+      .returning({ id: pgOfferSeries.id });
+    const oldId = num(r.id);
+    if (oldId != null && inserted[0]) seriesIdMap.set(oldId, inserted[0].id);
+  }
+
+  // 2. Offers
   const offerIdMap = new Map<number, number>();
   for (const r of offerRows) {
     const title = str(r.title);
     if (!title) continue;
+    const oldSeriesId = num(r.series_id);
     const inserted = await db
       .insert(pgOffers)
       .values({
@@ -275,7 +355,7 @@ export async function restoreNeonDeskBackup(
         scopeRaceId: null, // racing feed ids are not hosted
         scopeRaceLabel: str(r.scope_race_label),
         rules: str(r.rules),
-        seriesId: null, // recurrence series stay SQLite-only
+        seriesId: oldSeriesId != null ? (seriesIdMap.get(oldSeriesId) ?? null) : null,
         instanceDate: str(r.instance_date),
         source: str(r.source),
         offerUrl: str(r.offer_url),
@@ -285,7 +365,36 @@ export async function restoreNeonDeskBackup(
     if (oldId != null && inserted[0]) offerIdMap.set(oldId, inserted[0].id);
   }
 
-  // 2. Accounts (funded_by self-FK remapped in a second pass)
+  // 3. EV snapshots (after offers so offer_id remaps)
+  const keepSnapshotIds: number[] = [];
+  for (const r of snapshotRows) {
+    const oldOfferId = num(r.offer_id);
+    const newOfferId = oldOfferId != null ? offerIdMap.get(oldOfferId) : undefined;
+    const lockedAt = num(r.locked_at);
+    const expectedProfit = num(r.expected_profit);
+    const basis = str(r.basis);
+    if (newOfferId == null || lockedAt == null || expectedProfit == null || !basis) continue;
+    const inserted = await db
+      .insert(pgOfferEvSnapshots)
+      .values({
+        clerkUserId,
+        offerId: newOfferId,
+        version: num(r.version) ?? 1,
+        lockedAt,
+        expectedProfit,
+        basis,
+        inputsJson: str(r.inputs_json),
+        realizedProfit: num(r.realized_profit),
+        capturePct: num(r.capture_pct),
+        commissionDrag: num(r.commission_drag),
+        settledAt: num(r.settled_at),
+        mistakeTag: str(r.mistake_tag),
+      })
+      .returning({ id: pgOfferEvSnapshots.id });
+    if (inserted[0]) keepSnapshotIds.push(inserted[0].id);
+  }
+
+  // 4. Accounts (funded_by self-FK remapped in a second pass)
   const accountIdMap = new Map<number, number>();
   for (const r of accountRows) {
     const name = str(r.name);
@@ -625,6 +734,7 @@ export async function restoreNeonDeskBackup(
 
   // 6. Delete the previous desk rows (everything of mine not just re-created).
   const keepOffers = [...offerIdMap.values()];
+  const keepSeries = [...seriesIdMap.values()];
   const keepAccounts = [...accountIdMap.values()];
   const keepBets = [...betIdMap.values()];
   const keepCasinoOffers = [...casinoOfferIdMap.values()];
@@ -694,15 +804,34 @@ export async function restoreNeonDeskBackup(
         : eq(pgAccounts.clerkUserId, clerkUserId)
     );
   await db
+    .delete(pgOfferEvSnapshots)
+    .where(
+      keepSnapshotIds.length > 0
+        ? and(
+            eq(pgOfferEvSnapshots.clerkUserId, clerkUserId),
+            notInArray(pgOfferEvSnapshots.id, keepSnapshotIds)
+          )
+        : eq(pgOfferEvSnapshots.clerkUserId, clerkUserId)
+    );
+  await db
     .delete(pgOffers)
     .where(
       keepOffers.length > 0
         ? and(eq(pgOffers.clerkUserId, clerkUserId), notInArray(pgOffers.id, keepOffers))
         : eq(pgOffers.clerkUserId, clerkUserId)
     );
+  await db
+    .delete(pgOfferSeries)
+    .where(
+      keepSeries.length > 0
+        ? and(eq(pgOfferSeries.clerkUserId, clerkUserId), notInArray(pgOfferSeries.id, keepSeries))
+        : eq(pgOfferSeries.clerkUserId, clerkUserId)
+    );
 
   return {
+    offer_series: seriesIdMap.size,
     offers: offerIdMap.size,
+    offer_ev_snapshots: keepSnapshotIds.length,
     accounts: accountIdMap.size,
     bets: betIdMap.size,
     balance_transactions: keepTxIds.length,
