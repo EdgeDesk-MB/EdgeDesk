@@ -12,6 +12,10 @@ import {
   createCasinoOfferSeriesWithInstance,
   syncCasinoOfferSeriesInstances,
 } from "@/lib/offers/casino-offer-recurrence";
+import {
+  createNeonCasinoOfferSeriesWithInstance,
+  syncNeonCasinoOfferSeriesInstances,
+} from "@/lib/db/neon-desk-casino-series";
 import { normalizeOfferUrl } from "@/lib/offers/offer-url";
 import { getCasinoOfferSummaries, getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
@@ -46,8 +50,7 @@ const createSchema = z.object({
 
 export const GET = withDeskScope(async function GET() {
   if (isNeonDesk()) {
-    // Hosted desk: no series materialisation or ledger backfill (SQLite-only
-    // machinery). Plain campaign list summarised from Neon rows.
+    await syncNeonCasinoOfferSeriesInstances().catch(() => 0);
     const rows = await listNeonDeskCasinoRows();
     return NextResponse.json({ offers: summariseNeonCasinoOffers(rows) });
   }
@@ -74,10 +77,17 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
 
   if (isNeonDesk()) {
     if (input.recurrence) {
-      return NextResponse.json(
-        { error: "Recurring casino offers are not available yet." },
-        { status: 400 }
+      const { offerId } = await createNeonCasinoOfferSeriesWithInstance(
+        {
+          casino: input.casino?.trim() || null,
+          title: input.title.trim(),
+          notes: input.notes ?? null,
+          offerUrl,
+          expiresAt: input.expiresAt ?? null,
+        },
+        input.recurrence
       );
+      return NextResponse.json({ offer: await getNeonCasinoOfferSummary(offerId) });
     }
     const row = await insertNeonDeskCasinoOffer({
       casino: input.casino?.trim() || null,

@@ -11,6 +11,7 @@ import type {
   ExchangeRow,
   HistoryRow,
   OfferRow,
+  OfferSeriesRow,
 } from "@/lib/db/schema";
 import type {
   AccountRow as PgAccountRow,
@@ -25,6 +26,7 @@ import type {
   ExchangeRow as PgExchangeRow,
   HistoryRow as PgHistoryRow,
   OfferRow as PgOfferRow,
+  OfferSeriesRow as PgOfferSeriesRow,
 } from "@/lib/db/schema.pg";
 
 /**
@@ -121,6 +123,31 @@ export function toSqliteOfferRow(row: PgOfferRow): OfferRow {
     instanceDate: row.instanceDate,
     source: row.source,
     offerUrl: row.offerUrl,
+  };
+}
+
+export function toSqliteOfferSeriesRow(row: PgOfferSeriesRow): OfferSeriesRow {
+  return {
+    id: row.id,
+    recurrenceEnabled: row.recurrenceEnabled,
+    recurrenceStoppedFrom: row.recurrenceStoppedFrom,
+    skippedDatesJson: row.skippedDatesJson,
+    ruleJson: row.ruleJson,
+    templateExpiresAt: row.templateExpiresAt,
+    horizonDays: row.horizonDays,
+    bookmaker: row.bookmaker,
+    title: row.title,
+    description: row.description,
+    expectedProfit: row.expectedProfit,
+    sport: row.sport,
+    offerType: row.offerType,
+    scopeCourse: row.scopeCourse,
+    scopeRaceId: row.scopeRaceId,
+    scopeRaceLabel: row.scopeRaceLabel,
+    rules: row.rules,
+    offerUrl: row.offerUrl,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 

@@ -27,10 +27,14 @@ import {
   writeNeonEvLock,
 } from "@/lib/db/neon-desk-ev-snapshots";
 import {
-  deleteNeonDeskOffer,
   getNeonDeskOffer,
   patchNeonDeskOffer,
 } from "@/lib/db/neon-desk-offers";
+import {
+  deleteNeonOfferWithScope,
+  stopNeonRecurrenceForOffer,
+  syncNeonOfferSeriesTemplateFromOffer,
+} from "@/lib/db/neon-desk-offer-series";
 import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
 import { summariseOffer as summariseOfferPure } from "@/lib/offers/offer-profit";
 
@@ -83,16 +87,12 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
   const offerId = Number(id);
 
   if (isNeonDesk()) {
-    // Recurrence writers still need clerk-scoped offer_series (slice 2).
-    if (p.stopRecurrence || p.updateSeries) {
-      return NextResponse.json(
-        { error: "That offer feature is not available yet." },
-        { status: 400 }
-      );
-    }
     const hostedExisting = await getNeonDeskOffer(offerId);
     if (!hostedExisting) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (p.stopRecurrence) {
+      await stopNeonRecurrenceForOffer(hostedExisting);
     }
     if (p.mistakeTag !== undefined) {
       await setNeonMistakeTag(offerId, p.mistakeTag as MistakeTag | null);
@@ -199,6 +199,9 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
             () => {}
           );
         }
+      }
+      if (p.updateSeries && !p.stopRecurrence) {
+        await syncNeonOfferSeriesTemplateFromOffer(offerId);
       }
       return NextResponse.json({ offer: updated });
     } catch (error) {
@@ -324,8 +327,15 @@ export const DELETE = withDeskScope(async function DELETE(req: NextRequest, ctx:
   const offerId = Number(id);
 
   if (isNeonDesk()) {
-    // No recurring series on the hosted desk yet - scope is always "instance".
-    const deleted = await deleteNeonDeskOffer(offerId);
+    const existing = await getNeonDeskOffer(offerId);
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const scopeParsed = deleteScopeSchema.safeParse(
+      req.nextUrl.searchParams.get("scope") ?? "instance"
+    );
+    if (!scopeParsed.success) {
+      return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+    }
+    const deleted = await deleteNeonOfferWithScope(existing, scopeParsed.data);
     if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
     quietOfferAlerts(offerId);
     return NextResponse.json({ ok: true });

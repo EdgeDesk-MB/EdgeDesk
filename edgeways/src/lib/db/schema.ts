@@ -840,6 +840,7 @@ export type BalanceTransactionRow = typeof balanceTransactions.$inferSelect;
 export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
+export type OfferSeriesRow = typeof offerSeries.$inferSelect;
 export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
 export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;

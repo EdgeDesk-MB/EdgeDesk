@@ -9,6 +9,12 @@ import {
   insertNeonDeskOffer,
   listNeonDeskOffers,
 } from "@/lib/db/neon-desk-offers";
+import {
+  createNeonOfferSeriesWithInstance,
+  listNeonOfferSeries,
+  neonOfferRecurrenceMeta,
+  syncNeonOfferSeriesInstances,
+} from "@/lib/db/neon-desk-offer-series";
 import { promoAwardsFromTransactions } from "@/lib/accounts/promo-awards";
 import { writeNeonEvLock } from "@/lib/db/neon-desk-ev-snapshots";
 import { summariseOffer as summariseOfferPure } from "@/lib/offers/offer-profit";
@@ -69,18 +75,30 @@ export const GET = withDeskScope(async function GET() {
   const denied = await deniedFeatureResponse("offers_pipeline");
   if (denied) return denied;
   if (isNeonDesk()) {
-    // Hosted desk: no series sync / backfill (SQLite-only machinery). Plain
-    // campaign list with profit summaries computed from Neon rows.
-    const [offerRows, betRows, txRows] = await Promise.all([
+    await syncNeonOfferSeriesInstances().catch(() => 0);
+    const [offerRows, betRows, txRows, seriesRows] = await Promise.all([
       listNeonDeskOffers(),
       listNeonDeskBets(),
       listNeonDeskBalanceTransactions(),
+      listNeonOfferSeries(),
     ]);
     const promoAwards = promoAwardsFromTransactions(txRows);
+    const seriesById = new Map(seriesRows.map((s) => [s.id, s]));
     const hosted = offerRows
-      .map((o) =>
-        summariseOfferPure(o, betRows.filter((b) => b.offerId === o.id), promoAwards)
-      )
+      .map((o) => {
+        const summary = summariseOfferPure(
+          o,
+          betRows.filter((b) => b.offerId === o.id),
+          promoAwards
+        );
+        return {
+          ...summary,
+          recurrence: neonOfferRecurrenceMeta(
+            o,
+            o.seriesId != null ? seriesById.get(o.seriesId) : null
+          ),
+        };
+      })
       .sort((a, b) => b.createdAt - a.createdAt);
     return NextResponse.json({ offers: hosted });
   }
@@ -102,10 +120,42 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
 
   if (isNeonDesk()) {
     if (input.recurrence) {
-      return NextResponse.json(
-        { error: "Recurring offers are not available yet." },
-        { status: 400 }
-      );
+      const rule: OfferRecurrenceRule = {
+        freq: input.recurrence.freq,
+        interval: input.recurrence.interval ?? 1,
+        byWeekday: input.recurrence.byWeekday,
+        byMonthday: input.recurrence.byMonthday,
+        expiryOffsetDays: input.recurrence.expiryOffsetDays,
+      };
+      try {
+        const { offerId } = await createNeonOfferSeriesWithInstance(
+          {
+            bookmaker: input.bookmaker?.trim() || null,
+            title: input.title.trim(),
+            description: input.description?.trim() || null,
+            expectedProfit: input.expectedProfit ?? null,
+            sport: input.sport ?? null,
+            offerType: input.offerType ?? null,
+            scopeCourse: input.scopeCourse ?? null,
+            scopeRaceId: input.scopeRaceId ?? null,
+            scopeRaceLabel: input.scopeRaceLabel ?? null,
+            rules: input.rules ?? null,
+            offerUrl,
+            expiresAt: input.expiresAt ?? null,
+          },
+          rule,
+          { startsOn: input.startsOn ?? undefined }
+        );
+        const row = await listNeonDeskOffers().then((rows) =>
+          rows.find((o) => o.id === offerId)
+        );
+        return NextResponse.json({ offer: row });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Could not save the offer.";
+        const status = message.startsWith("Sign in") ? 401 : 500;
+        return NextResponse.json({ error: message }, { status });
+      }
     }
     const hostedStartsOn = input.startsOn?.trim() || null;
     const hostedScheduled =

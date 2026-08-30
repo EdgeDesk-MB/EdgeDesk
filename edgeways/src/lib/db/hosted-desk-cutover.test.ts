@@ -66,13 +66,19 @@ describe("hosted desk cutover", () => {
     }
   });
 
-  it("writes hosted playbook steps and mistake tags, still blocks recurrence", () => {
-    const src = routeSource("offers/[id]/route.ts");
-    expect(src).toMatch(/setNeonMistakeTag/);
-    expect(src).toMatch(/rulesAfterPlaybookStep/);
-    expect(src).toMatch(/p\.stopRecurrence \|\| p\.updateSeries/);
-    expect(src).not.toMatch(
-      /p\.mistakeTag !== undefined \|\| p\.playbookStepDone/
+  it("writes hosted playbook steps, mistake tags, and clerk-scoped recurrence", () => {
+    const patch = routeSource("offers/[id]/route.ts");
+    const create = routeSource("offers/route.ts");
+    expect(patch).toMatch(/setNeonMistakeTag/);
+    expect(patch).toMatch(/rulesAfterPlaybookStep/);
+    expect(patch).toMatch(/stopNeonRecurrenceForOffer/);
+    expect(create).toMatch(/createNeonOfferSeriesWithInstance/);
+    expect(create).not.toMatch(/Recurring offers are not available yet/);
+    expect(routeSource("casino/route.ts")).toMatch(
+      /createNeonCasinoOfferSeriesWithInstance/
+    );
+    expect(routeSource("casino/route.ts")).not.toMatch(
+      /Recurring casino offers are not available yet/
     );
   });
 

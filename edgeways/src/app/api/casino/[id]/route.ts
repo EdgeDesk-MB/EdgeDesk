@@ -10,6 +10,7 @@ import {
   patchNeonDeskCasinoOffer,
   syncNeonCasinoOfferBalance,
 } from "@/lib/db/neon-desk-casino";
+import { stopNeonCasinoRecurrenceForOffer } from "@/lib/db/neon-desk-casino-series";
 import {
   deleteCasinoOfferWithScope,
   stopRecurrenceForCasinoOffer,
@@ -61,10 +62,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     const existing = await getNeonDeskCasinoOffer(offerId);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (p.stopRecurrence) {
-      return NextResponse.json(
-        { error: "Recurrence editing is not available yet." },
-        { status: 400 }
-      );
+      await stopNeonCasinoRecurrenceForOffer(existing);
     }
     const updated = await patchNeonDeskCasinoOffer(offerId, {
       ...(p.casino !== undefined ? { casino: p.casino?.trim() || null } : {}),

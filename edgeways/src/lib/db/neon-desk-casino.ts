@@ -3,10 +3,7 @@
  * rest of the desk; rows are mapped to the SQLite shapes so services and UI
  * consume either backend unchanged.
  *
- * Recurring-series machinery (materialisation, template sealing) stays
- * SQLite-only: restored series rows are readable here so instances render
- * their recurrence meta, but creating/editing series is rejected at the
- * route layer on the hosted desk.
+ * Recurring-series create / seal / sync lives in neon-desk-casino-series.ts.
  */
 import "server-only";
 
@@ -201,6 +198,8 @@ export type NeonDeskCasinoOfferValues = {
   notes?: string | null;
   offerUrl?: string | null;
   expiresAt?: number | null;
+  seriesId?: number | null;
+  instanceDate?: string | null;
 };
 
 export async function insertNeonDeskCasinoOffer(
@@ -227,6 +226,8 @@ export async function insertNeonDeskCasinoOffer(
       notes: values.notes ?? null,
       offerUrl: values.offerUrl ?? null,
       expiresAt: values.expiresAt ?? null,
+      seriesId: values.seriesId ?? null,
+      instanceDate: values.instanceDate ?? null,
       createdAt: Date.now(),
     })
     .returning();

@@ -34,6 +34,8 @@ import {
 } from "@/lib/db/neon-desk-digests";
 import { runNeonDeskLiveness } from "@/lib/db/neon-desk-liveness";
 import { syncNeonOfferStatuses } from "@/lib/db/neon-desk-offer-liveness";
+import { syncNeonOfferSeriesInstances } from "@/lib/db/neon-desk-offer-series";
+import { syncNeonCasinoOfferSeriesInstances } from "@/lib/db/neon-desk-casino-series";
 import { appStateFromNeonDesk } from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
@@ -78,6 +80,12 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     }
   } catch {
     // Auto-result and lay-due alerts are best-effort; the snapshot still renders.
+  }
+  try {
+    await syncNeonOfferSeriesInstances();
+    await syncNeonCasinoOfferSeriesInstances();
+  } catch {
+    // Recurrence materialise is best-effort; the snapshot still renders.
   }
   try {
     const statusChanged = await syncNeonOfferStatuses();

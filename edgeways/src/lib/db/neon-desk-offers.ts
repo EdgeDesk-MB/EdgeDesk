@@ -1,8 +1,7 @@
 /**
- * Hosted desk offers on Neon (EDGE-47). Recurrence series stay SQLite-only
- * until their own cutover; playbook steps and EV tags write this table /
- * offer_ev_snapshots. The hosted path covers single campaigns: list, create,
- * edit, delete.
+ * Hosted desk offers on Neon (EDGE-47). Series rows live in
+ * neon-desk-offer-series.ts and are clerk-scoped. Playbook steps and EV
+ * tags write this table / offer_ev_snapshots.
  */
 import "server-only";
 
@@ -29,6 +28,8 @@ export type NeonDeskOfferValues = {
   scopeRaceLabel?: string | null;
   rules?: string | null;
   offerUrl?: string | null;
+  seriesId?: number | null;
+  instanceDate?: string | null;
   createdAt: number;
 };
 

@@ -9,6 +9,7 @@ import {
   getNeonDeskCasinoOffer,
   insertNeonDeskCasinoComponent,
 } from "@/lib/db/neon-desk-casino";
+import { sealNeonCasinoSeriesTemplateFromOffer } from "@/lib/db/neon-desk-casino-series";
 import { syncCasinoSeriesTemplateFromOffer } from "@/lib/offers/casino-offer-recurrence";
 import { getCasinoOfferSummary } from "@/lib/services/casino-offers";
 import { componentFieldsSchema, toComponentRowValues } from "./schema";
@@ -37,7 +38,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest, ctx: { p
       expectedEv,
       sortOrder,
     });
-    // No series template sync on the hosted desk (SQLite-only machinery).
+    await sealNeonCasinoSeriesTemplateFromOffer(offerId).catch(() => 0);
     return NextResponse.json({ offer: await getNeonCasinoOfferSummary(offerId) });
   }
 
