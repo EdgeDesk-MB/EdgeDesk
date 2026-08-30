@@ -159,7 +159,7 @@ import { SportIcon, SportLabel } from "@/components/sport-icon";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { cn } from "@/lib/utils";
 import { BetOfferTriggerField } from "@/components/add-bet/bet-offer-trigger-field";
-import { Gift, Trash2, Zap } from "lucide-react";
+import { Gift, Loader2, Trash2, Zap } from "lucide-react";
 import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
 import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
@@ -320,11 +320,13 @@ const AddBetEventsSelectOptions = memo(function AddBetEventsSelectOptions({
   courseScopeLabel,
   trackedBands,
   notTrackedBands,
+  loading,
 }: {
   courseScopeLocked: boolean;
   courseScopeLabel: string | null;
   trackedBands: HourBanded<TrackedEventLike>[];
   notTrackedBands: HourBanded<KnownFixtureOption>[];
+  loading: boolean;
 }) {
   return (
     <>
@@ -335,11 +337,19 @@ const AddBetEventsSelectOptions = memo(function AddBetEventsSelectOptions({
       ) : (
         <SelectItem value="none">Manual entry</SelectItem>
       )}
-      {trackedBands.length > 0 && (
+      {loading || trackedBands.length > 0 ? (
         <>
           {!courseScopeLocked ? <SelectSeparator /> : null}
           <SelectGroup className="p-0">
             <SelectLabel className="text-foreground">Tracked</SelectLabel>
+            {loading ? (
+              <SelectItem value="__events_loading__" disabled>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  Loading events…
+                </span>
+              </SelectItem>
+            ) : null}
             {trackedBands.map((band, bandIdx) => (
               <Fragment key={`tracked-${band.key}`}>
                 {bandIdx > 0 ? <SelectSeparator /> : null}
@@ -365,7 +375,7 @@ const AddBetEventsSelectOptions = memo(function AddBetEventsSelectOptions({
             ))}
           </SelectGroup>
         </>
-      )}
+      ) : null}
       {notTrackedBands.length > 0 && (
         <>
           <SelectSeparator />
@@ -471,6 +481,10 @@ export function AddBetDialog({
   usePauseAppStatePolling(open);
 
   const [fetchedEvents, setFetchedEvents] = useState<EventLite[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [fixturesLoading, setFixturesLoading] = useState(false);
+  const eventsFetchGen = useRef(0);
+  const fixturesFetchGen = useRef(0);
   const events = eventsProp ?? fetchedEvents;
   const [knownFixtures, setKnownFixtures] = useState<KnownFixtureOption[]>([]);
   const [pendingFixture, setPendingFixture] = useState<KnownFixtureOption | null>(null);
@@ -578,9 +592,85 @@ export function AddBetDialog({
     setRunnersFetchDone(false);
   }
 
+  const loadTrackedEvents = useCallback(() => {
+    if (eventsProp !== undefined) {
+      setEventsLoading(false);
+      return;
+    }
+    const gen = ++eventsFetchGen.current;
+    setEventsLoading(true);
+    api<{ events: EventLite[] }>("/api/events")
+      .then((r) => {
+        if (gen === eventsFetchGen.current) setFetchedEvents(r.events);
+      })
+      .catch(() => {
+        if (gen === eventsFetchGen.current) setFetchedEvents([]);
+      })
+      .finally(() => {
+        if (gen === eventsFetchGen.current) setEventsLoading(false);
+      });
+  }, [eventsProp]);
+
+  const loadKnownFixtures = useCallback(() => {
+    if (sport !== "football" && sport !== "horse_racing") {
+      fixturesFetchGen.current += 1;
+      setKnownFixtures([]);
+      setFixturesLoading(false);
+      return;
+    }
+    const gen = ++fixturesFetchGen.current;
+    setFixturesLoading(true);
+    const today = localCalendarDate();
+    const tomorrow = tomorrowCalendarDate();
+    const extraDate = prefill?.eventDate?.trim() || prefill?.raceEventDate?.trim();
+    const dates = [...new Set([today, tomorrow, ...(extraDate ? [extraDate] : [])])];
+
+    void (async () => {
+      try {
+        if (sport === "football") {
+          const batches = await Promise.all(
+            dates.map((d) => api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${d}`))
+          );
+          if (gen !== fixturesFetchGen.current) return;
+          const byId = new Map<string, Fixture>();
+          for (const batch of batches) {
+            for (const f of batch.fixtures ?? []) {
+              if (f.externalId) byId.set(f.externalId, f);
+            }
+          }
+          setKnownFixtures(knownFromFootballFixtures([...byId.values()]));
+          return;
+        }
+        const batches = await Promise.all(
+          dates.map((d) => api<{ racecards: RacingFixture[] }>(`/api/racing/racecards?date=${d}`))
+        );
+        if (gen !== fixturesFetchGen.current) return;
+        const byId = new Map<string, RacingFixture>();
+        for (const batch of batches) {
+          for (const r of batch.racecards ?? []) {
+            if (r.externalId) byId.set(r.externalId, r);
+          }
+        }
+        setKnownFixtures(knownFromRacingFixtures([...byId.values()]));
+      } catch {
+        if (gen === fixturesFetchGen.current) setKnownFixtures([]);
+      } finally {
+        if (gen === fixturesFetchGen.current) setFixturesLoading(false);
+      }
+    })();
+  }, [sport, prefill?.eventDate, prefill?.raceEventDate]);
+
+  const eventsListLoading =
+    eventsLoading ||
+    ((sport === "football" || sport === "horse_racing") && fixturesLoading);
+
   // Refresh tracked-events list, known fixtures, and default date/time when the dialog opens
   useEffect(() => {
     if (!open) {
+      eventsFetchGen.current += 1;
+      fixturesFetchGen.current += 1;
+      setEventsLoading(false);
+      setFixturesLoading(false);
       hydratedKeyRef.current = null;
       queueMicrotask(() => resetFormState());
       return;
@@ -591,11 +681,11 @@ export function AddBetDialog({
     // owns reset+apply in one microtask so a later reset cannot wipe selection
     // (React Strict Mode re-runs this effect after the once-only prefill guard).
     if (!editBet && !prefill) {
-      queueMicrotask(() => resetFormState());
+      // Reset before the fixture fetch, not in a later microtask: that could
+      // wipe a cached racecard list and leave Events looking empty.
+      resetFormState();
     }
-    api<{ events: EventLite[] }>("/api/events")
-      .then((r) => setFetchedEvents(r.events))
-      .catch(() => {});
+    loadTrackedEvents();
     if (editBet) return;
     // Boost (and similar) prefills leave date/time blank on purpose.
     if (prefill?.omitEventDefaults || prefill?.boostDiaryId != null) return;
@@ -609,58 +699,14 @@ export function AddBetDialog({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editBet?.id, prefill?.omitEventDefaults, prefill?.boostDiaryId]);
+  }, [open, editBet?.id, prefill?.omitEventDefaults, prefill?.boostDiaryId, loadTrackedEvents]);
 
   // Load today + tomorrow fixtures for football / horse racing Event dropdown
   // (plus the race-scoped campaign day when prefill asks for a specific card).
   useEffect(() => {
     if (!open) return;
-    if (sport !== "football" && sport !== "horse_racing") return;
-    let cancelled = false;
-    const today = localCalendarDate();
-    const tomorrow = tomorrowCalendarDate();
-    const extraDate =
-      prefill?.eventDate?.trim() || prefill?.raceEventDate?.trim();
-
-    async function load() {
-      try {
-        if (sport === "football") {
-          const dates = [...new Set([today, tomorrow, ...(extraDate ? [extraDate] : [])])];
-          const batches = await Promise.all(
-            dates.map((d) => api<{ fixtures: Fixture[] }>(`/api/fixtures?date=${d}`))
-          );
-          if (cancelled) return;
-          const byId = new Map<string, Fixture>();
-          for (const batch of batches) {
-            for (const f of batch.fixtures ?? []) {
-              if (f.externalId) byId.set(f.externalId, f);
-            }
-          }
-          setKnownFixtures(knownFromFootballFixtures([...byId.values()]));
-          return;
-        }
-        const dates = [...new Set([today, tomorrow, ...(extraDate ? [extraDate] : [])])];
-        const batches = await Promise.all(
-          dates.map((d) => api<{ racecards: RacingFixture[] }>(`/api/racing/racecards?date=${d}`))
-        );
-        if (cancelled) return;
-        const byId = new Map<string, RacingFixture>();
-        for (const batch of batches) {
-          for (const r of batch.racecards ?? []) {
-            if (r.externalId) byId.set(r.externalId, r);
-          }
-        }
-        setKnownFixtures(knownFromRacingFixtures([...byId.values()]));
-      } catch {
-        if (!cancelled) setKnownFixtures([]);
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, sport, prefill?.eventDate, prefill?.raceEventDate]);
+    loadKnownFixtures();
+  }, [open, loadKnownFixtures]);
 
   // Populate fields when editing an existing bet (once per open, when events are ready)
   useEffect(() => {
@@ -2346,6 +2392,12 @@ export function AddBetDialog({
               <Select
                 value={courseScopeLocked && eventId === "none" ? "__scope_pending__" : eventId}
                 onValueChange={changeEvent}
+                onOpenChange={(next) => {
+                  if (next) {
+                    loadTrackedEvents();
+                    loadKnownFixtures();
+                  }
+                }}
               >
                 <SelectTrigger
                   className={cn(
@@ -2367,6 +2419,7 @@ export function AddBetDialog({
                     courseScopeLabel={courseScopeLabel}
                     trackedBands={trackedHourBands}
                     notTrackedBands={notTrackedHourBands}
+                    loading={eventsListLoading}
                   />
                 </SelectContent>
               </Select>
@@ -2375,7 +2428,9 @@ export function AddBetDialog({
                   Limited to {courseScopeLabel} races for this campaign.
                 </span>
               ) : null}
-              {trackedDayBands.length === 0 && notTrackedDayBands.length === 0 && (
+              {!eventsListLoading &&
+                trackedDayBands.length === 0 &&
+                notTrackedDayBands.length === 0 && (
                 <span className="text-[11px] leading-tight text-muted-foreground">
                   {courseScopeLocked
                     ? `No ${courseScopeLabel} races loaded yet for this day.`

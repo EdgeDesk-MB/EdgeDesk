@@ -156,6 +156,34 @@ export default function EdgeReportPage() {
             description={`${report.settledCampaigns} of ${report.minCampaigns} settled campaigns needed - a couple of noisy lines would mislead more than inform. Keep settling offers.`}
             action={{ label: "View offers", href: "/offers" }}
           />
+        ) : report.kind === "profit_only" ? (
+          <>
+            <StatStrip columns={5}>
+              <StatTile
+                label="Profit"
+                value={formatGbp(report.profit)}
+                sub={`${report.settledBets} settled bet${report.settledBets === 1 ? "" : "s"}`}
+              />
+              <StatTile label="Expected" value="—" />
+              <StatTile label="Realised" value="—" />
+              <StatTile label="Capture rate" value="—" sub="realised ÷ expected" />
+              <StatTile
+                label="Commission drag"
+                value={formatGbp(report.commissionDrag)}
+                sub="ex. comm. paid"
+              />
+            </StatStrip>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Settled profit only</CardTitle>
+                <CardDescription>
+                  No EV locks in {formatMonthLabel(report.month)}, so capture cannot be
+                  scored. The figure above is settled Profit Tracker P&L for the month,
+                  the same number the year table uses.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </>
         ) : (
           <>
             <StatStrip columns={5}>

@@ -96,13 +96,19 @@ export function SeasonView({ owner }: { owner?: string | null } = {}) {
         <StatTile
           label="Profit"
           value={formatGbp(season.totals.profit)}
-          sub={`${season.year} settled`}
+          sub={`${season.year} settled bets`}
         />
-        <StatTile label="Expected" value={formatGbp(season.totals.expected)} />
-        <StatTile label="Realised" value={formatGbp(season.totals.realized)} />
+        <StatTile
+          label="Expected"
+          value={season.captureFrom ? formatGbp(season.totals.expected) : "—"}
+        />
+        <StatTile
+          label="Realised"
+          value={season.captureFrom ? formatGbp(season.totals.realized) : "—"}
+        />
         <StatTile
           label="Capture rate"
-          value={pct(season.totals.captureRate)}
+          value={season.captureFrom ? pct(season.totals.captureRate) : "—"}
           sub="realised ÷ expected"
         />
         <StatTile

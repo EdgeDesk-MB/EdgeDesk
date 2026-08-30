@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { BetRow } from "@/lib/db/schema";
 import type { EvSnapshotRow } from "@/lib/offers/ev-capture";
-import { buildEdgeReport, monthsWithSettledCampaigns } from "./edge-report";
+import {
+  buildEdgeReport,
+  monthsWithReportData,
+  monthsWithSettledCampaigns,
+} from "./edge-report";
 
 const JUL = (day: number, hour = 12) => new Date(2026, 6, day, hour, 0).getTime();
 
@@ -154,6 +158,34 @@ describe("buildEdgeReport", () => {
     expect(report.retention).toEqual({ rate: 0.76, sampleSize: 1 });
   });
 
+  it("shows settled profit when a month has bets but no EV locks", () => {
+    const report = buildEdgeReport({
+      snapshots: [],
+      bets: [
+        bet({ id: 1, actualProfit: 12.3 }),
+        bet({ id: 2, betType: "free_snr", backStake: 50, layStake: 0, status: "won", actualProfit: 38 }),
+        bet({ id: 3, status: "void", actualProfit: 0 }),
+        bet({ id: 4, settledAt: new Date(2026, 5, 20).getTime(), actualProfit: 99 }),
+      ],
+      month: "2026-07",
+    });
+    expect(report.kind).toBe("profit_only");
+    if (report.kind !== "profit_only") return;
+    expect(report.settledBets).toBe(2);
+    expect(report.profit).toBeCloseTo(50.3, 10);
+    expect(report.retention).toEqual({ rate: 0.76, sampleSize: 1 });
+  });
+
+  it("keeps insufficient when a month has some locks but fewer than the floor", () => {
+    const report = buildEdgeReport({
+      snapshots: FIVE_SNAPS.slice(0, 2),
+      bets: [bet({ id: 1 })],
+      month: "2026-07",
+    });
+    expect(report.kind).toBe("insufficient");
+    if (report.kind === "insufficient") expect(report.settledCampaigns).toBe(2);
+  });
+
   it("mug bets never touch commission drag or retention (J5 exclusion)", () => {
     const bets = [
       bet({ id: 1 }),
@@ -180,6 +212,16 @@ describe("monthsWithSettledCampaigns", () => {
       ...FIVE_SNAPS,
       snap({ id: 9, settledAt: new Date(2026, 5, 25).getTime() }),
     ]);
+    expect(months).toEqual(["2026-07", "2026-06"]);
+  });
+});
+
+describe("monthsWithReportData", () => {
+  it("unions settled bets with campaign locks", () => {
+    const months = monthsWithReportData(
+      [snap({ id: 9, settledAt: new Date(2026, 5, 25).getTime() })],
+      [bet({ id: 1 }), bet({ id: 2, status: "void" })]
+    );
     expect(months).toEqual(["2026-07", "2026-06"]);
   });
 });

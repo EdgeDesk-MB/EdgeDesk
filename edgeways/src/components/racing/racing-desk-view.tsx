@@ -710,6 +710,7 @@ export function RacingDeskView() {
           aria-label="Loading racing desk"
         >
           <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
+          <p className="mt-3 text-sm text-muted-foreground">Fetching today&apos;s racecards…</p>
         </div>
       </PageShell>
     );

@@ -40,7 +40,17 @@ export interface EdgeReportInsufficient {
   minCampaigns: number;
 }
 
-export type EdgeReport = EdgeReportReady | EdgeReportInsufficient;
+/** Settled bets this month, but no EV locks yet, so capture cannot be scored. */
+export interface EdgeReportProfitOnly {
+  kind: "profit_only";
+  month: string;
+  settledBets: number;
+  profit: number;
+  commissionDrag: number;
+  retention: { rate: number; sampleSize: number } | null;
+}
+
+export type EdgeReport = EdgeReportReady | EdgeReportInsufficient | EdgeReportProfitOnly;
 
 function monthKey(ms: number): string {
   const d = new Date(ms);
@@ -55,6 +65,19 @@ export function monthsWithSettledCampaigns(snapshots: EvSnapshotRow[]): string[]
   const months = new Set<string>();
   for (const s of snapshots) {
     if (s.settledAt != null) months.add(monthKey(s.settledAt));
+  }
+  return [...months].sort((a, b) => b.localeCompare(a));
+}
+
+function isSettledBet(b: BetRow): boolean {
+  return b.settledAt != null && b.status !== "open" && b.status !== "void";
+}
+
+/** Months with a settled campaign lock or a settled (non-void) bet, newest first. */
+export function monthsWithReportData(snapshots: EvSnapshotRow[], bets: BetRow[]): string[] {
+  const months = new Set(monthsWithSettledCampaigns(snapshots));
+  for (const b of bets) {
+    if (isSettledBet(b)) months.add(monthKey(b.settledAt!));
   }
   return [...months].sort((a, b) => b.localeCompare(a));
 }
@@ -75,6 +98,31 @@ export function buildEdgeReport(input: {
   );
 
   if (settled.length < minCampaigns) {
+    if (settled.length === 0) {
+      const monthBets = bets.filter((b) => isSettledBet(b) && monthKey(b.settledAt!) === month);
+      if (monthBets.length > 0) {
+        const conversions = monthBets.filter(
+          (b) =>
+            (b.betType === "free_snr" || b.betType === "free_sr") &&
+            b.backStake > 0
+        );
+        const faceTotal = conversions.reduce((a, b) => a + b.backStake, 0);
+        const retained = conversions.reduce((a, b) => a + (b.actualProfit ?? 0), 0);
+        return {
+          kind: "profit_only",
+          month,
+          settledBets: monthBets.length,
+          profit: round2(monthBets.reduce((a, b) => a + (b.actualProfit ?? 0), 0)),
+          commissionDrag: round2(
+            monthBets.reduce((a, b) => a + commissionPaidOnSettledBet(b), 0)
+          ),
+          retention:
+            conversions.length > 0 && faceTotal > 0
+              ? { rate: round2(retained / faceTotal), sampleSize: conversions.length }
+              : null,
+        };
+      }
+    }
     return {
       kind: "insufficient",
       month,

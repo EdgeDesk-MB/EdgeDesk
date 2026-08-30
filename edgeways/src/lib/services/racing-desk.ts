@@ -166,6 +166,7 @@ async function loadRacecards(
 
   let cards: RacingRacecard[];
   let oddsTier: "free" | "standard" = "free";
+  const resultsPromise = resultsToday();
   try {
     const loaded = await racecardsByDate(date);
     cards = loaded.cards;
@@ -182,7 +183,7 @@ async function loadRacecards(
     oddsTier = "free";
   }
 
-  const { results } = await resultsToday();
+  const { results } = await resultsPromise;
   return {
     oddsTier,
     results,
@@ -641,6 +642,9 @@ export async function getRacingDesk(
   }
   // Start Neon reads immediately so the Clerk id is bound before racecards await.
   const storePromise = loadRacingDeskStore(clerkUserId);
+  const extrasPromise = hosted
+    ? Promise.all([listNeonAccaRuns(), listNeonBetBuilderRuns(), listNeonSystemRuns()])
+    : Promise.resolve([listAccaRuns(), listBetBuilderRuns(), listSystemRuns()] as const);
 
   const source = hasRacingApiKey() ? "api" : "demo";
   let error: string | undefined;
@@ -663,7 +667,11 @@ export async function getRacingDesk(
 
   if (!hosted) syncCourseOfferExpiryFromRaces(cards, date);
 
-  const { allEvents, feedEvents, allBets, allOffers } = await storePromise;
+  const [{ allEvents, feedEvents, allBets, allOffers }, extras] = await Promise.all([
+    storePromise,
+    extrasPromise,
+  ]);
+  const [accaBundles, betBuilderBundles, systemBundles] = extras;
   const eventByExternal = new Map(
     allEvents.filter((e) => e.externalId).map((e) => [e.externalId!, e])
   );
@@ -675,11 +683,6 @@ export async function getRacingDesk(
     list.push(bet);
     betsByEvent.set(bet.eventId, list);
   }
-  const accaBundles = hosted ? await listNeonAccaRuns() : listAccaRuns();
-  const betBuilderBundles = hosted
-    ? await listNeonBetBuilderRuns()
-    : listBetBuilderRuns();
-  const systemBundles = hosted ? await listNeonSystemRuns() : listSystemRuns();
   const deskMarkInput = {
     acca: accaBundles.map(({ run, legs, backBetType }) => {
       const back = run.backBetId != null ? betsById.get(run.backBetId) : undefined;

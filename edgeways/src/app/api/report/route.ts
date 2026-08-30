@@ -7,7 +7,7 @@ import { listNeonAllSnapshots } from "@/lib/db/neon-desk-ev-snapshots";
 import type { EvSnapshotRow } from "@/lib/offers/ev-capture";
 import {
   buildEdgeReport,
-  monthsWithSettledCampaigns,
+  monthsWithReportData,
 } from "@/lib/report/edge-report";
 import { buildSeasonReport, seasonYears } from "@/lib/report/season-report";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
@@ -69,7 +69,8 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     });
   }
 
-  const months = monthsWithSettledCampaigns(snapshots);
+  const allBets = scopeBets(betRows);
+  const months = monthsWithReportData(snapshots, allBets);
   const requested = req.nextUrl.searchParams.get("month");
   const month =
     requested && /^\d{4}-\d{2}$/.test(requested) ? requested : (months[0] ?? null);
@@ -77,8 +78,6 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   if (!month) {
     return NextResponse.json({ months: [], report: null });
   }
-
-  const allBets = scopeBets(betRows);
   const report = buildEdgeReport({
     snapshots,
     bets: allBets,
