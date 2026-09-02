@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { WaitlistForm } from "@/components/marketing/waitlist-form";
 import { MarketingLogo } from "@/components/marketing/marketing-logo";
 import { MarketingGlimpseRail } from "@/components/marketing/marketing-glimpse-rail";
 import { MarketingPricing } from "@/components/marketing/marketing-pricing";
 import { MarketingSiteFooter } from "@/components/marketing/marketing-site-footer";
 import { moneyPositiveClass } from "@/components/money-flow";
-import { TRIAL_DAYS, trialOfferSummary } from "@/lib/billing/public-offer";
+import { TRIAL_DAYS } from "@/lib/billing/public-offer";
 import {
   HERO_LEAD,
   HOW_IT_HELPS_LEAD,
@@ -307,28 +306,9 @@ export function LaunchHome() {
             </dl>
           </div>
         </section>
-
-        <section className="border-t border-white/10 px-5 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-5xl text-center" data-reveal="">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Join the waitlist
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-white/60 sm:text-base">
-              {trialOfferSummary()}
-            </p>
-            <div className="mx-auto mt-8 w-full max-w-lg">
-              <WaitlistForm id="waitlist-footer" />
-            </div>
-          </div>
-        </section>
       </main>
 
-      <MarketingSiteFooter>
-        <p className="text-xs text-white/55">
-          We keep your email for the waitlist and launch updates.
-          Unsubscribe any time.
-        </p>
-      </MarketingSiteFooter>
+      <MarketingSiteFooter />
     </>
   );
 }
