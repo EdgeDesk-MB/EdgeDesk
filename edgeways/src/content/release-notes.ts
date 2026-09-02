@@ -32,6 +32,24 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-02",
+    title: "Phone quick actions open the real bet form",
+    summary:
+      "Add bet on the phone is the same form as the desktop, with the bookie list, event and stake. The old three-field shortcut is gone.",
+    entries: [
+      {
+        kind: "fix",
+        area: "Mobile",
+        text: "Quick actions → Add bet opens the full bet form (bookie dropdown included). The old Log manually shortcut, which saved a half-empty bet and could error, is removed.",
+      },
+      {
+        kind: "improvement",
+        area: "Mobile",
+        text: "The other quick-action tiles now use the same names as the command palette: Adjust balance, Matched calculator, Log casino offer, Check a boost.",
+      },
+    ],
+  },
+  {
     date: "2026-08-30",
     title: "Plans you can open, and a live desk that stays",
     summary:
