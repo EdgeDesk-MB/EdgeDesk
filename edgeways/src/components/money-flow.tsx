@@ -83,7 +83,13 @@ function SplitFlow({
   const intPart = Math.floor(totalUnits / scale);
   const fracPart = totalUnits % scale;
   const fracText = String(fracPart).padStart(digits, "0");
-  const animated = useAnimateMoneyFlow(fracPart, animateFraction && digits > 0);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
+  // NumberFlow's custom element is HTML on the client and text on the server.
+  const liveFlow = mounted && animateFraction && digits > 0;
+  const animated = useAnimateMoneyFlow(fracPart, liveFlow);
 
   return (
     <span
@@ -97,7 +103,7 @@ function SplitFlow({
       {prefix}
       {intPart.toLocaleString("en-GB")}
       {digits > 0 &&
-        (animateFraction ? (
+        (liveFlow ? (
           <>
             .
             <NumberFlow

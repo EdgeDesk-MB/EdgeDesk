@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LogIn, LogOut } from "lucide-react";
 import { useClerk, useUser } from "@clerk/nextjs";
@@ -51,7 +51,13 @@ export function TopBarLoginButton({ className }: { className?: string }) {
 /** Desktop meta-nav session control: Log out when signed in, Log in when not. */
 export function TopBarSessionButton({ className }: { className?: string }) {
   const { isLoaded, isSignedIn } = useUser();
-  if (!isLoaded) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
+  // Clerk's isLoaded can differ between SSR and the first client paint.
+  // Wait until mount so admin/desk chrome hydrates as the same empty slot.
+  if (!mounted || !isLoaded) return null;
   if (isSignedIn) return <TopBarLogoutButton className={className} />;
   return <TopBarLoginButton className={className} />;
 }
@@ -106,7 +112,11 @@ export function MobileDrawerSessionButton({
   onNavigate?: () => void;
 }) {
   const { isLoaded, isSignedIn } = useUser();
-  if (!isLoaded) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
+  if (!mounted || !isLoaded) return null;
   if (isSignedIn) return <MobileDrawerLogoutButton onLoggedOut={onNavigate} />;
   return (
     <Link

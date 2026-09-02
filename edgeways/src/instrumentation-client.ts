@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { shouldDropPosthogException } from "@/lib/analytics/exception-noise";
 
 /**
  * Product analytics + error tracking (EDGE-35 / EDGE-49). Privacy posture:
@@ -18,6 +19,10 @@ if (token) {
     cookieless_mode: "always",
     autocapture: false,
     capture_exceptions: true,
+    before_send: (event) => {
+      if (shouldDropPosthogException(event)) return null;
+      return event;
+    },
     disable_session_recording: true,
     enable_heatmaps: false,
     disable_surveys: true,

@@ -29,26 +29,22 @@ const HeaderPatternContext = createContext<HeaderPatternContextValue | null>(
   null
 );
 
-function initialHeaderPattern(): HeaderPatternId {
-  if (typeof window === "undefined" || hasPublicDemoCookieInDocument()) {
-    return DEFAULT_HEADER_PATTERN;
-  }
-  return readStoredHeaderPattern();
-}
-
 export function HeaderPatternProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Default on first paint so SSR HTML matches the client. FOUC scripts already
+  // applied the stored pattern on <html>; sync React state after mount.
   const [patternId, setPatternIdState] =
-    useState<HeaderPatternId>(initialHeaderPattern);
+    useState<HeaderPatternId>(DEFAULT_HEADER_PATTERN);
 
   useEffect(() => {
     const demo = hasPublicDemoCookieInDocument();
     const next = demo ? DEFAULT_HEADER_PATTERN : readStoredHeaderPattern();
     applyHeaderPattern(next);
     if (!demo) writeStoredHeaderPattern(next);
+    setPatternIdState((prev) => (prev === next ? prev : next));
   }, []);
 
   const setPatternId = useCallback((id: HeaderPatternId) => {

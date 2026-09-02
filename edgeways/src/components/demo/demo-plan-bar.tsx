@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -82,13 +82,21 @@ function chooseButton(view: PublicDemoView) {
 }
 
 function setDemoBarHeight(px: number) {
-  document.documentElement.style.setProperty("--layout-demo-bar-h", `${px}px`);
+  const next = `${Math.round(px)}px`;
+  if (document.documentElement.style.getPropertyValue("--layout-demo-bar-h") === next) {
+    return;
+  }
+  document.documentElement.style.setProperty("--layout-demo-bar-h", next);
 }
 
 export function DemoPlanBar() {
   const { active, view, setView } = usePublicDemo();
   const { isLoaded, isSignedIn } = useUser();
-  const live = useLiveDeskStarted(Boolean(isLoaded && isSignedIn));
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
+  const live = useLiveDeskStarted(Boolean(mounted && isLoaded && isSignedIn));
   const signedInCta = signedInDemoCtaForStatus(live.status, live.started);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -153,7 +161,7 @@ export function DemoPlanBar() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 px-3 pr-6 sm:pl-0">
-          {!isLoaded || (isSignedIn && !signedInCta) ? (
+          {!mounted || !isLoaded || (isSignedIn && !signedInCta) ? (
             <Button size="lg" disabled aria-busy="true">
               Back to your desk
             </Button>

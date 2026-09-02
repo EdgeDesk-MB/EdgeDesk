@@ -27,21 +27,17 @@ type UiFontContextValue = {
 
 const UiFontContext = createContext<UiFontContextValue | null>(null);
 
-function initialUiFont(): UiFontId {
-  if (typeof window === "undefined" || hasPublicDemoCookieInDocument()) {
-    return DEFAULT_UI_FONT;
-  }
-  return readStoredUiFont();
-}
-
 export function UiFontProvider({ children }: { children: React.ReactNode }) {
-  const [fontId, setFontIdState] = useState<UiFontId>(initialUiFont);
+  // Default on first paint so SSR HTML matches the client. FOUC scripts already
+  // applied the stored font on <html>; sync React state after mount.
+  const [fontId, setFontIdState] = useState<UiFontId>(DEFAULT_UI_FONT);
 
   useEffect(() => {
     const demo = hasPublicDemoCookieInDocument();
     const next = demo ? DEFAULT_UI_FONT : readStoredUiFont();
     applyUiFont(next);
     if (!demo) writeStoredUiFont(next);
+    setFontIdState((prev) => (prev === next ? prev : next));
   }, []);
 
   const setFontId = useCallback((id: UiFontId) => {

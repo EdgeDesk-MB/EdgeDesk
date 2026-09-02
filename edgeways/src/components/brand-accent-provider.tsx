@@ -48,15 +48,10 @@ const DEFAULT_ACCENT_STATE: BrandAccentState = {
   hex: DEFAULT_BRAND_ACCENT_HEX,
 };
 
-function initialAccentState(): BrandAccentState {
-  if (typeof window === "undefined" || hasPublicDemoCookieInDocument()) {
-    return DEFAULT_ACCENT_STATE;
-  }
-  return readStoredBrandAccent();
-}
-
 export function BrandAccentProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<BrandAccentState>(initialAccentState);
+  // Default on first paint so SSR HTML matches the client. FOUC scripts already
+  // applied the stored accent on <html>; sync React state after mount.
+  const [state, setState] = useState<BrandAccentState>(DEFAULT_ACCENT_STATE);
   const [pending, setPending] = useState<BrandAccentState | null>(null);
   const waiterRef = useRef<{
     resolve: (value: BrandAccentState) => void;
@@ -68,6 +63,9 @@ export function BrandAccentProvider({ children }: { children: React.ReactNode })
     const next = demo ? DEFAULT_ACCENT_STATE : readStoredBrandAccent();
     applyBrandAccent(next.hex);
     if (!demo) writeStoredBrandAccent(next);
+    setState((prev) =>
+      prev.presetId === next.presetId && prev.hex === next.hex ? prev : next
+    );
     // Enable brand colour transitions only after the initial paint settles,
     // so load never animates Amber → selected.
     const id = window.requestAnimationFrame(() => {
