@@ -126,6 +126,15 @@ export default function PrivacyPage() {
               </td>
             </tr>
             <tr>
+              <td>Appearance preferences</td>
+              <td>While you use the desk</td>
+              <td>
+                Light or dark theme, header pattern, typeface, and brand
+                colour preset. Not custom hex values. Used to understand how
+                the desk is customised.
+              </td>
+            </tr>
+            <tr>
               <td>Referral codes</td>
               <td>If you share or redeem a referral</td>
               <td>
