@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Liveline } from "liveline";
-import { ChartNoAxesCombined } from "lucide-react";
+import { ChartNoAxesCombined, Layers2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -20,8 +20,11 @@ import { RegionFlag } from "@/components/region-flag";
 import { SportIcon } from "@/components/sport-icon";
 import { formatClockTime } from "@/lib/time-format";
 import { formatGbp } from "@/lib/format-money";
-import type { ChartBetMarker } from "@/lib/pnl/chart-bet-markers";
-import { PNL_CHART_PADDING_PANEL } from "@/lib/pnl/chart-bet-markers";
+import {
+  ensureWindowLinePoints,
+  PNL_CHART_PADDING_PANEL,
+  type ChartBetMarker,
+} from "@/lib/pnl/chart-bet-markers";
 import type { RacingDeskPnlDay } from "@/lib/racing-desk/types";
 import {
   deskCardShell,
@@ -59,6 +62,16 @@ const LIVELINE_LEFT_EDGE_MARGIN = 0.06;
 function pnlChartColor(value: number, dark: boolean): string {
   const palette = dark ? PNL_CHART_COLORS.dark : PNL_CHART_COLORS.light;
   return value < -0.004 ? palette.loss : palette.profit;
+}
+
+function racingDayMarkerHref(marker: ChartBetMarker): string {
+  if (marker.id < 0) {
+    const abs = Math.abs(marker.id);
+    if (abs >= 3_000_000) return "/systems";
+    if (abs >= 2_000_000) return "/bet-builder";
+    return "/acca";
+  }
+  return `/tracker?highlight=${marker.id}`;
 }
 
 /**
@@ -110,13 +123,19 @@ export function RacingPnlTodayView({
     }));
     const lastHist = historic.at(-1)!;
     // Tip at now (Home live-pnl pattern) so the plateau reaches the live edge.
-    const points =
+    const withLive =
       nowSec > lastHist.time + 0.5
         ? [...historic, { time: nowSec, value: total }]
         : historic;
+    const windowSecs = dayChartWindowSecs(withLive[0]!.time, nowSec);
     return {
-      points,
-      windowSecs: dayChartWindowSecs(points[0]!.time, nowSec),
+      ledgerPoints: historic,
+      points: ensureWindowLinePoints(withLive, windowSecs, {
+        nowSec,
+        showBadge: false,
+        liveValue: total,
+      }),
+      windowSecs,
     };
   }, [report, total, nowTick]);
 
@@ -128,6 +147,8 @@ export function RacingPnlTodayView({
   const rows = report?.rows ?? [];
   const openCount = report?.openCount ?? 0;
   const settledCount = report?.settledCount ?? 0;
+  const raceRowCount = rows.filter((row) => row.kind !== "campaign").length;
+  const campaignRowCount = rows.filter((row) => row.kind === "campaign").length;
   const empty = rows.length === 0;
   const showChart = rows.length >= CHART_MIN_RACES && chart != null;
 
@@ -142,7 +163,8 @@ export function RacingPnlTodayView({
         <CardHeader className="gap-2 pb-0">
           <CardTitle className="text-base">Day P&L</CardTitle>
           <CardDescription compact>
-            By race off time{dateLabel ? ` · ${dateLabel}` : ""}. Open at worst
+            By race off time{dateLabel ? ` · ${dateLabel}` : ""}. Accas and
+            other multi-race tickets plot at the last racing leg. Open at worst
             case until settled.
           </CardDescription>
         </CardHeader>
@@ -181,12 +203,15 @@ export function RacingPnlTodayView({
                     <ChartBetMarkersOverlay
                       markers={markers}
                       livePoints={chart.points}
+                      ledgerPoints={chart.ledgerPoints}
                       liveValue={total}
                       windowSecs={chart.windowSecs}
                       activeWindowSecs={chart.windowSecs}
                       showBadge={false}
                       referenceValue={0}
+                      nowSec={nowTick / 1000}
                       padding={PNL_CHART_PADDING_PANEL}
+                      hrefForMarker={(marker) => racingDayMarkerHref(marker)}
                     />
                   ) : null}
                 </>
@@ -207,8 +232,12 @@ export function RacingPnlTodayView({
             <p className="mt-[var(--layout-section-y)] border-t border-border/60 pt-[var(--layout-section-y)] text-xs text-muted-foreground">
               {settledCount} settled
               {openCount > 0 ? ` · ${openCount} open at worst case` : ""}
-              {" · "}
-              {rows.length} race{rows.length === 1 ? "" : "s"}
+              {raceRowCount > 0
+                ? ` · ${raceRowCount} race${raceRowCount === 1 ? "" : "s"}`
+                : ""}
+              {campaignRowCount > 0
+                ? ` · ${campaignRowCount} multi-race`
+                : ""}
             </p>
           )}
         </CardContent>
@@ -217,7 +246,8 @@ export function RacingPnlTodayView({
       <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
         <h3 className={sectionTitle}>P&L breakdown</h3>
         <p className={sectionDescription}>
-          By race, in off-time order. Same race-day attribution as the summary tile.
+          By race, in off-time order. Accas and combo tickets count as one bet,
+          on their own line when they span more than one race.
         </p>
         {empty ? (
           <EmptyState
@@ -261,15 +291,20 @@ export function RacingPnlTodayView({
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
+                  const isCampaign = row.kind === "campaign";
                   const clickable =
                     Boolean(onSelectRace) && Boolean(row.raceExternalId);
                   const time =
                     row.offTime?.trim() ||
                     formatClockTime(new Date(row.startTime));
                   const hasFlag = Boolean(row.region?.trim());
+                  const span =
+                    isCampaign && (row.spanCount ?? 0) > 1
+                      ? `${row.spanCount} races`
+                      : null;
                   return (
                     <TableRow
-                      key={row.eventId}
+                      key={row.rowId ?? `${row.kind ?? "race"}-${row.eventId}-${row.campaignId ?? 0}`}
                       className={cn(
                         listRow,
                         clickable && "cursor-pointer hover:bg-selection-subtle"
@@ -289,7 +324,12 @@ export function RacingPnlTodayView({
                       >
                         <div className="flex flex-col gap-0.5">
                           <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                            {hasFlag ? (
+                            {isCampaign ? (
+                              <Layers2
+                                className="size-3.5 shrink-0 text-muted-foreground"
+                                aria-hidden
+                              />
+                            ) : hasFlag ? (
                               <>
                                 <RegionFlag code={row.region} />
                                 <SportIcon
@@ -300,12 +340,15 @@ export function RacingPnlTodayView({
                                 />
                               </>
                             ) : null}
-                            <span className="min-w-0">
-                              {time} {row.course}
+                            <span className="min-w-0 text-pretty break-words">
+                              {isCampaign
+                                ? `${row.course}${time ? ` · ${time}` : ""}`
+                                : `${time} ${row.course}`}
                             </span>
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground text-pretty break-words">
                             {row.raceName}
+                            {span ? ` · ${span}` : ""}
                             {row.openCount > 0
                               ? ` · ${row.openCount} open (worst case)`
                               : ""}

@@ -122,6 +122,61 @@ describe("acca-desk settlement (auditor F3)", () => {
     expect(run.id).toBeTruthy();
   });
 
+  it("last deciding leg records a campaign-complete alert, not the bookie ticket", () => {
+    const { run, legs } = createAccaRun({
+      label: "Bet £10 get £10 free bet",
+      method: "sequential",
+      stake: 10,
+      commission: 0,
+      bookmaker: "Betfair Sportsbook",
+      legs: [
+        { label: "Star Start", backOdds: 5 },
+        { label: "Burning Up", backOdds: 1.4 },
+      ],
+    });
+    logLegLay(legs[0].id, 6.4, 10);
+    setLegResult(legs[0].id, "won");
+    const done = setLegResult(legs[1].id, "won");
+    expect(done).toMatchObject({ runCompleted: true, runId: run.id });
+
+    const alert = db
+      .select()
+      .from(alertsInbox)
+      .where(eq(alertsInbox.dedupe, `acca_complete:${run.id}`))
+      .get();
+    expect(alert).toMatchObject({
+      kind: "acca_complete",
+      title: "You just made £6.00 · Acca won",
+      href: "/acca",
+    });
+    expect(alert?.body).toContain("Double · 1 laid");
+    expect(
+      db.select().from(alertsInbox).where(eq(alertsInbox.kind, "result_settled")).all()
+    ).toHaveLength(0);
+  });
+
+  it("covered bust records Acca busted at £0", () => {
+    const { run, legs } = createAccaRun({
+      label: "Bet £10 get £10 free bet",
+      method: "sequential",
+      stake: 10,
+      commission: 0,
+      legs: [
+        { label: "Star Start", backOdds: 5 },
+        { label: "Burning Up", backOdds: 1.4 },
+      ],
+    });
+    logLegLay(legs[0].id, 6.4, 10);
+    setLegResult(legs[0].id, "lost");
+    const alert = db
+      .select()
+      .from(alertsInbox)
+      .where(eq(alertsInbox.dedupe, `acca_complete:${run.id}`))
+      .get();
+    expect(alert?.title).toBe("£0.00 settled · Acca busted");
+    expect(alert?.body).toContain("Busted at Star Start");
+  });
+
   it("void legs return the lay and drop out of the combined odds", () => {
     const { run, legs } = createAccaRun(THREE_FOLD);
     logLegLay(legs[0].id, 2.02, 10.0);

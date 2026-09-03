@@ -19,6 +19,7 @@ import {
   accaRuns,
   bets,
   events,
+  offers,
   type AccaLegRow,
   type AccaRunRow,
   type EventRow,
@@ -42,6 +43,8 @@ import {
   deriveDeskLegAutoResult,
   toBinaryDeskResult,
 } from "@/lib/desk/leg-auto-result";
+import { accaCampaignCompleteAlert } from "@/lib/alerts/acca-complete";
+import { plainAlertBody } from "@/lib/alerts/plain-body";
 import { recordAlerts } from "@/lib/services/alerts-inbox";
 import { sendPush } from "@/lib/services/push";
 import {
@@ -194,6 +197,35 @@ export type AccaRunView = {
   /** Linked back bet type (qualifying / free_snr / …) for campaign P&L mirroring */
   backBetType: string | null;
 };
+
+export function toAccaDeskStateRun(view: AccaRunView) {
+  const { run, legs, backBetType } = view;
+  return {
+    id: run.id,
+    label: run.label,
+    status: run.status,
+    settledAt: run.settledAt,
+    method: run.method,
+    bookmaker: run.bookmaker,
+    offerId: run.offerId,
+    stake: run.stake,
+    commission: run.commission,
+    boostPct: run.boostPct,
+    backBetType,
+    refundAmount: run.refundAmount,
+    noLay: run.noLay,
+    wholeLayStake: run.wholeLayStake,
+    wholeLayOdds: run.wholeLayOdds,
+    legs: legs.map((l) => ({
+      seq: l.seq,
+      label: l.label,
+      result: l.result,
+      backOdds: l.backOdds,
+      layStake: l.layStake,
+      layOdds: l.layOdds,
+    })),
+  };
+}
 
 export function listAccaRuns(): AccaRunView[] {
   const runs = db.select().from(accaRuns).all().sort((a, b) => b.createdAt - a.createdAt);
@@ -731,7 +763,7 @@ function settleLinkedBet(betId: number | null, status: "won" | "lost" | "void", 
 export function setLegResult(
   legId: number,
   result: "won" | "lost" | "void"
-): { leg: AccaLegRow; runCompleted: boolean } | null {
+): { leg: AccaLegRow; runCompleted: boolean; runId: number } | null {
   const leg = db.select().from(accaLegs).where(eq(accaLegs.id, legId)).get();
   if (!leg || leg.result !== "pending") return null;
   const run = db.select().from(accaRuns).where(eq(accaRuns.id, leg.runId)).get();
@@ -786,7 +818,7 @@ export function setLegResult(
     // Mid-run: actionable push is the next cover stake, not the settled lay liability.
     maybeAccaNextLayAlert(run, legs);
   }
-  return { leg: updated, runCompleted: runDecided };
+  return { leg: updated, runCompleted: runDecided, runId: run.id };
 }
 
 /**
@@ -890,6 +922,57 @@ function completeRun(run: AccaRunRow, legs: AccaLegRow[], anyLost: boolean) {
     recordAlerts([alert]);
     void sendPush(alert).catch(() => {});
   }
+
+  notifyAccaComplete(run, legs, back?.betType ?? null);
+}
+
+function notifyAccaComplete(
+  run: AccaRunRow,
+  legs: AccaLegRow[],
+  backBetType: string | null
+) {
+  let offerTitle: string | null = null;
+  if (run.offerId != null) {
+    offerTitle =
+      db
+        .select({ title: offers.title })
+        .from(offers)
+        .where(eq(offers.id, run.offerId))
+        .get()?.title ?? null;
+  }
+  const alert = accaCampaignCompleteAlert({
+    id: run.id,
+    label: run.label,
+    method: run.method,
+    bookmaker: run.bookmaker,
+    offerTitle,
+    stake: run.stake,
+    commission: run.commission,
+    boostPct: run.boostPct,
+    backBetType,
+    refundAmount: run.refundAmount,
+    noLay: run.noLay,
+    wholeLayStake: run.wholeLayStake,
+    wholeLayOdds: run.wholeLayOdds,
+    legs: legs.map((l) => ({
+      seq: l.seq,
+      label: l.label,
+      result: l.result,
+      backOdds: l.backOdds,
+      layStake: l.layStake,
+      layOdds: l.layOdds,
+    })),
+  });
+  recordAlerts([
+    {
+      key: alert.key,
+      kind: alert.kind,
+      title: alert.title,
+      body: plainAlertBody(alert),
+      href: alert.href,
+    },
+  ]);
+  void sendPush(alert).catch(() => {});
 }
 
 /** Auto-results: linked finished events decide football + racing desk legs. */

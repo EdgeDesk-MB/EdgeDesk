@@ -111,4 +111,16 @@ describe("hosted desk cutover", () => {
     expect(appStateSource).toMatch(/isNeonDesk\(\)/);
     expect(appStateSource).toMatch(/buildNeonDeskAppState/);
   });
+
+  it("Racing Desk reads follow the Neon alias, not the raw Clerk id", () => {
+    // Clerk dev/prod issue different user ids for the same email. Passing the
+    // raw signed-in id down would open the empty twin desk on localhost.
+    expect(routeSource("racing/desk/route.ts")).toMatch(/neonClerkUserId/);
+    expect(routeSource("offers/edge/route.ts")).toMatch(/neonClerkUserId/);
+    const racingDesk = readFileSync(
+      resolve(__dirname, "../services/racing-desk.ts"),
+      "utf8"
+    );
+    expect(racingDesk).toMatch(/neonClerkUserId/);
+  });
 });

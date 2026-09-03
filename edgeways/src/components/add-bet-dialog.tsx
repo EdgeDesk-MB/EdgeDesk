@@ -149,6 +149,18 @@ import {
 import { sportDisplayLabel } from "@/lib/sports";
 import { qualifyingOfferTriggerText } from "@/lib/offers/offer-track-bet";
 import {
+  OfferRequirementHint,
+  OfferRequirementsNotice,
+} from "@/components/offers/offer-requirements-notice";
+import {
+  evaluatePlacementBreaches,
+  hasPlacementRequirements,
+  placementBreachMessages,
+  placementRequirementsFromImportant,
+} from "@/lib/offers/offer-placement-requirements";
+import { placementFieldWarningClass } from "@/lib/ui/surface-styles";
+import { readImportantTerms } from "@/lib/offers/offer-terms";
+import {
   bookmakerFromOfferPrefs,
   stakeFromOfferPrefs,
 } from "@/lib/services/settings-shared";
@@ -1280,6 +1292,21 @@ export function AddBetDialog({
     reservedFreeBetCredit
   );
 
+  const linkedOfferId =
+    selectedOfferId ?? prefill?.offerId ?? editBet?.offerId ?? null;
+  const offerRequirements = useMemo(() => {
+    if (linkedOfferId == null) return null;
+    const offer = (appState?.offers ?? []).find((o) => o.id === linkedOfferId);
+    if (!offer) return null;
+    return placementRequirementsFromImportant(readImportantTerms(offer), {
+      purpose: stakingFreeBet ? "convert" : "qualify",
+    });
+  }, [appState?.offers, linkedOfferId, stakingFreeBet]);
+  const requirementBreaches = evaluatePlacementBreaches(offerRequirements, {
+    odds: isDutch ? null : effectiveBackOdds,
+    stake: backStake,
+  });
+
   // Derived: the top-up option only holds while the shortfall exists.
   const effectiveAddBalance = addBalance && needsAddBalance;
 
@@ -2242,6 +2269,15 @@ export function AddBetDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {hasPlacementRequirements(offerRequirements) ? (
+          <div className="px-6 pb-3 pt-3">
+            <OfferRequirementsNotice
+              requirements={offerRequirements}
+              breaches={requirementBreaches}
+            />
+          </div>
+        ) : null}
+
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-y-auto sm:grid-cols-2 sm:divide-x">
           {/* Left - event & market details */}
           <div className="flex flex-col gap-3 p-6">
@@ -2835,9 +2871,15 @@ export function AddBetDialog({
                   onChange={setBackStake}
                   min={0}
                   placeholder="10.00"
+                  invalid={requirementBreaches.stakeLow || requirementBreaches.stakeHigh}
+                  describedBy="add-bet-offer-req"
                   inputClassName={cn(
                     ring(!(backStake > 0)),
+                    (requirementBreaches.stakeLow || requirementBreaches.stakeHigh) &&
+                      placementFieldWarningClass,
                     stakingFreeBet &&
+                      !requirementBreaches.stakeLow &&
+                      !requirementBreaches.stakeHigh &&
                       "bg-violet-500/10 ring-violet-500/30 focus:ring-violet-500/45 dark:bg-violet-500/15"
                   )}
                 />
@@ -2847,9 +2889,18 @@ export function AddBetDialog({
                   onChange={setBackOdds}
                   min={1}
                   placeholder="3.00"
-                  inputClassName={ring(!(backOdds > 1))}
+                  invalid={requirementBreaches.oddsLow}
+                  describedBy="add-bet-offer-req"
+                  inputClassName={cn(
+                    ring(!(backOdds > 1)),
+                    requirementBreaches.oddsLow && placementFieldWarningClass
+                  )}
                 />
               </div>
+              <OfferRequirementHint
+                id="add-bet-offer-req"
+                messages={placementBreachMessages(offerRequirements, requirementBreaches)}
+              />
               {calcBetType === "risk_free" ? (
                 <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                   <PanelInput

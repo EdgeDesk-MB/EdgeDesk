@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic";
  * hides the panel, this is the server-side guard behind it.
  */
 export const GET = withDeskScope(async function GET(req: NextRequest) {
-  const clerkUserId = getDeskActor().clerkUserId;
+  // Aliased Neon id, not the raw Clerk id (see api/racing/desk).
+  const clerkUserId = getDeskActor().neonClerkUserId || getDeskActor().clerkUserId;
   const date =
     req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
   if (

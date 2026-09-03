@@ -32,6 +32,50 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-03",
+    title: "Acca verdicts, offer terms in the bet form, faster race cards",
+    summary:
+      "One alert sums up a finished acca, bet forms warn you before you break the offer terms, and Racing Desk opens faster with multi-race tickets counted properly in the day P&L.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Acca Desk",
+        href: "/acca",
+        text: "When the last deciding leg lands, one alert sums up the whole run: You just made £X (or the settled loss), won, locked or busted, with a nudge to claim the refund on acca insurance. The per-leg ledger toasts step aside, so the campaign gets one clear verdict.",
+      },
+      {
+        kind: "feature",
+        area: "Offers",
+        href: "/offers",
+        text: "Offer terms inside the bet form. Placing a qualifier or convert from an offer shows the terms that matter (min odds, min and max stake, min selections) and warns you as you type if the draft breaks one, across Add bet, Acca and Bet Builder.",
+      },
+      {
+        kind: "improvement",
+        area: "Acca Desk",
+        href: "/acca",
+        text: "Mid-run, the acca card headline reads If this leg loses with the cover amount, the next leg to lay or lock, and an all-win estimate, instead of a bare Worst outcome.",
+      },
+      {
+        kind: "improvement",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Today's racing P&L counts accas, bet builders and systems once, on their own line when they span more than one race, and plots them on the day chart at the last racing leg.",
+      },
+      {
+        kind: "improvement",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Race cards open faster and stay available all day: the desk keeps its own copy of today's and tomorrow's cards and refreshes them in the background.",
+      },
+      {
+        kind: "improvement",
+        area: "Tracked Events",
+        href: "/tracked-events",
+        text: "The race-awaiting-result prompt on Tracked Events opens Set result in place, instead of linking you to the page you are already on.",
+      },
+    ],
+  },
+  {
     date: "2026-09-02",
     title: "Phone quick actions open the real bet form",
     summary:

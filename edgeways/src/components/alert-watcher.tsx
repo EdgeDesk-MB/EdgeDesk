@@ -23,6 +23,12 @@ import {
 } from "@/lib/alerts/settled-since-poll";
 import { plainAlertBody } from "@/lib/alerts/plain-body";
 import {
+  accaCompleteAlertKey,
+  accaRunIdsToAnnounce,
+  mergeAccaStatusMap,
+  type AccaCompleteAlertRun,
+} from "@/lib/alerts/acca-complete";
+import {
   evaluateAlertRules,
   type SettledBetNotice,
   type TwoUpLockNotice,
@@ -52,6 +58,8 @@ export function AlertWatcher() {
   const dismissedRef = useRef<Set<string>>(new Set());
   /** Settled bet id → status; detects new settles and later void/push revisions. */
   const settledStatusRef = useRef<Map<number, string> | null>(null);
+  /** Acca run id → status; campaign toast when the last deciding leg lands. */
+  const accaStatusRef = useRef<Map<number, string> | null>(null);
 
   useEffect(() => {
     ensureAlertToastLifecycle();
@@ -102,11 +110,51 @@ export function AlertWatcher() {
           sport: b.sport ?? event?.sport ?? null,
           event: event ?? null,
         }),
+        notes: b.notes,
+      });
+    }
+    const accaDesk = state.accaDesk ?? [];
+    const prevAcca = accaStatusRef.current;
+    accaStatusRef.current = mergeAccaStatusMap(
+      prevAcca,
+      accaDesk.map((r) => ({ id: r.id, status: r.status }))
+    );
+    const accaAnnounceIds = new Set(
+      accaRunIdsToAnnounce(
+        prevAcca,
+        accaDesk.map((r) => ({
+          id: r.id,
+          status: r.status,
+          settledAt: r.settledAt,
+        })),
+        now
+      )
+    );
+    const accaCompletedSinceLastPoll: AccaCompleteAlertRun[] = [];
+    for (const r of accaDesk) {
+      if (!accaAnnounceIds.has(r.id)) continue;
+      const offer = r.offerId != null ? offersById.get(r.offerId) : undefined;
+      accaCompletedSinceLastPoll.push({
+        id: r.id,
+        label: r.label,
+        method: r.method,
+        bookmaker: r.bookmaker,
+        offerTitle: offer?.title ?? null,
+        stake: r.stake,
+        commission: r.commission,
+        boostPct: r.boostPct,
+        backBetType: r.backBetType,
+        refundAmount: r.refundAmount,
+        noLay: r.noLay,
+        wholeLayStake: r.wholeLayStake,
+        wholeLayOdds: r.wholeLayOdds,
+        legs: r.legs,
       });
     }
     if (previous == null) {
       // History with no inbox row (imports, pre-alert desks) stays quiet.
       suppressAlertKeys(resultSettledAlertKeys(settledNow.map((b) => b.id)));
+      suppressAlertKeys(accaDesk.map((r) => accaCompleteAlertKey(r.id)));
     }
 
     // B5: unhedged backs past their threshold (windows tunable via E1).
@@ -227,6 +275,7 @@ export function AlertWatcher() {
         };
       }),
       settledSinceLastPoll,
+      accaCompletedSinceLastPoll,
       nakedExposed,
       twoUpTriggered,
     });
@@ -240,6 +289,11 @@ export function AlertWatcher() {
       if (notice.status === "void" || notice.status === "push") {
         seen.delete(resultSettledAlertKey(notice.betId));
       }
+    }
+    // Server may have already inbox'd acca_complete (hosted / auto-result).
+    // A this-session active → completed transition still deserves the toast.
+    for (const run of accaCompletedSinceLastPoll) {
+      seen.delete(accaCompleteAlertKey(run.id));
     }
 
     // Pull down shade notifications when a live prompt is no longer due

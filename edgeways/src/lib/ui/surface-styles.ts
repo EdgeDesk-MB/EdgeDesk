@@ -542,6 +542,10 @@ export const warningNotice = cn(
   "rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
 );
 
+/** Warning ring on a stake / odds field that is off the offer terms. */
+export const placementFieldWarningClass =
+  "ring-2 ring-warning/70 focus:ring-warning";
+
 /** Operator site banner plates. Type maps to tokens, never a free colour. */
 export type SiteBannerPlateKind = "maintenance" | "notice" | "offer";
 

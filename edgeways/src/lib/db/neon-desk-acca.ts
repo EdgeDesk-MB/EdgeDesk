@@ -13,6 +13,8 @@ import {
   priorLayLiabilities,
 } from "@/lib/calc/acca-workflow";
 import { roundPence } from "@/lib/calc/money";
+import { accaCampaignCompleteAlert } from "@/lib/alerts/acca-complete";
+import { plainAlertBody } from "@/lib/alerts/plain-body";
 import { listNeonInboxDedupes, recordNeonAlerts } from "@/lib/db/neon-alerts-inbox";
 import { getNeonDb } from "@/lib/db/neon";
 import {
@@ -781,12 +783,46 @@ async function completeNeonRun(
     await recordNeonAlerts([alert]);
     void sendPush(alert).catch(() => {});
   }
+
+  const completeAlert = accaCampaignCompleteAlert({
+    id: run.id,
+    label: run.label,
+    method: run.method,
+    bookmaker: run.bookmaker,
+    offerTitle: null,
+    stake: run.stake,
+    commission: run.commission,
+    boostPct: run.boostPct,
+    backBetType: back?.betType ?? null,
+    refundAmount: run.refundAmount,
+    noLay: run.noLay,
+    wholeLayStake: run.wholeLayStake,
+    wholeLayOdds: run.wholeLayOdds,
+    legs: legs.map((l) => ({
+      seq: l.seq,
+      label: l.label,
+      result: l.result,
+      backOdds: l.backOdds,
+      layStake: l.layStake,
+      layOdds: l.layOdds,
+    })),
+  });
+  await recordNeonAlerts([
+    {
+      key: completeAlert.key,
+      kind: completeAlert.kind,
+      title: completeAlert.title,
+      body: plainAlertBody(completeAlert),
+      href: completeAlert.href,
+    },
+  ]);
+  void sendPush(completeAlert).catch(() => {});
 }
 
 export async function setNeonLegResult(
   legId: number,
   result: "won" | "lost" | "void"
-): Promise<{ leg: AccaLegRow; runCompleted: boolean } | null> {
+): Promise<{ leg: AccaLegRow; runCompleted: boolean; runId: number } | null> {
   const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return null;
   const leg = await getOwnedLeg(legId, clerkUserId);
@@ -840,7 +876,7 @@ export async function setNeonLegResult(
   ) {
     await maybeNeonAccaNextLayAlert(run, legs);
   }
-  return { leg: toSqliteAccaLeg(updated), runCompleted: runDecided };
+  return { leg: toSqliteAccaLeg(updated), runCompleted: runDecided, runId: run.id };
 }
 
 export async function deleteNeonAccaRun(runId: number): Promise<boolean> {

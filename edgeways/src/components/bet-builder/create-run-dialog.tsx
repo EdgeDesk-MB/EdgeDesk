@@ -31,14 +31,24 @@ import { DateTimePicker } from "@/components/date-time-picker";
 import { DeskLegEventFields } from "@/components/desk/desk-leg-event-fields";
 import { DeskRunDialogBody } from "@/components/desk/desk-run-dialog-body";
 import { DeskStakeSource } from "@/components/desk/desk-stake-source";
-import { WarningNotice } from "@/components/ui/warning-notice";
+import {
+  OfferRequirementHint,
+  OfferRequirementsNotice,
+} from "@/components/offers/offer-requirements-notice";
 import { nextDeskLegLabel } from "@/lib/desk/desk-leg-title";
 import { resolveDeskEventIdForSave } from "@/lib/desk/resolve-desk-event-id";
 import { usePauseAppStatePolling } from "@/components/app-state-provider";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { wholeComboLay } from "@/lib/calc/bet-builder-workflow";
-import { formatGbp } from "@/lib/format-money";
+import {
+  evaluatePlacementBreaches,
+  placementBreachMessages,
+  placementRequirementsFromImportant,
+  placementRequirementsFromPrefill,
+} from "@/lib/offers/offer-placement-requirements";
+import { placementFieldWarningClass } from "@/lib/ui/surface-styles";
+import { readImportantTerms, toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import {
   emptySelectionCountFromPrefill,
   type BetBuilderRunPrefill,
@@ -54,7 +64,6 @@ import {
   type KnownFixtureOption,
 } from "@/lib/add-bet-event-options";
 import { MARKETS } from "@/lib/markets";
-import { toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import type {
   BetBuilderRunRow,
   BetBuilderSelectionRow,
@@ -98,26 +107,6 @@ function emptySelections(count: number, sport = "football"): SelDraft[] {
   return Array.from({ length: count }, () => ({ label: "", market, selection: "" }));
 }
 
-function RequirementsStrip({ prefill }: { prefill: BetBuilderRunPrefill }) {
-  const parts: string[] = [];
-  if (prefill.purpose === "convert") parts.push("Free-bet convert");
-  if (prefill.minSelections != null) parts.push(`Min ${prefill.minSelections} selections`);
-  if (prefill.minOdds != null) parts.push(`Min odds ${prefill.minOdds}`);
-  if (prefill.minStake != null) parts.push(`Min stake ${formatGbp(prefill.minStake)}`);
-  if (prefill.maxStake != null) parts.push(`Max stake ${formatGbp(prefill.maxStake)}`);
-  const notes = prefill.importantNotes?.trim();
-  if (notes) {
-    parts.push(notes.length > 160 ? `${notes.slice(0, 157)}…` : notes);
-  }
-  if (parts.length === 0) return null;
-  return (
-    <WarningNotice
-      title={prefill.purpose === "convert" ? "Reward requirements" : "Offer requirements"}
-    >
-      <p>{parts.join(" · ")}</p>
-    </WarningNotice>
-  );
-}
 
 function selectionsFromEdit(edit: BetBuilderRunEdit): SelDraft[] {
   const sport = edit.run.sport?.trim() || "football";
@@ -249,6 +238,22 @@ export function BetBuilderCreateRunForm({
   }
 
   const validSelections = selections.filter((s) => s.label.trim());
+  const offerRequirements = (() => {
+    if (prefill) return placementRequirementsFromPrefill(prefill);
+    const offerId = edit?.run.offerId;
+    if (offerId == null) return null;
+    const offer = state?.offers?.find((o) => o.id === offerId);
+    if (!offer) return null;
+    return placementRequirementsFromImportant(readImportantTerms(offer), {
+      purpose: backBetType === "free_snr" || backBetType === "free_sr" ? "convert" : "qualify",
+      includeSelections: true,
+    });
+  })();
+  const requirementBreaches = evaluatePlacementBreaches(offerRequirements, {
+    odds: backOdds,
+    stake,
+    selectionCount: validSelections.length,
+  });
   const canSave =
     label.trim().length > 0 &&
     stake > 0 &&
@@ -394,7 +399,10 @@ export function BetBuilderCreateRunForm({
       </DialogHeader>
       <DeskRunDialogBody>
 
-      {prefill && !isEdit ? <RequirementsStrip prefill={prefill} /> : null}
+      <OfferRequirementsNotice
+        requirements={offerRequirements}
+        breaches={requirementBreaches}
+      />
 
       {!isEdit ? (
         <BetImportDialog onApply={(fields) => applyOcr(fields)} />
@@ -500,6 +508,13 @@ export function BetBuilderCreateRunForm({
             min={0.01}
             placeholder="10.00"
             disabled={moneyLocked}
+            invalid={requirementBreaches.stakeLow || requirementBreaches.stakeHigh}
+            describedBy="bb-offer-req"
+            inputClassName={
+              requirementBreaches.stakeLow || requirementBreaches.stakeHigh
+                ? placementFieldWarningClass
+                : undefined
+            }
           />
           <PanelInput
             label="BB odds"
@@ -509,8 +524,20 @@ export function BetBuilderCreateRunForm({
             step={0.01}
             placeholder="Bookie price"
             disabled={moneyLocked}
+            invalid={requirementBreaches.oddsLow}
+            describedBy="bb-offer-req"
+            inputClassName={
+              requirementBreaches.oddsLow ? placementFieldWarningClass : undefined
+            }
           />
         </div>
+        <OfferRequirementHint
+          id="bb-offer-req"
+          messages={placementBreachMessages(offerRequirements, {
+            ...requirementBreaches,
+            selectionsLow: false,
+          })}
+        />
       </BackPanel>
 
       {method === "combined" ? (
@@ -580,6 +607,16 @@ export function BetBuilderCreateRunForm({
 
       <div className={cn(panelSurface, deskRunLegsPanelClass)}>
         <p className="text-xs font-semibold text-foreground">Selections</p>
+        {requirementBreaches.selectionsLow ? (
+          <OfferRequirementHint
+            messages={placementBreachMessages(offerRequirements, {
+              ...requirementBreaches,
+              oddsLow: false,
+              stakeLow: false,
+              stakeHigh: false,
+            })}
+          />
+        ) : null}
         {selections.map((sel, i) => (
           <div
             key={sel.id ?? `new-${i}`}

@@ -21,7 +21,9 @@ const PROVIDERS = new Set<ExchangeProvider>([
 ]);
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
-  const clerkUserId = getDeskActor().clerkUserId;
+  // Aliased Neon id, not the raw Clerk id: localhost (Clerk test keys) must
+  // read the same desk as live (Clerk prod keys issue a different user id).
+  const clerkUserId = getDeskActor().neonClerkUserId || getDeskActor().clerkUserId;
   const date =
     req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
   const raw = req.nextUrl.searchParams.get("exchange");

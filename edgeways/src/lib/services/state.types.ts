@@ -12,6 +12,32 @@ export type RacingResultsTier = "basic" | "free" | "none";
 
 export type LivePositionKind = "bet" | "acca" | "bet_builder" | "systems";
 
+export type AccaDeskStateRun = {
+  id: number;
+  label: string;
+  status: "active" | "completed" | "abandoned";
+  settledAt: number | null;
+  method: "sequential" | "insurance_legs" | "insurance_whole" | "combined";
+  bookmaker: string | null;
+  offerId: number | null;
+  stake: number;
+  commission: number;
+  boostPct: number | null;
+  backBetType: string | null;
+  refundAmount: number | null;
+  noLay: number;
+  wholeLayStake: number | null;
+  wholeLayOdds: number | null;
+  legs: Array<{
+    seq: number;
+    label: string;
+    result: "pending" | "won" | "lost" | "void";
+    backOdds: number;
+    layStake: number | null;
+    layOdds: number | null;
+  }>;
+};
+
 export interface LivePosition {
   betId: number;
   /** Event this position is attached to — used to sum "if ended now" on Home Events. */
@@ -65,6 +91,11 @@ export interface AppState {
   retention: RetentionState;
   /** J1: per-action-kind median execution minutes from logged samples */
   effortMeasured: Record<string, { minutes: number; sampleSize: number }>;
+  /**
+   * Acca Desk runs (active + completed). AlertWatcher toasts campaign P&L
+   * when a run flips to completed.
+   */
+  accaDesk?: AccaDeskStateRun[];
   /** J7: lay-due acca legs for the Daily Plan and desk badges */
   accaLayDue: Array<{
     legId: number;

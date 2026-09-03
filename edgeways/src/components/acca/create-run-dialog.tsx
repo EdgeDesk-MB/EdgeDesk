@@ -46,9 +46,18 @@ import {
 } from "@/lib/acca/acca-run-prefill";
 import { AccaMethodHelpDialog } from "@/components/acca/method-help-dialog";
 import { ExchangeFundingNotice } from "@/components/acca/exchange-funding-notice";
-import { WarningNotice } from "@/components/ui/warning-notice";
+import {
+  OfferRequirementHint,
+  OfferRequirementsNotice,
+} from "@/components/offers/offer-requirements-notice";
 import { accaExchangeFundingModel } from "@/lib/acca/exchange-funding-model";
-import { formatGbp } from "@/lib/format-money";
+import {
+  evaluatePlacementBreaches,
+  placementBreachMessages,
+  placementRequirementsFromImportant,
+  placementRequirementsFromPrefill,
+} from "@/lib/offers/offer-placement-requirements";
+import { readImportantTerms, toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import { ACCA_METHOD_HELP } from "@/content/help/acca-methods";
 import { accaRunMoneyLocked } from "@/lib/acca/acca-run-edit";
 import { contrastText } from "@/lib/brands/exchanges";
@@ -58,14 +67,13 @@ import {
 } from "@/lib/desk/desk-back-bet-type";
 import type { KnownFixtureOption } from "@/lib/add-bet-event-options";
 import { MARKETS } from "@/lib/markets";
-import { toDatetimeLocalValue } from "@/lib/offers/offer-terms";
 import type { AccaLegRow, AccaRunRow, ExchangeRow } from "@/lib/db/schema";
 import {
   deskRunDialogContentClass,
   deskRunLegsPanelClass,
   deskRunPanelClass,
 } from "@/lib/ui/desk-run-dialog";
-import { panelSurface } from "@/lib/ui/surface-styles";
+import { panelSurface, placementFieldWarningClass } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 type LegDraft = {
@@ -104,27 +112,6 @@ function emptyLegs(count: number, sport = "football"): LegDraft[] {
   }));
 }
 
-function RequirementsStrip({ prefill }: { prefill: AccaRunPrefill }) {
-  const parts: string[] = [];
-  if (prefill.purpose === "convert") parts.push("Free-bet convert");
-  if (prefill.minSelections != null) parts.push(`Min ${prefill.minSelections} selections`);
-  if (prefill.minOdds != null) parts.push(`Min odds ${prefill.minOdds}`);
-  if (prefill.minStake != null) parts.push(`Min stake ${formatGbp(prefill.minStake)}`);
-  if (prefill.maxStake != null) parts.push(`Max stake ${formatGbp(prefill.maxStake)}`);
-  const notes = prefill.importantNotes?.trim();
-  if (notes) {
-    const short = notes.length > 160 ? `${notes.slice(0, 157)}…` : notes;
-    parts.push(short);
-  }
-  if (parts.length === 0) return null;
-  return (
-    <WarningNotice
-      title={prefill.purpose === "convert" ? "Reward requirements" : "Offer requirements"}
-    >
-      <p>{parts.join(" · ")}</p>
-    </WarningNotice>
-  );
-}
 
 function legsFromEdit(edit: AccaRunEdit): LegDraft[] {
   return edit.legs.map((l) => {
@@ -230,6 +217,22 @@ export function CreateRunForm({
   const validLegs = legs.filter((l) => l.label.trim() && l.backOdds > 1);
   const rawCombinedOdds = validLegs.reduce((a, l) => a * l.backOdds, 1);
   const combinedOdds = applyAccaBoost(rawCombinedOdds, boosted && boostPct > 0 ? boostPct : null);
+  const offerRequirements = (() => {
+    if (prefill) return placementRequirementsFromPrefill(prefill);
+    const offerId = edit?.run.offerId;
+    if (offerId == null) return null;
+    const offer = state?.offers?.find((o) => o.id === offerId);
+    if (!offer) return null;
+    return placementRequirementsFromImportant(readImportantTerms(offer), {
+      purpose: backBetType === "free_snr" || backBetType === "free_sr" ? "convert" : "qualify",
+      includeSelections: true,
+    });
+  })();
+  const requirementBreaches = evaluatePlacementBreaches(offerRequirements, {
+    odds: validLegs.length >= 2 ? combinedOdds : null,
+    stake,
+    selectionCount: validLegs.length,
+  });
   const canSave = label.trim().length > 0 && stake > 0 && validLegs.length >= 2;
   const funding = accaExchangeFundingModel({
     method,
@@ -390,7 +393,10 @@ export function CreateRunForm({
       </DialogHeader>
       <DeskRunDialogBody>
 
-      {prefill && !isEdit ? <RequirementsStrip prefill={prefill} /> : null}
+      <OfferRequirementsNotice
+        requirements={offerRequirements}
+        breaches={requirementBreaches}
+      />
 
       {!isEdit ? (
         <BetImportDialog onApply={(fields) => applyOcr(fields)} />
@@ -459,6 +465,21 @@ export function CreateRunForm({
           min={0.01}
           placeholder="10.00"
           disabled={moneyLocked}
+          invalid={requirementBreaches.stakeLow || requirementBreaches.stakeHigh}
+          describedBy="acca-offer-req"
+          inputClassName={
+            requirementBreaches.stakeLow || requirementBreaches.stakeHigh
+              ? placementFieldWarningClass
+              : undefined
+          }
+        />
+        <OfferRequirementHint
+          id="acca-offer-req"
+          messages={placementBreachMessages(
+            offerRequirements,
+            { ...requirementBreaches, selectionsLow: false },
+            { oddsScope: "combined" }
+          )}
         />
         {method === "insurance_legs" || method === "insurance_whole" ? (
           <PanelInput
@@ -545,6 +566,16 @@ export function CreateRunForm({
 
       <div className={cn(panelSurface, deskRunLegsPanelClass)}>
         <Label className="text-xs text-muted-foreground">Legs (in play order)</Label>
+        {requirementBreaches.selectionsLow ? (
+          <OfferRequirementHint
+            messages={placementBreachMessages(offerRequirements, {
+              ...requirementBreaches,
+              oddsLow: false,
+              stakeLow: false,
+              stakeHigh: false,
+            })}
+          />
+        ) : null}
         {legs.map((leg, i) => (
           <div
             key={leg.id ?? `new-${i}`}
@@ -668,7 +699,15 @@ export function CreateRunForm({
           </Button>
           {validLegs.length >= 2 ? (
             <span className="text-xs tabular-nums text-muted-foreground">
-              Combined {combinedOdds.toFixed(2)} · returns £{(stake * combinedOdds).toFixed(2)}
+              Combined{" "}
+              {requirementBreaches.oddsLow ? (
+                <strong className="font-semibold text-foreground">
+                  {combinedOdds.toFixed(2)}
+                </strong>
+              ) : (
+                combinedOdds.toFixed(2)
+              )}{" "}
+              · returns £{(stake * combinedOdds).toFixed(2)}
             </span>
           ) : null}
         </div>

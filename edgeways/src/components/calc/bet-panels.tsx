@@ -159,6 +159,8 @@ export function PanelInput({
   inputClassName,
   exchangeOddsStepping,
   disabled,
+  invalid,
+  describedBy,
 }: {
   label: string;
   value: number;
@@ -172,6 +174,8 @@ export function PanelInput({
   /** Exchange lay-odds ladder for arrows / spinner. Typed prices stay. */
   exchangeOddsStepping?: boolean;
   disabled?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const exchangeStep =
     !disabled && exchangeOddsStepping
@@ -196,6 +200,8 @@ export function PanelInput({
           min={min}
           placeholder={placeholder}
           disabled={disabled}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           value={Number.isFinite(value) ? value : ""}
           onChange={(e) =>
             exchangeOddsStepping

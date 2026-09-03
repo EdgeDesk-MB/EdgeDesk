@@ -241,6 +241,12 @@ export function RacingPlacingsDialog({
     return () => window.removeEventListener("paste", onPaste);
   }, [open, runOcr, applyParsed]);
 
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current) hydrate();
+    wasOpen.current = open;
+  }, [open, event.id]);
+
   const firstHorse = rows[0]?.horse.trim() ?? "";
   const horseOptions = [...new Set([...selectionHints, ...cardRunners])];
   const runnersListId = `runners-${event.id}`;

@@ -773,6 +773,22 @@ export const racingOddsSnapshots = pgTable("racing_odds_snapshots", {
 });
 
 /**
+ * Durable racecards payload per UK calendar date. The hosted desk reads this
+ * first so a cold serverless instance never blocks on the upstream racing
+ * feed (per-instance in-memory caches cannot share a fetch). Global feed
+ * data, so no clerk scoping - same posture as feed_sync_state.
+ */
+export const racecardCache = pgTable("racecard_cache", {
+  /** UK calendar date, YYYY-MM-DD. */
+  date: text("date").primaryKey(),
+  /** Which provider tier produced the payload: free | standard. */
+  oddsTier: text("odds_tier").notNull(),
+  /** JSON array of RacingRacecard. */
+  payload: text("payload").notNull(),
+  fetchedAt: epochMs("fetched_at").notNull(),
+});
+
+/**
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */

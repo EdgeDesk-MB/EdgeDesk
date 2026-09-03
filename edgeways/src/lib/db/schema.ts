@@ -617,6 +617,22 @@ export const racingOddsSnapshots = sqliteTable("racing_odds_snapshots", {
 });
 
 /**
+ * Durable racecards payload per UK calendar date. The desk reads this first
+ * so a cold server never blocks on the upstream racing feed; the cron warmer
+ * and write-through on live fetches keep it fresh. Global feed data, not
+ * desk-scoped.
+ */
+export const racecardCache = sqliteTable("racecard_cache", {
+  /** UK calendar date, YYYY-MM-DD. */
+  date: text("date").primaryKey(),
+  /** Which provider tier produced the payload: free | standard. */
+  oddsTier: text("odds_tier").notNull(),
+  /** JSON array of RacingRacecard. */
+  payload: text("payload").notNull(),
+  fetchedAt: integer("fetched_at").notNull(),
+});
+
+/**
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */

@@ -183,6 +183,20 @@
       "when": 1788019800000,
       "tag": "0025_desk_offer_ev_snapshots_clerk",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788023400000,
+      "tag": "0026_desk_offer_series_clerk",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788456000000,
+      "tag": "0027_racecard_cache",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ export type EdgeAlertKind =
   | "free_bet_expiring"
   | "race_off_soon"
   | "result_settled"
+  | "acca_complete"
   | "naked_exposure"
   | "two_up_lock"
   | "user_reminder";

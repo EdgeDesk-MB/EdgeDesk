@@ -68,4 +68,15 @@ describe("noteUserOriginatedSettles", () => {
     expect(isUserOriginatedAlertKey("result_settled:10")).toBe(true);
     expect(isUserOriginatedAlertKey("result_settled:11")).toBe(true);
   });
+
+  it("marks Acca campaign complete when the last leg is set from the desk", () => {
+    stubSessionStorage();
+    noteUserOriginatedSettlesFromResponse(
+      "/api/acca/legs/4",
+      { result: "won" },
+      { leg: { layBetId: 22 }, runCompleted: true, runId: 7 }
+    );
+    expect(isUserOriginatedAlertKey("result_settled:22")).toBe(true);
+    expect(isUserOriginatedAlertKey("acca_complete:7")).toBe(true);
+  });
 });

@@ -85,11 +85,10 @@ import {
   demoRacecards,
   getCachedRacingResultsTier,
   hasRacingApiKey,
-  racecardsByDate,
-  racecardsFree,
   resultsToday,
   type RacingRacecard,
 } from "@/lib/services/theracingapi";
+import { getRacecardsForDate } from "@/lib/services/racecard-store";
 import {
   getDefaultExchangeName,
   getDefaultExchangeProvider,
@@ -100,7 +99,8 @@ import {
   type ExchangeProvider,
 } from "@/lib/services/exchange";
 import { syncCourseOfferExpiryFromRaces } from "@/lib/offers/course-offer-sync";
-import { racingPnlByRace, racingPnlToday } from "@/lib/racing/pnl-today";
+import { racingDeskPnlCampaigns } from "@/lib/racing/pnl-campaigns";
+import { racingPnlByRace } from "@/lib/racing/pnl-today";
 
 /** Merge API / tracked race result onto desk runners (position, SP, distances). */
 export function applyRaceResultToDeskRunners(
@@ -164,24 +164,11 @@ async function loadRacecards(
     return { cards: demoRacecards(date), oddsTier: "demo", results: new Map() };
   }
 
-  let cards: RacingRacecard[];
-  let oddsTier: "free" | "standard" = "free";
+  // Store-first: the persisted payload serves instantly (refreshing in the
+  // background when stale), so the desk never blocks on the upstream feed and
+  // an upstream 429 cannot blank a day that has already been fetched.
   const resultsPromise = resultsToday();
-  try {
-    const loaded = await racecardsByDate(date);
-    cards = loaded.cards;
-    oddsTier = loaded.oddsTier;
-  } catch {
-    cards = [];
-  }
-
-  if (cards.length === 0) {
-    const today = new Date().toISOString().slice(0, 10);
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    if (date === today) cards = await racecardsFree("today");
-    else if (date === tomorrow) cards = await racecardsFree("tomorrow");
-    oddsTier = "free";
-  }
+  const { cards, oddsTier } = await getRacecardsForDate(date);
 
   const { results } = await resultsPromise;
   return {
@@ -631,8 +618,14 @@ export async function getRacingDesk(
     clerkUserId?: string | null;
   }
 ): Promise<RacingDeskPayload> {
+  // Prefer the aliased Neon id: Clerk dev/prod issue different user ids for
+  // the same email, and the raw signed-in id would open an empty desk.
+  const actor = getDeskActor();
   const clerkUserId =
-    options?.clerkUserId?.trim() || getDeskActor().clerkUserId?.trim() || null;
+    options?.clerkUserId?.trim() ||
+    actor.neonClerkUserId?.trim() ||
+    actor.clerkUserId?.trim() ||
+    null;
   // SQLite-only: series spawn and title repair write the Mac file. Hosted
   // Neon already stores instances; those helpers would mutate empty memory.
   const hosted = isNeonDesk();
@@ -1004,6 +997,18 @@ export async function getRacingDesk(
   );
   const suggestedRaces = buildSuggestedRaces(races, edgePlays);
 
+  const racingPnlDay = racingPnlByRace(
+    allBets,
+    feedEvents,
+    date,
+    racingDeskPnlCampaigns({
+      betsById,
+      acca: accaBundles,
+      betBuilder: betBuilderBundles,
+      systems: systemBundles,
+    })
+  );
+
   const trackedCount = races.filter((r) => r.trackedEventId).length;
   const effectiveOddsTier: RacingDeskSummary["oddsTier"] =
     isDemo ? "demo" : useProxyOdds ? "proxy" : apiOddsTier;
@@ -1034,7 +1039,7 @@ export async function getRacingDesk(
     upcomingCount: races.filter((r) => r.status === "upcoming").length,
     trackedCount,
     openPositions: 0,
-    racingPnlToday: racingPnlToday(allBets, feedEvents, date),
+    racingPnlToday: racingPnlDay.total,
     source: error ? "error" : source === "demo" ? "demo" : "racing-api",
     oddsSnapshotsEnabled: true,
     premiumOddsApi: hasRacingApiKey(),
@@ -1144,14 +1149,15 @@ export async function getRacingDesk(
   );
   summary.openPositions = activeBets.length;
 
-  const racingPnlDay = racingPnlByRace(allBets, feedEvents, date);
   for (const row of racingPnlDay.rows) {
     const race = row.raceExternalId
       ? raceByExternal.get(row.raceExternalId)
       : races.find((r) => r.trackedEventId === row.eventId);
     if (!race) continue;
-    if (race.course) row.course = race.course;
-    if (race.raceName) row.raceName = race.raceName;
+    if (row.kind !== "campaign") {
+      if (race.course) row.course = race.course;
+      if (race.raceName) row.raceName = race.raceName;
+    }
     if (race.offTime) row.offTime = race.offTime;
     if (race.region) row.region = race.region;
     if (!row.raceExternalId) row.raceExternalId = race.externalId;

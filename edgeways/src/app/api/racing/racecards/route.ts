@@ -3,34 +3,13 @@ import { localCalendarDate } from "@/lib/events";
 import {
   demoRacecards,
   hasRacingApiKey,
-  isRacingTierAccessError,
-  racecardsByDate,
-  racecardsFree,
   resultsToday,
-  type RacingRacecard,
 } from "@/lib/services/theracingapi";
+import { getRacecardsForDate } from "@/lib/services/racecard-store";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
-
-async function loadRacecardsForDate(date: string): Promise<{
-  racecards: RacingRacecard[];
-  oddsTier: "free" | "standard";
-}> {
-  try {
-    const { cards, oddsTier } = await racecardsByDate(date);
-    if (cards.length > 0) return { racecards: cards, oddsTier };
-  } catch (error) {
-    if (!isRacingTierAccessError(error)) throw error;
-  }
-
-  const today = localCalendarDate();
-  const tomorrow = localCalendarDate(new Date(Date.now() + 86400000));
-  if (date === today) return { racecards: await racecardsFree("today"), oddsTier: "free" };
-  if (date === tomorrow) return { racecards: await racecardsFree("tomorrow"), oddsTier: "free" };
-  return { racecards: [], oddsTier: "free" };
-}
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
   const date =
@@ -47,7 +26,10 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   }
 
   try {
-    const { racecards, oddsTier } = await loadRacecardsForDate(date);
+    // Store-first: a persisted payload serves instantly and refreshes in the
+    // background when stale, so an upstream 429 never blanks the desk once
+    // the day has been fetched.
+    const { cards: racecards, oddsTier } = await getRacecardsForDate(date);
 
     const { results } = await resultsToday();
     const enriched = racecards.map((card) => {

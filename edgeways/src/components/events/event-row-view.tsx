@@ -64,6 +64,8 @@ export function EventRowView({
   liveModel,
   onPatch,
   onDelete,
+  resultDialogOpen,
+  onResultDialogOpenChange,
 }: {
   event: EventRow;
   linkedBets: BetRow[];
@@ -72,6 +74,8 @@ export function EventRowView({
   liveModel?: { marketsLabel: string } | null;
   onPatch: (id: number, json: Record<string, unknown>) => void;
   onDelete: (id: number) => void;
+  resultDialogOpen?: boolean;
+  onResultDialogOpenChange?: (open: boolean) => void;
 }) {
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
@@ -94,7 +98,10 @@ export function EventRowView({
     }
   }
   return (
-    <TableRow>
+    <TableRow
+      id={`tracked-event-${event.id}`}
+      data-state={resultDialogOpen ? "selected" : undefined}
+    >
       <TableCell>
         <SportEventBlock
           sport={event.sport}
@@ -240,6 +247,8 @@ export function EventRowView({
               event={event}
               linkedBets={linkedBets}
               incomplete={!!raceResult && isRaceResultIncomplete(raceResult)}
+              open={resultDialogOpen}
+              onOpenChange={onResultDialogOpenChange}
               onRecord={(payload) =>
                 onPatch(event.id, {
                   raceWinner: payload.winner,

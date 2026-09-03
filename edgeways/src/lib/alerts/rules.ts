@@ -7,7 +7,8 @@
  * soon as an offer is created on the same calendar day.
  */
 
-import { isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
+import { accaCampaignCompleteAlert, type AccaCompleteAlertRun } from "./acca-complete";
+import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { nakedExposureAlertKey } from "@/lib/bets/naked-exposure";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import type { DoNextItem } from "@/lib/offers/do-next";
@@ -76,6 +77,8 @@ export interface SettledBetNotice {
    * Omitted when the event/selection result is unknown.
    */
   resultSummary?: string | null;
+  /** Acca desk backs store "Acca desk" in notes. */
+  notes?: string | null;
 }
 
 export interface NakedExposureNotice {
@@ -159,8 +162,35 @@ export interface AlertRuleInput {
     }
   >;
   settledSinceLastPoll: SettledBetNotice[];
+  /** Acca runs that completed since the previous poll. */
+  accaCompletedSinceLastPoll?: AccaCompleteAlertRun[];
   nakedExposed: NakedExposureNotice[];
   twoUpTriggered: TwoUpLockNotice[];
+}
+
+export function isAccaDeskSettlement(settled: SettledBetNotice): boolean {
+  if (
+    isAccaDeskLay({
+      label: settled.label,
+      betType: settled.betType ?? "",
+    })
+  ) {
+    return true;
+  }
+  if (
+    isAccaDeskBack({
+      label: settled.label,
+      notes: settled.notes ?? null,
+      betType: settled.betType ?? "",
+    })
+  ) {
+    return true;
+  }
+  return (
+    settled.label.startsWith("Acca ·") ||
+    settled.label.startsWith("Acca FB ·") ||
+    settled.label.startsWith("Acca lay")
+  );
 }
 
 /** Title/body for a free-bet conversion deadline (same 2-hour lead as promo expiry). */
@@ -305,6 +335,7 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
     offers,
     races,
     settledSinceLastPoll,
+    accaCompletedSinceLastPoll,
     nakedExposed,
     twoUpTriggered,
   } = input;
@@ -454,18 +485,13 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
 
   if (prefs.resultSettled) {
     for (const settled of settledSinceLastPoll) {
-      // Acca desk lay losses are liabilities paid mid-campaign. The desk
-      // pushes `acca_next_lay` with the cover stake instead of a ledger line.
-      if (
-        isAccaDeskLay({
-          label: settled.label,
-          betType: settled.betType ?? "",
-        }) &&
-        settled.profit < 0
-      ) {
-        continue;
-      }
+      // Acca desk bets are mid-campaign ledger lines. The run toast
+      // (`acca_complete`) summarises campaign P&L when the last leg lands.
+      if (isAccaDeskSettlement(settled)) continue;
       alerts.push(settledResultAlert(settled));
+    }
+    for (const acca of accaCompletedSinceLastPoll ?? []) {
+      alerts.push(accaCampaignCompleteAlert(acca));
     }
   }
 

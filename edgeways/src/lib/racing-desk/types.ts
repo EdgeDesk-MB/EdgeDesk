@@ -297,6 +297,12 @@ export interface RacingDeskPnlDay {
   openCount: number;
   settledCount: number;
   rows: Array<{
+    rowId?: string;
+    kind?: "race" | "campaign";
+    campaignKind?: "acca" | "bet_builder" | "systems";
+    campaignId?: number;
+    /** Distinct horse-racing events on a multi-race ticket */
+    spanCount?: number;
     eventId: number;
     raceExternalId: string | null;
     startTime: number;

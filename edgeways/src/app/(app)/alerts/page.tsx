@@ -39,6 +39,9 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   free_bet_expiring: Gift,
   race_off_soon: Timer,
   result_settled: CircleCheck,
+  acca_complete: CircleCheck,
+  acca_refund: Gift,
+  acca_next_lay: AlarmClock,
   naked_exposure: ShieldAlert,
   two_up_lock: Flag,
   user_reminder: Bell,
@@ -133,8 +136,9 @@ export default function AlertsPage() {
         ) : (
           alerts.map((alert) => {
             const voided =
-              alert.kind === "result_settled" &&
-              (alert.title.startsWith("Void ·") || alert.title.startsWith("Push ·"));
+              (alert.kind === "result_settled" &&
+                (alert.title.startsWith("Void ·") || alert.title.startsWith("Push ·"))) ||
+              (alert.kind === "acca_complete" && alert.title.startsWith("Acca void"));
             const Icon = voided ? Ban : (KIND_ICONS[alert.kind] ?? BellRing);
             const isUnread = alert.readAt == null;
             return (

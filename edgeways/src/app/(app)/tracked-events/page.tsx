@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,9 @@ export default function TrackedEventsPage() {
   const [syncingRacing, setSyncingRacing] = useState(false);
   const [dayFilter, setDayFilter] = useState<EventListDayFilter>("all");
   const [jumpDay, setJumpDay] = useState("");
+  const [settleEventId, setSettleEventId] = useState<number | null>(null);
+  /** Scroll-request flag: a ref, so the scroll effect sets no state. */
+  const scrollSettleRef = useRef(false);
 
   const myEvents = useMemo(() => state?.events ?? [], [state?.events]);
   const linkedBets = useMemo(() => state?.bets ?? [], [state?.bets]);
@@ -172,6 +175,20 @@ export default function TrackedEventsPage() {
     setDayFilter(next);
   }
 
+  function openSettleFromPrompt(eventId: number) {
+    selectDayFilter("all");
+    setSettleEventId(eventId);
+    scrollSettleRef.current = true;
+  }
+
+  useEffect(() => {
+    if (!scrollSettleRef.current || settleEventId == null) return;
+    const el = document.getElementById(`tracked-event-${settleEventId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrollSettleRef.current = false;
+  }, [settleEventId, grouped]);
+
   const filteredEmpty = myEvents.length > 0 && grouped.length === 0;
 
   if (state == null) {
@@ -260,6 +277,8 @@ export default function TrackedEventsPage() {
         <RacingSettlePrompt
           races={pendingSettleRaces}
           resultsTier={state?.racingResultsTier}
+          placement="tracked-events"
+          onSetResult={openSettleFromPrompt}
         />
       )}
 
@@ -304,6 +323,10 @@ export default function TrackedEventsPage() {
                   linkedBets={linkedBets}
                   promoAwards={promoAwards}
                   liveModelsById={liveModelsById}
+                  settleEventId={settleEventId}
+                  onSettleEventOpenChange={(id, open) => {
+                    setSettleEventId(open ? id : null);
+                  }}
                   onPatch={patchEvent}
                   onDelete={deleteEvent}
                 />
@@ -323,6 +346,8 @@ function TrackedEventsDayTable({
   linkedBets,
   promoAwards,
   liveModelsById,
+  settleEventId,
+  onSettleEventOpenChange,
   onPatch,
   onDelete,
 }: {
@@ -331,6 +356,8 @@ function TrackedEventsDayTable({
   linkedBets: BetRow[];
   promoAwards: PromoAwardsByBetId;
   liveModelsById: Map<number, { marketsLabel: string }>;
+  settleEventId: number | null;
+  onSettleEventOpenChange: (id: number, open: boolean) => void;
   onPatch: (id: number, json: Record<string, unknown>) => void;
   onDelete: (id: number) => void;
 }) {
@@ -354,6 +381,8 @@ function TrackedEventsDayTable({
                 linkedBets={linkedBets.filter((b) => b.eventId === event.id)}
                 promoAwards={promoAwards}
                 liveModel={liveModelsById.get(event.id) ?? null}
+                resultDialogOpen={settleEventId === event.id}
+                onResultDialogOpenChange={(open) => onSettleEventOpenChange(event.id, open)}
                 onPatch={onPatch}
                 onDelete={onDelete}
               />

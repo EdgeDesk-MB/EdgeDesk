@@ -11,7 +11,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { markUserSettledBetIds } from "@/lib/alerts/user-originated";
+import { accaCompleteAlertKey } from "@/lib/alerts/acca-complete";
+import { markUserOriginatedAlertKeys, markUserSettledBetIds } from "@/lib/alerts/user-originated";
 import { Check, ChevronDown, CircleHelp, Hourglass, Layers, Link2, Radio, Timer, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ import { AccaLegsTimeline } from "@/components/acca/acca-legs-timeline";
 import { AccaMethodHelpDialog } from "@/components/acca/method-help-dialog";
 import { CreateRunDialog, EditAccaRunDialog } from "@/components/acca/create-run-dialog";
 import { ExchangeFundingNotice } from "@/components/acca/exchange-funding-notice";
+import { accaSquareHeadline } from "@/lib/acca/acca-square-headline";
 import { accaExchangeFundingModel } from "@/lib/acca/exchange-funding-model";
 import { MoneyFlow } from "@/components/money-flow";
 import { VenueBadge } from "@/components/venue-badge";
@@ -82,6 +84,7 @@ import {
   filterPillCountState,
   filterPillGroup,
   offerCampaignCardShell,
+  sectionDescription,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { FillSlipButton } from "@/components/fill-slip-button";
@@ -400,6 +403,19 @@ function RunCard({
     },
     ladderLegs
   );
+  const squareHeadline =
+    squareProv != null
+      ? accaSquareHeadline({
+          square: squareProv,
+          method: run.method,
+          legs: ladderLegs.map((l) => ({
+            seq: l.seq,
+            label: l.label,
+            result: l.result,
+          })),
+          allWinEst,
+        })
+      : null;
 
   // Mid-run: tint from square provisional when known; otherwise wait for
   // finished / busted Campaign P&L.
@@ -487,20 +503,46 @@ function RunCard({
               </p>
             ) : null}
           </div>
-          <div className="shrink-0 text-right">
+          <div className="min-w-0 max-w-[11rem] shrink-0 text-right sm:max-w-[13rem]">
             {stillOpen ? (
-              squareProv != null ? (
-                <>
-                  <p className={campaignCardPnlLabel}>
-                    {squareProv.kind === "locked" ? "Locked" : "Worst outcome"}
-                  </p>
-                  <MoneyFlow
-                    value={squareProv.value}
-                    signColor
-                    signDisplay
-                    className={cn(campaignCardPnl, "leading-tight")}
-                  />
-                </>
+              squareHeadline != null ? (
+                squareHeadline.mode === "cover" ? (
+                  <>
+                    <p className={cn(sectionDescription, "font-medium")}>
+                      {squareHeadline.loseLabel}
+                    </p>
+                    <MoneyFlow
+                      value={squareHeadline.value}
+                      signColor
+                      signDisplay
+                      className={cn(campaignCardPnl, "leading-tight")}
+                    />
+                    <p className={cn(campaignCardNextAction, "mt-1")}>
+                      Win: {squareHeadline.nextVerb} {squareHeadline.nextLabel}
+                      {squareHeadline.winEst != null ? (
+                        <>
+                          {", est. "}
+                          <MoneyFlow
+                            value={squareHeadline.winEst}
+                            signColor
+                            signDisplay
+                            className="inline font-medium"
+                          />
+                        </>
+                      ) : null}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className={campaignCardPnlLabel}>{squareHeadline.label}</p>
+                    <MoneyFlow
+                      value={squareHeadline.value}
+                      signColor
+                      signDisplay
+                      className={cn(campaignCardPnl, "leading-tight")}
+                    />
+                  </>
+                )
               ) : (
                 <>
                   <p className={campaignCardPnlLabel}>Campaign P&L</p>
@@ -876,6 +918,10 @@ function LegRow({
   async function setResult(result: "won" | "lost" | "void") {
     // Linked lays mark via api(); also mark the run back bet (not on the leg payload).
     markUserSettledBetIds([run.backBetId, leg.layBetId]);
+    const othersPending = legs.some((l) => l.id !== leg.id && l.result === "pending");
+    const runCompletes =
+      (run.method === "sequential" && result === "lost") || !othersPending;
+    if (runCompletes) markUserOriginatedAlertKeys([accaCompleteAlertKey(run.id)]);
     await api(`/api/acca/legs/${leg.id}`, { method: "PATCH", json: { result } }).catch(() => {});
     onChanged();
   }

@@ -616,7 +616,7 @@ describe("result_settled rule", () => {
     ).toHaveLength(0);
   });
 
-  it("skips Acca desk lay losses (next-lay push owns that moment)", () => {
+  it("skips every Acca desk bet (campaign toast owns the finish)", () => {
     const alerts = evaluateAlertRules({
       ...base,
       settledSinceLastPoll: [
@@ -641,15 +641,65 @@ describe("result_settled rule", () => {
           status: "won",
           betType: "lay_only",
         },
+        {
+          betId: 13,
+          label: "Acca · Bet £10 get £10 free bet",
+          profit: 60,
+          status: "won",
+          betType: "qualifying",
+          notes: "Acca desk",
+        },
       ],
     });
-    expect(alerts.map((a) => a.key)).toEqual([
-      "result_settled:11",
-      "result_settled:12",
-    ]);
-    expect(alerts[1]).toMatchObject({
-      title: "You just made £36.20 · Bet won",
-      body: "Lay · Acca lay · Cambridge United",
+    expect(alerts.map((a) => a.key)).toEqual(["result_settled:11"]);
+  });
+
+  it("announces Acca campaign P&L when the run completes", () => {
+    const alerts = evaluateAlertRules({
+      ...base,
+      accaCompletedSinceLastPoll: [
+        {
+          id: 7,
+          label: "Bet £10 get £10 free bet",
+          method: "sequential",
+          bookmaker: "Betfair Sportsbook",
+          offerTitle: "Bet £10 get £10 free bet",
+          stake: 10,
+          commission: 0,
+          boostPct: null,
+          backBetType: "qualifying",
+          refundAmount: null,
+          noLay: 0,
+          wholeLayStake: null,
+          wholeLayOdds: null,
+          legs: [
+            {
+              seq: 1,
+              label: "Star Start",
+              result: "won",
+              backOdds: 5,
+              layStake: 10,
+              layOdds: 6.4,
+            },
+            {
+              seq: 2,
+              label: "Burning Up",
+              result: "won",
+              backOdds: 1.4,
+              layStake: null,
+              layOdds: null,
+            },
+          ],
+        },
+      ],
+    });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      key: "acca_complete:7",
+      kind: "acca_complete",
+      title: "You just made £6.00 · Acca won",
+      href: "/acca",
+      tone: "positive",
     });
   });
 });

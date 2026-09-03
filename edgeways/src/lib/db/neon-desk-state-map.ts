@@ -27,7 +27,7 @@ import {
   wholeComboLay,
 } from "@/lib/calc/bet-builder-workflow";
 import { indexOfferDeskProgress } from "@/lib/offers/offer-desk-progress";
-import { legDueState, type AccaRunView } from "@/lib/services/acca-desk";
+import { legDueState, toAccaDeskStateRun, type AccaRunView } from "@/lib/services/acca-desk";
 import type {
   BetBuilderRunRow,
   BetBuilderSelectionRow,
@@ -233,6 +233,7 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     retention: { rate: DEFAULT_SETTINGS.tuning.retentionPrior, sampleSize: 0 },
     effortMeasured: input.effortMeasured ?? {},
     mugPlans: input.mugPlans ?? [],
+    accaDesk: (input.deskRuns?.acca ?? []).map(toAccaDeskStateRun),
     accaLayDue,
     betBuilderLayDue,
     alertsUnread: input.alertsUnread ?? 0,

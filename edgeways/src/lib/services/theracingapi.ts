@@ -57,6 +57,25 @@ interface CacheEntry<T> {
 }
 
 const cache = new Map<string, CacheEntry<unknown>>();
+
+/**
+ * Single-flight for upstream calls. Concurrent cache misses on the same key
+ * (two desk tabs, a desk load plus a fixtures refresh) share one provider
+ * request instead of stampeding the per-second rate limit, which was the
+ * main source of upstream 429s.
+ */
+const inflight = new Map<string, Promise<unknown>>();
+
+function singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = inflight.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+  const promise = fn().finally(() => {
+    inflight.delete(key);
+  });
+  inflight.set(key, promise);
+  return promise;
+}
+
 const RACECARDS_TTL = 15 * 60 * 1000;
 // Idle browsing / desk refresh: longer TTL protects the rate limit while the
 // app is open. Open-bet sync uses RESULTS_TTL_ACTIVE so fast results are not
@@ -375,11 +394,13 @@ export async function racecardsFree(day: "today" | "tomorrow" = "today"): Promis
   const hit = cache.get(cacheKey) as CacheEntry<RacingRacecard[]> | undefined;
   if (hit && Date.now() - hit.at < RACECARDS_TTL) return hit.data;
 
-  const json = await apiGet(`/v1/racecards/free?day=${day}&region_codes=gb&region_codes=ire`);
-  const now = Date.now();
-  const cards: RacingRacecard[] = (json.racecards ?? []).map((r: any) => mapRacecard(r, now));
-  cache.set(cacheKey, { at: Date.now(), data: cards });
-  return cards;
+  return singleFlight(cacheKey, async () => {
+    const json = await apiGet(`/v1/racecards/free?day=${day}&region_codes=gb&region_codes=ire`);
+    const now = Date.now();
+    const cards: RacingRacecard[] = (json.racecards ?? []).map((r: any) => mapRacecard(r, now));
+    cache.set(cacheKey, { at: Date.now(), data: cards });
+    return cards;
+  });
 }
 
 /** Standard tier - today/tomorrow racecards with bookmaker odds. Falls back to free on 401/403. */
@@ -391,13 +412,15 @@ export async function racecardsStandard(
   if (hit && Date.now() - hit.at < RACECARDS_TTL) return hit.data;
 
   try {
-    const json = await apiGet(
-      `/v1/racecards/standard?day=${day}&region_codes=gb&region_codes=ire`
-    );
-    const now = Date.now();
-    const cards: RacingRacecard[] = (json.racecards ?? []).map((r: any) => mapRacecard(r, now));
-    cache.set(cacheKey, { at: Date.now(), data: cards });
-    return cards;
+    return await singleFlight(cacheKey, async () => {
+      const json = await apiGet(
+        `/v1/racecards/standard?day=${day}&region_codes=gb&region_codes=ire`
+      );
+      const now = Date.now();
+      const cards: RacingRacecard[] = (json.racecards ?? []).map((r: any) => mapRacecard(r, now));
+      cache.set(cacheKey, { at: Date.now(), data: cards });
+      return cards;
+    });
   } catch (e) {
     if (isRacingTierAccessError(e)) return null;
     throw e;
@@ -493,7 +516,9 @@ export async function resultsToday(
   }
 
   try {
-    const map = await fetchPagedResults("/v1/results/today?region=gb&region=ire");
+    const map = await singleFlight(cacheKey, () =>
+      fetchPagedResults("/v1/results/today?region=gb&region=ire")
+    );
     const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
     cache.set(cacheKey, { at: Date.now(), data });
     rememberResultsTier("basic");
@@ -540,8 +565,10 @@ export async function resultsForDate(
   }
 
   try {
-    const map = await fetchPagedResults(
-      `/v1/results?start_date=${encodeURIComponent(date)}&end_date=${encodeURIComponent(date)}&region=gb&region=ire`
+    const map = await singleFlight(cacheKey, () =>
+      fetchPagedResults(
+        `/v1/results?start_date=${encodeURIComponent(date)}&end_date=${encodeURIComponent(date)}&region=gb&region=ire`
+      )
     );
     const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
     cache.set(cacheKey, { at: Date.now(), data });

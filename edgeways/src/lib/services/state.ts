@@ -129,6 +129,7 @@ import {
   listAccaRuns,
   maybeAccaLayDueAlerts,
   pendingAccaRacingEventIds,
+  toAccaDeskStateRun,
 } from "@/lib/services/acca-desk";
 import {
   autoResultBetBuilderSelections,
@@ -1173,6 +1174,7 @@ export async function getAppState(): Promise<AppState> {
     retention: { rate: retentionData.rate, sampleSize: retentionData.sampleSize },
     effortMeasured,
     mugPlans: mugPlanRows,
+    accaDesk: accaBundles.map(toAccaDeskStateRun),
     accaLayDue,
     betBuilderLayDue: betBuilderLayDue(),
     alertsUnread: unreadCount(),

@@ -247,6 +247,34 @@ describe("theracingapi tier access", () => {
     ).toBe("15:10");
   });
 
+  it("shares one upstream request across concurrent cache misses (single-flight)", async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { racecardsFree } = await import("./theracingapi");
+    const first = racecardsFree("today");
+    const second = racecardsFree("today");
+    const third = racecardsFree("today");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolveFetch({
+      status: 200,
+      ok: true,
+      json: async () => ({ racecards: [] }),
+    });
+
+    await expect(first).resolves.toEqual([]);
+    await expect(second).resolves.toEqual([]);
+    await expect(third).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("marks historicBlocked when dated results need Standard", async () => {
     vi.stubGlobal(
       "fetch",

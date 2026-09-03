@@ -4,7 +4,8 @@
  * poll cannot deliver a sticky toast first.
  */
 
-import { markUserSettledBetIds } from "./user-originated";
+import { accaCompleteAlertKey } from "./acca-complete";
+import { markUserOriginatedAlertKeys, markUserSettledBetIds } from "./user-originated";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value != null;
@@ -59,5 +60,9 @@ export function noteUserOriginatedSettlesFromResponse(
   if (/^\/api\/acca\/legs\/\d+$/.test(p) && isRecord(json) && typeof json.result === "string") {
     const leg = isRecord(data) && isRecord(data.leg) ? data.leg : null;
     if (leg) markUserSettledBetIds([positiveInt(leg.layBetId)]);
+    if (isRecord(data) && data.runCompleted === true) {
+      const runId = positiveInt(data.runId);
+      if (runId != null) markUserOriginatedAlertKeys([accaCompleteAlertKey(runId)]);
+    }
   }
 }

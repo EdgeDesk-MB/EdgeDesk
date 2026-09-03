@@ -365,7 +365,7 @@ export function formatImportantTermsSummary(terms: OfferImportantTerms): string 
   if (terms.rewardMinSelections != null && scopesNeedMinSelections(terms.rewardScopes)) {
     parts.push(`Reward min ${terms.rewardMinSelections}`);
   }
-  if (terms.minOdds != null) parts.push(`Min odds ${formatOdds(terms.minOdds)}`);
+  if (terms.minOdds != null) parts.push(`Min odds ${formatOfferOdds(terms.minOdds)}`);
   if (terms.minStake != null) parts.push(`Min stake £${terms.minStake}`);
   if (terms.maxStake != null) parts.push(`Max stake £${terms.maxStake}`);
   if (terms.rewardEventLabel) parts.push(`FB: ${terms.rewardEventLabel}`);
@@ -376,7 +376,7 @@ export function formatImportantTermsSummary(terms: OfferImportantTerms): string 
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-function formatOdds(n: number): string {
+export function formatOfferOdds(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, "");
 }
 

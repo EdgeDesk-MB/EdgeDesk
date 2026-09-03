@@ -433,6 +433,12 @@ CREATE TABLE IF NOT EXISTS racing_odds_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_racing_odds_race_horse ON racing_odds_snapshots(race_id, horse_id, captured_at);
 CREATE INDEX IF NOT EXISTS idx_racing_odds_race_horse_kind ON racing_odds_snapshots(race_id, horse_id, kind, captured_at);
+CREATE TABLE IF NOT EXISTS racecard_cache (
+  date TEXT PRIMARY KEY,
+  odds_tier TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS racing_odds_overrides (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,

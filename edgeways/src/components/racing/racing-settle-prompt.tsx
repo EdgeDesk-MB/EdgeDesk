@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PendingSettleRace } from "@/lib/racing/pending-settle";
+import {
+  settlePromptCopy,
+  type SettlePromptPlacement,
+} from "@/lib/racing/settle-prompt-copy";
 import { formatClockString } from "@/lib/time-format";
 import { AlertCircle, X } from "lucide-react";
 
@@ -33,11 +37,17 @@ export function RacingSettlePrompt({
   races,
   resultsTier,
   className,
+  placement = "elsewhere",
+  onSetResult,
 }: {
   races: PendingSettleRace[];
   /** basic = auto results available; free = racecards only; none = no key */
   resultsTier?: "basic" | "free" | "none";
   className?: string;
+  /** tracked-events = already on the settle page; skip the self-link. */
+  placement?: SettlePromptPlacement;
+  /** Opens Set result for the primary race when already on Tracked Events. */
+  onSetResult?: (eventId: number) => void;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
 
@@ -70,11 +80,28 @@ export function RacingSettlePrompt({
 
   const primary = visible[0];
   const moreCount = visible.length - 1;
+  const copy = settlePromptCopy({
+    placement,
+    resultsTier,
+    pendingCount: visible.length,
+  });
   const trackedEventsLink = (
     <Link href="/tracked-events" className="font-medium underline underline-offset-2">
       Tracked Events
     </Link>
   );
+  const action =
+    copy.actionKind === "set-result-on-page" ? (
+      <>use Set result (1st–4th) on {copy.racePhrase}.</>
+    ) : (
+      <>set the result on {trackedEventsLink}.</>
+    );
+  const actionCapped =
+    copy.actionKind === "set-result-on-page" ? (
+      <>Use Set result (1st–4th) on {copy.racePhrase}.</>
+    ) : (
+      <>Set the result on {trackedEventsLink}.</>
+    );
 
   return (
     <div
@@ -89,24 +116,36 @@ export function RacingSettlePrompt({
         <p className="font-semibold text-warning">
           {visible.length === 1 ? "Race awaiting result" : `${visible.length} races awaiting results`}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{primary.course}</span>
+        <p className="mt-0.5 text-pretty break-words text-xs text-muted-foreground">
+          <strong className="font-medium text-foreground">{primary.course}</strong>
           {" "}
           ({formatClockString(primary.offTime)}) has started.{" "}
-          {resultsTier === "basic" ? (
-            <>
-              Results sync automatically while the app is open, or set the result on {trackedEventsLink}.
-            </>
+          {copy.lead === "auto-sync" ? (
+            <>Results sync automatically while the app is open, or {action}</>
           ) : (
-            <>Set the result on {trackedEventsLink}.</>
+            actionCapped
           )}
           {moreCount > 0 && <span> +{moreCount} more</span>}
         </p>
       </div>
       <div className="flex shrink-0 gap-1">
-        <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-          <Link href="/tracked-events">Set result</Link>
-        </Button>
+        {copy.actionKind === "set-result-on-page" ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              if (primary.trackedEventId != null) onSetResult?.(primary.trackedEventId);
+            }}
+          >
+            Set result
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+            <Link href="/tracked-events">Set result</Link>
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"

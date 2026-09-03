@@ -59,7 +59,11 @@ import { hasBetWinTrigger, parseBetTriggerRule, ruleNeedsTimeline } from "@/lib/
 import { shouldFetchGoalTimeline } from "@/lib/live-poll-rules";
 import { formatEventTitle, formatRacingEventTitle, localCalendarDate } from "@/lib/events";
 import { parseRaceResults } from "@/lib/racing";
-import { settledResultAlert, type SettledBetNotice } from "@/lib/alerts/rules";
+import {
+  isAccaDeskSettlement,
+  settledResultAlert,
+  type SettledBetNotice,
+} from "@/lib/alerts/rules";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import type { NeonEventFeedPatch } from "@/lib/db/neon-events";
 import type {
@@ -139,6 +143,7 @@ async function defaultNotifySettlement(
   ]);
   const settings = await getNeonDeskSettingsForUser(clerkUserId);
   if (!settings.alertsResultSettled) return;
+  if (isAccaDeskSettlement(notice)) return;
   const alert = settledResultAlert(notice);
   const recorded = await inbox.recordNeonAlertsForUser(clerkUserId, [alert]);
   if (recorded > 0) {
@@ -393,6 +398,7 @@ async function settleOpenBets(
         betType: bet.betType,
         offerTitle: null,
         bookmaker: bet.bookmaker,
+        notes: bet.notes,
       })
       .catch(() => {});
   }
