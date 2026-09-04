@@ -118,6 +118,9 @@ export async function claimReferral(input: {
   const referrer = await findAppUserByReferralCode(code);
   if (!referrer) return { status: "unknown_code" };
   if (referrer.clerkUserId === input.clerkUserId) return { status: "self" };
+  // /subscribe can run before /api/account/sync. Without a row, the UPDATE
+  // in claimAppUserReferral matches nothing and the share link is lost.
+  await ensureAppUser({ clerkUserId: input.clerkUserId });
   const claimed = await claimAppUserReferral({
     clerkUserId: input.clerkUserId,
     referrerClerkUserId: referrer.clerkUserId,

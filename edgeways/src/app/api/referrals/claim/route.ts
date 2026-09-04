@@ -8,8 +8,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * EDGE-67: claim a ?ref=CODE after sign-up. Sets referred_by once; the first
- * claim wins. The Stripe-side discount comes from entering the same code as
- * a promotion code at Checkout.
+ * claim wins. Checkout auto-applies the referral coupon from that row.
  */
 export const POST = withDeskScope(async function POST(request: Request) {
   const { userId } = await auth();

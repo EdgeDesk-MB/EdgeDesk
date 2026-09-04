@@ -5,6 +5,7 @@ import {
   parseCheckoutFrom,
   parsePaidCheckout,
   priorTrialConsumed,
+  referralCheckoutCouponId,
   signUpRedirectForPlan,
   stripeSubscriptionIsLive,
   subscriptionConsumedTrial,
@@ -38,6 +39,8 @@ describe("checkout session", () => {
     expect(edge.automatic_tax).toBeUndefined();
     expect(edge.managed_payments).toEqual({ enabled: false });
     expect(edge.consent_collection).toEqual({ terms_of_service: "required" });
+    expect(edge.allow_promotion_codes).toBe(true);
+    expect(edge.discounts).toBeUndefined();
     expect(edge.line_items).toEqual([{ price: "price_edge", quantity: 1 }]);
     expect(edge.metadata).toEqual({
       clerkUserId: "user_1",
@@ -77,6 +80,49 @@ describe("checkout session", () => {
     });
     expect(session.subscription_data?.metadata).toEqual(session.metadata);
     expect(session.line_items).toEqual([{ price: "price_founding", quantity: 1 }]);
+    expect(session.allow_promotion_codes).toBeUndefined();
+    expect(session.discounts).toBeUndefined();
+  });
+
+  it("auto-applies the referral coupon from a share-link claim", () => {
+    const session = buildSubscriptionCheckoutParams({
+      priceId: "price_edge",
+      plan: "edge",
+      interval: "month",
+      clerkUserId: "user_1",
+      successUrl: "https://edgeways.app/subscribe/success",
+      cancelUrl: "https://edgeways.app/#pricing",
+      referred: true,
+      referralCouponId: "edge_referral_50_once",
+    });
+    expect(session.discounts).toEqual([{ coupon: "edge_referral_50_once" }]);
+    expect(session.allow_promotion_codes).toBeUndefined();
+  });
+
+  it("does not stack the referral coupon on Founding checkout", () => {
+    const session = buildSubscriptionCheckoutParams({
+      priceId: "price_founding",
+      plan: "edge",
+      interval: "month",
+      clerkUserId: "user_1",
+      successUrl: "https://edgeways.app/subscribe/success",
+      cancelUrl: "https://edgeways.app/#pricing",
+      founding: true,
+      referred: true,
+      referralCouponId: "edge_referral_50_once",
+    });
+    expect(session.discounts).toBeUndefined();
+    expect(session.allow_promotion_codes).toBeUndefined();
+    expect(session.metadata?.founding).toBe("true");
+  });
+
+  it("does not auto-apply without a coupon id", () => {
+    expect(
+      referralCheckoutCouponId({
+        referred: true,
+        couponId: "  ",
+      })
+    ).toBeNull();
   });
 
   it("sends paid sign-ups to subscribe, Free to live setup", () => {

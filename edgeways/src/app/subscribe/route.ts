@@ -23,7 +23,10 @@ import { SETTINGS_SUBSCRIPTION_HREF } from "@/lib/billing/subscription-view";
 import { isOperatorAdmin } from "@/lib/admin/emails";
 import { publicCatalogueReady } from "@/lib/billing/stripe-prices";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
-import { claimReferralBestEffort } from "@/lib/referrals/referral-service";
+import {
+  claimReferralBestEffort,
+  referralCouponId,
+} from "@/lib/referrals/referral-service";
 import {
   REFERRAL_COOKIE,
   resolveReferralCode,
@@ -60,8 +63,8 @@ export async function GET(request: Request) {
   }
 
   // EDGE-67: a signed-in arrival with ?ref= (or the ew_ref cookie from a
-  // homepage share) claims the referral before checkout, so attribution
-  // holds even if the code is never typed into the Stripe promotion-code box.
+  // homepage share) claims the referral before checkout, so the 50% coupon
+  // auto-applies from referred_by. They never type a promotion code.
   await claimReferralBestEffort(userId, ref);
 
   if (!publicCatalogueReady()) {
@@ -181,6 +184,10 @@ export async function GET(request: Request) {
         customerId,
         customerEmail: customerId ? null : email,
         founding,
+        // EDGE-67: share-link claim is already on the row. Auto-apply 50% off
+        // so the referee never types a promotion code at Checkout.
+        referred: Boolean(appUser?.referredBy),
+        referralCouponId: referralCouponId(),
         // EDGE-104: one trial per person - a second Edge checkout bills now.
         trialEligible: !priorTrialConsumed(appUser?.trialEndsAt, priorSubs),
         successUrl: `${origin}${subscribeSuccessHref(paid.plan, paid.interval, undefined, from)}`,

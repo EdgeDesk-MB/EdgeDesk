@@ -36,6 +36,16 @@ export function checkoutPriceId(
   return publicStripePriceId(plan, interval);
 }
 
+/** Coupon id to auto-apply at Checkout, or null (promo box / no discount). */
+export function referralCheckoutCouponId(input: {
+  referred?: boolean;
+  founding?: boolean;
+  couponId?: string | null;
+}): string | null {
+  if (!input.referred || input.founding) return null;
+  return input.couponId?.trim() || null;
+}
+
 export function buildSubscriptionCheckoutParams(input: {
   priceId: string;
   plan: PaidPlanId;
@@ -46,6 +56,10 @@ export function buildSubscriptionCheckoutParams(input: {
   customerId?: string;
   customerEmail?: string | null;
   founding?: boolean;
+  /** True when app_users.referred_by is set from a share link. */
+  referred?: boolean;
+  /** Live or test STRIPE_REFERRAL_COUPON_ID. Applied when referred and not Founding. */
+  referralCouponId?: string | null;
   /** EDGE-104: false when the person has already consumed their one trial. */
   trialEligible?: boolean;
 }): Stripe.Checkout.SessionCreateParams {
@@ -57,6 +71,11 @@ export function buildSubscriptionCheckoutParams(input: {
     interval: input.interval,
     ...(input.founding ? { founding: "true" } : {}),
   };
+  const referralCoupon = referralCheckoutCouponId({
+    referred: input.referred,
+    founding: input.founding,
+    couponId: input.referralCouponId,
+  });
 
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
@@ -69,7 +88,13 @@ export function buildSubscriptionCheckoutParams(input: {
       metadata,
       ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
     },
-    allow_promotion_codes: true,
+    // Stripe forbids discounts and allow_promotion_codes on the same session.
+    // Founding must not expose the promo box either (no stacking with 50% off).
+    ...(referralCoupon
+      ? { discounts: [{ coupon: referralCoupon }] }
+      : input.founding
+        ? {}
+        : { allow_promotion_codes: true }),
     // VAT later. Managed Payments is on by default and demands a tax code.
     managed_payments: { enabled: false },
     // Needs Terms + Privacy URLs in Stripe Dashboard → Public details.
