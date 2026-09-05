@@ -205,6 +205,29 @@ export async function claimNeonBetPlacementLedger(
   return rows.length > 0;
 }
 
+/**
+ * One worker wins the right to write settlement ledger rows. Feed sync
+ * and dashboard heal can otherwise credit the same win twice.
+ */
+export async function claimNeonBetSettlementLedger(
+  id: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<boolean> {
+  if (!clerkUserId) return false;
+  const rows = await getNeonDb()
+    .update(pgBets)
+    .set({ balanceSettled: 1 })
+    .where(
+      and(
+        eq(pgBets.id, id),
+        eq(pgBets.clerkUserId, clerkUserId),
+        eq(pgBets.balanceSettled, 0)
+      )
+    )
+    .returning({ id: pgBets.id });
+  return rows.length > 0;
+}
+
 /** Deletes one bet for this login. Throws when signed out. */
 export async function deleteNeonDeskBet(id: number): Promise<boolean> {
   const clerkUserId = neonDeskClerkUserId();

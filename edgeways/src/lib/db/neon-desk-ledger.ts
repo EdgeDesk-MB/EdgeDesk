@@ -18,10 +18,12 @@ import {
   listNeonExchanges,
   patchNeonDeskAccount,
   purgeNeonDeskPlacementTransactionsForBet,
+  purgeNeonDeskSettlementTransactionsForBet,
   purgeNeonDeskTransactionsForBet,
 } from "@/lib/db/neon-desk-accounts";
 import {
   claimNeonBetPlacementLedger,
+  claimNeonBetSettlementLedger,
   neonDeskClerkUserId,
   patchNeonDeskBet,
 } from "@/lib/db/neon-desk";
@@ -225,7 +227,7 @@ async function ledgerNeonCashSettlement(
     bet = { ...bet, balanceLedgered: 1 };
   }
   if (bet.betType === "dutch") {
-    await patchNeonDeskBet(bet.id, { balanceSettled: 1 }, owner);
+    await claimNeonBetSettlementLedger(bet.id, owner);
     return true;
   }
 
@@ -234,109 +236,117 @@ async function ledgerNeonCashSettlement(
   const exchange = await neonExchangeForBet(bet, owner);
   if (!bookie && !exchange) return false;
 
+  const claimed = await claimNeonBetSettlementLedger(bet.id, owner);
+  // Lost the race: the winner writes (or has written) the payout rows.
+  if (!claimed) return true;
+
   const liability = bet.layStake * (bet.layOdds - 1);
   const layWinnings = bet.layStake * (1 - bet.commission);
   const now = Date.now();
 
-  if (bet.status === "void" || bet.status === "push") {
-    if (bookie && bet.backStake > 0 && isFree) {
-      await deleteNeonDeskFreeBetUsageForBet(bet.id, owner);
-    } else if (bookie && bet.backStake > 0 && !isFree) {
-      await insertNeonDeskTransaction(
-        {
-          accountId: bookie.id,
-          amount: bet.backStake,
-          category: "bet_settlement",
-          note: `${bet.status === "push" ? "Push" : "Void"} - stake returned - ${bet.label}`,
-          betId: bet.id,
-          createdAt: now,
-        },
-        owner
-      );
+  try {
+    if (bet.status === "void" || bet.status === "push") {
+      if (bookie && bet.backStake > 0 && isFree) {
+        await deleteNeonDeskFreeBetUsageForBet(bet.id, owner);
+      } else if (bookie && bet.backStake > 0 && !isFree) {
+        await insertNeonDeskTransaction(
+          {
+            accountId: bookie.id,
+            amount: bet.backStake,
+            category: "bet_settlement",
+            note: `${bet.status === "push" ? "Push" : "Void"} - stake returned - ${bet.label}`,
+            betId: bet.id,
+            createdAt: now,
+          },
+          owner
+        );
+      }
+      if (exchange && liability > 0) {
+        await insertNeonDeskTransaction(
+          {
+            accountId: exchange.id,
+            amount: liability,
+            category: "bet_settlement",
+            note: `${bet.status === "push" ? "Push" : "Void"} - liability returned - ${bet.label}`,
+            betId: bet.id,
+            createdAt: now,
+          },
+          owner
+        );
+      }
+      return true;
     }
-    if (exchange && liability > 0) {
+
+    const early = bet.status === "early_payout";
+    const half = bet.status === "half_win" || bet.status === "half_lose";
+    const paid = bet.status === "won" || early;
+    const bookieFactor = half ? 0.5 : paid ? 1 : 0;
+
+    if (bookie && bookieFactor > 0 && !isFree) {
+      let payout = bet.backStake * bet.backOdds;
+      payout *= bookieFactor;
+      if (payout > 0) {
+        const label = half
+          ? bet.status === "half_win"
+            ? "half win"
+            : "half lose"
+          : early
+            ? "2UP"
+            : "back won";
+        await insertNeonDeskTransaction(
+          {
+            accountId: bookie.id,
+            amount: payout,
+            category: "bet_settlement",
+            note: `Bookie payout (${label}) - ${bet.label}`,
+            betId: bet.id,
+            createdAt: now,
+          },
+          owner
+        );
+      }
+    } else if (bookie && bookieFactor > 0 && isFree) {
+      let payout =
+        bet.betType === "free_snr"
+          ? bet.backStake * (bet.backOdds - 1)
+          : bet.backStake * bet.backOdds;
+      payout *= bookieFactor;
+      if (payout > 0) {
+        await insertNeonDeskTransaction(
+          {
+            accountId: bookie.id,
+            amount: payout,
+            category: "bet_settlement",
+            note: `Bookie payout (free bet) - ${bet.label}`,
+            betId: bet.id,
+            createdAt: now,
+          },
+          owner
+        );
+      }
+    }
+
+    const layCreditFactor = half ? 0.5 : paid ? 0 : 1;
+    if (exchange && layCreditFactor > 0 && bet.layStake > 0) {
       await insertNeonDeskTransaction(
         {
           accountId: exchange.id,
-          amount: liability,
+          amount: (liability + layWinnings) * layCreditFactor,
           category: "bet_settlement",
-          note: `${bet.status === "push" ? "Push" : "Void"} - liability returned - ${bet.label}`,
+          note: half ? `Lay half settled - ${bet.label}` : `Lay won - ${bet.label}`,
           betId: bet.id,
           createdAt: now,
         },
         owner
       );
     }
-    await patchNeonDeskBet(bet.id, { balanceSettled: 1 }, owner);
+
     return true;
+  } catch (error) {
+    await purgeNeonDeskSettlementTransactionsForBet(bet.id, owner);
+    await patchNeonDeskBet(bet.id, { balanceSettled: 0 }, owner);
+    throw error;
   }
-
-  const early = bet.status === "early_payout";
-  const half = bet.status === "half_win" || bet.status === "half_lose";
-  const paid = bet.status === "won" || early;
-  const bookieFactor = half ? 0.5 : paid ? 1 : 0;
-
-  if (bookie && bookieFactor > 0 && !isFree) {
-    let payout = bet.backStake * bet.backOdds;
-    payout *= bookieFactor;
-    if (payout > 0) {
-      const label = half
-        ? bet.status === "half_win"
-          ? "half win"
-          : "half lose"
-        : early
-          ? "2UP"
-          : "back won";
-      await insertNeonDeskTransaction(
-        {
-          accountId: bookie.id,
-          amount: payout,
-          category: "bet_settlement",
-          note: `Bookie payout (${label}) - ${bet.label}`,
-          betId: bet.id,
-          createdAt: now,
-        },
-        owner
-      );
-    }
-  } else if (bookie && bookieFactor > 0 && isFree) {
-    let payout =
-      bet.betType === "free_snr"
-        ? bet.backStake * (bet.backOdds - 1)
-        : bet.backStake * bet.backOdds;
-    payout *= bookieFactor;
-    if (payout > 0) {
-      await insertNeonDeskTransaction(
-        {
-          accountId: bookie.id,
-          amount: payout,
-          category: "bet_settlement",
-          note: `Bookie payout (free bet) - ${bet.label}`,
-          betId: bet.id,
-          createdAt: now,
-        },
-        owner
-      );
-    }
-  }
-
-  const layCreditFactor = half ? 0.5 : paid ? 0 : 1;
-  if (exchange && layCreditFactor > 0 && bet.layStake > 0) {
-    await insertNeonDeskTransaction(
-      {
-        accountId: exchange.id,
-        amount: (liability + layWinnings) * layCreditFactor,
-        category: "bet_settlement",
-        note: half ? `Lay half settled - ${bet.label}` : `Lay won - ${bet.label}`,
-        betId: bet.id,
-        createdAt: now,
-      },
-      owner
-    );
-  }
-
-  await patchNeonDeskBet(bet.id, { balanceSettled: 1 }, owner);
-  return true;
 }
 
 /** Credit a promotional free-bet award. Idempotent on an existing credit for the bet. */

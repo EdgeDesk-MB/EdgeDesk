@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   patches: [] as Array<{ id: number; patch: Record<string, unknown> }>,
   ensureCalls: [] as Array<{ name: string; kind: string; clerk?: string | null }>,
   claimed: new Set<number>(),
+  settlementClaimed: new Set<number>(),
+  insertError: null as Error | null,
 }));
 
 function account(
@@ -79,9 +81,16 @@ vi.mock("@/lib/db/neon-desk", () => ({
     mocks.patches.push({ id, patch: { balanceLedgered: 1 } });
     return true;
   },
+  claimNeonBetSettlementLedger: async (id: number) => {
+    if (mocks.settlementClaimed.has(id)) return false;
+    mocks.settlementClaimed.add(id);
+    mocks.patches.push({ id, patch: { balanceSettled: 1 } });
+    return true;
+  },
   patchNeonDeskBet: async (id: number, patch: Record<string, unknown>) => {
     mocks.patches.push({ id, patch });
     if (patch.balanceLedgered === 0) mocks.claimed.delete(id);
+    if (patch.balanceSettled === 0) mocks.settlementClaimed.delete(id);
     return bet({ id, ...patch });
   },
 }));
@@ -124,6 +133,7 @@ vi.mock("@/lib/db/neon-desk-accounts", () => ({
     },
   ],
   insertNeonDeskTransaction: async (values: Record<string, unknown>) => {
+    if (mocks.insertError) throw mocks.insertError;
     mocks.txs.push(values);
     return { id: mocks.txs.length, ...values };
   },
@@ -142,6 +152,12 @@ vi.mock("@/lib/db/neon-desk-accounts", () => ({
     return true;
   },
   purgeNeonDeskTransactionsForBet: async () => {},
+  purgeNeonDeskSettlementTransactionsForBet: async (betId: number) => {
+    mocks.txs = mocks.txs.filter((t) => {
+      if (t.betId !== betId) return true;
+      return t.category !== "bet_settlement";
+    });
+  },
   purgeNeonDeskPlacementTransactionsForBet: async (betId: number) => {
     mocks.txs = mocks.txs.filter((t) => {
       if (t.betId !== betId) return true;
@@ -175,6 +191,8 @@ describe("ledgerNeonBetPlacement", () => {
     mocks.txs = [];
     mocks.patches = [];
     mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
     mocks.ensureCalls = [];
   });
 
@@ -291,6 +309,8 @@ describe("ledgerNeonBetSettlement", () => {
     mocks.txs = [];
     mocks.patches = [];
     mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
     mocks.ensureCalls = [];
   });
 
@@ -420,6 +440,62 @@ describe("ledgerNeonBetSettlement", () => {
     );
   });
 
+  it("credits the bookie payout only once when two workers settle the same win", async () => {
+    // Worked: Millwall home £200 at 1.96. Payout = 200 × 1.96 = £392.
+    // Feed sync and dashboard heal both saw balanceSettled=0 and both
+    // credited £392, 0.5s apart. One worker must win the claim.
+    const millwall = bet({
+      status: "won",
+      balanceLedgered: 1,
+      exchangeId: null,
+      backStake: 200,
+      backOdds: 1.96,
+      label: "Match odds home",
+      actualProfit: -4,
+    });
+    const [first, second] = await Promise.all([
+      ledgerNeonBetSettlement(millwall),
+      ledgerNeonBetSettlement(millwall),
+    ]);
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    const payouts = mocks.txs.filter((t) => t.category === "bet_settlement");
+    expect(payouts).toHaveLength(1);
+    expect(payouts[0]).toEqual(
+      expect.objectContaining({
+        accountId: 30,
+        amount: 392,
+        category: "bet_settlement",
+        note: "Bookie payout (back won) - Match odds home",
+      })
+    );
+  });
+
+  it("does not write a second payout when settlement was already claimed", async () => {
+    mocks.settlementClaimed.add(10);
+    await expect(
+      ledgerNeonBetSettlement(
+        bet({ status: "won", balanceLedgered: 1, exchangeId: null, actualProfit: 0.4 })
+      )
+    ).resolves.toBe(true);
+    expect(mocks.txs).toEqual([]);
+  });
+
+  it("unclaims settlement when the payout write fails so a later heal can credit once", async () => {
+    mocks.insertError = new Error("neon write failed");
+    await expect(
+      ledgerNeonBetSettlement(
+        bet({ status: "won", balanceLedgered: 1, exchangeId: null, actualProfit: 0.4 })
+      )
+    ).rejects.toThrow("neon write failed");
+    expect(mocks.txs.filter((t) => t.category === "bet_settlement")).toEqual([]);
+    expect(mocks.settlementClaimed.has(10)).toBe(false);
+    expect(mocks.patches).toContainEqual({
+      id: 10,
+      patch: { balanceSettled: 0 },
+    });
+  });
+
   it("restores a free-bet usage debit on void instead of inventing a credit", async () => {
     mocks.txs.push({
       accountId: 30,
@@ -463,6 +539,8 @@ describe("awardNeonUnconditionalFreeBetsDue", () => {
     mocks.txs = [];
     mocks.patches = [];
     mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
     mocks.ensureCalls = [];
   });
 
@@ -517,6 +595,8 @@ describe("healNeonOpenBetPlacements", () => {
     mocks.txs = [];
     mocks.patches = [];
     mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
     mocks.ensureCalls = [];
   });
 
@@ -543,6 +623,8 @@ describe("healNeonDeskLedgers", () => {
     mocks.txs = [];
     mocks.patches = [];
     mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
     mocks.ensureCalls = [];
   });
 
@@ -571,6 +653,8 @@ describe("reledgerNeonOpenBetPlacement", () => {
     mocks.txs = [];
     mocks.patches = [];
     mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
     mocks.ensureCalls = [];
   });
 
