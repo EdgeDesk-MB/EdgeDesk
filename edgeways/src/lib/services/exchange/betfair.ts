@@ -8,6 +8,8 @@
  * Accounts with 2FA: set BETFAIR_TOTP_SECRET (authenticator base32 secret) so
  * Edgeways can append the current code to the password on login.
  */
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { TOTP } from "otpauth";
 import type {
   ExchangeConnectionStatus,
@@ -210,6 +212,8 @@ function normCourse(course: string): string {
     .replace(/\s+park$/, "");
 }
 
+let loginInflight: Promise<string> | null = null;
+
 async function login(): Promise<string> {
   const creds = credentials();
   if (!creds) throw new Error("Betfair credentials not configured");
@@ -217,28 +221,35 @@ async function login(): Promise<string> {
   if (cachedToken && Date.now() - cachedToken.at < SESSION_TTL_MS) {
     return cachedToken.token;
   }
+  if (loginInflight) return loginInflight;
 
-  const body = new URLSearchParams({
-    username: creds.username,
-    password: loginPassword(creds),
+  loginInflight = (async () => {
+    const body = new URLSearchParams({
+      username: creds.username,
+      password: loginPassword(creds),
+    });
+    const res = await betfairUpstreamFetch(IDENTITY_URL, {
+      method: "POST",
+      headers: betfairHeaders("application/x-www-form-urlencoded"),
+      body: body.toString(),
+    });
+
+    const data = await readBetfairJson<{ token?: string; status?: string; error?: string }>(
+      res,
+      "login"
+    );
+    if (!res.ok || !data.token) {
+      cachedToken = null;
+      throw new Error(formatLoginError(data.status, data.error) || `Betfair login failed (${res.status})`);
+    }
+
+    cachedToken = { token: data.token, at: Date.now() };
+    return data.token;
+  })().finally(() => {
+    loginInflight = null;
   });
-  const res = await betfairUpstreamFetch(IDENTITY_URL, {
-    method: "POST",
-    headers: betfairHeaders("application/x-www-form-urlencoded"),
-    body: body.toString(),
-  });
 
-  const data = await readBetfairJson<{ token?: string; status?: string; error?: string }>(
-    res,
-    "login"
-  );
-  if (!res.ok || !data.token) {
-    cachedToken = null;
-    throw new Error(formatLoginError(data.status, data.error) || `Betfair login failed (${res.status})`);
-  }
-
-  cachedToken = { token: data.token, at: Date.now() };
-  return data.token;
+  return loginInflight;
 }
 
 async function betfairPost<T>(method: string, params: Record<string, unknown>): Promise<T> {
@@ -319,12 +330,20 @@ export async function betfairListMarketCatalogue(
 export async function betfairListMarketBook(marketIds: string[]): Promise<MarketBookRow[]> {
   if (marketIds.length === 0) return [];
   const books: MarketBookRow[] = [];
-  for (const batch of chunkMarketIds(marketIds)) {
-    const batchBooks = await betfairPost<MarketBookRow[]>("listMarketBook", {
-      marketIds: batch,
-      priceProjection: { priceData: ["EX_BEST_OFFERS"] },
-    });
-    books.push(...batchBooks);
+  const batches = chunkMarketIds(marketIds);
+  // Two batches at a time: a Saturday card is several calls, but a serial
+  // stampede from desk + Race picks used to sit on hyphens for 20s+.
+  for (let i = 0; i < batches.length; i += 2) {
+    const pair = batches.slice(i, i + 2);
+    const pairBooks = await Promise.all(
+      pair.map((batch) =>
+        betfairPost<MarketBookRow[]>("listMarketBook", {
+          marketIds: batch,
+          priceProjection: { priceData: ["EX_BEST_OFFERS"] },
+        })
+      )
+    );
+    for (const batchBooks of pairBooks) books.push(...batchBooks);
   }
   return books;
 }
@@ -374,12 +393,57 @@ function dayWindowMs(dateIso: string): { from: string; to: string } {
  * Keyed on the only two inputs that change the response: the day window and the
  * countries requested. Race matching downstream is pure, so it is not cached.
  */
+function catalogueStorePath(): string | null {
+  if (process.env.VERCEL || process.env.VITEST) return null;
+  return path.join(process.cwd(), "data", "betfair-win-catalogue.json");
+}
+
+function readPersistedCatalogue(key: string): MarketCatalogueRow[] | null {
+  const file = catalogueStorePath();
+  if (!file) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as Record<
+      string,
+      { at: number; markets: MarketCatalogueRow[] }
+    >;
+    const row = parsed[key];
+    if (!row || !Array.isArray(row.markets) || row.markets.length === 0) return null;
+    if (Date.now() - row.at >= CATALOGUE_TTL_MS) return null;
+    return row.markets;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedCatalogue(key: string, markets: MarketCatalogueRow[]): void {
+  const file = catalogueStorePath();
+  if (!file || markets.length === 0) return;
+  try {
+    mkdirSync(path.dirname(file), { recursive: true });
+    let current: Record<string, { at: number; markets: MarketCatalogueRow[] }> = {};
+    try {
+      current = JSON.parse(readFileSync(file, "utf8")) as typeof current;
+    } catch {
+      current = {};
+    }
+    current[key] = { at: Date.now(), markets };
+    writeFileSync(file, JSON.stringify(current));
+  } catch {
+    // Local restart cache only. Live keeps the in-process TTL.
+  }
+}
+
 async function dayWinCatalogue(
   dateIso: string
 ): Promise<{ markets: MarketCatalogueRow[]; stale: boolean }> {
   const key = `win:${dateIso}:${RACING_MARKET_COUNTRIES.join(",")}`;
-  const read = await cachedFetch(dayCatalogueCache, key, CATALOGUE_TTL_MS, () =>
-    betfairPost<MarketCatalogueRow[]>("listMarketCatalogue", {
+  const persisted = readPersistedCatalogue(key);
+  if (persisted) {
+    writeEntry(dayCatalogueCache, key, persisted);
+    return { markets: persisted, stale: false };
+  }
+  const read = await cachedFetch(dayCatalogueCache, key, CATALOGUE_TTL_MS, async () => {
+    const markets = await betfairPost<MarketCatalogueRow[]>("listMarketCatalogue", {
       filter: {
         eventTypeIds: ["7"],
         marketCountries: RACING_MARKET_COUNTRIES,
@@ -389,8 +453,10 @@ async function dayWinCatalogue(
       marketProjection: ["RUNNER_DESCRIPTION", "EVENT", "MARKET_START_TIME"],
       maxResults: 400,
       sort: "FIRST_TO_START",
-    })
-  );
+    });
+    writePersistedCatalogue(key, markets);
+    return markets;
+  });
   return { markets: read.data, stale: read.stale };
 }
 
@@ -567,4 +633,5 @@ export async function fetchBetfairLayOdds(
 /** Reset cached session - for tests */
 export function resetBetfairSession(): void {
   cachedToken = null;
+  loginInflight = null;
 }

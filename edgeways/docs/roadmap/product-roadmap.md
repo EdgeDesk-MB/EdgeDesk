@@ -9,9 +9,9 @@
 > Companion docs: `../../docs/strategy/api-dependencies-and-tiers.md` (API cost/tier detail),
 > `docs/offer-command-centre.md` (offer pipeline spec), `docs/design-system.md`.
 
-Last updated: 2026-08-25 (hosted desk live: Clerk auth + Neon per-user data, Route 1.
-Stripe catalogue, checkout, webhooks, portal and test-mode rehearsal done — EDGE-3/4/5/7;
-entitlements enforced server-side — EDGE-22/83. Edge-tier live feeds still gated on EDGE-45.)
+Last updated: 2026-09-05 (P1 Football live card Phase 1: HT, event tape, and XI
+on Edge. Production remains the live app: `SITE_SURFACE=app`,
+`LANDING_VARIANT=launch` on https://edgeways.app.)
 
 > **Roadmap hygiene.** This document is kept current as work ships: statuses flip in the §6 table
 > the day a phase lands, and *new* feature ideas are never scheduled directly — they land in
@@ -485,18 +485,18 @@ Commercial terms (trial, Founding, feedback credit, annual pence): **`docs/strat
 | ---- | ----- | ----------------- | ----- |
 | Free | £0 | Calculators, manual bet logging, basic P&L, demo Racing Desk | Funnel + community trust |
 | Core | £9.99/mo · £99.90/yr | Offers pipeline, Do Next / Daily Plan, EV capture analytics, Edge Report, tracker, free-bet lots | All-lib features, near-zero COGS |
-| Edge | £24.99/mo · £249.90/yr | **Offer Edge** (modelled race/horse picks + recommended desk chrome), Racing Desk live/delayed feeds, 2UP sentinel + push, exchange integration | Carries API cost + the pro differentiator; signature `--edge` violet chrome |
+| Edge | £24.99/mo · £249.90/yr | **Offer Edge** (modelled race/horse picks + recommended desk chrome), Racing Desk live/delayed feeds, football live card (HT, event tape, XI), 2UP sentinel + push, exchange integration | Carries API cost + the pro differentiator; signature `--edge` violet chrome |
 
 **Public mechanics:** 14-day Edge trial (one per person), then Core or Edge at list.
 Annual ≈ 2 months free (10× monthly). **Founding** (waitlist/beta, not on public cards):
 three months of Edge at Core price after the trial. Gate by *data cost and edge delivered*.
 
-**Readiness (25 Aug 2026):** N0 matrix + Settings plan preview exist; real server-side
+**Readiness (4 Sep 2026):** N0 matrix + Settings plan preview exist; real server-side
 enforcement live (EDGE-22, feed guards EDGE-83). Processor decided: Stripe direct (EDGE-2);
 catalogue, checkout, portal, webhooks and an automated test-mode rehearsal all done
-(EDGE-3/4/5/58/7); checkout blocks stacking a second subscription (EDGE-82). Landing shows
-this table on the **launch variant** (EDGE-21); live `/` stays waitlist until the
-`SITE_SURFACE=app` flip.
+(EDGE-3/4/5/58/7); checkout blocks stacking a second subscription (EDGE-82). Production `/`
+is the launch variant with this table (EDGE-21). `SITE_SURFACE=app`. Do not revert to
+waitlist.
 
 A fourth tier is under consideration (2026-08-02): an **Elite** level bundling direct exchange
 connections (e.g. Betdaq partner API) once Edge-tier revenue funds the integration and data
@@ -506,7 +506,7 @@ it only makes sense once subscriptions already cover the base tiers.
 ### 7.6 Compliance & go-to-market checklist (at gate)
 
 - 18+ gating, BeGambleAware messaging, UK ad-standards review for gambling-adjacent products.
-- Public Terms of Service and Privacy Policy pages, linked from waitlist, marketing footer, and signup; required ToS/Privacy checkbox before account creation (EDGE-61, published 17 Aug 2026). Source drafts live in repo-root `docs/legal/`.
+- Public Terms of Service and Privacy Policy pages, linked from the marketing footer and signup (EDGE-61, published 17 Aug 2026). Privacy still discloses waitlist email for historical rows. Source drafts live in repo-root `docs/legal/`.
 - No gambling licence needed (the product never takes a wager) — confirm with a solicitor anyway.
 - Betfair/Racing API/API-Football ToS re-read for redistribution once proxying (§7.2).
 - Beta via r/MatchedBettingUK + MB Discords; these communities make or break tools in this niche.

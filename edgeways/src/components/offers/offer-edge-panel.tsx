@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Loader2, AlertTriangle, ChevronRight, Zap } from "lucide-react";
 import { MoneyFlow } from "@/components/money-flow";
 import {
   OfferConfidenceBadge,
@@ -16,7 +17,6 @@ import { formatClockTime } from "@/lib/time-format";
 import { RegionFlag } from "@/components/region-flag";
 import { proNavTag, sectionDescription } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronRight, Zap } from "lucide-react";
 
 const MAX_PLAYS = 3;
 
@@ -104,10 +104,12 @@ export function OfferEdgePanel({
   const [plays, setPlays] = useState<OfferEdgePlay[] | null>(null);
   const [dataSource, setDataSource] = useState<EdgeDataSource | undefined>();
 
-  const [prevEntitled, setPrevEntitled] = useState(entitled);
-  if (prevEntitled !== entitled) {
-    setPrevEntitled(entitled);
-    if (!entitled) setPlays(null);
+  const fetchKey = `${offerId}|${eventDate}|${entitled}`;
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (prevFetchKey !== fetchKey) {
+    setPrevFetchKey(fetchKey);
+    setPlays(null);
+    if (!entitled) setDataSource(undefined);
   }
 
   useEffect(() => {
@@ -125,7 +127,19 @@ export function OfferEdgePanel({
 
   if (!entitled) return null;
 
-  if (!plays || plays.length === 0) return null;
+  if (plays === null) {
+    return (
+      <div className={racePicksNest}>
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <Loader2 className="size-3 shrink-0 animate-spin text-edge" aria-hidden />
+          <span className="text-xs font-semibold text-foreground">Finding race picks…</span>
+          <span className={proNavTag}>Pro</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (plays.length === 0) return null;
 
   // The free-bet leg scales linearly with retention, so an EV resting on the
   // configured prior rather than the user's own settled history has to say so.

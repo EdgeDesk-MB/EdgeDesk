@@ -1,10 +1,12 @@
 /**
- * API-Football (api-sports.io) client with in-memory throttling so the free tier
- * (100 requests/day) isn't burned by dashboard polling. Falls back to demo fixtures
- * when no key is configured.
+ * API-Football (api-sports.io) client. Day lists go through `fixture-store`
+ * (durable, cron-warmed). This module is the upstream adapter plus short-TTL
+ * live/id/goals polls. In-memory maps only dedupe a single instance.
  */
 
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import type { FootballLineupPlayer, FootballLineups } from "@/lib/events/lineups";
+import type { MatchTapeEvent, MatchTapeKind } from "@/lib/events/match-tape";
 import { localCalendarDate, wallClockKickoffMs } from "@/lib/events";
 
 const BASE = "https://v3.football.api-sports.io";
@@ -27,6 +29,9 @@ export interface Fixture {
   matchEnding?: "ft" | "aet" | "pen" | null;
   /** API-Football `fixture.status.short` — HT, 1H, 2H, ET, P, … */
   period?: string | null;
+  /** Half-time score from `score.halftime` when published */
+  htHomeScore?: number | null;
+  htAwayScore?: number | null;
   /** Club crest or national team badge URL from API-Football */
   homeLogo?: string | null;
   awayLogo?: string | null;
@@ -185,6 +190,7 @@ function mapFixture(item: any): Fixture {
   const isPen = shortStatus === "PEN";
   // 90-minute score is in score.fulltime; goals.home/away is the full final (including ET)
   const ftScore = item.score?.fulltime;
+  const htScore = item.score?.halftime;
   return {
     externalId: String(item.fixture?.id ?? ""),
     sport: "football",
@@ -204,6 +210,8 @@ function mapFixture(item: any): Fixture {
     ftAwayScore: (isAet || isPen) ? (ftScore?.away ?? null) : null,
     matchEnding: isAet ? "aet" : isPen ? "pen" : shortStatus === "FT" ? "ft" : null,
     period: liveStatuses.includes(shortStatus) ? shortStatus : null,
+    htHomeScore: typeof htScore?.home === "number" ? htScore.home : null,
+    htAwayScore: typeof htScore?.away === "number" ? htScore.away : null,
     homeLogo: item.teams?.home?.logo ? String(item.teams.home.logo) : null,
     awayLogo: item.teams?.away?.logo ? String(item.teams.away.logo) : null,
     leagueCountry: item.league?.country ? String(item.league.country) : null,
@@ -220,7 +228,8 @@ export function footballOperation(pathAndQuery: string): string {
   if (pathAndQuery.startsWith("/fixtures?date=")) return "fixtures-by-date";
   if (pathAndQuery.startsWith("/fixtures?live=")) return "live-fixtures";
   if (pathAndQuery.startsWith("/fixtures?id=")) return "fixture-by-id";
-  if (pathAndQuery.startsWith("/fixtures/events")) return "goal-events";
+  if (pathAndQuery.startsWith("/fixtures/events")) return "match-events";
+  if (pathAndQuery.startsWith("/fixtures/lineups")) return "lineups";
   return "other";
 }
 
@@ -273,6 +282,7 @@ function formatApiErrors(errors: unknown): string | null {
 /** Calendar date in the operator's local timezone (API-Football dates are local-day oriented). */
 export { localCalendarDate } from "@/lib/events";
 
+/** Upstream day fetch. Desk/API callers must use `getFixturesForDate`. */
 export async function fixturesByDate(date: string): Promise<Fixture[]> {
   const cacheKey = `fixtures:${date}`;
   const hit = cache.get(cacheKey);
@@ -315,33 +325,121 @@ export interface FixtureGoal {
   og?: boolean;
 }
 
+function mapEventKind(type: string | undefined): MatchTapeKind {
+  const t = (type ?? "").toLowerCase();
+  if (t === "goal") return "goal";
+  if (t === "card") return "card";
+  if (t === "subst" || t === "substitution") return "subst";
+  if (t === "var") return "var";
+  return "other";
+}
+
+function mapTapeEvent(e: any, homeTeamName: string): MatchTapeEvent | null {
+  const side: "home" | "away" =
+    normaliseTeam(e.team?.name ?? "") === normaliseTeam(homeTeamName) ? "home" : "away";
+  const kind = mapEventKind(e.type);
+  if (kind === "goal" && e.detail === "Missed Penalty") {
+    return {
+      kind: "other",
+      minute: (e.time?.elapsed ?? 0) + (e.time?.extra ?? 0),
+      side,
+      player: e.player?.name || undefined,
+      detail: "Missed Penalty",
+    };
+  }
+  const event: MatchTapeEvent = {
+    kind,
+    minute: (e.time?.elapsed ?? 0) + (e.time?.extra ?? 0),
+    side,
+  };
+  if (e.player?.name) event.player = String(e.player.name);
+  if (e.assist?.name) event.assist = String(e.assist.name);
+  if (e.detail) event.detail = String(e.detail);
+  if (e.detail === "Own Goal") event.og = true;
+  return event;
+}
+
 /**
- * Goal events (scorer, minute) for one fixture - powers "The bet wins IF" player
- * triggers. Costs one request per fixture per LIVE_TTL, so the state service only
- * calls this for live fixtures that actually have an open trigger bet on them.
+ * Full match tape (goals, cards, subs, VAR). One request per fixture per LIVE_TTL.
+ */
+export async function fixtureMatchEvents(
+  externalId: string,
+  homeTeamName: string
+): Promise<MatchTapeEvent[]> {
+  const cacheKey = `tape:${externalId}`;
+  const hit = tapeCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < LIVE_TTL) return hit.data;
+  const json = await apiGet(`/fixtures/events?fixture=${externalId}`);
+  const data: MatchTapeEvent[] = (json.response ?? [])
+    .map((e: any) => mapTapeEvent(e, homeTeamName))
+    .filter((e: MatchTapeEvent | null): e is MatchTapeEvent => e != null);
+  tapeCache.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
+/**
+ * Goal events only. Wrapper over {@link fixtureMatchEvents} so trigger settlement
+ * keeps the old shape. Same quota as a full-tape fetch (one request, cached).
  */
 export async function fixtureGoalEvents(
   externalId: string,
   homeTeamName: string
 ): Promise<FixtureGoal[]> {
-  const cacheKey = `goals:${externalId}`;
-  const hit = goalsCache.get(cacheKey);
-  if (hit && Date.now() - hit.at < LIVE_TTL) return hit.data;
-  const json = await apiGet(`/fixtures/events?fixture=${externalId}&type=Goal`);
-  const normHome = normaliseTeam(homeTeamName);
-  const data: FixtureGoal[] = (json.response ?? [])
-    .filter((e: any) => e.type === "Goal" && e.detail !== "Missed Penalty")
-    .map((e: any) => ({
-      minute: (e.time?.elapsed ?? 0) + (e.time?.extra ?? 0),
-      side: normaliseTeam(e.team?.name ?? "") === normHome ? ("home" as const) : ("away" as const),
-      player: e.player?.name ?? undefined,
-      og: e.detail === "Own Goal" || undefined,
+  const tape = await fixtureMatchEvents(externalId, homeTeamName);
+  return tape
+    .filter((e) => e.kind === "goal")
+    .map((e) => ({
+      minute: e.minute,
+      side: e.side,
+      player: e.player,
+      og: e.og || undefined,
     }));
-  goalsCache.set(cacheKey, { at: Date.now(), data });
-  return data;
 }
 
-const goalsCache = new Map<string, { at: number; data: FixtureGoal[] }>();
+const tapeCache = new Map<string, { at: number; data: MatchTapeEvent[] }>();
+const lineupsCache = new Map<string, { at: number; data: FootballLineups | null }>();
+
+function mapLineupPlayers(raw: unknown): FootballLineupPlayer[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FootballLineupPlayer[] = [];
+  for (const row of raw) {
+    const player = row?.player;
+    const name = player?.name ? String(player.name).trim() : "";
+    if (!name) continue;
+    const item: FootballLineupPlayer = { name };
+    if (typeof player?.number === "number") item.number = player.number;
+    if (player?.grid) item.grid = String(player.grid);
+    out.push(item);
+  }
+  return out;
+}
+
+/** Confirmed XI. Cached for 15 minutes; callers persist on the event row. */
+export async function fixtureLineups(
+  externalId: string
+): Promise<FootballLineups | null> {
+  const cacheKey = `xi:${externalId}`;
+  const hit = lineupsCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.data;
+  const json = await apiGet(`/fixtures/lineups?fixture=${externalId}`);
+  const rows: any[] = json.response ?? [];
+  if (rows.length === 0) {
+    lineupsCache.set(cacheKey, { at: Date.now(), data: null });
+    return null;
+  }
+  const home = rows[0];
+  const away = rows[1] ?? rows.find((r) => r?.team?.id !== home?.team?.id);
+  const data: FootballLineups = {
+    homeFormation: home?.formation ? String(home.formation) : null,
+    awayFormation: away?.formation ? String(away.formation) : null,
+    home: mapLineupPlayers(home?.startXI),
+    away: mapLineupPlayers(away?.startXI),
+  };
+  const empty = data.home.length === 0 && data.away.length === 0;
+  const stored = empty ? null : data;
+  lineupsCache.set(cacheKey, { at: Date.now(), data: stored });
+  return stored;
+}
 
 /** Fetch fixtures by external id(s). Live matches come from the live feed; others use `?id=`. */
 export async function fixturesByIds(ids: string[]): Promise<Fixture[]> {
@@ -375,9 +473,8 @@ function teamsMatch(a: string, b: string): boolean {
 }
 
 /**
- * Find a real fixture matching two team names among today's and tomorrow's fixtures
- * (both lists are cached, so this costs at most 2 API requests per 10 minutes).
- * Used by "track this match" to import a live-trackable event from a calculator.
+ * Find a real fixture matching two team names among today's and tomorrow's
+ * store-first fixture lists. Used by "track this match".
  */
 export async function searchFixtureByTeams(
   homeTeam: string,
@@ -387,9 +484,10 @@ export async function searchFixtureByTeams(
   const dates = [0, 1].map((offset) =>
     localCalendarDate(new Date(Date.now() + offset * 24 * 60 * 60 * 1000))
   );
+  const { getFixturesForDate } = await import("@/lib/services/fixture-store");
   for (const date of dates) {
     try {
-      const fixtures = await fixturesByDate(date);
+      const { fixtures } = await getFixturesForDate(date);
       const hit = fixtures.find(
         (f) =>
           f.status !== "finished" &&

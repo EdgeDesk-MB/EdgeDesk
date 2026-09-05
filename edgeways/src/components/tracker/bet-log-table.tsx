@@ -87,13 +87,15 @@ import { betStatusBadgeVariant, formatPillLabel } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
 import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
 import { formatAccaDeskBetDisplayTitle, isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
+import { stripStaleHorseFromRacingBetLabel } from "@/lib/bets/racing-bet-label";
+import { twoUpBothWinProfit } from "@/lib/bets/two-up-windfall";
 import { api } from "@/hooks/use-app-state";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { Link2, Pencil, RotateCcw, Zap } from "lucide-react";
 
 function betLogTitle(bet: BetRow): string {
   if (isAccaDeskBack(bet) || isAccaDeskLay(bet)) return formatAccaDeskBetDisplayTitle(bet);
-  return bet.label;
+  return stripStaleHorseFromRacingBetLabel(bet.label, bet.selection);
 }
 
 /**
@@ -196,7 +198,7 @@ export function BetLogTable({
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-medium leading-snug">{betLogTitle(bet)}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {bet.betType.replace("_", " ")}
+                    {formatPillLabel(bet.betType)}
                     {bet.earlyPayout ? " · 2UP" : ""}
                     {offer && (
                       <>
@@ -299,14 +301,17 @@ export function BetLogTable({
               </p>
 
               <div className="mt-2 flex items-center justify-between gap-3">
-                <p className={cn("text-xs tabular-nums text-muted-foreground", inactiveFigure)}>
-                  {bet.backStake > 0
-                    ? `${formatGbp(bet.backStake)} @ ${bet.backOdds.toFixed(2)}`
-                    : "-"}
-                  {bet.layStake > 0
-                    ? ` · lay ${formatGbp(bet.layStake)} @ ${bet.layOdds.toFixed(2)}`
-                    : ""}
-                </p>
+                <div className={cn("min-w-0 text-xs tabular-nums text-muted-foreground", inactiveFigure)}>
+                  <p>
+                    {bet.backStake > 0
+                      ? `${formatGbp(bet.backStake)} @ ${bet.backOdds.toFixed(2)}`
+                      : "-"}
+                    {bet.layStake > 0
+                      ? ` · lay ${formatGbp(bet.layStake)} @ ${bet.layOdds.toFixed(2)}`
+                      : ""}
+                  </p>
+                  <TwoUpStakesHint bet={bet} className="mt-0.5" />
+                </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {canLockIn(bet) && <LockInDialog bet={bet} onLogged={onLogged} />}
                   {bet.status !== "open" && (
@@ -414,7 +419,7 @@ export function BetLogTable({
               >
                 <div className="line-clamp-2 font-medium leading-snug">{betLogTitle(bet)}</div>
                 <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                  {bet.betType.replace("_", " ")}
+                  {formatPillLabel(bet.betType)}
                   {bet.earlyPayout ? " · 2UP" : ""}
                   {offer && (
                     <>
@@ -516,6 +521,7 @@ export function BetLogTable({
                     {formatGbp(bet.layStake)} @ {bet.layOdds.toFixed(2)}
                   </div>
                 ) : null}
+                <TwoUpStakesHint bet={bet} className="mt-0.5 justify-end" />
               </TableCell>
 
               <TableCell className={cn(deskTableBodyCell, "whitespace-normal align-top")}>
@@ -883,6 +889,32 @@ function profitEntryClass(value: number): string {
   if (rounded === 0) return "text-muted-foreground";
   if (rounded > 0) return moneyPositiveClass;
   return "text-negative";
+}
+
+/** 2UP both-win P&L under Stakes: bookie pays early and the lay also wins. */
+function TwoUpStakesHint({
+  bet,
+  className,
+}: {
+  bet: BetRow;
+  className?: string;
+}) {
+  const profit = twoUpBothWinProfit(bet);
+  if (profit == null) return null;
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-0.5 text-xs tabular-nums",
+        className
+      )}
+      title="If the selection goes two up, then fails to win"
+    >
+      <Zap className="size-3 shrink-0 text-primary-text" aria-hidden />
+      <span className="text-muted-foreground">
+        2UP (<span className={cn("font-medium", profitEntryClass(profit))}>{formatGbp(profit, { signed: true })}</span>)
+      </span>
+    </div>
+  );
 }
 
 /** Expected P&L on the tracker row: whole amount coloured (incl. £). */

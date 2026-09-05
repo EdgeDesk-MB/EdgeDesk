@@ -1,0 +1,40 @@
+---
+description: Sport and price feeds are store-first — cron warms, desks read Edgeways
+globs: edgeways/src/lib/services/**/*.ts,edgeways/src/app/api/**/*.ts
+alwaysApply: true
+---
+
+# Feed store-first
+
+Users never pull upstream sports APIs. Edgeways fetches on a timer, persists
+one shared row, and every desk reads that. New sports copy this shape. Do
+not add a user-triggered `apiGet` / provider fetch on a card list.
+
+## Day cards (fixtures, racecards, future sports)
+
+1. **READ** the durable store (Neon hosted, SQLite local) for the UK date.
+2. Fresh row → serve. Stale row → serve immediately and refresh in the
+   background. Users never wait on the provider.
+3. **MISS** → one live fetch, write-through. Do not persist an empty
+   payload (rate-limit `[]` poisons the day).
+4. **WARM** today and tomorrow from `/api/cron/warm-racecards` (10 min).
+   Add the new sport to that cron, do not add a per-user refetch.
+5. Past dates are immutable. Re-derive upcoming/live/finished on read from
+   start time. Live scores / in-play stay on a short poll, not this store.
+6. Global feed data: no `clerk_user_id`. Dual-path `isNeonDesk()` like
+   `racecard-store` / `fixture-store`.
+
+## Do not
+
+- Fetch the provider from an Add bet / Fixtures / desk `GET` when a store
+  exists for that day list.
+- Give each serverless instance its own memory cache as the source of
+  truth (cold starts stampede the quota).
+- Invent a third cache with a different TTL story. Day cards: 10–15 min.
+  Live scores and settlement: existing short TTLs only.
+
+## Adding a sport
+
+New adapter writes into a `*_cache` date row (or the shared `events` table
+for tracked rows). Cap + admin feed monitor from day one (D9). Customer
+copy never names the provider (D8).

@@ -248,6 +248,12 @@ export interface RacingDeskSummary {
   /** Calculator-style cell colours from active Desk exchange */
   backColor?: string;
   layColor?: string;
+  /**
+   * True when this payload skipped live results and exchange books so the
+   * desk could paint from the racecard store. A follow-up full request fills
+   * lays in without blanking the page.
+   */
+  lite?: boolean;
 }
 
 export type RacingDeskActiveBetKind = "bet" | "acca" | "bet_builder" | "systems";

@@ -24,7 +24,7 @@ the public cards. If the homepage says early adopters pay less, everyone waits.
 |------|---------|--------------------------|------|
 | **Free** | £0 | — | Calculators, manual log, basic P&L, demo Racing Desk |
 | **Core** | £9.99 | £99.90/yr | Pipeline, Do Next, Daily Plan, Edge Report, tracker, free-bet lots. Near-zero COGS. |
-| **Edge** | £24.99 | £249.90/yr | Offer Edge / race picks, live racing feeds, 2UP + push, exchange lay. Carries API cost. |
+| **Edge** | £24.99 | £249.90/yr | Offer Edge / race picks, live racing feeds, football live card (HT, tape, XI), 2UP + push, exchange lay. Carries API cost. |
 
 **Trial (everyone, one per person):** 14 days of **Edge**, then they choose Core
 or Edge at list price (or Founding, if the account qualifies). Cancel before
@@ -73,7 +73,7 @@ In-app product feedback (already files to Linear). Not public reviews.
 
 | Ticket | What it owes this offer |
 |--------|-------------------------|
-| EDGE-21 | Launch landing **variant** (waitlist `/` stays default). Login CTA. Comparison table of the **public** offer. Subscribe now hits `/subscribe` (EDGE-4). |
+| EDGE-21 | Launch landing is production `/` (verified 4 Sep 2026). Login CTA. Comparison table of the **public** offer. Subscribe now hits `/subscribe` (EDGE-4). |
 | EDGE-3 | Catalogue: Free, Core monthly/annual, Edge monthly/annual, 14-day Edge trial, Founding Edge-at-Core for 3 months. **Done 15 Aug 2026** in Stripe test mode (see below). |
 | EDGE-4 | Hosted Checkout + still thermal slip + portal (cancel / invoices / card / Core↔Edge). Waitlist email gets Founding on Edge monthly. Live catalogue still empty. |
 | EDGE-5 | Webhooks write tier + trial/founding window onto `app_users`. **Done locally 15 Aug.** |
@@ -81,20 +81,22 @@ In-app product feedback (already files to Linear). Not public reviews.
 | EDGE-22 | Desk reads Neon tier (including trial = Edge, Founding = Edge). Settings preview is not the live gate. |
 | EDGE-2 | Processor only. Does not change prices or Founding. |
 
-`SITE_SURFACE=waitlist` still blocks `/desk` on production until beta desk is
-ready. A signed-in Free user on a future app surface sees upgrade, not the
-full desk (soft gate; real feature locks are EDGE-22).
+Production is `SITE_SURFACE=app` (verified 4 Sep 2026). `/desk` is open.
+Unset still fails closed to waitlist (EDGE-109). A signed-in Free user sees
+upgrade prompts, not the full Edge desk (real feature locks are EDGE-22).
 
 ---
 
 ## Homepage versions
 
-Iterate landings. Do not silently replace the live waitlist page.
+Production `/` is the **launch** variant (verified 4 Sep 2026). Do not flip
+it back to waitlist.
 
-- Production `/` stays the waitlist until we flip `LANDING_VARIANT=launch`
-  (or promote a preview).
-- Launch variant: Login + public pricing table + Subscribe stub. Waitlist
-  form can remain as a secondary “get founding” path until invites go out.
+- Live homepage: Login + public pricing + Start free trial. No waitlist form
+  (closer stripped 2 Sep). Founding is still waitlist-email eligibility at
+  Checkout (EDGE-93), not a public card.
+- Waitlist homepage code remains as the fail-closed fallback when
+  `LANDING_VARIANT` is unset.
 - Code: `LANDING_VARIANT=waitlist|launch`, prices in
   `edgeways/src/lib/billing/public-offer.ts`. Stripe IDs in
   `edgeways/src/lib/billing/stripe-prices.ts`.

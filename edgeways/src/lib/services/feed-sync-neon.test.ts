@@ -39,6 +39,10 @@ function event(partial: Partial<EventRow> = {}): EventRow {
     ftAwayScore: null,
     matchEnding: null,
     period: "2H",
+    htHomeScore: null,
+    htAwayScore: null,
+    lineups: null,
+    tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
     createdAt: NOW - 4 * 60 * 60 * 1000,
@@ -111,7 +115,8 @@ type Harness = {
   history: OwnedHistoryValues[];
   notifications: Array<{ clerkUserId: string; notice: SettledBetNotice }>;
   fixturesByIds: ReturnType<typeof vi.fn>;
-  fixtureGoalEvents: ReturnType<typeof vi.fn>;
+  fixtureMatchEvents: ReturnType<typeof vi.fn>;
+  fixtureLineups: ReturnType<typeof vi.fn>;
   resultsForRaceIds: ReturnType<typeof vi.fn>;
 };
 
@@ -127,9 +132,10 @@ function harness(options: {
   const history: OwnedHistoryValues[] = [];
   const notifications: Array<{ clerkUserId: string; notice: SettledBetNotice }> = [];
   const fixturesByIds = vi.fn(async () => options.fixtures ?? []);
-  const fixtureGoalEvents = vi.fn(async () => [
-    { minute: 10, side: "home" as const, player: "Saka" },
+  const fixtureMatchEvents = vi.fn(async () => [
+    { kind: "goal" as const, minute: 10, side: "home" as const, player: "Saka" },
   ]);
+  const fixtureLineups = vi.fn(async () => null);
   const resultsForRaceIds = vi.fn(async () => ({
     results: options.raceResults ?? new Map<string, RaceResult>(),
     tierBlocked: false,
@@ -143,7 +149,8 @@ function harness(options: {
     history,
     notifications,
     fixturesByIds,
-    fixtureGoalEvents,
+    fixtureMatchEvents,
+    fixtureLineups,
     resultsForRaceIds,
     deps: {
       listEvents: async () => options.events,
@@ -159,8 +166,10 @@ function harness(options: {
         history.push(values);
       },
       fixturesByIds: fixturesByIds as unknown as NeonFeedSyncDeps["fixturesByIds"],
-      fixtureGoalEvents:
-        fixtureGoalEvents as unknown as NeonFeedSyncDeps["fixtureGoalEvents"],
+      fixtureMatchEvents:
+        fixtureMatchEvents as unknown as NeonFeedSyncDeps["fixtureMatchEvents"],
+      fixtureLineups:
+        fixtureLineups as unknown as NeonFeedSyncDeps["fixtureLineups"],
       resultsForRaceIds:
         resultsForRaceIds as unknown as NeonFeedSyncDeps["resultsForRaceIds"],
       hasApiKey: () => true,
@@ -201,26 +210,15 @@ describe("runNeonFeedSync — football", () => {
     expect(h.fixturesByIds).not.toHaveBeenCalled();
   });
 
-  it("only spends the timeline request when a trigger bet needs scorers", async () => {
-    const plain = harness({
+  it("fetches the event tape for every live tracked match, not only scorers", async () => {
+    const live = harness({
       events: [event()],
       openBets: [{ bet: bet(), clerkUserId: "user_a" }],
       fixtures: [fixture({ status: "live", homeScore: 1, awayScore: 0 })],
     });
-    await runNeonFeedSync(plain.deps);
-    expect(plain.fixtureGoalEvents).not.toHaveBeenCalled();
-
-    const triggerBet = bet({
-      id: 101,
-      triggerRule: JSON.stringify({ kind: "first_goalscorer", player: "Saka" }),
-    });
-    const scorer = harness({
-      events: [event()],
-      openBets: [{ bet: triggerBet, clerkUserId: "user_a" }],
-      fixtures: [fixture({ status: "live", homeScore: 1, awayScore: 0 })],
-    });
-    await runNeonFeedSync(scorer.deps);
-    expect(scorer.fixtureGoalEvents).toHaveBeenCalledTimes(1);
+    await runNeonFeedSync(live.deps);
+    expect(live.fixtureMatchEvents).toHaveBeenCalledTimes(1);
+    expect(live.updates[0]!.patch.goals).toContain("Saka");
   });
 });
 

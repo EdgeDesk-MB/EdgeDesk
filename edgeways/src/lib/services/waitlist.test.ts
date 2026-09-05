@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildWaitlistThanksEmail,
   confirmWaitlist,
+  grantFoundingInvite,
   isValidWaitlistEmail,
   isWaitlistFoundingEligible,
   joinWaitlist,
@@ -109,5 +110,48 @@ describe("joinWaitlist + unsubscribeWaitlist", () => {
       .where(eq(waitlistSignups.email, email))
       .get();
     expect(restored?.unsubscribedAt).toBeNull();
+  });
+});
+
+describe("grantFoundingInvite", () => {
+  it("marks the email Founding-eligible without sending waitlist mail", async () => {
+    const email = `founding-${Date.now()}@example.com`;
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const granted = await grantFoundingInvite(` ${email.toUpperCase()} `);
+    expect(granted).toEqual({ status: "granted", email });
+    expect(await isWaitlistFoundingEligible(email)).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const again = await grantFoundingInvite(email);
+    expect(again).toEqual({ status: "already_eligible", email });
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("rejects a bad address and restores an unsubscribed row", async () => {
+    await expect(grantFoundingInvite("nope")).rejects.toThrow(
+      "Enter a valid email address."
+    );
+
+    const email = `founding-unsub-${Date.now()}@example.com`;
+    await grantFoundingInvite(email);
+
+    const { createHash, randomBytes } = await import("node:crypto");
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    db.update(waitlistSignups)
+      .set({ confirmTokenHash: tokenHash })
+      .where(eq(waitlistSignups.email, email))
+      .run();
+
+    const unsub = await unsubscribeWaitlist(token);
+    expect(unsub).toEqual({ status: "unsubscribed", email });
+    expect(await isWaitlistFoundingEligible(email)).toBe(false);
+
+    const restored = await grantFoundingInvite(email);
+    expect(restored).toEqual({ status: "granted", email });
+    expect(await isWaitlistFoundingEligible(email)).toBe(true);
   });
 });

@@ -15,6 +15,7 @@ export const FEATURES = [
   "systems_desk",
   "offer_edge",
   "racing_live_feeds",
+  "football_live_feeds",
   "push_alerts",
   "exchange_lay",
 ] as const;
@@ -32,6 +33,7 @@ export const FEATURE_LABELS: Record<FeatureFlag, string> = {
   systems_desk: "Systems Desk",
   offer_edge: "Offer Edge model + Race picks + recommended desk chrome",
   racing_live_feeds: "Live/delayed Racing Desk feeds",
+  football_live_feeds: "Football live card: scorers, bookings and lineups",
   push_alerts: "2UP sentinel + web push",
   exchange_lay: "Exchange lay integration on desk",
 };

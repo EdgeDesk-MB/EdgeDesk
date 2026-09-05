@@ -41,6 +41,13 @@ export function AddBetProvider({ children }: { children: React.ReactNode }) {
     [state?.events]
   );
 
+  // HMR / sticky-open remounts the provider with an empty snapshot and never
+  // re-runs openAddBet. Fill once from state, or leave empty so the dialog
+  // fetches /api/events itself.
+  if (open && eventsSnapshot.length === 0 && (state?.events?.length ?? 0) > 0) {
+    setEventsSnapshot(state!.events);
+  }
+
   const handleOpenChange = useCallback((next: boolean) => {
     setOpen(next);
     if (!next) setPrefill(undefined);
@@ -70,7 +77,7 @@ export function AddBetProvider({ children }: { children: React.ReactNode }) {
         <AddBetDialog
           open={open}
           onOpenChange={handleOpenChange}
-          events={eventsSnapshot}
+          events={eventsSnapshot.length > 0 ? eventsSnapshot : undefined}
           prefill={prefill}
           onSaved={handleSaved}
           onOpenEachWayCalculator={handleOpenEachWay}

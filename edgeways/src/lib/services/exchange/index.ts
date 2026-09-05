@@ -218,7 +218,29 @@ export async function testExchangeConnections(): Promise<{
   return { providers };
 }
 
+const exchangeOddsInflight = new Map<string, Promise<ExchangeOddsResult>>();
+
 export async function getExchangeOdds(
+  provider: ExchangeProvider,
+  races: ExchangeRaceContext[],
+  dateIso: string
+): Promise<ExchangeOddsResult> {
+  const raceKey = races
+    .map((r) => r.externalId)
+    .sort()
+    .join(",");
+  const key = `${provider}|${dateIso}|${raceKey}`;
+  const existing = exchangeOddsInflight.get(key);
+  if (existing) return existing;
+
+  const work = loadExchangeOdds(provider, races, dateIso).finally(() => {
+    if (exchangeOddsInflight.get(key) === work) exchangeOddsInflight.delete(key);
+  });
+  exchangeOddsInflight.set(key, work);
+  return work;
+}
+
+async function loadExchangeOdds(
   provider: ExchangeProvider,
   races: ExchangeRaceContext[],
   dateIso: string

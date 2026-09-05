@@ -10,4 +10,14 @@ export async function register(): Promise<void> {
     "@/lib/services/racing-usage-recorder"
   );
   ensureRacingUsageRecorder();
+
+  // Live gets `/api/cron/warm-racecards` every 10 minutes. Localhost does not,
+  // so the first Race picks load used to block on a cold Racing API miss.
+  if (process.env.NODE_ENV === "development") {
+    void import("@/lib/services/racecard-store")
+      .then(({ warmRacecardStore }) => warmRacecardStore())
+      .catch((error) => {
+        console.error("[instrumentation] racecard warm failed:", error);
+      });
+  }
 }

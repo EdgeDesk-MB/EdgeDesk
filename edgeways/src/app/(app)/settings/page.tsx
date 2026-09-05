@@ -20,6 +20,7 @@ import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookieNamePicker, ExchangeNamePicker } from "@/components/bookie-name-picker";
 import { DataCustodyCard } from "@/components/settings/data-custody-card";
 import { DemoModeCard } from "@/components/settings/demo-mode-card";
+import { OfferInboxCard } from "@/components/settings/offer-inbox-card";
 import { PushDeviceControl } from "@/components/settings/push-device-control";
 import { SubscriptionCard } from "@/components/settings/subscription-card";
 import { Switch } from "@/components/ui/switch";
@@ -303,7 +304,10 @@ export default function SettingsPage() {
           )}
 
           {tab === "automation" && settings && (
-            <AutomationCard settings={settings} onPatch={patchSettings} />
+            <div className="flex flex-col gap-4">
+              <AutomationCard settings={settings} onPatch={patchSettings} />
+              <OfferInboxCard />
+            </div>
           )}
 
           {tab === "alerts" && settings && (

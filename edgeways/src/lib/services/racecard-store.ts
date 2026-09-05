@@ -15,7 +15,8 @@
  * 2. MISS: one live fetch, written straight through to the store so the next
  *    reader on any instance is a database read.
  * 3. WARM: the cron warmer (`/api/cron/warm-racecards`) refreshes today and
- *    tomorrow on a slow cadence, so in practice the store is never cold.
+ *    tomorrow (racing + football) on a slow cadence, so the store is never
+ *    cold.
  *
  * Past dates are immutable: a stored row is served forever and never
  * refetched. Stored cards re-derive upcoming/live/finished from startTime on
@@ -91,6 +92,9 @@ export async function writeRacecardStore(
   oddsTier: "free" | "standard",
   fetchedAt: number = Date.now()
 ): Promise<void> {
+  // A rate-limit `[]` must not become the stored day. The next reader would
+  // treat it as a hit and skip the live fetch for 15 minutes.
+  if (cards.length === 0) return;
   const payload = JSON.stringify(cards);
   if (isNeonDesk()) {
     const { writeNeonRacecardCache } = await import("@/lib/db/neon-racecard-cache");

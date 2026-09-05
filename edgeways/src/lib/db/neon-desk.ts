@@ -4,7 +4,7 @@
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { getDeskActor } from "@/lib/db/desk-scope";
 import { getNeonDb } from "@/lib/db/neon";
 import { toSqliteBetRow } from "@/lib/db/neon-desk-map";
@@ -71,6 +71,36 @@ export async function listNeonDeskBets(
     .where(eq(pgBets.clerkUserId, id))
     .orderBy(pgBets.id);
   return rows.map(toSqliteBetRow);
+}
+
+/** Bets linked to one campaign — playbook steps must not load the whole desk. */
+export async function listNeonDeskBetsForOffer(
+  offerId: number,
+  clerkUserId?: string | null
+): Promise<BetRow[]> {
+  const id = resolveClerkUserId(clerkUserId);
+  if (!id) return [];
+  const rows = await getNeonDb()
+    .select()
+    .from(pgBets)
+    .where(and(eq(pgBets.clerkUserId, id), eq(pgBets.offerId, offerId)))
+    .orderBy(pgBets.id);
+  return rows.map(toSqliteBetRow);
+}
+
+/** Offer ids that already have a linked bet — used to hide spent campaigns from Race picks. */
+export async function listNeonDeskLinkedOfferIds(
+  clerkUserId?: string | null
+): Promise<Set<number>> {
+  const id = resolveClerkUserId(clerkUserId);
+  if (!id) return new Set();
+  const rows = await getNeonDb()
+    .selectDistinct({ offerId: pgBets.offerId })
+    .from(pgBets)
+    .where(and(eq(pgBets.clerkUserId, id), isNotNull(pgBets.offerId)));
+  return new Set(
+    rows.map((row) => row.offerId).filter((offerId): offerId is number => offerId != null)
+  );
 }
 
 export async function insertNeonDeskBet(

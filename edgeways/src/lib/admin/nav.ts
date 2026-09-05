@@ -30,13 +30,13 @@ export const ADMIN_NAV: AdminNavItem[] = [
     href: "/admin/payments",
     label: "Payments",
     icon: CreditCard,
-    blurb: "Stripe MRR, invoices, refunds and founding-rate holders. Read only.",
+    blurb: "Stripe MRR, invoices, refunds and Founding-rate holders. Read only.",
   },
   {
     href: "/admin/subscribers",
     label: "Subscribers",
     icon: Users,
-    blurb: "Plans, trials, waitlist and waitlist-to-paid.",
+    blurb: "Plans, trials, Founding list and last active.",
   },
   {
     href: "/admin/users",

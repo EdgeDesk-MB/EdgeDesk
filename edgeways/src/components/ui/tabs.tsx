@@ -7,7 +7,6 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
 import { useSlidingIndicator } from "@/hooks/use-sliding-indicator"
-import { COLLAPSE_EASE, SPRING_DURATION_MS, springTransition } from "@/lib/ui/motion"
 import { lineTabTriggers, nextLineTabIndex } from "@/lib/ui/line-tabs-keyboard"
 
 function Tabs({
@@ -131,11 +130,10 @@ function TabsScrollList({
         {isLine && indicator.ready ? (
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-0 z-[1] h-0.5 bg-highlight motion-reduce:transition-none"
+            className="pointer-events-none absolute bottom-0 left-0 z-[1] h-0.5 origin-top-left bg-highlight transition-[transform,width] duration-300 ease-in-out motion-reduce:transition-none"
             style={{
-              left: indicator.left,
+              transform: `translate3d(${indicator.left}px, 0, 0)`,
               width: indicator.width,
-              transition: `left ${springTransition}, width ${springTransition}`,
             }}
           />
         ) : null}
@@ -143,7 +141,7 @@ function TabsScrollList({
           <span
             aria-hidden
             className={cn(
-              "pointer-events-none absolute z-0 rounded-full shadow-[var(--ew-chip-shadow)] motion-reduce:transition-none",
+              "pointer-events-none absolute top-[var(--segmented-track-pad)] bottom-[var(--segmented-track-pad)] left-0 z-0 origin-top-left rounded-full shadow-[var(--ew-chip-shadow)] transition-[transform,width,background-color] duration-300 ease-in-out motion-reduce:transition-none",
               indicator.plate === "edge"
                 ? "bg-edge"
                 : indicator.plate === "ink"
@@ -151,11 +149,8 @@ function TabsScrollList({
                   : "bg-brand"
             )}
             style={{
-              left: indicator.left,
+              transform: `translate3d(${indicator.left}px, 0, 0)`,
               width: indicator.width,
-              top: "var(--segmented-track-pad)",
-              bottom: "var(--segmented-track-pad)",
-              transition: `left ${springTransition}, width ${springTransition}, background-color ${SPRING_DURATION_MS}ms ${COLLAPSE_EASE}`,
             }}
           />
         ) : null}
@@ -209,7 +204,7 @@ function TabsList({
 }
 
 const segmentedTrigger = cn(
-  "group-data-[variant=segmented]/tabs-list:relative group-data-[variant=segmented]/tabs-list:z-[1] group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-200 group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5",
+  "group-data-[variant=segmented]/tabs-list:relative group-data-[variant=segmented]/tabs-list:z-[1] group-data-[variant=segmented]/tabs-list:h-8 group-data-[variant=segmented]/tabs-list:min-h-8 group-data-[variant=segmented]/tabs-list:flex-1 group-data-[variant=segmented]/tabs-list:items-center group-data-[variant=segmented]/tabs-list:justify-center group-data-[variant=segmented]/tabs-list:gap-1.5 group-data-[variant=segmented]/tabs-list:rounded-full group-data-[variant=segmented]/tabs-list:border-0 group-data-[variant=segmented]/tabs-list:bg-transparent group-data-[variant=segmented]/tabs-list:px-3 group-data-[variant=segmented]/tabs-list:py-0 group-data-[variant=segmented]/tabs-list:text-xs group-data-[variant=segmented]/tabs-list:font-semibold group-data-[variant=segmented]/tabs-list:leading-none group-data-[variant=segmented]/tabs-list:text-muted-foreground group-data-[variant=segmented]/tabs-list:shadow-none group-data-[variant=segmented]/tabs-list:transition-[color,background-color,box-shadow] group-data-[variant=segmented]/tabs-list:duration-300 group-data-[variant=segmented]/tabs-list:ease-in-out group-data-[variant=segmented]/tabs-list:hover:bg-transparent group-data-[variant=segmented]/tabs-list:hover:text-foreground group-data-[variant=segmented]/tabs-list:active:bg-transparent group-data-[variant=segmented]/tabs-list:[&_svg:not([class*='size-'])]:size-3.5",
   "group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:h-7 group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:min-h-7 group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:px-2.5 group-data-[size=sm]/tabs-list:group-data-[variant=segmented]/tabs-list:text-[11px]",
   /* Active solid brand plate — same filled-accent recipe as FilterPill.
    * Once the sliding plate is ready, fill/shadow live on the indicator. */
@@ -248,10 +243,10 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group/tab-trigger relative inline-flex touch-pan-x items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:flex-1 group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:w-auto group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:shrink-0 group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
+        "group/tab-trigger relative inline-flex touch-pan-x items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all motion-reduce:transition-none group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:h-[calc(100%-1px)] group-data-[variant=default]/tabs-list:flex-1 group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-skeuo)] group-data-[variant=line]/tabs-list:w-auto group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:shrink-0 group-data-[variant=line]/tabs-list:-mb-px group-data-[variant=line]/tabs-list:rounded-none group-data-[variant=line]/tabs-list:border-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:pb-2.5 group-data-[variant=line]/tabs-list:pt-0 group-data-[variant=line]/tabs-list:font-semibold group-data-[variant=line]/tabs-list:shadow-none group-data-[variant=line]/tabs-list:hover:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:text-foreground group-data-[variant=line]/tabs-list:data-active:shadow-none dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
         segmentedTrigger,
         "group-data-[variant=default]/tabs-list:data-active:bg-background group-data-[variant=default]/tabs-list:data-active:text-foreground dark:group-data-[variant=default]/tabs-list:data-active:border-input dark:group-data-[variant=default]/tabs-list:data-active:bg-input/30 dark:group-data-[variant=default]/tabs-list:data-active:text-foreground",
-        // Line tabs use a shared sliding spring underline on TabsList — hide per-trigger after.
+        // Line tabs use a shared sliding underline on TabsList — hide per-trigger after.
         "after:absolute after:bg-highlight after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:h-0.5 group-data-[variant=default]/tabs-list:after:bottom-[-5px] group-data-[variant=line]/tabs-list:after:hidden group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5",
         className
       )}

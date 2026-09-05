@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   shouldFetchGoalTimeline,
+  shouldFetchLineups,
   needsResultBackfill,
   LIVE_POLL_WINDOW_MS,
   RESULT_BACKFILL_MAX_AGE_MS,
+  TAPE_REFRESH_MS,
 } from "./live-poll-rules";
 
 const NOW = new Date(2026, 6, 16, 12, 0, 0).getTime();
@@ -17,10 +19,34 @@ describe("shouldFetchGoalTimeline", () => {
     ).toBe(true);
   });
 
-  it("skips when nothing changed - the expensive call burns the daily budget", () => {
+  it("skips when nothing changed and the tape is still fresh", () => {
     expect(
-      shouldFetchGoalTimeline(event, { status: "live", homeScore: 1, awayScore: 0 })
+      shouldFetchGoalTimeline(
+        { ...event, tapeFetchedAt: NOW },
+        { status: "live", homeScore: 1, awayScore: 0 },
+        NOW
+      )
     ).toBe(false);
+  });
+
+  it("refetches a live tape after five minutes so cards land without a goal", () => {
+    expect(
+      shouldFetchGoalTimeline(
+        { ...event, tapeFetchedAt: NOW - TAPE_REFRESH_MS },
+        { status: "live", homeScore: 1, awayScore: 0 },
+        NOW
+      )
+    ).toBe(true);
+  });
+
+  it("fetches when the period flips (HT / FT) even if the score is unchanged", () => {
+    expect(
+      shouldFetchGoalTimeline(
+        { ...event, period: "1H", tapeFetchedAt: NOW },
+        { status: "live", homeScore: 1, awayScore: 0, period: "HT" },
+        NOW
+      )
+    ).toBe(true);
   });
 
   it("fetches once when live with no stored timeline (catch-up after restart)", () => {
@@ -35,6 +61,38 @@ describe("shouldFetchGoalTimeline", () => {
   it("never fetches for an upcoming fixture", () => {
     expect(
       shouldFetchGoalTimeline(event, { status: "upcoming", homeScore: 0, awayScore: 0 })
+    ).toBe(false);
+  });
+});
+
+describe("shouldFetchLineups", () => {
+  it("skips when an XI is already stored", () => {
+    expect(
+      shouldFetchLineups(
+        { lineups: '{"home":[{"name":"Saka"}],"away":[]}', startTime: NOW + 60_000 },
+        { status: "upcoming" },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("fetches once kick-off is inside two hours", () => {
+    expect(
+      shouldFetchLineups(
+        { lineups: null, startTime: NOW + 90 * 60 * 1000 },
+        { status: "upcoming" },
+        NOW
+      )
+    ).toBe(true);
+  });
+
+  it("waits when kick-off is still far away", () => {
+    expect(
+      shouldFetchLineups(
+        { lineups: null, startTime: NOW + 5 * 60 * 60 * 1000 },
+        { status: "upcoming" },
+        NOW
+      )
     ).toBe(false);
   });
 });

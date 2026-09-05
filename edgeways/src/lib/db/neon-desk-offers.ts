@@ -30,6 +30,8 @@ export type NeonDeskOfferValues = {
   offerUrl?: string | null;
   seriesId?: number | null;
   instanceDate?: string | null;
+  /** 'email' = drafted by the offer inbox / intake (lands planned) */
+  source?: string | null;
   createdAt: number;
 };
 
@@ -64,9 +66,24 @@ export async function insertNeonDeskOffer(
   if (!clerkUserId) {
     throw new Error("Sign in to save an offer.");
   }
+  return insertNeonDeskOfferForUser(clerkUserId, values);
+}
+
+/**
+ * System-context insert (inbound email webhook): no desk actor exists, the
+ * owner comes from the address-token lookup instead of the session.
+ */
+export async function insertNeonDeskOfferForUser(
+  clerkUserId: string,
+  values: NeonDeskOfferValues
+): Promise<OfferRow> {
+  const id = clerkUserId.trim();
+  if (!id) {
+    throw new Error("Sign in to save an offer.");
+  }
   const rows = await getNeonDb()
     .insert(pgOffers)
-    .values({ ...values, clerkUserId })
+    .values({ ...values, clerkUserId: id })
     .returning();
   const row = rows[0];
   if (!row) {

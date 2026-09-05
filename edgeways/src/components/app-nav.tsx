@@ -45,7 +45,6 @@ import {
   Puzzle,
   Radio,
   Scale,
-  Trophy,
   Zap,
   Wallet,
 } from "lucide-react";
@@ -53,7 +52,7 @@ import { requiredPlan } from "@/lib/entitlements/plans";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import type { FeatureFlag } from "@/lib/entitlements/features";
 import { planLockCopy } from "@/lib/entitlements/nav";
-import { FootballIcon } from "@/components/sport-icon";
+import { FootballIcon, HorseRacingIcon } from "@/components/sport-icon";
 import { appNavColumn } from "@/lib/ui/app-shell-layout";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
@@ -211,7 +210,7 @@ export const NAV_SECTIONS: NavSection[] = [
         kind: "link",
         href: "/racing",
         label: "Racing Desk",
-        icon: Trophy,
+        icon: HorseRacingIcon,
         livePulse: "racing",
       },
       {

@@ -32,6 +32,68 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-05",
+    title: "Goals in History, richer live football, and fixtures that open at once",
+    summary:
+      "History now shows kick-off and each goal as they happen. On Edge, a tracked match lists who scored and the formations. Today's fixtures open straight away, and finding an event when you log a bet is quicker.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Tracked Events",
+        href: "/tracked-events",
+        text: "On Edge, a tracked football match now lists who scored, bookings and VAR, plus each side's formation once the teams are named.",
+      },
+      {
+        kind: "feature",
+        area: "Add bet",
+        href: "/tracker",
+        text: "First or anytime goalscorer on Edge lets you pick from the named players, instead of typing the name.",
+      },
+      {
+        kind: "fix",
+        area: "History",
+        href: "/history",
+        text: "Kick-off and each goal now show in History as the match unfolds, including the 2UP trigger, not only the final whistle and the settlement.",
+      },
+      {
+        kind: "improvement",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Today's and tomorrow's matches open straight away and stay up to date in the background, the same way race cards already do.",
+      },
+      {
+        kind: "improvement",
+        area: "Add bet",
+        href: "/tracker",
+        text: "Find a match or race faster: search Events, grouped by Today, Tomorrow and kick-off hour.",
+      },
+      {
+        kind: "improvement",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Race cards appear immediately, then live exchange prices fill in. Picks still come from your Edge recommendations.",
+      },
+      {
+        kind: "improvement",
+        area: "Profit Tracker",
+        href: "/tracker",
+        text: "On a 2UP bet, Stakes now shows the extra profit if the bookie pays early and the lay still wins, for example 2-2 after a two-goal lead.",
+      },
+      {
+        kind: "improvement",
+        area: "Accounts",
+        href: "/accounts",
+        text: "Adjust balance now has Top up, Withdrawal and Adjustment, so paying in and correcting a figure are separate.",
+      },
+      {
+        kind: "fix",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "An offer bet from the desk is titled with the course and the offer. The horse you actually backed stays on the selection, not in the title.",
+      },
+    ],
+  },
+  {
     date: "2026-09-03",
     title: "Acca verdicts, offer terms in the bet form, faster race cards",
     summary:

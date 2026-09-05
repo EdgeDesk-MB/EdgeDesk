@@ -23,8 +23,8 @@ import {
   Key,
   LayoutDashboard,
   Sparkles,
-  Trophy,
 } from "lucide-react";
+import { HorseRacingIcon } from "@/components/sport-icon";
 
 const STEPS = [
   {
@@ -46,7 +46,7 @@ const STEPS = [
     help: "The same loop you will run every day.",
   },
   {
-    icon: Trophy,
+    icon: HorseRacingIcon,
     title: "Racing Desk",
     body: "Find a qualifier from an offer.",
     help: "Add a place-refund offer, then use Race picks to find a qualifier.",

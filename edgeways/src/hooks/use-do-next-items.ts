@@ -6,7 +6,7 @@
  * the Daily Plan so both rank work identically.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, useAppState } from "@/hooks/use-app-state";
 import {
   offerMatchesAvailableBookies,
@@ -25,6 +25,8 @@ import {
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
+import { racingOfferEdgeKey } from "@/hooks/use-offer-edge-race-count";
+import { localCalendarDate } from "@/lib/events";
 
 export function useDoNextItems(pollMs?: number): {
   items: DoNextItem[];
@@ -106,6 +108,11 @@ export function useDoNextItems(pollMs?: number): {
     [canOfferEdge, scopedOffers]
   );
   const [edgePlays, setEdgePlays] = useState<Map<number, OfferEdgePlay>>(new Map());
+  const racingOfferKey = useMemo(
+    () => racingOfferEdgeKey(scopedOffers),
+    [scopedOffers]
+  );
+  const prevRacingOfferKey = useRef(racingOfferKey);
 
   // Adjust-during-render (react-hooks/set-state-in-effect): drop plays as soon
   // as no racing offer remains; the effect below only fetches.
@@ -118,8 +125,10 @@ export function useDoNextItems(pollMs?: number): {
   useEffect(() => {
     if (!hasRacingOffer) return;
     let cancelled = false;
-    const date = new Date().toISOString().slice(0, 10);
-    fetchOfferEdgePlays(date).then(({ plays }) => {
+    const date = localCalendarDate();
+    const offerSetChanged = prevRacingOfferKey.current !== racingOfferKey;
+    prevRacingOfferKey.current = racingOfferKey;
+    fetchOfferEdgePlays(date, { force: offerSetChanged }).then(({ plays }) => {
       if (cancelled) return;
       // Plays arrive best-EV first, so the first per offer is the one to show.
       const best = new Map<number, OfferEdgePlay>();
@@ -131,7 +140,7 @@ export function useDoNextItems(pollMs?: number): {
     return () => {
       cancelled = true;
     };
-  }, [hasRacingOffer, now]);
+  }, [hasRacingOffer, now, racingOfferKey]);
 
   const items = useMemo(() => {
     const opts = {

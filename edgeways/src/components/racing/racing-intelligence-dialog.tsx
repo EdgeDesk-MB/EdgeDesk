@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
+import { suggestedRacesFromPlays } from "@/lib/offers/suggested-races-from-plays";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +58,10 @@ export interface RacingIntelligenceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   suggestions: SuggestedRace[];
+  /** UK calendar date the desk is showing. Used to fetch Offer Edge if the lite payload has no picks yet. */
+  date?: string;
+  /** True while the desk is still waiting on exchange books. */
+  loading?: boolean;
   onSelectRace: (externalId: string) => void;
   onBackRunner: (raceId: string, runnerName: string, offerId: number) => void;
   /** Open the full campaign card for this offer (stacked over Race picks). */
@@ -393,6 +399,8 @@ export function RacingIntelligenceDialog({
   open,
   onOpenChange,
   suggestions,
+  date,
+  loading = false,
   onSelectRace,
   onBackRunner,
   onViewOffer,
@@ -403,12 +411,36 @@ export function RacingIntelligenceDialog({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
+  const [edgeSuggestions, setEdgeSuggestions] = useState<SuggestedRace[]>([]);
+  const [edgeLoading, setEdgeLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !date) return;
+    if (suggestions.length > 0) {
+      setEdgeSuggestions([]);
+      setEdgeLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setEdgeLoading(true);
+    fetchOfferEdgePlays(date).then((data) => {
+      if (cancelled) return;
+      setEdgeSuggestions(suggestedRacesFromPlays(data.plays));
+      setEdgeLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, date, suggestions.length]);
+
+  const resolvedSuggestions = suggestions.length > 0 ? suggestions : edgeSuggestions;
+  const picksPending = (loading || edgeLoading) && resolvedSuggestions.length === 0;
 
   // Picks are always scoped to one offer. The same race can be the best play for
   // one campaign and useless for another, so there is no mixed "All offers" list.
   const offerOptions = useMemo(() => {
     const byId = new Map<number, OfferOption>();
-    for (const s of suggestions) {
+    for (const s of resolvedSuggestions) {
       const existing = byId.get(s.offerId);
       if (!existing) {
         byId.set(s.offerId, {
@@ -427,7 +459,7 @@ export function RacingIntelligenceDialog({
       if (!existing.bookmaker && s.bookmaker) existing.bookmaker = s.bookmaker;
     }
     return [...byId.values()];
-  }, [suggestions]);
+  }, [resolvedSuggestions]);
 
   // When the dialog opens, land on the offer with the strongest pick. Soft polls
   // must not yank the user onto a different campaign mid-browse.
@@ -461,8 +493,8 @@ export function RacingIntelligenceDialog({
     () =>
       activeOfferId == null
         ? []
-        : suggestions.filter((s) => s.offerId === activeOfferId),
-    [suggestions, activeOfferId]
+        : resolvedSuggestions.filter((s) => s.offerId === activeOfferId),
+    [resolvedSuggestions, activeOfferId]
   );
 
   const sorted = useMemo(() => {
@@ -654,14 +686,23 @@ export function RacingIntelligenceDialog({
             <EmptyState
               compact
               oneLine
+              busy={picksPending}
               icon={Zap}
-              title={suggestions.length === 0 ? "No picks yet" : "No picks in this tier"}
+              title={
+                picksPending
+                  ? "Finding race picks…"
+                  : resolvedSuggestions.length === 0
+                    ? "No picks yet"
+                    : "No picks in this tier"
+              }
               description={
-                suggestions.length === 0
-                  ? hasPlaceRefundOffer
-                    ? "Qualifying races need bookie or live lay prices before they can be ranked. Paste a price, or wait for the exchange to match."
-                    : "Add a place-refund offer to unlock ranked picks."
-                  : "Try another confidence filter."
+                picksPending
+                  ? "Matching qualifying races to live lays. This can take a few seconds on the first load of the day."
+                  : resolvedSuggestions.length === 0
+                    ? hasPlaceRefundOffer
+                      ? "Qualifying races need bookie or live lay prices before they can be ranked. Paste a price, or wait for the exchange to match."
+                      : "Add a place-refund offer to unlock ranked picks."
+                    : "Try another confidence filter."
               }
             />
           ) : (

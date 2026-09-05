@@ -35,6 +35,11 @@ export function writeEntry<T>(cache: PriceCache<T>, key: string, data: T): void 
   cache.set(key, { at: Date.now(), data });
 }
 
+const fetchInflight = new WeakMap<
+  PriceCache<unknown>,
+  Map<string, Promise<CachedRead<unknown>>>
+>();
+
 /** Fetch through a TTL cache, falling back to an expired entry on upstream failure. */
 export async function cachedFetch<T>(
   cache: PriceCache<T>,
@@ -45,13 +50,29 @@ export async function cachedFetch<T>(
   const fresh = readFresh(cache, key, ttlMs);
   if (fresh !== undefined) return { data: fresh, stale: false };
 
-  try {
-    const data = await fetcher();
-    writeEntry(cache, key, data);
-    return { data, stale: false };
-  } catch (error) {
-    const expired = cache.get(key);
-    if (expired) return { data: expired.data, stale: true };
-    throw error;
+  const typedCache = cache as PriceCache<unknown>;
+  let inflight = fetchInflight.get(typedCache);
+  if (!inflight) {
+    inflight = new Map();
+    fetchInflight.set(typedCache, inflight);
   }
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<CachedRead<T>>;
+
+  const work = (async (): Promise<CachedRead<T>> => {
+    try {
+      const data = await fetcher();
+      writeEntry(cache, key, data);
+      return { data, stale: false };
+    } catch (error) {
+      const expired = cache.get(key);
+      if (expired) return { data: expired.data, stale: true };
+      throw error;
+    }
+  })().finally(() => {
+    if (inflight.get(key) === work) inflight.delete(key);
+  });
+
+  inflight.set(key, work as Promise<CachedRead<unknown>>);
+  return work;
 }

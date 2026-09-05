@@ -1,20 +1,26 @@
 # Live readiness — Edgeways
 
-> What stands between today and a paying, compliant, automated product.
+> Launch ops: automation, payments, legal, and the checklist that got us live.
 > Strategy lives in `edgeways/docs/roadmap/product-roadmap.md` (§7 business path);
-> this file is the operational wrapper: automation setup, payments, legal, and the
-> pre-launch checklist. **Daily checklist:** `docs/follow-this-plan.md`.
-> Folder rules: `docs/repo-layout.md`. Nothing here overrides the D1 gate (§7.1) — most items are
-> "prepare now, flip at the gate".
+> this file is the operational wrapper. **Daily checklist:** `docs/follow-this-plan.md`.
+> Folder rules: `docs/repo-layout.md`. Production is live (4 Sep 2026); the
+> cycle dates below are the original plan, not the current surface.
 >
 > Infrastructure (hosting, database, environments, go-live hygiene):
 > `docs/hosting-and-environments.md`. Architecture decision brief:
 > `docs/decisions/d6-architecture-route.md` (EDGE-18). Feeds:
 > `docs/decisions/d7-operator-held-feeds.md` (customers bring money only).
 
-**Status snapshot (2026-08-25):** waitlist site live at https://edgeways.app
-(`SITE_SURFACE=waitlist`). Desk routes redirect to `/` on production. Clerk
-auth, Neon `app_users`, Stripe Checkout + slip + portal, and Settings →
+**Status snapshot (2026-09-04):** https://edgeways.app is the **live app**,
+not a waitlist. Homepage is the launch variant (`LANDING_VARIANT=launch`):
+"Start free: matched betting without the faff", H1 "Know what's next. See
+what paid.", public pricing, Try the desk / Log in / Start free trial. No
+waitlist form. Desk is open (`SITE_SURFACE=app`): `/desk` HTTP 200, not
+bounced to `/`. Clerk at `clerk.edgeways.app`. Waitlist code remains as
+fail-closed fallback (EDGE-109), Founding eligibility, and admin metrics;
+Privacy still names waitlist email because those rows exist.
+
+Clerk auth, Neon `app_users`, Stripe Checkout + slip + portal, and Settings →
 Subscription (EDGE-58) are in. Webhooks write the tier (EDGE-5); real
 entitlement enforcement replaced the preview (EDGE-22) with server-side feed
 guards (EDGE-83). `/terms` + `/privacy` published (EDGE-61). Billing rehearsal
@@ -23,13 +29,9 @@ subscriptions (EDGE-82). Neon desk cutover done (EDGE-47, restore drill
 verified). Operator-held pooled feeds serve customer-tracked events (EDGE-81,
 D7); admin panel live at `/admin` (EDGE-80). Keyboard chords + `?` sheet
 (EDGE-78) and keyboard settle (EDGE-79) shipped; mobile polish round landed
-(EDGE-84/85/86: deck swipe, quick-actions sheet, modal field audit, touch
-targets, compact top bar). **Ahead of the cycle plan by ~4–6 weeks** — the
-C3–C5 build tickets are already Done. EDGE-45 resolved 25 Aug: D8 staged
-licensing means full tiers launch with pooled feeds; the ticket is now a
-dormant comply-on-contact protocol, not a blocker. Next: EDGE-37 checklist
-pass, EDGE-29 → EDGE-33 beta validation, EDGE-67 referral codes, then
-`SITE_SURFACE=app`.
+(EDGE-84/85/86). EDGE-45 resolved 25 Aug: D8 staged licensing. Remaining:
+EDGE-37 checklist pass, EDGE-33 stranger test, EDGE-67 referral codes.
+Do **not** flip production back to waitlist.
 The D1 gate was opened for launch-path work on
 10 Aug 2026 — evidence tracked as Linear EDGE-36. Work is in Linear: initiative
 **[Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c)**
@@ -38,16 +40,21 @@ M2 Beta (4 Oct) → M3 Launch (2 Nov).
 
 ## 1. The path, in order
 
+Original cycle (written Aug 2026). Production launched ahead of M3: live
+homepage and desk are already open (verified 4 Sep). Treat steps 1–3 as
+history.
+
 1. **Now → M1 (6 Sep):** foundation decisions and cheap legal: N0 matrix, D6 formal
    decision, processor acceptance, solicitor, ICO, trademark search, domain/hosting,
    feedback triage dogfooded. (Cycle 1 issues are in Linear.)
 2. **M1 → M2 (4 Oct):** auth + sign-in, billing in test mode, ToS/Privacy
-   **published** on `/terms` and `/privacy` with signup + waitlist consent
-   (EDGE-61), 18+ gate, waitlist + countdown live, E3/G2/onboarding done.
+   **published** on `/terms` and `/privacy` with signup consent
+   (EDGE-61), 18+ gate, E3/G2/onboarding done. Waitlist + countdown were the
+   interim public surface; they are no longer production `/`.
 3. **M2 → M3 (2 Nov):** real entitlement enforcement, live charges, solicitor
    sign-off of the published legal pages, a11y sweep, full pre-launch checklist
    pass.
-4. **Post-launch:** §7.3 oddsmatching bridge stays staged; Elite tier (§7.5) only
+4. **Post-launch (now):** §7.3 oddsmatching bridge stays staged; Elite tier (§7.5) only
    once Edge revenue funds it.
 
 ## 2. Automation setup
@@ -165,20 +172,17 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
 - [x] **Public legal pages + signup consent** — EDGE-61 (M2, High). This is
       the OddsMonkey-shaped gap: customer-facing `/terms` and `/privacy`,
       required checkbox on `/sign-up` ("I have read and agree to the Terms
-      of Service and Privacy Policy", both linked), waitlist + marketing
-      footer links (replace "Full privacy policy before public launch"),
-      Settings → Help & about, Stripe Checkout terms URL. Add both paths to
-      `WAITLIST_PAGES` or production bounces them home. Cookie/PECR: no
-      separate banner while PostHog stays cookieless (EDGE-35); fold cookies
-      into Privacy §9. Publishing a dated draft on the waitlist site can
-      happen as soon as Sam reads EDGE-11/12; solicitor sign-off stays
-      before charging strangers. We do **not** copy OddsMonkey's
+      of Service and Privacy Policy", both linked), marketing
+      footer links, Settings → Help & about, Stripe Checkout terms URL.
+      Cookie/PECR: no separate banner while PostHog stays cookieless
+      (EDGE-35); fold cookies into Privacy §9. Pages are live on
+      production. Solicitor sign-off stays if an EDGE-8 trigger fires. We do **not** copy OddsMonkey's
       "aggregator licensed by the GC" line: we are software, not an
       operator aggregator (see `docs/legal/gambling-licence-assessment.md`).
       Sibling: EDGE-66 public `/contact` and `/refund`. Gibraltar
       incorporation is **not** required (assessment §9, 16 Aug 2026).
 - [ ] **ICO registration** — self-assessment 17 Aug: no fee until trading
-      starts. Retake then (~£40/yr). Not a launch blocker for the waitlist.
+      starts. Retake then (~£40/yr). Production is already live.
 - [x] **Company form** — sole trader: Sam Hayter trading as Edgeways
       (EDGE-15, 17 Aug). Ltd later if revenue or liability justifies.
 - [ ] **Trademark** — UK IPO search 19 Aug 2026 (EDGE-10, on hold). Hit:
@@ -232,10 +236,10 @@ roadmap items that deliver them:
       warning/destructive/success tokens, marketing destructive remap.
       Custom Appearance accents were not measured. Settle-focused-bet
       leftover is EDGE-79.
-- [x] **Legal surfaces (EDGE-61)** — `/terms` and `/privacy` live on the
-      waitlist surface; waitlist + `/sign-up` collect consent; footer and
-      Settings link the same pages. Solicitor sign-off of those pages before
-      charging strangers (EDGE-8).
+- [x] **Legal surfaces (EDGE-61)** — `/terms` and `/privacy` live on
+      production; `/sign-up` collects consent; footer and Settings link the
+      same pages. Solicitor sign-off of those pages if an EDGE-8 trigger
+      fires.
 - [x] **Support channel** — EDGE-34 decided **email** (`support@` / `hello@`).
       Public `/contact` and `/refund` shipped (EDGE-66). In-app feedback
       remains for product bugs. No live-chat widget before launch.
@@ -267,6 +271,45 @@ roadmap items that deliver them:
       `docs/strategy/oddsmonkey-onboarding-research.md`. Import spec:
       `docs/strategy/platform-import.md`.
 
+### 5.1 Offer inbox go-live (email forwarding)
+
+Phase 1 shipped 4 Sep 2026: per-desk `offers+<token>@<inbox-domain>`
+addresses, `/api/offers/inbound` webhook (Svix signature verify, Message-ID +
+content-fingerprint dedup, 50/day cap, 12-month receipt-log retention),
+Settings → Automation card, privacy policy updated. Verified end to end on
+localhost against the Neon desk. **Admin-gated rollout (5 Sep):** the card,
+settings API and webhook ingest all require an operator admin account on
+hosted desks (`offerInboxAvailable` / `isOfferInboxAllowed`); Admin → Users
+is the control surface, non-admin addresses drop silently. Relax the gate
+when the feature opens to everyone. To take it live:
+
+- [ ] **Resend: enable receiving** — Domains → the verified edgeways.app
+      domain → Receiving → enable. Resend shows the MX record to add.
+- [ ] **DNS: one MX record** on the inbound subdomain (e.g.
+      `in.edgeways.app`, priority 10, value from the Resend dashboard). A
+      subdomain keeps existing email untouched. Back in Resend: "I've added
+      the record" → wait for verified.
+- [ ] **Resend: add webhook** — Webhooks → Add → URL
+      `https://<prod-host>/api/offers/inbound`, event `email.received`. Copy
+      the signing secret (`whsec_…`).
+- [ ] **Vercel env (production):** `EDGEWAYS_INBOUND_DOMAIN=in.edgeways.app`
+      (must match the MX subdomain), `EDGEWAYS_INBOUND_WEBHOOK_SECRET=whsec_…`.
+      `RESEND_API_KEY` is already set and is reused — the webhook is metadata
+      only, so the route fetches the body from the Resend Receiving API.
+      Without the secret, production refuses inbound mail (503).
+- [ ] **Smoke test:** enable the inbox on a hosted desk (Settings →
+      Automation), forward a real bookmaker offer email to the address,
+      confirm a Planned draft lands on Offers with the alert + push.
+- [ ] **Local tunnel test (optional):** ngrok → `http://localhost:3000`, add
+      the tunnel URL as a second webhook endpoint in Resend to rehearse
+      against the local desk.
+
+Phase 2 (zero-tap) started 4 Sep 2026: PWA Share Target shipped — installed
+app appears in the OS share sheet, shared text lands on `/share`, parses
+through `parseOfferFromText` and saves as Planned with `source: "share"`.
+Remaining Phase 2: auto-forward wizard, Gmail verification-link
+auto-confirm. Phase 3 (intelligence) not started.
+
 ## 6. Linear structure (created 10 Aug 2026)
 
 Initiative: **Live Readiness** (target 2 Nov 2026). Team `Edgeways` (key EDGE).
@@ -276,10 +319,9 @@ Milestones in every project: M1 Gate-ready (6 Sep) · M2 Beta (4 Oct) · M3 Laun
 Cycle plan (assigned 10 Aug; every open ticket now sits in a cycle except
 EDGE-43, deliberately deferred until feedback volume exists):
 
-> **Progress note (25 Aug 2026):** the C3–C5 build tickets landed weeks early —
-> EDGE-3, 4, 5, 7, 20, 21, 22, 32, 34, 47, 49, 61 are all Done. Open heading
-> into M1: EDGE-6, 9, 27, 28, 29, 33, 36, 37, 41, 43, 45, 67. The critical
-> path is now decisions and people (EDGE-45 scope, beta strangers), not code.
+> **Progress note (4 Sep 2026):** production is the live app (launch homepage
+> + open desk), ahead of the original M3 date. 25 Aug note still holds for
+> the build tickets. Do not plan a `SITE_SURFACE=app` flip; it already happened.
 
 | Cycle | Dates | Theme | Tickets |
 |-------|-------|-------|---------|

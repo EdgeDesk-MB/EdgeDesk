@@ -16,6 +16,19 @@ export const COLLAPSE_EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
 export const collapseTransition = `${SPRING_DURATION_MS}ms ${COLLAPSE_EASE}`;
 
 /**
+ * Sliding tab plate / underline (`useSlidingIndicator`). Material standard
+ * ease (same curve as COLLAPSE_EASE) — no overshoot. 300ms is 50% longer
+ * than the 200ms spring flourish. Independent of SPRING_DURATION_MS so a
+ * spring retune does not silently change tabs.
+ *
+ * Indicators in `tabs.tsx` apply this via `duration-300 ease-in-out` on
+ * `transform` + `width` (not `left`) so `motion-reduce:transition-none`
+ * can win over the class and the plate stays on the compositor.
+ */
+export const TAB_SLIDE_DURATION_MS = 300;
+export const tabSlideTransition = `${TAB_SLIDE_DURATION_MS}ms ${COLLAPSE_EASE}`;
+
+/**
  * Meta-nav Chrome tab slide — WAAPI on transform + width (compositor /
  * high-refresh). Fast + almost linear (very light ease-in/out only).
  */

@@ -23,7 +23,6 @@ reads Neon, so the desk looks empty. This shipped once. It must not ship again.
 
 - Ship a hosted mutation that only inserts/updates/deletes SQLite.
 - Treat localhost SQLite success as proof the live desk works.
-- Enable the Free Profit Tracker site banner until this branch is production.
 - Expand hosted backup/restore to new tables unless restore is tested.
 
 `EDGEWAYS_DESK_BACKEND=neon` plus `DATABASE_URL` is what `isNeonDesk()` checks.

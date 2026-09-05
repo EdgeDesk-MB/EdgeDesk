@@ -112,6 +112,12 @@ export const ONBOARDING_WHY = [
     flag: "racing_live_feeds",
   },
   {
+    id: "football_live",
+    label: "Football live card",
+    description: "Who scored, bookings, and the named lineups on tracked matches.",
+    flag: "football_live_feeds",
+  },
+  {
     id: "live_results",
     label: "Live results",
     description: "Fixtures and races settle when results land.",

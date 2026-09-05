@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ComponentType } from "react";
 import { Loader2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ export function EmptyState({
   busy,
   bare,
 }: {
-  icon?: LucideIcon;
+  icon?: LucideIcon | ComponentType<{ className?: string }>;
   title: string;
   description: React.ReactNode;
   action?: { label: string; href?: string; onClick?: () => void };

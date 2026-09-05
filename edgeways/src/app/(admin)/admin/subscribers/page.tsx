@@ -13,6 +13,7 @@ import { AdminSection } from "@/components/admin/admin-section";
 import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
 import { AdminTableFrame } from "@/components/admin/admin-table";
 import { OnboardingAnswersTable } from "@/components/admin/onboarding-answers-table";
+import { FoundingInviteForm } from "@/components/admin/founding-invite-form";
 import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
@@ -82,7 +83,7 @@ export default async function AdminSubscribersPage() {
   return (
     <AdminPage
       title="Subscribers"
-      description="Plans, waitlist and last active."
+      description="Plans, trials, Founding list and last active."
       icon={Users}
       toolbar={
         <AdminAccountFilters
@@ -331,7 +332,7 @@ export default async function AdminSubscribersPage() {
                   </TableCell>
                   <TableCell className={cn(tableBodyCell, "capitalize")}>
                     {user.plan}
-                    {user.founding ? " · founding" : ""}
+                    {user.founding ? " · Founding" : ""}
                   </TableCell>
                   <TableCell className={cn(tableBodyCell, "capitalize")}>
                     {adminBillingStatusLabel(user)}
@@ -346,13 +347,18 @@ export default async function AdminSubscribersPage() {
         )}
       </AdminSection>
 
-      <AdminSection title="Waitlist">
-        {visibleWaitlist.length === 0 ? (
+      <AdminSection
+        title="Founding list"
+        description="These emails get Founding at Edge monthly checkout: 14 days free, then three months at £9.99, then list price. No mail is sent. They must use this address. It does not change a sub already on list price."
+      >
+        <div className="flex min-w-0 flex-col gap-3">
+          <FoundingInviteForm />
+          {visibleWaitlist.length === 0 ? (
           <EmptyState
             compact
             icon={Users}
-            title="No waitlist signups yet"
-            description="Confirmed and unsubscribed rows appear here once people join."
+            title="No emails on the Founding list yet"
+            description="Add an address above, or people who joined the old waitlist appear here."
           />
         ) : (
         <AdminTableFrame>
@@ -368,7 +374,12 @@ export default async function AdminSubscribersPage() {
           <TableBody>
               {visibleWaitlist.map((row) => (
                 <TableRow key={row.email}>
-                  <TableCell className={cn(tableBodyCell, "max-w-[18rem] truncate")}>{row.email}</TableCell>
+                  <TableCell
+                    className={cn(tableBodyCell, "max-w-[18rem] min-w-0 truncate")}
+                    title={row.email}
+                  >
+                    {row.email}
+                  </TableCell>
                   <TableCell className={tableBodyCell}>{formatAdminDateTime(row.createdAt)}</TableCell>
                   <TableCell className={tableBodyCell}>
                     {row.confirmedAt ? formatAdminDateTime(row.confirmedAt) : "—"}
@@ -382,6 +393,7 @@ export default async function AdminSubscribersPage() {
         </Table>
         </AdminTableFrame>
         )}
+        </div>
       </AdminSection>
     </AdminPage>
   );

@@ -16,7 +16,7 @@
  *   npm run dev:detached
  */
 
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import {
   mkdirSync,
   writeFileSync,
@@ -24,14 +24,18 @@ import {
   unlinkSync,
   existsSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(root, "data");
 const pidPath = path.join(dataDir, "dev-keep.pid");
+const nextBin = path.join(root, "node_modules/next/dist/bin/next");
+const sendJs = path.join(root, "node_modules/next/dist/compiled/send/index.js");
 const port = process.env.PORT || "3000";
 const restartDelayMs = Number(process.env.EDGEWAYS_DEV_RESTART_MS || 1000);
+const requireFromKeep = createRequire(import.meta.url);
 
 let child = null;
 let stopping = false;
@@ -89,10 +93,67 @@ function stop(signal) {
   setTimeout(() => process.exit(0), 500).unref();
 }
 
+/** iCloud Documents evicts node_modules to dataless stubs; Next then exits 0. */
+function nextLooksEvicted() {
+  if (!existsSync(nextBin) || !existsSync(sendJs)) return true;
+  try {
+    const listing = execFileSync("ls", ["-lO", sendJs], { encoding: "utf8" });
+    if (listing.includes("dataless")) return true;
+  } catch {
+    // ls -lO is macOS-only; fall through to the require check.
+  }
+  try {
+    const send = requireFromKeep(sendJs);
+    return typeof send?.mime !== "object";
+  } catch {
+    return true;
+  }
+}
+
+function wipeEvictedDevCache() {
+  const cacheDir = path.join(root, ".next/dev/cache");
+  if (!existsSync(cacheDir)) return;
+  try {
+    const listing = execFileSync(
+      "find",
+      [cacheDir, "-type", "f", "-name", "*.sst", "-print"],
+      { encoding: "utf8", timeout: 2000 }
+    );
+    const sample = listing.split("\n").find(Boolean);
+    if (!sample) return;
+    const flags = execFileSync("ls", ["-lO", sample], { encoding: "utf8" });
+    if (!flags.includes("dataless")) return;
+  } catch {
+    return;
+  }
+  log("iCloud evicted the Turbopack cache; clearing .next/dev");
+  execFileSync("rm", ["-rf", path.join(root, ".next/dev")]);
+}
+
+function restoreNextIfEvicted() {
+  wipeEvictedDevCache();
+  if (!nextLooksEvicted()) return;
+  log(
+    "iCloud evicted node_modules files (Documents is synced). Restoring with npm install"
+  );
+  execFileSync("npm", ["install", "--no-fund", "--no-audit"], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  execFileSync("rm", ["-rf", path.join(root, ".next/dev")]);
+  if (nextLooksEvicted()) {
+    log(
+      "restore failed. Run: npm install. To stop this after reboots, keep node_modules off iCloud (node_modules.nosync + symlink)."
+    );
+  }
+}
+
 function start() {
   if (stopping) return;
   generation += 1;
   const gen = generation;
+
+  if (restarts === 0) restoreNextIfEvicted();
 
   const nodeOptions = [
     process.env.NODE_OPTIONS,
@@ -105,14 +166,13 @@ function start() {
     .replace(/\s+/g, " ")
     .trim();
 
-  const args = ["next", "dev", "--port", String(port)];
   log(
     restarts === 0
       ? `starting next on :${port}`
       : `restart #${restarts} → next on :${port}`
   );
 
-  child = spawn("npx", args, {
+  child = spawn(process.execPath, [nextBin, "dev", "--port", String(port)], {
     cwd: root,
     stdio: "inherit",
     env: {

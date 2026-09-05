@@ -4,6 +4,7 @@
  */
 import { buildOfferEdgePlays, formatEdgePlaySummary } from "@/lib/offers/offer-edge";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
+import { suggestedRacesFromPlays } from "@/lib/offers/suggested-races-from-plays";
 import type { BetGetFreePlaceRules } from "@/lib/offers/racing-offer-rules";
 import { placePositions } from "@/lib/racing";
 import type {
@@ -130,40 +131,7 @@ function attachOfferTags(race: RacingDeskRace, plays: OfferEdgePlay[]): RacingDe
 }
 
 function suggestionsFromPlays(plays: OfferEdgePlay[]): SuggestedRace[] {
-  return plays.map((play) => ({
-    externalId: play.raceExternalId,
-    course: play.course,
-    raceName: play.raceName,
-    startTime: play.startTime,
-    offTime: play.offTime,
-    region: play.region,
-    offerId: play.offerId,
-    offerTitle: play.offerTitle,
-    bookmaker: play.bookmaker,
-    score: 80,
-    summary: formatEdgePlaySummary(play),
-    oddsSource: play.oddsSource,
-    exchangeSource: play.exchangeSource,
-    confidence: play.confidence,
-    topEv: play.totalEv,
-    edge: play,
-    topTarget: {
-      horseId: play.runner.horseId,
-      name: play.runner.name,
-      marketRank: play.runner.marketRank,
-      score: 80,
-      summary: formatEdgePlaySummary(play),
-      bookieDecimal: play.runner.backDecimal,
-      exchangeDecimal: play.runner.layDecimal,
-      oddsSource: play.oddsSource,
-      exchangeSource: play.exchangeSource,
-      qualLoss: play.qualLoss,
-      freeBetEv: play.freeBetEv,
-      totalEv: play.totalEv,
-      confidence: play.confidence,
-      offerId: play.offerId,
-    },
-  }));
+  return suggestedRacesFromPlays(plays);
 }
 
 export function publicDemoRacingDesk(date: string): RacingDeskPayload {

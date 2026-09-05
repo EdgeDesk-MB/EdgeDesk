@@ -104,47 +104,52 @@ export function ExchangeBackTags({
 }) {
   if (tags.length === 0 && !suspended) return null;
 
+  const oddsRow = tags.length > 0 ? (
+    <div
+      className={cn(
+        "col-start-1 row-start-1 flex min-w-0 flex-wrap items-center justify-end gap-1.5",
+        suspended && "invisible"
+      )}
+      aria-hidden={suspended}
+    >
+      {tags.map((tag) => {
+        const price = formatDecimalOdds(tag.odds);
+        return (
+          <span
+            key={tag.runner}
+            style={oddsCellStyle(BETFAIR_BACK)}
+            aria-label={`${tag.label} ${price}`}
+            className={cn(
+              "surface-glass relative inline-flex max-w-full items-baseline gap-1 rounded-sm px-1.5 py-0.5 text-xs tabular-nums",
+              oddsCellClass
+            )}
+          >
+            <span
+              className={cn(
+                "max-w-[4.5rem] truncate",
+                tag.highlighted
+                  ? "font-semibold text-black/90 dark:text-white"
+                  : "text-black/60 dark:text-white/70"
+              )}
+            >
+              {tag.label}
+            </span>
+            <LiveBackOdds odds={tag.odds} paused={!!suspended} quoteSeq={quoteSeq} />
+          </span>
+        );
+      })}
+    </div>
+  ) : null;
+
   return (
-    <div className={cn("flex min-w-0 flex-col items-end gap-0.5", className)}>
-      {tags.length > 0 ? (
-        <div
-          className={cn(
-            "flex min-w-0 flex-wrap items-center justify-end gap-1.5",
-            suspended && "opacity-60"
-          )}
-        >
-          {tags.map((tag) => {
-            const price = formatDecimalOdds(tag.odds);
-            return (
-              <span
-                key={tag.runner}
-                style={oddsCellStyle(BETFAIR_BACK)}
-                aria-label={
-                  suspended ? `${tag.label} ${price}, market suspended` : `${tag.label} ${price}`
-                }
-                className={cn(
-                  "surface-glass relative inline-flex max-w-full items-baseline gap-1 rounded-sm px-1.5 py-0.5 text-xs tabular-nums",
-                  oddsCellClass
-                )}
-              >
-                <span
-                  className={cn(
-                    "max-w-[4.5rem] truncate",
-                    tag.highlighted
-                      ? "font-semibold text-black/90 dark:text-white"
-                      : "text-black/60 dark:text-white/70"
-                  )}
-                >
-                  {tag.label}
-                </span>
-                <LiveBackOdds odds={tag.odds} paused={!!suspended} quoteSeq={quoteSeq} />
-              </span>
-            );
-          })}
-        </div>
-      ) : null}
+    <div className={cn("grid min-h-6 min-w-0 justify-items-end", className)}>
+      {oddsRow}
       {suspended ? (
-        <span className="text-xs text-muted-foreground">Market suspended</span>
+        <div className="col-start-1 row-start-1 flex min-h-6 items-center justify-end">
+          <span className="text-xs text-muted-foreground" role="status">
+            Market suspended
+          </span>
+        </div>
       ) : null}
     </div>
   );

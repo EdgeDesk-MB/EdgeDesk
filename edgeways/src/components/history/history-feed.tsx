@@ -46,6 +46,7 @@ import {
   showEarlyFreeBetAwardButton,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
+import { stripStaleHorseFromRacingBetLabel } from "@/lib/bets/racing-bet-label";
 import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Gift, History } from "lucide-react";
@@ -689,7 +690,9 @@ export function HistoryEntryCard({
                 {showHistoryBetLabel(bet) && (
                   <div>
                     <dt className="text-xs text-muted-foreground">Bet</dt>
-                    <dd className="font-medium">{bet.label}</dd>
+                    <dd className="font-medium">
+                      {stripStaleHorseFromRacingBetLabel(bet.label, bet.selection)}
+                    </dd>
                   </div>
                 )}
                 {bet.bookmaker && (

@@ -1,8 +1,9 @@
 # Hosting, database & environments — the infrastructure map
 
-> 10 Aug 2026. The methodical companion to `live-readiness.md`: what runs
-> where, which tools we need accounts for, and the go-live hygiene gates.
-> PWA-first is confirmed; native apps are a later wrapper, not a rewrite.
+> 10 Aug 2026, status pass **4 Sep 2026**. Companion to `live-readiness.md`:
+> what runs where, which tools we need accounts for, and go-live hygiene.
+> Production is the live app (`SITE_SURFACE=app`, launch homepage), not a
+> waitlist. PWA-first is confirmed; native apps are a later wrapper.
 
 ## 1. Target shape
 
@@ -61,12 +62,10 @@ Web Analytics (leave off — PostHog covers it, don't double-track).
 **Today:** SQLite-per-install with bootstrap `CREATE TABLE IF NOT EXISTS` +
 additive `ALTER` migrations in `src/lib/db/index.ts`. Right for local-first.
 
-**Hosted (Route 1, post-D6):** managed Postgres. Recommendation: **Neon** —
-serverless Postgres, scale-to-zero (cheap at waitlist scale), instant
-copy-on-write **branches** (that *is* our staging database), point-in-time
-recovery on paid tiers. Turso is the alternative (SQLite semantics, embedded
-replicas — the Route 2 fallback). Drizzle ORM supports both; the schema is
-already Drizzle.
+**Hosted (Route 1, shipped):** managed Postgres on **Neon**. Production
+desk is Neon (`EDGEWAYS_DESK_BACKEND=neon`). Instant copy-on-write
+**branches** are staging. Cheap at current scale. Turso remains the Route 2
+fallback. Drizzle ORM supports both; the schema is already Drizzle.
 
 **Migration discipline (new, required for hosted):**
 1. `drizzle-kit generate` produces versioned SQL migration files (replaces
@@ -90,10 +89,10 @@ already Drizzle.
 | Human email | Zoho Mail — `sam@edgeways.app` + `hello@` / `support@` aliases | **Done** (11 Aug) |
 | GitHub | Private repo `EdgeDesk-MB/EdgeDesk`, branch protection, Actions for migration deploys | Exists — **confirm private** |
 | Vercel | Hosting, previews (staging), env vars, cron — team `edgeways` (Pro trial) | **Done** (EDGE-46 — prod live at edgeways.app) |
-| Neon | Managed Postgres + branches + PITR | **In progress** (EDGE-47; scaffold + migrations; app cutover open) |
+| Neon | Managed Postgres + branches + PITR | **Done** (EDGE-47; hosted desk on production) |
 | PostHog EU | Analytics + error tracking, cookieless, `/ingest` proxy | **Done** (EDGE-35) |
-| Stripe | Payments (direct, L1 15 Aug). Test catalogue EDGE-3. Checkout + slip + portal + webhook tier write on localhost | **In progress** — next is EDGE-58 Settings manage |
-| Transactional email (Resend) | Waitlist + auth emails; domain Verified Ireland | **Done** for waitlist (EDGE-26); auth emails later |
+| Stripe | Payments (direct, L1 15 Aug). Catalogue, Checkout, slip, portal, webhooks | **Live** on production; test-mode rehearsal EDGE-7 green 25 Aug |
+| Transactional email (Resend) | Auth, billing, feedback, leftover waitlist mail; domain Verified Ireland | **Done** (EDGE-26); waitlist joins no longer collected on `/` |
 | Uptime monitor (Better Stack / UptimeRobot free) | Hits `/api/health`, alerts to email | Sam: point at `https://edgeways.app/api/health` (EDGE-48) |
 | Linear | Planning | Done |
 | **Later (native):** Google Play + TWA; Apple Developer + Capacitor/PWABuilder | App store wrappers | Post-launch |

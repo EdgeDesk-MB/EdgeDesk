@@ -19,6 +19,7 @@ import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { PlanLockEmpty } from "@/components/plan-lock-empty";
+import { HorseRacingIcon } from "@/components/sport-icon";
 import { ActiveBetsStrip } from "@/components/racing/active-bets-strip";
 import { DeskRacecard } from "@/components/racing/desk-racecard";
 import { RacingPnlTodayView } from "@/components/racing/racing-pnl-today-view";
@@ -48,9 +49,13 @@ import {
 } from "@/components/ui/tooltip";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
+import { localCalendarDate } from "@/lib/events";
 import { deskRunnerLayPrices } from "@/lib/racing/desk-bet-prefill";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
+import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
+import { suggestedRacesFromPlays } from "@/lib/offers/suggested-races-from-plays";
 import {
   countRecommendedRaces,
   findOfferTag,
@@ -62,6 +67,7 @@ import {
 import type { RacingDeskPayload, RacingDeskRace } from "@/lib/racing-desk/types";
 import type { ExchangeProvider } from "@/lib/services/exchange/types";
 import { exchangeNameToProvider } from "@/lib/services/exchange/client";
+import { racingOfferBetLabel } from "@/lib/bets/racing-bet-label";
 import { placePositions } from "@/lib/racing";
 import { ukPlaceTerms } from "@/lib/racing/place-terms";
 import {
@@ -69,12 +75,27 @@ import {
   HelpCircle,
   Plus,
   RefreshCw,
-  Trophy,
   Zap,
 } from "lucide-react";
 
 /** Client remount TTL — server racecards cache is 15m; keep this shorter for lays. */
 const DESK_GET_TTL_MS = 45_000;
+const DESK_MEMORY_MS = 60_000;
+
+/** Survives Fast Refresh remounts so a lite paint cannot wipe live lays. */
+let rememberedDesk: { date: string; payload: RacingDeskPayload; at: number } | null =
+  null;
+
+function rememberFullDesk(payload: RacingDeskPayload): void {
+  if (payload.summary.lite) return;
+  rememberedDesk = { date: payload.date, payload, at: Date.now() };
+}
+
+function recalledDesk(date: string): RacingDeskPayload | null {
+  if (!rememberedDesk || rememberedDesk.date !== date) return null;
+  if (Date.now() - rememberedDesk.at > DESK_MEMORY_MS) return null;
+  return rememberedDesk.payload;
+}
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { RegionFlag } from "@/components/region-flag";
 import { cn } from "@/lib/utils";
@@ -142,8 +163,10 @@ export function RacingDeskView() {
     !canOfferEdge ||
     !canDesk(state?.settings, "exchange_lay");
   const offerBetPrefs = state?.settings?.offerBetPrefs ?? {};
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [payload, setPayload] = useState<RacingDeskPayload | null>(null);
+  const [date, setDate] = useState(() => localCalendarDate());
+  const [payload, setPayload] = useState<RacingDeskPayload | null>(() =>
+    recalledDesk(localCalendarDate())
+  );
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   /** True only on first load - soft polls must not blank the page. */
@@ -208,34 +231,58 @@ export function RacingDeskView() {
     return map;
   }, [state?.balances?.accounts]);
 
-  const load = useCallback(async (opts?: { soft?: boolean }) => {
+  const fullLoadInflight = useRef<Promise<void> | null>(null);
+
+  const load = useCallback(async (opts?: { soft?: boolean; lite?: boolean }) => {
     // Soft whenever we already have a card - avoids full-page height jump on 60s polls.
     const soft = opts?.soft === true || (opts?.soft !== false && hasPayloadRef.current);
+    if (soft && fullLoadInflight.current) return fullLoadInflight.current;
     if (soft) setRefreshing(true);
     else setLoading(true);
-    try {
-      const qs = new URLSearchParams({ date });
-      if (activeDeskProvider) qs.set("exchange", activeDeskProvider);
-      const path = `/api/racing/desk?${qs}`;
-      // Hard mount uses apiGet so side-nav remounts reuse a warm payload.
-      // Soft polls / manual refresh bypass the client cache for fresher lays;
-      // theracingapi still serves racecards from its 15m server TTL.
-      const res = soft
-        ? await api<RacingDeskPayload>(path)
-        : await apiGet<RacingDeskPayload>(path, DESK_GET_TTL_MS);
-      hasPayloadRef.current = true;
-      setPayload(res);
-      setLoadedAt(Date.now());
-      setSelectedId((prev) => {
-        if (prev && res.races.some((r) => r.externalId === prev)) return prev;
-        return res.races[0]?.externalId ?? null;
+    const run = (async () => {
+      try {
+        const qs = new URLSearchParams({ date });
+        if (activeDeskProvider) qs.set("exchange", activeDeskProvider);
+        if (opts?.lite) qs.set("lite", "1");
+        const path = `/api/racing/desk?${qs}`;
+        // Never cache the lite response: a remount would replay empty exchange
+        // cells over a full payload that already had Betfair lays.
+        const res =
+          opts?.lite || soft
+            ? await api<RacingDeskPayload>(path)
+            : await apiGet<RacingDeskPayload>(path, DESK_GET_TTL_MS);
+        hasPayloadRef.current = true;
+        setPayload((prev) => {
+          if (
+            opts?.lite &&
+            prev &&
+            !prev.summary.lite &&
+            prev.date === res.date
+          ) {
+            return prev;
+          }
+          if (!res.summary.lite) rememberFullDesk(res);
+          return res;
+        });
+        setLoadedAt(Date.now());
+        setSelectedId((prev) => {
+          if (prev && res.races.some((r) => r.externalId === prev)) return prev;
+          return res.races[0]?.externalId ?? null;
+        });
+      } catch (e) {
+        toast.error("Could not load racing desk", { description: String(e) });
+      } finally {
+        if (soft) setRefreshing(false);
+        else setLoading(false);
+      }
+    })();
+    if (soft) {
+      fullLoadInflight.current = run;
+      void run.finally(() => {
+        if (fullLoadInflight.current === run) fullLoadInflight.current = null;
       });
-    } catch (e) {
-      toast.error("Could not load racing desk", { description: String(e) });
-    } finally {
-      if (soft) setRefreshing(false);
-      else setLoading(false);
     }
+    return run;
   }, [date, activeDeskProvider]);
 
   // Adjust-during-render: a date switch blanks the card and re-enters loading.
@@ -247,8 +294,23 @@ export function RacingDeskView() {
   }
 
   useEffect(() => {
+    const recalled = recalledDesk(date);
+    if (recalled) {
+      hasPayloadRef.current = true;
+      setPayload(recalled);
+      setLoading(false);
+      queueMicrotask(() => void load({ soft: true }));
+      return;
+    }
     hasPayloadRef.current = false;
-    queueMicrotask(() => void load({ soft: false }));
+    queueMicrotask(() => {
+      void (async () => {
+        // Paint stored racecards first; live results and exchange books follow
+        // without blanking the page (those are the 10s wait on a full card).
+        await load({ soft: false, lite: true });
+        void load({ soft: true });
+      })();
+    });
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps -- hard reload on date only
 
   useEffect(() => {
@@ -269,6 +331,28 @@ export function RacingDeskView() {
         .join("|"),
     [state?.offers]
   );
+  const [fetchedEdgePlays, setFetchedEdgePlays] = useState<OfferEdgePlay[]>([]);
+  const [prevEdgeDate, setPrevEdgeDate] = useState(date);
+  if (prevEdgeDate !== date) {
+    setPrevEdgeDate(date);
+    setFetchedEdgePlays([]);
+  }
+  const prevRacingOfferKey = useRef(racingOfferKey);
+  useEffect(() => {
+    if (!canOfferEdge) {
+      setFetchedEdgePlays([]);
+      return;
+    }
+    let cancelled = false;
+    const offerSetChanged = prevRacingOfferKey.current !== racingOfferKey;
+    prevRacingOfferKey.current = racingOfferKey;
+    fetchOfferEdgePlays(date, { force: offerSetChanged }).then(({ plays }) => {
+      if (!cancelled) setFetchedEdgePlays(plays);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canOfferEdge, date, racingOfferKey]);
   useEffect(() => {
     if (!hasPayloadRef.current) return;
     void load({ soft: true });
@@ -394,8 +478,11 @@ export function RacingDeskView() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [payload]);
 
+  const deskEdgePlays = payload?.edgePlays ?? EMPTY_EDGE_PLAYS;
   const edgePlays = canOfferEdge
-    ? (payload?.edgePlays ?? EMPTY_EDGE_PLAYS)
+    ? deskEdgePlays.length > 0
+      ? deskEdgePlays
+      : fetchedEdgePlays
     : EMPTY_EDGE_PLAYS;
 
   const qualifyingRaceTotal = useMemo(
@@ -619,7 +706,7 @@ export function RacingDeskView() {
           undefined,
         offerId: offerTag.offerId,
         triggerText: offerTag.triggerText,
-        labelSuggestion: `${race.course} · ${runnerName} · ${offerTag.offerTitle}`,
+        labelSuggestion: racingOfferBetLabel(race.course, offerTag.offerTitle),
       });
       return;
     }
@@ -676,7 +763,11 @@ export function RacingDeskView() {
   }
 
   const summary = payload?.summary;
-  const suggestions = canOfferEdge ? (payload?.suggestedRaces ?? []) : [];
+  const suggestions = canOfferEdge
+    ? payload?.suggestedRaces?.length
+      ? payload.suggestedRaces
+      : suggestedRacesFromPlays(fetchedEdgePlays)
+    : [];
   const topSuggestion = suggestions.reduce<(typeof suggestions)[number] | undefined>(
     (best, s) => (s.topEv != null && (best?.topEv == null || s.topEv > best.topEv) ? s : best),
     undefined
@@ -710,7 +801,7 @@ export function RacingDeskView() {
     return (
       <PageLoading
         label="Loading Racing Desk"
-        description="Fetching today's racecards…"
+        description="Opening today's racecards…"
       />
     );
   }
@@ -763,6 +854,8 @@ export function RacingDeskView() {
         open={intelligenceOpen}
         onOpenChange={setIntelligenceOpen}
         suggestions={suggestions}
+        date={date}
+        loading={Boolean(payload?.summary.lite || refreshing)}
         onSelectRace={selectRace}
         onBackRunner={(raceId, runnerName, offerId) => {
           selectRace(raceId);
@@ -875,7 +968,7 @@ export function RacingDeskView() {
           <PlanLockEmpty feature="racing_live_feeds" />
         ) : (
           <EmptyState
-            icon={Trophy}
+            icon={HorseRacingIcon}
             title={summary?.source === "demo" ? "Demo racecards" : "No races for this date"}
             description={
               summary?.source === "demo"
@@ -1002,7 +1095,7 @@ export function RacingDeskView() {
                 <div className="px-(--card-spacing) pb-4">
                   <EmptyState
                     compact
-                    icon={Trophy}
+                    icon={HorseRacingIcon}
                     title={
                       deskTab === "tracked"
                         ? "No tracked races"

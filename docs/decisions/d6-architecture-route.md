@@ -2,6 +2,10 @@
 
 > Prepared for EDGE-18, 10 Aug 2026. Decision owner: Sam. Record the outcome
 > in `product-roadmap.md` D6 with the date. One read, one decision.
+>
+> **Status 4 Sep 2026:** Route 1 shipped. Production is the live app
+> (`SITE_SURFACE=app`, launch homepage), not a waitlist. Waitlist language
+> below is the launch motion as of the decision date.
 
 ## The decision is narrower than it looks
 

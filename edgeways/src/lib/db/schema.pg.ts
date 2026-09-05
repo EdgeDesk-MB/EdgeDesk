@@ -51,6 +51,13 @@ export const events = pgTable("events", {
   matchEnding: text("match_ending"),
   /** API-Football `status.short` while live: 1H, HT, 2H, ET, BT, P, LIVE, INT */
   period: text("period"),
+  /** Half-time score from the football feed (`score.halftime`) */
+  htHomeScore: integer("ht_home_score"),
+  htAwayScore: integer("ht_away_score"),
+  /** Confirmed XI JSON: { homeFormation, awayFormation, home, away } */
+  lineups: text("lineups"),
+  /** Epoch ms of the last full event-tape fetch */
+  tapeFetchedAt: epochMs("tape_fetched_at"),
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
@@ -789,6 +796,17 @@ export const racecardCache = pgTable("racecard_cache", {
 });
 
 /**
+ * Durable football fixtures payload per UK calendar date. Global feed data,
+ * no clerk scoping — same posture as racecard_cache / feed_sync_state.
+ */
+export const fixtureCache = pgTable("fixture_cache", {
+  date: text("date").primaryKey(),
+  /** JSON array of Fixture. */
+  payload: text("payload").notNull(),
+  fetchedAt: epochMs("fetched_at").notNull(),
+});
+
+/**
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */
@@ -1011,6 +1029,48 @@ export const racingOddsOverrides = pgTable("racing_odds_overrides", {
   clerkUserId: text("clerk_user_id"),
 });
 
+/**
+ * Offer inbox (email forwarding). One active address per desk: the token in
+ * offers+<token>@<inbox-domain> routes inbound email to its owner. The token
+ * is globally unique (it is the bearer credential), clerk_user_id is unique
+ * (rotate replaces, never stacks).
+ */
+export const offerInboxAddresses = pgTable(
+  "offer_inbox_addresses",
+  {
+    id: serial("id").primaryKey(),
+    token: text("token").notNull(),
+    clerkUserId: text("clerk_user_id").notNull(),
+    createdAt: epochMs("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("offer_inbox_addresses_token_unique").on(t.token),
+    unique("offer_inbox_addresses_user_unique").on(t.clerkUserId),
+  ]
+);
+
+/** Inbound email ledger per desk: dedup (message id + fingerprint) and audit. */
+export const offerInboundMessages = pgTable(
+  "offer_inbound_messages",
+  {
+    id: serial("id").primaryKey(),
+    clerkUserId: text("clerk_user_id").notNull(),
+    /** Provider Message-ID when known; null rows never dedupe by id */
+    messageId: text("message_id"),
+    fingerprint: text("fingerprint").notNull(),
+    status: text("status", { enum: ["drafted", "duplicate", "failed"] }).notNull(),
+    offerId: integer("offer_id"),
+    createdAt: epochMs("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("offer_inbound_messages_user_message_unique").on(
+      t.clerkUserId,
+      t.messageId
+    ),
+    index("offer_inbound_messages_user_created_idx").on(t.clerkUserId, t.createdAt),
+  ]
+);
+
 export type EventRow = typeof events.$inferSelect;
 export type NewEventRow = typeof events.$inferInsert;
 export type FeedSyncStateRow = typeof feedSyncState.$inferSelect;
@@ -1033,6 +1093,8 @@ export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
 export type OfferSeriesRow = typeof offerSeries.$inferSelect;
+export type OfferInboxAddressRow = typeof offerInboxAddresses.$inferSelect;
+export type OfferInboundMessageRow = typeof offerInboundMessages.$inferSelect;
 export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
 export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;

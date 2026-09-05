@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useDragToScroll } from "@/hooks/use-drag-to-scroll";
+import {
+  adjacentSnapValue,
+  readHorizontalSnapPositions,
+  scrollToAdjacentSnap,
+} from "@/lib/ui/drag-scroll";
 import { cn } from "@/lib/utils";
 
 const SCROLL_EPS = 2;
@@ -22,6 +29,25 @@ function resolveChildScroller(wrap: HTMLElement | null): HTMLElement | null {
   return null;
 }
 
+const MODAL_FOCUS_SELECTOR =
+  "[data-slot='dialog-content'], [data-slot='sheet-content'], [role='dialog'], [role='alertdialog']";
+
+/** Dialogs portal under the cursor without pointerleave — don't pan the strip. */
+function carouselKeysBlocked(target: EventTarget | null): boolean {
+  const node = target instanceof Element ? target : null;
+  if (node?.closest(MODAL_FOCUS_SELECTOR)) return true;
+  const active = document.activeElement;
+  if (active instanceof Element && active.closest(MODAL_FOCUS_SELECTOR)) return true;
+  return Boolean(
+    document.querySelector(
+      "[data-slot='dialog-overlay'], [data-slot='dialog-content'][data-state='open'], [role='dialog'][aria-modal='true']"
+    )
+  );
+}
+
+/** Cover icon-sm (28px) at left-1 / right-1 so the circle stays in the wash. */
+const STEP_BUTTON_FADE_PX = 36;
+
 /**
  * Wraps a scrolling container and fades its leading/trailing edge in and
  * out as it scrolls, so clipped content reads as "more to scroll" rather
@@ -30,10 +56,14 @@ function resolveChildScroller(wrap: HTMLElement | null): HTMLElement | null {
  *
  * `dragToScroll` adds click-and-drag panning with the mouse (touch/pen keep
  * native scrolling) - a plain click still reaches its target underneath;
- * only a click that follows an actual drag is swallowed.
+ * only a click that follows an actual drag is swallowed. Use it on short
+ * chrome (tab strips). Card decks should use `stepButtons` instead: overlay
+ * prev/next chevrons when that direction has more content, plus trackpad /
+ * wheel. Mouse-drag on glassy snap cards reads as hitchy.
  *
- * With `springSnap`, Left/Right arrows step cards while the pointer is over
- * the strip (native arrow scrolling only works when the scroller is focused).
+ * `stepButtons` + `springSnap` also step one snap child with Left/Right while
+ * the pointer is over the strip (native arrow scrolling only works when the
+ * scroller is focused). Chevron clicks leave CSS snap on.
  *
  * `pinScrollStart` locks the scroller at its start edge until the user
  * interacts (wheel / pointer / touch). That beats browser scroll restoration,
@@ -51,6 +81,7 @@ export function ScrollFadeEdges({
   fadeSize = 28,
   orientation = "vertical",
   dragToScroll = false,
+  stepButtons = false,
   springSnap = false,
   pinScrollStart = false,
   scrollStartKey,
@@ -64,6 +95,11 @@ export function ScrollFadeEdges({
   fadeSize?: number;
   orientation?: "vertical" | "horizontal";
   dragToScroll?: boolean;
+  /**
+   * Overlay circular prev/next on a horizontal snap strip. Each control
+   * shows only while that direction still has cards.
+   */
+  stepButtons?: boolean;
   /** With dragToScroll: ease to the nearest snap child on mouse-drag release */
   springSnap?: boolean;
   /** Keep the scroller pinned to its start edge on mount / key change */
@@ -81,6 +117,8 @@ export function ScrollFadeEdges({
   const [showEnd, setShowEnd] = useState(false);
 
   const canDrag = !scrollAsChild && horizontal && dragToScroll;
+  const canStep = !scrollAsChild && horizontal && stepButtons;
+  const hoveredRef = useRef(false);
   const drag = useDragToScroll(scrollRef, {
     springSnap: canDrag && springSnap,
     hoverArrowKeys: canDrag && springSnap,
@@ -110,26 +148,35 @@ export function ScrollFadeEdges({
   const pinToStart = useCallback(() => {
     const el = getScroller();
     if (!el) return;
+    if (el.hasAttribute("data-ew-panning")) return;
     // Mandatory snap can bounce away from 0 in the same frame we set it.
+    // Two frames: wait for the reordered children to lay out, then restore.
     const prevSnap = el.style.scrollSnapType;
     el.style.scrollSnapType = "none";
     if (horizontal) el.scrollLeft = 0;
     else el.scrollTop = 0;
     requestAnimationFrame(() => {
-      const node = getScroller();
-      if (!node) return;
-      node.style.scrollSnapType = prevSnap;
-      if (lockStartRef.current) {
-        if (horizontal) node.scrollLeft = 0;
-        else node.scrollTop = 0;
-      }
-      update();
+      requestAnimationFrame(() => {
+        const node = getScroller();
+        if (!node || node.hasAttribute("data-ew-panning")) return;
+        node.style.scrollSnapType = prevSnap;
+        if (lockStartRef.current) {
+          if (horizontal) node.scrollLeft = 0;
+          else node.scrollTop = 0;
+        }
+        update();
+      });
     });
   }, [getScroller, horizontal, update]);
 
   const releaseStartLock = useCallback(() => {
     lockStartRef.current = false;
   }, []);
+
+  const fnsRef = useRef({ update, pinToStart, releaseStartLock, horizontal });
+  useLayoutEffect(() => {
+    fnsRef.current = { update, pinToStart, releaseStartLock, horizontal };
+  });
 
   // Re-arm the start lock whenever the caller says the leading content changed.
   useLayoutEffect(() => {
@@ -146,26 +193,27 @@ export function ScrollFadeEdges({
     if (!el) return;
 
     const onScroll = () => {
+      const { update: nextUpdate, horizontal: axis } = fnsRef.current;
       // Restoration / anchoring / snap often fire after first paint. While
       // locked, any drift off start is forced back; user interaction releases.
       if (lockStartRef.current) {
-        if (horizontal && el.scrollLeft > SCROLL_EPS) {
+        if (axis && el.scrollLeft > SCROLL_EPS) {
           el.scrollLeft = 0;
           return;
         }
-        if (!horizontal && el.scrollTop > SCROLL_EPS) {
+        if (!axis && el.scrollTop > SCROLL_EPS) {
           el.scrollTop = 0;
           return;
         }
       }
-      update();
+      if (el.hasAttribute("data-ew-panning")) return;
+      nextUpdate();
     };
 
-    // ResizeObserver delivers an initial observation on observe(), so the
-    // first fade computation arrives with it rather than a sync setState here.
     const ro = new ResizeObserver(() => {
-      if (lockStartRef.current) pinToStart();
-      else update();
+      if (el.hasAttribute("data-ew-panning")) return;
+      if (lockStartRef.current) fnsRef.current.pinToStart();
+      else fnsRef.current.update();
     });
     ro.observe(el);
     const content = el.firstElementChild;
@@ -174,27 +222,65 @@ export function ScrollFadeEdges({
       ro.observe(wrapRef.current);
     }
 
+    const onWheel = () => fnsRef.current.releaseStartLock();
+    const onTouch = () => fnsRef.current.releaseStartLock();
+
     el.addEventListener("scroll", onScroll, { passive: true });
-    el.addEventListener("wheel", releaseStartLock, { passive: true });
-    el.addEventListener("touchstart", releaseStartLock, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("touchstart", onTouch, { passive: true });
     return () => {
       ro.disconnect();
       el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("wheel", releaseStartLock);
-      el.removeEventListener("touchstart", releaseStartLock);
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouch);
     };
-  }, [getScroller, update, children, horizontal, pinToStart, releaseStartLock, scrollAsChild]);
+  }, [getScroller, scrollAsChild]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       releaseStartLock();
-      drag.onPointerDown?.(e);
+      if (canDrag) drag.onPointerDown?.(e);
     },
-    [drag, releaseStartLock]
+    [canDrag, drag, releaseStartLock]
   );
 
+  const step = useCallback(
+    (direction: -1 | 1) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      releaseStartLock();
+      const snaps = readHorizontalSnapPositions(el);
+      const next = adjacentSnapValue(snaps, el.scrollLeft, direction);
+      scrollToAdjacentSnap(el, direction);
+      if (next == null) return;
+      const further = adjacentSnapValue(snaps, next, direction);
+      if (further == null) el.focus({ preventScroll: true });
+    },
+    [releaseStartLock]
+  );
+
+  useEffect(() => {
+    if (!canStep || !springSnap) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!hoveredRef.current) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (carouselKeysBlocked(e.target)) return;
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        if (target.isContentEditable) return;
+        if (target.closest("input, textarea, select, [contenteditable=true]")) return;
+      }
+      e.preventDefault();
+      step(e.key === "ArrowLeft" ? -1 : 1);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [canStep, springSnap, step]);
+
   const fadeBase = fadeClassName ?? "from-page";
-  const fadeLength = fadeSize + FADE_OVERHANG_PX;
+  const edgeFadeSize = canStep ? Math.max(fadeSize, STEP_BUTTON_FADE_PX) : fadeSize;
+  const fadeLength = edgeFadeSize + FADE_OVERHANG_PX;
   // Solid for the first few px — gradient interpolation at 0% is slightly
   // transparent and reads as a hairline on the clip edge.
   const fadeStop = "from-[6px]";
@@ -211,7 +297,27 @@ export function ScrollFadeEdges({
         scrollAsChild ? "block" : "flex flex-1 flex-col",
         className
       )}
+      onPointerEnter={
+        canStep
+          ? () => {
+              hoveredRef.current = true;
+            }
+          : undefined
+      }
+      onPointerLeave={
+        canStep
+          ? () => {
+              hoveredRef.current = false;
+            }
+          : undefined
+      }
     >
+      {canStep ? (
+        <>
+          <StepChevron direction={-1} visible={showStart} onStep={step} />
+          <StepChevron direction={1} visible={showEnd} onStep={step} />
+        </>
+      ) : null}
       {scrollAsChild ? (
         children
       ) : (
@@ -229,15 +335,14 @@ export function ScrollFadeEdges({
             // Stop the browser shifting scrollLeft when cards are prepended
             // (lots/edge arriving after first paint).
             pinScrollStart && "[overflow-anchor:none]",
-            canDrag && "cursor-grab active:cursor-grabbing",
+            canDrag && "cursor-grab",
+            canStep && "focus:outline-none",
             scrollClassName
           )}
+          tabIndex={canStep ? -1 : undefined}
           onPointerDown={canDrag || pinScrollStart ? onPointerDown : undefined}
-          onPointerMove={canDrag ? drag.onPointerMove : undefined}
-          onPointerUp={canDrag ? drag.onPointerUp : undefined}
           onPointerEnter={canDrag ? drag.onPointerEnter : undefined}
           onPointerLeave={canDrag ? drag.onPointerLeave : undefined}
-          onPointerCancel={canDrag ? drag.onPointerCancel : undefined}
           onClickCapture={canDrag ? drag.onClickCapture : undefined}
         >
           {children}
@@ -271,6 +376,45 @@ export function ScrollFadeEdges({
           style={horizontal ? { width: fadeLength } : { height: fadeLength }}
         />
       ) : null}
+    </div>
+  );
+}
+
+function StepChevron({
+  direction,
+  visible,
+  onStep,
+}: {
+  direction: -1 | 1;
+  visible: boolean;
+  onStep: (direction: -1 | 1) => void;
+}) {
+  const Icon = direction < 0 ? ChevronLeft : ChevronRight;
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute inset-y-0 z-20 flex items-center",
+        direction < 0 ? "left-1" : "right-1",
+        !visible && "invisible"
+      )}
+    >
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon-sm"
+        rounded="full"
+        aria-label={direction < 0 ? "Previous card" : "Next card"}
+        aria-hidden={!visible}
+        disabled={!visible}
+        tabIndex={visible ? 0 : -1}
+        className="pointer-events-auto"
+        onClick={(e) => {
+          e.stopPropagation();
+          onStep(direction);
+        }}
+      >
+        <Icon className="size-3.5" aria-hidden />
+      </Button>
     </div>
   );
 }

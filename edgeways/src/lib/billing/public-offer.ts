@@ -50,7 +50,7 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
     name: "Edge",
     monthlyPence: 2499,
     annualPence: 2499 * ANNUAL_MONTHS_CHARGED,
-    blurb: "Live racing feeds, Offer Edge picks, and 2UP alerts.",
+    blurb: "Live racing and football feeds, Offer Edge picks, and 2UP alerts.",
     cta: "Start 14-day Edge trial",
     href: "/sign-up?plan=edge",
   },
@@ -67,6 +67,7 @@ export const SETTINGS_PLAN_HIGHLIGHTS = {
     "Everything in Core",
     "Live UK and Irish racecards",
     "Offer Edge picks and 2UP alerts",
+    "Football live card: scorers, bookings and lineups",
   ],
 } as const;
 
@@ -119,6 +120,11 @@ export const COMPARISON_FEATURES: Record<
     title: "Live racing cards",
     description:
       "Today's UK and Irish racecards and results. Demo cards are shown on Racing Desk.",
+  },
+  football_live_feeds: {
+    title: "Football live card",
+    description:
+      "Who scored, bookings, and the named lineups on tracked matches.",
   },
   push_alerts: {
     title: "2UP alerts",

@@ -264,13 +264,10 @@ export function AppTopBarMetaNav() {
           */}
           <div
             ref={scrollRef}
-            className="app-scroll-overlay min-w-0 flex-1 overscroll-x-contain overflow-x-auto overflow-y-clip"
+            className="app-scroll-overlay min-w-0 flex-1 cursor-grab overscroll-x-contain overflow-x-auto overflow-y-clip"
             onPointerDown={drag.onPointerDown}
-            onPointerMove={drag.onPointerMove}
-            onPointerUp={drag.onPointerUp}
             onPointerEnter={drag.onPointerEnter}
             onPointerLeave={drag.onPointerLeave}
-            onPointerCancel={drag.onPointerCancel}
             onClickCapture={drag.onClickCapture}
           >
             <nav

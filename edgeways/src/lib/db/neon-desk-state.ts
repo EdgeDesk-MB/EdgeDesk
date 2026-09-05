@@ -18,7 +18,7 @@ import {
   listNeonDeskAccounts,
   listNeonDeskBalanceTransactions,
 } from "@/lib/db/neon-desk-accounts";
-import { listNeonDeskHistory } from "@/lib/db/neon-desk-history";
+import { listNeonDeskHistory, syncNeonDeskEventHistory } from "@/lib/db/neon-desk-history";
 import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
 import { listNeonEvents } from "@/lib/db/neon-events";
 import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
@@ -73,6 +73,12 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
       maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
     ]);
   const events = filterEventsForDesk(feedEvents, followedIds, bets);
+  try {
+    await syncNeonDeskEventHistory(events, history);
+    history = await listNeonDeskHistory();
+  } catch {
+    // Commentary backfill is best-effort; settlements still render.
+  }
   try {
     const resolved = await runNeonDeskLiveness(events);
     if (resolved > 0) {

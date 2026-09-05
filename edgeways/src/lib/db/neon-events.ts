@@ -60,6 +60,10 @@ export type NeonEventValues = {
   ftAwayScore?: number | null;
   matchEnding?: string | null;
   period?: string | null;
+  htHomeScore?: number | null;
+  htAwayScore?: number | null;
+  lineups?: string | null;
+  tapeFetchedAt?: number | null;
   simScript?: string | null;
   simStartedAt?: number | null;
   createdAt: number;
@@ -87,6 +91,10 @@ export async function insertNeonEvent(values: NeonEventValues): Promise<EventRow
       ftAwayScore: values.ftAwayScore ?? null,
       matchEnding: values.matchEnding ?? null,
       period: values.period ?? null,
+      htHomeScore: values.htHomeScore ?? null,
+      htAwayScore: values.htAwayScore ?? null,
+      lineups: values.lineups ?? null,
+      tapeFetchedAt: values.tapeFetchedAt ?? null,
       simScript: values.simScript ?? null,
       simStartedAt: values.simStartedAt ?? null,
       createdAt: values.createdAt,
@@ -121,6 +129,10 @@ export type NeonEventFeedPatch = Partial<{
   awayScore: number;
   minute: number;
   period: string | null;
+  htHomeScore: number | null;
+  htAwayScore: number | null;
+  lineups: string | null;
+  tapeFetchedAt: number | null;
   homeLed2: number;
   awayLed2: number;
   goals: string | null;

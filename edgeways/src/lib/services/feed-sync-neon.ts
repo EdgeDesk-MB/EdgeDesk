@@ -42,7 +42,8 @@ import {
   type FeedSyncLease,
 } from "@/lib/services/feed-sync-lease";
 import {
-  fixtureGoalEvents as realFixtureGoalEvents,
+  fixtureLineups as realFixtureLineups,
+  fixtureMatchEvents as realFixtureMatchEvents,
   fixturesByIds as realFixturesByIds,
   hasApiKey as realHasApiKey,
 } from "@/lib/services/apifootball";
@@ -55,8 +56,7 @@ import {
   eventInRacingSyncWindow,
   eventNeedsRaceResult,
 } from "@/lib/services/sync-racing-results";
-import { hasBetWinTrigger, parseBetTriggerRule, ruleNeedsTimeline } from "@/lib/bets/settle-inputs";
-import { shouldFetchGoalTimeline } from "@/lib/live-poll-rules";
+import { shouldFetchGoalTimeline, shouldFetchLineups } from "@/lib/live-poll-rules";
 import { formatEventTitle, formatRacingEventTitle, localCalendarDate } from "@/lib/events";
 import { parseRaceResults } from "@/lib/racing";
 import {
@@ -82,7 +82,8 @@ export type NeonFeedSyncDeps = {
   settleBet: (settlement: NeonBetSettlement) => Promise<boolean>;
   insertHistory: (values: OwnedHistoryValues) => Promise<void>;
   fixturesByIds: typeof realFixturesByIds;
-  fixtureGoalEvents: typeof realFixtureGoalEvents;
+  fixtureMatchEvents: typeof realFixtureMatchEvents;
+  fixtureLineups: typeof realFixtureLineups;
   resultsForRaceIds: typeof realResultsForRaceIds;
   hasApiKey: () => boolean;
   hasRacingApiKey: () => boolean;
@@ -163,7 +164,8 @@ async function defaultDeps(): Promise<NeonFeedSyncDeps> {
     settleBet: settlement.settleNeonBet,
     insertHistory: settlement.insertNeonHistoryForOwner,
     fixturesByIds: realFixturesByIds,
-    fixtureGoalEvents: realFixtureGoalEvents,
+    fixtureMatchEvents: realFixtureMatchEvents,
+    fixtureLineups: realFixtureLineups,
     resultsForRaceIds: realResultsForRaceIds,
     hasApiKey: realHasApiKey,
     hasRacingApiKey: realHasRacingApiKey,
@@ -180,7 +182,7 @@ async function defaultDeps(): Promise<NeonFeedSyncDeps> {
 async function syncFootball(
   deps: NeonFeedSyncDeps,
   allEvents: EventRow[],
-  openBets: OwnedBet[]
+  _openBets: OwnedBet[]
 ): Promise<number[]> {
   if (!deps.hasApiKey()) return [];
   const now = deps.now();
@@ -188,18 +190,6 @@ async function syncFootball(
   for (const e of backfill) backfillAttempted.add(e.id);
   const candidates = [...poll, ...backfill];
   if (candidates.length === 0) return [];
-
-  // The goal timeline is a second upstream request; only spend it when an open
-  // trigger bet actually needs scorers.
-  const needTimeline = new Set(
-    openBets
-      .filter(({ bet }) => {
-        if (!bet.eventId || !bet.triggerRule || !hasBetWinTrigger(bet)) return false;
-        const rule = parseBetTriggerRule(bet);
-        return rule != null && ruleNeedsTimeline(rule);
-      })
-      .map(({ bet }) => bet.eventId!)
-  );
 
   const touched: number[] = [];
   try {
@@ -211,17 +201,32 @@ async function syncFootball(
       if (!fixture) continue;
 
       let goals = event.goals;
-      if (needTimeline.has(event.id) && shouldFetchGoalTimeline(event, fixture)) {
+      let tapeFetchedAt = event.tapeFetchedAt ?? null;
+      if (shouldFetchGoalTimeline(event, fixture, now)) {
         try {
           goals = JSON.stringify(
-            await deps.fixtureGoalEvents(event.externalId!, fixture.homeTeam)
+            await deps.fixtureMatchEvents(event.externalId!, fixture.homeTeam)
           );
+          tapeFetchedAt = now;
         } catch {
-          // keep the previous timeline; triggers wait for the next poll
+          // keep the previous timeline; the next poll retries
         }
       }
 
-      const patch = footballEventPatch(event, fixture, goals);
+      let lineups = event.lineups ?? null;
+      if (shouldFetchLineups(event, fixture, now)) {
+        try {
+          const xi = await deps.fixtureLineups(event.externalId!);
+          if (xi) lineups = JSON.stringify(xi);
+        } catch {
+          // keep the previous XI
+        }
+      }
+
+      const patch = footballEventPatch(event, fixture, goals, {
+        lineups,
+        tapeFetchedAt,
+      });
       await deps.updateEvent(event.id, patch);
       // Keep the in-memory row current so the settlement pass below sees the
       // score and status this poll just wrote.

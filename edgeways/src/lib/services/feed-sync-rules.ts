@@ -67,7 +67,11 @@ export function selectFootballSyncEvents<
 export function footballEventPatch(
   event: Pick<EventRow, "homeLed2" | "awayLed2">,
   fixture: Fixture,
-  goals: string | null
+  goals: string | null,
+  extras?: {
+    lineups?: string | null;
+    tapeFetchedAt?: number | null;
+  }
 ): NeonEventFeedPatch {
   return {
     status: fixture.status,
@@ -78,6 +82,14 @@ export function footballEventPatch(
     homeLed2: event.homeLed2 || (fixture.homeScore - fixture.awayScore >= 2 ? 1 : 0),
     awayLed2: event.awayLed2 || (fixture.awayScore - fixture.homeScore >= 2 ? 1 : 0),
     goals,
+    ...(typeof fixture.htHomeScore === "number" || typeof fixture.htAwayScore === "number"
+      ? {
+          htHomeScore: fixture.htHomeScore ?? null,
+          htAwayScore: fixture.htAwayScore ?? null,
+        }
+      : {}),
+    ...(extras?.lineups !== undefined ? { lineups: extras.lineups } : {}),
+    ...(extras?.tapeFetchedAt !== undefined ? { tapeFetchedAt: extras.tapeFetchedAt } : {}),
     ...(fixture.matchEnding != null
       ? {
           matchEnding: fixture.matchEnding,

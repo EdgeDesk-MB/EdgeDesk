@@ -5,15 +5,31 @@
 > [Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c).
 > Repo layout rules: `docs/repo-layout.md`.
 >
-> Last updated: **25 Aug 2026** (EDGE-83 **done** — server 403 on racing feeds
-and exchange prices. EDGE-82 / EDGE-22 / EDGE-7 already done the same day.
-Live-mode billing rerun stays M3.)
+> Last updated: **4 Sep 2026** (production is the **live app**, not a waitlist.
+> Verified against https://edgeways.app: launch homepage, `/desk` HTTP 200,
+> no waitlist form. `SITE_SURFACE=app`, `LANDING_VARIANT=launch`.)
 
 ---
 
-## 👇 You are here
+## Current live status
 
-The billing and first-run path is in. [EDGE-4](https://linear.app/samhayter/issue/EDGE-4),
+**https://edgeways.app is live.** Sign-up, login, pricing, trial checkout and
+the hosted desk are open. Do not treat production as waitlist-only. Do not
+flip `SITE_SURFACE` or `LANDING_VARIANT` back to waitlist.
+
+Verified 4 Sep 2026 (live HTML + route probes):
+
+| Surface | What is true now |
+|---------|------------------|
+| Homepage | Launch variant. Title: "Start free: matched betting without the faff". H1: "Know what's next. See what paid." Lead: command centre, one desk for the day. No waitlist form. Nav: Try the desk, Log in, Start free trial. Hero: See plans, Try the desk. |
+| Positioning | Not an oddsmatcher. Does not send bookie offers. Supplements finders. Free / Core £9.99/mo / Edge £24.99/mo / 14-day Edge trial. |
+| Desk | Open. `SITE_SURFACE=app`. `/desk` returns 200 (no bounce to `/`). Unsigned visitors still hit Clerk. |
+| Auth / billing | Clerk at `clerk.edgeways.app`. `/login` and `/sign-up` 200. Unsigned `/subscribe` 307s to `/#pricing`. |
+| Waitlist | Off the public homepage (closer stripped 2 Sep: `8bec22b`). Code stays as fail-closed fallback (EDGE-109), Founding eligibility (EDGE-93), and admin metrics. Privacy still discloses waitlist email because those rows exist. |
+
+## How we got here
+
+The August tickets below are **Done**. [EDGE-4](https://linear.app/samhayter/issue/EDGE-4),
 [EDGE-5](https://linear.app/samhayter/issue/EDGE-5),
 [EDGE-58](https://linear.app/samhayter/issue/EDGE-58),
 [EDGE-20](https://linear.app/samhayter/issue/EDGE-20),
@@ -70,8 +86,8 @@ when the billing row is not Edge. Runners skip the live enrichment path.
 `api()` treats a `source: "locked"` 403 as a safe fallback (demo desk, empty
 cards, unmatched prices).
 
-**Next session (pick one, do not mix in the same day):**
-- Flip `SITE_SURFACE=app` only when checklist + Sam says so
+**Done:** production flipped to `SITE_SURFACE=app` and `LANDING_VARIANT=launch`
+(waitlist closer removed from the live homepage 2 Sep). Do not reverse that.
 
 **Done 24 Aug:** [EDGE-80](https://linear.app/samhayter/issue/EDGE-80) admin
 control panel shipped to preview (full review + 10 fixes folded in; migration
@@ -85,10 +101,6 @@ audited against app config (all 5 prices match), automated webhook drill
 every §5 box ticked or consciously deferred with a dated note in
 `docs/live-readiness.md`. Final full pass stays in C6 (launch week).
 
-Production is still waitlist-only: signed-in users hit `/desk` then bounce
-home until `SITE_SURFACE=app`. Do not promote `LANDING_VARIANT=launch` on
-production until that flip.
-
 [EDGE-78](https://linear.app/samhayter/issue/EDGE-78) keyboard slice is Done.
 Settle-focused-bet leftover is [EDGE-79](https://linear.app/samhayter/issue/EDGE-79).
 
@@ -98,15 +110,15 @@ Settle-focused-bet leftover is [EDGE-79](https://linear.app/samhayter/issue/EDGE
 
 | Thing | Status |
 |-------|--------|
-| Live marketing site | **https://edgeways.app** — waitlist only |
-| Desk app on production | **Blocked** — `proxy.ts` redirects `/desk` etc. → `/` when `SITE_SURFACE=waitlist` |
+| Live marketing site | **https://edgeways.app** — launch homepage (not waitlist) |
+| Desk app on production | **Open** — `SITE_SURFACE=app`. `/desk` 200. Waitlist gate is only the fail-closed fallback if that env is unset |
 | Local desk | Full app on `:3000`; `/login`, `/sign-up`, `/subscribe` live |
-| Neon | Waitlist + `app_users` (Clerk `userId` PK). Preview desk: bets, offers, wallets, history + settings on Neon behind `EDGEWAYS_DESK_BACKEND=neon` (EDGE-47 done 23 Aug). Localhost stays SQLite |
+| Neon | `app_users` (Clerk `userId` PK) plus hosted desk: bets, offers, wallets, history, settings behind `EDGEWAYS_DESK_BACKEND=neon` (EDGE-47). Localhost stays SQLite. Waitlist table still holds founding/admin rows |
 | Auth / SSO | **Clerk** — EDGE-19 done. `/login` + `/sign-up` live. Neon `app_users` upserts on sign-in. Google consent still says “Clerk” until a custom Google OAuth client |
-| Waitlist owner alert | Resend sends; **Zoho `sam@` bounces** (`554 ContentRejected`). `WAITLIST_NOTIFY_TO` is Gmail (local + Vercel) |
+| Waitlist owner alert | Historical list still emails; **Zoho `sam@` bounces** (`554 ContentRejected`). `WAITLIST_NOTIFY_TO` is Gmail (local + Vercel). New-account notify also ships (27 Aug) |
 | In-app feedback | Resend notify + Neon `feedback_reports` (not the user's desk). Same Gmail notify list unless `FEEDBACK_NOTIFY_TO` is set. Linear filing still later (EDGE-43) |
-| Billing | **Stripe** (L1). Test catalogue ✓. Checkout + slip + portal ✓. Webhooks write tier ✓. Settings → Subscription ✓ (EDGE-58). Rehearsal is [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) |
-| Legal (customer-facing) | **Published 17 Aug.** `/terms` + `/privacy`, waitlist Privacy notice, signup ToS/Privacy checkbox. ICO fee later (retake when trading). Solicitor before charging strangers. [EDGE-61](https://linear.app/samhayter/issue/EDGE-61) |
+| Billing | **Stripe** (L1). Catalogue, Checkout, slip, portal, webhooks, Settings → Subscription. Test-mode rehearsal [EDGE-7](https://linear.app/samhayter/issue/EDGE-7) green 25 Aug |
+| Legal (customer-facing) | **Published 17 Aug.** `/terms` + `/privacy`, signup ToS/Privacy checkbox. Privacy still names waitlist email (those rows remain). ICO fee later (retake when trading). [EDGE-61](https://linear.app/samhayter/issue/EDGE-61) |
 
 Closed recently: EDGE-4, 5, 19, 20, 21, **47**, 49, 58, 61–66, **78**. **EDGE-37** interim pass done; final pass in C6.
 
@@ -129,7 +141,7 @@ Full rules: `docs/repo-layout.md`.
 ### 1. Admin / Sam only (~45 min) — do before or between sessions
 
 - [x] **[EDGE-1](https://linear.app/samhayter/issue/EDGE-1)** — Cancelled 15 Aug. Not a gambling site; no pre-approval emails. Residual review risk accepted.
-- [x] **Waitlist smoke** — Join on https://edgeways.app works; thanks email delivers. Owner alert delivers to Gmail. Unsubscribe still worth one click when you next join. (Zoho `sam@` is a dead end for Resend.)
+- [x] **Waitlist smoke** — Done while `/` was still the waitlist. Public homepage no longer collects waitlist joins (2 Sep). Historical rows remain on Neon.
 - [x] **[EDGE-48](https://linear.app/samhayter/issue/EDGE-48)** — Better Stack on `https://edgeways.app/api/health`. Android On-Call push confirmed 19 Aug.
 - [x] **Domains** — Canonical is apex `https://edgeways.app`. `www` already 307s to apex (paths preserved). Do not flip to www.
 - [x] **[EDGE-8](https://linear.app/samhayter/issue/EDGE-8)** — Memo stands. GC email skipped 19 Aug. Solicitor only if a §7 trigger fires.
@@ -149,7 +161,7 @@ Full rules: `docs/repo-layout.md`.
 |--------|---------|---------|
 | **D — Billing** | EDGE-3 ✓ → 4 ✓ → 5 ✓ → 58 ✓ | Tier writes. Settings → Subscription |
 | **A — Auth / first-run** | EDGE-19 ✓ → 20 ✓ → 21 ✓ + 59 ✓ + 60 ✓ | Try the desk, public `/demo`, full-page `/setup` |
-| **B — Neon slice** | EDGE-47 ✓ | Waitlist + `app_users` + full desk (bets, offers, wallets, history) on Neon for hosted; localhost stays SQLite |
+| **B — Neon slice** | EDGE-47 ✓ | `app_users` + full desk (bets, offers, wallets, history) on Neon for hosted; localhost stays SQLite |
 | 👇 **C — Checklist** | EDGE-49 ✓ → **37** | §5 boxes ticked or deferred before charging strangers |
 
 Do **not** run A + full Neon cutover + billing in the same day.
@@ -160,18 +172,18 @@ Do **not** run A + full Neon cutover + billing in the same day.
 - Referral codes (EDGE-67, confirm the 50% / £9.99 offer)
 - [EDGE-68](https://linear.app/samhayter/issue/EDGE-68) Import from Oddsmonkey
   (then Outplayed). Spec: `docs/strategy/platform-import.md`. Needs Sam’s enum dump.
-- Solicitor (EDGE-8) before charging strangers
-- Flip `SITE_SURFACE=app` only when Neon desk (EDGE-47) + EDGE-37 + Sam says so
+- Solicitor (EDGE-8) if a trigger fires
+- [x] `SITE_SURFACE=app` + `LANDING_VARIANT=launch` on production (verified 4 Sep)
 
 Shipped 19–22 Aug: EDGE-4 leftovers, 62–66, 78.
 
-### 5. M3 Launch (Nov)
+### 5. M3 leftovers (original target Nov; production already live)
 
-- EDGE-22 real entitlement enforcement
-- EDGE-7 billing rehearsal (recreate catalogue in **live** mode; you click every path)
-- EDGE-8 solicitor sign-off of the published `/terms` + `/privacy` pages
-- EDGE-37 full pre-launch checklist (in progress 22 Aug)
-- EDGE-49 go-live hygiene ✓
+- [x] EDGE-22 real entitlement enforcement (25 Aug)
+- EDGE-7 live-mode billing rerun (test-mode rehearsal already green)
+- EDGE-8 solicitor sign-off of the published `/terms` + `/privacy` pages (only if a trigger fires)
+- EDGE-37 full checklist pass
+- [x] EDGE-49 go-live hygiene
 
 ---
 
@@ -179,10 +191,10 @@ Shipped 19–22 Aug: EDGE-4 leftovers, 62–66, 78.
 
 **SSO (chosen): Clerk** — Google + email now; Apple when Developer account ready.
 - Login UI lives at **`/login`** (sign-up at `/sign-up`). Launch landing (EDGE-21)
-  is the homepage CTA; waitlist `/` stays default until promoted.
-- Waitlist mode still allows `/login` so auth can be tested without opening the desk.
-- After sign-in, redirect target is `/desk` (on production waitlist, middleware
-  still bounces desk → `/` until `SITE_SURFACE=app`).
+  is production `/`. Waitlist homepage is only the fail-closed fallback when
+  `LANDING_VARIANT` is not `launch`.
+- After sign-in, redirect target is `/desk`. Production is `SITE_SURFACE=app`,
+  so the waitlist gate does not bounce desk home.
 
 **Subscriptions (locked 12 Aug 2026 — `docs/strategy/subscriptions.md`):**
 1. EDGE-1 skipped 15 Aug → EDGE-2 Stripe vs MoR (does not change prices)
@@ -210,7 +222,7 @@ day. Take the *questions* (experience, why here, attribution, monthly target
 slider) and a named empty-desk welcome. Do not take Gibraltar, live chat, or
 “earn your first £100”. Plan:
 `docs/strategy/oddsmonkey-onboarding-research.md`. Tickets: EDGE-62…68.
-Landing must say we do not supply bookie offers (EDGE-64) before beta.
+Landing says we do not supply bookie offers (EDGE-64, live FAQ).
 Empty Home import from Oddsmonkey is EDGE-68 (needs enum dump).
 
 **Pre-launch QA:** Thorough pass on Settings, Help, and any localhost-era copy before real users (EDGE-37 / EDGE-49).
@@ -220,10 +232,10 @@ Empty Home import from Oddsmonkey is EDGE-68 (needs enum dump).
 ## Critical path (simple)
 
 ```text
-EDGE-1 skipped ──► EDGE-2 Stripe ✓ ──► EDGE-3 catalogue ✓ ──► EDGE-4 user path ✓ ──► EDGE-5 webhooks ✓ ──► 👇 EDGE-58 Settings manage
+EDGE-1 skipped ──► EDGE-2 Stripe ✓ ──► EDGE-3 catalogue ✓ ──► EDGE-4 user path ✓ ──► EDGE-5 webhooks ✓ ──► EDGE-58 Settings manage ✓
 EDGE-19 Clerk ✓ ──► EDGE-20 /login + Neon user ✓ ──► EDGE-21 + 59 /demo + 60 /setup ✓
-EDGE-47 Neon waitlist + app_users ✓ ──► full desk cutover later
-SITE_SURFACE=waitlist until beta desk is ready
+EDGE-47 Neon app_users + hosted desk ✓
+SITE_SURFACE=app · LANDING_VARIANT=launch (production, verified 4 Sep 2026)
 ```
 
 ---

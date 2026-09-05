@@ -30,6 +30,7 @@ const EDGE: readonly FeatureFlag[] = [
   ...CORE,
   "offer_edge",
   "racing_live_feeds",
+  "football_live_feeds",
   "push_alerts",
   "exchange_lay",
 ];

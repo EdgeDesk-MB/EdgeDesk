@@ -47,13 +47,13 @@ function svgProps({ className, size = 16, strokeWidth = 2 }: SvgIconProps) {
   };
 }
 
-/** Soccer ball - stroke style matched to Lucide. */
+/** Association football — pentagon and five hexagonal panels, Lucide stroke. */
 export function FootballIcon(props: SvgIconProps) {
   return (
     <svg {...svgProps(props)}>
       <circle cx="12" cy="12" r="10" />
-      <path d="M12 7.2 14.6 12 12 16.8 9.4 12Z" />
-      <path d="M12 2.5v4.7M12 16.8v4.7M4.8 8.2l4.1 2.4M15.1 13.4l4.1 2.4M4.8 15.8l4.1-2.4M15.1 10.6l4.1-2.4" />
+      <path d="M12 7 16.76 10.45 14.94 16.05H9.06L7.24 10.45Z" />
+      <path d="M12 7V2M16.76 10.45 21.51 8.91M7.24 10.45 2.49 8.91M14.94 16.05 17.88 20.09M9.06 16.05 6.12 20.09" />
     </svg>
   );
 }
@@ -75,7 +75,7 @@ export function WhistleIcon(props: SvgIconProps) {
  * Horse racing - Lucide Lab `horse-head` (main Lucide has no horse icon).
  * https://lucide.dev/icons/lab/horse-head
  */
-function HorseRacingIcon(props: SvgIconProps) {
+export function HorseRacingIcon(props: SvgIconProps) {
   return (
     <svg {...svgProps(props)}>
       <path d="M11.5 12H11" />

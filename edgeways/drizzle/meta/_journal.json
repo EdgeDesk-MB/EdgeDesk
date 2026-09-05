@@ -197,6 +197,20 @@
       "when": 1788456000000,
       "tag": "0027_racecard_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788600000000,
+      "tag": "0028_fixture_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788610000000,
+      "tag": "0029_football_live_card",
+      "breakpoints": true
     }
   ]
 }

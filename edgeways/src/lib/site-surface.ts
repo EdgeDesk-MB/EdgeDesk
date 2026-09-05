@@ -1,4 +1,7 @@
-/** Public deploy mode: waitlist marketing only, or full desk app. */
+/** Public deploy mode: waitlist marketing only, or full desk app.
+ * Production is `app` (verified 4 Sep 2026). Unset still fails closed to
+ * waitlist (EDGE-109) so a new environment never opens the desk by accident.
+ */
 export type SiteSurface = "waitlist" | "app";
 
 export function getSiteSurface(): SiteSurface {
@@ -7,7 +10,9 @@ export function getSiteSurface(): SiteSurface {
   return process.env.SITE_SURFACE === "app" ? "app" : "waitlist";
 }
 
-/** Homepage version. Production stays waitlist until this is set to launch. */
+/** Homepage version. Production is `launch` (verified 4 Sep 2026).
+ * Unset still serves the waitlist homepage.
+ */
 export type LandingVariant = "waitlist" | "launch";
 
 export function getLandingVariant(): LandingVariant {
@@ -72,6 +77,9 @@ export function isWaitlistAllowedPath(pathname: string): boolean {
     return true;
   }
   if (pathname === "/api/health") return true;
+  // Offer inbox webhook: provider POSTs must reach the app whatever surface
+  // the inbound domain lands on. The route does its own signature auth.
+  if (pathname === "/api/offers/inbound") return true;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return true;
   if (pathname === "/api/admin" || pathname.startsWith("/api/admin/")) return true;
   if (pathname === "/api/maintenance") return true;

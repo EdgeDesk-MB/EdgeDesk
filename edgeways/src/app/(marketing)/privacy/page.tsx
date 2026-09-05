@@ -87,6 +87,20 @@ export default function PrivacyPage() {
               </td>
             </tr>
             <tr>
+              <td>Forwarded offer emails</td>
+              <td>
+                If you enable the optional offer inbox and forward an email to
+                your unique Edgeways address
+              </td>
+              <td>
+                The offer details parsed from the email (bookmaker, offer
+                terms, expiry) become a desk offer. We also keep your
+                forwarding address and a receipt log (message reference, date,
+                whether it drafted, duplicated or failed). We do not store the
+                raw email itself.
+              </td>
+            </tr>
+            <tr>
               <td>Payment data</td>
               <td>When you pay</td>
               <td>
@@ -180,6 +194,15 @@ export default function PrivacyPage() {
               <td>Contract (Art. 6(1)(b))</td>
             </tr>
             <tr>
+              <td>
+                Turn emails you forward to your offer inbox into desk offers
+              </td>
+              <td>
+                Contract (Art. 6(1)(b)). Optional feature you switch on in
+                Settings; disable it any time
+              </td>
+            </tr>
+            <tr>
               <td>Process payments via our processor</td>
               <td>Contract. The processor has its own obligations</td>
             </tr>
@@ -259,7 +282,10 @@ export default function PrivacyPage() {
             </tr>
             <tr>
               <td>Resend</td>
-              <td>Transactional and waitlist email</td>
+              <td>
+                Transactional and waitlist email, and receiving emails you
+                forward to your offer inbox
+              </td>
               <td>United States, with UK-approved safeguards</td>
             </tr>
           </tbody>
@@ -288,6 +314,11 @@ export default function PrivacyPage() {
           Desk records (bets, balances, offers, history): kept while your
           account is active and deleted when you delete your account. Rows you
           delete in the app are removed from the live database immediately.
+        </li>
+        <li>
+          Offer inbox: parsed offers are desk records (as above). The receipt
+          log is kept 12 months. The raw forwarded email is processed in
+          memory and never stored.
         </li>
         <li>
           Payment records: kept for 6 years to meet tax and accounting

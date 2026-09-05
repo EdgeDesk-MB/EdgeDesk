@@ -439,6 +439,11 @@ CREATE TABLE IF NOT EXISTS racecard_cache (
   payload TEXT NOT NULL,
   fetched_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS fixture_cache (
+  date TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS racing_odds_overrides (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,
@@ -552,6 +557,10 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("events", "ft_away_score INTEGER");
   addColumn("events", "match_ending TEXT");
   addColumn("events", "period TEXT");
+  addColumn("events", "ht_home_score INTEGER");
+  addColumn("events", "ht_away_score INTEGER");
+  addColumn("events", "lineups TEXT");
+  addColumn("events", "tape_fetched_at INTEGER");
   addColumn("bets", "trigger_text TEXT");
   addColumn("bets", "trigger_rule TEXT");
   addColumn("bets", "exchange_id INTEGER");
@@ -718,6 +727,29 @@ CREATE INDEX IF NOT EXISTS idx_offer_ev_snapshots_offer ON offer_ev_snapshots(of
 `);
   // Additive column for DBs created before B7 (must run after the CREATE above).
   addColumn("offer_ev_snapshots", "mistake_tag TEXT");
+
+  // Offer inbox (email forwarding): one address row per local desk, plus the
+  // inbound ledger that dedupes by provider message id and content fingerprint.
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS offer_inbox_addresses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS offer_inbound_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  address_id INTEGER NOT NULL,
+  message_id TEXT,
+  fingerprint TEXT NOT NULL,
+  status TEXT NOT NULL,
+  offer_id INTEGER,
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_offer_inbound_message_id
+  ON offer_inbound_messages(address_id, message_id);
+CREATE INDEX IF NOT EXISTS idx_offer_inbound_fingerprint
+  ON offer_inbound_messages(address_id, fingerprint, created_at);
+`);
 
   // Data migrations - only after tables exist (fresh DBs / vitest temp files)
   sqlite.exec(`DELETE FROM history WHERE kind = 'free_bet_promo'`);

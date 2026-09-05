@@ -1,13 +1,12 @@
 "use client";
 
 import {
-  memo,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
-  Fragment,
 } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,10 +24,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -67,6 +63,7 @@ import {
 } from "@/lib/alerts/quiet-offer-toasts";
 import { completeEffort } from "@/lib/effort-timer";
 import { useAppState } from "@/hooks/use-app-state";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import { usePauseAppStatePolling } from "@/components/app-state-provider";
 import { DeferredTextInput } from "@/components/add-bet/deferred-text-input";
 import { useExchanges } from "@/hooks/use-exchanges";
@@ -108,6 +105,10 @@ import {
 } from "@/lib/markets";
 import type { BetRow, ExchangeRow } from "@/lib/db/schema";
 import {
+  stripStaleHorseFromRacingBetLabel,
+  syncRacingBetLabelOnSelectionChange,
+} from "@/lib/bets/racing-bet-label";
+import {
   defaultEventDateTime,
   effectiveEventStatus,
   eventDisplayName,
@@ -132,13 +133,16 @@ import {
   knownFromFootballFixtures,
   knownFromRacingFixtures,
   parseFixtureSelectValue,
-  partsKnownFixtureOption,
-  partsTrackedEventOption,
+  knownFixtureSearchOption,
+  resolveFootballPlayerOptions,
   resolveRaceRunnerOptions,
+  toEventSearchSection,
   tomorrowCalendarDate,
-  type EventOptionParts,
+  trackedEventSearchOption,
+  type EventSearchSection,
   type KnownFixtureOption,
 } from "@/lib/add-bet-event-options";
+import { EventSearchSelect } from "@/components/event-search-select";
 import type { Fixture, RacingFixture } from "@/components/events/types";
 import {
   formatOfferScopeLabel,
@@ -158,7 +162,7 @@ import {
   placementBreachMessages,
   placementRequirementsFromImportant,
 } from "@/lib/offers/offer-placement-requirements";
-import { placementFieldWarningClass } from "@/lib/ui/surface-styles";
+import { placementFieldWarningClass, sectionDescription } from "@/lib/ui/surface-styles";
 import { readImportantTerms } from "@/lib/offers/offer-terms";
 import {
   bookmakerFromOfferPrefs,
@@ -167,11 +171,11 @@ import {
 import { liveEventInlineLabel } from "@/components/events/live-event-status";
 import { DatePicker } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
-import { SportIcon, SportLabel } from "@/components/sport-icon";
+import { SportLabel } from "@/components/sport-icon";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { cn } from "@/lib/utils";
 import { BetOfferTriggerField } from "@/components/add-bet/bet-offer-trigger-field";
-import { Gift, Loader2, Trash2, Zap } from "lucide-react";
+import { Gift, Trash2, Zap } from "lucide-react";
 import type { BetOcrFields, ScreenshotSource } from "@/lib/ocr/types";
 import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
@@ -188,6 +192,7 @@ export interface EventLite extends TrackedEventLike {
   awayScore?: number;
   minute?: number;
   goals?: string | null;
+  lineups?: string | null;
 }
 
 export interface AddBetPrefill {
@@ -280,149 +285,6 @@ const betTypeLabels: Record<UiBetType, string> = {
   boost: "Boost",
 };
 
-/**
- * Events rows hide the trailing check gutter so the clock can sit on the right
- * edge; selection is shown via the checked background instead.
- */
-const addBetEventSelectItemClass =
-  "pr-2 [&_[data-slot=select-item-indicator]]:hidden data-[state=checked]:bg-accent";
-
-/** Events dropdown row: title + status left, clock flush right. */
-function AddBetEventOptionRow({
-  sport,
-  parts,
-}: {
-  sport: string | null | undefined;
-  parts: EventOptionParts;
-}) {
-  return (
-    <span className="flex w-full min-w-0 items-center justify-between gap-3">
-      <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <SportIcon sport={sport} size={14} className="shrink-0 text-muted-foreground" />
-        <span className="truncate">{parts.title}</span>
-        {parts.status ? (
-          <span
-            className={cn(
-              "shrink-0 text-xs font-semibold",
-              parts.status === "Live" ? "text-success" : "text-muted-foreground"
-            )}
-          >
-            {parts.status}
-          </span>
-        ) : null}
-      </span>
-      {parts.time ? (
-        <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-          {parts.time}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-type HourBanded<T> = {
-  key: string;
-  label: string;
-  hours: { key: string; label: string; items: T[] }[];
-};
-
-/** Heavy Events list — memoised so Label keystrokes do not rebuild fixture rows. */
-const AddBetEventsSelectOptions = memo(function AddBetEventsSelectOptions({
-  courseScopeLocked,
-  courseScopeLabel,
-  trackedBands,
-  notTrackedBands,
-  loading,
-}: {
-  courseScopeLocked: boolean;
-  courseScopeLabel: string | null;
-  trackedBands: HourBanded<TrackedEventLike>[];
-  notTrackedBands: HourBanded<KnownFixtureOption>[];
-  loading: boolean;
-}) {
-  return (
-    <>
-      {courseScopeLocked ? (
-        <SelectItem value="__scope_pending__" disabled>
-          Select a {courseScopeLabel} race
-        </SelectItem>
-      ) : (
-        <SelectItem value="none">Manual entry</SelectItem>
-      )}
-      {loading || trackedBands.length > 0 ? (
-        <>
-          {!courseScopeLocked ? <SelectSeparator /> : null}
-          <SelectGroup className="p-0">
-            <SelectLabel className="text-foreground">Tracked</SelectLabel>
-            {loading ? (
-              <SelectItem value="__events_loading__" disabled>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                  Loading events…
-                </span>
-              </SelectItem>
-            ) : null}
-            {trackedBands.map((band, bandIdx) => (
-              <Fragment key={`tracked-${band.key}`}>
-                {bandIdx > 0 ? <SelectSeparator /> : null}
-                <SelectLabel>{band.label}</SelectLabel>
-                {band.hours.map((hour) => (
-                  <Fragment key={`tracked-${band.key}-${hour.key}`}>
-                    {hour.label ? <SelectLabel>{hour.label}</SelectLabel> : null}
-                    {hour.items.map((e) => (
-                      <SelectItem
-                        key={e.id}
-                        value={String(e.id)}
-                        className={addBetEventSelectItemClass}
-                      >
-                        <AddBetEventOptionRow
-                          sport={e.sport}
-                          parts={partsTrackedEventOption(e)}
-                        />
-                      </SelectItem>
-                    ))}
-                  </Fragment>
-                ))}
-              </Fragment>
-            ))}
-          </SelectGroup>
-        </>
-      ) : null}
-      {notTrackedBands.length > 0 && (
-        <>
-          <SelectSeparator />
-          <SelectGroup className="p-0">
-            <SelectLabel className="text-foreground">Not tracked</SelectLabel>
-            {notTrackedBands.map((band, bandIdx) => (
-              <Fragment key={`not-tracked-${band.key}`}>
-                {bandIdx > 0 ? <SelectSeparator /> : null}
-                <SelectLabel>{band.label}</SelectLabel>
-                {band.hours.map((hour) => (
-                  <Fragment key={`not-tracked-${band.key}-${hour.key}`}>
-                    {hour.label ? <SelectLabel>{hour.label}</SelectLabel> : null}
-                    {hour.items.map((f) => (
-                      <SelectItem
-                        key={f.externalId}
-                        value={fixtureSelectValue(f.externalId)}
-                        className={addBetEventSelectItemClass}
-                      >
-                        <AddBetEventOptionRow
-                          sport={f.sport}
-                          parts={partsKnownFixtureOption(f)}
-                        />
-                      </SelectItem>
-                    ))}
-                  </Fragment>
-                ))}
-              </Fragment>
-            ))}
-          </SelectGroup>
-        </>
-      )}
-    </>
-  );
-});
-
 function exchangeFromNotes(notes: string | null | undefined, exchanges: ExchangeRow[]) {
   const match = notes?.match(/^Exchange: (.+)$/);
   if (!match) return null;
@@ -497,7 +359,8 @@ export function AddBetDialog({
   const [fixturesLoading, setFixturesLoading] = useState(false);
   const eventsFetchGen = useRef(0);
   const fixturesFetchGen = useRef(0);
-  const events = eventsProp ?? fetchedEvents;
+  const hasPassedEvents = eventsProp != null && eventsProp.length > 0;
+  const events = hasPassedEvents ? eventsProp : fetchedEvents;
   const [knownFixtures, setKnownFixtures] = useState<KnownFixtureOption[]>([]);
   const [pendingFixture, setPendingFixture] = useState<KnownFixtureOption | null>(null);
   /** Runners fetched for a tracked race when goals has no racecard yet. */
@@ -514,6 +377,7 @@ export function AddBetDialog({
     isKnownSport(seedSport) ? seedSport : "football",
   );
   const [eventId, setEventId] = useState<string>("none");
+  const eventsSelectId = useId();
   const dateTimeDefaults = defaultEventDateTime();
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState(dateTimeDefaults.date);
@@ -522,6 +386,10 @@ export function AddBetDialog({
   const [awayTeam, setAwayTeam] = useState("");
   const [market, setMarket] = useState(seedMarket);
   const [selection, setSelection] = useState(defaultSelection(seedSport, seedMarket));
+  const commitHorseSelection = (next: string) => {
+    setLabel((current) => syncRacingBetLabelOnSelectionChange(current, selection, next));
+    setSelection(next);
+  };
   const [betType, setBetType] = useState<UiBetType>(appSettings?.defaultBetType ?? "qualifying");
   /** The calc/settlement mode behind the UI type */
   const calcBetType: BetMode =
@@ -605,7 +473,7 @@ export function AddBetDialog({
   }
 
   const loadTrackedEvents = useCallback(() => {
-    if (eventsProp !== undefined) {
+    if (hasPassedEvents) {
       setEventsLoading(false);
       return;
     }
@@ -621,7 +489,7 @@ export function AddBetDialog({
       .finally(() => {
         if (gen === eventsFetchGen.current) setEventsLoading(false);
       });
-  }, [eventsProp]);
+  }, [hasPassedEvents]);
 
   const loadKnownFixtures = useCallback(() => {
     if (sport !== "football" && sport !== "horse_racing") {
@@ -736,7 +604,7 @@ export function AddBetDialog({
 
     queueMicrotask(() => {
       setSport(resolvedSport);
-      setLabel(editBet.label);
+      setLabel(stripStaleHorseFromRacingBetLabel(editBet.label, editBet.selection));
       setBookmaker(editBet.bookmaker ?? "");
       const unhedgedFree = noLayFreeBetFromStored(
         editBet.betType,
@@ -1170,6 +1038,35 @@ export function AddBetDialog({
     [notTrackedDayBands]
   );
 
+  const eventSearchSections = useMemo<EventSearchSection[]>(
+    () => [
+      ...(trackedHourBands.length > 0
+        ? [
+            toEventSearchSection(
+              "tracked",
+              "Tracked",
+              trackedHourBands,
+              trackedEventSearchOption
+            ),
+          ]
+        : []),
+      ...(notTrackedHourBands.length > 0
+        ? [
+            {
+              ...toEventSearchSection(
+                "fixtures",
+                "Not tracked",
+                notTrackedHourBands,
+                knownFixtureSearchOption
+              ),
+              showHeading: false,
+            },
+          ]
+        : []),
+    ],
+    [trackedHourBands, notTrackedHourBands]
+  );
+
   const selectedEvent = events.find((e) => String(e.id) === eventId);
   const effectiveHome = homeTeam.trim() || selectedEvent?.homeTeam || "";
   const effectiveAway = awayTeam.trim() || selectedEvent?.awayTeam || "";
@@ -1205,6 +1102,17 @@ export function AddBetDialog({
     selection,
   ]);
   const useRaceRunnerSelect = raceRunnerOptions.length > 0;
+  const footballPlayerOptions = useMemo(() => {
+    if (!canDesk(appState?.settings, "football_live_feeds")) return [];
+    return resolveFootballPlayerOptions({
+      eventLinked,
+      sport,
+      market,
+      lineups: selectedEvent?.lineups,
+      currentSelection: selection,
+    });
+  }, [appState?.settings, eventLinked, sport, market, selectedEvent?.lineups, selection]);
+  const useFootballPlayerSelect = footballPlayerOptions.length > 0;
   /** Linked race with a known card (or still loading): Selection is a dropdown, not free text. */
   const lockRaceSelection =
     sport === "horse_racing" && eventLinked && (useRaceRunnerSelect || !runnersFetchDone);
@@ -2150,10 +2058,12 @@ export function AddBetDialog({
       await creditBackStakeIfNeeded(resolvedBookmaker, backStake);
 
       const payload = {
-        label:
+        label: stripStaleHorseFromRacingBetLabel(
           label ||
-          prefill?.labelSuggestion ||
-          `${currentMarket?.label ?? market} ${selection}`.trim(),
+            prefill?.labelSuggestion ||
+            `${currentMarket?.label ?? market} ${selection}`.trim(),
+          selection
+        ),
         eventId: resolvedEventId ?? null,
         // Boost Place bet may leave market unset until the user picks a sport.
         market: market || "other",
@@ -2422,52 +2332,73 @@ export function AddBetDialog({
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">
-                {courseScopeLocked ? `Events · ${courseScopeLabel}` : "Events"}
-              </Label>
-              <Select
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor={eventsSelectId} className="text-xs text-muted-foreground">
+                  {courseScopeLocked ? `Events · ${courseScopeLabel}` : "Events"}
+                </Label>
+                {eventId !== "none" || pendingFixture ? (
+                  <button
+                    type="button"
+                    aria-label="Clear event"
+                    disabled={saving}
+                    className="text-xs font-medium text-primary-text underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                    onClick={() => {
+                      setEventId("none");
+                      setPendingFixture(null);
+                      setFetchedRunners([]);
+                      setRunnersFetchDone(false);
+                      if (!courseScopeLocked) setManualEntry(true);
+                      if (sport === "horse_racing") setSelection("");
+                    }}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              <EventSearchSelect
+                id={eventsSelectId}
                 value={courseScopeLocked && eventId === "none" ? "__scope_pending__" : eventId}
                 onValueChange={changeEvent}
-                onOpenChange={(next) => {
-                  if (next) {
+                onOpen={() => {
+                  // Dialog already fetches on open. A second pass here used to
+                  // flip the loading flags again and flash the page behind.
+                  if (!hasPassedEvents && fetchedEvents.length === 0) {
                     loadTrackedEvents();
+                  }
+                  if (knownFixtures.length === 0) {
                     loadKnownFixtures();
                   }
                 }}
-              >
-                <SelectTrigger
-                  className={cn(
-                    "w-full",
-                    ring(!!highlightEmpty && courseScopeLocked && eventId === "none" && !pendingFixture)
-                  )}
-                >
-                  <SelectValue
-                    placeholder={
-                      courseScopeLocked
-                        ? `Select a ${courseScopeLabel} race`
-                        : "Select an event"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <AddBetEventsSelectOptions
-                    courseScopeLocked={courseScopeLocked}
-                    courseScopeLabel={courseScopeLabel}
-                    trackedBands={trackedHourBands}
-                    notTrackedBands={notTrackedHourBands}
-                    loading={eventsListLoading}
-                  />
-                </SelectContent>
-              </Select>
+                placeholder={
+                  courseScopeLocked
+                    ? `Select a ${courseScopeLabel} race`
+                    : "Select an event"
+                }
+                searchPlaceholder={
+                  sport === "horse_racing" ? "Search races…" : "Search events…"
+                }
+                className={ring(!!highlightEmpty && courseScopeLocked && eventId === "none" && !pendingFixture)}
+                topRow={
+                  courseScopeLocked
+                    ? {
+                        value: "__scope_pending__",
+                        label: `Select a ${courseScopeLabel} race`,
+                        disabled: true,
+                      }
+                    : { value: "none", label: "Manual entry" }
+                }
+                sections={eventSearchSections}
+                loading={eventsListLoading}
+              />
               {courseScopeLocked ? (
-                <span className="text-[11px] leading-tight text-muted-foreground">
+                <span className={sectionDescription}>
                   Limited to {courseScopeLabel} races for this campaign.
                 </span>
               ) : null}
               {!eventsListLoading &&
                 trackedDayBands.length === 0 &&
                 notTrackedDayBands.length === 0 && (
-                <span className="text-[11px] leading-tight text-muted-foreground">
+                <span className={sectionDescription}>
                   {courseScopeLocked
                     ? `No ${courseScopeLabel} races loaded yet for this day.`
                     : "No events loaded. Track one on Tracked Events, or enter details below."}
@@ -2764,11 +2695,24 @@ export function AddBetDialog({
                     </span>
                   </div>
                 </div>
-              ) : lockRaceSelection ? (
+              ) : useFootballPlayerSelect ? (
                 <PanelIconSelect
                   label="Selection"
                   value={selection}
                   onChange={setSelection}
+                  sport={sport}
+                  placeholder="Select player"
+                  selectClassName={ring(!selection.trim())}
+                  options={footballPlayerOptions.map((player) => ({
+                    value: player,
+                    label: capitaliseSelectionLabel(player),
+                  }))}
+                />
+              ) : lockRaceSelection ? (
+                <PanelIconSelect
+                  label="Selection"
+                  value={selection}
+                  onChange={commitHorseSelection}
                   sport={sport}
                   placeholder={useRaceRunnerSelect ? "Select runner" : "Loading runners…"}
                   selectClassName={ring(!selection.trim())}

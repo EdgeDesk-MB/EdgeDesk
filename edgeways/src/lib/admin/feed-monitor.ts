@@ -130,6 +130,8 @@ export const FEED_OPERATION_LABEL: Record<string, string> = {
   "live-fixtures": "Live scores poll",
   "fixture-by-id": "Fixture lookup",
   "goal-events": "Goal events",
+  "match-events": "Match events",
+  lineups: "Lineups",
   "racecards-free": "Racecards (free)",
   "racecards-standard": "Racecards (standard)",
   results: "Results",

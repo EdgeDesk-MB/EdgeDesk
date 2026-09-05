@@ -109,7 +109,8 @@ describe("footballOperation", () => {
     expect(footballOperation("/fixtures?date=2026-08-27")).toBe("fixtures-by-date");
     expect(footballOperation("/fixtures?live=all")).toBe("live-fixtures");
     expect(footballOperation("/fixtures?id=12345")).toBe("fixture-by-id");
-    expect(footballOperation("/fixtures/events?fixture=1&type=Goal")).toBe("goal-events");
+    expect(footballOperation("/fixtures/events?fixture=1")).toBe("match-events");
+    expect(footballOperation("/fixtures/lineups?fixture=1")).toBe("lineups");
     expect(footballOperation("/status")).toBe("other");
   });
 });

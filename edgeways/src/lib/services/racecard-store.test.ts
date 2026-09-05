@@ -152,6 +152,22 @@ describe("racecard-store", () => {
     expect(served.cards[0]?.status).toBe("finished");
   });
 
+  it("does not persist an empty live payload so a 429 cannot poison the day", async () => {
+    const { store, racecardsByDate, racecardsFree } = await loadStore();
+    const today = localCalendarDate();
+    racecardsByDate.mockResolvedValue({ cards: [], oddsTier: "standard" });
+    racecardsFree.mockResolvedValueOnce([]);
+
+    const first = await store.getRacecardsForDate(today);
+    expect(first.cards).toHaveLength(0);
+    expect(await store.readRacecardStore(today)).toBeNull();
+
+    racecardsByDate.mockResolvedValueOnce({ cards: [card()], oddsTier: "standard" });
+    const second = await store.getRacecardsForDate(today);
+    expect(second.cards).toHaveLength(1);
+    expect(await store.readRacecardStore(today)).not.toBeNull();
+  });
+
   it("throws on a cold miss when the live fetch fails", async () => {
     const { store, racecardsByDate } = await loadStore();
     const today = localCalendarDate();

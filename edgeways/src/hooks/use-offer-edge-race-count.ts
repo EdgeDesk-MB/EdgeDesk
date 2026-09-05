@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { fetchOfferEdgePlays } from "@/lib/offers/offer-edge-client";
 import type { DeskGateSettings } from "@/lib/entitlements/effective-plan";
+import { localCalendarDate } from "@/lib/events";
 import { useNow } from "@/hooks/use-now";
 
 /**
@@ -31,7 +32,7 @@ export function useOfferEdgeRaceCount(
   useEffect(() => {
     if (!entitled) return;
     let cancelled = false;
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localCalendarDate();
     const offerSetChanged = prevOfferKey.current !== racingOfferKey;
     prevOfferKey.current = racingOfferKey;
     fetchOfferEdgePlays(date, { force: offerSetChanged }).then(({ plays }) => {

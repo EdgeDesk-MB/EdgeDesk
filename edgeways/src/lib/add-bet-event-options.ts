@@ -22,6 +22,7 @@ import { parseRacecardRunners, parseRaceResults } from "@/lib/racing";
 import { titleCaseHorse } from "@/lib/racing/parse-race-result-text";
 import { sortRunnerNamesByOdds, type OddsSortableRunner } from "@/lib/racing/odds";
 import { formatClockString } from "@/lib/time-format";
+import { lineupPlayerNames, parseFootballLineups } from "@/lib/events/lineups";
 
 /** Tomorrow's calendar date in the fixture timezone (DST-safe via noon). */
 export function tomorrowCalendarDate(now = Date.now()): string {
@@ -87,6 +88,9 @@ export function isLiveInAddBetEvents(
   sport?: string | null
 ): boolean {
   if (status === "finished") return false;
+  // Match production: stored live wins even if kick-off is a minute ahead
+  // of the local clock (DST / poll lag).
+  if (status === "live") return true;
   if (startTime != null && Number.isFinite(startTime)) {
     if (startTime > now) return false;
     // Racing always uses the short grace. Football (or live with no sport) uses in-play.
@@ -344,13 +348,13 @@ export function partsKnownFixtureOption(
         awayTeam: f.awayTeam,
         offTime: f.offTime,
       }),
-      status: live ? "Live" : "",
+      status: live ? "LIVE" : "",
     };
   }
   return {
     title: `${f.homeTeam} v ${f.awayTeam}`,
     time: formatClockString(formatEventTime(f.startTime)),
-    status: live ? "Live" : "",
+    status: live ? "LIVE" : "",
   };
 }
 
@@ -377,7 +381,7 @@ export function partsTrackedEventOption(
     return {
       title: racingVenueLabel(ev.competition),
       time: racingOptionClock(ev),
-      status: live ? "Live" : ev.status === "finished" ? "Result" : "",
+      status: live ? "LIVE" : ev.status === "finished" ? "Result" : "",
     };
   }
   return {
@@ -386,7 +390,7 @@ export function partsTrackedEventOption(
       ev.startTime != null
         ? formatClockString(formatEventTime(ev.startTime))
         : "",
-    status: live ? "Live" : ev.status === "finished" ? "FT" : "",
+    status: live ? "LIVE" : ev.status === "finished" ? "FT" : "",
   };
 }
 
@@ -396,6 +400,162 @@ export function formatTrackedEventOption(
   now = Date.now()
 ): string {
   return joinEventOptionParts(partsTrackedEventOption(ev, now));
+}
+
+/**
+ * Searchable Events picker (EventSearchSelect) option: the structured row
+ * plus a lowercase haystack so substring search reaches teams, race names,
+ * courses and competitions ("Arsenal" finds both "Arsenal" and "Arsenal U21").
+ */
+export interface EventSearchOption {
+  value: string;
+  sport?: string | null;
+  parts: EventOptionParts;
+  startTime?: number | null;
+  eventStatus?: string | null;
+  source?: string | null;
+  /** Lowercase search haystack (title, teams, competition / course). */
+  keywords: string;
+}
+
+export interface EventSearchHourBand {
+  key: string;
+  label: string;
+  items: EventSearchOption[];
+}
+
+export interface EventSearchDayBand {
+  key: string;
+  label: string;
+  hours: EventSearchHourBand[];
+}
+
+export interface EventSearchSection {
+  key: string;
+  label: string;
+  bands: EventSearchDayBand[];
+  /** When false, options stay searchable but the idle list omits the band. */
+  listInIdle?: boolean;
+  /** When false, list the rows without a Tracked / Fixtures heading. */
+  showHeading?: boolean;
+}
+
+function searchHaystack(parts: Array<string | null | undefined>): string {
+  return parts
+    .filter((p): p is string => Boolean(p && p.trim()))
+    .join(" ")
+    .toLowerCase();
+}
+
+/** Tracked event → searchable option (value is the tracked id). */
+export function trackedEventSearchOption(
+  ev: TrackedEventLike,
+  now = Date.now()
+): EventSearchOption {
+  const parts = partsTrackedEventOption(ev, now);
+  return {
+    value: String(ev.id),
+    sport: ev.sport,
+    parts,
+    startTime: ev.startTime,
+    eventStatus: ev.status,
+    source: ev.source,
+    keywords: searchHaystack([parts.title, ev.homeTeam, ev.awayTeam, ev.competition]),
+  };
+}
+
+/** Known fixture → searchable option (value keeps the fixture: prefix). */
+export function knownFixtureSearchOption(
+  f: KnownFixtureOption,
+  now = Date.now()
+): EventSearchOption {
+  const parts = partsKnownFixtureOption(f, now);
+  return {
+    value: fixtureSelectValue(f.externalId),
+    sport: f.sport,
+    parts,
+    startTime: f.startTime,
+    eventStatus: f.status,
+    source: "api",
+    keywords: searchHaystack([
+      parts.title,
+      f.homeTeam,
+      f.awayTeam,
+      f.competition,
+      f.course,
+      f.raceName,
+    ]),
+  };
+}
+
+/**
+ * Tokenised substring match: every query word must appear somewhere in the
+ * haystack, so "arsenal u21" narrows to the U21 fixture while "Arsenal"
+ * still finds both the senior and U21 rows.
+ */
+export function matchesEventSearch(keywords: string, query: string): boolean {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  return tokens.every((token) => keywords.includes(token));
+}
+
+/** Map hour-banded picker rows into a searchable section (order preserved). */
+export function toEventSearchSection<T>(
+  key: string,
+  label: string,
+  bands: {
+    key: string;
+    label: string;
+    hours: { key: string; label: string; items: T[] }[];
+  }[],
+  mapItem: (item: T) => EventSearchOption
+): EventSearchSection {
+  return {
+    key,
+    label,
+    bands: bands.map((band) => ({
+      key: band.key,
+      label: band.label,
+      hours: band.hours.map((hour) => ({
+        key: hour.key,
+        label: hour.label,
+        items: hour.items.map(mapItem),
+      })),
+    })),
+  };
+}
+
+/** First paint of the idle Events list. More rows mount as the user scrolls. */
+export const EVENT_SEARCH_IDLE_PAGE = 60;
+/** First paint of a typed search. More matches mount as the user scrolls. */
+export const EVENT_SEARCH_SEARCH_PAGE = 100;
+
+/** Keep day / hour banding, but only mount the first `limit` rows. */
+export function capEventSearchSections(
+  sections: EventSearchSection[],
+  limit: number
+): { sections: Array<EventSearchSection & { total: number }>; rendered: number } {
+  let remaining = Math.max(limit, 0);
+  const capped: Array<EventSearchSection & { total: number }> = [];
+  for (const section of sections) {
+    const total = section.bands.reduce(
+      (n, band) => n + band.hours.reduce((m, hour) => m + hour.items.length, 0),
+      0
+    );
+    const bands: EventSearchSection["bands"] = [];
+    for (const band of section.bands) {
+      const hours: EventSearchSection["bands"][number]["hours"] = [];
+      for (const hour of band.hours) {
+        if (remaining <= 0) break;
+        const items = hour.items.slice(0, remaining);
+        remaining -= items.length;
+        if (items.length > 0) hours.push({ ...hour, items });
+      }
+      if (hours.length > 0) bands.push({ ...band, hours });
+    }
+    if (bands.length > 0) capped.push({ ...section, bands, total });
+  }
+  return { sections: capped, rendered: limit - Math.max(remaining, 0) };
 }
 
 /** Tracked section: same sort as today (live first, then ascending kick-off). */
@@ -566,4 +726,26 @@ export function resolveRaceRunnerOptions(input: {
     return [current, ...runners];
   }
   return runners;
+}
+
+const FOOTBALL_PLAYER_MARKETS = new Set(["first_goalscorer", "anytime_goalscorer"]);
+
+/** Player names from a stored XI when Add bet is on a goalscorer market. */
+export function resolveFootballPlayerOptions(input: {
+  eventLinked: boolean;
+  sport?: string | null;
+  market?: string | null;
+  lineups?: string | null;
+  currentSelection?: string;
+}): string[] {
+  if (!input.eventLinked) return [];
+  if ((input.sport ?? "football") !== "football") return [];
+  if (!input.market || !FOOTBALL_PLAYER_MARKETS.has(input.market)) return [];
+  const names = lineupPlayerNames(parseFootballLineups(input.lineups ?? null));
+  const current = (input.currentSelection ?? "").trim();
+  if (names.length === 0) return current ? [current] : [];
+  if (current && !names.some((n) => n.toLowerCase() === current.toLowerCase())) {
+    return [current, ...names];
+  }
+  return names;
 }

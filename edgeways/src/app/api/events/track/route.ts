@@ -73,6 +73,8 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         awayScore: fixture.awayScore,
         minute: fixture.minute,
         period: fixture.period ?? null,
+        htHomeScore: fixture.htHomeScore ?? null,
+        htAwayScore: fixture.htAwayScore ?? null,
         createdAt: now,
       });
       await followNeonEvent(inserted.id);
@@ -128,6 +130,8 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         awayScore: fixture.awayScore,
         minute: fixture.minute,
         period: fixture.period ?? null,
+        htHomeScore: fixture.htHomeScore ?? null,
+        htAwayScore: fixture.htAwayScore ?? null,
         createdAt: now,
       })
       .returning()

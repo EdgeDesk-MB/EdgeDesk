@@ -8,7 +8,7 @@ export default function RacingPage() {
       fallback={
         <PageLoading
           label="Loading Racing Desk"
-          description="Fetching today's racecards…"
+          description="Opening today's racecards…"
         />
       }
     >

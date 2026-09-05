@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { warmFixtureStore } from "@/lib/services/fixture-store";
 import { warmRacecardStore } from "@/lib/services/racecard-store";
 
 export const dynamic = "force-dynamic";
@@ -10,17 +11,20 @@ function cronAuthorized(request: Request): boolean {
 }
 
 /**
- * Keep the durable racecard store fresh for today and tomorrow so desk loads
- * are database reads, not upstream fetches. The store's own freshness window
- * makes most runs a cheap no-op.
+ * Keep durable day-card stores fresh (racing + football) so desk loads are
+ * database reads, not upstream fetches. Each store's freshness window makes
+ * most runs a cheap no-op.
  */
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
   try {
-    const result = await warmRacecardStore();
-    return NextResponse.json({ ok: true, ...result });
+    const [racing, football] = await Promise.all([
+      warmRacecardStore(),
+      warmFixtureStore(),
+    ]);
+    return NextResponse.json({ ok: true, racing, football });
   } catch (error) {
     console.error("[cron/warm-racecards] warm failed:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DialogSaveButton } from "@/components/ui/dialog-save-button";
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
@@ -29,11 +30,22 @@ import type { AccountBalance } from "@/lib/services/balances.types";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { BookieNamePicker, EXCHANGE_CUSTOM } from "@/components/bookie-name-picker";
 import { formatGbp, isNegativeGbp, roundMoney } from "@/lib/format-money";
+import { quietPanel } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Wallet } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 
-type FundKind = "cash" | "free_bet";
+export type FundKind = "cash" | "free_bet";
+export type AdjustBalanceMode = "top_up" | "withdrawal" | "adjustment";
 
 export type AddBalanceOpenOpts = {
   accountId?: number;
@@ -42,10 +54,49 @@ export type AddBalanceOpenOpts = {
 };
 
 interface TopUpRow {
+  rowKey: string;
   accountId: number;
   amount: number;
   note: string;
   fundKind: FundKind;
+}
+
+let rowKeySeq = 0;
+function nextRowKey(): string {
+  rowKeySeq += 1;
+  return `row-${rowKeySeq}`;
+}
+
+const MODE_TABS: {
+  value: AdjustBalanceMode;
+  label: string;
+  icon: LucideIcon;
+  iconClass: string;
+}[] = [
+  {
+    value: "top_up",
+    label: "Top up",
+    icon: ArrowDownToLine,
+    iconClass: "text-profit",
+  },
+  {
+    value: "withdrawal",
+    label: "Withdraw",
+    icon: ArrowUpFromLine,
+    iconClass: "text-negative",
+  },
+  {
+    value: "adjustment",
+    label: "Adjust",
+    icon: SlidersHorizontal,
+    iconClass: "text-muted-foreground",
+  },
+];
+
+function rowGridClass(mode: AdjustBalanceMode): string {
+  return mode === "top_up"
+    ? "sm:grid-cols-[minmax(0,1.5fr)_7.5rem_7.5rem_minmax(0,1fr)_2rem]"
+    : "sm:grid-cols-[minmax(0,1.5fr)_7.5rem_minmax(0,1fr)_2rem]";
 }
 
 function resolveSeedAccount(
@@ -105,15 +156,145 @@ export function AddBalanceDialog({
  */
 export function balanceAmountInputValue(
   amount: number,
-  mode: "top_up" | "withdrawal" | "adjustment"
+  mode: AdjustBalanceMode
 ): number | "" {
   if (mode !== "adjustment" && amount === 0) return "";
   return Number.isFinite(amount) ? amount : "";
 }
 
+export function ledgerAmountForRow(
+  mode: AdjustBalanceMode,
+  amount: number,
+  currentBalance: number
+): number {
+  if (mode === "adjustment") return roundMoney(amount - currentBalance);
+  if (mode === "withdrawal") return roundMoney(-Math.abs(amount));
+  return roundMoney(amount);
+}
+
+export function nextUnusedAccountId(
+  accounts: { id: number }[],
+  usedIds: readonly number[]
+): number | undefined {
+  if (accounts.length === 0) return undefined;
+  const used = new Set(usedIds);
+  return (accounts.find((a) => !used.has(a.id)) ?? accounts[0]).id;
+}
+
+export function balanceDeltaClass(amount: number): string {
+  if (isNegativeGbp(amount)) return "text-negative";
+  if (roundMoney(amount) > 0) return "text-profit";
+  return "text-muted-foreground";
+}
+
+export type AdjustFooterBreakdown = {
+  name: string;
+  amount: number;
+  fundKind: FundKind;
+};
+
+export type AdjustFooterModel = {
+  headlineLabel: string;
+  headlineAmount: number;
+  headlineSigned: boolean;
+  supportingNewBalance: number | null;
+  supportingDelta: number | null;
+  freeBetAmount: number;
+};
+
+export function adjustBalanceFooterModel(opts: {
+  mode: AdjustBalanceMode;
+  affectPnl: boolean;
+  cashDelta: number;
+  freeBetAmount: number;
+  newBalance: number | null;
+  breakdown: AdjustFooterBreakdown[];
+}): AdjustFooterModel {
+  const contributing = opts.breakdown.filter((row) => roundMoney(row.amount) !== 0);
+  const multi = contributing.length > 1;
+
+  if (opts.affectPnl && roundMoney(opts.cashDelta) !== 0) {
+    return {
+      headlineLabel: isNegativeGbp(opts.cashDelta) ? "Loss" : "Profit",
+      headlineAmount: opts.cashDelta,
+      headlineSigned: true,
+      supportingNewBalance: opts.newBalance,
+      supportingDelta: null,
+      freeBetAmount: opts.freeBetAmount,
+    };
+  }
+
+  if (opts.mode === "top_up" && opts.freeBetAmount > 0) {
+    return {
+      headlineLabel: "Cash",
+      headlineAmount: opts.cashDelta,
+      headlineSigned: true,
+      supportingNewBalance: null,
+      supportingDelta: null,
+      freeBetAmount: opts.freeBetAmount,
+    };
+  }
+
+  if (opts.mode === "top_up" && opts.newBalance != null && !multi) {
+    return {
+      headlineLabel: "New balance",
+      headlineAmount: opts.newBalance,
+      headlineSigned: false,
+      supportingNewBalance: null,
+      supportingDelta: roundMoney(opts.cashDelta) !== 0 ? opts.cashDelta : null,
+      freeBetAmount: 0,
+    };
+  }
+
+  return {
+    headlineLabel: "Net change",
+    headlineAmount: opts.cashDelta,
+    headlineSigned: true,
+    supportingNewBalance: null,
+    supportingDelta: null,
+    freeBetAmount: 0,
+  };
+}
+
+export function adjustPnlHelpText(opts: {
+  enabled: boolean;
+  mode: "top_up" | "adjustment";
+  cashRowCount: number;
+  cashDelta: number;
+}): string {
+  if (!opts.enabled) {
+    return opts.cashRowCount > 1
+      ? "Wallet move only. Turn on to count every cash row as profit or loss."
+      : "Wallet move only. Turn on to count this cash movement as profit or loss.";
+  }
+  if (opts.cashRowCount === 0) {
+    return "Counts cash rows as profit or loss. Free bets stay off P&L.";
+  }
+  const signed = formatGbp(opts.cashDelta, { signed: true });
+  const asWhat = isNegativeGbp(opts.cashDelta)
+    ? "loss"
+    : roundMoney(opts.cashDelta) > 0
+      ? "profit"
+      : "profit or loss";
+  if (opts.cashRowCount <= 1) {
+    return opts.mode === "top_up"
+      ? `Records this cash movement as ${asWhat} (${signed}) on Home and History.`
+      : `Records this correction as ${asWhat} (${signed}) on Home and History.`;
+  }
+  return `Applies to all ${opts.cashRowCount} cash rows. Home and History will show ${signed} as ${asWhat}.`;
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="sm:hidden">
+      <Label className="text-xs text-muted-foreground">{children}</Label>
+    </div>
+  );
+}
+
 function seedRow(
   account: AccountBalance | undefined,
-  mode: string,
+  mode: AdjustBalanceMode,
   amount?: number
 ): TopUpRow[] {
   if (!account) return [];
@@ -125,6 +306,7 @@ function seedRow(
         : 0;
   return [
     {
+      rowKey: `seed-${account.id}`,
       accountId: account.id,
       amount: seededAmount,
       note: "",
@@ -150,8 +332,9 @@ function AddBalanceForm({
   initial?: AddBalanceOpenOpts | null;
 }) {
   const { exchanges } = useExchanges();
+  const pnlId = useId();
   const seedAccount = resolveSeedAccount(accounts, initial);
-  const [mode, setMode] = useState<"top_up" | "withdrawal" | "adjustment">("top_up");
+  const [mode, setMode] = useState<AdjustBalanceMode>("top_up");
   const [rows, setRows] = useState<TopUpRow[]>(() =>
     seedRow(seedAccount, "top_up", initial?.amount)
   );
@@ -171,31 +354,17 @@ function AddBalanceForm({
 
   const effectiveRows = rows.length > 0 ? rows : seedRow(seedAccount, mode, initial?.amount);
 
-  /** Mode change reshapes every row - amounts reset (or mirror balances). */
-  function changeMode(next: typeof mode) {
+  /** Keep account, amount, note, and type. Mode only changes how those values save. */
+  function changeMode(next: AdjustBalanceMode) {
+    if (rows.length === 0 && effectiveRows.length > 0) {
+      setRows(effectiveRows);
+    }
     setMode(next);
-    setRows(
-      effectiveRows.map((row) => {
-        const account = accounts.find((a) => a.id === row.accountId) ?? accounts[0];
-        return {
-          ...row,
-          amount: next === "adjustment" ? roundMoney(account?.balance ?? 0) : 0,
-          fundKind: account?.type === "bookie" ? row.fundKind : "cash",
-        };
-      })
-    );
   }
 
-  const signedAmount = (amount: number) =>
-    mode === "withdrawal" ? -Math.abs(amount) : amount;
-
-  /** In adjustment mode, row.amount is the target balance - return ledger delta. */
   function rowLedgerAmount(row: TopUpRow): number {
-    if (mode === "adjustment") {
-      const account = accounts.find((a) => a.id === row.accountId);
-      return roundMoney(row.amount - (account?.balance ?? 0));
-    }
-    return roundMoney(signedAmount(row.amount));
+    const account = accounts.find((a) => a.id === row.accountId);
+    return ledgerAmountForRow(mode, row.amount, account?.balance ?? 0);
   }
 
   function categoryForRow(row: TopUpRow): "top_up" | "withdrawal" | "adjustment" | "free_bet" {
@@ -297,8 +466,9 @@ function AddBalanceForm({
     }
   }
 
-  // Cheap reductions - plain derivation keeps them exact every render.
-  const totalDelta = roundMoney(effectiveRows.reduce((s, r) => s + rowLedgerAmount(r), 0));
+  const cashRows = effectiveRows.filter((r) => categoryForRow(r) !== "free_bet");
+  const cashDelta = roundMoney(cashRows.reduce((s, r) => s + rowLedgerAmount(r), 0));
+  const contributingCashRows = cashRows.filter((r) => rowLedgerAmount(r) !== 0);
 
   const totalFreeBets =
     mode === "top_up"
@@ -307,11 +477,6 @@ function AddBalanceForm({
           .reduce((s, r) => s + Math.abs(r.amount), 0)
       : 0;
 
-  const totalCash = effectiveRows
-    .filter((r) => mode !== "top_up" || r.fundKind === "cash")
-    .reduce((s, r) => s + signedAmount(r.amount), 0);
-
-  /** Top up footer: resulting cash balance when every cash row hits one account. */
   const topUpCashRows = mode === "top_up" ? effectiveRows.filter((r) => r.fundKind === "cash") : [];
   const topUpAccountIds = new Set(topUpCashRows.map((r) => r.accountId));
   const topUpNewBalance =
@@ -322,6 +487,26 @@ function AddBalanceForm({
         )
       : null;
 
+  const footer = adjustBalanceFooterModel({
+    mode,
+    affectPnl: affectPnl && (mode === "top_up" || mode === "adjustment"),
+    cashDelta,
+    freeBetAmount: totalFreeBets,
+    newBalance: topUpNewBalance,
+    breakdown: effectiveRows.map((row) => {
+      const account = accounts.find((a) => a.id === row.accountId);
+      return {
+        name: account?.name ?? "Account",
+        amount: rowLedgerAmount(row),
+        fundKind: row.fundKind,
+      };
+    }),
+  });
+
+  const showPnl = mode === "adjustment" || mode === "top_up";
+  const hasDelta = effectiveRows.some((r) => rowLedgerAmount(r) !== 0);
+  const amountLabel = mode === "adjustment" ? "New balance" : "Amount";
+
   return (
     <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[780px]">
         <DialogHeader className="mx-0 mt-0">
@@ -330,7 +515,8 @@ function AddBalanceForm({
             explainer={
               <DialogExplainer title="Adjust balance">
                 Top up or withdraw from a bookie or exchange, or set the wallet
-                to a known balance.
+                to a known balance. Include in P&amp;L counts every cash row as
+                profit or loss. Free bets stay off P&amp;L.
               </DialogExplainer>
             }
           >
@@ -338,14 +524,40 @@ function AddBalanceForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="app-scroll-nested flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
-          <Tabs value={mode} onValueChange={(v) => changeMode(v as typeof mode)}>
-            <TabsList>
-              <TabsTrigger value="top_up">Top up</TabsTrigger>
-              <TabsTrigger value="withdrawal">Withdraw</TabsTrigger>
-              <TabsTrigger value="adjustment">Adjust</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <ScrollFadeEdges
+          className="min-h-0 min-w-0 flex-1"
+          fadeClassName="from-page dark:from-card"
+          scrollClassName="app-scroll-nested flex flex-col gap-4 overflow-x-hidden p-4 sm:p-6"
+        >
+          <div className="inline-flex max-w-full">
+            <Tabs
+              value={mode}
+              onValueChange={(v) => changeMode(v as AdjustBalanceMode)}
+              activationMode="manual"
+              className="w-auto max-w-full"
+            >
+              <TabsList
+                variant="segmented"
+                aria-label="Balance action"
+                fadeClassName="from-page dark:from-card"
+                className="w-max min-w-0"
+              >
+                {MODE_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className="flex-none group-data-[variant=segmented]/tabs-list:!flex-none"
+                    >
+                      <Icon className={cn("size-3.5 shrink-0", tab.iconClass)} />
+                      {tab.label}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </div>
 
           {accounts.length === 0 && !showAddAccount && (
             <EmptyState
@@ -357,187 +569,220 @@ function AddBalanceForm({
             />
           )}
 
-          {effectiveRows.map((row, i) => {
-            const account = accounts.find((a) => a.id === row.accountId);
-            const canFreeBet = mode === "top_up" && account?.type === "bookie";
-
-            return (
+          {effectiveRows.length > 0 && (
+            <div className="flex min-w-0 flex-col gap-3 sm:gap-0">
               <div
-                key={i}
                 className={cn(
-                  "grid items-end gap-2",
-                  // Mobile: stacked card per row - account full width, type +
-                  // amount paired, note full width with remove alongside.
-                  // sm:contents dissolves the wrappers back into the flat
-                  // desktop grid.
-                  "grid-cols-1 gap-3 rounded-lg border p-3 sm:rounded-none sm:border-0 sm:p-0",
-                  mode === "top_up"
-                    ? "sm:grid-cols-[1fr_100px_120px_1fr_auto]"
-                    : "sm:grid-cols-[1fr_120px_1fr_auto]"
+                  "hidden sm:grid sm:items-end sm:gap-2 sm:border-b sm:border-border/60 sm:pb-2",
+                  rowGridClass(mode)
                 )}
               >
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs text-muted-foreground">Account</Label>
-                  <Select
-                    value={String(row.accountId)}
-                    onValueChange={(v) =>
-                      setRows(
-                        effectiveRows.map((r, j) => {
-                          if (j !== i) return r;
-                          const nextId = Number(v);
-                          const nextAccount = accounts.find((a) => a.id === nextId);
-                          return {
-                            ...r,
-                            accountId: nextId,
-                            fundKind:
-                              nextAccount?.type === "bookie" ? r.fundKind : "cash",
-                            amount:
-                              mode === "adjustment"
-                                ? roundMoney(nextAccount?.balance ?? 0)
-                                : r.amount,
-                          };
-                        })
-                      )
-                    }
+                <p className="text-xs font-medium text-muted-foreground">Account</p>
+                {mode === "top_up" ? (
+                  <p className="text-xs font-medium text-muted-foreground">Type</p>
+                ) : null}
+                <p className="text-xs font-medium text-muted-foreground">{amountLabel}</p>
+                <p className="text-xs font-medium text-muted-foreground">Note</p>
+                <p className="sr-only">Remove</p>
+              </div>
+
+              {effectiveRows.map((row, i) => {
+                const account = accounts.find((a) => a.id === row.accountId);
+                const canFreeBet = mode === "top_up" && account?.type === "bookie";
+                const delta = rowLedgerAmount(row);
+
+                const showRowDelta = mode === "adjustment" && delta !== 0;
+
+                return (
+                  <div
+                    key={row.rowKey}
+                    className={cn(
+                      "grid min-w-0 items-start gap-2 grid-cols-1 gap-3 p-3",
+                      "max-sm:rounded-md max-sm:border max-sm:border-border/60 max-sm:bg-muted/30",
+                      "sm:border-b sm:border-border/60 sm:p-0 sm:py-2 sm:last:border-b-0",
+                      rowGridClass(mode)
+                    )}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.id} value={String(a.id)}>
-                          <span className="flex items-center gap-1.5">
-                            <span>{a.name}</span>
-                            <AccountTypeBadge type={a.type} />
-                            <span className="shrink-0 text-muted-foreground">
-                              · {formatGbp(a.balance)}
-                              {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
-                                <> · FB {formatGbp(a.freeBets ?? 0)}</>
-                              )}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:contents">
-                  {mode === "top_up" && (
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Type</Label>
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <FieldLabel>Account</FieldLabel>
                       <Select
-                        value={row.fundKind}
+                        value={String(row.accountId)}
                         onValueChange={(v) =>
                           setRows(
-                            effectiveRows.map((r, j) =>
-                              j === i ? { ...r, fundKind: v as FundKind } : r
-                            )
+                            effectiveRows.map((r, j) => {
+                              if (j !== i) return r;
+                              const nextId = Number(v);
+                              const nextAccount = accounts.find((a) => a.id === nextId);
+                              return {
+                                ...r,
+                                accountId: nextId,
+                                fundKind:
+                                  nextAccount?.type === "bookie" ? r.fundKind : "cash",
+                                amount:
+                                  mode === "adjustment"
+                                    ? roundMoney(nextAccount?.balance ?? 0)
+                                    : r.amount,
+                              };
+                            })
                           )
                         }
-                        disabled={!canFreeBet}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger className="w-full min-w-0" aria-label="Account">
+                          {account ? (
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                              <span className="min-w-0 truncate" title={account.name}>
+                                {account.name}
+                              </span>
+                              <AccountTypeBadge type={account.type} />
+                              <span className="shrink-0 tabular-nums text-muted-foreground">
+                                {formatGbp(account.balance)}
+                              </span>
+                            </span>
+                          ) : (
+                            <SelectValue placeholder="Account" />
+                          )}
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="free_bet" disabled={account?.type !== "bookie"}>
-                            Free bet
-                          </SelectItem>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              <span className="flex items-center gap-1.5">
+                                <span>{a.name}</span>
+                                <AccountTypeBadge type={a.type} />
+                                <span className="shrink-0 text-muted-foreground">
+                                  · {formatGbp(a.balance)}
+                                  {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
+                                    <> · FB {formatGbp(a.freeBets ?? 0)}</>
+                                  )}
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">
-                      {mode === "adjustment" ? "New balance" : "Amount"}
-                    </Label>
-                    <Input
-                      type="number"
-                      step={0.01}
-                      min={mode === "adjustment" ? undefined : 0}
-                      prefix=""
-                      value={balanceAmountInputValue(row.amount, mode)}
-                      onChange={(e) =>
-                        setRows(
-                          effectiveRows.map((r, j) =>
-                            j === i
-                              ? { ...r, amount: roundMoney(parseFloat(e.target.value) || 0) }
-                              : r
-                          )
-                        )
-                      }
-                      placeholder={
-                        mode === "adjustment" && account
-                          ? formatGbp(account.balance).slice(1)
-                          : "0.00"
-                      }
-                      className="tabular-nums"
-                    />
+                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:contents">
+                      {mode === "top_up" && (
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <FieldLabel>Type</FieldLabel>
+                          <Select
+                            value={row.fundKind}
+                            onValueChange={(v) =>
+                              setRows(
+                                effectiveRows.map((r, j) =>
+                                  j === i ? { ...r, fundKind: v as FundKind } : r
+                                )
+                              )
+                            }
+                            disabled={!canFreeBet}
+                          >
+                            <SelectTrigger className="w-full" aria-label="Type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="free_bet" disabled={account?.type !== "bookie"}>
+                                Free bet
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <FieldLabel>{amountLabel}</FieldLabel>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
+                            £
+                          </span>
+                          <Input
+                            type="number"
+                            step={0.01}
+                            min={mode === "adjustment" ? undefined : 0}
+                            value={balanceAmountInputValue(row.amount, mode)}
+                            onChange={(e) =>
+                              setRows(
+                                effectiveRows.map((r, j) =>
+                                  j === i
+                                    ? { ...r, amount: roundMoney(parseFloat(e.target.value) || 0) }
+                                    : r
+                                )
+                              )
+                            }
+                            placeholder={
+                              mode === "adjustment" && account
+                                ? formatGbp(account.balance).slice(1)
+                                : "0.00"
+                            }
+                            aria-label={amountLabel}
+                            className="tabular-nums pl-7"
+                          />
+                        </div>
+                        {showRowDelta ? (
+                          <p className={cn("text-xs tabular-nums", balanceDeltaClass(delta))}>
+                            {formatGbp(delta, { signed: true })}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid min-w-0 grid-cols-[1fr_auto] items-end gap-2 sm:contents">
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <FieldLabel>Note</FieldLabel>
+                        <Input
+                          value={row.note}
+                          onChange={(e) =>
+                            setRows(
+                              effectiveRows.map((r, j) =>
+                                j === i ? { ...r, note: e.target.value } : r
+                              )
+                            )
+                          }
+                          placeholder="Optional"
+                          aria-label="Note"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground sm:self-start"
+                        disabled={effectiveRows.length <= 1}
+                        aria-label={
+                          account ? `Remove ${account.name} row` : "Remove row"
+                        }
+                        onClick={() => setRows(effectiveRows.filter((_, j) => j !== i))}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-[1fr_auto] items-end gap-2 sm:contents">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">Note</Label>
-                    <Input
-                      value={row.note}
-                      onChange={(e) =>
-                        setRows(
-                          effectiveRows.map((r, j) => (j === i ? { ...r, note: e.target.value } : r))
-                        )
-                      }
-                      placeholder="Optional"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground"
-                    disabled={effectiveRows.length <= 1}
-                    onClick={() => setRows(effectiveRows.filter((_, j) => j !== i))}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-
-          {(mode === "adjustment" || mode === "top_up") && (
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 rounded accent-primary"
-                checked={affectPnl}
-                onChange={(e) => setAffectPnl(e.target.checked)}
-              />
-              <span>Include in P&amp;L</span>
-              <span className="text-xs text-muted-foreground">
-                {mode === "top_up"
-                  ? "records this top-up in your profit & loss history"
-                  : "records this correction in your profit & loss history"}
-              </span>
-            </label>
+                );
+              })}
+            </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={accounts.length === 0}
-              onClick={() =>
+              onClick={() => {
+                const accountId = nextUnusedAccountId(
+                  accounts,
+                  effectiveRows.map((r) => r.accountId)
+                );
+                const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+                if (!account) return;
                 setRows([
                   ...effectiveRows,
                   {
-                    accountId: accounts[0]?.id ?? 0,
-                    amount: mode === "adjustment" ? (accounts[0]?.balance ?? 0) : 0,
+                    rowKey: nextRowKey(),
+                    accountId: account.id,
+                    amount: mode === "adjustment" ? roundMoney(account.balance) : 0,
                     note: "",
                     fundKind: "cash",
                   },
-                ])
-              }
+                ]);
+              }}
             >
               <Plus className="size-3.5" /> Add row
             </Button>
@@ -552,13 +797,13 @@ function AddBalanceForm({
           </div>
 
           {showAddAccount && (
-            <div className="rounded-lg border bg-muted/30 p-4">
-              <p className="mb-3 text-sm font-semibold">Add wallet</p>
+            <div className={cn(quietPanel, "p-4")}>
+              <p className="mb-3 text-sm font-semibold">Add account</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">Type</Label>
                   <Select value={newType} onValueChange={(v) => setNewType(v as typeof newType)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -601,7 +846,7 @@ function AddBalanceForm({
                         if (ex) setNewName(ex.name);
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select exchange" />
                       </SelectTrigger>
                       <SelectContent>
@@ -626,13 +871,20 @@ function AddBalanceForm({
                 )}
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">Opening balance</Label>
-                  <Input
-                    type="number"
-                    step={0.01}
-                    value={openingBalance || ""}
-                    onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
+                      £
+                    </span>
+                    <Input
+                      type="number"
+                      step={0.01}
+                      value={openingBalance || ""}
+                      onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      aria-label="Opening balance"
+                      className="tabular-nums pl-7"
+                    />
+                  </div>
                 </div>
               </div>
               <Button className="mt-3" size="sm" onClick={createAccount} disabled={saving}>
@@ -640,59 +892,88 @@ function AddBalanceForm({
               </Button>
             </div>
           )}
-        </div>
+        </ScrollFadeEdges>
 
-        <div className="flex shrink-0 flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span className="text-sm text-muted-foreground">
-            {mode === "top_up" && totalFreeBets > 0 ? (
-              <>
-                Cash:{" "}
+        <div className="shrink-0 border-t">
+          {showPnl && (
+            <div className="flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-6">
+              <label htmlFor={pnlId} className="min-w-0 cursor-pointer">
+                <span className="block text-sm font-medium">Include in P&amp;L</span>
+                <span
+                  id={`${pnlId}-help`}
+                  className="mt-0.5 block text-xs text-pretty text-muted-foreground"
+                >
+                  {adjustPnlHelpText({
+                    enabled: affectPnl,
+                    mode: mode === "adjustment" ? "adjustment" : "top_up",
+                    cashRowCount: contributingCashRows.length,
+                    cashDelta,
+                  })}
+                </span>
+              </label>
+              <Switch
+                id={pnlId}
+                checked={affectPnl}
+                onCheckedChange={setAffectPnl}
+                aria-describedby={`${pnlId}-help`}
+              />
+            </div>
+          )}
+          <div className="flex flex-col flex-wrap gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="min-w-0 text-sm text-muted-foreground">
+              <p>
+                <span className="font-semibold text-foreground">{footer.headlineLabel}:</span>{" "}
                 <span
                   className={cn(
                     "font-semibold tabular-nums",
-                    isNegativeGbp(totalCash)
-                      ? "text-negative"
-                      : "text-profit"
+                    footer.headlineSigned
+                      ? balanceDeltaClass(footer.headlineAmount)
+                      : "text-foreground"
                   )}
                 >
-                  {formatGbp(totalCash, { signed: true })}
+                  {formatGbp(footer.headlineAmount, { signed: footer.headlineSigned })}
                 </span>
-                {" · "}
-                Free bets:{" "}
-                <span className="font-semibold tabular-nums text-violet-600">
-                  {formatGbp(totalFreeBets, { signed: true })}
-                </span>
-              </>
-            ) : mode === "top_up" && topUpNewBalance != null ? (
-              <>
-                New balance:{" "}
-                <span className="font-semibold tabular-nums text-foreground">
-                  {formatGbp(topUpNewBalance)}
-                </span>
-              </>
-            ) : (
-              <>
-                Net change:{" "}
-                <span
-                  className={cn(
-                    "font-semibold tabular-nums",
-                    isNegativeGbp(totalDelta)
-                      ? "text-negative"
-                      : "text-profit"
-                  )}
-                >
-                  {formatGbp(totalDelta, { signed: true })}
-                </span>
-              </>
-            )}
-          </span>
-          <DialogSaveButton
-            onClick={save}
-            disabled={saving || accounts.length === 0}
-            className="max-sm:w-full"
-          >
-            Save balances
-          </DialogSaveButton>
+                {footer.supportingDelta != null ? (
+                  <>
+                    {" · "}
+                    <span
+                      className={cn(
+                        "font-semibold tabular-nums",
+                        balanceDeltaClass(footer.supportingDelta)
+                      )}
+                    >
+                      {formatGbp(footer.supportingDelta, { signed: true })}
+                    </span>
+                  </>
+                ) : null}
+                {footer.supportingNewBalance != null ? (
+                  <>
+                    {" · "}
+                    New balance{" "}
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {formatGbp(footer.supportingNewBalance)}
+                    </span>
+                  </>
+                ) : null}
+                {footer.freeBetAmount > 0 ? (
+                  <>
+                    {" · "}
+                    Free bets:{" "}
+                    <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                      {formatGbp(footer.freeBetAmount, { signed: true })}
+                    </span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <DialogSaveButton
+              onClick={save}
+              disabled={saving || accounts.length === 0 || !hasDelta}
+              className="shrink-0 max-sm:w-full"
+            >
+              Save balances
+            </DialogSaveButton>
+          </div>
         </div>
     </DialogContent>
   );

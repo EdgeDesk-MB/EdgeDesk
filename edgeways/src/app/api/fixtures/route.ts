@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   demoFixtures,
-  fixturesByDate,
   hasApiKey,
   localCalendarDate,
 } from "@/lib/services/apifootball";
+import { getFixturesForDate } from "@/lib/services/fixture-store";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 
@@ -37,7 +37,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   }
 
   try {
-    const fixtures = await fixturesByDate(date);
+    const { fixtures } = await getFixturesForDate(date);
     return NextResponse.json({ source: "feed", fixtures, date });
   } catch (error) {
     // Free tier often returns HTTP 200 + errors.requests when capped -

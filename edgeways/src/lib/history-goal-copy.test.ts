@@ -168,6 +168,25 @@ describe("goalHistoryCopyFromEntry", () => {
     ).toBe("Goal!");
   });
 
+  it("indexes goal:n against tape goals, not cards", () => {
+    const copy = goalHistoryCopyFromEntry(
+      entry({
+        title: "Goal!",
+        detail: "Paris Saint Germain 1-0 Aston Villa",
+        dedupe: "goal:1:0",
+        minute: 21,
+      }),
+      {
+        ...event,
+        goals: JSON.stringify([
+          { kind: "card", minute: 8, side: "away", player: "Konsa" },
+          { kind: "goal", minute: 21, side: "home", player: "K. Mbappé" },
+        ]),
+      }
+    );
+    expect(copy.title).toBe("Goal: K. Mbappé!");
+  });
+
   it("rebuilds timeline rows as Goal: player", () => {
     const copy = goalHistoryCopyFromEntry(
       entry({

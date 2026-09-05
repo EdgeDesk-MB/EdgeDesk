@@ -19,6 +19,7 @@ import { useBetBuilderRun } from "@/components/bet-builder-run-provider";
 import { useScopePlaceChooser } from "@/components/scope-place-chooser-provider";
 import { OfferCampaignCard } from "@/components/offers/offer-campaign-card";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { rulesAfterPlaybookStep } from "@/lib/offers/offer-playbook";
 import {
   completedKindFromBetType,
   notifyOfferStepDone,
@@ -54,7 +55,7 @@ export function OfferViewDialog({
   const { openAccaRun } = useAccaRun();
   const { openBetBuilderRun } = useBetBuilderRun();
   const { openScopeChooser } = useScopePlaceChooser();
-  const { state } = useAppState(5000);
+  const { state, refresh, applyLocalOfferPatch } = useAppState(5000);
   const [marking, setMarking] = useState(false);
 
   if (!offer) return null;
@@ -82,15 +83,23 @@ export function OfferViewDialog({
 
   async function handlePlaybookMarkDone() {
     if (trackBet.destination.kind !== "playbook_mark_done") return;
+    if (!offer) return;
+    const stepId = trackBet.destination.stepId;
+    const previousRules = offer.rules;
+    const built = rulesAfterPlaybookStep(offer.rules, offer.profit, stepId);
+    if (built.ok) {
+      applyLocalOfferPatch(offer.id, { rules: built.rules });
+    }
     setMarking(true);
     try {
-      await api(`/api/offers/${offer!.id}`, {
+      await api(`/api/offers/${offer.id}`, {
         method: "PATCH",
-        json: { playbookStepDone: trackBet.destination.stepId },
+        json: { playbookStepDone: stepId },
       });
       toast.success("Step marked done", { description: trackBet.label });
-      onRefresh();
+      void refresh();
     } catch (err) {
+      applyLocalOfferPatch(offer.id, { rules: previousRules });
       toast.error("Could not update step", { description: formatApiError(err) });
     } finally {
       setMarking(false);

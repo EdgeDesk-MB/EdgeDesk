@@ -9,7 +9,9 @@ import {
   freeBetPlaceTagsFromLinkedBets,
   isRacingDeskOffer,
   isRacingOfferActiveForDate,
+  racecardsForOfferEdge,
   selectActiveRacingOffers,
+  selectRacesForExchangeBooks,
 } from "@/lib/services/racing-desk";
 import type { RacingDeskRace } from "@/lib/racing-desk/types";
 
@@ -234,6 +236,90 @@ describe("selectActiveRacingOffers", () => {
   });
 });
 
+describe("racecardsForOfferEdge", () => {
+  const galwayOffer: OfferRow = {
+    id: 401,
+    bookmaker: "Paddy Power",
+    title: "Bet £10 get £10 free bet (2nd, 3rd, 4th)",
+    description: null,
+    expectedProfit: null,
+    status: "active",
+    expiresAt: null,
+    createdAt: 1,
+    completedAt: null,
+    seriesId: null,
+    instanceDate: null,
+    startsOn: null,
+    source: null,
+    offerUrl: null,
+    sport: "horse_racing",
+    offerType: "bet_get_free_place",
+    scopeCourse: "Galway",
+    scopeRaceId: null,
+    scopeRaceLabel: null,
+    eventDate: "2026-08-27",
+    rules: JSON.stringify({
+      type: "bet_get_free_place",
+      minRunners: 8,
+      regions: ["GB", "IRE"],
+      qualifyingPlaces: [2, 3, 4],
+      betStake: 10,
+      freeBetAmount: 10,
+    }),
+  };
+
+  function card(
+    over: Partial<{
+      externalId: string;
+      course: string;
+      fieldSize: number;
+      region: string;
+      offTime: string;
+      status: "upcoming" | "live" | "finished";
+    }>
+  ) {
+    return {
+      externalId: "r1",
+      course: "Galway",
+      fieldSize: 12,
+      region: "IRE",
+      offTime: "14:00",
+      status: "upcoming" as const,
+      ...over,
+    };
+  }
+
+  it("keeps only qualifying upcoming races for a meeting-scoped trigger offer", () => {
+    const picked = racecardsForOfferEdge(
+      [
+        card({ externalId: "gal-1", course: "Galway" }),
+        card({ externalId: "asc-1", course: "Ascot", region: "GB" }),
+        card({ externalId: "gal-fin", course: "Galway", status: "finished" }),
+        card({ externalId: "gal-small", course: "Galway", fieldSize: 5 }),
+      ],
+      [galwayOffer],
+      "2026-08-27"
+    );
+    expect(picked.map((c) => c.externalId)).toEqual(["gal-1"]);
+  });
+
+  it("returns nothing when the offer has no result trigger", () => {
+    const straight = {
+      ...galwayOffer,
+      id: 402,
+      rules: JSON.stringify({
+        type: "bet_get_free_place",
+        minRunners: 8,
+        regions: ["GB", "IRE"],
+        qualifyingPlaces: [],
+        betStake: 10,
+        freeBetAmount: 10,
+      }),
+    };
+    expect(racecardsForOfferEdge([card({})], [straight], "2026-08-27")).toEqual([]);
+  });
+});
+
 describe("freeBetPlaceTagsFromLinkedBets", () => {
   const placeOffer: OfferRow = {
     id: 83,
@@ -326,5 +412,23 @@ describe("freeBetPlaceTagsFromLinkedBets", () => {
         "2026-08-06"
       )
     ).toEqual([]);
+  });
+});
+
+describe("selectRacesForExchangeBooks", () => {
+  it("keeps the next six hours and pads to 20 upcoming when the window is thin", () => {
+    const now = Date.parse("2026-09-05T13:00:00Z");
+    const cards = [
+      { startTime: now - 2 * 60 * 60 * 1000, status: "finished" as const },
+      { startTime: now + 30 * 60 * 1000, status: "upcoming" as const },
+      { startTime: now + 3 * 60 * 60 * 1000, status: "upcoming" as const },
+      { startTime: now + 8 * 60 * 60 * 1000, status: "upcoming" as const },
+    ];
+    const picked = selectRacesForExchangeBooks(cards, now);
+    expect(picked.map((c) => c.startTime)).toEqual([
+      now + 30 * 60 * 1000,
+      now + 3 * 60 * 60 * 1000,
+      now + 8 * 60 * 60 * 1000,
+    ]);
   });
 });

@@ -19,7 +19,7 @@ import { rulesAfterPlaybookStep } from "@/lib/offers/offer-playbook";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
 import { isNeonDesk } from "@/lib/db/desk-backend";
-import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskBets, listNeonDeskBetsForOffer } from "@/lib/db/neon-desk";
 import { listNeonDeskBalanceTransactions } from "@/lib/db/neon-desk-accounts";
 import {
   fillNeonSettlementSnapshot,
@@ -99,13 +99,12 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     }
     let hostedRulesFromPlaybook: string | undefined;
     if (p.playbookStepDone) {
-      const [linked, txs] = await Promise.all([
-        listNeonDeskBets(),
-        listNeonDeskBalanceTransactions(),
-      ]);
+      const linked = await listNeonDeskBetsForOffer(offerId);
+      const txs =
+        linked.length === 0 ? [] : await listNeonDeskBalanceTransactions();
       const summary = summariseOfferPure(
         hostedExisting,
-        linked.filter((b) => b.offerId === offerId),
+        linked,
         promoAwardsFromTransactions(txs)
       );
       const built = rulesAfterPlaybookStep(

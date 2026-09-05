@@ -718,6 +718,15 @@ html[data-font="figtree"] {
     display: none;
   }
 
+  /**
+   * Mouse drag-to-pan. Scroller-only: do not select descendants here —
+   * a `[data-ew-panning] *` rule restyles every card on gesture start
+   * and hitches the first frame.
+   */
+  [data-ew-panning] {
+    cursor: grabbing !important;
+  }
+
   /** Sonner toasts — UI chrome, not selectable copy */
   [data-sonner-toast],
   [data-sonner-toast] * {

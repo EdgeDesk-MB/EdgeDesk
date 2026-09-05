@@ -10,8 +10,8 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-08-10 (O1 Offer completion playbook Phase 1–2 done — hybrid wizard,
-deposit/WR auto, Dynobet golden parse, release notes. L7 EW/EP local done. Phase 14 / N0 ⏸ gated.)
+Last updated: 2026-09-05 (P1 Football live card Phase 1 in flight — HT persist, event
+tape, XI picker on Edge. HT/FT auto-settle and stats/predictions deferred.)
 
 ---
 
@@ -2281,6 +2281,7 @@ and optionally preview the locked UX. Auth + Stripe wait for the business gate (
 | Acca Desk + offer → Acca qualifier routing (L4) | | ✓ | ✓ |
 | Offer Edge model + Race picks + recommended desk chrome | | | ✓ |
 | Live/delayed Racing Desk feeds (when keys present) | | | ✓ |
+| Football live card (HT, event tape, XI) | | | ✓ |
 | 2UP sentinel + web push | | | ✓ |
 | Exchange lay integration on desk | | | ✓ |
 
@@ -2807,7 +2808,151 @@ C4 (AlertChannel) ──► B5, B6    C1 ──► C2
 B9 (after A1; feeds advantage scoring)
 L7 (EW/EP desk) ◄─ calc-ew (done), Racing Desk; multi-dutch later
 O1 (offer playbook) ◄─ J6 paste/email, pipeline/next-actions (done)
+P1 (football live card) ◄─ API-Football adapter, feed-sync, N0 entitlements
 ```
+
+# PHASE — FOOTBALL LIVE CARD (EDGE)
+
+## P1. Football live card `[strong]`
+
+> **Verified against code 2026-09-05.** Football feed is score + minute + period +
+> AET/pens 90-minute score. Goal tape is fetched only when an open “The bet wins IF”
+> rule needs scorers (`fixtureGoalEvents` → `/fixtures/events?type=Goal`). HT score
+> is on every fixture payload and discarded. `half_time_full_time` is in
+> `src/lib/markets.ts` and is **not** `auto`. Lineups are unused. Entitlements
+> (`src/lib/entitlements/plans.ts`) have no football-live flag. Day lists stay
+> store-first (`fixture-store`). Live stays on the short poll.
+
+**Objective.** Make Edge football feel like Racing Desk: a tracked match carries
+the tape and the XI, so settlement and Add bet stop being free text. Same
+API-Football key. No new vendor. No pitch widget.
+
+**Why.** Edge already sells live racing, Offer Edge, 2UP push, and exchange lays.
+Football on the same plan is still a scoreboard. The unused payload on calls we
+already make (HT, full events, lineups) is the cheapest way to make £24.99 feel
+like a football desk.
+
+**Product locks (Sam 2026-09-05).**
+- Phase 1 first, so 3pm kick-offs can be tested the same day.
+- Gate extras on Edge (`football_live_feeds`). Core keeps calculators, manual
+  settle, and live **score**. Free stays demo / score if a key is present.
+- One shared poll per `externalId`. Never per open tab.
+- Do not auto-settle HT/FT in Phase 1 (that is `/calc-change`, Phase 1b).
+- Do not add `/odds`, predictions, team statistics, or a moving pitch in Phase 1.
+- Customer copy never names the provider (D8).
+
+### Data shapes (verified 2026-09-05)
+
+`events` (SQLite `schema.ts` / Neon `schema.pg.ts`) gains:
+
+```
+htHomeScore: number | null
+htAwayScore: number | null
+lineups: string | null   // JSON, see FootballLineups
+tapeFetchedAt: number | null
+```
+
+`events.goals` stays the tape column. Phase 1 stores `MatchTapeEvent[]`
+(legacy `{minute,side,player?,og?}` still parses as goals).
+
+```ts
+type MatchTapeKind = "goal" | "card" | "subst" | "var" | "other";
+
+type MatchTapeEvent = {
+  kind: MatchTapeKind;
+  minute: number;
+  side: "home" | "away";
+  player?: string;
+  assist?: string;
+  detail?: string;
+  og?: boolean;
+};
+
+type FootballLineupPlayer = { name: string; number?: number; grid?: string };
+type FootballLineups = {
+  homeFormation: string | null;
+  awayFormation: string | null;
+  home: FootballLineupPlayer[];
+  away: FootballLineupPlayer[];
+};
+```
+
+`Fixture` in `src/lib/services/apifootball.ts` gains `htHomeScore` / `htAwayScore`
+from `score.halftime`.
+
+### Phase 1 (this slice) — persist and show
+
+**Files.**
+- NEW `src/lib/events/match-tape.ts` + `.test.ts` — parse / filter / format.
+- NEW `src/lib/events/lineups.ts` + `.test.ts` — parse XI JSON.
+- NEW `src/components/events/match-tape.tsx` — compact tape on Tracked Events
+  only. Home → Live stays a slim dock (title, if-ended-now, clock + score,
+  exchange backs).
+- `src/lib/live-poll-rules.ts` — fetch tape when score or period changes, tape
+  is empty, or `tapeFetchedAt` is older than 5 minutes while live. Upcoming:
+  never.
+- `src/lib/services/apifootball.ts` — `fixtureMatchEvents` (no `type=Goal`
+  filter; same 1 request). `fixtureLineups` once per tracked fixture. Keep
+  `fixtureGoalEvents` as a thin wrapper that filters goals so old tests hold.
+- `src/lib/services/feed-sync-rules.ts` + local `state.ts` + hosted
+  `feed-sync-neon.ts` — persist HT on every score poll. Fetch tape for **every
+  live tracked football event**, not only trigger bets. Fetch lineups when
+  `lineups` is empty and kick-off is within 2 hours (or already live/finished).
+- `src/lib/bets/settle-inputs.ts` — `toTriggerContext` uses `tapeGoals()` so
+  cards/subs never count as goals. Legacy arrays without `kind` stay goals.
+- Schema + `src/lib/db/index.ts` `addColumn` + Neon `drizzle/0029_football_live_card.sql`.
+- Dual-path: `neon-events.ts` patch, `neon-desk-map.ts`, track route writes HT
+  when the fixture already has it.
+- Entitlements: `football_live_feeds` on Edge. Labels, N0 matrix test,
+  `COMPARISON_FEATURES`, Settings highlights, Edge homepage blurb.
+- UI: persist HT for Phase 1b, do not render it. Tape and formation live on
+  Tracked Events only. Add bet Selection becomes a player dropdown for
+  `first_goalscorer` / `anytime_goalscorer` when lineups exist
+  (`resolveFootballPlayerOptions` in `add-bet-event-options.ts`). Hide tape /
+  XI / player picker when `!canDesk(..., "football_live_feeds")`. Score stays
+  visible.
+
+**Quota.** Live scores unchanged (`/fixtures?live=all`, 60s). Tape is a second
+request on the 5-minute / score / period gate. Lineups are one request, then
+cached on the event. One 90-minute match ≈ existing ~90 live calls + ~20 tape
++ 1 lineup. Fine on Pro. Tight on free 100/day, same as today.
+
+**Out of Phase 1.** Auto HT/FT settlement. New trigger kinds (bookings, pens).
+`/fixtures/statistics`. `/predictions`. Pitch SVG. API-Football `/odds`.
+
+### Phase 1b — auto HT/FT `[strong]` `/calc-change`
+
+Mark `half_time_full_time` `auto`. Derive from stored HT + FT. Tests first.
+Calc-auditor before commit. Depends on Phase 1 columns.
+
+### Phase 1c — stats tape when a bet needs it
+
+`/fixtures/statistics` only while an open bet/builder needs corners, cards, or
+shots. Same shared-poll rule.
+
+### Phase 1d — cached pre-match prediction
+
+`/predictions` once per upcoming tracked match, cache until kick-off, feed
+`inferPreMatchProbs`. Label as the feed model, not Edgeways fair odds.
+
+**Acceptance (Phase 1).**
+1. Tracking a live API match writes `htHomeScore` when the payload has a
+   half-time score. Do not show HT on Home or Tracked Events.
+2. After a goal, card, or HT period change, `events.goals` contains typed tape
+   rows; trigger settlement still uses goals only (own goals still ignored for
+   scorers).
+3. Confirmed XI lands in `events.lineups`; Add bet goalscorer Selection lists
+   those names on Edge.
+4. Core preview hides tape / XI / picker; live score still updates.
+5. `footballOperation` attributes `/fixtures/events` and `/fixtures/lineups`.
+6. `hosted-desk-cutover.test.ts` stays green. No customer mutation writes
+   SQLite on `isNeonDesk()`.
+7. `npx vitest run` green.
+
+**Sizing.** `[strong]` — schema, dual-path feed, entitlements, live UI.
+Phase 1b is a separate calc change.
+
+---
 
 ## Standing acceptance bar for every brief
 

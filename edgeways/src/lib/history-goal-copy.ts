@@ -1,5 +1,6 @@
 import type { EventRow, HistoryRow } from "@/lib/db/schema";
 import type { GoalEvent, Side } from "@/lib/calc/trigger";
+import { tapeGoals } from "@/lib/events/match-tape";
 
 export interface HistoryTitlePart {
   text: string;
@@ -159,13 +160,7 @@ export function formatGoalHistoryCopy(input: {
 }
 
 function parseGoalsJson(raw: string | null | undefined): GoalEvent[] {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as GoalEvent[]) : [];
-  } catch {
-    return [];
-  }
+  return tapeGoals(raw);
 }
 
 export function matchTimelineGoal(

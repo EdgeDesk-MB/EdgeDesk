@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { EventRow } from "@/lib/db/schema";
 import {
   buildHistoryContext,
   isDeskCampaignLayHistoryEntry,
@@ -11,7 +10,10 @@ import { dedupeHistoryForDisplay, getHistoryFeed } from "@/lib/services/history-
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
 import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
-import { listNeonDeskHistory } from "@/lib/db/neon-desk-history";
+import { listNeonDeskHistory, syncNeonDeskEventHistory } from "@/lib/db/neon-desk-history";
+import { listNeonEvents } from "@/lib/db/neon-events";
+import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
+import { filterEventsForDesk } from "@/lib/events/desk-tracked-events";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 const FILTERS: HistoryFilter[] = [
@@ -51,14 +53,18 @@ export const GET = withDeskScope(async function GET(req: Request) {
   });
 });
 
-/** Hosted feed: same display pipeline over Neon rows (no events yet). */
+/** Hosted feed: same display pipeline over Neon rows and desk events. */
 async function getHostedHistoryFeed(limit: number, filter: HistoryFilter) {
-  const [rows, betRows, offerRows] = await Promise.all([
+  const [initialRows, betRows, offerRows, feedEvents, followedIds] = await Promise.all([
     listNeonDeskHistory(limit * 2),
     listNeonDeskBets(),
     listNeonDeskOffers(),
+    listNeonEvents().catch(() => []),
+    listNeonDeskTrackedEventIds().catch(() => []),
   ]);
-  const events: EventRow[] = [];
+  const events = filterEventsForDesk(feedEvents, followedIds, betRows);
+  await syncNeonDeskEventHistory(events, initialRows).catch(() => {});
+  const rows = await listNeonDeskHistory(limit * 2);
   const promoAwards: Record<number, { amount: number; reason: string }> = {};
   const offerTitles = offerRows.map((o) => ({ id: o.id, title: o.title }));
 

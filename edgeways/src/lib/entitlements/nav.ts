@@ -51,6 +51,8 @@ export const FEATURE_LOCK_BODIES: Record<FeatureFlag, string> = {
   offer_edge: "Modelled race and horse recommendations on Racing Desk.",
   racing_live_feeds:
     "Today's UK and Irish racecards and results. Demo cards are shown on Racing Desk.",
+  football_live_feeds:
+    "Who scored, bookings, and the named lineups on tracked football.",
   push_alerts:
     "Push to your phone or desktop when a 2UP position needs a decision.",
   exchange_lay:

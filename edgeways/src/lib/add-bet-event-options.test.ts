@@ -3,6 +3,8 @@ import {
   ADD_BET_FOOTBALL_IN_PLAY_MS,
   bandLinkableEventsForPicker,
   bandNotTrackedFixtures,
+  capEventSearchSections,
+  EVENT_SEARCH_IDLE_PAGE,
   bandTrackedEvents,
   filterByOfferCourseScope,
   filterNotTrackedFixtures,
@@ -17,12 +19,17 @@ import {
   isFixtureSelectValue,
   isLiveInAddBetEvents,
   isSelectableInAddBetEvents,
+  knownFixtureSearchOption,
   knownFromFootballFixtures,
   knownFromRacingFixtures,
+  matchesEventSearch,
   parseFixtureSelectValue,
   partsKnownFixtureOption,
   partsTrackedEventOption,
+  resolveFootballPlayerOptions,
   resolveRaceRunnerOptions,
+  toEventSearchSection,
+  trackedEventSearchOption,
   type KnownFixtureOption,
 } from "./add-bet-event-options";
 import { londonWallToUtcMs, localCalendarDate } from "./events";
@@ -145,6 +152,9 @@ describe("add bet past grace window", () => {
     expect(isSelectableInAddBetEvents(now + 60_000, now)).toBe(true);
     expect(isLiveInAddBetEvents(now - 2 * 60_000, "upcoming", now)).toBe(true);
     expect(isLiveInAddBetEvents(now + 10 * 60_000, "upcoming", now)).toBe(false);
+    expect(isLiveInAddBetEvents(now + 10 * 60_000, "live", now, undefined, "football")).toBe(
+      true
+    );
   });
 
   it("drops stale live fixtures from not-tracked and tracked lists", () => {
@@ -214,7 +224,7 @@ describe("add bet past grace window", () => {
         },
         now
       )
-    ).toContain("Live");
+    ).toContain("LIVE");
     expect(
       formatKnownFixtureOption(
         {
@@ -229,7 +239,7 @@ describe("add bet past grace window", () => {
         },
         now
       )
-    ).toContain("Live");
+    ).toContain("LIVE");
   });
 
   it("keeps in-play football selectable with a Live chip", () => {
@@ -287,7 +297,7 @@ describe("add bet past grace window", () => {
         },
         now
       )
-    ).toContain("Live");
+    ).toContain("LIVE");
     expect(
       filterTrackedForAddBet(
         [
@@ -467,7 +477,7 @@ describe("formatKnownFixtureOption", () => {
       now
     );
     expect(parts.title).toBe("Arsenal v Chelsea");
-    expect(parts.status).toBe("Live");
+    expect(parts.status).toBe("LIVE");
     expect(parts.time).toBeTruthy();
   });
 });
@@ -642,5 +652,183 @@ describe("filterByOfferCourseScope", () => {
     expect(
       filterByOfferCourseScope(fixtures, "Galway, Goodwood").map((f) => f.externalId)
     ).toEqual(["a", "c"]);
+  });
+});
+
+describe("event search options", () => {
+  const now = msOnDay(0, "09:00");
+
+  const senior = trackedEventSearchOption(
+    {
+      id: 1,
+      homeTeam: "Arsenal",
+      awayTeam: "Chelsea",
+      competition: "Premier League",
+      startTime: msOnDay(0, "15:00"),
+      status: "upcoming",
+      sport: "football",
+    },
+    now
+  );
+  const u21 = trackedEventSearchOption(
+    {
+      id: 2,
+      homeTeam: "Arsenal U21",
+      awayTeam: "Chelsea U21",
+      competition: "Premier League 2",
+      startTime: msOnDay(0, "13:00"),
+      status: "upcoming",
+      sport: "football",
+    },
+    now
+  );
+
+  it("values tracked rows by id and fixtures by fixture: prefix", () => {
+    expect(senior.value).toBe("1");
+    const fixture = knownFixtureSearchOption(
+      {
+        externalId: "ext-9",
+        sport: "football",
+        competition: "Premier League",
+        homeTeam: "Arsenal",
+        awayTeam: "Spurs",
+        startTime: msOnDay(0, "17:30"),
+        status: "upcoming",
+      },
+      now
+    );
+    expect(fixture.value).toBe(fixtureSelectValue("ext-9"));
+  });
+
+  it("matches both Arsenal and Arsenal U21 for a shared substring", () => {
+    expect(matchesEventSearch(senior.keywords, "Arsenal")).toBe(true);
+    expect(matchesEventSearch(u21.keywords, "Arsenal")).toBe(true);
+  });
+
+  it("narrows with tokenised AND across words", () => {
+    expect(matchesEventSearch(u21.keywords, "arsenal u21")).toBe(true);
+    expect(matchesEventSearch(senior.keywords, "arsenal u21")).toBe(false);
+    expect(matchesEventSearch(senior.keywords, "arsenal chelsea")).toBe(true);
+    expect(matchesEventSearch(senior.keywords, "arsenal spurs")).toBe(false);
+  });
+
+  it("is case-insensitive and matches competitions", () => {
+    expect(matchesEventSearch(senior.keywords, "PREMIER")).toBe(true);
+    expect(matchesEventSearch(senior.keywords, "")).toBe(true);
+    expect(matchesEventSearch(senior.keywords, "   ")).toBe(true);
+  });
+
+  it("reaches race names and courses for racing fixtures", () => {
+    const race = knownFixtureSearchOption(
+      {
+        externalId: "r1",
+        sport: "horse_racing",
+        competition: "Goodwood",
+        course: "Goodwood",
+        raceName: "14:30 Handicap",
+        homeTeam: "14:30 Handicap",
+        awayTeam: "14:30",
+        startTime: msOnDay(0, "14:30"),
+        status: "upcoming",
+        offTime: "14:30",
+      },
+      now
+    );
+    expect(matchesEventSearch(race.keywords, "goodwood")).toBe(true);
+    expect(matchesEventSearch(race.keywords, "handicap")).toBe(true);
+    expect(matchesEventSearch(race.keywords, "ascot")).toBe(false);
+  });
+
+  it("maps banded rows into a searchable section preserving order", () => {
+    const section = toEventSearchSection(
+      "tracked",
+      "Tracked",
+      [
+        {
+          key: "today",
+          label: "Today",
+          hours: [
+            { key: "13:00", label: "13:00", items: [u21] },
+            { key: "15:00", label: "15:00", items: [senior] },
+          ].map((h) => ({ ...h, items: h.items.map((o) => o.value) })),
+        },
+      ],
+      (value) => ({ value, sport: "football", parts: { title: value, time: "", status: "" }, keywords: value })
+    );
+    expect(section.key).toBe("tracked");
+    expect(section.bands[0]?.hours[0]?.items[0]?.value).toBe("2");
+    expect(section.bands[0]?.hours[1]?.items[0]?.value).toBe("1");
+  });
+});
+
+describe("capEventSearchSections", () => {
+  const option = (value: string) => ({
+    value,
+    sport: "football",
+    parts: { title: value, time: "", status: "" },
+    keywords: value,
+  });
+
+  const section = toEventSearchSection(
+    "fixtures",
+    "Fixtures",
+    [
+      {
+        key: "today",
+        label: "Today",
+        hours: [
+          { key: "10:00", label: "10:00", items: [option("a"), option("b"), option("c")] },
+          { key: "11:00", label: "11:00", items: [option("d"), option("e")] },
+        ],
+      },
+    ],
+    (item) => item
+  );
+
+  it("keeps banding and counts what is still hidden", () => {
+    const first = capEventSearchSections([section], 3);
+    expect(first.rendered).toBe(3);
+    expect(first.sections[0]?.total).toBe(5);
+    expect(first.sections[0]?.bands[0]?.hours).toHaveLength(1);
+    expect(first.sections[0]?.bands[0]?.hours[0]?.items.map((row) => row.value)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+
+    const next = capEventSearchSections([section], EVENT_SEARCH_IDLE_PAGE);
+    expect(next.rendered).toBe(5);
+    expect(next.sections[0]?.bands[0]?.hours).toHaveLength(2);
+  });
+});
+
+describe("resolveFootballPlayerOptions", () => {
+  const xi = JSON.stringify({
+    homeFormation: "4-3-3",
+    awayFormation: "4-4-2",
+    home: [{ name: "Saka" }],
+    away: [{ name: "Salah" }],
+  });
+
+  it("lists the XI on a goalscorer market", () => {
+    expect(
+      resolveFootballPlayerOptions({
+        eventLinked: true,
+        sport: "football",
+        market: "first_goalscorer",
+        lineups: xi,
+      })
+    ).toEqual(["Saka", "Salah"]);
+  });
+
+  it("stays empty for match odds", () => {
+    expect(
+      resolveFootballPlayerOptions({
+        eventLinked: true,
+        sport: "football",
+        market: "match_odds",
+        lineups: xi,
+      })
+    ).toEqual([]);
   });
 });

@@ -65,7 +65,7 @@ target **operators**, not tools.
 | Payment processor acceptance | Stripe restricted-business policy | EDGE-1 |
 | Marketing claims ("risk-free profit") | ASA / CAP advertising codes | Marketing review before launch push |
 | Subscription auto-renewal, refunds, cooling-off | Consumer Contracts Regs / CRA 2015 | Terms of Service draft (EDGE-11); public `/terms` + signup checkbox (EDGE-61) |
-| Data protection | UK GDPR | ICO registration (EDGE-9), Privacy Policy draft (EDGE-12); public `/privacy` + waitlist notice (EDGE-61) |
+| Data protection | UK GDPR | ICO registration (EDGE-9), Privacy Policy (EDGE-12); public `/privacy` (EDGE-61). Waitlist email still disclosed for historical rows |
 | Pooled odds redistribution | Provider contracts / IP | EDGE-45 |
 
 ## 6. Conclusion

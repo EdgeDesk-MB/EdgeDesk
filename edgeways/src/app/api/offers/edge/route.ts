@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { publicDemoOfferEdge } from "@/lib/demo/public-racing-desk";
 import { PUBLIC_DEMO_COOKIE } from "@/lib/demo/public-demo";
 import { verifyPublicDemoCookieValue } from "@/lib/demo/public-demo-cookie";
-import { getRacingDesk } from "@/lib/services/racing-desk";
+import { getOfferEdgePlays } from "@/lib/services/racing-desk";
 import { getDeskActor } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
+import { localCalendarDate } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   // Aliased Neon id, not the raw Clerk id (see api/racing/desk).
   const clerkUserId = getDeskActor().neonClerkUserId || getDeskActor().clerkUserId;
   const date =
-    req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+    req.nextUrl.searchParams.get("date") ?? localCalendarDate();
   if (
     await verifyPublicDemoCookieValue(
       (await cookies()).get(PUBLIC_DEMO_COOKIE)?.value
@@ -35,6 +36,6 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     source: "locked",
   });
   if (denied) return denied;
-  const { edgePlays, summary } = await getRacingDesk(date, { clerkUserId });
-  return NextResponse.json({ date, plays: edgePlays, source: summary.source });
+  const { plays, source } = await getOfferEdgePlays(date, { clerkUserId });
+  return NextResponse.json({ date, plays, source });
 });

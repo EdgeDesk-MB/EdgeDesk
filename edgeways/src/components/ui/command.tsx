@@ -50,11 +50,15 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  icon,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  /** Leading icon override (e.g. a spinner while a debounced search runs). */
+  icon?: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-2 border-b px-3" cmdk-input-wrapper="">
-      <Search className="size-4 shrink-0 text-muted-foreground" />
+      {icon ?? <Search className="size-4 shrink-0 text-muted-foreground" />}
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
@@ -79,7 +83,7 @@ function CommandList({
     >
       <CommandPrimitive.List
         data-slot="command-list"
-        className="app-scroll-overlay h-full min-h-0 max-h-full overflow-x-hidden overflow-y-auto overscroll-contain p-1"
+        className="app-scroll-overlay h-full min-h-0 max-h-[inherit] overflow-x-hidden overflow-y-auto overscroll-contain p-1"
         {...props}
       />
     </ScrollFadeEdges>

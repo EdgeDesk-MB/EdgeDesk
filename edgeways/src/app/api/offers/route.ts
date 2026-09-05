@@ -68,6 +68,8 @@ const createSchema = z.object({
   scopeRaceLabel: z.string().nullable().optional(),
   rules: z.string().nullable().optional(),
   offerUrl: offerUrlField,
+  /** PWA share target intake; everything else leaves source unset. */
+  source: z.enum(["share"]).optional(),
   recurrence: recurrenceSchema.optional(),
 });
 
@@ -177,6 +179,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
         scopeRaceLabel: input.scopeRaceLabel ?? null,
         rules: input.rules ?? null,
         offerUrl,
+        source: input.source ?? null,
         createdAt: Date.now(),
       });
       if (row.status === "active") {
@@ -246,6 +249,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       scopeRaceLabel: input.scopeRaceLabel ?? null,
       rules: input.rules ?? null,
       offerUrl,
+      source: input.source ?? null,
       createdAt: Date.now(),
     })
     .returning()

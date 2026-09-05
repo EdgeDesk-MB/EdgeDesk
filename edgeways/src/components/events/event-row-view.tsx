@@ -23,8 +23,10 @@ import {
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import type { GoalEvent } from "@/lib/calc";
 import type { BetRow, EventRow } from "@/lib/db/schema";
+import { FootballLiveMeta } from "@/components/events/match-tape";
+import { useAppState } from "@/hooks/use-app-state";
+import { canDesk } from "@/lib/entitlements/effective-plan";
 import {
   parseRaceResults,
   isRaceResultIncomplete,
@@ -77,6 +79,8 @@ export function EventRowView({
   resultDialogOpen?: boolean;
   onResultDialogOpenChange?: (open: boolean) => void;
 }) {
+  const { state } = useAppState();
+  const showFootballLive = canDesk(state?.settings, "football_live_feeds");
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
   const status = effectiveEventStatus(event);
@@ -89,14 +93,6 @@ export function EventRowView({
     betCount === 1
       ? `/tracker?highlight=${linkedBets[0]!.id}&queue=all`
       : `/tracker?event=${event.id}&queue=all`;
-  let goals: GoalEvent[] = [];
-  if (!isRacing && event.goals) {
-    try {
-      goals = JSON.parse(event.goals) as GoalEvent[];
-    } catch {
-      goals = [];
-    }
-  }
   return (
     <TableRow
       id={`tracked-event-${event.id}`}
@@ -164,17 +160,7 @@ export function EventRowView({
                 </div>
               );
             })}
-          {goals.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-              {goals.map((g, i) => (
-                <span key={i} className="inline-flex items-center gap-0.5">
-                  <Goal className="size-3" />
-                  {g.player ?? (g.side === "home" ? event.homeTeam : event.awayTeam)} {g.minute}&apos;
-                  {g.og ? " (og)" : ""}
-                </span>
-              ))}
-            </div>
-          )}
+          {!isRacing && showFootballLive ? <FootballLiveMeta event={event} /> : null}
         </SportEventBlock>
       </TableCell>
       <TableCell>

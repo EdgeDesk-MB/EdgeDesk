@@ -17,7 +17,8 @@ import { stampReferralCookie } from "@/lib/referrals/persist";
 
 /**
  * Next.js 16+: file must be named proxy.ts (Clerk + Next convention).
- * Combines Clerk session handling with SITE_SURFACE=waitlist gate.
+ * Combines Clerk session handling with the SITE_SURFACE gate.
+ * Production is `app`. Waitlist still blocks /desk when the env is not app.
  */
 export default clerkMiddleware(async (_auth, request) => {
   const response = await handleSurface(request);

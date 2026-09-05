@@ -28,6 +28,13 @@ export const events = sqliteTable("events", {
   matchEnding: text("match_ending"),
   /** API-Football `status.short` while live: 1H, HT, 2H, ET, BT, P, LIVE, INT */
   period: text("period"),
+  /** Half-time score from the football feed (`score.halftime`) */
+  htHomeScore: integer("ht_home_score"),
+  htAwayScore: integer("ht_away_score"),
+  /** Confirmed XI JSON: { homeFormation, awayFormation, home, away } */
+  lineups: text("lineups"),
+  /** Epoch ms of the last full event-tape fetch */
+  tapeFetchedAt: integer("tape_fetched_at"),
   /** Simulated matches: JSON script of goals [{minute, side}] generated at creation */
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
@@ -352,6 +359,33 @@ export const offerSeries = sqliteTable("offer_series", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/**
+ * Offer inbox (forwarding address). The local desk has at most one row:
+ * the token in offers+<token>@<inbox-domain> routes inbound email here.
+ * Hosted desks use the clerk-scoped Neon twin (schema.pg.ts).
+ */
+export const offerInboxAddresses = sqliteTable("offer_inbox_addresses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  token: text("token").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+});
+
+/**
+ * Inbound email ledger: one row per forwarded email, whether it drafted,
+ * deduped or failed. Dedup keys are the provider message id and a content
+ * fingerprint (bookie + title + expiry day), both scoped to the address.
+ */
+export const offerInboundMessages = sqliteTable("offer_inbound_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  addressId: integer("address_id").notNull(),
+  /** Provider Message-ID when known; null rows never dedupe by id */
+  messageId: text("message_id"),
+  fingerprint: text("fingerprint").notNull(),
+  status: text("status", { enum: ["drafted", "duplicate", "failed"] }).notNull(),
+  offerId: integer("offer_id"),
+  createdAt: integer("created_at").notNull(),
+});
+
 /** Web-push subscriptions (F3) - one row per device/browser */
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -633,6 +667,18 @@ export const racecardCache = sqliteTable("racecard_cache", {
 });
 
 /**
+ * Durable football fixtures payload per UK calendar date. Same store-first
+ * posture as racecard_cache: cron warms today/tomorrow, desks read this, no
+ * clerk scoping.
+ */
+export const fixtureCache = sqliteTable("fixture_cache", {
+  date: text("date").primaryKey(),
+  /** JSON array of Fixture. */
+  payload: text("payload").notNull(),
+  fetchedAt: integer("fetched_at").notNull(),
+});
+
+/**
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */
@@ -857,6 +903,8 @@ export type NewBalanceTransactionRow = typeof balanceTransactions.$inferInsert;
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
 export type OfferSeriesRow = typeof offerSeries.$inferSelect;
+export type OfferInboxAddressRow = typeof offerInboxAddresses.$inferSelect;
+export type OfferInboundMessageRow = typeof offerInboundMessages.$inferSelect;
 export type RacingOddsOverrideRow = typeof racingOddsOverrides.$inferSelect;
 export type CasinoOfferRow = typeof casinoOffers.$inferSelect;
 export type NewCasinoOfferRow = typeof casinoOffers.$inferInsert;

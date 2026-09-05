@@ -8,6 +8,7 @@ import type { ExchangeProvider } from "@/lib/services/exchange/types";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { getDeskActor } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { localCalendarDate } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 /** Betfair identity often challenges US datacentre IPs; prefer London. */
@@ -25,7 +26,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   // read the same desk as live (Clerk prod keys issue a different user id).
   const clerkUserId = getDeskActor().neonClerkUserId || getDeskActor().clerkUserId;
   const date =
-    req.nextUrl.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+    req.nextUrl.searchParams.get("date") ?? localCalendarDate();
   const raw = req.nextUrl.searchParams.get("exchange");
   const exchangeProvider =
     raw && PROVIDERS.has(raw as ExchangeProvider) ? (raw as ExchangeProvider) : null;
@@ -42,6 +43,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     ...demo,
   });
   if (denied) return denied;
-  const payload = await getRacingDesk(date, { exchangeProvider, clerkUserId });
+  const lite = req.nextUrl.searchParams.get("lite") === "1";
+  const payload = await getRacingDesk(date, { exchangeProvider, clerkUserId, lite });
   return NextResponse.json(payload);
 });

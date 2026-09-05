@@ -250,11 +250,26 @@ export type JoinWaitlistResult =
   | { status: "joined"; email: string }
   | { status: "already_confirmed"; email: string };
 
+export type GrantFoundingInviteResult =
+  | { status: "granted"; email: string }
+  | { status: "already_eligible"; email: string };
+
+type EnsureWaitlistResult =
+  | { status: "already_confirmed"; email: string }
+  | {
+      status: "upserted";
+      email: string;
+      rejoin: boolean;
+      unsubscribeUrl: string;
+    };
+
 /**
- * Upsert a waitlist signup, mark confirmed, and send the branded thanks email.
- * Re-joining after unsubscribe restores the address and sends thanks again.
+ * Confirmed waitlist row, still subscribed. That is the Founding checkout gate.
+ * Does not send mail. Used by public join (which then emails) and admin invite.
  */
-export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult> {
+async function ensureConfirmedWaitlistEmail(
+  rawEmail: string
+): Promise<EnsureWaitlistResult> {
   const email = normaliseWaitlistEmail(rawEmail);
   if (!isValidWaitlistEmail(email)) {
     throw new Error("Enter a valid email address.");
@@ -289,9 +304,40 @@ export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult
     });
   }
 
-  await sendThanksEmail({ email, unsubscribeUrl });
-  await notifyOwnerOfJoin({ email, rejoin });
-  return { status: "joined", email };
+  return { status: "upserted", email, rejoin, unsubscribeUrl };
+}
+
+/**
+ * Operator invite: same Founding eligibility as the old waitlist, no thanks
+ * email and no owner ping. They must still check out Edge monthly with this
+ * address. Does not rewrite an existing list-price subscription.
+ */
+export async function grantFoundingInvite(
+  rawEmail: string
+): Promise<GrantFoundingInviteResult> {
+  const result = await ensureConfirmedWaitlistEmail(rawEmail);
+  if (result.status === "already_confirmed") {
+    return { status: "already_eligible", email: result.email };
+  }
+  return { status: "granted", email: result.email };
+}
+
+/**
+ * Upsert a waitlist signup, mark confirmed, and send the branded thanks email.
+ * Re-joining after unsubscribe restores the address and sends thanks again.
+ */
+export async function joinWaitlist(rawEmail: string): Promise<JoinWaitlistResult> {
+  const result = await ensureConfirmedWaitlistEmail(rawEmail);
+  if (result.status === "already_confirmed") {
+    return { status: "already_confirmed", email: result.email };
+  }
+
+  await sendThanksEmail({
+    email: result.email,
+    unsubscribeUrl: result.unsubscribeUrl,
+  });
+  await notifyOwnerOfJoin({ email: result.email, rejoin: result.rejoin });
+  return { status: "joined", email: result.email };
 }
 
 export type ConfirmWaitlistResult =

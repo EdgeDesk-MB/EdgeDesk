@@ -32,6 +32,10 @@ function event(partial: Partial<EventRow> = {}): EventRow {
     ftAwayScore: null,
     matchEnding: null,
     period: "1H",
+    htHomeScore: null,
+    htAwayScore: null,
+    lineups: null,
+    tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
     createdAt: NOW - 60 * 60 * 1000,
@@ -104,6 +108,16 @@ describe("footballEventPatch", () => {
       period: "1H",
       goals: null,
     });
+  });
+
+  it("persists the half-time score when the fixture has one", () => {
+    const patch = footballEventPatch(
+      event(),
+      fixture({ htHomeScore: 1, htAwayScore: 0 }),
+      null
+    );
+    expect(patch.htHomeScore).toBe(1);
+    expect(patch.htAwayScore).toBe(0);
   });
 
   it("latches homeLed2 once the home side leads by two", () => {

@@ -69,3 +69,8 @@ The admin feed monitor (built 26 Aug 2026) is the upgrade mechanism:
 If a reply would add a sport by spinning up a new paid provider account
 before its phase trigger, stop. Phase 1 is Betfair-catalogue work at £0;
 Phase 2 upgrades are justified by the feed monitor, not by enthusiasm.
+
+Every sport day-card feed is store-first: cron warms a shared Neon/SQLite
+row, users read Edgeways. Copy `fixture-store` / `racecard-store`. Do not
+let a desk open become the thing that spends the provider quota. Live
+scores stay on the short poll. Rule: `.cursor/rules/feed-store-first.mdc`.

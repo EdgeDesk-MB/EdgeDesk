@@ -29,7 +29,6 @@ import { buildDeskLivePositions } from "@/lib/pnl/desk-live-positions";
 import {
   hasBetWinTrigger,
   parseBetTriggerRule,
-  ruleNeedsTimeline,
   toMatchResult,
   toSettleable,
   toTriggerContext,
@@ -53,7 +52,13 @@ import {
 import { countBoostsNeedingAction } from "@/lib/services/boosts";
 import type { BalanceSummary } from "@/lib/services/balances.types";
 import { simStateAt, type SimGoal } from "./sim";
-import { fixtureGoalEvents, fixturesByIds, hasApiKey, apiUsageToday } from "./apifootball";
+import {
+  fixtureLineups,
+  fixtureMatchEvents,
+  fixturesByIds,
+  hasApiKey,
+  apiUsageToday,
+} from "./apifootball";
 import {
   syncRacingResultsForOpenBets,
   syncRecentTrackedRacingResults,
@@ -89,7 +94,6 @@ import {
   racingMarketReadyToSettle,
   settleRacingBet,
   triggerIfEndedNow,
-  type GoalEvent,
   type TriggerRule,
 } from "@/lib/calc";
 import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
@@ -100,7 +104,6 @@ import {
   selectionPosition,
 } from "@/lib/racing";
 import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes";
-import { formatRacingEventTitle } from "@/lib/events";
 import { formatEventTitle, racingVenueLabel } from "@/lib/events";
 import { livePositionValuation } from "@/lib/calc/ep/live-pnl";
 import {
@@ -118,11 +121,7 @@ import {
   formatSettlementTitleWithFreeBet,
   historyInPlayPlacementMinute,
 } from "@/lib/history-display";
-import {
-  formatGoalHistoryCopy,
-  inferScoringSide,
-  previousScorelineFromDedupe,
-} from "@/lib/history-goal-copy";
+import { eventHistoryFacts } from "@/lib/history-event-rows";
 import {
   autoResultLinkedLegs,
   legDueState,
@@ -150,6 +149,7 @@ import {
   LIVE_POLL_WINDOW_MS,
   needsResultBackfill,
   shouldFetchGoalTimeline,
+  shouldFetchLineups,
 } from "@/lib/live-poll-rules";
 import { openBetCoversRacingEvent } from "@/lib/alerts/race-open-bet-coverage";
 import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
@@ -248,22 +248,6 @@ async function refreshApiEvents(): Promise<void> {
   if (apiEvents.length === 0 && backfillEvents.length === 0) return;
   apiEvents.push(...backfillEvents);
 
-  // Goal timeline is expensive - only fetch for open trigger bets that need scorers.
-  const openTriggerBets = db
-    .select()
-    .from(bets)
-    .where(eq(bets.status, "open"))
-    .all()
-    .filter((b) => b.eventId && b.triggerRule && hasBetWinTrigger(b));
-  const needTimeline = new Set(
-    openTriggerBets
-      .filter((b) => {
-        const rule = parseRule(b);
-        return rule && ruleNeedsTimeline(rule);
-      })
-      .map((b) => b.eventId)
-  );
-
   try {
     const fixtures = await fixturesByIds(apiEvents.map((e) => e.externalId!));
     for (const event of apiEvents) {
@@ -274,13 +258,23 @@ async function refreshApiEvents(): Promise<void> {
       const awayLed2 = event.awayLed2 || (fixture.awayScore - fixture.homeScore >= 2 ? 1 : 0);
 
       let goals = event.goals;
-      // Timeline is a SECOND request per poll - only spend it when the score
-      // moved (or a live match has no timeline yet), never every minute.
-      if (needTimeline.has(event.id) && shouldFetchGoalTimeline(event, fixture)) {
+      let tapeFetchedAt = event.tapeFetchedAt ?? null;
+      if (shouldFetchGoalTimeline(event, fixture, now)) {
         try {
-          goals = JSON.stringify(await fixtureGoalEvents(event.externalId!, fixture.homeTeam));
+          goals = JSON.stringify(await fixtureMatchEvents(event.externalId!, fixture.homeTeam));
+          tapeFetchedAt = now;
         } catch {
-          // keep the previous timeline; triggers just wait for the next poll
+          // keep the previous timeline; the next poll retries
+        }
+      }
+
+      let lineups = event.lineups ?? null;
+      if (shouldFetchLineups(event, fixture, now)) {
+        try {
+          const xi = await fixtureLineups(event.externalId!);
+          if (xi) lineups = JSON.stringify(xi);
+        } catch {
+          // keep the previous XI
         }
       }
 
@@ -294,6 +288,14 @@ async function refreshApiEvents(): Promise<void> {
           homeLed2,
           awayLed2,
           goals,
+          lineups,
+          tapeFetchedAt,
+          ...(typeof fixture.htHomeScore === "number" || typeof fixture.htAwayScore === "number"
+            ? {
+                htHomeScore: fixture.htHomeScore ?? null,
+                htAwayScore: fixture.htAwayScore ?? null,
+              }
+            : {}),
           ...(fixture.matchEnding != null
             ? {
                 matchEnding: fixture.matchEnding,
@@ -522,142 +524,27 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
   };
 
   for (const event of allEvents) {
-    if (event.status === "upcoming") continue;
-    if (event.source === "sim") continue;
-
-    if (event.sport === "horse_racing") {
-      const race = parseRaceResults(event.goals);
-      const title = formatRacingEventTitle(event);
-      if (event.status === "finished" && race) {
-        upsert({
-          dedupe: event.externalId ? `ft:racing:${event.externalId}` : `ft:${event.id}`,
-          kind: "full_time",
-          eventId: event.id,
-          title: "Result",
-          detail: `${title} - won by ${race.winner}`,
-          createdAt: event.startTime,
-        });
-      }
-      continue;
-    }
-
-    const name = `${event.homeTeam} v ${event.awayTeam}`;
-
-    put({
-      dedupe: `ko:${event.id}`,
-      kind: "kickoff",
-      eventId: event.id,
-      minute: 0,
-      title: "Kick-off",
-      detail: name,
-      createdAt: event.startTime,
-    });
-
-    const goals: GoalEvent[] = event.goals ? JSON.parse(event.goals) : [];
-    let h = 0;
-    let a = 0;
-    goals.forEach((goal, i) => {
-      if (goal.side === "home") h++;
-      else a++;
-      const flags = [
-        i === 0 && !goal.og ? "1st goalscorer" : null,
-        goal.og ? "own goal" : null,
-      ].filter(Boolean);
-      const copy = formatGoalHistoryCopy({
-        side: goal.side,
-        player: goal.player,
-        og: goal.og,
-        homeTeam: event.homeTeam,
-        awayTeam: event.awayTeam,
-      });
-      upsert({
-        dedupe: `goal:${event.id}:${i}`,
-        kind: "goal",
-        eventId: event.id,
-        minute: goal.minute,
-        title: copy.title,
-        detail: `${flags.length ? flags.join(" · ") + " - " : ""}${event.homeTeam} ${h}-${a} ${event.awayTeam}`,
-      });
-    });
-    // API events without a scorer feed: log score changes so the feed never
-    // goes quiet just because no player trigger is watching. Name the team
-    // when the score ticked by exactly one goal.
-    if (goals.length < event.homeScore + event.awayScore && event.homeScore + event.awayScore > 0) {
-      const existing = db
-        .select({ dedupe: history.dedupe })
-        .from(history)
-        .where(eq(history.eventId, event.id))
-        .all();
-      const side = inferScoringSide({
-        knownHome: h,
-        knownAway: a,
-        currentHome: event.homeScore,
-        currentAway: event.awayScore,
-        previousScore: previousScorelineFromDedupe(
-          existing.map((row) => row.dedupe),
-          event.id,
-          event.homeScore,
-          event.awayScore
-        ),
-      });
-      const copy = formatGoalHistoryCopy({
-        side,
-        homeTeam: event.homeTeam,
-        awayTeam: event.awayTeam,
-      });
-      upsert({
-        dedupe: `score:${event.id}:${event.homeScore}-${event.awayScore}`,
-        kind: "goal",
-        eventId: event.id,
-        minute: event.minute,
-        title: copy.title,
-        detail: `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`,
-      });
-    }
-
-    if (event.homeLed2) {
-      put({
-        dedupe: `2up:${event.id}:home`,
-        kind: "two_up",
-        eventId: event.id,
-        minute: event.minute,
-        title: "2UP triggered",
-        detail: `${event.homeTeam} went 2 goals ahead`,
-      });
-    }
-    if (event.awayLed2) {
-      put({
-        dedupe: `2up:${event.id}:away`,
-        kind: "two_up",
-        eventId: event.id,
-        minute: event.minute,
-        title: "2UP triggered",
-        detail: `${event.awayTeam} went 2 goals ahead`,
-      });
-    }
-
-    if (event.status === "finished") {
-      const ending = event.matchEnding;
-      const titleSuffix = ending === "aet" ? " (AET)" : ending === "pen" ? " (Pens)" : "";
-      let scoreDetail: string;
-      const hasFtScore = event.ftHomeScore != null && event.ftAwayScore != null;
-      if (ending === "aet" && hasFtScore) {
-        // Show AET final score; 90-min score in brackets for clarity
-        scoreDetail = `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam} (FT: ${event.ftHomeScore}-${event.ftAwayScore})`;
-      } else if (ending === "pen" && hasFtScore) {
-        scoreDetail = `${event.homeTeam} ${event.ftHomeScore}-${event.ftAwayScore} ${event.awayTeam} (Pens)`;
-      } else {
-        scoreDetail = `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`;
-      }
-      upsert({
-        dedupe: `ft:${event.id}`,
-        kind: "full_time",
-        eventId: event.id,
-        minute: event.minute || 90,
-        title: `Full time${titleSuffix}`,
-        detail: scoreDetail,
-        createdAt: event.startTime + (event.minute || 90) * 60 * 1000,
-      });
+    const existing =
+      event.sport === "football"
+        ? db
+            .select({ dedupe: history.dedupe })
+            .from(history)
+            .where(eq(history.eventId, event.id))
+            .all()
+            .map((row) => row.dedupe)
+        : [];
+    for (const fact of eventHistoryFacts(event, now, { existingDedupes: existing })) {
+      const row = {
+        dedupe: fact.dedupe,
+        kind: fact.kind,
+        eventId: fact.eventId,
+        minute: fact.minute,
+        title: fact.title,
+        detail: fact.detail,
+        createdAt: fact.createdAt,
+      };
+      if (fact.write === "upsert") upsert(row);
+      else put(row);
     }
   }
 

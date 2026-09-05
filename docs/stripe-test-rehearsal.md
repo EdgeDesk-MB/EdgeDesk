@@ -119,7 +119,8 @@ Listen terminal: `checkout.session.completed` and `customer.subscription.updated
 
 - Reuse test Price IDs in live mode (recreate the catalogue before EDGE-7).
 - Commit `.env.local`, `sk_`, `rk_`, or `whsec_`.
-- Flip `SITE_SURFACE=app` or `LANDING_VARIANT=launch` on production for a local pay.
+- Flip production back to `SITE_SURFACE=waitlist` or `LANDING_VARIANT=waitlist`
+  for a local pay. Production is already `app` / `launch` (verified 4 Sep 2026).
 
 ---
 

@@ -30,8 +30,10 @@ the app derives every market and auto-settles linked bets.
 - Hosted desk is Neon. Vercel SQLite is `:memory:`. Never ship a customer
   mutation that writes SQLite on `isNeonDesk()`. Dual-path or return 400.
   `hosted-desk-cutover.test.ts` must stay green. Localhost success is not
-  live proof. Do not enable the Free Profit Tracker site banner until
-  production.
+  live proof. Production is the live app (`SITE_SURFACE=app`).
+- Sport day-cards are store-first (`racecard-store`, `fixture-store`). Cron
+  warms today/tomorrow; desks read Edgeways, not the provider. New sports
+  copy that shape. See `../.cursor/rules/feed-store-first.mdc`.
 - NEVER weaken or delete a passing calc/settlement test to make code pass.
 - Money maths is exact: no floating-point shortcuts in stake/lay/commission logic.
 - Respect the result-centric model: derive market outcomes, do not hardcode them.

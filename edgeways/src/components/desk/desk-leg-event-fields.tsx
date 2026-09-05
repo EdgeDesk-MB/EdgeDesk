@@ -1,29 +1,28 @@
 "use client";
 
-import { Fragment, useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { SportIcon } from "@/components/sport-icon";
+import { EventSearchSelect } from "@/components/event-search-select";
 import {
   bandNotTrackedFixtures,
   bandTrackedEvents,
   filterByOfferCourseScope,
   fixtureSelectValue,
   groupByHourBandIfDense,
+  knownFixtureSearchOption,
   parseFixtureSelectValue,
-  partsKnownFixtureOption,
-  partsTrackedEventOption,
-  type EventOptionParts,
+  toEventSearchSection,
+  trackedEventSearchOption,
+  type EventSearchSection,
   type KnownFixtureOption,
 } from "@/lib/add-bet-event-options";
 import { type TrackedEventLike } from "@/lib/events";
@@ -49,50 +48,11 @@ export type DeskLegEventDraft = {
   selection: string;
 };
 
-/**
- * Match Add bet Events rows: hide the trailing check gutter so the clock
- * sits flush right; selection is the checked background, not a tick.
- */
-const eventSelectItemClass =
-  "pr-2 [&_[data-slot=select-item-indicator]]:hidden data-[state=checked]:bg-accent";
-
 type HourBanded<T> = {
   key: string;
   label: string;
   hours: { key: string; label: string; items: T[] }[];
 };
-
-function EventOptionRow({
-  sport,
-  parts,
-}: {
-  sport: string | null | undefined;
-  parts: EventOptionParts;
-}) {
-  return (
-    <span className="flex w-full min-w-0 items-center justify-between gap-3">
-      <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <SportIcon sport={sport} size={14} className="shrink-0 text-muted-foreground" />
-        <span className="truncate">{parts.title}</span>
-        {parts.status ? (
-          <span
-            className={cn(
-              "shrink-0 text-xs font-semibold",
-              parts.status === "Live" ? "text-success" : "text-muted-foreground"
-            )}
-          >
-            {parts.status}
-          </span>
-        ) : null}
-      </span>
-      {parts.time ? (
-        <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-          {parts.time}
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 function selectionChoices(
   sport: string,
@@ -237,6 +197,32 @@ export function DeskLegEventFields({
     [fixturesForList, trackedExternalIds]
   );
 
+  const eventSearchSections = useMemo<EventSearchSection[]>(
+    () => [
+      ...(notTrackedHourBands.length > 0
+        ? [
+            toEventSearchSection(
+              "fixtures",
+              isRacingSport(sport) ? "Today's races" : "Fixtures",
+              notTrackedHourBands,
+              knownFixtureSearchOption
+            ),
+          ]
+        : []),
+      ...(trackedHourBands.length > 0
+        ? [
+            toEventSearchSection(
+              "tracked",
+              "Tracked",
+              trackedHourBands,
+              trackedEventSearchOption
+            ),
+          ]
+        : []),
+    ],
+    [notTrackedHourBands, trackedHourBands, sport]
+  );
+
   // Runners for a tracked race only. Pending fixtures use card runners (no network).
   const runnersEventId =
     isRacingSport(sport) && value.eventId != null && !value.pendingFixture
@@ -365,8 +351,6 @@ export function DeskLegEventFields({
     trackedHourBands.length === 0 &&
     notTrackedHourBands.length === 0 &&
     fixtureSport;
-  const fixturesSectionLabel = isRacingSport(sport) ? "Today's races" : "Fixtures";
-
   return (
     <div className={cn("grid gap-2", className)}>
       {showSportEvent ? (
@@ -410,124 +394,72 @@ export function DeskLegEventFields({
             </Select>
           </div>
           <div className="flex min-w-0 flex-col gap-1">
-            <Label
-              htmlFor={eventSelectId}
-              className="min-w-0 text-pretty break-words text-xs text-muted-foreground"
-            >
-              {courseScopeLocked && courseScopeLabel
-                ? `Event · ${courseScopeLabel}`
-                : "Event"}
-            </Label>
-            <Select
+            <div className="flex items-center justify-between gap-2">
+              <Label
+                htmlFor={eventSelectId}
+                className="min-w-0 text-pretty break-words text-xs text-muted-foreground"
+              >
+                {courseScopeLocked && courseScopeLabel
+                  ? `Event · ${courseScopeLabel}`
+                  : "Event"}
+              </Label>
+              {value.eventId != null || value.pendingFixture ? (
+                <button
+                  type="button"
+                  aria-label="Clear event"
+                  className="shrink-0 text-xs font-medium text-primary-text underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                  disabled={disabled}
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      eventId: null,
+                      pendingFixture: null,
+                      selection: "",
+                    })
+                  }
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+            <EventSearchSelect
+              id={eventSelectId}
               value={selectValue}
               onValueChange={changeEvent}
               disabled={disabled}
-            >
-              <SelectTrigger
-                id={eventSelectId}
-                className="w-full"
-                aria-describedby={
-                  courseScopeLocked && courseScopeLabel ? eventHintId : undefined
-                }
-              >
-                <SelectValue
-                  placeholder={
-                    courseScopeLocked && courseScopeLabel
-                      ? `Select a ${courseScopeLabel} race`
-                      : "Manual entry"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {courseScopeLocked && courseScopeLabel ? (
-                  <SelectItem value="__scope_pending__" disabled>
-                    Select a {courseScopeLabel} race
-                  </SelectItem>
-                ) : (
-                  <SelectItem value="none">Manual entry</SelectItem>
-                )}
-                {notTrackedHourBands.length > 0 ? (
-                  <>
-                    {!courseScopeLocked ? <SelectSeparator /> : null}
-                    <SelectGroup className="p-0">
-                      <SelectLabel className="text-foreground">{fixturesSectionLabel}</SelectLabel>
-                      {notTrackedHourBands.map((band, bandIdx) => (
-                        <Fragment key={`not-tracked-${band.key}`}>
-                          {bandIdx > 0 ? <SelectSeparator /> : null}
-                          <SelectLabel>{band.label}</SelectLabel>
-                          {band.hours.map((hour) => (
-                            <Fragment key={`not-tracked-${band.key}-${hour.key}`}>
-                              {hour.label ? <SelectLabel>{hour.label}</SelectLabel> : null}
-                              {hour.items.map((f) => (
-                                <SelectItem
-                                  key={f.externalId}
-                                  value={fixtureSelectValue(f.externalId)}
-                                  className={eventSelectItemClass}
-                                >
-                                  <EventOptionRow
-                                    sport={f.sport}
-                                    parts={partsKnownFixtureOption(f)}
-                                  />
-                                </SelectItem>
-                              ))}
-                            </Fragment>
-                          ))}
-                        </Fragment>
-                      ))}
-                    </SelectGroup>
-                  </>
-                ) : null}
-                {trackedHourBands.length > 0 ? (
-                  <>
-                    <SelectSeparator />
-                    <SelectGroup className="p-0">
-                      <SelectLabel className="text-foreground">Tracked</SelectLabel>
-                      {trackedHourBands.map((band, bandIdx) => (
-                        <Fragment key={`tracked-${band.key}`}>
-                          {bandIdx > 0 ? <SelectSeparator /> : null}
-                          <SelectLabel>{band.label}</SelectLabel>
-                          {band.hours.map((hour) => (
-                            <Fragment key={`tracked-${band.key}-${hour.key}`}>
-                              {hour.label ? <SelectLabel>{hour.label}</SelectLabel> : null}
-                              {hour.items.map((e) => (
-                                <SelectItem
-                                  key={e.id}
-                                  value={String(e.id)}
-                                  className={eventSelectItemClass}
-                                >
-                                  <EventOptionRow
-                                    sport={e.sport}
-                                    parts={partsTrackedEventOption(e)}
-                                  />
-                                </SelectItem>
-                              ))}
-                            </Fragment>
-                          ))}
-                        </Fragment>
-                      ))}
-                    </SelectGroup>
-                  </>
-                ) : null}
-                {showLoadingHint ? (
-                  <>
-                    <SelectSeparator />
-                    <SelectItem value="__loading__" disabled>
-                      {isRacingSport(sport) ? "Loading races…" : "Loading fixtures…"}
-                    </SelectItem>
-                  </>
-                ) : null}
-                {showEmptyHint ? (
-                  <>
-                    <SelectSeparator />
-                    <SelectItem value="__empty__" disabled>
-                      {courseScopeLocked && courseScopeLabel
-                        ? `No ${courseScopeLabel} races loaded yet for this day.`
-                        : `No ${sportLabel} fixtures loaded`}
-                    </SelectItem>
-                  </>
-                ) : null}
-              </SelectContent>
-            </Select>
+              ariaDescribedBy={
+                courseScopeLocked && courseScopeLabel ? eventHintId : undefined
+              }
+              placeholder={
+                courseScopeLocked && courseScopeLabel
+                  ? `Select a ${courseScopeLabel} race`
+                  : "Manual entry"
+              }
+              searchPlaceholder={
+                isRacingSport(sport) ? "Search races…" : "Search events…"
+              }
+              topRow={
+                courseScopeLocked && courseScopeLabel
+                  ? {
+                      value: "__scope_pending__",
+                      label: `Select a ${courseScopeLabel} race`,
+                      disabled: true,
+                    }
+                  : { value: "none", label: "Manual entry" }
+              }
+              sections={eventSearchSections}
+              loading={showLoadingHint}
+              loadingLabel={
+                isRacingSport(sport) ? "Loading races…" : "Loading fixtures…"
+              }
+              emptyLabel={
+                showEmptyHint
+                  ? courseScopeLocked && courseScopeLabel
+                    ? `No ${courseScopeLabel} races loaded yet for this day.`
+                    : `No ${sportLabel} fixtures loaded.`
+                  : null
+              }
+            />
           </div>
         </div>
         {courseScopeLocked && courseScopeLabel ? (

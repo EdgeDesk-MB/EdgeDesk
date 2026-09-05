@@ -3,6 +3,7 @@ import {
   deriveOfferNextAction,
   listOfferNextActions,
 } from "@/lib/offers/next-actions";
+import { rulesAfterPlaybookStep } from "@/lib/offers/offer-playbook";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { OfferEdgePlay } from "@/lib/offers/offer-edge.types";
 import { formatClockTime } from "@/lib/time-format";
@@ -162,6 +163,68 @@ describe("deriveOfferNextAction", () => {
       })
     );
     expect(planned?.kind).toBe("playbook_deposit");
+  });
+
+  it("switches from opt-in to place qualifying once the playbook step is marked done", () => {
+    const pending = JSON.stringify({
+      type: "promo_terms",
+      playbook: {
+        version: 1,
+        steps: [
+          {
+            id: "opt_in",
+            kind: "opt_in",
+            title: "Opt in to the offer",
+            detail: "Confirm opt-in at Paddy Power before qualifying.",
+            sortOrder: 0,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+          {
+            id: "qualify",
+            kind: "qualify",
+            title: "Place £10 qualifying bet",
+            detail: "Cash bet",
+            sortOrder: 1,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+          {
+            id: "done",
+            kind: "done",
+            title: "Offer complete",
+            detail: "",
+            sortOrder: 2,
+            status: "pending",
+            completion: null,
+            completedAt: null,
+          },
+        ],
+      },
+    });
+    const before = offer({
+      id: 214,
+      title: "Bet £10 get £10",
+      bookmaker: "Paddy Power",
+      status: "active",
+      rules: pending,
+      betCount: 0,
+    });
+    expect(deriveOfferNextAction(before, now)?.kind).toBe("playbook_opt_in");
+    const built = rulesAfterPlaybookStep(before.rules, before.profit, "opt_in", now);
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const after = offer({
+      id: 214,
+      title: "Bet £10 get £10",
+      bookmaker: "Paddy Power",
+      status: "active",
+      rules: built.rules,
+      betCount: 0,
+    });
+    expect(deriveOfferNextAction(after, now)?.kind).toBe("place_qualifying");
   });
 
   it("does not keep opt-in as next once the qualifying bet is logged", () => {

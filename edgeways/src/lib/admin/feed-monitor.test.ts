@@ -117,7 +117,7 @@ describe("groupFeedUsageBySource", () => {
       row({
         clerkUserId: "user_a",
         email: "ada@example.com",
-        operation: "goal-events",
+        operation: "match-events",
         count: 2,
       }),
       row({ clerkUserId: "user_a", email: "ada@example.com", feed: "racing", operation: "odds", count: 3 }),
@@ -136,7 +136,7 @@ describe("groupFeedUsageBySource", () => {
     expect(sources[0].operations.map((op) => op.operation)).toEqual([
       "fixtures-by-date",
       "odds",
-      "goal-events",
+      "match-events",
     ]);
   });
 

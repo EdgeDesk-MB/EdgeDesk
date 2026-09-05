@@ -4,7 +4,7 @@
 import { db, bets, events, offers, type BetRow, type EventRow, type OfferRow } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { getDeskActor } from "@/lib/db/desk-scope";
-import { listNeonDeskBets } from "@/lib/db/neon-desk";
+import { listNeonDeskBets, listNeonDeskLinkedOfferIds } from "@/lib/db/neon-desk";
 import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
 import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
 import { listNeonEvents } from "@/lib/db/neon-events";
@@ -154,7 +154,8 @@ export function applyRunnerBetMarks(
 
 async function loadRacecards(
   date: string,
-  source: "demo" | "api"
+  source: "demo" | "api",
+  opts?: { includeResults?: boolean }
 ): Promise<{
   cards: RacingRacecard[];
   oddsTier: "free" | "standard" | "demo" | "proxy";
@@ -167,7 +168,10 @@ async function loadRacecards(
   // Store-first: the persisted payload serves instantly (refreshing in the
   // background when stale), so the desk never blocks on the upstream feed and
   // an upstream 429 cannot blank a day that has already been fetched.
-  const resultsPromise = resultsToday();
+  const includeResults = opts?.includeResults !== false;
+  const resultsPromise = includeResults
+    ? resultsToday()
+    : Promise.resolve({ results: new Map<string, RaceResult>() });
   const { cards, oddsTier } = await getRacecardsForDate(date);
 
   const { results } = await resultsPromise;
@@ -344,6 +348,56 @@ export function selectActiveRacingOffers(
   return allOffers.filter(
     (o) => isRacingDeskOffer(o, date) && !linkedOfferIds.has(o.id)
   );
+}
+
+/** How far ahead to pull live lays on the first full desk pass. */
+export const EXCHANGE_BOOK_HORIZON_MS = 6 * 60 * 60 * 1000;
+const EXCHANGE_BOOK_MIN_RACES = 20;
+
+/**
+ * Saturday cards are dozens of WIN markets. Asking Betfair for the whole day
+ * on every remount left the Exchange column on hyphens for 20s+. Price the
+ * next window first; later meetings join on the 60s poll as they enter it.
+ */
+export function selectRacesForExchangeBooks<
+  T extends { startTime: number; status?: string },
+>(cards: readonly T[], now: number = Date.now()): T[] {
+  const upcoming = cards.filter((card) => card.status !== "finished");
+  const horizon = now + EXCHANGE_BOOK_HORIZON_MS;
+  const inWindow = upcoming.filter((card) => card.startTime <= horizon);
+  if (inWindow.length >= EXCHANGE_BOOK_MIN_RACES) return inWindow;
+  return [...upcoming].sort((a, b) => a.startTime - b.startTime).slice(0, EXCHANGE_BOOK_MIN_RACES);
+}
+
+/** Cards Offer Edge can price: upcoming races that match at least one trigger offer. */
+export function racecardsForOfferEdge<
+  T extends Pick<
+    RacingRacecard,
+    "externalId" | "course" | "fieldSize" | "region" | "offTime" | "status"
+  >,
+>(cards: readonly T[], offers: readonly OfferRow[], date: string): T[] {
+  const triggerOffers = offers.filter((offer) => {
+    const rules = parseOfferRules(offer);
+    return rules != null && offerHasResultTrigger(rules);
+  });
+  if (triggerOffers.length === 0) return [];
+  return cards.filter((card) => {
+    if (card.status === "finished") return false;
+    return triggerOffers.some(
+      (offer) =>
+        raceQualifiesForOffer(
+          offer,
+          {
+            course: card.course,
+            fieldSize: card.fieldSize,
+            region: card.region ?? "GB",
+            externalId: card.externalId,
+            offTime: card.offTime,
+          },
+          date
+        ).qualifies
+    );
+  });
 }
 
 async function loadRacingDeskStore(clerkUserId?: string | null): Promise<{
@@ -610,22 +664,49 @@ function buildSuggestedRaces(
     .slice(0, 8);
 }
 
+const racingDeskInflight = new Map<string, Promise<RacingDeskPayload>>();
+
 export async function getRacingDesk(
   date: string,
   options?: {
     exchangeProvider?: ExchangeProvider | null;
     /** Captured before `cookies()` / racecard awaits, which can drop ALS. */
     clerkUserId?: string | null;
+    /**
+     * First paint: store racecards + desk rows only. Skip live results,
+     * exchange books and snapshot writes so the page is not blocked on
+     * Betfair catalogue/books (often several seconds on a full card).
+     */
+    lite?: boolean;
   }
 ): Promise<RacingDeskPayload> {
-  // Prefer the aliased Neon id: Clerk dev/prod issue different user ids for
-  // the same email, and the raw signed-in id would open an empty desk.
   const actor = getDeskActor();
   const clerkUserId =
     options?.clerkUserId?.trim() ||
     actor.neonClerkUserId?.trim() ||
     actor.clerkUserId?.trim() ||
     null;
+  const key = `${date}|${options?.lite === true ? "lite" : "full"}|${options?.exchangeProvider ?? ""}|${clerkUserId ?? ""}`;
+  const existing = racingDeskInflight.get(key);
+  if (existing) return existing;
+  const work = assembleRacingDesk(date, { ...options, clerkUserId }).finally(() => {
+    if (racingDeskInflight.get(key) === work) racingDeskInflight.delete(key);
+  });
+  racingDeskInflight.set(key, work);
+  return work;
+}
+
+async function assembleRacingDesk(
+  date: string,
+  options?: {
+    exchangeProvider?: ExchangeProvider | null;
+    clerkUserId?: string | null;
+    lite?: boolean;
+  }
+): Promise<RacingDeskPayload> {
+  // Prefer the aliased Neon id: Clerk dev/prod issue different user ids for
+  // the same email, and the raw signed-in id would open an empty desk.
+  const clerkUserId = options?.clerkUserId?.trim() || null;
   // SQLite-only: series spawn and title repair write the Mac file. Hosted
   // Neon already stores instances; those helpers would mutate empty memory.
   const hosted = isNeonDesk();
@@ -646,7 +727,9 @@ export async function getRacingDesk(
   let apiOddsTier: "free" | "standard" | "demo" | "proxy" = "demo";
   let resultsByRace = new Map<string, RaceResult>();
   try {
-    const loaded = await loadRacecards(date, source);
+    const loaded = await loadRacecards(date, source, {
+      includeResults: options?.lite !== true,
+    });
     cards = loaded.cards;
     apiOddsTier = loaded.oddsTier;
     resultsByRace = loaded.results;
@@ -776,14 +859,18 @@ export async function getRacingDesk(
   const exchangeColors = getExchangeColors(liveFeed.provider);
   const settingsStatus = getExchangeProviderStatus(settingsProvider);
 
-  const upcomingCards = cards.filter((c) => c.status !== "finished");
+  const upcomingCards = selectRacesForExchangeBooks(cards);
   const exchangeLayByRace = new Map<string, Map<string, ExchangeBookQuote>>();
   const exchangeMetaByRace = new Map<
     string,
     { source: "live" | "estimated" | "api"; error?: string; quoteCount: number }
   >();
 
-  if (liveFeed.status.status === "connected" && upcomingCards.length > 0) {
+  if (
+    options?.lite !== true &&
+    liveFeed.status.status === "connected" &&
+    upcomingCards.length > 0
+  ) {
     const exchangeResult = await getExchangeOdds(
       liveFeed.provider,
       upcomingCards.map((card) => ({
@@ -948,7 +1035,7 @@ export async function getRacingDesk(
       }))
   );
   const snapshotInputs = [...bookieSnapshots, ...exchangeSnapshots];
-  if (snapshotInputs.length > 0) {
+  if (options?.lite !== true && snapshotInputs.length > 0) {
     if (hosted) {
       await recordNeonOddsSnapshots(snapshotInputs);
       const moves = await neonPriceMovementsForRaces(races.map((r) => r.externalId));
@@ -1018,7 +1105,10 @@ export async function getRacingDesk(
   );
 
   let exchangeNote: string | undefined;
-  if (liveFeed.status.status === "not_configured") {
+  if (options?.lite === true) {
+    // First paint has not asked the exchange yet. Do not flash "unmatched".
+    exchangeNote = undefined;
+  } else if (liveFeed.status.status === "not_configured") {
     exchangeNote = deskOverride
       ? `${liveFeed.name} is selected, but live prices are not available. Showing estimates, or pick another exchange.`
       : `Live exchange prices are not connected. Showing estimates.`;
@@ -1056,15 +1146,19 @@ export async function getRacingDesk(
     settingsExchangeProvider: settingsProvider,
     settingsExchangeName: settingsName,
     deskExchangeOverride: deskOverride,
-    exchangeStatus: hasLiveExchange
-      ? "connected"
-      : liveFeed.status.status === "connected"
-        ? "disconnected"
-        : liveFeed.status.status,
+    exchangeStatus:
+      options?.lite === true
+        ? liveFeed.status.status
+        : hasLiveExchange
+          ? "connected"
+          : liveFeed.status.status === "connected"
+            ? "disconnected"
+            : liveFeed.status.status,
     exchangeFeedType: liveFeed.status.feedType,
     exchangeNote,
     backColor: exchangeColors.backColor,
     layColor: exchangeColors.layColor,
+    lite: options?.lite === true ? true : undefined,
   };
 
   const raceByExternal = new Map(races.map((r) => [r.externalId, r]));
@@ -1181,6 +1275,204 @@ export function findTrackedEventForRace(
   allEvents: EventRow[]
 ): EventRow | undefined {
   return allEvents.find((e) => e.externalId === externalId);
+}
+
+const offerEdgeInflight = new Map<
+  string,
+  Promise<{ plays: OfferEdgePlay[]; source: RacingDeskSummary["source"] }>
+>();
+
+/**
+ * Offer Edge plays without assembling the full Racing Desk.
+ *
+ * Campaign cards and Do next only need ranked plays. The desk path also loads
+ * accas, results, odds snapshots and exchange books for every upcoming race,
+ * which on live is several seconds before the first pick appears.
+ *
+ * Concurrent callers (nav count, Do next, campaign cards) share one build —
+ * the exchange book pass is the expensive part.
+ */
+export async function getOfferEdgePlays(
+  date: string,
+  options?: { clerkUserId?: string | null }
+): Promise<{ plays: OfferEdgePlay[]; source: RacingDeskSummary["source"] }> {
+  const actor = getDeskActor();
+  const clerkUserId =
+    options?.clerkUserId?.trim() ||
+    actor.neonClerkUserId?.trim() ||
+    actor.clerkUserId?.trim() ||
+    null;
+  const key = `${date}|${clerkUserId ?? ""}`;
+  const existing = offerEdgeInflight.get(key);
+  if (existing) return existing;
+
+  const work = computeOfferEdgePlays(date, clerkUserId).finally(() => {
+    if (offerEdgeInflight.get(key) === work) offerEdgeInflight.delete(key);
+  });
+  offerEdgeInflight.set(key, work);
+  return work;
+}
+
+async function computeOfferEdgePlays(
+  date: string,
+  clerkUserId: string | null
+): Promise<{ plays: OfferEdgePlay[]; source: RacingDeskSummary["source"] }> {
+  const hosted = isNeonDesk();
+
+  const [allOffers, linkedOfferIds] = hosted
+    ? await Promise.all([
+        listNeonDeskOffers(clerkUserId),
+        listNeonDeskLinkedOfferIds(clerkUserId),
+      ])
+    : [
+        db.select().from(offers).all(),
+        new Set(
+          db
+            .select({ offerId: bets.offerId })
+            .from(bets)
+            .all()
+            .map((row) => row.offerId)
+            .filter((id): id is number => id != null)
+        ),
+      ];
+
+  const activeOffers = selectActiveRacingOffers(allOffers, date, linkedOfferIds);
+  const triggerOffers = activeOffers.filter((offer) => {
+    const rules = parseOfferRules(offer);
+    return rules != null && offerHasResultTrigger(rules);
+  });
+  if (triggerOffers.length === 0) {
+    return { plays: [], source: hasRacingApiKey() ? "racing-api" : "demo" };
+  }
+
+  const source = hasRacingApiKey() ? "api" : "demo";
+  let error: string | undefined;
+  let cards: RacingRacecard[];
+  let apiOddsTier: "free" | "standard" | "demo" | "proxy" = "demo";
+  try {
+    const loaded = await loadRacecards(date, source, { includeResults: false });
+    cards = loaded.cards;
+    apiOddsTier = loaded.oddsTier;
+  } catch (e) {
+    error = String(e);
+    cards = demoRacecards(date);
+    apiOddsTier = "demo";
+  }
+
+  const qualifyingCards = racecardsForOfferEdge(cards, triggerOffers, date);
+  if (qualifyingCards.length === 0) {
+    return { plays: [], source: error ? "error" : source === "demo" ? "demo" : "racing-api" };
+  }
+
+  const isDemo = source === "demo" && !hasRacingApiKey();
+  const useProxyOdds = !isDemo && apiOddsTier === "free";
+  const primaryBookmaker = triggerOffers[0]?.bookmaker ?? null;
+  const liveFeed = resolveLiveExchangeProvider(null);
+  const upcomingCards = qualifyingCards.filter((card) => card.status !== "finished");
+
+  const exchangeLayByRace = new Map<string, Map<string, ExchangeBookQuote>>();
+  const exchangeMetaByRace = new Map<
+    string,
+    { source: "live" | "estimated" | "api"; error?: string; quoteCount: number }
+  >();
+
+  if (liveFeed.status.status === "connected" && upcomingCards.length > 0) {
+    const exchangeResult = await getExchangeOdds(
+      liveFeed.provider,
+      upcomingCards.map((card) => ({
+        externalId: card.externalId,
+        course: card.course,
+        raceName: card.raceName,
+        startTime: card.startTime,
+        offTime: card.offTime,
+        region: card.region,
+        runners: card.runnerDetails
+          .filter((r) => !r.nonRunner)
+          .map((r) => ({ horseId: r.horseId, name: r.name })),
+      })),
+      date
+    );
+
+    for (const raceOdds of exchangeResult.races) {
+      const byHorse = new Map<string, ExchangeBookQuote>();
+      for (const q of raceOdds.quotes) {
+        byHorse.set(q.horseId, {
+          layDecimal: q.layDecimal,
+          laySize: q.laySize,
+          backDecimal: q.backDecimal,
+          backSize: q.backSize,
+        });
+      }
+      if (byHorse.size > 0) exchangeLayByRace.set(raceOdds.externalId, byHorse);
+      exchangeMetaByRace.set(raceOdds.externalId, {
+        source: raceOdds.source,
+        error: raceOdds.error,
+        quoteCount: raceOdds.quotes.length,
+      });
+    }
+  }
+
+  const raceIds = qualifyingCards.map((card) => card.externalId);
+  const overridesByRace = hosted
+    ? await listNeonOverridesForRaces(raceIds)
+    : listOverridesForRaces(raceIds);
+
+  const races: RacingDeskRace[] = qualifyingCards.map((card) => {
+    const runners = enrichRunners(
+      card,
+      isDemo,
+      card.externalId.length,
+      primaryBookmaker,
+      useProxyOdds,
+      exchangeLayByRace.get(card.externalId),
+      overridesByRace.get(card.externalId)
+    );
+    const liveLayCount = runners.filter((r) => r.exchangeSource === "live").length;
+    const meta = exchangeMetaByRace.get(card.externalId);
+    return {
+      externalId: card.externalId,
+      course: card.course,
+      raceName: card.raceName,
+      startTime: card.startTime,
+      offTime: card.offTime,
+      status: card.status,
+      fieldSize: card.fieldSize,
+      region: card.region,
+      runners,
+      openBetCount: 0,
+      standardPlaces: placePositions(card.fieldSize, {
+        type: card.type,
+        raceName: card.raceName,
+      }),
+      offerTags: [],
+      oddsSource: raceOddsSource(runners),
+      pricedRunnerCount: runners.filter((r) => (r.bookieDecimal ?? 0) > 1).length,
+      exchangeSource: liveLayCount > 0 ? ("live" as const) : meta?.source,
+      exchangeMatchError: liveLayCount > 0 ? undefined : meta?.error,
+      liveLayCount,
+    };
+  });
+
+  const { tuning } = hosted
+    ? clerkUserId
+      ? await getNeonDeskSettingsForUser(clerkUserId)
+      : await getNeonDeskSettings()
+    : getAppSettings();
+  const realizedRetention = getRealizedRetention(undefined, {
+    rate: tuning.retentionPrior,
+    weight: tuning.retentionPriorWeight,
+  });
+
+  return {
+    plays: buildEdgePlays(
+      races,
+      triggerOffers,
+      date,
+      realizedRetention.rate,
+      realizedRetention.sampleSize
+    ),
+    source: error ? "error" : source === "demo" ? "demo" : "racing-api",
+  };
 }
 
 /**

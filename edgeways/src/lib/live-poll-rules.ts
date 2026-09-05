@@ -11,20 +11,57 @@ export const LIVE_POLL_WINDOW_MS = 4 * 60 * 60 * 1000;
 /** Backfill gives up after 3 days - beyond that, correct manually. */
 export const RESULT_BACKFILL_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 
+/** Cards and subs arrive without a score change; refresh live tape on this cadence. */
+export const TAPE_REFRESH_MS = 5 * 60 * 1000;
+
+/** Confirmed XI: fetch once when kick-off is close, or the match has started. */
+export const LINEUPS_AHEAD_MS = 2 * 60 * 60 * 1000;
+
 /**
- * The goal timeline is a SECOND request per poll (it once drained the whole
- * daily budget by half-time). Fetch it only when the score moved, or once
- * when a live match has no stored timeline yet.
+ * The event tape is a SECOND request per poll (it once drained the whole
+ * daily budget by half-time). Fetch when the score or period moved, when a
+ * live match has no stored tape yet, or when the last tape is older than
+ * {@link TAPE_REFRESH_MS}.
  */
 export function shouldFetchGoalTimeline(
-  event: { goals: string | null; homeScore: number; awayScore: number },
-  fixture: { status: string; homeScore: number; awayScore: number }
+  event: {
+    goals: string | null;
+    homeScore: number;
+    awayScore: number;
+    period?: string | null;
+    tapeFetchedAt?: number | null;
+  },
+  fixture: {
+    status: string;
+    homeScore: number;
+    awayScore: number;
+    period?: string | null;
+  },
+  now = Date.now()
 ): boolean {
   if (fixture.status === "upcoming") return false;
   const scoreChanged =
     fixture.homeScore !== event.homeScore || fixture.awayScore !== event.awayScore;
+  const periodChanged =
+    fixture.period != null && fixture.period !== (event.period ?? null);
   const noTimelineYet = !event.goals || event.goals === "[]";
-  return scoreChanged || noTimelineYet;
+  const stale =
+    fixture.status === "live" &&
+    event.tapeFetchedAt != null &&
+    now - event.tapeFetchedAt >= TAPE_REFRESH_MS;
+  return scoreChanged || periodChanged || noTimelineYet || stale;
+}
+
+export function shouldFetchLineups(
+  event: { lineups: string | null; startTime: number },
+  fixture: { status: string },
+  now = Date.now()
+): boolean {
+  if (event.lineups && event.lineups !== "{}" && event.lineups !== "[]") {
+    return false;
+  }
+  if (fixture.status === "live" || fixture.status === "finished") return true;
+  return event.startTime <= now + LINEUPS_AHEAD_MS;
 }
 
 /**

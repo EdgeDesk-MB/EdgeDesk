@@ -71,6 +71,7 @@ describe("hosted desk cutover", () => {
     const create = routeSource("offers/route.ts");
     expect(patch).toMatch(/setNeonMistakeTag/);
     expect(patch).toMatch(/rulesAfterPlaybookStep/);
+    expect(patch).toMatch(/listNeonDeskBetsForOffer/);
     expect(patch).toMatch(/stopNeonRecurrenceForOffer/);
     expect(create).toMatch(/createNeonOfferSeriesWithInstance/);
     expect(create).not.toMatch(/Recurring offers are not available yet/);
@@ -107,20 +108,66 @@ describe("hosted desk cutover", () => {
     expect(ungated).toEqual([]);
   });
 
+  it("offer inbox routes dual-path through the offer-inbox service", () => {
+    // The webhook and its settings route must never touch a desk store
+    // directly: all reads/writes go through the service, which gates on
+    // isNeonDesk and writes Neon clerk-scoped when hosted.
+    const webhook = routeSource("offers/inbound/route.ts");
+    const settings = routeSource("settings/offer-inbox/route.ts");
+    expect(webhook).toMatch(/@\/lib\/services\/offer-inbox/);
+    expect(webhook).not.toMatch(/from ["']@\/lib\/db["']/);
+    expect(settings).toMatch(/@\/lib\/services\/offer-inbox/);
+    expect(settings).not.toMatch(/from ["']@\/lib\/db["']/);
+    const service = readFileSync(
+      resolve(__dirname, "../services/offer-inbox.ts"),
+      "utf8"
+    );
+    expect(service).toMatch(/isNeonDesk/);
+    expect(service).toMatch(/insertNeonDeskOfferForUser/);
+    expect(service).toMatch(/recordNeonAlertsForUser/);
+  });
+
+  it("day-card stores dual-path Neon and desk routes read the store", () => {
+    const racecards = readFileSync(
+      resolve(__dirname, "../services/racecard-store.ts"),
+      "utf8"
+    );
+    const fixtures = readFileSync(
+      resolve(__dirname, "../services/fixture-store.ts"),
+      "utf8"
+    );
+    expect(racecards).toMatch(/isNeonDesk/);
+    expect(fixtures).toMatch(/isNeonDesk/);
+    expect(routeSource("fixtures/route.ts")).toMatch(/getFixturesForDate/);
+    expect(routeSource("racing/racecards/route.ts")).toMatch(/getRacecardsForDate/);
+    expect(routeSource("cron/warm-racecards/route.ts")).toMatch(/warmFixtureStore/);
+  });
+
   it("builds Home from Neon when the hosted desk flag is on", () => {
     expect(appStateSource).toMatch(/isNeonDesk\(\)/);
     expect(appStateSource).toMatch(/buildNeonDeskAppState/);
+  });
+
+  it("narrates hosted History goals onto Neon, not SQLite", () => {
+    const historyRoute = routeSource("history/route.ts");
+    expect(historyRoute).toMatch(/isNeonDesk/);
+    expect(historyRoute).toMatch(/syncNeonDeskEventHistory/);
+    expect(stateSource).toMatch(/syncNeonDeskEventHistory/);
   });
 
   it("Racing Desk reads follow the Neon alias, not the raw Clerk id", () => {
     // Clerk dev/prod issue different user ids for the same email. Passing the
     // raw signed-in id down would open the empty twin desk on localhost.
     expect(routeSource("racing/desk/route.ts")).toMatch(/neonClerkUserId/);
+    expect(routeSource("racing/desk/route.ts")).toMatch(/lite/);
     expect(routeSource("offers/edge/route.ts")).toMatch(/neonClerkUserId/);
+    expect(routeSource("offers/edge/route.ts")).toMatch(/getOfferEdgePlays/);
+    expect(routeSource("offers/edge/route.ts")).not.toMatch(/getRacingDesk/);
     const racingDesk = readFileSync(
       resolve(__dirname, "../services/racing-desk.ts"),
       "utf8"
     );
     expect(racingDesk).toMatch(/neonClerkUserId/);
+    expect(racingDesk).toMatch(/options\?\.lite/);
   });
 });

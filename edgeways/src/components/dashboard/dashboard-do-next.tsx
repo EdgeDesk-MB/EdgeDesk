@@ -237,6 +237,20 @@ export function DashboardDoNext({ className }: { className?: string }) {
     [allItems, offers, sort]
   );
 
+  const measuredOfferCount = useMemo(() => {
+    const measured = Object.values(state?.effortMeasured ?? {});
+    return measured.reduce((a, m) => a + m.sampleSize, 0);
+  }, [state?.effortMeasured]);
+
+  const sortHelp = [
+    "Priority: urgency",
+    "Edge: remaining EV",
+    "Rate: £/hr",
+    measuredOfferCount > 0
+      ? `£/hr uses your measured times where available (${measuredOfferCount} timed offer${measuredOfferCount === 1 ? "" : "s"}).`
+      : "£/hr uses estimated effort. Times are measured automatically as you work offers.",
+  ].join("\n");
+
   function onConvert(item: DoNextItem) {
     const lot = item.convertLot;
     if (!lot) return;
@@ -312,7 +326,7 @@ export function DashboardDoNext({ className }: { className?: string }) {
         className="bg-page"
         titleHref="/offers"
         title="Do next"
-        description={"Priority: urgency\nEdge: remaining EV\nRate: £/hr"}
+        description={sortHelp}
         descriptionAriaLabel="Sort Do next. Priority by urgency, Edge by remaining EV, Rate by pounds per hour."
         action={
           <Tabs
@@ -338,18 +352,6 @@ export function DashboardDoNext({ className }: { className?: string }) {
         }
       />
 
-      {sort === "rate" ? (
-        <p className="px-[var(--layout-card-x)] pt-2 text-xs text-muted-foreground">
-          {(() => {
-            const measured = Object.values(state?.effortMeasured ?? {});
-            const n = measured.reduce((a, m) => a + m.sampleSize, 0);
-            return n > 0
-              ? `£/hr uses your measured times where available (${n} timed offer${n === 1 ? "" : "s"}).`
-              : "£/hr uses estimated effort - times are measured automatically as you work offers.";
-          })()}
-        </p>
-      ) : null}
-
       {/* Mobile: vertical full-width cards; sort tabs reorder this stack */}
       <div className="flex flex-col gap-3 px-[var(--layout-card-x)] py-[calc(0.75rem+12px)] sm:hidden">
         {renderCards("stack")}
@@ -359,18 +361,15 @@ export function DashboardDoNext({ className }: { className?: string }) {
       <div className="hidden py-[calc(0.75rem+12px)] sm:block">
         <ScrollFadeEdges
           orientation="horizontal"
-          dragToScroll
+          stepButtons
           springSnap
           pinScrollStart
           // Re-pin when the leader changes (lots/edge often prepend a convert
           // card after first paint) or the queue length settles on load.
           scrollStartKey={`${sort}:${items[0]?.id ?? ""}:${items.length}`}
           scrollClassName={cn(
-            "app-scroll-overlay overflow-x-auto overflow-y-visible",
+            "app-scroll-overlay overflow-x-auto overflow-y-clip",
             "snap-x snap-mandatory",
-            // scroll-padding keeps snap-start aligned with card-x; actual
-            // inset lives on the flex row so end padding is not clipped
-            // (padding-right on overflow-x scrollports often collapses).
             "scroll-pl-[var(--layout-card-x)] scroll-pr-[var(--layout-card-x)]",
             "py-px"
           )}

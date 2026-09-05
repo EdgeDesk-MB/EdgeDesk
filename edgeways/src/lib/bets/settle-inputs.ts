@@ -5,7 +5,8 @@
  * can reuse the exact same conversions without importing the SQLite-bound
  * state service. `state.ts` re-exports them, so its public API is unchanged.
  */
-import { betWinRuleForBet, type DutchLegRecord, type GoalEvent, type MatchResult, type SettleableBet, type TriggerContext, type TriggerRule } from "@/lib/calc";
+import { betWinRuleForBet, type DutchLegRecord, type MatchResult, type SettleableBet, type TriggerContext, type TriggerRule } from "@/lib/calc";
+import { tapeGoals } from "@/lib/events/match-tape";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 
@@ -53,7 +54,7 @@ export function toTriggerContext(event: EventRow): TriggerContext {
     homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
     awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
     finished: event.status === "finished",
-    goals: event.goals ? (JSON.parse(event.goals) as GoalEvent[]) : [],
+    goals: tapeGoals(event.goals),
   };
 }
 
