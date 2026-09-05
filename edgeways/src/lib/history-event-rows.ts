@@ -59,6 +59,33 @@ function fullTimeDedupe(event: EventHistorySource, clerkUserId?: string): string
   return clerkUserId ? `ft:${event.id}:${clerkUserId}` : `ft:${event.id}`;
 }
 
+export function scoreTickDedupe(
+  eventId: number,
+  home: number,
+  away: number
+): string {
+  return `score:${eventId}:${home}-${away}`;
+}
+
+/**
+ * Score-tick History keys now covered by the match tape.
+ * Those nameless "Goal!" rows must go once a scorer exists for that scoreline.
+ */
+export function obsoleteScoreHistoryDedupes(
+  event: Pick<EventHistorySource, "id" | "goals">
+): string[] {
+  const goals = tapeGoals(event.goals);
+  let home = 0;
+  let away = 0;
+  const out: string[] = [];
+  for (const goal of goals) {
+    if (goal.side === "home") home += 1;
+    else away += 1;
+    out.push(scoreTickDedupe(event.id, home, away));
+  }
+  return out;
+}
+
 /** Commentary rows for one event. Skip upcoming and simulations. */
 export function eventHistoryFacts(
   event: EventHistorySource,
@@ -152,7 +179,7 @@ export function eventHistoryFacts(
     });
     const minute = event.minute || 0;
     facts.push({
-      dedupe: `score:${event.id}:${event.homeScore}-${event.awayScore}`,
+      dedupe: scoreTickDedupe(event.id, event.homeScore, event.awayScore),
       kind: "goal",
       eventId: event.id,
       minute,

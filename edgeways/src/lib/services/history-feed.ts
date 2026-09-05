@@ -19,6 +19,7 @@ import {
   matchesHistoryFilter,
 } from "@/lib/history-display";
 import { isChartAnnotationEntry } from "@/lib/pnl/chart-bet-markers";
+import { obsoleteScoreHistoryDedupes } from "@/lib/history-event-rows";
 
 /** Set or clear the user note on a balance-correction history row. */
 export function updateHistoryNote(id: number, note: string | null): HistoryRow | null {
@@ -58,9 +59,13 @@ export function dedupeHistoryForDisplay(rows: HistoryRow[], allEvents: EventRow[
   const eventById = new Map(allEvents.map((e) => [e.id, e]));
   const seenRacingResults = new Set<string>();
   const seenPromoBets = new Set<number>();
+  const obsoleteScoreTicks = new Set(
+    allEvents.flatMap((event) => obsoleteScoreHistoryDedupes(event))
+  );
   const out: HistoryRow[] = [];
 
   for (const row of rows) {
+    if (obsoleteScoreTicks.has(row.dedupe)) continue;
     if (row.kind === "free_bet_promo") {
       if (row.betId == null || seenPromoBets.has(row.betId)) continue;
       seenPromoBets.add(row.betId);

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { eventHistoryFacts, type EventHistorySource } from "./history-event-rows";
+import {
+  eventHistoryFacts,
+  obsoleteScoreHistoryDedupes,
+  type EventHistorySource,
+} from "./history-event-rows";
 
 function event(overrides: Partial<EventHistorySource> = {}): EventHistorySource {
   return {
@@ -59,6 +63,46 @@ describe("eventHistoryFacts", () => {
     expect(goals).toHaveLength(1);
     expect(goals[0]!.dedupe).toBe("score:9:4-0");
     expect(goals[0]!.detail).toBe("Stoke City 4-0 Charlton");
+  });
+
+  it("does not add Goal! for a scoreline the tape already named", () => {
+    const tape = JSON.stringify([
+      { kind: "goal", minute: 11, side: "home", player: "Josh King" },
+      { kind: "goal", minute: 35, side: "away", player: "Tyrick Mitchell" },
+      { kind: "goal", minute: 42, side: "home", player: "Cesar Palacios Perez" },
+    ]);
+    const facts = eventHistoryFacts(
+      event({
+        homeTeam: "Fulham",
+        awayTeam: "Crystal Palace",
+        homeScore: 2,
+        awayScore: 1,
+        minute: 43,
+        goals: tape,
+      }),
+      1
+    );
+    const goals = facts.filter((row) => row.kind === "goal");
+    expect(goals.map((row) => row.dedupe)).toEqual(["goal:9:0", "goal:9:1", "goal:9:2"]);
+    expect(goals.some((row) => row.title === "Goal!")).toBe(false);
+    expect(obsoleteScoreHistoryDedupes({ id: 9, goals: tape })).toEqual([
+      "score:9:1-0",
+      "score:9:1-1",
+      "score:9:2-1",
+    ]);
+  });
+
+  it("keeps the latest score tick only while the tape is still behind", () => {
+    const tape = JSON.stringify([
+      { kind: "goal", minute: 11, side: "home", player: "Josh King" },
+    ]);
+    const facts = eventHistoryFacts(
+      event({ homeScore: 2, awayScore: 1, minute: 43, goals: tape }),
+      1
+    );
+    const goals = facts.filter((row) => row.kind === "goal");
+    expect(goals.map((row) => row.dedupe)).toEqual(["goal:9:0", "score:9:2-1"]);
+    expect(obsoleteScoreHistoryDedupes({ id: 9, goals: tape })).toEqual(["score:9:1-0"]);
   });
 
   it("uses the clerk-scoped full-time key on the hosted desk", () => {

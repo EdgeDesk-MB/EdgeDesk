@@ -113,7 +113,7 @@ export function DashboardFeedPanel({
         prominent
         className="bg-page"
         titleHref="/history"
-        title="History feed"
+        title="Live feed"
         description="Goals, results and settlements."
         action={
           <ScrollFadeEdges

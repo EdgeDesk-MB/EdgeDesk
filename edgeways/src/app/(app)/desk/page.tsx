@@ -157,7 +157,7 @@ export default function DashboardPage() {
       ...(canDoNext
         ? [{ id: "plan", label: "Today's plan", node: <DailyPlan keepMounted /> }]
         : []),
-      { id: "feed", label: "History feed", node: <DashboardFeedPanel state={state} /> },
+      { id: "feed", label: "Live feed", node: <DashboardFeedPanel state={state} /> },
       ...(canDoNext && nextActions.length > 0
         ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
         : []),

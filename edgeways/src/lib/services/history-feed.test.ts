@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { EventRow, HistoryRow } from "@/lib/db/schema";
 
 const mockRun = vi.fn();
 const mockWhere = vi.fn(() => ({ run: mockRun }));
@@ -56,5 +57,42 @@ describe("purgeOrphanedBetHistory", () => {
     expect(removed).toBe(1);
     expect(mockDelete).toHaveBeenCalled();
     expect(mockRun).toHaveBeenCalled();
+  });
+});
+
+describe("dedupeHistoryForDisplay", () => {
+  it("drops nameless Goal! ticks once the tape covers that scoreline", async () => {
+    const { dedupeHistoryForDisplay } = await import("./history-feed");
+    const event = {
+      id: 9,
+      goals: JSON.stringify([
+        { kind: "goal", minute: 42, side: "home", player: "Cesar Palacios Perez" },
+      ]),
+    } as EventRow;
+    const named = {
+      id: 1,
+      dedupe: "goal:9:0",
+      kind: "goal",
+      title: "Goal: Cesar Palacios Perez!",
+      eventId: 9,
+    } as HistoryRow;
+    const leftover = {
+      id: 2,
+      dedupe: "score:9:1-0",
+      kind: "goal",
+      title: "Goal!",
+      eventId: 9,
+    } as HistoryRow;
+    const keptTick = {
+      id: 3,
+      dedupe: "score:9:2-1",
+      kind: "goal",
+      title: "Goal!",
+      eventId: 9,
+    } as HistoryRow;
+
+    expect(
+      dedupeHistoryForDisplay([named, leftover, keptTick], [event]).map((row) => row.dedupe)
+    ).toEqual(["goal:9:0", "score:9:2-1"]);
   });
 });

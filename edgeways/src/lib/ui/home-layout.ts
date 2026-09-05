@@ -13,7 +13,7 @@ export const HOME_WIDGET_LABELS: Record<HomeWidgetId, string> = {
   "do-next": "Do next",
   plan: "Today's plan",
   chart: "Chart",
-  feed: "History feed",
+  feed: "Live feed",
 };
 
 /**

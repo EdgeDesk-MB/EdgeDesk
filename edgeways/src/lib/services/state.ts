@@ -121,7 +121,10 @@ import {
   formatSettlementTitleWithFreeBet,
   historyInPlayPlacementMinute,
 } from "@/lib/history-display";
-import { eventHistoryFacts } from "@/lib/history-event-rows";
+import {
+  eventHistoryFacts,
+  obsoleteScoreHistoryDedupes,
+} from "@/lib/history-event-rows";
 import {
   autoResultLinkedLegs,
   legDueState,
@@ -545,6 +548,10 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
       };
       if (fact.write === "upsert") upsert(row);
       else put(row);
+    }
+    const staleScoreTicks = obsoleteScoreHistoryDedupes(event);
+    if (staleScoreTicks.length > 0) {
+      db.delete(history).where(inArray(history.dedupe, staleScoreTicks)).run();
     }
   }
 

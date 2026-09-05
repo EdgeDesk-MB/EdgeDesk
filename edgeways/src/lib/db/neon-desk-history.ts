@@ -4,13 +4,16 @@
  */
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
 import { toSqliteHistoryRow } from "@/lib/db/neon-desk-map";
 import { history as pgHistory } from "@/lib/db/schema.pg";
 import type { EventRow, HistoryRow } from "@/lib/db/schema";
-import { eventHistoryFacts } from "@/lib/history-event-rows";
+import {
+  eventHistoryFacts,
+  obsoleteScoreHistoryDedupes,
+} from "@/lib/history-event-rows";
 
 export async function listNeonDeskHistory(limit = 500): Promise<HistoryRow[]> {
   const clerkUserId = neonDeskClerkUserId();
@@ -113,7 +116,24 @@ export async function syncNeonDeskEventHistory(
       }
       seen.add(fact.dedupe);
     }
+    const staleScoreTicks = obsoleteScoreHistoryDedupes(event);
+    if (staleScoreTicks.length > 0) {
+      await purgeNeonDeskHistoryDedupes(staleScoreTicks, clerkUserId);
+    }
   }
+}
+
+/** Drop leftover nameless score ticks once the tape names that scoreline. */
+export async function purgeNeonDeskHistoryDedupes(
+  dedupes: string[],
+  clerkUserId = neonDeskClerkUserId()
+): Promise<void> {
+  if (!clerkUserId || dedupes.length === 0) return;
+  await getNeonDb()
+    .delete(pgHistory)
+    .where(
+      and(eq(pgHistory.clerkUserId, clerkUserId), inArray(pgHistory.dedupe, dedupes))
+    );
 }
 
 /** Edit a balance-correction note. Clerk-scoped. */
