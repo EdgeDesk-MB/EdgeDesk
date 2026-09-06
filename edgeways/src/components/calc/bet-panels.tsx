@@ -21,6 +21,7 @@ import {
   exchangeOddsStepHandlers,
   handleExchangeOddsInputEvent,
 } from "@/lib/calc/exchange-odds-step";
+import { stepByIncrement } from "@/lib/calc/money";
 import {
   commitLayStake,
   formatLayStake,
@@ -158,6 +159,7 @@ export function PanelInput({
   placeholder,
   inputClassName,
   exchangeOddsStepping,
+  incrementStepping,
   disabled,
   invalid,
   describedBy,
@@ -173,6 +175,8 @@ export function PanelInput({
   inputClassName?: string;
   /** Exchange lay-odds ladder for arrows / spinner. Typed prices stay. */
   exchangeOddsStepping?: boolean;
+  /** Arrow / wheel steps on this increment grid (from zero). Never below £0. */
+  incrementStepping?: number;
   disabled?: boolean;
   invalid?: boolean;
   describedBy?: string;
@@ -181,7 +185,26 @@ export function PanelInput({
     !disabled && exchangeOddsStepping
       ? exchangeOddsStepHandlers(value, onChange)
       : null;
-  const wheelRef = useNonPassiveWheel<HTMLInputElement>(exchangeStep?.onWheel);
+  const increment =
+    !disabled && incrementStepping != null && incrementStepping > 0
+      ? incrementStepping
+      : null;
+  function stepIncrement(direction: 1 | -1) {
+    if (increment == null) return;
+    const current = Number.isFinite(value) && value >= 0 ? value : 0;
+    onChange(stepByIncrement(current, increment, direction));
+  }
+  const incrementWheel =
+    increment != null
+      ? (e: { deltaY: number; preventDefault: () => void }) => {
+          if (e.deltaY === 0) return;
+          e.preventDefault();
+          stepIncrement(e.deltaY > 0 ? -1 : 1);
+        }
+      : null;
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>(
+    exchangeStep?.onWheel ?? incrementWheel
+  );
 
   return (
     <label className="flex flex-col gap-1">
@@ -196,7 +219,7 @@ export function PanelInput({
           ref={wheelRef}
           type="number"
           inputMode="decimal"
-          step={exchangeOddsStepping ? "any" : step}
+          step={exchangeOddsStepping ? "any" : increment ?? step}
           min={min}
           placeholder={placeholder}
           disabled={disabled}
@@ -208,7 +231,20 @@ export function PanelInput({
               ? handleExchangeOddsInputEvent(value, e, onChange)
               : onChange(parseFloat(e.target.value))
           }
-          onKeyDown={exchangeStep?.onKeyDown}
+          onKeyDown={(e) => {
+            if (exchangeStep) {
+              exchangeStep.onKeyDown(e);
+              return;
+            }
+            if (increment == null) return;
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              stepIncrement(1);
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              stepIncrement(-1);
+            }
+          }}
           className={cn(
             "h-11 w-full rounded-md border-0 bg-[var(--pi)] px-3 text-lg font-bold tabular-nums text-black/85 outline-none ring-primary/40 placeholder:text-base placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40",
             PANEL_TINT_TRANSITION,

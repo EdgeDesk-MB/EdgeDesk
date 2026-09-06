@@ -174,12 +174,18 @@
   /* DateTimePicker: calendar + time wheels (wider than the default 18rem popover). */
   --overlay-datetime-max: min(26rem, calc(100vw - var(--overlay-gutter)));
   /* Three-layer hierarchy: canvas (app shell) → page (main panel) → card (lifted blocks) */
-  --canvas: oklch(0.915 0.002 250);
-  /* Same lightness as before; chroma 0 so it reads white-neutral, not cool grey */
-  --page: oklch(0.942 0 0);
-  --surface: oklch(0.955 0 0);
+  --canvas: oklch(0.932 0.002 250);
+  /* Near-white page plate; chroma 0 so it reads white-neutral, not cool grey.
+   * --surface stays a step lighter so canvas → page → card still holds. */
+  --page: oklch(0.968 0 0);
+  --surface: oklch(0.982 0 0);
   --surface-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
   --page-shadow: 0 0 8px rgb(0 0 0 / 0.06), 0 0 2px rgb(0 0 0 / 0.03);
+  /* Floating dialog plate — drop + light hairline. Dark cannot share
+   * --page-shadow (that token is none). Face inset stays on ::after. */
+  --modal-shadow: 0 12px 36px rgb(0 0 0 / 0.14), 0 3px 10px rgb(0 0 0 / 0.07),
+    0 0 0 1px color-mix(in oklab, var(--border) 50%, transparent);
+  --modal-overlay-blur: 2px;
   /* Alert toasts — hover drop only (rest uses --page-shadow). No layout. */
   --toast-shadow-hover: 0 10px 28px rgb(0 0 0 / 0.14), 0 3px 8px rgb(0 0 0 / 0.08);
   /* Mobile quick-actions FAB — outer drop only (face stays --shadow-skeuo).
@@ -216,6 +222,9 @@
     inset 0 -1px 0 0 rgb(0 0 0 / 0.05),
     inset 0 0 0 1px rgb(0 0 0 / 0.06);
   --ew-surface-rim: 0 0 0 1px rgb(0 0 0 / 0.04);
+  /* Page panel: top/bottom catch only — no left/right boxy stroke */
+  --ew-page-panel-face: inset 0 1px 0 0 rgb(255 255 255 / 0.5),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.05);
   /* Selected StatTile face — a step above quiet surface-lift (campaign language) */
   --ew-stat-tile-selected-face: inset 0 1px 0 0 rgb(255 255 255 / 0.72),
     inset 0 -1px 0 0 rgb(0 0 0 / 0.08),
@@ -266,12 +275,12 @@
   --accent: oklch(0.965 0.002 250);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.48 0.22 27);
-  /* Loss / holding status — deeper brick, chroma in line with success/warning
-   * (was 0.245 and read neon on page white, especially large Racing Desk type). */
-  --negative: oklch(0.5 0.14 25);
+  /* Loss / holding status — price-tape red (CMC / exchange pair). 3:1 on page. */
+  --negative: oklch(0.62 0.205 25);
   --success: oklch(0.45 0.12 150);
-  /* P&L / “it paid” type. Distinct from --success (eligibility). AA on canvas. */
-  --profit: oklch(0.42 0.13 155);
+  /* P&L / “it paid” type. Price-tape green (CMC / exchange), not eligibility.
+   * 3:1 on page / canvas — brighter than AA type, distinct from --success. */
+  --profit: oklch(0.585 0.16 162);
   /* Type on solid `bg-profit` plates (Admin Activity casino FilterPill) */
   --profit-foreground: oklch(1 0 0);
   /* Dark enough for 12px titles on warning/10 washes (EDGE-32). */
@@ -304,8 +313,8 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --selection-subtle: oklch(0.965 0.002 250);
-  --selection-subdued: oklch(0.935 0.003 250);
+  --selection-subtle: oklch(0.988 0.002 250);
+  --selection-subdued: oklch(0.952 0.003 250);
   --selection-subtle-border: oklch(0.91 0 0);
   --selection-subdued-border: oklch(0.875 0 0);
   /* Interactive StatTile selected plate — white lift vs --surface */
@@ -402,6 +411,7 @@
   --surface: oklch(0.235 0.003 250);
   --surface-shadow: none;
   --page-shadow: none;
+  --modal-shadow: 0 18px 48px rgb(0 0 0 / 0.55), 0 6px 18px rgb(0 0 0 / 0.4);
   --toast-shadow-hover: 0 14px 40px rgb(0 0 0 / 0.55), 0 4px 14px rgb(0 0 0 / 0.4);
   --fab-shadow: 0 4px 18px rgb(0 0 0 / 0.55), 0 0 1px rgb(0 0 0 / 0.4);
   /* Dark plates: lighten edges (top + bottom shine), kept soft so faces
@@ -421,6 +431,9 @@
     inset 0 -1px 0 0 rgb(255 255 255 / 0.07),
     inset 0 0 0 1px rgb(255 255 255 / 0.08);
   --ew-surface-rim: 0 0 0 1px rgb(255 255 255 / 0.06);
+  /* Page panel: top/bottom catch only — no left/right boxy stroke */
+  --ew-page-panel-face: inset 0 1px 0 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 0 rgb(255 255 255 / 0.07);
   /* Selected StatTile face — between chip and do-next strength */
   --ew-stat-tile-selected-face: inset 0 1px 0 0 rgb(255 255 255 / 0.22),
     inset 0 -1px 0 0 rgb(255 255 255 / 0.12),
@@ -719,6 +732,35 @@ html[data-font="figtree"] {
   }
 
   /**
+   * Thin thumb painted over the content (no reserved gutter). Use when the
+   * list must meet the plate edge (match-events tape) but still show a bar.
+   */
+  .app-scroll-float {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.52 0 0 / 0.38) transparent;
+    scrollbar-gutter: auto;
+  }
+  .dark .app-scroll-float {
+    scrollbar-color: oklch(0.72 0 0 / 0.34) transparent;
+  }
+  .app-scroll-float::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .app-scroll-float::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .app-scroll-float::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: oklch(0.52 0 0 / 0.32);
+    background-clip: padding-box;
+  }
+  .dark .app-scroll-float::-webkit-scrollbar-thumb {
+    background-color: oklch(0.72 0 0 / 0.3);
+  }
+
+  /**
    * Mouse drag-to-pan. Scroller-only: do not select descendants here —
    * a `[data-ew-panning] *` rule restyles every card on gesture start
    * and hitches the first frame.
@@ -739,7 +781,8 @@ html[data-font="figtree"] {
   .page-panel {
     position: relative;
     background-color: var(--page);
-    box-shadow: var(--page-shadow), var(--ew-surface-rim);
+    /* Drop + top/bottom catch only. No rim — left/right of Home Summary stay open. */
+    box-shadow: var(--page-shadow);
     border-radius: var(--layout-page-radius);
     /* Clip section headers (e.g. Home Summary) so they follow the panel radius */
     overflow: hidden;
@@ -755,7 +798,7 @@ html[data-font="figtree"] {
     }
   }
   .dark .page-panel {
-    box-shadow: var(--ew-surface-rim);
+    box-shadow: none;
   }
 
   .surface-lift {
@@ -824,6 +867,11 @@ html[data-font="figtree"] {
     pointer-events: none;
     z-index: 1;
     box-shadow: var(--ew-surface-face);
+  }
+
+  /* Open left/right — keep only the top/bottom catch on the desk plate. */
+  .page-panel::after {
+    box-shadow: var(--ew-page-panel-face);
   }
 
   /* Selected summary tab — stronger glossy face (must follow quiet surface ::after). */
@@ -917,7 +965,7 @@ html[data-font="figtree"] {
   }
 
   .chart-bet-marker--win .chart-bet-marker__inner {
-    background-color: #059669;
+    background-color: var(--profit);
   }
 
   .dark .chart-bet-marker--win .chart-bet-marker__inner {
@@ -925,7 +973,7 @@ html[data-font="figtree"] {
   }
 
   .chart-bet-marker--loss .chart-bet-marker__inner {
-    background-color: #e7000b;
+    background-color: var(--negative);
   }
 
   .dark .chart-bet-marker--loss .chart-bet-marker__inner {
@@ -1093,7 +1141,12 @@ html[data-font="figtree"] {
    * Do NOT set position on .modal-surface — DialogContent uses `fixed`; a
    * relative override here knocked modals below the viewport.
    * ::after still anchors: `fixed` / other positioned ancestors create the CB.
+   * Outer drop is --modal-shadow (not --page-shadow: that is none in dark).
    */
+  .modal-surface {
+    box-shadow: var(--modal-shadow);
+  }
+
   .offer-campaign-card {
     position: relative;
   }
@@ -1342,6 +1395,19 @@ html[data-font="figtree"] {
  * the default `relative` (unlayered rules were winning and broke the FAB).
  */
 @layer components {
+  /* Dialog scrim — keep blur off the overlay node if it ever gains a transform. */
+  .dialog-overlay {
+    -webkit-backdrop-filter: blur(var(--modal-overlay-blur));
+    backdrop-filter: blur(var(--modal-overlay-blur));
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .dialog-overlay {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
   .skeuo {
     box-shadow: var(--shadow-skeuo);
   }
@@ -1824,22 +1890,16 @@ html[data-font="figtree"] {
   font-weight: inherit;
 }
 
-/* Match MoneyFlow signColor (emerald-600 / emerald-400 / --negative) on £ only. */
+/* Match MoneyFlow signColor (--profit / --negative) on £ only. */
 [data-sonner-toast].edge-alert-toast .edge-alert-toast-amount-positive {
-  color: #059669 !important; /* emerald-600 */
-}
-.dark [data-sonner-toast].edge-alert-toast .edge-alert-toast-amount-positive {
-  color: #34d399 !important; /* emerald-400 */
+  color: var(--profit) !important;
 }
 [data-sonner-toast].edge-alert-toast .edge-alert-toast-amount-negative {
   color: var(--negative) !important;
 }
 
 [data-sonner-toast].edge-alert-toast.edge-alert-toast--positive {
-  border-left-color: #059669 !important;
-}
-.dark [data-sonner-toast].edge-alert-toast.edge-alert-toast--positive {
-  border-left-color: #34d399 !important;
+  border-left-color: var(--profit) !important;
 }
 [data-sonner-toast].edge-alert-toast.edge-alert-toast--negative {
   border-left-color: var(--negative) !important;

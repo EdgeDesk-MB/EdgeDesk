@@ -105,6 +105,7 @@ export function isPublicAssetPath(pathname: string): boolean {
     return true;
   }
   if (pathname.startsWith("/brand/")) return true;
+  if (pathname === "/api/crest-lockup") return true;
   return false;
 }
 

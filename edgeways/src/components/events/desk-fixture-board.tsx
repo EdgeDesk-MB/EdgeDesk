@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useNow } from "@/hooks/use-now";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { FavouriteStar } from "@/components/events/favourite-star";
+import { HideScopeButton } from "@/components/events/hide-scope-button";
 import { FixtureScopeFilter } from "@/components/events/fixture-scope-filter";
+import { api, useAppState } from "@/hooks/use-app-state";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FilterPill } from "@/components/ui/filter-pill";
@@ -22,7 +26,10 @@ import { isWorldCupCompetition } from "@/lib/accounts/access";
 import { groupByDisplayDay } from "@/lib/events/fixture-day-groups";
 import {
   fixtureMatchesFootballScope,
+  footballScopeId,
   groupFootballByLeague,
+  sortFavouriteScopeIdsFirst,
+  toggleFavouriteScopeId,
 } from "@/lib/events/fixture-scope";
 import { competitionFlagIso } from "@/lib/geo/competition";
 import { toIsoCountryCode, racingRegionLabel } from "@/lib/geo/region";
@@ -32,6 +39,7 @@ import { formatClockTime } from "@/lib/time-format";
 import {
   captionHeading,
   deskInsetX,
+  favouriteStarIconOnBrandPlate,
   filterPillCountState,
   filterPillGroup,
   listDaySectionContentNested,
@@ -41,7 +49,7 @@ import {
   sectionTitle,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Flame, ChevronDown, NotebookPen, Plus } from "lucide-react";
+import { CalendarDays, Flame, ChevronDown, NotebookPen, Plus, Star } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
 
 export type FixtureStatusFilter = "all" | "live" | "scheduled";
@@ -62,17 +70,45 @@ function fixtureBoardEmptyCopy(
   emptyDescription: string,
   loadFailed?: boolean,
   scopeLabel?: string | null,
+  favouritesOnly?: boolean,
+  hasFavouritePins?: boolean,
+  hasHiddenPins?: boolean,
 ) {
   if (loadFailed) return { title: emptyTitle, description: emptyDescription };
+  if (favouritesOnly && !hasFavouritePins) {
+    return {
+      title:
+        sport === "horse_racing" ? "No saved courses" : "No saved competitions",
+      description:
+        sport === "horse_racing"
+          ? "Star a course to pin it here. Saved courses stay on this desk."
+          : "Star a competition to pin it here. Saved competitions stay on this desk.",
+    };
+  }
+  if (hasHiddenPins && !scopeLabel && !favouritesOnly && statusFilter === "all") {
+    return {
+      title:
+        sport === "horse_racing" ? "No courses to show" : "No competitions to show",
+      description:
+        sport === "horse_racing"
+          ? "Hidden courses are under Hidden in All courses."
+          : "Hidden competitions are under Hidden in All competitions.",
+    };
+  }
   const scoped =
     scopeLabel
       ? sport === "horse_racing"
         ? ` at ${scopeLabel}`
         : ` in ${scopeLabel}`
-      : "";
-  const clearHint = scopeLabel
-    ? "Nothing matches this filter. Show all, or try another status."
-    : null;
+      : favouritesOnly
+        ? sport === "horse_racing"
+          ? " in Saved"
+          : " in Saved"
+        : "";
+  const clearHint =
+    scopeLabel || favouritesOnly
+      ? "Nothing matches this filter. Show all, or try another status."
+      : null;
   if (statusFilter === "live") {
     return {
       title: sport === "horse_racing" ? `No live races${scoped}` : `No live fixtures${scoped}`,
@@ -227,31 +263,48 @@ const sectionBody = "bg-selection-subtle dark:bg-transparent";
 function CollapsibleSectionHeader({
   open,
   onToggle,
+  leading,
+  trailing,
   children,
 }: {
   open: boolean;
   onToggle: () => void;
+  leading?: ReactNode;
+  trailing?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
+    <div
       className={cn(
         sectionHeaderBar,
-        "flex w-full cursor-pointer items-center justify-between gap-2 text-left transition-colors hover:bg-muted dark:hover:bg-selection-subtle"
+        "flex w-full items-center gap-0.5 transition-colors hover:bg-muted dark:hover:bg-selection-subtle"
       )}
     >
-      <div className="min-w-0 flex-1">{children}</div>
-      <ChevronDown
-        className={cn(
-          "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-          open && "rotate-180"
-        )}
-        aria-hidden
-      />
-    </button>
+      {leading}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="min-w-0 flex-1 cursor-pointer py-0 text-left"
+      >
+        <div className="min-w-0">{children}</div>
+      </button>
+      {trailing}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={open ? "Collapse section" : "Expand section"}
+        className="flex shrink-0 cursor-pointer items-center py-0"
+      >
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+            open && "rotate-180"
+          )}
+          aria-hidden
+        />
+      </button>
+    </div>
   );
 }
 
@@ -301,6 +354,10 @@ function FootballCompetitionSection({
   onTrackAndBet,
   onEpDesk,
   displayTimezone,
+  favourite,
+  onToggleFavourite,
+  hidden,
+  onToggleHidden,
 }: {
   scopeId: string;
   competition: string;
@@ -313,6 +370,10 @@ function FootballCompetitionSection({
   onTrackAndBet: (fixture: Fixture) => void;
   onEpDesk: (fixture: Fixture) => void;
   displayTimezone: string;
+  favourite: boolean;
+  onToggleFavourite: () => void;
+  hidden: boolean;
+  onToggleHidden: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const now = useNow(30_000);
@@ -320,14 +381,25 @@ function FootballCompetitionSection({
 
   return (
     <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
-      <CollapsibleSectionHeader open={open} onToggle={() => setOpen((v) => !v)}>
+      <CollapsibleSectionHeader
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        leading={
+          <FavouriteStar favourite={favourite} label={label} onToggle={onToggleFavourite} />
+        }
+        trailing={
+          hidden || !favourite ? (
+            <HideScopeButton hidden={hidden} label={label} onToggle={onToggleHidden} />
+          ) : null
+        }
+      >
         <p className={cn(sectionTitle, "flex items-center gap-1.5")}>
           <CompetitionHeaderIcon
             competition={competition}
             leagueFlag={leagueFlag}
             leagueCountry={leagueCountry}
           />
-          <span>{label}</span>
+          <span className="min-w-0 truncate">{label}</span>
         </p>
       </CollapsibleSectionHeader>
       {open ? (
@@ -409,6 +481,10 @@ function RacingCourseSection({
   onTrack,
   onTrackAndBet,
   displayTimezone,
+  favourite,
+  onToggleFavourite,
+  hidden,
+  onToggleHidden,
 }: {
   course: string;
   region?: string;
@@ -417,6 +493,10 @@ function RacingCourseSection({
   onTrack: (race: RacingFixture) => void;
   onTrackAndBet: (race: RacingFixture) => void;
   displayTimezone: string;
+  favourite: boolean;
+  onToggleFavourite: () => void;
+  hidden: boolean;
+  onToggleHidden: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const now = useNow(30_000);
@@ -427,14 +507,25 @@ function RacingCourseSection({
 
   return (
     <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
-      <CollapsibleSectionHeader open={open} onToggle={() => setOpen((v) => !v)}>
+      <CollapsibleSectionHeader
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        leading={
+          <FavouriteStar favourite={favourite} label={course} onToggle={onToggleFavourite} />
+        }
+        trailing={
+          hidden || !favourite ? (
+            <HideScopeButton hidden={hidden} label={course} onToggle={onToggleHidden} />
+          ) : null
+        }
+      >
         <p className={cn(captionHeading, "flex items-center gap-1.5 text-foreground")}>
           {hasRegionFlag ? (
             <RegionFlag code={region} size="md" />
           ) : (
             <SportIcon sport="horse_racing" size={16} className="text-muted-foreground" />
           )}
-          <span>
+          <span className="min-w-0 truncate">
             {racingRegionLabel(region).toUpperCase()}: {course.toUpperCase()}
           </span>
         </p>
@@ -536,13 +627,105 @@ export function DeskFixtureBoard({
   displayTimezone?: string;
   emptyCompact?: boolean;
 }) {
+  const { state, applyLocalSettingsPatch } = useAppState();
   const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>("all");
   const [scopeFilter, setScopeFilter] = useState("all");
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const settingsFavouriteIds =
+    sport === "football"
+      ? state?.settings.favouriteFootballScopes ?? []
+      : state?.settings.favouriteRacingCourses ?? [];
+  const settingsHiddenIds =
+    sport === "football"
+      ? state?.settings.hiddenFootballScopes ?? []
+      : state?.settings.hiddenRacingCourses ?? [];
+  const [favouriteIds, setFavouriteIds] = useState<string[]>(settingsFavouriteIds);
+  const [hiddenIds, setHiddenIds] = useState<string[]>(settingsHiddenIds);
 
   const [prevSport, setPrevSport] = useState(sport);
   if (prevSport !== sport) {
     setPrevSport(sport);
     setScopeFilter("all");
+  }
+
+  const settingsFavouriteKey = settingsFavouriteIds.join("\0");
+  const settingsHiddenKey = settingsHiddenIds.join("\0");
+  useEffect(() => {
+    setFavouriteIds(settingsFavouriteKey ? settingsFavouriteKey.split("\0") : []);
+  }, [settingsFavouriteKey]);
+  useEffect(() => {
+    setHiddenIds(settingsHiddenKey ? settingsHiddenKey.split("\0") : []);
+  }, [settingsHiddenKey]);
+
+  const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+
+  async function persistFavourites(next: string[]) {
+    const previous = favouriteIds;
+    setFavouriteIds(next);
+    const json =
+      sport === "football"
+        ? { favouriteFootballScopes: next }
+        : { favouriteRacingCourses: next };
+    applyLocalSettingsPatch(json);
+    try {
+      await api("/api/settings", { method: "PATCH", json });
+    } catch (error) {
+      setFavouriteIds(previous);
+      applyLocalSettingsPatch(
+        sport === "football"
+          ? { favouriteFootballScopes: previous }
+          : { favouriteRacingCourses: previous }
+      );
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("look at the desk")) return;
+      toast.error(
+        sport === "football"
+          ? "Could not update saved competitions"
+          : "Could not update saved courses"
+      );
+    }
+  }
+
+  function toggleFavourite(id: string) {
+    void persistFavourites(toggleFavouriteScopeId(favouriteIds, id));
+  }
+
+  async function persistHidden(next: string[]) {
+    const previous = hiddenIds;
+    setHiddenIds(next);
+    const json =
+      sport === "football"
+        ? { hiddenFootballScopes: next }
+        : { hiddenRacingCourses: next };
+    applyLocalSettingsPatch(json);
+    try {
+      await api("/api/settings", { method: "PATCH", json });
+    } catch (error) {
+      setHiddenIds(previous);
+      applyLocalSettingsPatch(
+        sport === "football"
+          ? { hiddenFootballScopes: previous }
+          : { hiddenRacingCourses: previous }
+      );
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("look at the desk")) return;
+      toast.error(
+        sport === "football"
+          ? "Could not update hidden competitions"
+          : "Could not update hidden courses"
+      );
+    }
+  }
+
+  function toggleHidden(id: string) {
+    const next = toggleFavouriteScopeId(hiddenIds, id);
+    if (scopeFilter === id && next.includes(id)) setScopeFilter("all");
+    void persistHidden(next);
+  }
+
+  function changeScope(id: string) {
+    setScopeFilter(id);
   }
 
   const filteredFootball = useMemo(
@@ -554,78 +737,105 @@ export function DeskFixtureBoard({
     [racing, statusFilter]
   );
 
-  const footballScopeOptions = useMemo(
-    () =>
-      groupFootballByLeague(football)
-        .map((group) => ({
-          id: group.id,
-          label: group.label,
-          name: group.competition,
-          country: group.leagueCountry,
-          count: group.fixtures.filter((f) => matchesStatusFilter(f.status, statusFilter))
-            .length,
-          icon: (
-            <CompetitionHeaderIcon
-              competition={group.competition}
-              leagueFlag={group.leagueFlag}
-              leagueCountry={group.leagueCountry}
-              size="sm"
-            />
-          ),
-        }))
-        .filter((option) => option.count > 0 || option.id === scopeFilter),
-    [football, statusFilter, scopeFilter]
-  );
-  const racingScopeOptions = useMemo(
-    () =>
-      groupRacesByCourse(racing)
-        .map((group) => ({
-          id: group.course,
-          label: group.course,
-          name: group.course,
-          count: group.races.filter((r) => matchesStatusFilter(r.status, statusFilter)).length,
-          icon: toIsoCountryCode(group.region) ? (
-            <RegionFlag code={group.region} size="sm" />
-          ) : (
-            <SportIcon sport="horse_racing" size={14} className="text-muted-foreground" />
-          ),
-        }))
-        .filter((option) => option.count > 0 || option.id === scopeFilter),
-    [racing, statusFilter, scopeFilter]
-  );
+  const footballScopeOptions = useMemo(() => {
+    const options = groupFootballByLeague(football)
+      .map((group) => ({
+        id: group.id,
+        label: group.label,
+        name: group.competition,
+        country: group.leagueCountry,
+        count: group.fixtures.filter((f) => matchesStatusFilter(f.status, statusFilter))
+          .length,
+        icon: (
+          <CompetitionHeaderIcon
+            competition={group.competition}
+            leagueFlag={group.leagueFlag}
+            leagueCountry={group.leagueCountry}
+            size="sm"
+          />
+        ),
+      }))
+      .filter((option) => option.count > 0 || option.id === scopeFilter);
+    return sortFavouriteScopeIdsFirst(options, favouriteSet);
+  }, [football, statusFilter, scopeFilter, favouriteSet]);
+  const racingScopeOptions = useMemo(() => {
+    const options = groupRacesByCourse(racing)
+      .map((group) => ({
+        id: group.course,
+        label: group.course,
+        name: group.course,
+        count: group.races.filter((r) => matchesStatusFilter(r.status, statusFilter)).length,
+        icon: toIsoCountryCode(group.region) ? (
+          <RegionFlag code={group.region} size="sm" />
+        ) : (
+          <SportIcon sport="horse_racing" size={14} className="text-muted-foreground" />
+        ),
+      }))
+      .filter((option) => option.count > 0 || option.id === scopeFilter);
+    return sortFavouriteScopeIdsFirst(options, favouriteSet);
+  }, [racing, statusFilter, scopeFilter, favouriteSet]);
   const scopeOptions = sport === "football" ? footballScopeOptions : racingScopeOptions;
 
-  const scopedFootball = useMemo(
-    () =>
+  const scopedFootball = useMemo(() => {
+    const scoped =
       scopeFilter === "all"
         ? filteredFootball
-        : filteredFootball.filter((f) => fixtureMatchesFootballScope(f, scopeFilter)),
-    [filteredFootball, scopeFilter]
-  );
-  const scopedRacing = useMemo(
-    () =>
+        : filteredFootball.filter((f) => fixtureMatchesFootballScope(f, scopeFilter));
+    if (!favouritesOnly) {
+      if (scopeFilter !== "all") return scoped;
+      return scoped.filter(
+        (f) => !hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
+      );
+    }
+    return scoped.filter((f) =>
+      favouriteSet.has(footballScopeId(f.competition, f.leagueCountry))
+    );
+  }, [filteredFootball, scopeFilter, favouritesOnly, favouriteSet, hiddenSet]);
+  const scopedRacing = useMemo(() => {
+    const scoped =
       scopeFilter === "all"
         ? filteredRacing
-        : filteredRacing.filter((r) => r.course === scopeFilter),
-    [filteredRacing, scopeFilter]
-  );
+        : filteredRacing.filter((r) => r.course === scopeFilter);
+    if (!favouritesOnly) {
+      if (scopeFilter !== "all") return scoped;
+      return scoped.filter((r) => !hiddenSet.has(r.course));
+    }
+    return scoped.filter((r) => favouriteSet.has(r.course));
+  }, [filteredRacing, scopeFilter, favouritesOnly, favouriteSet, hiddenSet]);
 
   const footballGroups = useMemo(
     () =>
-      groupFootballByLeague(scopedFootball, football).map((group) => ({
-        ...group,
-        fixtures: sortFixturesByKickoff(group.fixtures),
-      })),
-    [scopedFootball, football]
+      sortFavouriteScopeIdsFirst(
+        groupFootballByLeague(scopedFootball, football).map((group) => ({
+          ...group,
+          fixtures: sortFixturesByKickoff(group.fixtures),
+        })),
+        favouriteSet
+      ),
+    [scopedFootball, football, favouriteSet]
   );
-  const racingGroups = useMemo(() => groupRacesByCourse(scopedRacing), [scopedRacing]);
+  const racingGroups = useMemo(
+    () =>
+      sortFavouriteScopeIdsFirst(
+        groupRacesByCourse(scopedRacing).map((group) => ({
+          ...group,
+          id: group.course,
+        })),
+        favouriteSet
+      ),
+    [scopedRacing, favouriteSet]
+  );
 
   const scopedSourceFootball =
     scopeFilter === "all"
-      ? football
+      ? football.filter(
+          (f) => !hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
+        )
       : football.filter((f) => fixtureMatchesFootballScope(f, scopeFilter));
   const scopedSourceRacing =
-    scopeFilter === "all" ? racing : racing.filter((r) => r.course === scopeFilter);
+    scopeFilter === "all"
+      ? racing.filter((r) => !hiddenSet.has(r.course))
+      : racing.filter((r) => r.course === scopeFilter);
 
   const liveCount =
     sport === "football"
@@ -657,21 +867,39 @@ export function DeskFixtureBoard({
     emptyDescription,
     loadFailed,
     scopeLabel,
+    favouritesOnly,
+    favouriteSet.size > 0,
+    hiddenSet.size > 0 &&
+      (sport === "football" ? football.length > 0 : racing.length > 0) &&
+      (sport === "football"
+        ? football.some((f) =>
+            hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
+          )
+        : racing.some((r) => hiddenSet.has(r.course))),
   );
+  const favouriteFixtureCount =
+    sport === "football"
+      ? football.filter((f) =>
+          favouriteSet.has(footballScopeId(f.competition, f.leagueCountry))
+        ).length
+      : racing.filter((r) => favouriteSet.has(r.course)).length;
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-start gap-4 sm:justify-between">
-          <div className={filterPillGroup} role="group" aria-label="Fixture status">
+          <div className={filterPillGroup} role="group" aria-label="Fixture filters">
             {statusFilters.map((f) => {
-              const active = statusFilter === f.id;
+              const active = !favouritesOnly && statusFilter === f.id;
               const hasCount = f.id !== "all";
-              return (
+              const pill = (
                 <FilterPill
                   key={f.id}
                   active={active}
-                  onClick={() => setStatusFilter(f.id)}
+                  onClick={() => {
+                    setFavouritesOnly(false);
+                    setStatusFilter(f.id);
+                  }}
                   hasCount={hasCount}
                 >
                   {f.label}
@@ -680,15 +908,44 @@ export function DeskFixtureBoard({
                   ) : null}
                 </FilterPill>
               );
+              if (f.id !== "all") return pill;
+              return (
+                <Fragment key="after-all">
+                  {pill}
+                  <FilterPill
+                    active={favouritesOnly}
+                    onClick={() => {
+                      setFavouritesOnly(true);
+                      setStatusFilter("all");
+                    }}
+                    hasCount
+                  >
+                    <Star
+                      aria-hidden
+                      className={favouriteStarIconOnBrandPlate(favouritesOnly)}
+                    />
+                    Saved
+                    <span className={filterPillCountState(favouritesOnly)}>
+                      {favouriteFixtureCount}
+                    </span>
+                  </FilterPill>
+                </Fragment>
+              );
             })}
           </div>
-          <FixtureScopeFilter
-            sport={sport}
-            options={scopeOptions}
-            value={scopeFilter}
-            onChange={setScopeFilter}
-            disabled={loading && scopeOptions.length === 0}
-          />
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+            <FixtureScopeFilter
+              sport={sport}
+              options={scopeOptions}
+              value={scopeFilter}
+              onChange={changeScope}
+              favouriteIds={favouriteSet}
+              hiddenIds={hiddenSet}
+              onToggleFavourite={toggleFavourite}
+              onToggleHidden={toggleHidden}
+              disabled={loading && scopeOptions.length === 0}
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -709,13 +966,16 @@ export function DeskFixtureBoard({
             title={emptyCopy.title}
             description={emptyCopy.description}
             action={
-              scopeFilter !== "all"
+              scopeFilter !== "all" || favouritesOnly
                 ? {
                     label:
                       sport === "football"
                         ? "Show all competitions"
                         : "Show all courses",
-                    onClick: () => setScopeFilter("all"),
+                    onClick: () => {
+                      setFavouritesOnly(false);
+                      setScopeFilter("all");
+                    },
                   }
                 : undefined
             }
@@ -736,6 +996,10 @@ export function DeskFixtureBoard({
                 onTrackAndBet={onTrackAndBetFixture}
                 onEpDesk={onEpDesk}
                 displayTimezone={displayTimezone}
+                favourite={favouriteSet.has(group.id)}
+                onToggleFavourite={() => toggleFavourite(group.id)}
+                hidden={hiddenSet.has(group.id)}
+                onToggleHidden={() => toggleHidden(group.id)}
               />
             ))}
           </div>
@@ -751,6 +1015,10 @@ export function DeskFixtureBoard({
                 onTrack={onTrackRace}
                 onTrackAndBet={onTrackAndBetRace}
                 displayTimezone={displayTimezone}
+                favourite={favouriteSet.has(group.course)}
+                onToggleFavourite={() => toggleFavourite(group.course)}
+                hidden={hiddenSet.has(group.course)}
+                onToggleHidden={() => toggleHidden(group.course)}
               />
             ))}
           </div>

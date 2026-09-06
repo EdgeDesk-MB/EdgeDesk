@@ -42,7 +42,7 @@ export const FEATURE_LOCK_BODIES: Record<FeatureFlag, string> = {
   offers_pipeline:
     "Track bookie offers as campaigns. Qualifiers through to free bet payouts.",
   do_next:
-    "Ranked work for today, Daily Plan, and Edge Report on what you kept.",
+    "Ranked work for today, and Edge Report on what you kept.",
   acca_desk:
     "Run accumulator offers one leg at a time, with a lay when that selection is due.",
   bet_builder_desk:

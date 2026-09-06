@@ -9,7 +9,11 @@ import { ReleasesPanel } from "@/components/admin/releases-panel";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { buildFlagShare } from "@/lib/admin/activity-charts";
 import { loadFlagsOverview } from "@/lib/admin/flags";
-import { readMaintenanceBanner } from "@/lib/admin/operator-settings";
+import {
+  readAppUpdateSettings,
+  readMaintenanceBanner,
+} from "@/lib/admin/operator-settings";
+import { getOperatorChromeEnv } from "@/lib/admin/operator-chrome-env";
 import { getLandingVariant, getSiteSurface } from "@/lib/site-surface";
 import { surfaceLift } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -37,9 +41,11 @@ function deployIdentity() {
 }
 
 export default async function AdminReleasesPage() {
-  const [flags, banner] = await Promise.all([
+  const chromeEnv = getOperatorChromeEnv();
+  const [flags, banner, update] = await Promise.all([
     loadFlagsOverview(),
     readMaintenanceBanner(),
+    readAppUpdateSettings(),
   ]);
   const flagsOn = flags.flags.filter((flag) => flag.active).length;
   const flagShare = buildFlagShare(flagsOn, flags.flags.length - flagsOn);
@@ -50,12 +56,18 @@ export default async function AdminReleasesPage() {
     { label: "Desk surface", value: surface === "app" ? "App" : "Waitlist", on: surface === "app" },
     { label: "Landing", value: landing === "launch" ? "Launch" : "Waitlist", on: landing === "launch" },
     { label: "Stripe live", value: envSet("STRIPE_SECRET_KEY") ? (process.env.STRIPE_SECRET_KEY!.startsWith("sk_live_") ? "Live" : "Test") : "Unset", on: process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ?? false },
-    { label: "Banner", value: banner.enabled ? "On" : "Off", on: banner.enabled },
+    { label: "Site banner", value: banner.enabled ? "On" : "Off", on: banner.enabled },
+    {
+      label: "App update",
+      value: update.mode === "auto" ? "Auto" : update.mode === "force" ? "Force" : "Off",
+      on: update.mode !== "off",
+      tone: update.mode === "force" ? ("warning" as const) : undefined,
+    },
   ];
   return (
     <AdminPage
       title="Releases"
-      description="Flags and the site banner."
+      description="Flags, the site banner, and app update. Saves stay on this environment."
       icon={Flag}
     >
       <AdminSection title="This deploy">
@@ -95,18 +107,24 @@ export default async function AdminReleasesPage() {
         </dl>
       </AdminSection>
 
-      <StatStrip columns={3}>
+      <StatStrip columns={4}>
         <StatTile
           label="Flags"
           value={String(flags.flags.length)}
           sub={`${flagsOn} on`}
         />
-        <StatTile label="Banner" value={banner.enabled ? "On" : "Off"} />
+        <StatTile label="Site banner" value={banner.enabled ? "On" : "Off"} />
+        <StatTile
+          label="App update"
+          value={update.mode === "auto" ? "Auto" : update.mode === "force" ? "Force" : "Off"}
+        />
         <StatTile label="PostHog" value={flags.configured ? "Linked" : "Unset"} />
       </StatStrip>
       <AdminSection title="Launch state">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {launchToggles.map((toggle) => (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {launchToggles.map((toggle) => {
+            const onTone = toggle.tone === "warning" ? "warning" : "success";
+            return (
             <div
               key={toggle.label}
               className={cn(surfaceLift, "flex items-center justify-between gap-3 rounded-lg border border-transparent px-4 py-3")}
@@ -115,14 +133,28 @@ export default async function AdminReleasesPage() {
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 text-sm font-semibold",
-                  toggle.on ? "text-profit" : "text-muted-foreground"
+                  toggle.on
+                    ? onTone === "warning"
+                      ? "text-warning"
+                      : "text-success"
+                    : "text-muted-foreground"
                 )}
               >
-                <span className={cn("size-1.5 rounded-full", toggle.on ? "bg-profit" : "bg-muted-foreground/50")} />
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    toggle.on
+                      ? onTone === "warning"
+                        ? "bg-warning"
+                        : "bg-success"
+                      : "bg-muted-foreground/50"
+                  )}
+                />
                 {toggle.value}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </AdminSection>
 
@@ -134,7 +166,12 @@ export default async function AdminReleasesPage() {
           <AdminDonutChart slices={flagShare} label="Flag state" />
         </AdminChartCard>
       ) : null}
-      <ReleasesPanel flags={flags} banner={banner} />
+      <ReleasesPanel
+        flags={flags}
+        banner={banner}
+        update={update}
+        chromeEnv={chromeEnv}
+      />
     </AdminPage>
   );
 }

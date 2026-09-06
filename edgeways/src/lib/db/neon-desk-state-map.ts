@@ -35,6 +35,10 @@ import type {
   SystemRunRow,
 } from "@/lib/db/schema";
 import type { AppState } from "@/lib/services/state.types";
+import { dedupeHistoryForDisplay } from "@/lib/history-feed-display";
+
+/** Same window as local `getHistoryFeed({ limit: 40 })` on Home. */
+const HOME_HISTORY_LIMIT = 40;
 
 export type NeonDeskSnapshot = {
   bets: BetRow[];
@@ -213,9 +217,9 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     freeBetBalanceByAccountFromTransactions(accounts, transactions)
   );
 
-  const history = [...historyRows].sort(
-    (a, b) => b.createdAt - a.createdAt || b.id - a.id
-  );
+  const history = dedupeHistoryForDisplay(historyRows, input.events ?? [])
+    .sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
+    .slice(0, HOME_HISTORY_LIMIT);
 
   const derived = hostedEventDerivations(input.events ?? [], bets, offers);
 

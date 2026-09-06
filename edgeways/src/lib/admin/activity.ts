@@ -1,5 +1,5 @@
 import "server-only";
-import { and, gte, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNotNull, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import {
   emptyActivityDaily,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/admin/activity-mix";
 import { SERIES_COMPARE_DAYS } from "@/lib/admin/series";
 import { getNeonDb } from "@/lib/db/neon";
-import { bets, offers, casinoOffers } from "@/lib/db/schema.pg";
+import { bets, casinoOffers, events, offers } from "@/lib/db/schema.pg";
 import { listAppUsers, type AdminUserRow } from "@/lib/services/app-users";
 
 export type DeskActivityRow = {
@@ -131,6 +131,35 @@ async function countsByUserKey(
 const unsetText = (column: PgColumn) =>
   sql<string>`coalesce(nullif(btrim(${column}), ''), 'unset')`;
 
+/** Keep in step with `resolveActivitySport` in activity-mix.ts. */
+const resolvedBetSport = sql<string>`coalesce(
+  nullif(btrim(${events.sport}), ''),
+  nullif(btrim(${bets.sport}), ''),
+  nullif(btrim(${offers.sport}), ''),
+  case
+    when ${bets.market} in ('win', 'place', 'each_way', 'extra_place') then 'horse_racing'
+    when ${bets.market} in ('match_winner', 'set_betting') then 'tennis'
+    when ${bets.market} in ('outright', 'top_finish') then 'golf'
+    else 'football'
+  end
+)`;
+
+async function countsByResolvedBetSport(): Promise<ActivityKeyedCount[]> {
+  const db = getNeonDb();
+  const rows = await db
+    .select({
+      clerkUserId: bets.clerkUserId,
+      key: resolvedBetSport,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(bets)
+    .leftJoin(events, eq(bets.eventId, events.id))
+    .leftJoin(offers, eq(bets.offerId, offers.id))
+    .where(isNotNull(bets.clerkUserId))
+    .groupBy(bets.clerkUserId, resolvedBetSport);
+  return keyedCounts(rows);
+}
+
 async function loadActivityMix(): Promise<ActivityMix> {
   const [
     betTypes,
@@ -149,7 +178,7 @@ async function loadActivityMix(): Promise<ActivityMix> {
     casinoStatuses,
   ] = await Promise.all([
     countsByUserKey(bets, bets.clerkUserId, bets.betType),
-    countsByUserKey(bets, bets.clerkUserId, unsetText(bets.sport)),
+    countsByResolvedBetSport(),
     countsByUserKey(bets, bets.clerkUserId, bets.status),
     countsByUserKey(
       bets,

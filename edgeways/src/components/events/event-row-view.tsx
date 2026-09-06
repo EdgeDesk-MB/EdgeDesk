@@ -24,9 +24,7 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import type { BetRow, EventRow } from "@/lib/db/schema";
-import { FootballLiveMeta } from "@/components/events/match-tape";
-import { useAppState } from "@/hooks/use-app-state";
-import { canDesk } from "@/lib/entitlements/effective-plan";
+import { FootballLiveTapeDialog } from "@/components/events/match-tape";
 import {
   parseRaceResults,
   isRaceResultIncomplete,
@@ -79,10 +77,10 @@ export function EventRowView({
   resultDialogOpen?: boolean;
   onResultDialogOpenChange?: (open: boolean) => void;
 }) {
-  const { state } = useAppState();
-  const showFootballLive = canDesk(state?.settings, "football_live_feeds");
+  const [tapeOpen, setTapeOpen] = useState(false);
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
+  const canOpenTape = !isRacing;
   const status = effectiveEventStatus(event);
   const live = status === "live";
   const now = useNow(60_000);
@@ -97,8 +95,28 @@ export function EventRowView({
     <TableRow
       id={`tracked-event-${event.id}`}
       data-state={resultDialogOpen ? "selected" : undefined}
+      className={canOpenTape ? "cursor-pointer" : undefined}
+      onClick={
+        canOpenTape
+          ? (e) => {
+              if ((e.target as HTMLElement).closest("a, button, input, [role='switch']")) {
+                return;
+              }
+              setTapeOpen(true);
+            }
+          : undefined
+      }
     >
       <TableCell>
+        {canOpenTape ? (
+          <button
+            type="button"
+            className="sr-only"
+            onClick={() => setTapeOpen(true)}
+          >
+            Open match events for {event.homeTeam} v {event.awayTeam}
+          </button>
+        ) : null}
         <SportEventBlock
           sport={event.sport}
           title={isRacing ? formatRacingEventTitle(event) : `${event.homeTeam} v ${event.awayTeam}`}
@@ -128,6 +146,7 @@ export function EventRowView({
           {betCount > 0 ? (
             <Link
               href={betsHref}
+              onClick={(e) => e.stopPropagation()}
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-text underline-offset-2 hover:underline"
             >
               <span>
@@ -160,7 +179,6 @@ export function EventRowView({
                 </div>
               );
             })}
-          {!isRacing && showFootballLive ? <FootballLiveMeta event={event} /> : null}
         </SportEventBlock>
       </TableCell>
       <TableCell>
@@ -226,8 +244,15 @@ export function EventRowView({
           <span className="text-sm text-muted-foreground">–</span>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-end gap-1">
+          {canOpenTape ? (
+            <FootballLiveTapeDialog
+              event={event}
+              open={tapeOpen}
+              onOpenChange={setTapeOpen}
+            />
+          ) : null}
           {isRacing && (
             <RacingPlacingsDialog
               event={event}

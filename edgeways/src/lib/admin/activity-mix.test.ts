@@ -6,6 +6,9 @@ import {
   buildActivityMixCharts,
   emptyActivityMix,
   filterActivityMix,
+  leadingSportByUser,
+  resolveActivitySport,
+  sportDeskRows,
   type ActivityKeyedCount,
 } from "@/lib/admin/activity-mix";
 
@@ -22,6 +25,40 @@ describe("activity mix labels", () => {
     expect(activitySportLabel(ACTIVITY_UNSET_KEY)).toBe("Not set");
     expect(activitySportLabel("horse_racing")).toBe("Horse racing");
     expect(activitySportLabel("sports")).toBe("Sports");
+  });
+
+  it("resolves sport from event, then bet, then offer, then market", () => {
+    expect(
+      resolveActivitySport({
+        eventSport: "football",
+        betSport: "horse_racing",
+        offerSport: "cricket",
+        market: "win",
+      })
+    ).toBe("football");
+    expect(
+      resolveActivitySport({
+        eventSport: "  ",
+        betSport: "horse_racing",
+        offerSport: "cricket",
+      })
+    ).toBe("horse_racing");
+    expect(
+      resolveActivitySport({
+        offerSport: "cricket",
+        market: "match_winner",
+      })
+    ).toBe("cricket");
+    expect(resolveActivitySport({ market: "win" })).toBe("horse_racing");
+    expect(resolveActivitySport({ market: "match_odds" })).toBe("football");
+    expect(resolveActivitySport({ market: "set_betting" })).toBe("tennis");
+    expect(resolveActivitySport({})).toBe(ACTIVITY_UNSET_KEY);
+  });
+
+  it("keeps unknown stored sport ids", () => {
+    expect(resolveActivitySport({ eventSport: "gaelic_football" })).toBe(
+      "gaelic_football"
+    );
   });
 
   it("uses desk bet-type names", () => {
@@ -99,6 +136,49 @@ describe("buildActivityMixCharts", () => {
     expect(charts.betPurposes.map((slice) => [slice.label, slice.value])).toEqual([
       ["Edge", 4],
       ["Mug", 1],
+    ]);
+  });
+});
+
+describe("leadingSportByUser", () => {
+  it("picks the sport with the most bets on each desk", () => {
+    const leading = leadingSportByUser([
+      count("user_a", "football", 2),
+      count("user_a", "horse_racing", 5),
+      count("user_b", "cricket", 1),
+    ]);
+    expect(leading.get("user_a")).toEqual({
+      key: "horse_racing",
+      n: 5,
+      total: 7,
+    });
+    expect(leading.get("user_b")).toEqual({
+      key: "cricket",
+      n: 1,
+      total: 1,
+    });
+  });
+
+  it("breaks ties with the fleet sport order", () => {
+    const leading = leadingSportByUser([
+      count("user_a", "football", 3),
+      count("user_a", "horse_racing", 3),
+    ]);
+    expect(leading.get("user_a")?.key).toBe("horse_racing");
+  });
+});
+
+describe("sportDeskRows", () => {
+  it("counts bets and distinct desks per sport", () => {
+    expect(
+      sportDeskRows([
+        count("user_a", "horse_racing", 4),
+        count("user_b", "horse_racing", 1),
+        count("user_b", "football", 2),
+      ])
+    ).toEqual([
+      { key: "horse_racing", label: "Horse racing", bets: 5, desks: 2 },
+      { key: "football", label: "Football", bets: 2, desks: 1 },
     ]);
   });
 });

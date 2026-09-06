@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Gift } from "lucide-react";
 import { MoneyFlow } from "@/components/money-flow";
 import type { BetMode } from "@/lib/calc";
+import { findVenueBalanceAccount } from "@/lib/accounts/resolve-venue";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import { cn } from "@/lib/utils";
 
@@ -49,13 +50,12 @@ export function noLayFreeBetFromStored(
   return null;
 }
 
+/** Bookie or exchange wallet for the back venue (dutch / no-lay on Betdaq). */
 export function findBookieBalanceAccount(
   accounts: AccountBalance[] | undefined,
   bookmaker: string
 ): AccountBalance | undefined {
-  const q = bookmaker.trim().toLowerCase();
-  if (!q) return undefined;
-  return accounts?.find((a) => a.type === "bookie" && a.name.toLowerCase() === q);
+  return findVenueBalanceAccount(accounts, bookmaker);
 }
 
 /** Stake already locked on an open ledgered bet being edited (same bookie). */

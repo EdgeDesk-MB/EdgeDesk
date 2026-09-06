@@ -44,8 +44,8 @@ const CHART_WINDOWS: ReadonlyArray<{
   desktopOnly?: true;
 }> = [
   { label: "24h", secs: 86_400 },
-  { label: "This week", secs: 604_800 },
-  { label: "This month", secs: 2_592_000, desktopOnly: true },
+  { label: "7d", secs: 604_800 },
+  { label: "30d", secs: 2_592_000, desktopOnly: true },
   { label: "All", secs: ALL_WINDOW_SECS },
 ];
 
@@ -98,7 +98,7 @@ const LIVELINE_LEFT_EDGE_MARGIN = 0.06;
  * Liveline only parses hex/rgb - CSS vars fall back to grey.
  */
 const PNL_CHART_COLORS = {
-  light: { profit: "#059669", loss: "#e7000b" },
+  light: { profit: "#009461", loss: "#e83f41" },
   dark: { profit: "#34d399", loss: "#ff8d8b" },
 } as const;
 

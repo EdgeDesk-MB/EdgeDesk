@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type { OfferSummary } from "@/lib/services/offers.types";
+import type { AppSettings } from "@/lib/services/settings-shared";
 import type { AppState } from "@/lib/services/state.types";
 import { ALERT_INBOX_READ_EVENT } from "@/lib/alerts/inbox-read-event";
 import { setDisplayTimeFormat } from "@/lib/time-format";
@@ -28,6 +29,8 @@ type AppStateContextValue = {
   refresh: () => Promise<void>;
   /** Patch one campaign in the current snapshot so the CTA can move before the next poll. */
   applyLocalOfferPatch: (offerId: number, patch: Partial<OfferSummary>) => void;
+  /** Merge desk settings after /api/settings so hide/save survive the next poll. */
+  applyLocalSettingsPatch: (patch: Partial<AppSettings>) => void;
   /**
    * Pause the shared /api/state poll (e.g. while Add bet is open).
    * Returns a resume function; safe to call from useEffect cleanups.
@@ -39,6 +42,21 @@ const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 /** Abandon a coalesced poll that has been stuck this long (dev compile / API hang). */
 const STALE_INFLIGHT_MS = 15_000;
+
+function settingsHoldCovered(
+  incoming: AppSettings,
+  hold: Partial<AppSettings>
+): boolean {
+  for (const [key, value] of Object.entries(hold)) {
+    const current = incoming[key as keyof AppSettings];
+    if (Array.isArray(value) && Array.isArray(current)) {
+      if (value.join("\0") !== current.join("\0")) return false;
+      continue;
+    }
+    if (current !== value) return false;
+  }
+  return true;
+}
 
 /** One poll loop for the whole app - avoids N duplicate /api/state fetches per page. */
 export function AppStateProvider({ children }: { children: ReactNode }) {
@@ -52,6 +70,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const inFlightStartedAt = useRef(0);
   /** Bumped on user refresh / local patches so a slower poll cannot clobber newer state. */
   const pollGen = useRef(0);
+  /** Hide / saved keys stay until /api/state echoes them, so a poll cannot flash them back. */
+  const settingsHoldRef = useRef<Partial<AppSettings> | null>(null);
   const [prevDemo, setPrevDemo] = useState({
     active: publicDemo.active,
     view: publicDemo.view,
@@ -75,6 +95,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
   }, [publicDemo.active, publicDemo.view]);
 
+  const pauseCountRef = useRef(0);
+  pauseCountRef.current = pauseCount;
+
   const fetchState = useCallback(
     async (mode: "poll" | "user") => {
       if (publicDemo.active) {
@@ -84,6 +107,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setError(null);
         return;
       }
+      // A modal can pause after this poll has already left the network.
+      if (mode === "poll" && pauseCountRef.current > 0) return;
       // Background polls may share an in-flight request. User refresh (after a
       // mutation) must not join a snapshot that started before the write.
       if (
@@ -101,8 +126,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const next = (await res.json()) as AppState;
           if (pollGen.current !== gen) return;
-          setDisplayTimeFormat(next.settings?.timeFormat);
-          setState(next);
+          if (mode === "poll" && pauseCountRef.current > 0) return;
+          const hold = settingsHoldRef.current;
+          const settings =
+            hold && !settingsHoldCovered(next.settings, hold)
+              ? { ...next.settings, ...hold }
+              : next.settings;
+          if (hold && settingsHoldCovered(next.settings, hold)) {
+            settingsHoldRef.current = null;
+          }
+          setDisplayTimeFormat(settings.timeFormat);
+          setState({ ...next, settings });
           setError(null);
         } catch (e) {
           if (pollGen.current !== gen) return;
@@ -138,6 +172,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     []
   );
+
+  const applyLocalSettingsPatch = useCallback((patch: Partial<AppSettings>) => {
+    settingsHoldRef.current = { ...settingsHoldRef.current, ...patch };
+    setState((current) => {
+      if (current == null) return current;
+      return { ...current, settings: { ...current.settings, ...patch } };
+    });
+  }, []);
 
   const pausePolling = useCallback(() => {
     setPauseCount((n) => n + 1);
@@ -201,20 +243,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [refresh, publicDemo.active]);
 
   const value = useMemo(
-    () => ({ state, error, refresh, applyLocalOfferPatch, pausePolling }),
-    [state, error, refresh, applyLocalOfferPatch, pausePolling]
+    () => ({
+      state,
+      error,
+      refresh,
+      applyLocalOfferPatch,
+      applyLocalSettingsPatch,
+      pausePolling,
+    }),
+    [state, error, refresh, applyLocalOfferPatch, applyLocalSettingsPatch, pausePolling]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
 
-/** Pause shared app-state polling while `paused` is true (Add bet, heavy editors). */
+/** Pause shared app-state polling while `paused` is true.
+ * Safe outside `AppStateProvider` (marketing dialogs no-op).
+ * `DialogContent` pauses for every open modal. */
 export function usePauseAppStatePolling(paused: boolean) {
-  const { pausePolling } = useAppStateContext();
+  const ctx = useContext(AppStateContext);
   useEffect(() => {
-    if (!paused) return;
-    return pausePolling();
-  }, [paused, pausePolling]);
+    if (!paused || !ctx) return;
+    return ctx.pausePolling();
+  }, [paused, ctx]);
 }
 
 /** @param _intervalMs Ignored. Shared poll is a product default (3s), not a user setting. */

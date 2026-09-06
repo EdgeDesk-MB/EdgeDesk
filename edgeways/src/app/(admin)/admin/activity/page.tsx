@@ -20,7 +20,11 @@ import {
   scopeActivityView,
   weeklyCountsByUser,
 } from "@/lib/admin/activity-charts";
-import { buildActivityMixCharts } from "@/lib/admin/activity-mix";
+import {
+  activitySportLabel,
+  buildActivityMixCharts,
+  leadingSportByUser,
+} from "@/lib/admin/activity-mix";
 import { hiddenAccountsSub } from "@/lib/admin/exclude-accounts";
 import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
@@ -57,6 +61,7 @@ export default async function AdminActivityPage() {
   const casino = scoped.rows.reduce((sum, row) => sum + row.casino, 0);
   const charts = buildActivityCharts(scoped.rows, scoped.daily);
   const mixCharts = buildActivityMixCharts(scoped.mix);
+  const leadingSports = leadingSportByUser(scoped.mix.betSports);
   const activityEvents = activityEventsFromStamps(
     scoped.stamps,
     new Map(scoped.rows.map((row) => [row.clerkUserId, row.email]))
@@ -153,6 +158,7 @@ export default async function AdminActivityPage() {
             <TableRow>
               <TableHead className={tableHeaderCell}>Email</TableHead>
               <TableHead className={tableHeaderCell}>Plan</TableHead>
+              <TableHead className={tableHeaderCell}>Top sport</TableHead>
               <TableHead className={tableHeaderCell}>This week</TableHead>
               <TableHead className={tableHeaderCell}>Bets</TableHead>
               <TableHead className={tableHeaderCell}>Offers</TableHead>
@@ -160,23 +166,47 @@ export default async function AdminActivityPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedRows.map((row) => (
-              <TableRow key={row.clerkUserId}>
-                <TableCell
-                  className={cn(tableBodyCell, "max-w-[18rem] truncate")}
-                  title={row.email ?? row.clerkUserId}
-                >
-                  {row.email ?? row.clerkUserId}
-                </TableCell>
-                <TableCell className={cn(tableBodyCell, "capitalize")}>{row.plan}</TableCell>
-                <TableCell className={cn(tableBodyCell, "font-semibold tabular-nums")}>
-                  {weekly.get(row.clerkUserId) ?? 0}
-                </TableCell>
-                <TableCell className={tableBodyCell}>{row.bets}</TableCell>
-                <TableCell className={tableBodyCell}>{row.offers}</TableCell>
-                <TableCell className={tableBodyCell}>{row.casino}</TableCell>
-              </TableRow>
-            ))}
+            {sortedRows.map((row) => {
+              const lead = leadingSports.get(row.clerkUserId);
+              const leadLabel = lead ? activitySportLabel(lead.key) : null;
+              return (
+                <TableRow key={row.clerkUserId}>
+                  <TableCell
+                    className={cn(tableBodyCell, "max-w-[18rem] truncate")}
+                    title={row.email ?? row.clerkUserId}
+                  >
+                    {row.email ?? row.clerkUserId}
+                  </TableCell>
+                  <TableCell className={cn(tableBodyCell, "capitalize")}>{row.plan}</TableCell>
+                  <TableCell
+                    className={cn(
+                      tableBodyCell,
+                      "min-w-0 whitespace-normal"
+                    )}
+                    title={leadLabel ?? undefined}
+                  >
+                    {lead && leadLabel ? (
+                      <div className="min-w-0">
+                        <p className="font-medium text-pretty break-words">
+                          {leadLabel}
+                        </p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {lead.n} of {lead.total}
+                        </p>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className={cn(tableBodyCell, "font-semibold tabular-nums")}>
+                    {weekly.get(row.clerkUserId) ?? 0}
+                  </TableCell>
+                  <TableCell className={tableBodyCell}>{row.bets}</TableCell>
+                  <TableCell className={tableBodyCell}>{row.offers}</TableCell>
+                  <TableCell className={tableBodyCell}>{row.casino}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         </AdminTableFrame>

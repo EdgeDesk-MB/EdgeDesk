@@ -49,7 +49,7 @@ export interface AppSettings {
   displayTimezone: string;
   /** Clock format for every displayed time of day (inputs stay HH:mm). */
   timeFormat: TimeFormatPreference;
-  /** Mobile Home deck start card: "auto" = context-aware, else a pinned card id. */
+  /** Mobile Home deck start card id (Summary, Live feed, or Do next). */
   mobileDeckPin: MobileDeckPin;
   /** Alert toggles (C4) - local notifications, toast fallback. */
   alertsOfferExpiring: boolean;
@@ -76,6 +76,14 @@ export interface AppSettings {
   homeLayout: HomeLayoutSettings;
   /** Monthly profit target in £ (G1); null = no target, no pace copy */
   monthlyProfitTarget: number | null;
+  /** Football competition scope ids (`country::name`) starred in the fixture browser. */
+  favouriteFootballScopes: string[];
+  /** Racing course names starred in the fixture browser. */
+  favouriteRacingCourses: string[];
+  /** Football competition scope ids hidden from the fixture board. */
+  hiddenFootballScopes: string[];
+  /** Racing course names hidden from the fixture board. */
+  hiddenRacingCourses: string[];
   /** Brand accent preset id (amber, viridian, …, custom). */
   brandAccentPreset: string;
   /** Brand accent hex (#RRGGBB); used with custom or as resolved colour. */
@@ -165,15 +173,15 @@ export function normalizeTuning(raw: unknown): TuningSettings {
   };
 }
 
-export const MOBILE_DECK_PINS = ["auto", "hero", "plan", "feed", "do-next"] as const;
+export const MOBILE_DECK_PINS = ["hero", "feed", "do-next"] as const;
 export type MobileDeckPin = (typeof MOBILE_DECK_PINS)[number];
 
 export function normalizeMobileDeckPin(value: string | null | undefined): MobileDeckPin {
-  // Chart is no longer a standalone deck card; it lives on Summary.
-  if (value === "chart") return "hero";
+  // Chart is not a standalone card; Today's plan and Auto were retired (2026-09-06).
+  if (value === "chart" || value === "plan" || value === "auto") return "hero";
   return (MOBILE_DECK_PINS as readonly string[]).includes(value ?? "")
     ? (value as MobileDeckPin)
-    : "auto";
+    : "hero";
 }
 
 export function normalizeDefaultSport(value: string | null | undefined): SportValue {
@@ -193,7 +201,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dashboardPollMs: 3000,
   displayTimezone: "Europe/London",
   timeFormat: DEFAULT_TIME_FORMAT,
-  mobileDeckPin: "auto",
+  mobileDeckPin: "hero",
   alertsOfferExpiring: true,
   alertsFreeBetExpiring: true,
   alertsRaceOffSoon: true,
@@ -206,6 +214,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tuning: DEFAULT_TUNING,
   homeLayout: DEFAULT_HOME_LAYOUT,
   monthlyProfitTarget: null,
+  favouriteFootballScopes: [],
+  favouriteRacingCourses: [],
+  hiddenFootballScopes: [],
+  hiddenRacingCourses: [],
   brandAccentPreset: "amber",
   brandAccentHex: "#FFC71E",
   uiFont: "default",

@@ -143,7 +143,7 @@ Mirrored from `product-roadmap.md` §7.5 and `docs/strategy/subscriptions.md`
 | Tier | Price | Contents | Logic |
 |------|-------|----------|-------|
 | **Free** | £0 | Calculators, manual tracking, basic P&L | Funnel + community trust |
-| **Core** | £9.99/mo (£99.90/yr) | Pipeline, Do Next, Daily Plan, EV capture analytics, Edge Report | All-lib features, near-zero COGS |
+| **Core** | £9.99/mo (£99.90/yr) | Pipeline, Do Next, EV capture analytics, Edge Report | All-lib features, near-zero COGS |
 | **Edge** | £24.99/mo (£249.90/yr) | Racing Desk live feeds, 2UP sentinel + push, exchange integration, league table | Carries the API costs; anchored just under Outplayed |
 
 This section adds the competitive reasoning that doesn't belong in the pricing draft itself.

@@ -93,7 +93,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "The three questions",
         paragraphs: [
-          "Everything in Edgeways exists to answer one of three daily questions: what should I do next (Do next, the Daily Plan, the offer calendar), am I executing correctly (trackers, checkers, alerts), and did it actually pay (P&L, EV capture, the Edge Report). If a number does not serve one of those, it is not on the desk.",
+          "Everything in Edgeways exists to answer one of three daily questions: what should I do next (Do next, the offer calendar), am I executing correctly (trackers, checkers, alerts), and did it actually pay (P&L, EV capture, the Edge Report). If a number does not serve one of those, it is not on the desk.",
         ],
       },
       {
@@ -160,7 +160,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Dependencies at a glance",
         bullets: [
           "Do next ranks offers using: measured retention + EV basis + bookie health (gubbed sinks, never hides) + funding checks + measured £/hr.",
-          "The Daily Plan is Do next re-cut for today, plus timed slots: tracked races, kickoffs, and acca lay-due legs.",
+          "Do next ranks today's offer work; timed races, kickoffs and acca lay-due legs also raise alerts.",
           "The 2UP Desk consumes tracked-event live scores; the Acca Desk consumes event results; the Racing Desk consumes racecards plus your racing offers.",
           "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, the morning daily tasks digest, acca lay-due, and the weekly digest.",
         ],
@@ -229,7 +229,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Insurance · leg-by-leg: same cover lays, for refund-if-one-loses offers. Stays open after a loss until every leg resolves; claim the free bet when exactly one lost.",
           "Insurance · whole acca: one equalising lay at the combined exchange price, then settle legs. Same refund rule.",
           "The next unlaid leg is ready to lay immediately (leg 1 right after create). Enter live exchange lay odds and stake. Do not reuse the bookie back price.",
-          "Alerts / Daily Plan still fire from 30 minutes before the leg starts; you can lay earlier whenever you like.",
+          "Alerts still fire from 30 minutes before the leg starts; you can lay earlier whenever you like.",
           "Tracked-event legs auto-result from the football score or race result; everything else uses Won / Lost / Void on the desk.",
         ],
       },
@@ -374,7 +374,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "Core - everyday matched betting",
         bullets: [
           "Matched Betting - qualifiers, free bets (SNR/SR), risk-free. The workhorse.",
-          "Dutching - equal-profit across outcomes. Use 2UP dutch mode for early-payout windfalls.",
+          "Dutching - equal-profit across outcomes, with stake rounding and per-leg overrides. Use 2UP dutch mode for early-payout windfalls.",
           "Early Payout (2UP) - back a 2UP bookie, lay the exchange, see windfall scenarios.",
           "Each Way & Extra Place - standard EW arbs and extra-place offers.",
           "Sequential Lay - part lays at earlier odds, finish at current market.",

@@ -5,8 +5,10 @@ import {
   formatAccaHistoryDetail,
   formatAccaPlacedTitle,
   formatAccaSettlementTitle,
+  formatHistoryDateGroup,
   formatHistoryTimeBadge,
   formatHistoryTimeBadgeParts,
+  groupHistoryFeedByDay,
   historyEntrySubtitle,
   historyEntryTitle,
   historyEntryTitleParts,
@@ -23,6 +25,9 @@ import {
   isRacingResultMoment,
   historyEntryHref,
   historyEntryLinkLabel,
+  historyEntryFixtureLockup,
+  historyEntryOpensMatchTape,
+  historyFootballEventsForCrests,
   isFreeBetWonHistoryEntry,
   historyKindLabel,
   historyOccurredAt,
@@ -370,12 +375,41 @@ describe("football match-moment feed copy", () => {
     expect(historyGoalEventLabel(goal, ctx)).toBe("Goal!");
     expect(historyMatchMomentHeadline(fullTime, ctx)).toBe("Wolves v Blackburn");
     expect(historyMatchMomentSubline(fullTime, ctx)).toBe("Full time · 2-2");
+    expect(historyEntryOpensMatchTape(kickoff, ctx)?.id).toBe(8);
     expect(historyEntryLinkLabel(kickoff, ctx)).toBe(
-      "Open Kick-off, Wolves v Blackburn in tracked events"
+      "Open match events for Wolves v Blackburn"
     );
     expect(historyEntryLinkLabel(fullTime, ctx)).toBe(
-      "Open Full time, Wolves v Blackburn in tracked events"
+      "Open match events for Wolves v Blackburn"
     );
+  });
+
+  it("puts the crest lock-up on football Bet placed without opening the tape", () => {
+    const ctx = buildHistoryContext([event], [], {});
+    const placed = row({
+      kind: "bet_placed",
+      title: "Bet placed",
+      eventId: 8,
+      betId: undefined,
+    });
+    expect(historyEntryOpensMatchTape(placed, ctx)).toBeNull();
+    expect(historyEntryFixtureLockup(placed, ctx)?.id).toBe(8);
+    expect(historyFootballEventsForCrests([placed], ctx).map((event) => event.id)).toEqual([
+      8,
+    ]);
+    expect(historyEntryLinkLabel(placed, ctx)).toBe("Open profit tracker");
+  });
+
+  it("skips the crest lock-up on racing Bet placed", () => {
+    const race: EventRow = { ...event, id: 19, sport: "horse_racing", homeTeam: "1:15 Newbury" };
+    const raceCtx = buildHistoryContext([race], [], {});
+    const placed = row({
+      kind: "bet_placed",
+      title: "Bet placed",
+      eventId: 19,
+      betId: undefined,
+    });
+    expect(historyEntryFixtureLockup(placed, raceCtx)).toBeNull();
   });
 
   it("folds the 2UP trigger onto the goal that went two ahead", () => {
@@ -419,7 +453,7 @@ describe("football match-moment feed copy", () => {
     expect(isHiddenHistoryFeedEntry(twoUp, ctx)).toBe(true);
     expect(isHiddenHistoryFeedEntry(g2, ctx)).toBe(false);
     expect(historyEntryLinkLabel(g2, ctx)).toBe(
-      "Open Goal, 2UP triggered, Wolves v Blackburn, Wolves [2] - 0 Blackburn in tracked events"
+      "Open match events for Wolves v Blackburn"
     );
   });
 
@@ -493,7 +527,7 @@ describe("football match-moment feed copy", () => {
       { text: " - 2 Blackburn" },
     ]);
     expect(historyEntryLinkLabel(g4, ctx)).toBe(
-      "Open Goal, Wolves v Blackburn, Wolves [2] - 2 Blackburn in tracked events"
+      "Open match events for Wolves v Blackburn"
     );
   });
 
@@ -634,6 +668,7 @@ describe("formatHistoryTimeBadge", () => {
       secondary: "08:56",
     });
     expect(formatHistoryTimeBadge(entry, ctx)).toBe("Today, 08:56");
+    expect(formatHistoryTimeBadge(entry, ctx, { omitDay: true })).toBe("08:56");
 
     vi.useRealTimers();
   });
@@ -682,6 +717,49 @@ describe("formatHistoryTimeBadge", () => {
       primary: "5 Jul",
       secondary: "16:23",
     });
+    expect(formatHistoryTimeBadgeParts(entry, olderCtx, { omitDay: true })).toEqual({
+      primary: "16:23",
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("groups newest-first feed rows into Today then Yesterday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-08T21:00:00"));
+
+    const today = row({
+      id: 2,
+      kind: "bet_placed",
+      title: "Bet placed",
+      betId: undefined,
+      createdAt: new Date("2026-07-08T11:53:00").getTime(),
+    });
+    const yesterday = row({
+      id: 3,
+      kind: "settlement",
+      title: "Bet lost",
+      betId: undefined,
+      createdAt: new Date("2026-07-07T21:56:00").getTime(),
+    });
+    const emptyCtx = buildHistoryContext([], [], {});
+
+    expect(formatHistoryTimeBadgeParts(today, emptyCtx, { omitDay: true })).toEqual({
+      primary: "11:53",
+    });
+    expect(groupHistoryFeedByDay([today, yesterday], emptyCtx)).toEqual([
+      { key: "2026-07-08", label: "Today", entries: [today] },
+      { key: "2026-07-07", label: "Yesterday", entries: [yesterday] },
+    ]);
+
+    const older = row({
+      id: 4,
+      kind: "bet_placed",
+      title: "Bet placed",
+      betId: undefined,
+      createdAt: new Date("2026-07-05T16:00:00").getTime(),
+    });
+    expect(formatHistoryDateGroup(older, emptyCtx)).toBe("Sunday 5th July");
 
     vi.useRealTimers();
   });

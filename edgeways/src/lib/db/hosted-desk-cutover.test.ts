@@ -143,6 +143,39 @@ describe("hosted desk cutover", () => {
     expect(routeSource("cron/warm-racecards/route.ts")).toMatch(/warmFixtureStore/);
   });
 
+  it("match-tape miss writes Neon on the hosted desk", () => {
+    const tape = readFileSync(
+      resolve(__dirname, "../services/event-match-tape.ts"),
+      "utf8"
+    );
+    expect(tape).toMatch(/isNeonDesk/);
+    expect(tape).toMatch(/updateNeonEvent/);
+    expect(tape).toMatch(/fixtureMatchEvents/);
+    expect(routeSource("events/[id]/tape/route.ts")).toMatch(/ensureEventMatchTape/);
+  });
+
+  it("stores bets.quick_logged as epoch ms (bigint), not int4", () => {
+    // Date.now() overflows Postgres integer. The campaign tick writes that
+    // stamp; leaving the column on int4 500s POST /api/bets on the hosted desk.
+    const schema = readFileSync(resolve(__dirname, "schema.pg.ts"), "utf8");
+    expect(schema).toMatch(/quickLogged:\s*epochMs\("quick_logged"\)/);
+    expect(schema).not.toMatch(/quickLogged:\s*integer\("quick_logged"\)/);
+  });
+
+  it("persists desk settings including hidden competitions on Neon", () => {
+    const settings = routeSource("settings/route.ts");
+    expect(settings).toMatch(/isNeonDesk/);
+    expect(settings).toMatch(/patchNeonDeskSettings/);
+    expect(settings).toMatch(/hiddenFootballScopes/);
+    expect(settings).toMatch(/hiddenRacingCourses/);
+    expect(settings).toMatch(/isFixtureScopeSettingsPatch/);
+    const neonSettings = readFileSync(
+      resolve(__dirname, "neon-desk-settings.ts"),
+      "utf8"
+    );
+    expect(neonSettings).toMatch(/deskSettings: JSON\.stringify\(next\)/);
+  });
+
   it("builds Home from Neon when the hosted desk flag is on", () => {
     expect(appStateSource).toMatch(/isNeonDesk\(\)/);
     expect(appStateSource).toMatch(/buildNeonDeskAppState/);

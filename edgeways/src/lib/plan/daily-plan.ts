@@ -1,11 +1,11 @@
 /**
- * The Daily Plan (B1) - one time-ordered run-sheet for today merging offer
- * next-actions (timed by today's deadline), tracked race off times, fixture
- * kickoffs for open bets, and untimed Do Next work as an "anytime" bucket.
+ * Daily Plan merge (B1). The Home timeline UI was removed on 2026-09-06
+ * (not adding value; parked to revisit). This lib stays: race/fixture slot
+ * shapes feed alerts and /api/state, and the merge is ready if we bring
+ * the run-sheet back.
  *
- * Product rule: completed/impossible slots COLLAPSE (the component renders
- * them muted) but never reorder - the user's mental model stays stable while
- * the plan regenerates on every state poll.
+ * Product rule if the UI returns: completed/impossible slots COLLAPSE
+ * (muted) but never reorder.
  */
 
 import type { OfferSummary } from "@/lib/services/offers.types";

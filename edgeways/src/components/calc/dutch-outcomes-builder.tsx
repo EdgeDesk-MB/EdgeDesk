@@ -2,19 +2,27 @@
 
 /**
  * Shared "build a dutch" block - the outcomes table plus the three stake-entry
- * modes (Total stake / Target profit / First outcome). Mounted by BOTH the
- * standalone Dutching calculator and Add bet's Dutch type, so behaviour and
- * styling never drift between the two entry points.
+ * modes (Total stake / Target profit / First outcome), plus execution rounding
+ * and per-leg stake overrides. Mounted by BOTH the standalone Dutching
+ * calculator and Add bet's Dutch type, so behaviour and styling never drift.
  *
  * Self-contained: owns its legs/mode state locally and only surfaces the
  * computed DutchResult (plus the raw label/odds legs) via `onResult` - the
  * parent decides what to do with it (calculator preview vs a bet payload).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PANEL_NEUTRAL, PanelInput, PanelTextInput } from "@/components/calc/bet-panels";
+import { PANEL_NEUTRAL, PanelInput, PanelSelect, PanelTextInput } from "@/components/calc/bet-panels";
 import { MoneyFlow, PercentFlow } from "@/components/money-flow";
 import { VenueSelect } from "@/components/venue-select";
 import { bookieFreeBetBalance } from "@/components/add-bet/back-bookie-balance-strip";
@@ -23,17 +31,24 @@ import { darken, lighten } from "@/lib/brands/exchanges";
 import { useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
+  DUTCH_END_BIAS_CENTER,
+  DUTCH_STAKE_INCREMENTS,
+  applyDutchEndBias,
   dutch,
+  dutchEndBias,
   dutchStakeForLegStake,
   dutchStakeForProfit,
   dutchStakesForFreeLeg,
+  formatDutchStakeIncrement,
+  realiseDutch,
   type DutchLeg,
   type DutchResult,
 } from "@/lib/calc";
-import { campaignHeaderBand } from "@/lib/ui/surface-styles";
-import { panelSurface } from "@/lib/ui/surface-styles";
+import { formatMoneyAmount } from "@/lib/format-money";
+import { roundPence, stepByIncrement } from "@/lib/calc/money";
+import { campaignHeaderBand, panelSurface, toolbarSelectTrigger } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Gift, Plus, X } from "lucide-react";
+import { ChevronDown, Gift, Plus, X } from "lucide-react";
 
 export type DutchStakeMode = "total" | "profit" | "leg";
 
@@ -104,6 +119,12 @@ export function DutchOutcomesBuilder({
   const [freeBetType, setFreeBetType] = useState<"snr" | "sr" | null>(() =>
     initialFreeLegIndex >= 0 ? (initialLegs![initialFreeLegIndex].freeBet ?? null) : null
   );
+  const [roundTo, setRoundTo] = useState<(typeof DUTCH_STAKE_INCREMENTS)[number]>(0.01);
+  const [overrides, setOverrides] = useState<Array<number | null>>(() =>
+    (initialLegs ?? []).map((l) => (l.stake != null && l.stake > 0 ? l.stake : null))
+  );
+  const [dragBias, setDragBias] = useState<number | null>(null);
+  const dragBiasRef = useRef<number | null>(null);
 
   const { defaultExchange } = useExchanges();
   const { state: appState } = useAppState();
@@ -111,6 +132,9 @@ export function DutchOutcomesBuilder({
   const legsValid = legs.length >= minLegs && legs.every((l) => l.odds > 1);
   const safeFixedIndex = Math.min(fixedLegIndex, legs.length - 1);
   const freeLegActive = mode === "leg" && freeBetType != null;
+  const lastIndex = legs.length - 1;
+  const lockFirst = mode === "leg" && safeFixedIndex === 0;
+  const lockLast = mode === "leg" && lastIndex > 0 && safeFixedIndex === lastIndex;
 
   // Memoized so `result` only gets a NEW reference when an input actually
   // changes - dutch()/the ternary chain otherwise return a fresh object on
@@ -123,13 +147,52 @@ export function DutchOutcomesBuilder({
     return dutchStakeForLegStake(legs, safeFixedIndex, fixedLegStakeInput);
   }, [legsValid, freeLegActive, mode, totalStakeInput, targetProfitInput, legs, safeFixedIndex, fixedLegStakeInput]);
 
-  const result = useMemo(() => {
+  const ideal = useMemo(() => {
     if (!legsValid) return null;
     if (freeLegActive) {
       return dutchStakesForFreeLeg(legs, safeFixedIndex, fixedLegStakeInput, freeBetType!);
     }
     return totalStake != null && totalStake > 0 ? dutch(legs, totalStake) : null;
   }, [legsValid, freeLegActive, legs, safeFixedIndex, fixedLegStakeInput, freeBetType, totalStake]);
+
+  const preserveExact = useMemo(() => {
+    if (mode !== "leg") return [];
+    return [safeFixedIndex];
+  }, [mode, safeFixedIndex]);
+
+  const suggested = useMemo(
+    () =>
+      ideal
+        ? realiseDutch(ideal, {
+            roundTo,
+            preserveExact,
+            freeLeg: freeLegActive ? { index: safeFixedIndex, type: freeBetType! } : undefined,
+          })
+        : null,
+    [ideal, roundTo, preserveExact, freeLegActive, safeFixedIndex, freeBetType]
+  );
+
+  const result = useMemo(
+    () =>
+      ideal
+        ? realiseDutch(ideal, {
+            roundTo,
+            preserveExact,
+            overrides,
+            freeLeg: freeLegActive ? { index: safeFixedIndex, type: freeBetType! } : undefined,
+          })
+        : null,
+    [ideal, roundTo, preserveExact, overrides, freeLegActive, safeFixedIndex, freeBetType]
+  );
+
+  const derivedBias = useMemo(() => {
+    if (!suggested || !result || suggested.legs.length < 2) return DUTCH_END_BIAS_CENTER;
+    return dutchEndBias(
+      suggested.legs.map((leg) => leg.stake),
+      result.legs.map((leg) => leg.stake)
+    );
+  }, [suggested, result]);
+  const shownBias = dragBias ?? derivedBias;
 
   // legs annotated with the free-bet flag on the fixed leg only, for the
   // parent to persist alongside each leg's stake/bookmaker.
@@ -149,6 +212,61 @@ export function DutchOutcomesBuilder({
 
   function updateLeg(index: number, patch: Partial<BuilderLeg>) {
     setLegs((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  }
+
+  function setLegOverride(index: number, stake: number | null) {
+    setOverrides((prev) => {
+      const next = Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => prev[i] ?? null);
+      next[index] = stake;
+      return next;
+    });
+  }
+
+  function isCustomStake(index: number): boolean {
+    const override = overrides[index];
+    const idealStake = suggested?.legs[index]?.stake;
+    if (override == null || !Number.isFinite(override) || idealStake == null) return false;
+    return roundPence(override) !== roundPence(idealStake);
+  }
+
+  function applyEndBias(raw: number, snap: boolean) {
+    if (!suggested || !result || lastIndex < 1) return;
+    const value =
+      snap && Math.abs(raw - DUTCH_END_BIAS_CENTER) < 0.03 ? DUTCH_END_BIAS_CENTER : raw;
+    if (value === DUTCH_END_BIAS_CENTER) {
+      setOverrides((prev) => {
+        const next = Array.from({ length: legs.length }, (_, i) => prev[i] ?? null);
+        if (!lockFirst) next[0] = null;
+        if (!lockLast) next[lastIndex] = null;
+        return next;
+      });
+      return;
+    }
+    const nextStakes = applyDutchEndBias(
+      suggested.legs.map((leg) => leg.stake),
+      result.legs.map((leg) => leg.stake),
+      value,
+      { lockFirst, lockLast }
+    );
+    setOverrides((prev) => {
+      const next = Array.from({ length: legs.length }, (_, i) => prev[i] ?? null);
+      if (!lockFirst) next[0] = nextStakes[0];
+      if (!lockLast) next[lastIndex] = nextStakes[lastIndex];
+      return next;
+    });
+  }
+
+  function onBiasInput(raw: number) {
+    dragBiasRef.current = raw;
+    setDragBias(raw);
+    applyEndBias(raw, false);
+  }
+
+  function endBiasDrag() {
+    const raw = dragBiasRef.current;
+    if (raw != null) applyEndBias(raw, true);
+    dragBiasRef.current = null;
+    setDragBias(null);
   }
 
   function changeFixedLeg(index: number) {
@@ -174,17 +292,42 @@ export function DutchOutcomesBuilder({
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       <div className="flex flex-col gap-3 p-4">
-      <Tabs
-        value={mode}
-        onValueChange={(v) => setMode(v as DutchStakeMode)}
-        activationMode="manual"
-      >
-        <TabsList variant="segmented">
-          <TabsTrigger value="total">Total stake</TabsTrigger>
-          <TabsTrigger value="profit">Target profit</TabsTrigger>
-          <TabsTrigger value="leg">First outcome</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          value={mode}
+          onValueChange={(v) => setMode(v as DutchStakeMode)}
+          activationMode="manual"
+        >
+          <TabsList variant="segmented">
+            <TabsTrigger value="total">Total stake</TabsTrigger>
+            <TabsTrigger value="profit">Target profit</TabsTrigger>
+            <TabsTrigger value="leg">First outcome</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Select
+          value={String(roundTo)}
+          onValueChange={(v) => {
+            const next = DUTCH_STAKE_INCREMENTS.find((inc) => String(inc) === v);
+            if (next != null) setRoundTo(next);
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label="Round stakes to"
+            className={cn(toolbarSelectTrigger, "h-8")}
+          >
+            <span className="text-muted-foreground">Round to</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DUTCH_STAKE_INCREMENTS.map((inc) => (
+              <SelectItem key={inc} value={String(inc)}>
+                {formatDutchStakeIncrement(inc)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {mode === "total" ? (
         <PanelInput
@@ -193,6 +336,7 @@ export function DutchOutcomesBuilder({
           value={totalStakeInput}
           onChange={setTotalStakeInput}
           min={0}
+          incrementStepping={roundTo}
           inputClassName="bg-muted dark:bg-muted"
         />
       ) : mode === "profit" ? (
@@ -206,35 +350,37 @@ export function DutchOutcomesBuilder({
           />
           {legsValid && totalStake == null ? (
             <p className="text-xs font-medium text-muted-foreground">
-              Not achievable at these odds - the market doesn&apos;t allow a guaranteed profit.
+              Not achievable at these odds - a fair book needs an infinite stake.
+            </p>
+          ) : mode === "profit" && result && result.profit < -0.005 && targetProfitInput > 0 ? (
+            <p className="text-xs font-medium text-muted-foreground">
+              Overround book, these stakes equalise at a loss of{" "}
+              <MoneyFlow value={Math.abs(result.profit)} className="inline font-semibold" />
             </p>
           ) : null}
         </>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-muted-foreground">
-                Fix stake on
-              </span>
-              <select
-                value={safeFixedIndex}
-                onChange={(e) => changeFixedLeg(Number(e.target.value))}
-                className="h-11 w-full rounded-md border-0 bg-muted px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                {legs.map((l, i) => (
-                  <option key={i} value={i}>
-                    {l.label || `Outcome ${i + 1}`}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <PanelSelect
+              label="Fix stake on"
+              value={String(safeFixedIndex)}
+              onChange={(v) => changeFixedLeg(Number(v))}
+              selectClassName="h-11 bg-muted text-sm font-semibold dark:bg-muted"
+            >
+              {legs.map((l, i) => (
+                <option key={i} value={i}>
+                  {l.label || `Outcome ${i + 1}`}
+                </option>
+              ))}
+            </PanelSelect>
             <PanelInput
               label={freeBetType ? "Free bet stake" : "Its stake"}
               prefix="£"
               value={fixedLegStakeInput}
               onChange={setFixedLegStakeInput}
               min={0}
+              incrementStepping={roundTo}
               inputClassName="bg-muted dark:bg-muted"
             />
           </div>
@@ -300,6 +446,7 @@ export function DutchOutcomesBuilder({
         {legs.map((leg, i) => {
           const legResult = result?.legs[i];
           const isFreeLeg = freeLegActive && i === safeFixedIndex;
+          const isScaleLeg = mode === "leg" && i === safeFixedIndex && !freeLegActive;
           // Each outcome box tints from ITS OWN bookmaker when one is set,
           // else falls back to the account's default exchange - so a leg
           // stands apart from its siblings the moment it gets its own venue.
@@ -325,7 +472,10 @@ export function DutchOutcomesBuilder({
                 size="icon-xs"
                 className="absolute right-1.5 top-1.5 text-black/45 hover:bg-black/10 hover:text-black/75 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white/80"
                 disabled={legs.length <= minLegs}
-                onClick={() => setLegs((prev) => prev.filter((_, j) => j !== i))}
+                onClick={() => {
+                  setLegs((prev) => prev.filter((_, j) => j !== i));
+                  setOverrides((prev) => prev.filter((_, j) => j !== i));
+                }}
                 aria-label={`Remove outcome ${i + 1}`}
               >
                 <X />
@@ -355,23 +505,62 @@ export function DutchOutcomesBuilder({
                   value={leg.odds}
                   onChange={(v) => updateLeg(i, { odds: v })}
                   min={1.01}
-                  step={0.01}
+                  exchangeOddsStepping
                   inputClassName="h-10 text-sm"
                 />
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold text-black/60 dark:text-white/70">
                     Stake
                   </span>
-                  <div className="flex h-10 items-center gap-1 rounded-md bg-[var(--pi)] px-2.5 dark:bg-[var(--pi-dark)]">
-                    {isFreeLeg ? (
+                  {isFreeLeg ? (
+                    <div className="flex h-10 items-center gap-1 rounded-md bg-[var(--pi)] px-2.5 dark:bg-[var(--pi-dark)]">
                       <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
-                    ) : null}
-                    <span className="truncate text-sm font-bold tabular-nums text-black/85 dark:text-white/95">
-                      <MoneyFlow value={legResult?.stake ?? 0} />
-                    </span>
-                  </div>
+                      <span className="truncate text-sm font-bold tabular-nums text-black/85 dark:text-white/95">
+                        <MoneyFlow value={legResult?.stake ?? 0} />
+                      </span>
+                    </div>
+                  ) : (
+                    <DutchStakeField
+                      value={legResult?.stake ?? 0}
+                      custom={!isScaleLeg && isCustomStake(i)}
+                      increment={roundTo}
+                      onCommit={(stake) => {
+                        if (isScaleLeg) setFixedLegStakeInput(stake);
+                        else setLegOverride(i, stake);
+                      }}
+                      onReset={() => {
+                        if (isScaleLeg) return;
+                        setLegOverride(i, null);
+                      }}
+                    />
+                  )}
                 </div>
               </div>
+              {legResult ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 text-xs text-black/55 dark:text-white/60">
+                    If this wins{" "}
+                    <MoneyFlow
+                      value={legResult.profitIfWins}
+                      signColor
+                      signDisplay
+                      className="font-semibold"
+                    />
+                  </p>
+                  {!isFreeLeg && !isScaleLeg && isCustomStake(i) ? (
+                    <span className="flex shrink-0 items-baseline gap-1.5 whitespace-nowrap text-xs">
+                      <span className="font-semibold text-muted-foreground">Custom</span>
+                      <button
+                        type="button"
+                        className="font-medium text-primary-text underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                        onClick={() => setLegOverride(i, null)}
+                      >
+                        Reset
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -381,23 +570,37 @@ export function DutchOutcomesBuilder({
           size="sm"
           className="self-start border-black/15 bg-black/5 text-black/80 hover:bg-black/10 dark:border-white/20 dark:bg-white/10 dark:text-white/90 dark:hover:bg-white/15"
           disabled={legs.length >= maxLegs}
-          onClick={() => setLegs((prev) => [...prev, { label: `Outcome ${prev.length + 1}`, odds: 3 }])}
+          onClick={() => {
+            setLegs((prev) => [...prev, { label: `Outcome ${prev.length + 1}`, odds: 3 }]);
+            setOverrides((prev) => [...prev, null]);
+          }}
         >
           <Plus className="size-4" /> Add outcome
         </Button>
       </div>
 
+      {legsValid && lastIndex >= 1 ? (
+        <DutchWeightSlider
+          firstLabel={legs[0]?.label || "First"}
+          lastLabel={legs[lastIndex]?.label || "Last"}
+          value={shownBias}
+          onInput={onBiasInput}
+          onRelease={endBiasDrag}
+          onReset={() => applyEndBias(DUTCH_END_BIAS_CENTER, true)}
+        />
+      ) : null}
+
       <div className="grid grid-cols-3 gap-3 border-t border-black/10 pt-3 dark:border-white/15">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
-            Equal profit
+          <div className="text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+            {result && result.equalised === false ? "Worst profit" : "Equal profit"}
           </div>
           <div className="text-lg font-bold">
             <MoneyFlow value={result?.profit ?? 0} signColor signDisplay />
           </div>
         </div>
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
             {freeLegActive ? "Cash outlay" : "Total stake"}
           </div>
           <div className="text-lg font-bold tabular-nums">
@@ -407,7 +610,7 @@ export function DutchOutcomesBuilder({
           </div>
         </div>
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
             Overround
           </div>
           <div className="text-lg font-bold">
@@ -417,5 +620,140 @@ export function DutchOutcomesBuilder({
       </div>
       </div>
     </div>
+  );
+}
+
+/** First-vs-last weighting. Centre is the equal-profit split, not a 50/50 cash split. */
+function DutchWeightSlider({
+  firstLabel,
+  lastLabel,
+  value,
+  onInput,
+  onRelease,
+  onReset,
+}: {
+  firstLabel: string;
+  lastLabel: string;
+  value: number;
+  onInput: (bias: number) => void;
+  onRelease: () => void;
+  onReset: () => void;
+}) {
+  const pct = Math.min(100, Math.max(0, value * 100));
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="relative h-6" onDoubleClick={onReset}>
+        <div
+          className="absolute left-1/2 top-1/2 h-2 w-px -translate-x-1/2 -translate-y-1/2 bg-black/35 dark:bg-white/35"
+          aria-hidden
+        />
+        <ChevronDown
+          className="pointer-events-none absolute top-0 z-10 size-3.5 -translate-x-1/2 text-primary"
+          style={{ left: `${pct}%` }}
+          aria-hidden
+        />
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={value}
+          aria-valuemin={0}
+          aria-valuemax={1}
+          aria-valuenow={Number(value.toFixed(2))}
+          aria-label={`Favour ${firstLabel} or ${lastLabel}`}
+          onChange={(e) => onInput(parseFloat(e.target.value))}
+          onPointerUp={onRelease}
+          onPointerCancel={onRelease}
+          onBlur={onRelease}
+          className="absolute inset-x-0 top-1/2 h-1.5 w-full -translate-y-1/2 cursor-pointer appearance-none rounded-full bg-black/20 dark:bg-white/20 [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-transparent"
+        />
+      </div>
+      <div className="flex justify-between gap-3 text-xs font-semibold text-muted-foreground">
+        <span className="min-w-0 truncate">{firstLabel}</span>
+        <span className="min-w-0 truncate text-right">{lastLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Draft-on-focus so clearing the field does not snap back to the suggestion mid-type. */
+function DutchStakeField({
+  value,
+  custom,
+  increment,
+  onCommit,
+  onReset,
+}: {
+  value: number;
+  custom: boolean;
+  increment: number;
+  onCommit: (stake: number) => void;
+  onReset: () => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? (Number.isFinite(value) ? formatMoneyAmount(value) : "");
+
+  function currentStake(): number {
+    if (draft != null && draft.trim() !== "") {
+      const parsed = parseFloat(draft);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  }
+
+  function step(direction: 1 | -1) {
+    const next = stepByIncrement(currentStake(), increment, direction);
+    setDraft(formatMoneyAmount(next));
+    onCommit(next);
+  }
+
+  const wheelRef = useNonPassiveWheel<HTMLInputElement>((e) => {
+    if (e.deltaY === 0) return;
+    e.preventDefault();
+    step(e.deltaY > 0 ? -1 : 1);
+  });
+
+  return (
+    <span className="relative">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-semibold text-black/45 dark:text-white/50">
+        £
+      </span>
+      <input
+        ref={wheelRef}
+        type="number"
+        inputMode="decimal"
+        step={increment}
+        min={0}
+        aria-label={custom ? "Stake, custom" : "Stake, suggested"}
+        value={shown}
+        onFocus={() => setDraft(Number.isFinite(value) ? formatMoneyAmount(value) : "")}
+        onChange={(e) => {
+          const next = e.target.value;
+          setDraft(next);
+          const parsed = parseFloat(next);
+          if (Number.isFinite(parsed) && parsed >= 0) onCommit(parsed);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            step(1);
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            step(-1);
+          }
+        }}
+        onBlur={() => {
+          const parsed = draft == null ? Number.NaN : parseFloat(draft);
+          if (draft == null || draft.trim() === "" || !Number.isFinite(parsed) || parsed < 0) {
+            onReset();
+          } else {
+            onCommit(parsed);
+          }
+          setDraft(null);
+        }}
+        className="bet-panel-tint h-10 w-full rounded-md border-0 bg-[var(--pi)] pl-8 pr-3 text-sm font-bold tabular-nums text-black/85 outline-none ring-primary/40 transition-[background-color] duration-300 ease-out [appearance:textfield] placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+    </span>
   );
 }

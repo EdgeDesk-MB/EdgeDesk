@@ -10,7 +10,6 @@ import {
 import { DashboardLiveTabs } from "@/components/dashboard/dashboard-live-tabs";
 import { DashboardOverviewBar } from "@/components/dashboard/dashboard-overview-bar";
 import { DashboardDoNext } from "@/components/dashboard/dashboard-do-next";
-import { DailyPlan } from "@/components/dashboard/daily-plan";
 import { DashboardFeedPanel } from "@/components/dashboard/dashboard-feed-panel";
 import { MobileHomeDeck } from "@/components/dashboard/mobile-home-deck";
 import { NakedExposureBanner } from "@/components/naked-exposure-banner";
@@ -32,6 +31,7 @@ import {
 import {
   DEFAULT_HOME_LAYOUT,
   applyDeckLayout,
+  ensureVisibleDeckCards,
   isChartOnMobileSummary,
 } from "@/lib/ui/home-layout";
 import { PageLoading } from "@/components/page-loading";
@@ -106,9 +106,6 @@ export default function DashboardPage() {
     state.series.length > 0;
 
   const canDoNext = canDesk(state.settings, "do_next");
-  const planSignals = canDoNext
-    ? state.planRaces.length + state.planFixtures.length + nextActions.length
-    : 0;
 
   const homeLayout = state.settings.homeLayout ?? DEFAULT_HOME_LAYOUT;
   const desktopHidden = new Set<string>(homeLayout.desktopHidden);
@@ -149,24 +146,25 @@ export default function DashboardPage() {
     />
   );
 
-  // Plan stays mounted so an empty day keeps the header and a plated empty.
-  // Then the user's order and hidden set (E2). Chart is not a standalone card.
-  const deckCards = applyDeckLayout(
-    [
-      { id: "hero", label: "Summary", node: overviewMobile },
-      ...(canDoNext
-        ? [{ id: "plan", label: "Today's plan", node: <DailyPlan keepMounted /> }]
-        : []),
-      { id: "feed", label: "Live feed", node: <DashboardFeedPanel state={state} /> },
-      ...(canDoNext && nextActions.length > 0
-        ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
-        : []),
-    ],
-    homeLayout
+  // User's order and hidden set (E2). Chart is not a standalone card.
+  // If every swipe card is hidden or Do next has no work, keep Summary so
+  // the phone Home is never blank.
+  const overviewCard = { id: "hero", label: "Summary", node: overviewMobile };
+  const deckCards = ensureVisibleDeckCards(
+    applyDeckLayout(
+      [
+        overviewCard,
+        { id: "feed", label: "Live feed", node: <DashboardFeedPanel state={state} /> },
+        ...(canDoNext && nextActions.length > 0
+          ? [{ id: "do-next", label: "Do next", node: <DashboardDoNext /> }]
+          : []),
+      ],
+      homeLayout
+    ),
+    overviewCard
   );
 
   const showChartPanel = showActivity && !desktopHidden.has("chart");
-  const showPlanPanel = canDoNext && planSignals > 0 && !desktopHidden.has("plan");
   const showFeedPanel = !desktopHidden.has("feed");
 
   if (showEmptyCta) {
@@ -208,15 +206,13 @@ export default function DashboardPage() {
               <MobileHomeDeck
                 cards={deckCards}
                 pin={state.settings.mobileDeckPin}
-                hasOpenPositions={livePositionCount > 0}
-                hasPlanWork={planSignals > 0}
                 className="sm:hidden"
               />
             ) : null}
 
             {isMobile !== true ? (
               <>
-                {showChartPanel || showPlanPanel || showFeedPanel ? (
+                {showChartPanel || showFeedPanel ? (
                   <div
                     className={cn(
                       dashboardMainGrid,
@@ -227,7 +223,7 @@ export default function DashboardPage() {
                       <div
                         className={cn(
                           dashboardPanelColumn,
-                          showPlanPanel || showFeedPanel
+                          showFeedPanel
                             ? "xl:col-span-6"
                             : "lg:col-span-2 xl:col-span-12"
                         )}
@@ -236,7 +232,7 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    {showPlanPanel || showFeedPanel ? (
+                    {showFeedPanel ? (
                       <div
                         className={cn(
                           dashboardPanelColumn,
@@ -245,34 +241,16 @@ export default function DashboardPage() {
                             : "lg:col-span-2 xl:col-span-12"
                         )}
                       >
-                        {showPlanPanel ? (
-                          <DailyPlan
-                            className={
-                              showFeedPanel || showLive
-                                ? "border-b border-border/60"
-                                : undefined
-                            }
-                          />
-                        ) : null}
-                        {showFeedPanel ? (
-                          <DashboardFeedPanel
-                            state={state}
-                            showLiveDock={showLive}
-                          />
-                        ) : showLive ? (
-                          <DashboardLiveTabs
-                            state={state}
-                            docked
-                            className="min-h-0 flex-1"
-                          />
-                        ) : null}
+                        <DashboardFeedPanel
+                          state={state}
+                          showLiveDock={showLive}
+                        />
                       </div>
                     ) : null}
                   </div>
                 ) : null}
 
-                {/* No History / plan column: keep Live on the page foot. */}
-                {showLive && !showFeedPanel && !showPlanPanel ? (
+                {showLive && !showFeedPanel ? (
                   <div className="hidden border-t border-border/60 sm:block">
                     <DashboardLiveTabs state={state} docked />
                   </div>

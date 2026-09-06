@@ -70,7 +70,7 @@ export const ONBOARDING_WHY = [
   },
   {
     id: "do_next",
-    label: "Do next and Daily Plan",
+    label: "Do next",
     description: "Ranked work for today, in one queue.",
     flag: "do_next",
   },

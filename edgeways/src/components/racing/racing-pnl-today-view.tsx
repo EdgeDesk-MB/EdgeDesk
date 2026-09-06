@@ -50,7 +50,7 @@ const CHART_MIN_RACES = 2;
  * Keep in sync with `live-pnl-chart.tsx`.
  */
 const PNL_CHART_COLORS = {
-  light: { profit: "#059669", loss: "#e7000b" },
+  light: { profit: "#009461", loss: "#e83f41" },
   dark: { profit: "#34d399", loss: "#ff8d8b" },
 } as const;
 

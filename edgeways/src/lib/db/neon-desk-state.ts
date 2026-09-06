@@ -27,7 +27,11 @@ import {
   listNeonInboxDedupes,
   unreadNeonCount,
 } from "@/lib/db/neon-alerts-inbox";
-import { awardNeonUnconditionalFreeBetsDue, healNeonDeskLedgers } from "@/lib/db/neon-desk-ledger";
+import {
+  awardNeonPlaceFreeBetsDue,
+  awardNeonUnconditionalFreeBetsDue,
+  healNeonDeskLedgers,
+} from "@/lib/db/neon-desk-ledger";
 import {
   maybeSendNeonDailyTasksDigest,
   maybeSendNeonWeeklyDigest,
@@ -122,7 +126,9 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     // Heal is best-effort; the snapshot still renders.
   }
   try {
-    const awarded = await awardNeonUnconditionalFreeBetsDue(bets, transactions);
+    const awarded =
+      (await awardNeonUnconditionalFreeBetsDue(bets, transactions)) +
+      (await awardNeonPlaceFreeBetsDue(bets, events, transactions));
     if (awarded > 0) {
       const [nextTxs, nextHistory] = await Promise.all([
         listNeonDeskBalanceTransactions(),

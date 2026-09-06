@@ -54,7 +54,7 @@ export const CALCULATOR_SECTIONS: CalculatorSection[] = [
       {
         href: "/calculators/dutching",
         title: "Dutching",
-        description: "Split a stake across outcomes for equal profit.",
+        description: "Equal-profit splits, with rounding and stake overrides.",
         icon: ChartPie,
       },
       {

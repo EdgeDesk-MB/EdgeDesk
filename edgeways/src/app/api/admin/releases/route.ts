@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/session";
 import { setPosthogFlagActive } from "@/lib/admin/flags";
-import { writeMaintenanceBanner } from "@/lib/admin/operator-settings";
+import {
+  writeAppUpdateSettings,
+  writeMaintenanceBanner,
+} from "@/lib/admin/operator-settings";
+import { isAppUpdateMode } from "@/lib/admin/app-update-shared";
 import {
   isInvalidBannerHrefInput,
   isSiteBannerKind,
@@ -20,6 +24,10 @@ export async function PATCH(request: Request) {
       kind?: string;
       href?: string | null;
       linkLabel?: string | null;
+    };
+    update?: {
+      mode?: string;
+      message?: string;
     };
     flag?: { id?: number; active?: boolean };
   };
@@ -80,6 +88,26 @@ export async function PATCH(request: Request) {
       linkLabel: body.banner.linkLabel ?? null,
     });
     return NextResponse.json({ banner });
+  }
+
+  if (body.update) {
+    if (body.update.mode != null && !isAppUpdateMode(body.update.mode)) {
+      return NextResponse.json(
+        { error: "Pick auto, off, or force." },
+        { status: 400 }
+      );
+    }
+    if (body.update.message != null && typeof body.update.message !== "string") {
+      return NextResponse.json(
+        { error: "Update message must be text." },
+        { status: 400 }
+      );
+    }
+    const update = await writeAppUpdateSettings({
+      mode: isAppUpdateMode(body.update.mode) ? body.update.mode : undefined,
+      message: body.update.message ?? "",
+    });
+    return NextResponse.json({ update });
   }
 
   const flagId = body.flag?.id;

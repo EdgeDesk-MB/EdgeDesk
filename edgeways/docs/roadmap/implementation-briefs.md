@@ -10,8 +10,8 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-09-05 (P1 Football live card Phase 1 in flight — HT persist, event
-tape, XI picker on Edge. HT/FT auto-settle and stats/predictions deferred.)
+Last updated: 2026-09-06 (B1 Daily Plan Home UI removed and parked to revisit.
+P1 Football live card Phase 1 in flight — HT persist, event tape, XI picker on Edge.)
 
 ---
 
@@ -259,7 +259,12 @@ principle). Exclude `nonRunner: true`.
 
 # PHASE 2 — DAILY DRIVER
 
-## B1. The Daily Plan `[strong]` `[design-first]` ✅ DONE
+## B1. The Daily Plan `[strong]` `[design-first]` ✅ DONE — UI removed 2026-09-06 (parked)
+
+**Status.** The timeline shipped, then Sam removed it from Home (desktop + mobile deck),
+Settings start-card pin, and the mobile quick-log "From today's plan" list: not adding value.
+Revisit later. Keep `src/lib/plan/daily-plan.ts` and the `planRaces` / `planFixtures` state
+inputs (alerts still use the race shape). Do not restore the widget without a new brief.
 
 **Objective.** One time-ordered run-sheet for today merging: offer next-actions with deadlines
 (`offer-calendar.ts` already classifies today/critical), tracked races (off times), fixture
@@ -401,12 +406,10 @@ per settled bet; `state.ts` accumulates it as `commissionPaid` on each series po
 
 CSS scroll-snap deck replacing the vertical stack on `< sm` only: container
 `overflow-x-auto snap-x snap-mandatory flex`, children `snap-center shrink-0 w-[92vw]`.
-Cards: Edge hero (A4), Daily Plan (B1), Live P&L chart, Feed, Do Next. Desktop layout untouched —
-same components, different container in `src/app/page.tsx`; **widgets must not know which mode
-they're in**. Pagination dots + last-position memory (sessionStorage, pattern:
-`racing-settle-prompt.tsx` uses the same storage idiom). Context-aware initial card
-(deterministic): open `livePositions` → chart; before 12:00 with plan slots → Daily Plan; else
-hero. User pin overrides (a setting, added per §0 settings checklist).
+Cards: Summary, Live P&L chart (on Summary), Feed, Do Next. Daily Plan left the deck on
+2026-09-06. Desktop layout untouched — same components, different container; **widgets must not
+know which mode they're in**. Pagination dots + last-position memory (sessionStorage). Start
+card: Summary, Live feed, or Do next (Settings). Leftover `auto` / `plan` / `chart` pins map to Summary.
 
 ## C2. Progressive disclosure audit `[local]` ✅ DONE (primary surfaces; calculator-page tables deferred)
 
@@ -418,8 +421,8 @@ place. Racing Desk mobile default = race strip + suggested races + workflow step
 ## C3. Quick-log sheet `[strong]` ✅ DONE — needs B4
 
 Floating "+" on mobile (add to `src/components/app-nav.tsx` mobile chrome) → bottom sheet with
-three paths: Paste slip (B4), From plan (today's B1 slots → one-tap "placed"), Minimal manual
-(bookie/stake/odds only). Writes flag the bet `quick-logged` (new nullable text column
+Paste slip (B4) and minimal manual Add bet, then desk actions. The B1 "From plan" list was
+removed with the Daily Plan UI on 2026-09-06. Writes flag the bet `quick-logged` (new nullable text column
 `quick_logged` on `bets` per §0 additive-column pattern, or reuse `notes` marker — decide with
 Sam; column preferred for querying). **Decision: INTEGER epoch-ms column `quick_logged` (2026-07-13).** Desktop tracker shows a "review quick-logged" filter chip.
 **Mobile captures, desktop curates** — the sheet never demands full data.
@@ -572,11 +575,12 @@ default is visible on each row.
 
 ## E2. Home widget personalisation `[strong]` `[design-first]` ✅ DONE
 
-**Objective.** User-controlled visibility and order for the five Home widgets (`hero`, `do-next`,
-`plan`, `chart`, `feed`), persisted in settings, without breaking the context-aware start card.
+**Objective.** User-controlled visibility and order for the Home widgets (`hero`, `do-next`,
+`chart`, `feed`), persisted in settings, without breaking the start-card pin. `plan` was retired
+from this set on 2026-09-06 (normaliser drops the stored id).
 
 **Design decisions (documented deviations).** (1) The mobile deck is homogeneous, so it gets FULL
-reorder + hide. The desktop Home is a bespoke composition (chart and plan/feed share a designed
+reorder + hide. The desktop Home is a bespoke composition (chart and feed share a designed
 two-column row), so desktop gets per-widget show/hide with the grid adapting (hidden chart → the
 panel column goes full width, mirroring the existing `showActivity` behaviour) - free desktop
 reordering would destroy the pairing and is deferred until real use demands it. (2) Reordering
@@ -596,7 +600,7 @@ order controls for the deck.
 
 **Acceptance.** Untouched settings render today's exact Home (default order/visibility asserted
 in tests); hiding every widget is impossible (normaliser keeps one); hidden widgets remain
-reachable as pages (chart → tracker chart, plan/do-next → offers, feed → history); layout lib
+reachable as pages (chart → tracker chart, do-next → offers, feed → history); layout lib
 unit-tested.
 
 ## E3. Data custody: backup, restore, import `[strong]` ✅ DONE
@@ -2277,7 +2281,7 @@ and optionally preview the locked UX. Auth + Stripe wait for the business gate (
 | Calculators + manual bet log | ✓ | ✓ | ✓ |
 | Demo Racing Desk / demo data | ✓ | ✓ | ✓ |
 | Offers pipeline, tracker, free-bet lots | | ✓ | ✓ |
-| Do Next / Daily Plan / Edge Report / EV analytics | | ✓ | ✓ |
+| Do Next / Edge Report / EV analytics | | ✓ | ✓ |
 | Acca Desk + offer → Acca qualifier routing (L4) | | ✓ | ✓ |
 | Offer Edge model + Race picks + recommended desk chrome | | | ✓ |
 | Live/delayed Racing Desk feeds (when keys present) | | | ✓ |

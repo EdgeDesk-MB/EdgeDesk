@@ -5,13 +5,12 @@
  * reproduce the shipped Home exactly.
  */
 
-export const HOME_WIDGET_IDS = ["hero", "do-next", "plan", "chart", "feed"] as const;
+export const HOME_WIDGET_IDS = ["hero", "do-next", "chart", "feed"] as const;
 export type HomeWidgetId = (typeof HOME_WIDGET_IDS)[number];
 
 export const HOME_WIDGET_LABELS: Record<HomeWidgetId, string> = {
   hero: "Summary",
   "do-next": "Do next",
-  plan: "Today's plan",
   chart: "Chart",
   feed: "Live feed",
 };
@@ -22,14 +21,15 @@ export const HOME_WIDGET_LABELS: Record<HomeWidgetId, string> = {
  * skips `chart`; a visible Chart cannot hide Summary.
  */
 export const DEFAULT_HOME_LAYOUT: HomeLayoutSettings = {
-  deckOrder: ["hero", "plan", "chart", "feed", "do-next"],
+  deckOrder: ["hero", "chart", "feed", "do-next"],
   deckHidden: [],
   desktopHidden: [],
 };
 
-/** Chart is not a standalone mobile card; treat a stored "chart" pin as Summary. */
+/** Chart is not a standalone mobile card; leftover "plan" / "chart" / "auto" pins map to Summary. */
 export function resolveMobileDeckCardId(id: string | null | undefined): string {
-  return id === "chart" ? "hero" : (id ?? "hero");
+  if (id === "chart" || id === "plan" || id === "auto") return "hero";
+  return id ?? "hero";
 }
 
 export function isChartOnMobileSummary(layout: HomeLayoutSettings): boolean {
@@ -108,6 +108,14 @@ export function applyDeckLayout<T extends { id: string }>(
     }
   }
   return ordered;
+}
+
+/** Never leave the phone Home blank: if every card is hidden or absent, keep Summary. */
+export function ensureVisibleDeckCards<T extends { id: string }>(
+  cards: T[],
+  fallback: T
+): T[] {
+  return cards.length > 0 ? cards : [fallback];
 }
 
 /** Move a widget one step within the deck order; returns a new order. */

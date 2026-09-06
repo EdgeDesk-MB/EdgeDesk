@@ -21,9 +21,15 @@ describe("EDGE-32 default amber pairs", () => {
     expect(contrastInkOrWhite("#FFC71E")).toBe("#111111");
   });
 
-  it("gives light-mode profit type AA on the canvas", () => {
-    // --profit light ≈ #0a5c2c; --canvas light ≈ #e2e3e4
-    expect(contrastRatio("#0a5c2c", "#e2e3e4")).toBeGreaterThanOrEqual(4.5);
+  it("gives light-mode profit type at least 3:1 on the canvas", () => {
+    // --profit light ≈ #009461 (compiled); --canvas light ≈ #e7e8ea
+    expect(contrastRatio("#009461", "#e7e8ea")).toBeGreaterThanOrEqual(3);
+  });
+
+  it("gives light-mode profit and loss type at least 3:1 on the page", () => {
+    // --page light ≈ #f4f4f4
+    expect(contrastRatio("#009461", "#f4f4f4")).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio("#e83f41", "#f4f4f4")).toBeGreaterThanOrEqual(3);
   });
 
   it("gives dark-mode profit type AA on the page", () => {

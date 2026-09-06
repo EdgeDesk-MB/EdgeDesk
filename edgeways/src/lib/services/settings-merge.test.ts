@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "./settings-shared";
-import { mergeAppSettings, parseStoredSettings } from "./settings-merge";
+import {
+  isFixtureScopeSettingsPatch,
+  mergeAppSettings,
+  parseStoredSettings,
+} from "./settings-merge";
 
 describe("parseStoredSettings", () => {
   it("returns defaults for empty or invalid input", () => {
@@ -41,6 +45,33 @@ describe("mergeAppSettings", () => {
     });
     expect(confirmed.ageConfirmedAt).toBe(1_754_870_400_000);
     expect(mergeAppSettings(confirmed, { ageConfirmedAt: null }).ageConfirmedAt).toBeNull();
+  });
+
+  it("round-trips favourite fixture scopes", () => {
+    const patched = mergeAppSettings(DEFAULT_SETTINGS, {
+      favouriteFootballScopes: ["England::Premier League", "all", "England::Premier League"],
+      favouriteRacingCourses: ["Ascot", "favourites"],
+    });
+    expect(patched.favouriteFootballScopes).toEqual(["England::Premier League"]);
+    expect(patched.favouriteRacingCourses).toEqual(["Ascot"]);
+    const hidden = mergeAppSettings(DEFAULT_SETTINGS, {
+      hiddenFootballScopes: ["Gibraltar::Premier Division", "all"],
+    });
+    expect(hidden.hiddenFootballScopes).toEqual(["Gibraltar::Premier Division"]);
+    expect(
+      parseStoredSettings({
+        ...DEFAULT_SETTINGS,
+        favouriteFootballScopes: patched.favouriteFootballScopes,
+        hiddenFootballScopes: hidden.hiddenFootballScopes,
+      })
+    ).toMatchObject({
+      favouriteFootballScopes: ["England::Premier League"],
+      hiddenFootballScopes: ["Gibraltar::Premier Division"],
+    });
+    expect(isFixtureScopeSettingsPatch({ hiddenFootballScopes: ["Germany::Bundesliga"] })).toBe(
+      true
+    );
+    expect(isFixtureScopeSettingsPatch({ defaultBackStake: 10 })).toBe(false);
   });
 
   it("merges one offer pref without dropping the rest", () => {

@@ -10,6 +10,7 @@ import {
   normalizeAccessStatus,
   type BookieAccessStatus,
 } from "@/lib/accounts/access";
+import { inferBackVenueKind } from "@/lib/accounts/resolve-venue";
 import { filterBookmakers } from "@/lib/bookmakers";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { fieldControl } from "@/lib/ui/surface-styles";
@@ -33,7 +34,7 @@ export function inferVenueKind(
 ): "bookie" | "exchange" {
   const key = name.trim().toLowerCase();
   const asExchange =
-    /\b(exchange|betfair|betdaq|smarkets|matchbook|betconnect)\b/i.test(name) ||
+    inferBackVenueKind(name) === "exchange" ||
     exchangeDirectory.some((e) => e.name.toLowerCase() === key) ||
     exchangeWallets.some((e) => e.name.toLowerCase() === key);
   return asExchange ? "exchange" : "bookie";

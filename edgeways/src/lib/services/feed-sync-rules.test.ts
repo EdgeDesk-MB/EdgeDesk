@@ -84,6 +84,24 @@ describe("selectFootballSyncEvents", () => {
     expect(second.backfill).toEqual([]);
   });
 
+  it("gives a finished match with an empty tape one events backfill", () => {
+    const finished = event({
+      id: 12,
+      status: "finished",
+      startTime: NOW - 24 * 60 * 60 * 1000,
+      goals: null,
+    });
+    const first = selectFootballSyncEvents([finished], NOW, new Set());
+    expect(first.poll).toEqual([]);
+    expect(first.backfill.map((e) => e.id)).toEqual([12]);
+
+    const filled = event({
+      ...finished,
+      goals: '[{"minute":1,"side":"home"}]',
+    });
+    expect(selectFootballSyncEvents([filled], NOW, new Set()).backfill).toEqual([]);
+  });
+
   it("never lists an event as both a poll and a backfill", () => {
     const live = event({ id: 1 });
     const { poll, backfill } = selectFootballSyncEvents([live], NOW, new Set());

@@ -3,11 +3,11 @@
 /**
  * Mobile quick actions. A floating brand bolt on every phone screen opens a
  * bottom sheet that mirrors Cmd+K: Paste slip and Add bet as the capture
- * paths, today's plan slots when they exist, then the global modals (new
- * offer, balance, calculator, casino, boost, track fixture).
+ * paths, then the global modals (new offer, balance, calculator, casino,
+ * boost, track fixture).
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarSearch,
@@ -16,7 +16,6 @@ import {
   Dices,
   Zap,
   Gift,
-  ListTodo,
   Plus,
   Wallet,
   type LucideIcon,
@@ -29,7 +28,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EdgewaysBolt } from "@/components/edgeways-logo-icon";
-import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useCasinoLog } from "@/components/casino/casino-log-provider";
@@ -37,45 +35,15 @@ import { useBoostCheck } from "@/components/boosts/boost-check-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
 import { useOfferDialog } from "@/components/offers/offer-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
-import { beginEffort } from "@/lib/effort-timer";
 import { canDesk } from "@/lib/entitlements/effective-plan";
-import { useDoNextItems } from "@/hooks/use-do-next-items";
+import { useAppState } from "@/hooks/use-app-state";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { buildDailyPlan, type DailyPlanSlot } from "@/lib/plan/daily-plan";
 import {
   captionHeading,
-  listRowInteractive,
   offerCampaignCardInteractive,
   panelSurface,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-
-function PlanSlotButton({
-  slot,
-  onPick,
-}: {
-  slot: DailyPlanSlot;
-  onPick: (slot: DailyPlanSlot) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onPick(slot)}
-      className={cn(
-        listRowInteractive,
-        "flex min-h-12 w-full items-center gap-3 px-2 py-3 text-left outline-none active:bg-selection-subtle",
-        "focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
-      )}
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{slot.title}</span>
-        {slot.detail ? (
-          <span className="block truncate text-xs text-muted-foreground">{slot.detail}</span>
-        ) : null}
-      </span>
-    </button>
-  );
-}
 
 /**
  * The two capture paths are the sheet's reason to exist, so they wear the
@@ -157,40 +125,14 @@ export function QuickLogSheet() {
   const { openMatchedCalculator } = useMatchedCalculator();
   const { openOffer } = useOfferDialog();
   const { openTrackFixture } = useTrackFixture();
-  const { items: doNext, state } = useDoNextItems(5000);
+  const { state } = useAppState();
   const [open, setOpen] = useState(false);
-
-  const planSlots = useMemo(() => {
-    if (!state) return [];
-    return buildDailyPlan({
-      offers: state.offers ?? [],
-      doNext,
-      races: [],
-      fixtures: [],
-      accaLegs: state.accaLayDue ?? [],
-    }).filter((s) => !s.done && (s.doKind != null || s.id.startsWith("acca-lay-")));
-  }, [state, doNext]);
 
   if (isMobile !== true) return null;
 
   function launch(action: () => void) {
     setOpen(false);
     action();
-  }
-
-  function pickSlot(slot: DailyPlanSlot) {
-    const item = doNext.find((i) => i.id === slot.id);
-    if (item?.offerId != null) beginEffort(item.offerId, item.kind);
-    launch(() =>
-      openAddBet({
-        bookmaker: item?.bookmaker ?? undefined,
-        offerId: item?.offerId ?? undefined,
-        labelSuggestion: item?.offerTitle ?? slot.title,
-        ...(item?.convertLot
-          ? { betType: "free_snr" as const, backStake: item.convertLot.remaining }
-          : {}),
-      })
-    );
   }
 
   return (
@@ -211,27 +153,7 @@ export function QuickLogSheet() {
             <DialogDescription>Log a bet, or jump to a desk action.</DialogDescription>
           </DialogHeader>
 
-          {/* min-w-0: DialogContent is a grid, so without it this column sizes
-              to the widest plan row's min-content and overflows the sheet. */}
           <div className="flex min-w-0 flex-col gap-5">
-            {planSlots.length > 0 ? (
-              <div>
-                <p className={cn(captionHeading, "flex items-center gap-1.5 px-1 pb-2.5")}>
-                  <ListTodo className="size-3.5" aria-hidden />
-                  From today&apos;s plan
-                </p>
-                <ScrollFadeEdges
-                  className="max-h-44"
-                  fadeClassName="from-page dark:from-page"
-                  scrollClassName="app-scroll-nested max-h-44"
-                >
-                  {planSlots.map((slot) => (
-                    <PlanSlotButton key={slot.id} slot={slot} onPick={pickSlot} />
-                  ))}
-                </ScrollFadeEdges>
-              </div>
-            ) : null}
-
             <div className="grid min-w-0 grid-cols-2 gap-2.5">
               <CapturePathButton
                 icon={ClipboardPaste}

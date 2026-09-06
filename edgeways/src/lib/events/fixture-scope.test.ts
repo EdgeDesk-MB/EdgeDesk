@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  displayFootballCompetitionName,
   filterScopeOptions,
   fixtureMatchesFootballScope,
+  footballCompetitionDisplayTitle,
   footballScopeId,
   footballScopeLabel,
   groupFootballByLeague,
+  normalizeFavouriteScopeIds,
+  partitionHiddenScopeOptions,
+  sortFavouriteScopeIdsFirst,
+  toggleFavouriteScopeId,
 } from "@/lib/events/fixture-scope";
 
 describe("footballScopeId", () => {
@@ -30,6 +36,26 @@ describe("footballScopeLabel", () => {
       "Premier League (Hong Kong)"
     );
   });
+
+  it("strips a leading feed tier ordinal when the name stays unique", () => {
+    expect(displayFootballCompetitionName("2. Division - Group 1")).toBe(
+      "Division - Group 1"
+    );
+    expect(displayFootballCompetitionName("2. Bundesliga")).toBe("Bundesliga");
+    expect(
+      footballCompetitionDisplayTitle("2. Bundesliga", "Germany", [
+        { competition: "2. Bundesliga", leagueCountry: "Germany" },
+      ])
+    ).toBe("Bundesliga");
+    expect(displayFootballCompetitionName("1. Liga Classic - Group 1")).toBe(
+      "Liga Classic - Group 1"
+    );
+    expect(footballScopeLabel("Division", "Belarus", false)).toBe("Division");
+  });
+
+  it("keeps numbers that are not a leading ordinal", () => {
+    expect(displayFootballCompetitionName("Premier League 2")).toBe("Premier League 2");
+  });
 });
 
 describe("groupFootballByLeague", () => {
@@ -47,6 +73,30 @@ describe("groupFootballByLeague", () => {
     expect(
       groups.find((group) => group.leagueCountry === "England")?.fixtures
     ).toHaveLength(2);
+  });
+
+  it("keeps the tier ordinal when stripping would collide", () => {
+    const groups = groupFootballByLeague([
+      { competition: "Bundesliga", leagueCountry: "Germany" },
+      { competition: "2. Bundesliga", leagueCountry: "Germany" },
+      { competition: "2. Frauen Bundesliga", leagueCountry: "Germany" },
+    ]);
+    expect(groups.map((group) => group.label).sort()).toEqual([
+      "2. Bundesliga",
+      "Bundesliga",
+      "Frauen Bundesliga",
+    ]);
+  });
+
+  it("adds country when stripped names collide across countries", () => {
+    const groups = groupFootballByLeague([
+      { competition: "1. Division", leagueCountry: "Belarus" },
+      { competition: "2. Division", leagueCountry: "Norway" },
+    ]);
+    expect(groups.map((group) => group.label).sort()).toEqual([
+      "Division (Belarus)",
+      "Division (Norway)",
+    ]);
   });
 });
 
@@ -104,5 +154,44 @@ describe("filterScopeOptions", () => {
   it("uses prefix when the query is not an exact name", () => {
     const hits = filterScopeOptions(options, "premier league 2", "England");
     expect(hits.map((option) => option.id)).toEqual(["pl2"]);
+  });
+});
+
+describe("favourite scope ids", () => {
+  it("normalises, dedupes, and drops reserved tokens", () => {
+    expect(
+      normalizeFavouriteScopeIds([
+        " England::Premier League ",
+        "England::Premier League",
+        "all",
+        "favourites",
+        "",
+        12,
+        "Hong Kong::Premier League",
+      ])
+    ).toEqual(["England::Premier League", "Hong Kong::Premier League"]);
+  });
+
+  it("toggles a pin on and off", () => {
+    const added = toggleFavouriteScopeId([], "England::Premier League");
+    expect(added).toEqual(["England::Premier League"]);
+    expect(toggleFavouriteScopeId(added, "England::Premier League")).toEqual([]);
+  });
+
+  it("keeps favourite rows first without reordering the rest", () => {
+    const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(sortFavouriteScopeIdsFirst(rows, new Set(["c", "a"])).map((row) => row.id)).toEqual([
+      "a",
+      "c",
+      "b",
+    ]);
+  });
+
+  it("partitions hidden scope rows", () => {
+    const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(partitionHiddenScopeOptions(rows, new Set(["b"]))).toEqual({
+      visible: [{ id: "a" }, { id: "c" }],
+      hidden: [{ id: "b" }],
+    });
   });
 });

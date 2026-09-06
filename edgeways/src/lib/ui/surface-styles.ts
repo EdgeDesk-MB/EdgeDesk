@@ -15,14 +15,14 @@ export const fieldControl = cn(
   "skeuo-solid field-control rounded-[var(--radius-button)] border-transparent bg-[#eeeeee] dark:bg-input/30"
 );
 
-/** White card lifted above the grey-blue page surface */
+/** White card lifted above the page surface */
 export const surfaceLift = cn(
   "surface-lift bg-card text-card-foreground ring-1 ring-border/40 dark:ring-0"
 );
 
-/** Main centred page panel - grey-blue, sits on the canvas shell */
+/** Main centred page panel — sits on the canvas shell, no left/right stroke */
 export const pagePanel = cn(
-  "page-panel overflow-hidden bg-page text-foreground ring-1 ring-border/40 dark:ring-0"
+  "page-panel overflow-hidden bg-page text-foreground"
 );
 
 /** Nested full-width panel on the page - white lifted block */
@@ -150,6 +150,9 @@ export const listDaySectionLabel =
 /** Stack under a day-split heading (campaign cards or a day's table). */
 export const listDaySectionContent = "mt-3 flex flex-col gap-4.5";
 
+/** Tighter card stack under a day heading (History). Overrides `listDaySectionContent` gap. */
+export const listDaySectionContentCompact = "gap-3";
+
 /** Day-split inside a plate that already stacks hairline rows (Browse fixtures). */
 export const listDaySectionContentNested = "mt-1.5 flex flex-col gap-0";
 
@@ -169,9 +172,31 @@ export const tableBodyCell = "px-2 py-2 align-middle";
 export const tableEdgeStart = "pl-4";
 export const tableEdgeEnd = "pr-6";
 
+/**
+ * Inset desk table inside a lifted shell (match events, Racing P&L).
+ * Sinks one step on the canvas → page → card stack. No overflow clip:
+ * period headers stay sticky to the scrollport.
+ */
+export const deskTableWell =
+  "rounded-lg border border-border/80 bg-canvas dark:bg-page";
+
+/**
+ * Well corners when overflow stays visible (sticky period bars).
+ * Clip would trap sticky; paint the radius on the first/last row instead.
+ */
+export const deskTableWellCornerStart =
+  "rounded-t-[calc(var(--radius)-1px)] border-t-0";
+export const deskTableWellCornerEnd = "rounded-b-[calc(var(--radius)-1px)]";
+
 /** Header band + type for desk-style tables (race results, day P&L). */
 export const deskTableHeaderRow =
   "border-x-0 border-y border-border/60 bg-selection-subtle/50 text-xs uppercase tracking-wide text-muted-foreground";
+/** Opaque sticky period / section band (match events). Same fill as the
+ * light header, solid so rows do not show through. */
+export const deskTableHeaderRowSticky = cn(
+  deskTableHeaderRow,
+  "sticky top-0 z-20 bg-selection-subtle py-2"
+);
 /** Match Racing Desk results `<th>`: py-2 / px-2 (edges via tableEdge*). */
 export const deskTableHeaderCell =
   "h-auto border-x-0 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground";
@@ -408,6 +433,23 @@ export function filterPillState(
  */
 export const toolbarSelectTrigger =
   "w-auto rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground hover:text-foreground data-[state=open]:bg-muted/60 data-[state=open]:text-foreground data-[empty=false]:bg-muted/60 data-[empty=false]:text-foreground";
+
+/**
+ * Fixture competition / course combobox. Same type as `toolbarSelectTrigger`,
+ * but the plate stays transparent on hover, open, and an applied value.
+ */
+export const toolbarSelectTriggerGhost =
+  "h-8 max-sm:h-8 w-auto max-w-56 rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground aria-expanded:bg-transparent aria-expanded:text-foreground data-[state=open]:bg-transparent data-[state=open]:text-foreground data-[empty=false]:bg-transparent data-[empty=false]:text-foreground dark:hover:bg-transparent";
+
+/** Stroke star; filled brand when pinned. Use on page / card chrome, not a brand plate. */
+export function favouriteStarIcon(filled: boolean, size: "sm" | "md" = "md") {
+  return cn(size === "sm" ? "size-3.5" : "size-4", filled && "fill-brand text-brand");
+}
+
+/** Active Saved FilterPill: inherit `--brand-foreground` on the brand plate. */
+export function favouriteStarIconOnBrandPlate(filled: boolean) {
+  return cn("size-3.5", filled && "fill-current");
+}
 
 /** Compact “Convert” CTA shared by Do next cards and Accounts free-bet rows. */
 export const convertFreeBetButtonClass = "h-7 shrink-0 text-xs";

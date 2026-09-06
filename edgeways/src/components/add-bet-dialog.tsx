@@ -41,6 +41,7 @@ import {
   noLaySaveBetType,
   type FreeBetKind,
 } from "@/components/add-bet/back-bookie-balance-strip";
+import { backVenueKind } from "@/lib/accounts/resolve-venue";
 import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { MoneyFlow } from "@/components/money-flow";
 import { VenueBadge } from "@/components/venue-badge";
@@ -76,6 +77,7 @@ import {
   type KeyedLayOverride,
 } from "@/lib/add-bet-lay-stake";
 import {
+  dutchWorstProfit,
   layBounds,
   layPlanOutcome,
   matchedBackReturns,
@@ -97,6 +99,7 @@ import {
   inferSportFromBet,
   isKnownSport,
   marketDef,
+  marketUsesLinkedEventSides,
   MARKETS,
   parseCorrectScore,
   SPORTS,
@@ -200,7 +203,7 @@ export interface AddBetPrefill {
   /** Placeholder + fallback name when the user doesn't type a label */
   labelSuggestion?: string;
   /** Calc modes, or UI-only boost (J2b) / no_lay / dutch via setBetType after open */
-  betType?: BetMode | "boost";
+  betType?: BetMode | "boost" | "dutch" | "no_lay";
   backStake?: number;
   backOdds?: number;
   layOdds?: number;
@@ -768,7 +771,10 @@ export function AddBetDialog({
         setSelection(prefill.selection);
       }
       if (prefill.earlyPayout !== undefined) setEarlyPayout(prefill.earlyPayout);
-      if (prefill.dutchLegs) setDutchLegs(prefill.dutchLegs);
+      if (prefill.dutchLegs) {
+        setDutchLegs(prefill.dutchLegs);
+        if (!prefill.betType) setBetType("dutch");
+      }
       if (prefill.layStake !== undefined) {
         setLayStakeOverride(commitLayStakeOverride(prefill.layStake, prefillLayKey));
       }
@@ -863,7 +869,8 @@ export function AddBetDialog({
   const commission =
     exchange?.commissionPct ?? (editBet ? editBet.commission * 100 : 2);
   const markets = MARKETS[sport] ?? MARKETS.other;
-  const currentMarket = marketDef(sport, market);
+  const effectiveMarket = isDutch && sport === "football" ? "match_odds" : market;
+  const currentMarket = marketDef(sport, effectiveMarket);
 
   /** Boost % → effective bookie price (winnings-only); otherwise raw back odds. */
   const effectiveBackOdds = useMemo(() => {
@@ -1068,10 +1075,24 @@ export function AddBetDialog({
   );
 
   const selectedEvent = events.find((e) => String(e.id) === eventId);
-  const effectiveHome = homeTeam.trim() || selectedEvent?.homeTeam || "";
-  const effectiveAway = awayTeam.trim() || selectedEvent?.awayTeam || "";
-
+  const linkedHome =
+    selectedEvent?.homeTeam ||
+    (pendingFixture && sport !== "horse_racing" ? pendingFixture.homeTeam : "") ||
+    "";
+  const linkedAway =
+    selectedEvent?.awayTeam ||
+    (pendingFixture && sport !== "horse_racing" ? pendingFixture.awayTeam : "") ||
+    "";
   const eventLinked = eventId !== "none";
+  const lockEventSides =
+    sport === "football" &&
+    eventLinked &&
+    marketUsesLinkedEventSides(sport, effectiveMarket) &&
+    Boolean(linkedHome && linkedAway);
+  const displayedHome = lockEventSides ? linkedHome : homeTeam;
+  const displayedAway = lockEventSides ? linkedAway : awayTeam;
+  const effectiveHome = displayedHome.trim() || linkedHome || "";
+  const effectiveAway = displayedAway.trim() || linkedAway || "";
   /** Odds order from the loaded racecard (pending fixture or matching known race). */
   const raceOddsOrder = useMemo(() => {
     if (pendingFixture?.runners?.length) return pendingFixture.runners;
@@ -1455,6 +1476,12 @@ export function AddBetDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, events, eventId]);
 
+  useEffect(() => {
+    if (!lockEventSides) return;
+    if (homeTeam !== linkedHome) setHomeTeam(linkedHome);
+    if (awayTeam !== linkedAway) setAwayTeam(linkedAway);
+  }, [lockEventSides, linkedHome, linkedAway, homeTeam, awayTeam]);
+
   // Race-scoped campaign / Racing Desk: select the meeting race once tracked
   // events / racecards load. Re-apply horse selection — linking must not leave
   // Selection blank after the desk action already named the runner.
@@ -1623,8 +1650,8 @@ export function AddBetDialog({
     if (m !== "match_odds") setEarlyPayout(false);
   }
 
-  /** Dutch type: the builder computes stakes, this maps them into stored legs
-   * (market/selection) - same convention as the Dutching calculator. */
+  /** Dutch type: the builder computes (and may override) stakes, this maps
+   * them into stored legs - same convention as the Dutching calculator. */
   function handleDutchResult(
     result: { legs: Array<{ label: string; odds: number; stake: number }> } | null,
     legs: Array<DutchLeg & { bookmaker?: string; freeBet?: "snr" | "sr" }>
@@ -1798,7 +1825,10 @@ export function AddBetDialog({
     if (!(topUp > 0.001)) return;
     const ensured = await api<{ account: { id: number } }>("/api/accounts/ensure", {
       method: "POST",
-      json: { name: bookie.trim(), kind: "bookie" },
+      json: {
+        name: bookie.trim(),
+        kind: backVenueKind(appState?.balances?.accounts, bookie),
+      },
     });
     await api("/api/balances", {
       method: "POST",
@@ -1921,12 +1951,12 @@ export function AddBetDialog({
       }
     }
 
-    if (!resolvedEventId && homeTeam.trim() && awayTeam.trim()) {
+    if (!resolvedEventId && effectiveHome && effectiveAway) {
       const tracked = await api<{ event: { id: number }; mode: string }>("/api/events/track", {
         method: "POST",
         json: {
-          homeTeam: homeTeam.trim(),
-          awayTeam: awayTeam.trim(),
+          homeTeam: effectiveHome,
+          awayTeam: effectiveAway,
           sport,
           startTime: parseEventStartTime(eventDate, eventTime),
           competition: eventName.includes("·")
@@ -1938,7 +1968,7 @@ export function AddBetDialog({
       suppressRaceOffSoonForBetLink(resolvedEventId);
       if (tracked.mode === "existing") {
         toast.info("Linked to tracked event", {
-          description: `${homeTeam.trim()} v ${awayTeam.trim()} is already on your track list.`,
+          description: `${effectiveHome} v ${effectiveAway} is already on your track list.`,
         });
       }
     }
@@ -1994,6 +2024,7 @@ export function AddBetDialog({
           homeTeam: sport === "football" ? effectiveHome || undefined : undefined,
           awayTeam: sport === "football" ? effectiveAway || undefined : undefined,
           offerId: dutchOfferId,
+          expectedProfit: Number(dutchWorstProfit(dutchLegs).toFixed(2)),
         };
         const { bet } = editBet
           ? await api<{ bet: { id: number } }>(`/api/bets/${editBet.id}`, {
@@ -2006,7 +2037,6 @@ export function AddBetDialog({
                 ...payload,
                 eventId: resolvedEventId,
                 quickLogged: prefill?.quickLogged ?? undefined,
-                expectedProfit: prefill?.expectedProfit,
               },
             });
         setOpen(false);
@@ -2279,6 +2309,10 @@ export function AddBetDialog({
                     // Leaving Dutch clears the legs so the plain back/lay
                     // panels become the save-path source of truth again.
                     if (next !== "dutch") setDutchLegs(undefined);
+                    else if (sport === "football") {
+                      setMarket("match_odds");
+                      setSelection(defaultSelection("football", "match_odds"));
+                    }
                     // Free-bet funding overlay only applies while No lay is selected.
                     if (next !== "no_lay") setNoLayFreeBet(null);
                   }}
@@ -2519,35 +2553,42 @@ export function AddBetDialog({
                   <Label className="text-xs text-muted-foreground">Home team</Label>
                   <Input
                     placeholder="e.g. Arsenal"
-                    value={homeTeam}
+                    value={displayedHome}
                     onChange={(e) => changeHomeTeam(e.target.value)}
-                    className={ring(!!highlightEmpty && !homeTeam.trim())}
+                    disabled={lockEventSides}
+                    className={ring(!!highlightEmpty && !displayedHome.trim())}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">Away team</Label>
                   <Input
                     placeholder="e.g. Liverpool"
-                    value={awayTeam}
+                    value={displayedAway}
                     onChange={(e) => changeAwayTeam(e.target.value)}
-                    className={ring(!!highlightEmpty && !awayTeam.trim())}
+                    disabled={lockEventSides}
+                    className={ring(!!highlightEmpty && !displayedAway.trim())}
                   />
                 </div>
               </div>
             )}
-            {isDutch ? (
+            {lockEventSides ? (
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                Taken from the selected event
+              </p>
+            ) : null}
+            {isDutch && !lockEventSides ? (
               <p className="text-[11px] leading-tight text-muted-foreground">
                 {sport === "football"
                   ? "Home/away teams link this match so it can be tracked and auto-settled - they don't relabel the outcomes on the right, which settle by whichever label says home, draw or away."
                   : "Each outcome settles automatically from the score (home/draw/away, by label) - link the event above for that to work."}
               </p>
-            ) : (
+            ) : null}
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Market</Label>
               <Select
-                value={market || undefined}
+                value={effectiveMarket || undefined}
                 onValueChange={changeMarket}
-                disabled={!sport}
+                disabled={!sport || isDutch}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={sport ? "Select market" : "Select sport first"} />
@@ -2563,6 +2604,8 @@ export function AddBetDialog({
               <span className="text-[11px] leading-tight text-muted-foreground">
                 {!sport
                   ? "Pick a sport to choose the market"
+                  : isDutch
+                    ? "Dutch legs settle as match odds from the score"
                   : currentMarket?.auto
                     ? "Settles automatically from the score"
                     : "Manual settle, or use a win trigger below"}
@@ -2596,8 +2639,8 @@ export function AddBetDialog({
                             Number.isFinite(backOdds) && backOdds > 1 ? backOdds : undefined,
                           layWinOdds:
                             Number.isFinite(layOdds) && layOdds > 1 ? layOdds : undefined,
-                          homeTeam: homeTeam || undefined,
-                          awayTeam: awayTeam || undefined,
+                          homeTeam: effectiveHome || undefined,
+                          awayTeam: effectiveAway || undefined,
                           eventId: linkedId,
                           raceExternalId: pendingFixture?.externalId,
                           raceEventDate: eventDate || undefined,
@@ -2612,7 +2655,6 @@ export function AddBetDialog({
                   </div>
                 )}
             </div>
-            )}
           </div>
 
           {/* Right - back/lay & triggers */}

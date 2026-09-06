@@ -609,7 +609,7 @@ describe("projectBetMarkers", () => {
     );
   });
 
-  it("does not keep This-week events on a 24h window", () => {
+  it("does not keep 7d events on a 24h window", () => {
     const nowSec = 2_000_000;
     const windowSecs = 86_400;
     const weekAgo = nowSec - 5 * 86_400;
@@ -640,7 +640,7 @@ describe("projectBetMarkers", () => {
     const weekEvent = {
       id: 1,
       kind: "bet" as const,
-      label: "This week leftover",
+      label: "7d leftover",
       status: "won" as const,
       settledAtSec: chartWindowLeftEdge(windowSecs, nowSec, false) + 120,
       eventTimeSec: weekAgo + 3_600,

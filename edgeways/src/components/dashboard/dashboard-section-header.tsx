@@ -120,7 +120,7 @@ export function DashboardSectionHeader({
   return (
     <div
       className={cn(
-        "shrink-0 border-b border-border/60 py-3",
+        "relative z-10 shrink-0 border-b border-border/60 py-3",
         // Match Do next cards / chart filters (`--layout-card-x`), not Racing Desk
         // `sectionBar` (`px-4`) — that tighter inset made home titles look flush.
         pageAlign ? pageInsetX : cardInsetX,

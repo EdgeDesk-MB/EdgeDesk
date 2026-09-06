@@ -9,6 +9,10 @@ export interface FootballLineups {
   awayFormation: string | null;
   home: FootballLineupPlayer[];
   away: FootballLineupPlayer[];
+  homeCoach?: string | null;
+  awayCoach?: string | null;
+  homeSubs?: FootballLineupPlayer[];
+  awaySubs?: FootballLineupPlayer[];
 }
 
 function asOptionalString(value: unknown): string | undefined {
@@ -55,12 +59,48 @@ export function parseFootballLineups(
   const home = parsePlayers(row.home);
   const away = parsePlayers(row.away);
   if (home.length === 0 && away.length === 0) return null;
+  const homeCoach = asOptionalString(row.homeCoach) ?? null;
+  const awayCoach = asOptionalString(row.awayCoach) ?? null;
+  const homeSubs = parsePlayers(row.homeSubs);
+  const awaySubs = parsePlayers(row.awaySubs);
   return {
     homeFormation: asOptionalString(row.homeFormation) ?? null,
     awayFormation: asOptionalString(row.awayFormation) ?? null,
     home,
     away,
+    ...(homeCoach ? { homeCoach } : {}),
+    ...(awayCoach ? { awayCoach } : {}),
+    ...(homeSubs.length > 0 ? { homeSubs } : {}),
+    ...(awaySubs.length > 0 ? { awaySubs } : {}),
   };
+}
+
+function parseGridPart(grid: string | undefined, index: number): number {
+  if (!grid) return 99;
+  const part = grid.split(":")[index];
+  const n = Number(part);
+  return Number.isFinite(n) ? n : 99;
+}
+
+/** Formation rows from API-Football `grid` (`row:col`). One row if there is no grid. */
+export function lineupGridRows(
+  players: FootballLineupPlayer[]
+): FootballLineupPlayer[][] {
+  if (players.length === 0) return [];
+  const hasGrid = players.some((p) => p.grid);
+  if (!hasGrid) return [players];
+  const rows = new Map<number, FootballLineupPlayer[]>();
+  for (const player of players) {
+    const row = parseGridPart(player.grid, 0);
+    const list = rows.get(row) ?? [];
+    list.push(player);
+    rows.set(row, list);
+  }
+  return [...rows.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, list]) =>
+      [...list].sort((a, b) => parseGridPart(a.grid, 1) - parseGridPart(b.grid, 1))
+    );
 }
 
 /** Starting XI names, home then away, for Add bet Selection. */

@@ -697,7 +697,7 @@ export function projectBetMarkers(
 
   for (const marker of markers) {
     const eventTimeSec = marker.eventTimeSec ?? marker.settledAtSec;
-    // A 24h view must not keep This-week events just because the icon sits on
+    // A 24h view must not keep 7d events just because the icon sits on
     // the prior plateau (that time can fall inside a wider leftover series).
     if (eventTimeSec < leftEdge || eventTimeSec > rightEdge) continue;
     if (firstDrawnTime != null && eventTimeSec < firstDrawnTime - 1) continue;

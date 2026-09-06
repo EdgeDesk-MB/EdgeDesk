@@ -25,7 +25,13 @@ function MixEmpty({
   );
 }
 
-function BetHeadlineGrid({ charts }: { charts: ActivityMixCharts }) {
+function BetHeadlineGrid({
+  charts,
+  sports = true,
+}: {
+  charts: ActivityMixCharts;
+  sports?: boolean;
+}) {
   return (
     <AdminChartGrid>
       <AdminChartCard
@@ -34,9 +40,25 @@ function BetHeadlineGrid({ charts }: { charts: ActivityMixCharts }) {
       >
         <AdminDonutChart slices={charts.betTypes} label="Bet types" />
       </AdminChartCard>
-      <AdminChartCard title="Sports on bets" description={COUNTS_ONLY}>
-        <AdminDonutChart slices={charts.betSports} label="Sports on bets" />
-      </AdminChartCard>
+      {sports ? (
+        <AdminChartCard
+          title="Sports on bets"
+          description="From the linked event, then the bet, then the campaign, then the market. Counts only."
+        >
+          <AdminDonutChart slices={charts.betSports} label="Sports on bets" />
+        </AdminChartCard>
+      ) : (
+        <AdminChartCard
+          title="Bookmakers on bets"
+          description="Bookie names on bet rows. Not wallets or balances."
+        >
+          <AdminShareBars
+            slices={charts.betBookmakers}
+            emptyTitle="No bookmakers yet"
+            emptyDescription="Bookie names appear here after someone logs a bet."
+          />
+        </AdminChartCard>
+      )}
     </AdminChartGrid>
   );
 }
@@ -59,7 +81,7 @@ export function AdminActivityMix({
         title="Fleet mix"
         description="Lifetime category counts. No selections, stakes, wallets, or P&L."
       >
-        <BetHeadlineGrid charts={charts} />
+        <BetHeadlineGrid charts={charts} sports={false} />
       </AdminSection>
     );
   }

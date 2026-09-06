@@ -199,7 +199,7 @@ export function LaunchHome() {
               {[
                 {
                   title: "Know what to do next",
-                  body: "Ranked Do Next and a Daily Plan. Offers, races and fixtures on one run-sheet.",
+                  body: "Ranked Do Next for today's work. Offers, races and fixtures in one queue.",
                 },
                 {
                   title: "Keep execution clean",
@@ -236,7 +236,7 @@ export function LaunchHome() {
                 Key features
               </h2>
               <p className="mt-3 max-w-xl text-base text-white/55 sm:text-lg">
-                The tools that run the day. Daily Plan, pipelines, P&amp;L.
+                The tools that run the day. Do Next, pipelines, P&amp;L.
               </p>
             </div>
             <div className="mt-10" data-reveal="">

@@ -11,6 +11,7 @@ import {
   FREE_BET_WON_PHRASE,
   titleHasFreeBetAwardPhrase,
 } from "@/lib/offers/early-free-bet-award";
+import { formatOfferListGroupLabel, startOfLocalDay } from "@/lib/offers/offer-list-groups";
 import { formatClockTime } from "@/lib/time-format";
 import { MARKET_LABELS } from "@/lib/markets";
 import {
@@ -205,7 +206,8 @@ export interface HistoryTimeBadgeParts {
 
 export function formatHistoryTimeBadgeParts(
   entry: HistoryRow,
-  ctx: HistoryContext
+  ctx: HistoryContext,
+  options?: { omitDay?: boolean }
 ): HistoryTimeBadgeParts {
   const occurredAt = historyOccurredAt(entry, ctx);
   const when = new Date(occurredAt);
@@ -217,6 +219,9 @@ export function formatHistoryTimeBadgeParts(
   }
 
   const time = formatHistoryClock(when);
+  if (options?.omitDay) {
+    return { primary: time };
+  }
 
   if (isSameCalendarDay(when, now)) {
     return { primary: "Today", secondary: time };
@@ -233,8 +238,12 @@ export function formatHistoryTimeBadgeParts(
 }
 
 /** Left-column time badge - aligned to event/race time where possible. */
-export function formatHistoryTimeBadge(entry: HistoryRow, ctx: HistoryContext): string {
-  const { primary, secondary } = formatHistoryTimeBadgeParts(entry, ctx);
+export function formatHistoryTimeBadge(
+  entry: HistoryRow,
+  ctx: HistoryContext,
+  options?: { omitDay?: boolean }
+): string {
+  const { primary, secondary } = formatHistoryTimeBadgeParts(entry, ctx, options);
   return secondary ? `${primary}, ${secondary}` : primary;
 }
 
@@ -243,18 +252,37 @@ export function formatHistoryDateGroup(
   ctx: HistoryContext,
   nowMs = Date.now()
 ): string {
-  const when = new Date(historyOccurredAt(entry, ctx));
-  const now = new Date(nowMs);
-  if (isSameCalendarDay(when, now)) return "Today";
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (isSameCalendarDay(when, yesterday)) return "Yesterday";
-  return when.toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: when.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-  });
+  return formatOfferListGroupLabel(startOfLocalDay(historyOccurredAt(entry, ctx)), nowMs);
+}
+
+export interface HistoryDayGroup {
+  key: string;
+  label: string;
+  entries: HistoryRow[];
+}
+
+/** Newest-first rows into Today / Yesterday / older day bands. */
+export function groupHistoryFeedByDay(
+  entries: HistoryRow[],
+  ctx: HistoryContext,
+  nowMs = Date.now()
+): HistoryDayGroup[] {
+  const groups: HistoryDayGroup[] = [];
+  for (const entry of entries) {
+    const when = new Date(historyOccurredAt(entry, ctx));
+    const key = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, "0")}-${String(when.getDate()).padStart(2, "0")}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.entries.push(entry);
+      continue;
+    }
+    groups.push({
+      key,
+      label: formatHistoryDateGroup(entry, ctx, nowMs),
+      entries: [entry],
+    });
+  }
+  return groups;
 }
 
 export function historySettledNote(entry: HistoryRow, ctx: HistoryContext): string | undefined {
@@ -362,12 +390,52 @@ const FOOTBALL_MATCH_MOMENT_KINDS = new Set<HistoryRow["kind"]>([
   "full_time",
 ]);
 
-/** Kick-off, goal, 2UP and full time on a football fixture — not a bet row. */
+/** Kick-off, goal, 2UP and full time on a football fixture, not a bet row. */
 export function isFootballMatchMoment(entry: HistoryRow, ctx: HistoryContext): boolean {
   if (!FOOTBALL_MATCH_MOMENT_KINDS.has(entry.kind)) return false;
   const event = resolveHistoryEvent(entry, ctx);
   if (!event) return false;
   return event.sport === "football" || !event.sport;
+}
+
+/** Football match-moment rows open the tape modal instead of navigating. */
+export function historyEntryOpensMatchTape(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): EventRow | null {
+  if (!isFootballMatchMoment(entry, ctx)) return null;
+  return resolveHistoryEvent(entry, ctx) ?? null;
+}
+
+function isFootballFixtureEvent(event: EventRow | undefined): event is EventRow {
+  return Boolean(event && (event.sport === "football" || !event.sport));
+}
+
+/**
+ * Football fixture for the right-hand crest lock-up.
+ * Match moments and Bet placed. Settlements keep the money rail.
+ */
+export function historyEntryFixtureLockup(
+  entry: HistoryRow,
+  ctx: HistoryContext
+): EventRow | null {
+  const tape = historyEntryOpensMatchTape(entry, ctx);
+  if (tape) return tape;
+  if (entry.kind !== "bet_placed") return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  return isFootballFixtureEvent(event) ? event : null;
+}
+
+export function historyFootballEventsForCrests(
+  entries: HistoryRow[],
+  ctx: HistoryContext
+): EventRow[] {
+  const byId = new Map<number, EventRow>();
+  for (const entry of entries) {
+    const event = historyEntryFixtureLockup(entry, ctx);
+    if (event) byId.set(event.id, event);
+  }
+  return [...byId.values()];
 }
 
 /** Top-row fixture for match-only football updates. */
@@ -598,6 +666,10 @@ function sportMomentLinkPhrase(
 
 /** Screen-reader label for a clickable feed row. */
 export function historyEntryLinkLabel(entry: HistoryRow, ctx: HistoryContext): string {
+  const tapeEvent = historyEntryOpensMatchTape(entry, ctx);
+  if (tapeEvent) {
+    return `Open match events for ${formatEventTitle(tapeEvent)}`;
+  }
   const href = historyEntryHref(entry, ctx);
   const bet = entry.betId != null ? ctx.betsById.get(entry.betId) : undefined;
   const event = resolveHistoryEvent(entry, ctx);

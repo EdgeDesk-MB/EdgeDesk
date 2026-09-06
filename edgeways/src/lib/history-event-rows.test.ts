@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   eventHistoryFacts,
   obsoleteScoreHistoryDedupes,
+  scoreTicksCoveredByNamedGoalRows,
   type EventHistorySource,
 } from "./history-event-rows";
 
@@ -103,6 +104,32 @@ describe("eventHistoryFacts", () => {
     const goals = facts.filter((row) => row.kind === "goal");
     expect(goals.map((row) => row.dedupe)).toEqual(["goal:9:0", "score:9:2-1"]);
     expect(obsoleteScoreHistoryDedupes({ id: 9, goals: tape })).toEqual(["score:9:1-0"]);
+  });
+
+  it("does not re-add a 1-1 tick when named goal rows already cover that score", () => {
+    const facts = eventHistoryFacts(event({ goals: null, homeScore: 1, awayScore: 1, minute: 23 }), 1, {
+      existingDedupes: ["ko:9", "goal:9:0", "goal:9:1"],
+    });
+    expect(facts.filter((row) => row.kind === "goal").map((row) => row.dedupe)).toEqual([]);
+  });
+
+  it("lists score ticks already named by goal rows in the feed", () => {
+    expect(
+      scoreTicksCoveredByNamedGoalRows([
+        {
+          kind: "goal",
+          dedupe: "goal:69:1",
+          eventId: 69,
+          detail: "Birmingham 1-1 Wolves",
+        },
+        {
+          kind: "goal",
+          dedupe: "score:69:1-1",
+          eventId: 69,
+          detail: "Birmingham 1-1 Wolves",
+        },
+      ])
+    ).toEqual(["score:69:1-1"]);
   });
 
   it("uses the clerk-scoped full-time key on the hosted desk", () => {

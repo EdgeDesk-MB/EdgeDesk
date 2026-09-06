@@ -34,7 +34,7 @@ import { useLivelineHoverOutline } from "@/lib/ui/liveline-tooltip-outline";
 
 /** Realised follows the P&L chart greens; expected uses the "estimated" sky. */
 const SERIES_COLORS = {
-  light: { expected: "#0369a1", realized: "#059669" },
+  light: { expected: "#0369a1", realized: "#009461" },
   dark: { expected: "#38bdf8", realized: "#34d399" },
 } as const;
 

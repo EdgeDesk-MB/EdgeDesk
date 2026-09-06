@@ -48,6 +48,18 @@ const recordSchema = z.object({
         title: z.string().min(1).max(300),
         body: z.string().max(1000).nullable().optional(),
         href: z.string().max(300).nullable().optional(),
+        icon: z
+          .string()
+          .max(400)
+          .nullable()
+          .optional()
+          .refine(
+            (value) =>
+              value == null ||
+              value.length === 0 ||
+              value.startsWith("/api/crest-lockup?") ||
+              value.startsWith("/icon-192.png")
+          ),
       })
     )
     .min(1)

@@ -116,6 +116,50 @@ export function bannerLinkText(linkLabel: string | null): string {
   return linkLabel?.trim() || DEFAULT_BANNER_LINK_LABEL;
 }
 
+/** How often open desks re-read the published banner. */
+export const SITE_BANNER_POLL_MS = 10_000;
+
+/** Same-tab publish from Admin → Releases so the operator sees it at once. */
+export const SITE_BANNER_CHANGE_EVENT = "edgeways:site-banner";
+
+export function siteBannerIsVisible(
+  banner: MaintenanceBanner | null | undefined
+): boolean {
+  return Boolean(banner?.enabled && banner.message.trim());
+}
+
+export function siteBannersEqual(
+  a: MaintenanceBanner,
+  b: MaintenanceBanner
+): boolean {
+  return (
+    a.enabled === b.enabled &&
+    a.message === b.message &&
+    a.kind === b.kind &&
+    a.href === b.href &&
+    a.linkLabel === b.linkLabel
+  );
+}
+
+/** Last visible copy to keep on screen while the bar is collapsing. */
+export function siteBannerExitHold(
+  previous: MaintenanceBanner | null,
+  next: MaintenanceBanner
+): MaintenanceBanner | null {
+  if (siteBannerIsVisible(next)) return next;
+  if (previous && siteBannerIsVisible(previous)) return previous;
+  return null;
+}
+
+export function announceSiteBanner(banner: MaintenanceBanner): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<MaintenanceBanner>(SITE_BANNER_CHANGE_EVENT, {
+      detail: normalizeMaintenanceBanner(banner),
+    })
+  );
+}
+
 export function normalizeMaintenanceBanner(
   input: Partial<MaintenanceBanner> | null | undefined
 ): MaintenanceBanner {

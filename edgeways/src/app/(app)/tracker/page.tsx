@@ -53,13 +53,18 @@ import {
   groupBetsByCampaign,
   type BetDeskQueue,
 } from "@/lib/bets/desk-queues";
+import {
+  flattenTrackerCampaignGroups,
+  groupBetsByListDay,
+  groupCampaignsByListDay,
+} from "@/lib/bets/tracker-list-groups";
+import { ListDaySection } from "@/components/layout/list-day-section";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { filterPillCountState } from "@/lib/ui/surface-styles";
 import { Plus, Trash2, Download, NotebookPen } from "lucide-react";
 
 /** First paint budgets for large queues (All / Offer campaigns). */
 const INITIAL_CAMPAIGN_GROUPS = 6;
-const MORE_CAMPAIGN_GROUPS = 6;
 const INITIAL_FLAT_BETS = 50;
 const MORE_FLAT_BETS = 50;
 
@@ -264,28 +269,48 @@ function TrackerContent() {
     (deferredDeskQueue === "offers" || deferredDeskQueue === "all") &&
     campaignGroups.some((g) => g.offerId != null);
 
+  const orderedCampaigns = useMemo(
+    () => flattenTrackerCampaignGroups(groupCampaignsByListDay(campaignGroups, eventById, now)),
+    [campaignGroups, eventById, now]
+  );
+
   const visibleGroups = useMemo(() => {
-    if (!useCampaignView) return campaignGroups;
+    if (!useCampaignView) return orderedCampaigns;
     let limit = visibleCampaignGroups;
     if (highlightId != null) {
-      const idx = campaignGroups.findIndex((g) => g.bets.some((b) => b.id === highlightId));
+      const idx = orderedCampaigns.findIndex((g) => g.bets.some((b) => b.id === highlightId));
       if (idx >= 0) limit = Math.max(limit, idx + 1);
     }
-    return campaignGroups.slice(0, limit);
-  }, [campaignGroups, useCampaignView, visibleCampaignGroups, highlightId]);
+    return orderedCampaigns.slice(0, limit);
+  }, [orderedCampaigns, useCampaignView, visibleCampaignGroups, highlightId]);
+
+  const visibleCampaignDays = useMemo(
+    () => (useCampaignView ? groupCampaignsByListDay(visibleGroups, eventById, now) : []),
+    [useCampaignView, visibleGroups, eventById, now]
+  );
+
+  const orderedFlatBets = useMemo(
+    () => groupBetsByListDay(scopedBets, eventById, offerById, now).flatMap((s) => s.bets),
+    [scopedBets, eventById, offerById, now]
+  );
 
   const visibleBets = useMemo(() => {
     if (useCampaignView) return scopedBets;
     let limit = visibleFlatBets;
     if (highlightId != null) {
-      const idx = scopedBets.findIndex((b) => b.id === highlightId);
+      const idx = orderedFlatBets.findIndex((b) => b.id === highlightId);
       if (idx >= 0) limit = Math.max(limit, idx + 1);
     }
-    return scopedBets.slice(0, limit);
-  }, [scopedBets, useCampaignView, visibleFlatBets, highlightId]);
+    return orderedFlatBets.slice(0, limit);
+  }, [scopedBets, orderedFlatBets, useCampaignView, visibleFlatBets, highlightId]);
+
+  const visibleBetDays = useMemo(
+    () => (useCampaignView ? [] : groupBetsByListDay(visibleBets, eventById, offerById, now)),
+    [useCampaignView, visibleBets, eventById, offerById, now]
+  );
 
   const hiddenCampaignCount = useCampaignView
-    ? Math.max(0, campaignGroups.length - visibleGroups.length)
+    ? Math.max(0, orderedCampaigns.length - visibleGroups.length)
     : 0;
   const hiddenFlatCount = !useCampaignView
     ? Math.max(0, scopedBets.length - visibleBets.length)
@@ -438,7 +463,7 @@ function TrackerContent() {
       <PageHeader
         helpId="tracker"
         title="Profit Tracker"
-        description="Open bets, grouped by queue and campaign."
+        description="Open bets, grouped by day, queue and campaign."
         action={
           <>
             <Button variant="outline" {...pageSecondaryButtonProps} asChild>
@@ -591,22 +616,33 @@ function TrackerContent() {
             />
           ) : useCampaignView ? (
             <>
-              <BetCampaignSections
-                groups={visibleGroups}
-                events={events}
-                promoAwards={promoAwards}
-                offerById={offerById}
-                eventById={eventById}
-                highlightId={highlightId}
-                accaRuns={accaRuns}
-                betBuilderRuns={betBuilderRuns}
-                systemRuns={systemRuns}
-                now={now}
-                onEdit={setEditingBet}
-                onPatch={patchBet}
-                onPatchEvent={patchEvent}
-                onLogged={() => refresh()}
-              />
+              <div className="flex flex-col gap-8">
+                {visibleCampaignDays.map((section) => (
+                  <ListDaySection
+                    key={section.dayMs}
+                    label={section.label}
+                    headingId={`tracker-day-${section.dayMs}`}
+                    upcoming={section.upcoming}
+                  >
+                    <BetCampaignSections
+                      groups={section.groups}
+                      events={events}
+                      promoAwards={promoAwards}
+                      offerById={offerById}
+                      eventById={eventById}
+                      highlightId={highlightId}
+                      accaRuns={accaRuns}
+                      betBuilderRuns={betBuilderRuns}
+                      systemRuns={systemRuns}
+                      now={now}
+                      onEdit={setEditingBet}
+                      onPatch={patchBet}
+                      onPatchEvent={patchEvent}
+                      onLogged={() => refresh()}
+                    />
+                  </ListDaySection>
+                ))}
+              </div>
               {hiddenCampaignCount > 0 ? (
                 <div className="mt-4 flex justify-center">
                   <Button
@@ -614,10 +650,10 @@ function TrackerContent() {
                     variant="outline"
                     {...pageSecondaryButtonProps}
                     onClick={() =>
-                      setVisibleCampaignGroups((n) => n + MORE_CAMPAIGN_GROUPS)
+                      setVisibleCampaignGroups(orderedCampaigns.length)
                     }
                   >
-                    Show more campaigns
+                    Show all campaigns
                     <span className="ml-1.5 text-muted-foreground">
                       ({hiddenCampaignCount} left)
                     </span>
@@ -627,18 +663,34 @@ function TrackerContent() {
             </>
           ) : (
             <>
-              <BetLogTable
-                bets={visibleBets}
-                events={events}
-                promoAwards={promoAwards}
-                offerById={offerById}
-                eventById={eventById}
-                highlightId={highlightId}
-                onEdit={setEditingBet}
-                onPatch={patchBet}
-                onPatchEvent={patchEvent}
-                onLogged={() => refresh()}
-              />
+              <div className="flex flex-col gap-8">
+                {visibleBetDays.map((section) => {
+                  const headingId = `tracker-bets-${section.dayMs}`;
+                  return (
+                  <ListDaySection
+                    key={section.dayMs}
+                    label={section.label}
+                    headingId={headingId}
+                    upcoming={section.upcoming}
+                    contentClassName="gap-0"
+                  >
+                    <BetLogTable
+                      bets={section.bets}
+                      events={events}
+                      promoAwards={promoAwards}
+                      offerById={offerById}
+                      eventById={eventById}
+                      highlightId={highlightId}
+                      labelledBy={headingId}
+                      onEdit={setEditingBet}
+                      onPatch={patchBet}
+                      onPatchEvent={patchEvent}
+                      onLogged={() => refresh()}
+                    />
+                  </ListDaySection>
+                  );
+                })}
+              </div>
               {hiddenFlatCount > 0 ? (
                 <div className="mt-4 flex justify-center">
                   <Button

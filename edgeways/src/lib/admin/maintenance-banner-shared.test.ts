@@ -9,7 +9,10 @@ import {
   normalizeBannerHref,
   normalizeMaintenanceBanner,
   parseMaintenanceBanner,
+  siteBannerExitHold,
+  siteBannerIsVisible,
   siteBannerPlateClass,
+  siteBannersEqual,
 } from "./maintenance-banner-shared";
 
 describe("parseMaintenanceBanner", () => {
@@ -120,6 +123,48 @@ describe("normalizeMaintenanceBanner", () => {
     expect(
       normalizeMaintenanceBanner({ enabled: true, message: "", kind: "offer" }).message
     ).toBe("A new offer is live on the desk.");
+  });
+});
+
+describe("site banner live helpers", () => {
+  it("treats enabled plus a message as visible", () => {
+    expect(siteBannerIsVisible(DEFAULT_BANNER)).toBe(false);
+    expect(
+      siteBannerIsVisible({ ...DEFAULT_BANNER, enabled: true, message: "Back soon." })
+    ).toBe(true);
+    expect(siteBannerIsVisible({ ...DEFAULT_BANNER, enabled: true, message: "  " })).toBe(
+      false
+    );
+  });
+
+  it("holds the last visible copy when the banner turns off", () => {
+    const notice = normalizeMaintenanceBanner({
+      enabled: true,
+      message: "Odds feed is delayed.",
+      kind: "notice",
+    });
+    const off = normalizeMaintenanceBanner({
+      enabled: false,
+      message: "",
+      kind: "maintenance",
+    });
+    expect(siteBannerExitHold(notice, off)).toEqual(notice);
+    expect(siteBannerExitHold(notice, notice)).toEqual(notice);
+    expect(siteBannerExitHold(null, off)).toBeNull();
+  });
+
+  it("compares published banner fields", () => {
+    const a = normalizeMaintenanceBanner({
+      enabled: true,
+      message: "Back soon.",
+      kind: "notice",
+      href: "/help",
+      linkLabel: "Help",
+    });
+    expect(siteBannersEqual(a, { ...a })).toBe(true);
+    expect(siteBannersEqual(a, { ...a, enabled: false })).toBe(false);
+    expect(siteBannersEqual(a, { ...a, message: "Updated." })).toBe(false);
+    expect(siteBannersEqual(a, { ...a, href: "/offers" })).toBe(false);
   });
 });
 

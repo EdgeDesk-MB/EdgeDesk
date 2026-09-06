@@ -5,8 +5,13 @@ import { eq } from "drizzle-orm";
 import { db, accounts, exchanges, type AccountRow, type ExchangeRow } from "@/lib/db";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
+import {
+  findVenueBalanceAccount,
+  inferBackVenueKind,
+  type VenueKind,
+} from "@/lib/accounts/resolve-venue";
 
-export type VenueKind = "bookie" | "exchange";
+export type { VenueKind };
 
 export interface EnsureVenueResult {
   account: AccountRow;
@@ -129,4 +134,31 @@ export function ensureVenueAccount(name: string, kind: VenueKind): EnsureVenueRe
     .returning()
     .get();
   return { account, exchange: null, created: true };
+}
+
+/**
+ * Back-bet wallet: existing bookie or exchange by name, else create
+ * with inferred kind (Betdaq → exchange, Bet365 → bookie).
+ */
+export function ensureBackVenueAccount(name: string): EnsureVenueResult {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Name is required");
+
+  const existing = findVenueBalanceAccount(
+    db.select().from(accounts).all(),
+    trimmed
+  );
+  if (existing) {
+    const exchange =
+      existing.type === "exchange"
+        ? existing.exchangeId
+          ? db.select().from(exchanges).where(eq(exchanges.id, existing.exchangeId)).get() ??
+            findExchangeByName(trimmed) ??
+            null
+          : findExchangeByName(trimmed) ?? null
+        : null;
+    return { account: existing, exchange, created: false };
+  }
+
+  return ensureVenueAccount(trimmed, inferBackVenueKind(trimmed));
 }

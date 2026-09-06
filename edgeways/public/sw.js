@@ -45,9 +45,11 @@ async function precacheNotificationArt() {
 }
 
 /** Resolve a notification asset to a blob: URL from cache (or network). */
-async function notificationAssetUrl(pathOrUrl) {
+async function notificationAssetUrl(pathOrUrl, fallbackPath) {
   const url = absUrl(pathOrUrl);
-  if (!url) return undefined;
+  if (!url) {
+    return fallbackPath ? notificationAssetUrl(fallbackPath) : undefined;
+  }
   const cache = await caches.open(NOTIF_CACHE);
   let res = await cache.match(url);
   if (!res) {
@@ -55,14 +57,25 @@ async function notificationAssetUrl(pathOrUrl) {
       res = await fetch(url);
       if (res.ok) await cache.put(url, res.clone());
     } catch {
+      if (fallbackPath && pathOrUrl !== fallbackPath) {
+        return notificationAssetUrl(fallbackPath);
+      }
       return url;
     }
   }
-  if (!res || !res.ok) return url;
+  if (!res || !res.ok) {
+    if (fallbackPath && pathOrUrl !== fallbackPath) {
+      return notificationAssetUrl(fallbackPath);
+    }
+    return url;
+  }
   try {
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   } catch {
+    if (fallbackPath && pathOrUrl !== fallbackPath) {
+      return notificationAssetUrl(fallbackPath);
+    }
     return url;
   }
 }
@@ -118,8 +131,8 @@ self.addEventListener("push", (event) => {
       const iconPath = data.icon || NOTIFICATION_ICON;
       const badgePath = data.badge || NOTIFICATION_BADGE;
       const [icon, badge] = await Promise.all([
-        notificationAssetUrl(iconPath),
-        notificationAssetUrl(badgePath),
+        notificationAssetUrl(iconPath, NOTIFICATION_ICON),
+        notificationAssetUrl(badgePath, NOTIFICATION_BADGE),
       ]);
       await self.registration.showNotification(data.title, {
         body: data.body || undefined,

@@ -141,15 +141,14 @@ These are ordered; each unlocks the next.
 
 ### Question 1: "What should I do next?"
 
-**B1. The Daily Plan (run-sheet, not a list). ✅ DONE**
+**B1. The Daily Plan (run-sheet, not a list). Shipped, then UI removed 2026-09-06.**
 Merge offers (expiry), racecards (off times), fixtures (kickoffs), and Do Next actions into a
-single time-ordered schedule for today: "09:30 qual bet Bet365 → 13:35 Haydock race → 20:00 2UP
-kickoff", each slot with expected £ and a deep link. All the data exists (offer calendar, racing
-desk, fixtures); the work is a merge + a timeline view. This becomes the default mobile Home
-widget in the morning.
-*Conundrum — plan vs reality drift:* races get abandoned, odds move. The plan re-generates on
-every state poll; completed/impossible slots collapse rather than reorder, so the user's mental
-model isn't shuffled mid-session.
+single time-ordered schedule for today. The merge lib (`src/lib/plan/daily-plan.ts`) and
+`planRaces` / `planFixtures` on app state stay; they still feed alerts. The Home widget, desktop
+panel, mobile start-card pin, and quick-log "From today's plan" list were removed because they
+were not adding value. Parked to revisit; see §9.
+*Conundrum — plan vs reality drift:* if the UI returns, regenerate on every poll;
+completed/impossible slots collapse rather than reorder.
 
 **B2. EV per minute (£/hr sort). ✅ DONE**
 A £2 offer taking 90 seconds beats a £5 offer needing 20 minutes of racecard study. Assign rough
@@ -222,13 +221,13 @@ Next.js reuse).
 
 ### 4.1 Interaction model: the Home swipe deck
 
-Home widgets (Edge hero, Live P&L chart, Feed, Do Next, Daily Plan) become a \*\*horizontally
+Home widgets (Summary, Live P&L chart, Feed, Do Next) become a \*\*horizontally
 swipeable deck\*\* on mobile — one widget in focus at a time, pagination dots, remembered last
 position. This was chosen over tabs/sub-nav because:
 - It preserves the "glanceable desk" feel: swiping is browsing, tabs are navigating.
 - Each widget gets the full viewport, so charts stay legible without shrinking.
-- The deck order can be **context-aware**: morning → Daily Plan first; open positions → Live P&L
-  first; otherwise → Edge hero. (Deterministic rules, not ML; user can pin an order.)
+- The start card is pinned in Settings (Summary, Live feed, or Do next). Today's plan was
+  removed from the deck on 2026-09-06; leftover Auto pins become Summary.
 
 Implementation notes: CSS scroll-snap on a flex row (\`overflow-x: auto; scroll-snap-type: x
 mandatory`), each child`scroll-snap-align: center\`. No carousel library needed. Desktop keeps
@@ -248,8 +247,8 @@ in.
 
 On-the-go logging must be ≤3 taps: floating "+" on every mobile screen → sheet with:
 1. **Paste** (B4 parser prefills everything from bet-confirmation text), or
-2. **From plan** (today's Daily Plan slots offer one-tap "log this as placed"), or
-3. Manual minimal form (bookie, stake, odds — the rest defaults and can be edited later on desktop).
+2. Manual minimal form (bookie, stake, odds — the rest defaults and can be edited later on desktop).
+   (A "From plan" path shipped with B1 and was removed with the Daily Plan UI on 2026-09-06.)
 
 The philosophy: **mobile captures, desktop curates.** A bet logged roughly on the phone is
 flagged "quick-logged" for later desktop review rather than forcing full data entry standing in a
@@ -293,9 +292,9 @@ with drag-to-reorder, hide/show, and the existing deck pin generalised (pin was 
 Persist in settings per mode (grid vs deck).
 *Why:* the standing product philosophy is iterate/enhance with user-controlled personalisation as
 the end state; Home is the surface it matters on most.
-*Conundrum — personalisation vs context-awareness:* the context-aware start card (morning → plan,
-open positions → P&L) stays a separate rule that operates *within* the user's chosen order;
-hidden widgets must remain reachable as pages so nothing is lost, only decluttered.
+*Conundrum — personalisation vs context-awareness:* the start-card pin stays a separate rule
+that operates *within* the user's chosen order; hidden widgets must remain reachable as pages
+so nothing is lost, only decluttered. (Morning → plan was retired with B1 on 2026-09-06.)
 
 **E3. Data custody: backup, restore, import.**
 One-tap backup (download the SQLite file plus a versioned JSON bundle), restore with a preview
@@ -393,7 +392,7 @@ Personal-product-first (D1) ordering. Each phase is shippable and personally use
 | Phase                                                                                                   | Contents                                                                                                                                                                                                                                                                                                                                                                   | Status                                                         | Exit criteria                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1. EV truth**                                                                                         | ✅ A1 retention, ✅ A2 provenance, ✅ A3 EV lock + capture, ✅ A4 hero, ✅ A5 no-vig UI                                                                                                                                                                                                                                                                                         | **Done**                                                       | Every £-EV on screen has a basis badge; settled offers show capture %; Home leads with edge-on-the-table                                                                                                                                                                                                                                                                                                                        |
-| **2. Daily driver**                                                                                     | ✅ B1 Daily Plan, ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ✅ B10 retained-P&L audit                                                                                                                                                                                                                                                                               | **Done**                                                       | A full offer day can be run start-to-finish from the plan view alone                                                                                                                                                                                                                                                                                                                                                            |
+| **2. Daily driver**                                                                                     | B1 Daily Plan UI removed 2026-09-06 (lib parked), ✅ B2 £/hr, ✅ B3 bankroll-aware, ✅ B4 paste-to-log, ✅ B10 retained-P&L audit                                                                                                                                                                                                                                               | **Done**                                                       | A full offer day can be run start-to-finish from Do Next                                                                                                                                                                                                                                                                                                                                                                        |
 | **3. Mobile**                                                                                           | ✅ §4 swipe deck, ✅ quick-log (+B4 parser), ✅ collapsed variants, ✅ PWA install + local alerts                                                                                                                                                                                                                                                                              | **Done**                                                       | Log a bet in ≤3 taps on a phone; Home usable one-handed                                                                                                                                                                                                                                                                                                                                                                         |
 | **4. Guardian**                                                                                         | ✅ B5 naked-exposure, ✅ B6 2UP sentinel, ✅ push delivery (local AlertChannel; true background web push delivered by F3)                                                                                                                                                                                                                                                     | **Done**                                                       | A deliberately-left-unhedged test bet alerts within threshold; a live 2UP fires a push                                                                                                                                                                                                                                                                                                                                          |
 | **5. Coach**                                                                                            | ✅ B7 mistake ledger, ✅ B8 Edge Report, ✅ B9 league table                                                                                                                                                                                                                                                                                                                   | **Done**                                                       | Monthly report renders from ≥1 month of real captured data                                                                                                                                                                                                                                                                                                                                                                      |
@@ -484,7 +483,7 @@ Commercial terms (trial, Founding, feedback credit, annual pence): **`docs/strat
 | Tier | Price | Contents (intent) | Logic |
 | ---- | ----- | ----------------- | ----- |
 | Free | £0 | Calculators, manual bet logging, basic P&L, demo Racing Desk | Funnel + community trust |
-| Core | £9.99/mo · £99.90/yr | Offers pipeline, Do Next / Daily Plan, EV capture analytics, Edge Report, tracker, free-bet lots | All-lib features, near-zero COGS |
+| Core | £9.99/mo · £99.90/yr | Offers pipeline, Do Next, EV capture analytics, Edge Report, tracker, free-bet lots | All-lib features, near-zero COGS |
 | Edge | £24.99/mo · £249.90/yr | **Offer Edge** (modelled race/horse picks + recommended desk chrome), Racing Desk live/delayed feeds, football live card (HT, event tape, XI), 2UP sentinel + push, exchange integration | Carries API cost + the pro differentiator; signature `--edge` violet chrome |
 
 **Public mechanics:** 14-day Edge trial (one per person), then Core or Edge at list.
@@ -573,3 +572,4 @@ casino desk), one decided no, the rest stay parked with their reasons confirmed.
 | **Offer qualifier shape → Acca Desk**            | ACCA / Build-a-bet qualifiers currently only live in offer titles; Place qualifying always opens Add bet. Need structured capture + Acca Desk handoff for entitled users                                                                                                                                                                                                                                   | **PROMOTED → L4 / Phase 16 (2026-08-05).** Sam: 1A structured Qualifier shape + paste suggest; 2B global New run dialog (not nav). Thin `canUseAccaDesk` stub until N0; bet_builder enum only in v1                                                                                                                  |
 | **Offer Edge (modelled runner targeting)**       | The Racing Desk tells the user *that* a race qualifies for a place-refund offer, but picks the target horse from a hand-tuned rank heuristic…                                                                                                                                                                                                                                                                 | **PROMOTED → M0–M3 + M3d (2026-07-31).** Model + three surfaces + desk cohesion. Recommended chrome uses `--edge` violet (D5), not amber.                                                                                                                                                                            |
 | **Entitlement scaffolding (Free / Core / Edge)** | Product is one unlocked local app; §7.5 tiers are draft only. Sam asked (2026-07-31) whether offerings can be split by subscription tier today, and for a measured plan in the roadmap                                                                                                                                                                                                                        | **PROMOTED → N0 (2026-07-31), gated on D1.** Matrix + feature flags + optional "preview as" Settings switch first; no Stripe/auth until the business gate. See implementation brief N0                                                                                                                               |
+| **Daily Plan Home widget (B1)**                  | Time-ordered run-sheet on Home (desktop panel + mobile deck card + morning start pin + quick-log "From today's plan"). Shipped; Sam removed the UI on 2026-09-06 because it was not adding value. Do Next, alerts, and the merge lib stay.                                                                                                                                                                  | **Parked to revisit (2026-09-06).** Keep `src/lib/plan/daily-plan.ts` and `planRaces` / `planFixtures` on state. Do not rebuild the widget without a new brief.                                                                                                                                                       |

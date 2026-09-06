@@ -32,42 +32,13 @@ import {
 } from "@/lib/add-bet-event-options";
 import { effectiveEventStatus } from "@/lib/events";
 import { useNow } from "@/hooks/use-now";
+import { ListDayRule } from "@/components/layout/list-day-rule";
 import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 /** Pause after the last keystroke before the list filters. */
 export const EVENT_SEARCH_DEBOUNCE_MS = 800;
 const LOAD_MORE_PX = 96;
-
-/** Hour chip on a centred rule (`—— [13:00] ——`). */
-const hourTagClass =
-  "shrink-0 rounded border border-border/70 bg-muted px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground";
-
-/** Day pill on a centred rule (`—— Today ——`), WhatsApp-style date stamp. */
-const dayTagClass =
-  "shrink-0 rounded-full border border-border/70 bg-muted px-2.5 py-0.5 text-xs font-semibold tracking-wide text-foreground";
-
-function EventListRule({
-  label,
-  kind,
-  className,
-}: {
-  label: string;
-  kind: "day" | "hour";
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn("flex items-center gap-2 px-1.5", className)}
-      role="separator"
-      aria-label={label}
-    >
-      <span className="h-px min-w-8 flex-1 bg-border" aria-hidden />
-      <span className={kind === "day" ? dayTagClass : hourTagClass}>{label}</span>
-      <span className="h-px min-w-8 flex-1 bg-border" aria-hidden />
-    </div>
-  );
-}
 
 /**
  * cmdk calls `scrollIntoView({block:"nearest"})` whenever the highlighted
@@ -603,7 +574,7 @@ export function EventSearchSelect({
                     {section.bands.map((band, bandIdx) => (
                       <div key={band.key}>
                         {band.label ? (
-                          <EventListRule
+                          <ListDayRule
                             kind="day"
                             label={band.label}
                             className={cn(
@@ -621,7 +592,7 @@ export function EventSearchSelect({
                             {!tracked &&
                             hour.label &&
                             !(band.label && hourIdx === 0) ? (
-                              <EventListRule
+                              <ListDayRule
                                 kind="hour"
                                 label={hour.label}
                                 className="py-1"

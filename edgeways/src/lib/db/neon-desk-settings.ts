@@ -46,17 +46,29 @@ export async function patchNeonDeskSettings(
     throw new Error("Sign in to save settings.");
   }
 
-  await ensureAppUser({ clerkUserId });
   await ensureNeonDeskSettingsColumn();
-  const current = await getNeonDeskSettings();
-  const next = mergeAppSettings(current, patch);
-  const now = Date.now();
+  const db = getNeonDb();
+  let rows = await db
+    .select({ deskSettings: pgUsers.deskSettings })
+    .from(pgUsers)
+    .where(eq(pgUsers.clerkUserId, clerkUserId))
+    .limit(1);
 
-  await getNeonDb()
+  if (rows.length === 0) {
+    await ensureAppUser({ clerkUserId });
+    rows = await db
+      .select({ deskSettings: pgUsers.deskSettings })
+      .from(pgUsers)
+      .where(eq(pgUsers.clerkUserId, clerkUserId))
+      .limit(1);
+  }
+
+  const next = mergeAppSettings(parseStoredSettings(rows[0]?.deskSettings ?? null), patch);
+  await db
     .update(pgUsers)
     .set({
       deskSettings: JSON.stringify(next),
-      updatedAt: now,
+      updatedAt: Date.now(),
     })
     .where(eq(pgUsers.clerkUserId, clerkUserId));
 

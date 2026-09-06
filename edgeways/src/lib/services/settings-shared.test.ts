@@ -7,13 +7,15 @@ import {
 } from "./settings-shared";
 
 describe("normalizeMobileDeckPin", () => {
-  it("keeps known pins and remaps a leftover chart pin to Summary", () => {
-    expect(normalizeMobileDeckPin("auto")).toBe("auto");
+  it("keeps known pins and remaps leftover auto, chart and plan pins to Summary", () => {
     expect(normalizeMobileDeckPin("hero")).toBe("hero");
+    expect(normalizeMobileDeckPin("feed")).toBe("feed");
     expect(normalizeMobileDeckPin("do-next")).toBe("do-next");
+    expect(normalizeMobileDeckPin("auto")).toBe("hero");
     expect(normalizeMobileDeckPin("chart")).toBe("hero");
-    expect(normalizeMobileDeckPin("nope")).toBe("auto");
-    expect(normalizeMobileDeckPin(undefined)).toBe("auto");
+    expect(normalizeMobileDeckPin("plan")).toBe("hero");
+    expect(normalizeMobileDeckPin("nope")).toBe("hero");
+    expect(normalizeMobileDeckPin(undefined)).toBe("hero");
   });
 });
 

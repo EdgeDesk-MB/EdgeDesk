@@ -201,7 +201,7 @@ export const bets = pgTable("bets", {
   settledAt: epochMs("settled_at"),
   offerId: integer("offer_id"),
   /** Epoch ms when the bet was captured via mobile quick-log (C3); null = full entry */
-  quickLogged: integer("quick_logged"),
+  quickLogged: epochMs("quick_logged"),
   /** Provenance (E3): "import" = spreadsheet history, excluded from EV capture */
   source: text("source"),
   /** J5: null/'edge' = normal; 'mug' = camouflage bet, excluded from edge analytics */

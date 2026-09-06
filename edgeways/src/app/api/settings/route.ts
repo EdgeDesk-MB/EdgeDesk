@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import type { AppSettingsPatch } from "@/lib/services/settings-merge";
+import {
+  isFixtureScopeSettingsPatch,
+  type AppSettingsPatch,
+} from "@/lib/services/settings-merge";
 import {
   normalizeDefaultSport,
   normalizeMobileDeckPin,
@@ -89,6 +92,26 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
   if (typeof body.monthlyProfitTarget === "number" || body.monthlyProfitTarget === null) {
     patch.monthlyProfitTarget = body.monthlyProfitTarget;
   }
+  if (Array.isArray(body.favouriteFootballScopes)) {
+    patch.favouriteFootballScopes = body.favouriteFootballScopes.filter(
+      (id): id is string => typeof id === "string"
+    );
+  }
+  if (Array.isArray(body.favouriteRacingCourses)) {
+    patch.favouriteRacingCourses = body.favouriteRacingCourses.filter(
+      (id): id is string => typeof id === "string"
+    );
+  }
+  if (Array.isArray(body.hiddenFootballScopes)) {
+    patch.hiddenFootballScopes = body.hiddenFootballScopes.filter(
+      (id): id is string => typeof id === "string"
+    );
+  }
+  if (Array.isArray(body.hiddenRacingCourses)) {
+    patch.hiddenRacingCourses = body.hiddenRacingCourses.filter(
+      (id): id is string => typeof id === "string"
+    );
+  }
   if (typeof body.brandAccentPreset === "string") {
     patch.brandAccentPreset = body.brandAccentPreset;
   }
@@ -124,6 +147,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
   if (isNeonDesk()) {
     try {
       const next = await patchNeonDeskSettings(patch);
+      if (isFixtureScopeSettingsPatch(patch)) {
+        return NextResponse.json(next);
+      }
       const billing = await resolveEntitlementBilling();
       return NextResponse.json({ ...next, billing });
     } catch (err) {
@@ -136,6 +162,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
   }
   const { patchAppSettings } = await import("@/lib/services/settings");
   const next = patchAppSettings(patch);
+  if (isFixtureScopeSettingsPatch(patch)) {
+    return NextResponse.json(next);
+  }
   const billing = await resolveEntitlementBilling();
   return NextResponse.json({ ...next, billing });
 });

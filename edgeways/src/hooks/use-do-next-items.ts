@@ -3,7 +3,7 @@
 /**
  * Shared Do Next assembly - offers scoped to available bookies, free-bet lots,
  * measured retention and funding checks. Used by the Home Do Next strip and
- * the Daily Plan so both rank work identically.
+ * the same ranking the rest of the desk uses.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";

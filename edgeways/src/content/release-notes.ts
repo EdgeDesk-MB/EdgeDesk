@@ -32,6 +32,56 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-06",
+    title: "A cleaner Home, Dutching stake controls, and both clubs in the feed",
+    summary:
+      "Home is Summary, chart, feed and Do next. Dutching can round stakes, let you change one stake, or weight the split toward one outcome. Football rows show both crests, and a tap opens the match tape. Star or hide competitions and courses.",
+    entries: [
+      {
+        kind: "improvement",
+        area: "Home",
+        href: "/",
+        text: "Today's plan is off Home, the phone deck, and Settings. The phone deck is Summary, Feed and Do next. A saved start card of Today's plan now opens Summary. Quick actions stay Paste slip and Add bet.",
+      },
+      {
+        kind: "feature",
+        area: "Dutching",
+        href: "/calculators/dutching",
+        text: "Round the suggested stakes, change one stake yourself, or weight the split toward the first or last outcome. The same controls are in Add bet for a Dutch bet.",
+      },
+      {
+        kind: "feature",
+        area: "History",
+        href: "/history",
+        text: "Football rows show both club crests. On Edge, tap a match to open the tape: goals, cards, VAR, substitutions and formations. Switch Expanded or Compact and the page remembers.",
+      },
+      {
+        kind: "improvement",
+        area: "Home",
+        href: "/",
+        text: "The live feed uses the same crests and day stamps (Today, Yesterday). A new day starts a new Today, instead of leaving yesterday's header stuck.",
+      },
+      {
+        kind: "feature",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Star a competition or course to pin it. Hide ones you do not want. Saved shows only what you pinned, on Fixtures and Racing Desk.",
+      },
+      {
+        kind: "improvement",
+        area: "Profit Tracker",
+        href: "/tracker",
+        text: "The bet log groups by day, same Today / Yesterday split as Tracked Events. Future work sits above Today.",
+      },
+      {
+        kind: "improvement",
+        area: "Alerts",
+        href: "/alerts",
+        text: "Football settlement and 2UP alerts can show both clubs on the large icon. The bolt stays the badge.",
+      },
+    ],
+  },
+  {
     date: "2026-09-05",
     title: "Goals in History, richer live football, and fixtures that open at once",
     summary:

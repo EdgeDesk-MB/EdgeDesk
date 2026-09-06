@@ -6,6 +6,7 @@ import {
   bookieFreeBetBalance,
   bookieNeedsCashFunding,
   editBetReservedCredit,
+  findBookieBalanceAccount,
   noLayFreeBetFromStored,
   noLaySaveBetType,
 } from "./back-bookie-balance-strip";
@@ -67,6 +68,17 @@ describe("editBetReservedCredit", () => {
     expect(
       editBetReservedCredit(edit({ balanceLedgered: 0 }), "Betfair Sportsbook", "cash")
     ).toBe(0);
+  });
+});
+
+describe("findBookieBalanceAccount", () => {
+  it("resolves an exchange wallet used as the back venue", () => {
+    const accounts = [
+      bookie({ id: 2, name: "Betdaq", type: "exchange", balance: 150 }),
+    ];
+    expect(findBookieBalanceAccount(accounts, "Betdaq")?.balance).toBe(150);
+    expect(bookieNeedsCashFunding(accounts, "Betdaq", 300)).toBe(true);
+    expect(bookieNeedsCashFunding(accounts, "Betdaq", 100)).toBe(false);
   });
 });
 

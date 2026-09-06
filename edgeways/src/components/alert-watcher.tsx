@@ -41,6 +41,7 @@ import {
   suppressAlertKeys,
 } from "@/lib/alerts/seen";
 import { consumeUserOriginatedAlertKey } from "@/lib/alerts/user-originated";
+import { crestLockupIconForEvent, footballPushBetId } from "@/lib/alerts/crest-lockup";
 import { detectNakedExposure } from "@/lib/bets/naked-exposure";
 import { suggestTwoUpLock } from "@/lib/calc/two-up-lock";
 import { parseRaceDisplayMeta, parseRacecardRunners } from "@/lib/racing";
@@ -338,7 +339,11 @@ export function AlertWatcher() {
       const delivery = consumeUserOriginatedAlertKey(alert.key)
         ? ("ephemeral" as const)
         : ("sticky" as const);
-      const delivered = { ...alert, delivery };
+      const betId = footballPushBetId(alert.key);
+      const bet = betId != null ? bets.find((row) => row.id === betId) : undefined;
+      const event = bet?.eventId != null ? eventsById.get(bet.eventId) : undefined;
+      const icon = event ? crestLockupIconForEvent(event) : null;
+      const delivered = { ...alert, delivery, icon: icon ?? alert.icon };
       fresh.push(delivered);
       channel.notify(delivered);
       dismissedRef.current.delete(alert.key);
@@ -360,6 +365,7 @@ export function AlertWatcher() {
             title: a.title,
             body: plainAlertBody(a),
             href: a.href,
+            icon: a.icon ?? undefined,
           })),
         }),
       }).catch(() => {});

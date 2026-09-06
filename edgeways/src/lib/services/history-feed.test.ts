@@ -95,4 +95,29 @@ describe("dedupeHistoryForDisplay", () => {
       dedupeHistoryForDisplay([named, leftover, keptTick], [event]).map((row) => row.dedupe)
     ).toEqual(["goal:9:0", "score:9:2-1"]);
   });
+
+  it("drops a 1-1 tick when a named goal row already has that scoreline", async () => {
+    const { dedupeHistoryForDisplay } = await import("./history-feed");
+    const named = {
+      id: 1,
+      dedupe: "goal:69:1",
+      kind: "goal",
+      title: "Goal: Jay Stansfield!",
+      eventId: 69,
+      detail: "Birmingham 1-1 Wolves",
+    } as HistoryRow;
+    const leftover = {
+      id: 2,
+      dedupe: "score:69:1-1",
+      kind: "goal",
+      title: "Goal!",
+      eventId: 69,
+      detail: "Birmingham 1-1 Wolves",
+    } as HistoryRow;
+    expect(
+      dedupeHistoryForDisplay([named, leftover], [{ id: 69, goals: null } as EventRow]).map(
+        (row) => row.dedupe
+      )
+    ).toEqual(["goal:69:1"]);
+  });
 });

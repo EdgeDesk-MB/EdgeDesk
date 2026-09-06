@@ -8,6 +8,7 @@ import {
   AdminDonutChart,
 } from "@/components/admin/admin-charts";
 import { AdminActivityMix } from "@/components/admin/admin-activity-mix";
+import { AdminSportsMix } from "@/components/admin/admin-sports-mix";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
 import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
@@ -24,7 +25,7 @@ import { AdminTableFrame } from "@/components/admin/admin-table";
 import { AttentionStrip } from "@/components/admin/attention-strip";
 import { StripeModeChip } from "@/components/admin/stripe-mode-chip";
 import { buildActivityCharts, scopeActivityView } from "@/lib/admin/activity-charts";
-import { buildActivityMixCharts } from "@/lib/admin/activity-mix";
+import { buildActivityMixCharts, sportDeskRows } from "@/lib/admin/activity-mix";
 import { addPeriodCompares } from "@/lib/admin/series";
 import { loadActivityOverview } from "@/lib/admin/activity";
 import { buildAttentionItems } from "@/lib/admin/attention";
@@ -95,6 +96,8 @@ export default async function AdminOverviewPage() {
     scopedActivity.daily
   );
   const activityMix = buildActivityMixCharts(scopedActivity.mix);
+  const sportRows = sportDeskRows(scopedActivity.mix.betSports);
+  const fleetLead = sportRows[0] ?? null;
   const attention = buildAttentionItems({
     stripe,
     users: visibleUsers,
@@ -116,7 +119,12 @@ export default async function AdminOverviewPage() {
       .filter(Boolean)
       .join(" · "),
     "/admin/activity": activity.available
-      ? `${deskEntries} entr${deskEntries === 1 ? "y" : "ies"}`
+      ? [
+          `${deskEntries} entr${deskEntries === 1 ? "y" : "ies"}`,
+          fleetLead?.label ?? null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : "Local desk",
     "/admin/live":
       liveLog.unread > 0
@@ -263,6 +271,7 @@ export default async function AdminOverviewPage() {
               <AdminDonutChart slices={activityCharts.kindShare} label="Desk volume mix" />
             </AdminChartCard>
           </AdminChartGrid>
+          <AdminSportsMix slices={activityMix.betSports} rows={sportRows} />
           <AdminActivityMix charts={activityMix} variant="preview" />
         </>
       ) : null}

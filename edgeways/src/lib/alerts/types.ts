@@ -34,6 +34,11 @@ export interface EdgeAlert {
   tone?: "positive" | "negative" | null;
   /** Deep link into the relevant desk */
   href: string;
+  /**
+   * Optional large-icon URL for OS / web push. Football match alerts use
+   * the crest lock-up; omit to keep the bolt.
+   */
+  icon?: string | null;
   /** Defaults to sticky when omitted (automation / background settles). */
   delivery?: EdgeAlertDelivery;
 }

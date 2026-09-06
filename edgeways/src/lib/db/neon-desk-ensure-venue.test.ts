@@ -69,7 +69,7 @@ vi.mock("@/lib/db/neon-desk-accounts", () => ({
   },
 }));
 
-import { ensureNeonVenueAccount } from "./neon-desk-ensure-venue";
+import { ensureNeonBackVenueAccount, ensureNeonVenueAccount } from "./neon-desk-ensure-venue";
 
 describe("ensureNeonVenueAccount", () => {
   beforeEach(() => {
@@ -122,5 +122,24 @@ describe("ensureNeonVenueAccount", () => {
     const r = await ensureNeonVenueAccount("Smarkets", "exchange", "user_customer");
     expect(r.created).toBe(true);
     expect(r.account.name).toBe("Smarkets");
+  });
+
+  it("reuses the hosted Betdaq exchange instead of creating a bookie", async () => {
+    mocks.accounts.push(account({ id: 40, name: "Betdaq", type: "exchange", exchangeId: 2 }));
+    mocks.exchanges.push({
+      id: 2,
+      name: "Betdaq",
+      commissionPct: 2,
+      brandColor: "#7b2d8b",
+      backColor: "#fce38f",
+      layColor: "#b5e5c4",
+      isDefault: 0,
+      createdAt: 1,
+    });
+    const r = await ensureNeonBackVenueAccount("Betdaq");
+    expect(r.created).toBe(false);
+    expect(r.account.id).toBe(40);
+    expect(r.account.type).toBe("exchange");
+    expect(mocks.accounts.filter((a) => a.name === "Betdaq")).toHaveLength(1);
   });
 });

@@ -12,7 +12,11 @@
 import type { Fixture } from "@/lib/services/apifootball";
 import type { NeonEventFeedPatch } from "@/lib/db/neon-events";
 import type { EventRow } from "@/lib/db/schema";
-import { LIVE_POLL_WINDOW_MS, needsResultBackfill } from "@/lib/live-poll-rules";
+import {
+  LIVE_POLL_WINDOW_MS,
+  needsResultBackfill,
+  needsTapeBackfill,
+} from "@/lib/live-poll-rules";
 import {
   isRaceResultIncomplete,
   parseRaceResults,
@@ -38,11 +42,15 @@ export function isFootballLivePollCandidate(
 
 /**
  * Which football events this poll should fetch. Same split as the local path:
- * the live window plus one cheap result backfill for matches that never
- * reached "finished" (budget ran dry, no traffic on the hosted desk).
+ * the live window, one cheap result backfill for matches that never
+ * reached "finished", and one tape backfill for finished matches whose
+ * `goals` column is still empty.
  */
 export function selectFootballSyncEvents<
-  T extends Pick<EventRow, "id" | "sport" | "externalId" | "status" | "startTime" | "source">,
+  T extends Pick<
+    EventRow,
+    "id" | "sport" | "externalId" | "status" | "startTime" | "source" | "goals"
+  >,
 >(
   rows: T[],
   now: number,
@@ -50,10 +58,18 @@ export function selectFootballSyncEvents<
 ): { poll: T[]; backfill: T[] } {
   const poll = rows.filter((e) => isFootballLivePollCandidate(e, now));
   const pollIds = new Set(poll.map((e) => e.id));
-  const backfill = rows.filter(
+  const resultBackfill = rows.filter(
     (e) => !pollIds.has(e.id) && needsResultBackfill(e, now) && !backfillAttempted.has(e.id)
   );
-  return { poll, backfill };
+  const resultIds = new Set(resultBackfill.map((e) => e.id));
+  const tapeBackfill = rows.filter(
+    (e) =>
+      !pollIds.has(e.id) &&
+      !resultIds.has(e.id) &&
+      needsTapeBackfill(e, now) &&
+      !backfillAttempted.has(e.id)
+  );
+  return { poll, backfill: [...resultBackfill, ...tapeBackfill] };
 }
 
 /**

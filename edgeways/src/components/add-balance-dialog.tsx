@@ -18,6 +18,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectItemRow,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -633,7 +634,9 @@ function AddBalanceForm({
                               <span className="min-w-0 truncate" title={account.name}>
                                 {account.name}
                               </span>
-                              <AccountTypeBadge type={account.type} />
+                              {account.type !== "bookie" ? (
+                                <AccountTypeBadge type={account.type} />
+                              ) : null}
                               <span className="shrink-0 tabular-nums text-muted-foreground">
                                 {formatGbp(account.balance)}
                               </span>
@@ -645,16 +648,24 @@ function AddBalanceForm({
                         <SelectContent>
                           {accounts.map((a) => (
                             <SelectItem key={a.id} value={String(a.id)}>
-                              <span className="flex items-center gap-1.5">
-                                <span>{a.name}</span>
-                                <AccountTypeBadge type={a.type} />
-                                <span className="shrink-0 text-muted-foreground">
-                                  · {formatGbp(a.balance)}
-                                  {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
-                                    <> · FB {formatGbp(a.freeBets ?? 0)}</>
-                                  )}
-                                </span>
-                              </span>
+                              <SelectItemRow
+                                label={
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className="min-w-0 truncate">{a.name}</span>
+                                    {a.type !== "bookie" ? (
+                                      <AccountTypeBadge type={a.type} />
+                                    ) : null}
+                                  </span>
+                                }
+                                trailing={
+                                  <>
+                                    {formatGbp(a.balance)}
+                                    {a.type === "bookie" && (a.freeBets ?? 0) > 0 && (
+                                      <> · FB {formatGbp(a.freeBets ?? 0)}</>
+                                    )}
+                                  </>
+                                }
+                              />
                             </SelectItem>
                           ))}
                         </SelectContent>

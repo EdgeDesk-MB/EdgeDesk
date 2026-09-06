@@ -96,7 +96,7 @@ export interface AppState {
    * when a run flips to completed.
    */
   accaDesk?: AccaDeskStateRun[];
-  /** J7: lay-due acca legs for the Daily Plan and desk badges */
+  /** J7: lay-due acca legs for desk badges (and a parked Daily Plan merge) */
   accaLayDue: Array<{
     legId: number;
     runLabel: string;
@@ -152,7 +152,7 @@ export interface AppState {
     title: string;
     casino: string | null;
   }[];
-  /** Daily Plan (B1) slot inputs: today's tracked races and fixtures with bets. */
+  /** Today's tracked races and fixtures with bets (alerts + parked Daily Plan merge). */
   planRaces: DailyPlanRaceInput[];
   planFixtures: DailyPlanFixtureInput[];
   history: HistoryRow[];

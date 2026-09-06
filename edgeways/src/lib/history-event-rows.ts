@@ -2,12 +2,13 @@
  * Kick-off, goal, 2UP and full-time facts for the History feed.
  * Local SQLite and the hosted Neon desk both write from this list.
  */
-import type { EventRow } from "@/lib/db/schema";
+import type { EventRow, HistoryRow } from "@/lib/db/schema";
 import { formatEventTitle, formatRacingEventTitle } from "@/lib/events";
 import { tapeGoals } from "@/lib/events/match-tape";
 import {
   formatGoalHistoryCopy,
   inferScoringSide,
+  parseGoalHistoryScoreline,
   previousScorelineFromDedupe,
 } from "@/lib/history-goal-copy";
 import { parseRaceResults } from "@/lib/racing";
@@ -86,6 +87,29 @@ export function obsoleteScoreHistoryDedupes(
   return out;
 }
 
+/**
+ * `score:{id}:{h}-{a}` keys already named by a `goal:{id}:{n}` row in the feed.
+ * Used when `events.goals` is briefly empty so a leftover tick is still hidden.
+ */
+export function scoreTicksCoveredByNamedGoalRows(
+  rows: Array<Pick<HistoryRow, "kind" | "dedupe" | "eventId" | "detail">>
+): string[] {
+  const out: string[] = [];
+  for (const row of rows) {
+    if (row.kind !== "goal" || row.eventId == null) continue;
+    if (!row.dedupe.startsWith(`goal:${row.eventId}:`)) continue;
+    const parsed = parseGoalHistoryScoreline(row.detail);
+    if (!parsed) continue;
+    out.push(scoreTickDedupe(row.eventId, parsed.homeScore, parsed.awayScore));
+  }
+  return out;
+}
+
+function namedTapeGoalCount(eventId: number, existingDedupes: string[]): number {
+  const prefix = `goal:${eventId}:`;
+  return existingDedupes.filter((dedupe) => dedupe.startsWith(prefix)).length;
+}
+
 /** Commentary rows for one event. Skip upcoming and simulations. */
 export function eventHistoryFacts(
   event: EventHistorySource,
@@ -159,7 +183,11 @@ export function eventHistoryFacts(
   });
 
   const scoreTotal = event.homeScore + event.awayScore;
-  if (goals.length < scoreTotal && scoreTotal > 0) {
+  const knownGoals = Math.max(
+    goals.length,
+    namedTapeGoalCount(event.id, options?.existingDedupes ?? [])
+  );
+  if (knownGoals < scoreTotal && scoreTotal > 0) {
     const side = inferScoringSide({
       knownHome: home,
       knownAway: away,

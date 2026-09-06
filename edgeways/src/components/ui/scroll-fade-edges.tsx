@@ -12,8 +12,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const SCROLL_EPS = 2;
+/** Default wash length; sticky day stamps reuse this via `SCROLL_FADE_LENGTH_PX`. */
+export const SCROLL_FADE_SIZE_PX = 28;
 /** Overhang past the clip so fractional zoom cannot leave a hairline. */
-const FADE_OVERHANG_PX = 2;
+export const FADE_OVERHANG_PX = 2;
+export const SCROLL_FADE_LENGTH_PX = SCROLL_FADE_SIZE_PX + FADE_OVERHANG_PX;
+/** Pull every wash 1px over its seam so non-100% zoom cannot leak a sliver. */
+export const FADE_SEAM_PX = 1;
+/** Solid for the first few px — gradient interpolation at 0% reads as a hairline. */
+export const SCROLL_FADE_STOP_CLASS = "from-[6px]";
+/** Same stop on a `::after` wash (sticky day stamps). Keep in lockstep with `SCROLL_FADE_STOP_CLASS`. */
+export const SCROLL_FADE_STOP_AFTER_CLASS = "after:from-[6px]";
 
 const CHILD_SCROLLER_SELECTOR =
   "[data-radix-select-viewport], [data-slot='command-list']";
@@ -78,7 +87,7 @@ export function ScrollFadeEdges({
   className,
   scrollClassName,
   fadeClassName,
-  fadeSize = 28,
+  fadeSize = SCROLL_FADE_SIZE_PX,
   orientation = "vertical",
   dragToScroll = false,
   stepButtons = false,
@@ -86,6 +95,7 @@ export function ScrollFadeEdges({
   pinScrollStart = false,
   scrollStartKey,
   scrollAsChild = false,
+  startFade = true,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -108,6 +118,12 @@ export function ScrollFadeEdges({
   scrollStartKey?: string | number;
   /** First child is the scroller; do not create a nested overflow box. */
   scrollAsChild?: boolean;
+  /**
+   * Leading-edge fade. Turn off when a sticky section header already
+   * occludes the start (Match events period bars, Home Live feed
+   * `ListDayRule`).
+   */
+  startFade?: boolean;
 }) {
   const horizontal = orientation === "horizontal";
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -281,16 +297,14 @@ export function ScrollFadeEdges({
   const fadeBase = fadeClassName ?? "from-page";
   const edgeFadeSize = canStep ? Math.max(fadeSize, STEP_BUTTON_FADE_PX) : fadeSize;
   const fadeLength = edgeFadeSize + FADE_OVERHANG_PX;
-  // Solid for the first few px — gradient interpolation at 0% is slightly
-  // transparent and reads as a hairline on the clip edge.
-  const fadeStop = "from-[6px]";
+  const fadeStop = SCROLL_FADE_STOP_CLASS;
 
   return (
     <div
       ref={wrapRef}
       className={cn(
-        // Overflow stays on the scroller. Hidden here clips the overhang
-        // that covers subpixel seams at non-integer zoom.
+        // Do not clip here: fades sit -1px over the seam so fractional
+        // zoom cannot leak a sliver. Sibling headers stay above (`z-10`).
         "relative min-h-0 w-full min-w-0",
         // Select/cmdk already own overflow — a flex parent would let
         // `flex: 1` on the Viewport collapse or fight max-height inherit.
@@ -348,14 +362,14 @@ export function ScrollFadeEdges({
           {children}
         </div>
       )}
-      {showStart ? (
+      {showStart && startFade ? (
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute z-10",
+            "pointer-events-none absolute z-[1]",
             horizontal
-              ? "-left-[2px] inset-y-0 bg-gradient-to-r to-transparent"
-              : "-top-[2px] inset-x-0 bg-gradient-to-b to-transparent",
+              ? "-left-px inset-y-0 bg-gradient-to-r to-transparent"
+              : "-top-px inset-x-0 bg-gradient-to-b to-transparent",
             fadeStop,
             fadeBase
           )}
@@ -366,10 +380,10 @@ export function ScrollFadeEdges({
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute z-10",
+            "pointer-events-none absolute z-[1]",
             horizontal
-              ? "-right-[2px] inset-y-0 bg-gradient-to-l to-transparent"
-              : "-bottom-[2px] inset-x-0 bg-gradient-to-t to-transparent",
+              ? "-right-px inset-y-0 bg-gradient-to-l to-transparent"
+              : "-bottom-px inset-x-0 bg-gradient-to-t to-transparent",
             fadeStop,
             fadeBase
           )}

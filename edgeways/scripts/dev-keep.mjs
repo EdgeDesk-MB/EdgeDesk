@@ -112,21 +112,40 @@ function nextLooksEvicted() {
 
 function wipeEvictedDevCache() {
   const cacheDir = path.join(root, ".next/dev/cache");
+  const turboDir = path.join(cacheDir, "turbopack");
   if (!existsSync(cacheDir)) return;
+
+  let reason = null;
   try {
-    const listing = execFileSync(
-      "find",
-      [cacheDir, "-type", "f", "-name", "*.sst", "-print"],
-      { encoding: "utf8", timeout: 2000 }
-    );
-    const sample = listing.split("\n").find(Boolean);
-    if (!sample) return;
-    const flags = execFileSync("ls", ["-lO", sample], { encoding: "utf8" });
-    if (!flags.includes("dataless")) return;
+    // iCloud Documents writes conflict copies ("00000032 2.sst"). Turbopack
+    // parses the numeric prefix and dies with "invalid digit found in string".
+    if (existsSync(turboDir)) {
+      const conflict = execFileSync(
+        "find",
+        [turboDir, "-name", "* *", "-print", "-quit"],
+        { encoding: "utf8", timeout: 3000 }
+      ).trim();
+      if (conflict) reason = "iCloud conflict copies in the Turbopack cache";
+    }
+    if (!reason) {
+      const listing = execFileSync(
+        "find",
+        [cacheDir, "-type", "f", "-name", "*.sst", "-print"],
+        { encoding: "utf8", timeout: 3000 }
+      );
+      for (const sample of listing.split("\n").filter(Boolean).slice(0, 40)) {
+        const flags = execFileSync("ls", ["-lO", sample], { encoding: "utf8" });
+        if (flags.includes("dataless")) {
+          reason = "iCloud evicted the Turbopack cache";
+          break;
+        }
+      }
+    }
   } catch {
     return;
   }
-  log("iCloud evicted the Turbopack cache; clearing .next/dev");
+  if (!reason) return;
+  log(`${reason}; clearing .next/dev`);
   execFileSync("rm", ["-rf", path.join(root, ".next/dev")]);
 }
 
@@ -153,7 +172,7 @@ function start() {
   generation += 1;
   const gen = generation;
 
-  if (restarts === 0) restoreNextIfEvicted();
+  restoreNextIfEvicted();
 
   const nodeOptions = [
     process.env.NODE_OPTIONS,

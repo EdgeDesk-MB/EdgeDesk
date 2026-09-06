@@ -38,16 +38,12 @@ function storeCard(id: string): void {
 
 export function MobileHomeDeck({
   cards,
-  /** "auto" = context-aware start card; otherwise a pinned card id. */
-  pin = "auto",
-  hasOpenPositions = false,
-  hasPlanWork = false,
+  /** Start card id; leftover auto / plan / chart ids map to Summary. */
+  pin = "hero",
   className,
 }: {
   cards: HomeDeckCard[];
   pin?: string;
-  hasOpenPositions?: boolean;
-  hasPlanWork?: boolean;
   className?: string;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -64,25 +60,15 @@ export function MobileHomeDeck({
     });
   }, []);
 
-  // Initial position: this session's remembered card, else the user's pin,
-  // else the deterministic context pick (open positions → Summary, which
-  // holds the chart; morning with plan work → plan; otherwise hero).
-  // A stored or pinned "chart" id maps to Summary. The programmatic
-  // scroll fires onScroll, which sets the active index.
+  // Initial position: this session's remembered card, else the user's pin.
+  // Leftover auto / chart / plan ids map to Summary.
   useEffect(() => {
     if (didInitRef.current || cards.length === 0) return;
     didInitRef.current = true;
-    const contextPick = hasOpenPositions
-      ? "hero"
-      : new Date().getHours() < 12 && hasPlanWork
-        ? "plan"
-        : "hero";
-    const startId = resolveMobileDeckCardId(
-      readStoredCard() ?? (pin !== "auto" ? pin : contextPick)
-    );
+    const startId = resolveMobileDeckCardId(readStoredCard() ?? pin);
     const index = cards.findIndex((c) => c.id === startId);
     if (index > 0) scrollToIndex(index, false);
-  }, [cards, pin, hasOpenPositions, hasPlanWork, scrollToIndex]);
+  }, [cards, pin, scrollToIndex]);
 
   const onScroll = useCallback(() => {
     const scroller = scrollerRef.current;
@@ -113,8 +99,8 @@ export function MobileHomeDeck({
       <div
         ref={scrollerRef}
         onScroll={onScroll}
-        role="group"
-        aria-roledescription="carousel"
+        role={cards.length > 1 ? "group" : undefined}
+        aria-roledescription={cards.length > 1 ? "carousel" : undefined}
         aria-label="Home widgets"
         className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
@@ -129,6 +115,7 @@ export function MobileHomeDeck({
             <ScrollFadeEdges
               className="min-h-0 flex-1"
               fadeClassName="from-background"
+              startFade={false}
               scrollClassName="app-scroll-nested"
             >
               {card.node}
@@ -137,26 +124,28 @@ export function MobileHomeDeck({
         ))}
       </div>
 
-      <div className="flex shrink-0 items-center justify-center pb-1.5">
-        {cards.map((card, i) => (
-          <button
-            key={card.id}
-            type="button"
-            aria-label={`Go to ${card.label}`}
-            aria-current={i === activeIndex ? "true" : undefined}
-            className="flex size-8 items-center justify-center"
-            onClick={() => scrollToIndex(i, true)}
-          >
-            <span
-              aria-hidden
-              className={cn(
-                "size-1.5 rounded-full transition-colors",
-                i === activeIndex ? "bg-primary" : "bg-muted-foreground/30"
-              )}
-            />
-          </button>
-        ))}
-      </div>
+      {cards.length > 1 ? (
+        <div className="flex shrink-0 items-center justify-center pb-1.5">
+          {cards.map((card, i) => (
+            <button
+              key={card.id}
+              type="button"
+              aria-label={`Go to ${card.label}`}
+              aria-current={i === activeIndex ? "true" : undefined}
+              className="flex size-8 items-center justify-center"
+              onClick={() => scrollToIndex(i, true)}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "size-1.5 rounded-full transition-colors",
+                  i === activeIndex ? "bg-primary" : "bg-muted-foreground/30"
+                )}
+              />
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -36,6 +36,23 @@ describe("stakeFromOfferPrefs / bookmakerFromOfferPrefs", () => {
   });
 });
 
+describe("favourite fixture scopes", () => {
+  it("round-trips football and racing pins", () => {
+    expect(getAppSettings().favouriteFootballScopes).toEqual([]);
+    patchAppSettings({
+      favouriteFootballScopes: ["England::Premier League"],
+      favouriteRacingCourses: ["Ascot"],
+    });
+    expect(getAppSettings().favouriteFootballScopes).toEqual(["England::Premier League"]);
+    expect(getAppSettings().favouriteRacingCourses).toEqual(["Ascot"]);
+    patchAppSettings({ hiddenFootballScopes: ["Gibraltar::Premier Division"] });
+    expect(getAppSettings().hiddenFootballScopes).toEqual(["Gibraltar::Premier Division"]);
+    patchAppSettings({ favouriteFootballScopes: [] });
+    expect(getAppSettings().favouriteFootballScopes).toEqual([]);
+    expect(getAppSettings().favouriteRacingCourses).toEqual(["Ascot"]);
+  });
+});
+
 describe("normalizeDefaultSport", () => {
   it("accepts known sports and falls back to football", () => {
     expect(normalizeDefaultSport("horse_racing")).toBe("horse_racing");

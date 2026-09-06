@@ -11,6 +11,11 @@ import { freeBetUsageNote } from "@/lib/accounts/free-bet-lot-balance";
 import type { DutchLegRecord } from "@/lib/calc/settlement";
 import { ensureNeonVenueAccount } from "@/lib/db/neon-desk-ensure-venue";
 import {
+  findVenueBalanceAccount,
+  inferBackVenueKind,
+  isBackPlacementDebit,
+} from "@/lib/accounts/resolve-venue";
+import {
   deleteNeonDeskFreeBetUsageForBet,
   insertNeonDeskTransaction,
   listNeonDeskAccounts,
@@ -28,17 +33,37 @@ import {
   patchNeonDeskBet,
 } from "@/lib/db/neon-desk";
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
-import { evaluateUnconditionalFreeBet, isPlaceFreeBetEffect } from "@/lib/calc/ai-triggers";
+import {
+  evaluateFreeBetAward,
+  evaluateUnconditionalFreeBet,
+  isPlaceFreeBetEffect,
+} from "@/lib/calc/ai-triggers";
 import {
   EARLY_FREE_BET_AWARD_REASON,
-  FREE_BET_EARNED_PHRASE,
+  freeBetAwardPhrase,
   freeBetEffectsForBet,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
-import type { AccountRow, BetRow } from "@/lib/db/schema";
+import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
+import type { AccountRow, BetRow, EventRow } from "@/lib/db/schema";
 
 function resolveOwner(clerkUserId?: string | null): string | null {
   return clerkUserId?.trim() || neonDeskClerkUserId();
+}
+
+async function neonBackVenueByName(
+  name: string,
+  clerkUserId: string
+): Promise<AccountRow> {
+  const accounts = await listNeonDeskAccounts(clerkUserId);
+  const existing = findVenueBalanceAccount(accounts, name);
+  if (existing) return existing;
+  const { account } = await ensureNeonVenueAccount(
+    name,
+    inferBackVenueKind(name),
+    clerkUserId
+  );
+  return account;
 }
 
 async function neonBookieForBet(
@@ -46,8 +71,16 @@ async function neonBookieForBet(
   clerkUserId: string
 ): Promise<AccountRow | undefined> {
   if (!bet.bookmaker?.trim()) return undefined;
-  const { account } = await ensureNeonVenueAccount(bet.bookmaker, "bookie", clerkUserId);
-  return account;
+  if (bet.balanceLedgered) {
+    const txs = await listNeonDeskBalanceTransactions(clerkUserId);
+    const debit = txs.find((t) => t.betId === bet.id && isBackPlacementDebit(t));
+    if (debit) {
+      const accounts = await listNeonDeskAccounts(clerkUserId);
+      const existing = accounts.find((a) => a.id === debit.accountId);
+      if (existing) return existing;
+    }
+  }
+  return neonBackVenueByName(bet.bookmaker, clerkUserId);
 }
 
 async function neonExchangeForBet(
@@ -107,6 +140,7 @@ async function applyNeonWageringRequirement(
   bookie: AccountRow,
   owner: string
 ): Promise<void> {
+  if (bookie.type !== "bookie") return;
   const burn = wrContributionForBet(bet, bookie);
   if (!(burn > 0)) return;
   const next = Math.max(0, Math.round((bookie.wrRemaining - burn) * 100) / 100);
@@ -117,7 +151,7 @@ async function applyNeonWageringRequirement(
 async function ledgerNeonDutchFreeLegs(bet: BetRow, owner: string): Promise<void> {
   for (const leg of parseDutchLegs(bet)) {
     if (!leg.freeBet || !leg.bookmaker?.trim() || !(leg.stake > 0)) continue;
-    const { account } = await ensureNeonVenueAccount(leg.bookmaker, "bookie", owner);
+    const account = await neonBackVenueByName(leg.bookmaker, owner);
     await ledgerNeonFreeBetUsageDebit(
       account.id,
       leg.stake,
@@ -387,7 +421,7 @@ export async function ledgerNeonPromoAward(
       kind: "free_bet_promo",
       betId: bet.id,
       eventId: bet.eventId,
-      title: FREE_BET_EARNED_PHRASE,
+      title: freeBetAwardPhrase(bet),
       detail: `£${amount.toFixed(2)} · ${reason}`,
       amount,
       createdAt: now,
@@ -399,7 +433,8 @@ export async function ledgerNeonPromoAward(
 
 /**
  * Hosted equivalent of processAiEffects for unconditional / refund-if awards.
- * Place-conditional rewards still need the racing-result path.
+ * Place-conditional rewards use awardNeonPlaceFreeBetIfDue once the race
+ * result is complete.
  * Snapshot awards must not credit a promo until placement has debited
  * (or attempted to debit) the qualifying stake.
  */
@@ -442,6 +477,63 @@ export async function awardNeonUnconditionalFreeBetsDue(
   for (const bet of bets) {
     if (already.has(bet.id)) continue;
     if (await awardNeonUnconditionalFreeBetIfDue(bet, owner)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Hosted equivalent of processAiEffects for place-refund free bets
+ * (finish 2nd–4th, 2nd to the SP favourite, …). Needs a finished race with
+ * complete placings — winner-only results wait.
+ */
+export async function awardNeonPlaceFreeBetIfDue(
+  bet: BetRow,
+  event: EventRow | undefined,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<boolean> {
+  const owner = resolveOwner(clerkUserId);
+  if (!owner) return false;
+  if (bet.betType === "free_snr" || bet.betType === "free_sr") return false;
+  if (!event || event.status !== "finished" || event.sport !== "horse_racing") {
+    return false;
+  }
+
+  const race = parseRaceResults(event.goals);
+  if (!race || isRaceResultIncomplete(race)) return false;
+
+  for (const effect of freeBetEffectsForBet(bet)) {
+    if (effect.kind !== "free_bet_award") continue;
+    if (!isPlaceFreeBetEffect(effect)) continue;
+    const verdict = evaluateFreeBetAward(effect, bet.selection, race);
+    if (!verdict.met) continue;
+    if (!bet.balanceLedgered) {
+      const placed = await ledgerNeonBetPlacement(bet, owner);
+      if (!placed) return false;
+    }
+    return ledgerNeonPromoAward(bet, effect.amount, verdict.reason, owner);
+  }
+  return false;
+}
+
+export async function awardNeonPlaceFreeBetsDue(
+  bets: BetRow[],
+  events: EventRow[],
+  existingTxs: Array<{ betId: number | null; category: string | null; amount: number }>,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<number> {
+  const owner = resolveOwner(clerkUserId);
+  if (!owner) return 0;
+  const already = new Set(
+    existingTxs
+      .filter((t) => t.category === "free_bet" && t.betId != null && t.amount > 0)
+      .map((t) => t.betId as number)
+  );
+  const byId = new Map(events.map((event) => [event.id, event]));
+  let n = 0;
+  for (const bet of bets) {
+    if (already.has(bet.id)) continue;
+    const event = bet.eventId != null ? byId.get(bet.eventId) : undefined;
+    if (await awardNeonPlaceFreeBetIfDue(bet, event, owner)) n += 1;
   }
   return n;
 }

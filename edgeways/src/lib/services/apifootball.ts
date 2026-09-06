@@ -334,14 +334,25 @@ function mapEventKind(type: string | undefined): MatchTapeKind {
   return "other";
 }
 
+function mapTapeClock(e: { time?: { elapsed?: number; extra?: number } }): {
+  minute: number;
+  extra?: number;
+} {
+  const elapsed = e.time?.elapsed ?? 0;
+  const extra = e.time?.extra ?? 0;
+  const minute = elapsed + extra;
+  return extra > 0 ? { minute, extra } : { minute };
+}
+
 function mapTapeEvent(e: any, homeTeamName: string): MatchTapeEvent | null {
   const side: "home" | "away" =
     normaliseTeam(e.team?.name ?? "") === normaliseTeam(homeTeamName) ? "home" : "away";
   const kind = mapEventKind(e.type);
+  const clock = mapTapeClock(e);
   if (kind === "goal" && e.detail === "Missed Penalty") {
     return {
       kind: "other",
-      minute: (e.time?.elapsed ?? 0) + (e.time?.extra ?? 0),
+      ...clock,
       side,
       player: e.player?.name || undefined,
       detail: "Missed Penalty",
@@ -349,7 +360,7 @@ function mapTapeEvent(e: any, homeTeamName: string): MatchTapeEvent | null {
   }
   const event: MatchTapeEvent = {
     kind,
-    minute: (e.time?.elapsed ?? 0) + (e.time?.extra ?? 0),
+    ...clock,
     side,
   };
   if (e.player?.name) event.player = String(e.player.name);
@@ -429,11 +440,19 @@ export async function fixtureLineups(
   }
   const home = rows[0];
   const away = rows[1] ?? rows.find((r) => r?.team?.id !== home?.team?.id);
+  const homeCoach = home?.coach?.name ? String(home.coach.name).trim() : "";
+  const awayCoach = away?.coach?.name ? String(away.coach.name).trim() : "";
+  const homeSubs = mapLineupPlayers(home?.substitutes);
+  const awaySubs = mapLineupPlayers(away?.substitutes);
   const data: FootballLineups = {
     homeFormation: home?.formation ? String(home.formation) : null,
     awayFormation: away?.formation ? String(away.formation) : null,
     home: mapLineupPlayers(home?.startXI),
     away: mapLineupPlayers(away?.startXI),
+    ...(homeCoach ? { homeCoach } : {}),
+    ...(awayCoach ? { awayCoach } : {}),
+    ...(homeSubs.length > 0 ? { homeSubs } : {}),
+    ...(awaySubs.length > 0 ? { awaySubs } : {}),
   };
   const empty = data.home.length === 0 && data.away.length === 0;
   const stored = empty ? null : data;

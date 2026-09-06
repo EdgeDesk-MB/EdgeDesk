@@ -36,7 +36,7 @@ const tabsListVariants = cva(
         line: "h-auto gap-6 rounded-none border-0 bg-transparent p-0",
         segmented: cn(
           // Override base `group-data-horizontal/tabs:h-8` or py is crushed to 0.
-          "box-border h-auto w-fit gap-0.5 group-data-horizontal/tabs:h-auto bg-foreground/8",
+          "box-border h-auto w-fit gap-0.5 group-data-horizontal/tabs:h-auto bg-muted/60",
           "rounded-[var(--segmented-radius)]",
           "px-[var(--segmented-track-pad-x)] py-[var(--segmented-track-pad)]",
           "ring-1 ring-border/40",

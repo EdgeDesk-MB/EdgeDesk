@@ -83,7 +83,7 @@ export const ACCA_DESK_HELP_BULLETS = [
   "Insurance · whole acca: one equalising lay at the combined exchange price, then settle legs. Same refund rule when exactly one leg loses.",
   "Combined lay: one Smarkets-style (or pre-built) equalising lay for the whole ticket, with optional No lay when matching is not worth it.",
   "The next unlaid leg shows Ready to lay as soon as earlier legs are done (or immediately for leg 1). Enter live exchange lay odds and stake, then Log lay or Fill slip. Set stake to £0.00 to Log no lay. Do not use the bookie back price.",
-  "Alerts and Daily Plan still fire from 30 minutes before the leg starts (or immediately if there is no start time). You can lay earlier whenever you like.",
+  "Alerts still fire from 30 minutes before the leg starts (or immediately if there is no start time). You can lay earlier whenever you like.",
   "Legs linked to a tracked event auto-result from the football score or race result; anything else uses Won / Lost / Void on the desk.",
   "The acca back and every lay are real Profit Tracker bets. Free-bet converts still size cover like a cash stake at risk.",
   "A mid-run cover shows If this loses, not Worst outcome. That lose-path £ still feeds provisional. If it wins, the card names the next lay or lock and the all-win estimate. Locked or Worst outcome only when both remaining paths are known. Campaign P&L settles when the run finishes, and that is the toast (not the bookie ticket). Mid-run lays stay off History.",

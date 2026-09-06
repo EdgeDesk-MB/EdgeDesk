@@ -23,7 +23,7 @@ the public cards. If the homepage says early adopters pay less, everyone waits.
 | Tier | Monthly | Annual (≈ 2 months free) | Role |
 |------|---------|--------------------------|------|
 | **Free** | £0 | — | Calculators, manual log, basic P&L, demo Racing Desk |
-| **Core** | £9.99 | £99.90/yr | Pipeline, Do Next, Daily Plan, Edge Report, tracker, free-bet lots. Near-zero COGS. |
+| **Core** | £9.99 | £99.90/yr | Pipeline, Do Next, Edge Report, tracker, free-bet lots. Near-zero COGS. |
 | **Edge** | £24.99 | £249.90/yr | Offer Edge / race picks, live racing feeds, football live card (HT, tape, XI), 2UP + push, exchange lay. Carries API cost. |
 
 **Trial (everyone, one per person):** 14 days of **Edge**, then they choose Core

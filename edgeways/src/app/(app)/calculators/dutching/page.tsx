@@ -18,7 +18,7 @@ export default function DutchingCalculatorPage() {
     <CalculatorShell wide>
       <CalculatorPageHeader
         title="Dutching"
-        description="Split a stake across outcomes for the same profit."
+        description="Split a stake across outcomes, then round or override the suggested stakes."
       />
       <Tabs defaultValue="standard">
         <TabsList>
@@ -54,6 +54,7 @@ function StandardDutch() {
         <CalculatorAddBetButton
           className="self-start"
           prefill={{
+            betType: "dutch",
             labelSuggestion: `Dutch · ${legs.map((l) => l.label).join(" / ")}`,
             dutchLegs: legs.map((l, i) => ({
               label: l.label,
@@ -97,9 +98,9 @@ function TwoUpDutch() {
             <PanelTextInput label="Home team" value={homeLabel} onChange={setHomeLabel} />
             <PanelTextInput label="Away team" value={awayLabel} onChange={setAwayLabel} />
             <PanelInput label="Home stake" prefix="£" value={homeStake} onChange={setHomeStake} min={0} />
-            <PanelInput label="Home odds" value={homeOdds} onChange={setHomeOdds} min={1} />
+            <PanelInput label="Home odds" value={homeOdds} onChange={setHomeOdds} min={1} exchangeOddsStepping />
             <PanelInput label="Away stake" prefix="£" value={awayStake} onChange={setAwayStake} min={0} />
-            <PanelInput label="Away odds" value={awayOdds} onChange={setAwayOdds} min={1} />
+            <PanelInput label="Away odds" value={awayOdds} onChange={setAwayOdds} min={1} exchangeOddsStepping />
           </div>
         </BackPanel>
 
@@ -127,6 +128,7 @@ function TwoUpDutch() {
               disabled={!scenarios}
               className="mt-4"
               prefill={{
+                betType: "dutch",
                 labelSuggestion: `2UP dutch: ${homeLabel} / ${awayLabel}`,
                 homeTeam: homeLabel,
                 awayTeam: awayLabel,

@@ -211,6 +211,13 @@
       "when": 1788610000000,
       "tag": "0029_football_live_card",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788623700000,
+      "tag": "0030_bets_quick_logged_bigint",
+      "breakpoints": true
     }
   ]
 }

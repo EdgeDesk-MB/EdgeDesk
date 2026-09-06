@@ -26,6 +26,7 @@ import {
   type OfferBetPref,
   type TuningSettings,
 } from "@/lib/services/settings-shared";
+import { normalizeFavouriteScopeIds } from "@/lib/events/fixture-scope";
 
 export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning" | "homeLayout">> & {
   /** Merge a single offer pref without replacing the whole map. */
@@ -35,6 +36,26 @@ export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning" | "homeLayout"
   /** Partial merge into the Home layout; normalised on write. */
   homeLayout?: Partial<HomeLayoutSettings>;
 };
+
+const FIXTURE_SCOPE_SETTING_KEYS = [
+  "favouriteFootballScopes",
+  "favouriteRacingCourses",
+  "hiddenFootballScopes",
+  "hiddenRacingCourses",
+] as const;
+
+/** Hide / saved patches only. Skip billing and a full desk refresh. */
+export function isFixtureScopeSettingsPatch(patch: AppSettingsPatch): boolean {
+  const keys = (Object.keys(patch) as (keyof AppSettingsPatch)[]).filter(
+    (key) => patch[key] !== undefined
+  );
+  return (
+    keys.length > 0 &&
+    keys.every((key) =>
+      (FIXTURE_SCOPE_SETTING_KEYS as readonly string[]).includes(key as string)
+    )
+  );
+}
 
 function cloneSettings(settings: AppSettings): AppSettings {
   return {
@@ -50,6 +71,10 @@ function cloneSettings(settings: AppSettings): AppSettings {
       deckHidden: [...settings.homeLayout.deckHidden],
       desktopHidden: [...settings.homeLayout.desktopHidden],
     },
+    favouriteFootballScopes: [...(settings.favouriteFootballScopes ?? [])],
+    favouriteRacingCourses: [...(settings.favouriteRacingCourses ?? [])],
+    hiddenFootballScopes: [...(settings.hiddenFootballScopes ?? [])],
+    hiddenRacingCourses: [...(settings.hiddenRacingCourses ?? [])],
   };
 }
 
@@ -186,6 +211,10 @@ export function parseStoredSettings(raw: unknown): AppSettings {
     tuning: normalizeTuning(o.tuning ?? DEFAULT_TUNING),
     homeLayout: normalizeHomeLayout(o.homeLayout),
     monthlyProfitTarget: parseMonthlyTarget(o.monthlyProfitTarget),
+    favouriteFootballScopes: normalizeFavouriteScopeIds(o.favouriteFootballScopes),
+    favouriteRacingCourses: normalizeFavouriteScopeIds(o.favouriteRacingCourses),
+    hiddenFootballScopes: normalizeFavouriteScopeIds(o.hiddenFootballScopes),
+    hiddenRacingCourses: normalizeFavouriteScopeIds(o.hiddenRacingCourses),
     ...brand,
     uiFont: normalizeUiFont(typeof o.uiFont === "string" ? o.uiFont : undefined),
     headerPattern: normalizeHeaderPattern(
@@ -267,6 +296,18 @@ export function mergeAppSettings(
   }
   if (patch.monthlyProfitTarget !== undefined) {
     next.monthlyProfitTarget = parseMonthlyTarget(patch.monthlyProfitTarget);
+  }
+  if (patch.favouriteFootballScopes != null) {
+    next.favouriteFootballScopes = normalizeFavouriteScopeIds(patch.favouriteFootballScopes);
+  }
+  if (patch.favouriteRacingCourses != null) {
+    next.favouriteRacingCourses = normalizeFavouriteScopeIds(patch.favouriteRacingCourses);
+  }
+  if (patch.hiddenFootballScopes != null) {
+    next.hiddenFootballScopes = normalizeFavouriteScopeIds(patch.hiddenFootballScopes);
+  }
+  if (patch.hiddenRacingCourses != null) {
+    next.hiddenRacingCourses = normalizeFavouriteScopeIds(patch.hiddenRacingCourses);
   }
   if (patch.brandAccentPreset != null) {
     const id = isBrandAccentPresetId(patch.brandAccentPreset)

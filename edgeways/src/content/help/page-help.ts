@@ -62,6 +62,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     title: "Profit Tracker",
     summary: "Log, settle, and see wallets and basic P&L. Link an event and the result can settle it.",
     bullets: [
+      "The bet log is grouped by day, same Today / Yesterday split as Tracked Events.",
       "Add bets manually, from calculators, or via OCR screenshot import.",
       "Placing a deliberate back-only bet (e.g. a mug bet)? Pick the No lay bet type - the lay panel disappears and the outcomes show the bookie side only.",
       "Flag a bet as a Mug bet (camouflage): it stays in real P&L but is excluded from every edge metric, never links an offer, and stamps the bookie's cadence plan.",
@@ -144,7 +145,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary: "Matched betting toolkit. Core calcs go to the tracker.",
     bullets: [
       "Matched Betting - qualifiers, free bets (SNR/SR) and risk-free offers.",
-      "Dutching - equal-profit splits; 2UP dutch mode for early-payout windfalls.",
+      "Dutching - equal-profit splits, stake rounding and per-leg overrides; 2UP dutch mode for early-payout windfalls.",
       "Each Way & Extra Place - lay win and place separately for extra-place offers.",
       "Fill slip: the lay-stake banner (and Lock in / Acca Desk) can fill your exchange betslip via the Edgeways browser extension - fill only, you always place the bet yourself. Without the extension the stake still lands on your clipboard.",
     ],
@@ -179,6 +180,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     title: "History",
     summary: "Bets, casino, promos, and live match moments.",
     bullets: [
+      "Entries sit under Today / Yesterday day headers, same hairline as Tracked Events.",
       "Filter by bets, settlements, casino, promos or match events.",
       "Times align to when things happened - kick-off, goals, full time, casino complete.",
       "Settled bets and completed casino campaigns appear with realised P&L highlighted.",

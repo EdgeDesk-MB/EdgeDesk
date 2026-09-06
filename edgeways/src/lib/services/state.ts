@@ -151,6 +151,7 @@ import { fireDueUserReminders } from "@/lib/services/user-reminders";
 import {
   LIVE_POLL_WINDOW_MS,
   needsResultBackfill,
+  needsTapeBackfill,
   shouldFetchGoalTimeline,
   shouldFetchLineups,
 } from "@/lib/live-poll-rules";
@@ -244,7 +245,9 @@ async function refreshApiEvents(): Promise<void> {
   // Matches that missed their live window (budget ran dry, desk was closed)
   // get one cheap result fetch instead of freezing at the last polled minute.
   const backfillEvents = allApiRows.filter(
-    (e) => needsResultBackfill(e, now) && !backfillAttempted.has(e.id)
+    (e) =>
+      (needsResultBackfill(e, now) || needsTapeBackfill(e, now)) &&
+      !backfillAttempted.has(e.id)
   );
   for (const e of backfillEvents) backfillAttempted.add(e.id);
 
@@ -817,7 +820,7 @@ export async function getAppState(): Promise<AppState> {
     .filter((h) => h.amount != null && h.amount !== 0)
     .map((h) => ({ id: h.id, time: h.createdAt, amount: h.amount!, detail: h.detail }));
 
-  // Daily Plan (B1) slot inputs: today's tracked races and fixtures with bets.
+  // Today's tracked races and fixtures with bets (alerts + parked Daily Plan merge).
   const planNow = new Date();
   const planDayStart = new Date(
     planNow.getFullYear(),

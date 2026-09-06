@@ -937,16 +937,14 @@ function AutomationCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">Auto (context-aware)</SelectItem>
               <SelectItem value="hero">Summary</SelectItem>
-              <SelectItem value="plan">Today&apos;s plan</SelectItem>
-              <SelectItem value="feed">Feed</SelectItem>
+              <SelectItem value="feed">Live feed</SelectItem>
               <SelectItem value="do-next">Do next</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Auto picks Summary when you have open positions (the chart lives there), Today&apos;s
-            plan in the morning, otherwise Summary.
+            The phone deck opens on this card. A leftover Auto or Today&apos;s plan pin becomes
+            Summary.
           </p>
         </div>
       </CardContent>

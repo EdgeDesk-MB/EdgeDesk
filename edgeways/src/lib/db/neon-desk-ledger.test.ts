@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AccountRow, BetRow } from "@/lib/db/schema";
+import type { AccountRow, BetRow, EventRow } from "@/lib/db/schema";
 
 const mocks = vi.hoisted(() => ({
   clerkUserId: "user_live" as string | null,
@@ -175,6 +175,8 @@ vi.mock("@/lib/db/neon-desk-history", () => ({
 }));
 
 import {
+  awardNeonPlaceFreeBetIfDue,
+  awardNeonPlaceFreeBetsDue,
   awardNeonUnconditionalFreeBetIfDue,
   awardNeonUnconditionalFreeBetsDue,
   healNeonDeskLedgers,
@@ -183,6 +185,48 @@ import {
   ledgerNeonBetSettlement,
   reledgerNeonOpenBetPlacement,
 } from "./neon-desk-ledger";
+
+function raceEvent(partial: Partial<EventRow> = {}): EventRow {
+  return {
+    id: 54,
+    sport: "horse_racing",
+    externalId: "rac_haydock",
+    competition: "Haydock",
+    homeTeam: "Betfair Be Friendly Handicap Stakes",
+    awayTeam: "4:15",
+    startTime: 1,
+    status: "finished",
+    homeScore: 1,
+    awayScore: 0,
+    minute: 0,
+    homeLed2: 0,
+    awayLed2: 0,
+    source: "api",
+    goals: JSON.stringify({
+      kind: "horse_racing",
+      winner: "Poatan (IRE)",
+      runners: [
+        { horse: "Poatan (IRE)", position: 1 },
+        { horse: "Trilby (GB)", position: 2 },
+        { horse: "Elara May (GB)", position: 3 },
+        { horse: "Jer Batt (IRE)", position: 4 },
+        { horse: "Marching Mac (IRE)", position: 5 },
+      ],
+    }),
+    ftHomeScore: null,
+    ftAwayScore: null,
+    matchEnding: null,
+    period: null,
+    htHomeScore: null,
+    htAwayScore: null,
+    lineups: null,
+    tapeFetchedAt: null,
+    simScript: null,
+    simStartedAt: null,
+    createdAt: 1,
+    ...partial,
+  };
+}
 
 describe("ledgerNeonBetPlacement", () => {
   beforeEach(() => {
@@ -222,6 +266,28 @@ describe("ledgerNeonBetPlacement", () => {
       id: 10,
       patch: { balanceLedgered: 1 },
     });
+  });
+
+  it("debits the Betdaq exchange wallet for an exchange-as-back no-lay", async () => {
+    mocks.accounts.push(
+      account({ id: 40, name: "Betdaq", type: "exchange", exchangeId: 2 })
+    );
+    await expect(
+      ledgerNeonBetPlacement(
+        bet({ bookmaker: "Betdaq", exchangeId: null, backStake: 300, backOdds: 2.8 })
+      )
+    ).resolves.toBe(true);
+    expect(mocks.ensureCalls).not.toContainEqual(
+      expect.objectContaining({ name: "Betdaq", kind: "bookie" })
+    );
+    expect(mocks.txs).toEqual([
+      expect.objectContaining({
+        accountId: 40,
+        amount: -300,
+        category: "bet_stake",
+        note: "Back stake - Arsenal",
+      }),
+    ]);
   });
 
   it("debits a free-bet usage row instead of cash on a free bet", async () => {
@@ -585,6 +651,118 @@ describe("awardNeonUnconditionalFreeBetsDue", () => {
         }),
       ])
     );
+  });
+});
+
+describe("awardNeonPlaceFreeBetIfDue", () => {
+  beforeEach(() => {
+    mocks.clerkUserId = "user_live";
+    mocks.accounts = [account({ id: 30, name: "Betfair Sportsbook", type: "bookie" })];
+    mocks.txs = [];
+    mocks.patches = [];
+    mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
+    mocks.ensureCalls = [];
+  });
+
+  const placeBet = (partial: Partial<BetRow> = {}): BetRow =>
+    bet({
+      bookmaker: "Betfair Sportsbook",
+      selection: "Trilby",
+      status: "lost",
+      exchangeId: null,
+      backStake: 20,
+      actualProfit: -0.56,
+      balanceLedgered: 1,
+      balanceSettled: 1,
+      eventId: 54,
+      label: "Haydock · Bet £20 get £20 free bet (2nd, 3rd, 4th)",
+      triggerRule: JSON.stringify({
+        v: 2,
+        betWin: null,
+        effects: [{ kind: "free_bet_award", amount: 20, positions: [2, 3, 4] }],
+      }),
+      triggerText: "Bet £20 get £20 FB if 2, 3, 4",
+      ...partial,
+    });
+
+  it("credits £20 when the selection finishes 2nd on a 2nd–4th place-refund", async () => {
+    // Worked: £20 qualifier, Trilby 2nd (needed 2nd–4th). Win market loses;
+    // promo must still mint a £20 free-bet lot on Betfair Sportsbook.
+    await expect(awardNeonPlaceFreeBetIfDue(placeBet(), raceEvent())).resolves.toBe(
+      true
+    );
+    expect(mocks.txs).toEqual([
+      expect.objectContaining({
+        accountId: 30,
+        amount: 20,
+        category: "free_bet",
+        betId: 10,
+        note: "Free bet promo - Finished 2nd (Haydock · Bet £20 get £20 free bet (2nd, 3rd, 4th))",
+      }),
+    ]);
+  });
+
+  it("does not credit a winner-only result before placings land", async () => {
+    await expect(
+      awardNeonPlaceFreeBetIfDue(
+        placeBet(),
+        raceEvent({
+          goals: JSON.stringify({
+            kind: "horse_racing",
+            winner: "Poatan (IRE)",
+            runners: [{ horse: "Poatan (IRE)", position: 1 }],
+          }),
+        })
+      )
+    ).resolves.toBe(false);
+    expect(mocks.txs).toEqual([]);
+  });
+
+  it("does not credit a 5th-place finish", async () => {
+    await expect(
+      awardNeonPlaceFreeBetIfDue(placeBet({ selection: "Marching Mac" }), raceEvent())
+    ).resolves.toBe(false);
+    expect(mocks.txs).toEqual([]);
+  });
+});
+
+describe("awardNeonPlaceFreeBetsDue", () => {
+  beforeEach(() => {
+    mocks.clerkUserId = "user_live";
+    mocks.accounts = [account({ id: 30, name: "Betfair Sportsbook", type: "bookie" })];
+    mocks.txs = [];
+    mocks.patches = [];
+    mocks.claimed.clear();
+    mocks.settlementClaimed.clear();
+    mocks.insertError = null;
+    mocks.ensureCalls = [];
+  });
+
+  it("skips a bet that already has a promo credit", async () => {
+    await expect(
+      awardNeonPlaceFreeBetsDue(
+        [
+          bet({
+            bookmaker: "Betfair Sportsbook",
+            selection: "Trilby",
+            status: "lost",
+            exchangeId: null,
+            eventId: 54,
+            balanceLedgered: 1,
+            triggerRule: JSON.stringify({
+              v: 2,
+              betWin: null,
+              effects: [{ kind: "free_bet_award", amount: 20, positions: [2, 3, 4] }],
+            }),
+          }),
+        ],
+        [raceEvent()],
+        [{ betId: 10, category: "free_bet", amount: 20 }]
+      )
+    ).resolves.toBe(0);
+    expect(mocks.txs).toEqual([]);
   });
 });
 

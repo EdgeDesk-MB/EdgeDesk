@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { inferSportFromBet, linkableEventsForSport } from "./markets";
+import {
+  inferSportFromBet,
+  linkableEventsForSport,
+  marketUsesLinkedEventSides,
+} from "./markets";
 
 describe("inferSportFromBet", () => {
   it("prefers the linked event sport", () => {
@@ -20,6 +24,32 @@ describe("inferSportFromBet", () => {
     expect(inferSportFromBet("win")).toBe("horse_racing");
     expect(inferSportFromBet("match_winner")).toBe("tennis");
     expect(inferSportFromBet("btts")).toBe("football");
+  });
+});
+
+describe("marketUsesLinkedEventSides", () => {
+  it("locks football match markets to the linked fixture sides", () => {
+    expect(marketUsesLinkedEventSides("football", "match_odds")).toBe(true);
+    expect(marketUsesLinkedEventSides("football", "draw_no_bet")).toBe(true);
+    expect(marketUsesLinkedEventSides("football", "btts")).toBe(true);
+    expect(marketUsesLinkedEventSides("football", "over_under_2_5")).toBe(true);
+    expect(marketUsesLinkedEventSides("football", "correct_score")).toBe(true);
+    expect(marketUsesLinkedEventSides("football", "first_goalscorer")).toBe(true);
+  });
+
+  it("leaves football Other editable so the sides are not assumed", () => {
+    expect(marketUsesLinkedEventSides("football", "other")).toBe(false);
+  });
+
+  it("locks two-sided sports that pick home or away", () => {
+    expect(marketUsesLinkedEventSides("tennis", "match_winner")).toBe(true);
+    expect(marketUsesLinkedEventSides("rugby_union", "match_winner")).toBe(true);
+  });
+
+  it("does not lock racing or outright catalogues", () => {
+    expect(marketUsesLinkedEventSides("horse_racing", "win")).toBe(false);
+    expect(marketUsesLinkedEventSides("golf", "outright")).toBe(false);
+    expect(marketUsesLinkedEventSides("greyhounds", "win")).toBe(false);
   });
 });
 

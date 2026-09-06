@@ -312,6 +312,33 @@ describe("appStateFromNeonDesk", () => {
     });
     expect(state.history.map((h) => h.id)).toEqual([2, 1]);
   });
+
+  it("drops a leftover 1-1 score tick once a named goal row covers that scoreline", () => {
+    const state = appStateFromNeonDesk({
+      bets: [],
+      history: [
+        historyRow({
+          id: 1,
+          dedupe: "goal:69:1",
+          kind: "goal",
+          title: "Goal: Jay Stansfield!",
+          eventId: 69,
+          minute: 22,
+          detail: "Birmingham 1-1 Wolves",
+        }),
+        historyRow({
+          id: 2,
+          dedupe: "score:69:1-1",
+          kind: "goal",
+          title: "Goal!",
+          eventId: 69,
+          minute: 23,
+          detail: "Birmingham 1-1 Wolves",
+        }),
+      ],
+    });
+    expect(state.history.map((h) => h.dedupe)).toEqual(["goal:69:1"]);
+  });
 });
 
 function casinoOffer(

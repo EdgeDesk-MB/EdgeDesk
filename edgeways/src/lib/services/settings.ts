@@ -19,6 +19,7 @@ import {
   type OfferBetPref,
   type TuningSettings,
 } from "./settings-shared";
+import { normalizeFavouriteScopeIds } from "@/lib/events/fixture-scope";
 import {
   DEFAULT_BRAND_ACCENT_HEX,
   DEFAULT_BRAND_ACCENT_PRESET,
@@ -97,6 +98,15 @@ function parseHomeLayout(raw: string | undefined): HomeLayoutSettings {
   }
 }
 
+function parseFavouriteScopeIds(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    return normalizeFavouriteScopeIds(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 export function getAppSettings(): AppSettings {
   const stake = parseFloat(readRaw("defaultBackStake") ?? "");
   const poll = parseInt(readRaw("dashboardPollMs") ?? "", 10);
@@ -145,6 +155,10 @@ export function getAppSettings(): AppSettings {
     tuning: parseTuning(readRaw("tuning")),
     homeLayout: parseHomeLayout(readRaw("homeLayout")),
     monthlyProfitTarget: parseMonthlyTarget(readRaw("monthlyProfitTarget")),
+    favouriteFootballScopes: parseFavouriteScopeIds(readRaw("favouriteFootballScopes")),
+    favouriteRacingCourses: parseFavouriteScopeIds(readRaw("favouriteRacingCourses")),
+    hiddenFootballScopes: parseFavouriteScopeIds(readRaw("hiddenFootballScopes")),
+    hiddenRacingCourses: parseFavouriteScopeIds(readRaw("hiddenRacingCourses")),
     ...(() => {
       const rawPreset = readRaw("brandAccentPreset");
       const presetId = isBrandAccentPresetId(rawPreset)
@@ -280,6 +294,30 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
   }
   if (patch.monthlyProfitTarget !== undefined) {
     writeRaw("monthlyProfitTarget", String(patch.monthlyProfitTarget ?? "null"));
+  }
+  if (patch.favouriteFootballScopes != null) {
+    writeRaw(
+      "favouriteFootballScopes",
+      JSON.stringify(normalizeFavouriteScopeIds(patch.favouriteFootballScopes))
+    );
+  }
+  if (patch.favouriteRacingCourses != null) {
+    writeRaw(
+      "favouriteRacingCourses",
+      JSON.stringify(normalizeFavouriteScopeIds(patch.favouriteRacingCourses))
+    );
+  }
+  if (patch.hiddenFootballScopes != null) {
+    writeRaw(
+      "hiddenFootballScopes",
+      JSON.stringify(normalizeFavouriteScopeIds(patch.hiddenFootballScopes))
+    );
+  }
+  if (patch.hiddenRacingCourses != null) {
+    writeRaw(
+      "hiddenRacingCourses",
+      JSON.stringify(normalizeFavouriteScopeIds(patch.hiddenRacingCourses))
+    );
   }
   if (patch.brandAccentPreset != null) {
     const id = isBrandAccentPresetId(patch.brandAccentPreset)

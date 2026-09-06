@@ -41,7 +41,7 @@ export const PUBLIC_PLANS: readonly PublicPlan[] = [
     name: "Core",
     monthlyPence: 999,
     annualPence: 999 * ANNUAL_MONTHS_CHARGED,
-    blurb: "Offers pipeline, Do Next, Daily Plan, and Edge Report.",
+    blurb: "Offers pipeline, Do Next, and Edge Report.",
     cta: "Choose Core",
     href: "/sign-up?plan=core",
   },
@@ -61,7 +61,7 @@ export const SETTINGS_PLAN_HIGHLIGHTS = {
   core: [
     "Offers pipeline and free-bet lots",
     "Acca, Bet Builder, and Systems desks",
-    "Daily Plan and Edge Report",
+    "Do Next and Edge Report",
   ],
   edge: [
     "Everything in Core",
@@ -92,7 +92,7 @@ export const COMPARISON_FEATURES: Record<
       "Track bookie offers, free-bet lots, and where each campaign sits.",
   },
   do_next: {
-    title: "Do Next and Daily Plan",
+    title: "Do Next and Edge Report",
     description:
       "Ranked work for today, plus Edge Report on what you actually kept.",
   },

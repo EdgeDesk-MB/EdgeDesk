@@ -8,26 +8,21 @@ import "server-only";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import type { EnsureVenueResult, VenueKind } from "@/lib/accounts/ensure-venue";
+import { findVenueBalanceAccount, inferBackVenueKind } from "@/lib/accounts/resolve-venue";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
-import {
-  insertNeonDeskAccount,
-  insertNeonExchange,
-  listNeonDeskAccounts,
-  listNeonExchanges,
-  patchNeonDeskAccount,
-} from "@/lib/db/neon-desk-accounts";
+import * as neonAccounts from "@/lib/db/neon-desk-accounts";
 import type { ExchangeRow } from "@/lib/db/schema";
 
 async function ensureNeonExchangeRow(name: string): Promise<ExchangeRow> {
   const trimmed = name.trim();
   const q = trimmed.toLowerCase();
-  const existing = (await listNeonExchanges()).find(
+  const existing = (await neonAccounts.listNeonExchanges()).find(
     (e) => e.name.toLowerCase() === q
   );
   if (existing) return existing;
 
   const preset = EXCHANGE_PRESETS.find((p) => p.name.toLowerCase() === q);
-  return insertNeonExchange({
+  return neonAccounts.insertNeonExchange({
     name: trimmed,
     commissionPct: preset?.commissionPct ?? 2,
     brandColor: preset?.brandColor ?? "#3f3f46",
@@ -50,19 +45,13 @@ export async function ensureNeonVenueAccount(
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Name is required");
   const q = trimmed.toLowerCase();
-  const accounts = await listNeonDeskAccounts(clerkUserId);
+  const accounts = await neonAccounts.listNeonDeskAccounts(clerkUserId);
 
   const active = accounts.find(
     (a) => a.type === kind && a.isActive === 1 && a.name.toLowerCase() === q
   );
   if (active) {
-    const exchange =
-      kind === "exchange"
-        ? active.exchangeId != null
-          ? ((await listNeonExchanges()).find((e) => e.id === active.exchangeId) ??
-            (await ensureNeonExchangeRow(trimmed)))
-          : await ensureNeonExchangeRow(trimmed)
-        : null;
+    const exchange = kind === "exchange" ? await ensureNeonExchangeRow(trimmed) : null;
     return { account: active, exchange, created: false };
   }
 
@@ -71,7 +60,7 @@ export async function ensureNeonVenueAccount(
   );
   if (inactive) {
     const exchange = kind === "exchange" ? await ensureNeonExchangeRow(trimmed) : null;
-    const account = await patchNeonDeskAccount(
+    const account = await neonAccounts.patchNeonDeskAccount(
       inactive.id,
       {
         isActive: 1,
@@ -89,7 +78,7 @@ export async function ensureNeonVenueAccount(
 
   if (kind === "exchange") {
     const exchange = await ensureNeonExchangeRow(trimmed);
-    const account = await insertNeonDeskAccount(
+    const account = await neonAccounts.insertNeonDeskAccount(
       {
         name: trimmed,
         type: "exchange",
@@ -103,7 +92,7 @@ export async function ensureNeonVenueAccount(
     return { account, exchange, created: true };
   }
 
-  const account = await insertNeonDeskAccount(
+  const account = await neonAccounts.insertNeonDeskAccount(
     {
       name: trimmed,
       type: "bookie",
@@ -114,4 +103,29 @@ export async function ensureNeonVenueAccount(
     clerkUserId
   );
   return { account, exchange: null, created: true };
+}
+
+/**
+ * Back-bet wallet: existing bookie or exchange by name, else create
+ * with inferred kind (Betdaq → exchange, Bet365 → bookie).
+ */
+export async function ensureNeonBackVenueAccount(
+  name: string,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<EnsureVenueResult> {
+  if (!clerkUserId) throw new Error("Sign in to save an account.");
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Name is required");
+
+  const existing = findVenueBalanceAccount(
+    await neonAccounts.listNeonDeskAccounts(clerkUserId),
+    trimmed
+  );
+  if (existing) {
+    const exchange =
+      existing.type === "exchange" ? await ensureNeonExchangeRow(trimmed) : null;
+    return { account: existing, exchange, created: false };
+  }
+
+  return ensureNeonVenueAccount(trimmed, inferBackVenueKind(trimmed), clerkUserId);
 }

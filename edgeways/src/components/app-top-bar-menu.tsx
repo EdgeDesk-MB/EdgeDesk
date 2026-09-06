@@ -102,7 +102,7 @@ function MobileNavDrawer() {
       <DialogPrimitive.Portal>
         {/* Heavier, slower scrim than dialog.tsx on purpose - a full-height
             drawer replaces the page context, a dialog only floats over it. */}
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 duration-200 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 translate-z-0 bg-black/40 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
         <DialogPrimitive.Content
           className="fixed inset-y-0 right-0 z-50 flex h-dvh w-[min(20rem,85vw)] flex-col border-l border-border/80 bg-popover text-popover-foreground shadow-xl duration-200 data-open:animate-in data-open:slide-in-from-right data-closed:animate-out data-closed:slide-out-to-right"
           aria-describedby={undefined}

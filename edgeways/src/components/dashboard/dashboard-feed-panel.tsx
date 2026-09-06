@@ -138,9 +138,11 @@ export function DashboardFeedPanel({
       />
       <ScrollFadeEdges
         className="min-h-0 flex-1"
+        startFade={false}
         scrollClassName={cn(
           dashboardPanelBody,
-          "app-scroll-overlay px-[var(--layout-card-x)] pb-3 pt-0"
+          // Keep focused rows clear of the sticky Today / Yesterday plate.
+          "app-scroll-overlay scroll-pt-10 px-2 pb-3 pt-0"
         )}
       >
         <HistoryFeed

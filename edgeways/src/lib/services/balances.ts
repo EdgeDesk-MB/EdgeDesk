@@ -20,7 +20,8 @@ import {
 export function casinoSettlementDedupe(casinoOfferId: number): string {
   return `casino:${casinoOfferId}`;
 }
-import { ensureVenueAccount } from "@/lib/accounts/ensure-venue";
+import { ensureBackVenueAccount, ensureVenueAccount } from "@/lib/accounts/ensure-venue";
+import { findVenueBalanceAccount, isBackPlacementDebit } from "@/lib/accounts/resolve-venue";
 import {
   freeBetUsageNote,
   selectFreeBetLotForUsage,
@@ -320,13 +321,20 @@ export function findBookieAccount(name: string | null | undefined): AccountRow |
 
 /** Any active bookie or exchange wallet by name (dutch legs may be either). */
 function findVenueAccountByName(name: string): AccountRow | undefined {
-  const q = name.trim().toLowerCase();
-  return db
+  return findVenueBalanceAccount(db.select().from(accounts).all(), name);
+}
+
+/** Wallet that already took this bet's back-stake debit (keeps settlement on that row). */
+function resolveLedgeredBackAccount(bet: BetRow): AccountRow | undefined {
+  if (!bet.balanceLedgered) return undefined;
+  const txs = db
     .select()
-    .from(accounts)
-    .where(eq(accounts.isActive, 1))
-    .all()
-    .find((a) => (a.type === "bookie" || a.type === "exchange") && a.name.toLowerCase() === q);
+    .from(balanceTransactions)
+    .where(eq(balanceTransactions.betId, bet.id))
+    .all();
+  const debit = txs.find(isBackPlacementDebit);
+  if (!debit) return undefined;
+  return db.select().from(accounts).where(eq(accounts.id, debit.accountId)).get();
 }
 
 export function findExchangeAccount(exchangeId: number | null | undefined): AccountRow | undefined {
@@ -632,7 +640,7 @@ function ledgerDutchFreeLegs(bet: BetRow): boolean {
   for (const leg of legs) {
     if (!leg.freeBet || !leg.bookmaker?.trim() || !(leg.stake > 0)) continue;
     const account =
-      findVenueAccountByName(leg.bookmaker) ?? ensureVenueAccount(leg.bookmaker, "bookie").account;
+      findVenueAccountByName(leg.bookmaker) ?? ensureBackVenueAccount(leg.bookmaker).account;
     ledgerFreeBetUsageDebit(
       account.id,
       leg.stake,
@@ -715,7 +723,7 @@ export function ledgerBetPlacement(
 
   // First-use: create wallets so tracked bets always move money (Ultimatcher-style).
   const bookie = bet.bookmaker?.trim()
-    ? ensureVenueAccount(bet.bookmaker, "bookie").account
+    ? ensureBackVenueAccount(bet.bookmaker).account
     : undefined;
   const exchange = ensureExchangeAccountForBet(bet.exchangeId);
   if (!bookie && !exchange) return false;
@@ -758,9 +766,10 @@ export function ledgerBetPlacement(
 export function ledgerBetSettlement(bet: BetRow): boolean {
   if (bet.balanceSettled || !bet.balanceLedgered) return false;
 
-  const bookie = bet.bookmaker?.trim()
-    ? ensureVenueAccount(bet.bookmaker, "bookie").account
-    : findBookieAccount(bet.bookmaker);
+  const bookie = resolveLedgeredBackAccount(bet) ??
+    (bet.bookmaker?.trim()
+      ? ensureBackVenueAccount(bet.bookmaker).account
+      : findBookieAccount(bet.bookmaker));
   const exchange =
     ensureExchangeAccountForBet(bet.exchangeId) ?? findExchangeAccount(bet.exchangeId);
   if (!bookie && !exchange) return false;
@@ -856,7 +865,7 @@ export function ledgerBetSettlement(bet: BetRow): boolean {
 export function ledgerPromoAward(bet: BetRow, amount: number, reason: string): boolean {
   if (amount <= 0) return false;
   if (!bet.bookmaker?.trim()) return false;
-  const bookie = ensureVenueAccount(bet.bookmaker, "bookie").account;
+  const bookie = ensureBackVenueAccount(bet.bookmaker).account;
 
   const existing = db
     .select()

@@ -151,9 +151,9 @@ export function DashboardOverviewBar({
   const pnlSub =
     Math.abs(provisional) >= 0.005 ? (
       <>
-        Settled <MoneyFlow value={settled} signColor className="inline text-xs" />
+        Settled <MoneyFlow value={settled} signColor className="inline text-xs font-semibold" />
         {" · "}
-        Prov <MoneyFlow value={provisional} signColor signDisplay className="inline text-xs" />
+        Prov <MoneyFlow value={provisional} signColor signDisplay className="inline text-xs font-semibold" />
       </>
     ) : openBets === 0 ? (
       "All settled - no open positions"

@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { HistoryEntryCard } from "@/components/history/history-feed";
+import {
+  HistoryEntryCard,
+  useHistoryMatchTape,
+} from "@/components/history/history-feed";
 import { PageShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
@@ -11,11 +14,13 @@ import { useNow } from "@/hooks/use-now";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import {
   buildHistoryContext,
-  formatHistoryDateGroup,
+  groupHistoryFeedByDay,
   HISTORY_FILTERS,
   sortHistoryEntries,
   type HistoryFilter,
 } from "@/lib/history-display";
+import { ListDaySection } from "@/components/layout/list-day-section";
+import { listDaySectionContentCompact } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -127,6 +132,10 @@ export default function HistoryPage() {
   );
 
   const now = useNow(60_000);
+  const { crests, crestsReady, onOpenMatch, dialog } = useHistoryMatchTape(
+    data?.entries ?? [],
+    ctx
+  );
 
   if (loading && !data) {
     return <PageLoading label="Loading history" />;
@@ -134,17 +143,9 @@ export default function HistoryPage() {
 
   // Plain derivation - the React Compiler memoizes this better than a manual
   // useMemo it cannot preserve.
-  const grouped = (() => {
-    if (!data?.entries.length) return [] as Array<[string, HistoryRow[]]>;
-    const map = new Map<string, HistoryRow[]>();
-    for (const entry of sortHistoryEntries(data.entries, ctx)) {
-      const key = formatHistoryDateGroup(entry, ctx, now);
-      const list = map.get(key) ?? [];
-      list.push(entry);
-      map.set(key, list);
-    }
-    return [...map.entries()];
-  })();
+  const grouped = data?.entries.length
+    ? groupHistoryFeedByDay(sortHistoryEntries(data.entries, ctx), ctx, now)
+    : [];
 
   return (
     <PageShell>
@@ -187,32 +188,38 @@ export default function HistoryPage() {
         <EmptyState
           icon={HistoryIcon}
           title="No history yet"
-          description="Track a live event or log a bet - settlements, goals and promo awards will appear here automatically."
+          description="Track a live event or log a bet, and settlements, goals and promo awards will appear here automatically."
           action={{ label: "Browse fixtures", href: "/fixtures" }}
           secondaryAction={{ label: "Open tracker", href: "/tracker" }}
         />
       )}
 
       <div className="flex flex-col gap-8">
-        {grouped.map(([day, entries]) => (
-          <section key={day}>
-            <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{day}</h2>
-            <div className={cn("flex flex-col", collapsed ? "gap-2" : "gap-3")}>
-              {entries.map((entry) => (
-                <HistoryEntryCard
-                  key={entry.id}
-                  entry={entry}
-                  ctx={ctx}
-                  bet={entry.betId != null ? ctx.betsById.get(entry.betId) : undefined}
-                  collapsed={collapsed}
-                  onFreeBetAwarded={() => void loadHistory(filter, { quiet: true })}
-                  onNoteSaved={() => void loadHistory(filter, { quiet: true })}
-                />
-              ))}
-            </div>
-          </section>
+        {grouped.map((group) => (
+          <ListDaySection
+            key={group.key}
+            label={group.label}
+            headingId={`history-day-${group.key}`}
+            contentClassName={cn(listDaySectionContentCompact, collapsed && "gap-2")}
+          >
+            {group.entries.map((entry) => (
+              <HistoryEntryCard
+                key={entry.id}
+                entry={entry}
+                ctx={ctx}
+                bet={entry.betId != null ? ctx.betsById.get(entry.betId) : undefined}
+                collapsed={collapsed}
+                crests={crests}
+                crestsReady={crestsReady}
+                onOpenMatch={onOpenMatch}
+                onFreeBetAwarded={() => void loadHistory(filter, { quiet: true })}
+                onNoteSaved={() => void loadHistory(filter, { quiet: true })}
+              />
+            ))}
+          </ListDaySection>
         ))}
       </div>
+      {dialog}
     </PageShell>
   );
 }

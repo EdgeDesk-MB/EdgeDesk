@@ -209,7 +209,11 @@ export function BetCampaignSections({
 
         return (
           <section
-            key={group.offerId ?? "orphans"}
+            key={
+              group.offerId != null
+                ? `offer-${group.offerId}`
+                : `orphans-${group.bets[0]?.id ?? "empty"}`
+            }
             className={cn(panelSurface, "min-w-0 rounded-lg")}
           >
             <div

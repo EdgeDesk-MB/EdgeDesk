@@ -220,6 +220,33 @@ describe("runNeonFeedSync — football", () => {
     expect(live.fixtureMatchEvents).toHaveBeenCalledTimes(1);
     expect(live.updates[0]!.patch.goals).toContain("Saka");
   });
+
+  it("fetches the event tape for a finished match that never stored one", async () => {
+    const finished = harness({
+      events: [
+        event({
+          status: "finished",
+          startTime: NOW - 24 * 60 * 60 * 1000,
+          homeScore: 1,
+          awayScore: 1,
+          minute: 90,
+          goals: null,
+        }),
+      ],
+      openBets: [],
+      fixtures: [
+        fixture({
+          status: "finished",
+          homeScore: 1,
+          awayScore: 1,
+          minute: 90,
+        }),
+      ],
+    });
+    await runNeonFeedSync(finished.deps);
+    expect(finished.fixtureMatchEvents).toHaveBeenCalledTimes(1);
+    expect(finished.updates[0]!.patch.goals).toContain("Saka");
+  });
 });
 
 describe("runNeonFeedSync — settlement", () => {

@@ -128,6 +128,18 @@ export function isAutoSettleMarket(sport: string, market: string): boolean {
   return !!marketDef(sport, market)?.auto;
 }
 
+/**
+ * Home and away are the two sides of a linked fixture, not free-typed names.
+ * Football match markets (match odds, BTTS, goalscorer, …) take Everton /
+ * Manchester United from the selected event. Racing and outrights do not.
+ */
+export function marketUsesLinkedEventSides(sport: string, market: string): boolean {
+  if (sport === "horse_racing" || sport === "greyhounds") return false;
+  if (sport === "golf" || sport === "motorsport" || sport === "cycling") return false;
+  if (sport === "football") return market !== "other";
+  return !!marketDef(sport, market)?.options?.some((option) => option === "home" || option === "away");
+}
+
 const HORSE_RACING_MARKETS = new Set(["win", "place", "each_way", "extra_place"]);
 const TENNIS_MARKETS = new Set(["match_winner", "set_betting"]);
 const OUTRIGHT_MARKETS = new Set(["outright", "top_finish"]);

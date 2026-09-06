@@ -3,6 +3,7 @@ import {
   shouldFetchGoalTimeline,
   shouldFetchLineups,
   needsResultBackfill,
+  needsTapeBackfill,
   LIVE_POLL_WINDOW_MS,
   RESULT_BACKFILL_MAX_AGE_MS,
   TAPE_REFRESH_MS,
@@ -127,5 +128,42 @@ describe("needsResultBackfill", () => {
     expect(needsResultBackfill({ ...base, sport: "horse_racing", startTime: stale }, NOW)).toBe(false);
     expect(needsResultBackfill({ ...base, source: "manual", startTime: stale }, NOW)).toBe(false);
     expect(needsResultBackfill({ ...base, externalId: null, startTime: stale }, NOW)).toBe(false);
+  });
+});
+
+describe("needsTapeBackfill", () => {
+  const finished = {
+    sport: "football",
+    source: "api",
+    externalId: "123",
+    status: "finished" as const,
+    goals: null as string | null,
+    startTime: NOW - 24 * 60 * 60 * 1000,
+  };
+
+  it("selects a finished api match that never stored a tape", () => {
+    expect(needsTapeBackfill(finished, NOW)).toBe(true);
+    expect(needsTapeBackfill({ ...finished, goals: "[]" }, NOW)).toBe(true);
+  });
+
+  it("skips once a tape is stored, even a goals-only legacy row", () => {
+    expect(
+      needsTapeBackfill(
+        { ...finished, goals: '[{"minute":12,"side":"home","player":"X"}]' },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("ignores live, upcoming, ancient, and non-api rows", () => {
+    expect(needsTapeBackfill({ ...finished, status: "live" }, NOW)).toBe(false);
+    expect(needsTapeBackfill({ ...finished, status: "upcoming" }, NOW)).toBe(false);
+    expect(
+      needsTapeBackfill(
+        { ...finished, startTime: NOW - RESULT_BACKFILL_MAX_AGE_MS - 1 },
+        NOW
+      )
+    ).toBe(false);
+    expect(needsTapeBackfill({ ...finished, source: "manual" }, NOW)).toBe(false);
   });
 });

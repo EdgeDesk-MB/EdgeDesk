@@ -819,7 +819,7 @@ function LegRow({
     leg.scheduledAt == null || leg.scheduledAt - now <= DEFAULT_LAY_LEAD_MINUTES * 60_000;
   const notExpired = leg.scheduledAt == null || leg.scheduledAt >= now - LAY_DUE_EXPIRY_MS;
   // Next actionable leg can be laid any time (including right after create).
-  // The 30-minute lead window only drives alerts / Daily Plan, not the form.
+  // The 30-minute lead window only drives alerts, not the form.
   const canLay =
     active &&
     !isWholeComboAccaMethod(run.method) &&

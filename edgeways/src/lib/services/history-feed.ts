@@ -19,7 +19,9 @@ import {
   matchesHistoryFilter,
 } from "@/lib/history-display";
 import { isChartAnnotationEntry } from "@/lib/pnl/chart-bet-markers";
-import { obsoleteScoreHistoryDedupes } from "@/lib/history-event-rows";
+import { dedupeHistoryForDisplay } from "@/lib/history-feed-display";
+
+export { dedupeHistoryForDisplay } from "@/lib/history-feed-display";
 
 /** Set or clear the user note on a balance-correction history row. */
 export function updateHistoryNote(id: number, note: string | null): HistoryRow | null {
@@ -52,36 +54,6 @@ export function purgeOrphanedBetHistory(): number {
       .run();
   }
   return orphaned.length;
-}
-
-/** Drop legacy duplicate rows from the feed (old promo lines, duplicate race results). */
-export function dedupeHistoryForDisplay(rows: HistoryRow[], allEvents: EventRow[]): HistoryRow[] {
-  const eventById = new Map(allEvents.map((e) => [e.id, e]));
-  const seenRacingResults = new Set<string>();
-  const seenPromoBets = new Set<number>();
-  const obsoleteScoreTicks = new Set(
-    allEvents.flatMap((event) => obsoleteScoreHistoryDedupes(event))
-  );
-  const out: HistoryRow[] = [];
-
-  for (const row of rows) {
-    if (obsoleteScoreTicks.has(row.dedupe)) continue;
-    if (row.kind === "free_bet_promo") {
-      if (row.betId == null || seenPromoBets.has(row.betId)) continue;
-      seenPromoBets.add(row.betId);
-      continue;
-    }
-    if (row.kind === "full_time" && row.eventId != null) {
-      const ev = eventById.get(row.eventId);
-      if (ev?.sport === "horse_racing") {
-        const key = ev.externalId ?? `local:${ev.competition}:${ev.startTime}`;
-        if (seenRacingResults.has(key)) continue;
-        seenRacingResults.add(key);
-      }
-    }
-    out.push(row);
-  }
-  return out;
 }
 
 export interface HistoryFeedResult {

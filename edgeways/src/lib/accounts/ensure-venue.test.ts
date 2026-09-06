@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, accounts, exchanges } from "@/lib/db";
-import { ensureVenueAccount } from "./ensure-venue";
+import { ensureBackVenueAccount, ensureVenueAccount } from "./ensure-venue";
 
 describe("ensureVenueAccount", () => {
   beforeEach(() => {
@@ -44,5 +44,25 @@ describe("ensureVenueAccount", () => {
       .all()
       .find((e) => e.name === "TestVenue Exchange");
     expect(ex).toBeTruthy();
+  });
+
+  it("uses the existing exchange wallet for an exchange-as-back name", () => {
+    const created = ensureVenueAccount("TestVenue Betdaq", "exchange");
+    const resolved = ensureBackVenueAccount("TestVenue Betdaq");
+    expect(resolved.created).toBe(false);
+    expect(resolved.account.id).toBe(created.account.id);
+    expect(resolved.account.type).toBe("exchange");
+    const bookies = db
+      .select()
+      .from(accounts)
+      .all()
+      .filter((a) => a.name === "TestVenue Betdaq" && a.type === "bookie");
+    expect(bookies).toHaveLength(0);
+  });
+
+  it("creates a bookie when the back name is not an exchange", () => {
+    const r = ensureBackVenueAccount("TestVenue Sky Bet");
+    expect(r.account.type).toBe("bookie");
+    expect(r.created).toBe(true);
   });
 });

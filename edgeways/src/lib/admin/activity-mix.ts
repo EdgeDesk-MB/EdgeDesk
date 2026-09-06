@@ -1,5 +1,6 @@
 import { rankShare, shareSlices, type ShareSlice } from "@/lib/admin/series";
-import { sportDisplayLabel } from "@/lib/sports";
+import { inferSportFromBet } from "@/lib/markets";
+import { SPORTS, sportDisplayLabel } from "@/lib/sports";
 
 export const ACTIVITY_UNSET_KEY = "unset";
 
@@ -105,7 +106,7 @@ const OFFER_TYPE_LABEL: Record<string, string> = {
   general: "General",
 };
 
-const SPORT_ORDER = [
+const SPORT_HEAD = [
   "horse_racing",
   "football",
   "sports",
@@ -113,6 +114,26 @@ const SPORT_ORDER = [
   "tennis",
   "greyhounds",
 ] as const;
+
+const SPORT_HEAD_SET = new Set<string>(SPORT_HEAD);
+
+export const SPORT_ORDER = [
+  ...SPORT_HEAD,
+  ...SPORTS.map((sport) => sport.value).filter((value) => !SPORT_HEAD_SET.has(value)),
+];
+
+export type LeadingSport = {
+  key: string;
+  n: number;
+  total: number;
+};
+
+export type SportDeskRow = {
+  key: string;
+  label: string;
+  bets: number;
+  desks: number;
+};
 
 export function emptyActivityMix(): ActivityMix {
   return {
@@ -143,6 +164,94 @@ export function activitySportLabel(key: string): string {
   if (key === "sports") return "Sports";
   if (key === "casino") return "Casino";
   return sportDisplayLabel(key);
+}
+
+function trimmedActivityValue(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Same preference as the desk tracker: linked event, then the bet row, then
+ * the campaign, then the market. Unknown stored ids are kept, not forced
+ * through the known-sport list.
+ */
+export function resolveActivitySport(input: {
+  eventSport?: string | null;
+  betSport?: string | null;
+  offerSport?: string | null;
+  market?: string | null;
+}): string {
+  return (
+    trimmedActivityValue(input.eventSport) ??
+    trimmedActivityValue(input.betSport) ??
+    trimmedActivityValue(input.offerSport) ??
+    (trimmedActivityValue(input.market)
+      ? inferSportFromBet(input.market!)
+      : ACTIVITY_UNSET_KEY)
+  );
+}
+
+function sportOrderRank(key: string): number {
+  const index = SPORT_ORDER.indexOf(key);
+  return index === -1 ? SPORT_ORDER.length : index;
+}
+
+export function leadingSportByUser(
+  rows: ActivityKeyedCount[]
+): Map<string, LeadingSport> {
+  const byUser = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    if (!row.clerkUserId || !Number.isFinite(row.n) || row.n <= 0) continue;
+    const sports = byUser.get(row.clerkUserId) ?? new Map<string, number>();
+    const key = normaliseActivityKey(row.key);
+    sports.set(key, (sports.get(key) ?? 0) + row.n);
+    byUser.set(row.clerkUserId, sports);
+  }
+  const out = new Map<string, LeadingSport>();
+  for (const [userId, sports] of byUser) {
+    let bestKey = ACTIVITY_UNSET_KEY;
+    let bestN = 0;
+    let total = 0;
+    for (const [key, n] of sports) {
+      total += n;
+      if (
+        n > bestN ||
+        (n === bestN && sportOrderRank(key) < sportOrderRank(bestKey))
+      ) {
+        bestKey = key;
+        bestN = n;
+      }
+    }
+    if (total > 0) out.set(userId, { key: bestKey, n: bestN, total });
+  }
+  return out;
+}
+
+export function sportDeskRows(rows: ActivityKeyedCount[]): SportDeskRow[] {
+  const bets = new Map<string, number>();
+  const desks = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.clerkUserId || !Number.isFinite(row.n) || row.n <= 0) continue;
+    const key = normaliseActivityKey(row.key);
+    bets.set(key, (bets.get(key) ?? 0) + row.n);
+    const set = desks.get(key) ?? new Set<string>();
+    set.add(row.clerkUserId);
+    desks.set(key, set);
+  }
+  return [...bets.entries()]
+    .map(([key, n]) => ({
+      key,
+      label: activitySportLabel(key),
+      bets: n,
+      desks: desks.get(key)?.size ?? 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.bets - a.bets ||
+        sportOrderRank(a.key) - sportOrderRank(b.key) ||
+        a.label.localeCompare(b.label)
+    );
 }
 
 export function activityBetTypeLabel(key: string): string {
@@ -217,7 +326,7 @@ export function filterActivityMix(
 export function buildActivityMixCharts(mix: ActivityMix): ActivityMixCharts {
   return {
     betTypes: slicesFromKeyed(mix.betTypes, activityBetTypeLabel, [...BET_TYPE_ORDER]),
-    betSports: slicesFromKeyed(mix.betSports, activitySportLabel, [...SPORT_ORDER]),
+    betSports: slicesFromKeyed(mix.betSports, activitySportLabel, SPORT_ORDER),
     betStatuses: slicesFromKeyed(
       mix.betStatuses,
       activityBetStatusLabel,
@@ -237,7 +346,7 @@ export function buildActivityMixCharts(mix: ActivityMix): ActivityMixCharts {
       "none",
     ]),
     betBookmakers: rankKeyed(mix.betBookmakers, activityBookmakerLabel),
-    offerSports: slicesFromKeyed(mix.offerSports, activitySportLabel, [...SPORT_ORDER]),
+    offerSports: slicesFromKeyed(mix.offerSports, activitySportLabel, SPORT_ORDER),
     offerTypes: slicesFromKeyed(mix.offerTypes, activityOfferTypeLabel, [
       "bet_get_free_place",
       "promo_terms",

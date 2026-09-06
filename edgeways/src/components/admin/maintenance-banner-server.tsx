@@ -1,21 +1,27 @@
-import { readMaintenanceBanner } from "@/lib/admin/operator-settings";
-import { MaintenanceBannerView } from "./maintenance-banner";
+import { DEFAULT_APP_UPDATE } from "@/lib/admin/app-update-shared";
+import { getAppBuildStamp } from "@/lib/admin/app-build-stamp";
+import { DEFAULT_BANNER } from "@/lib/admin/maintenance-banner-shared";
+import {
+  readAppUpdateSettings,
+  readMaintenanceBanner,
+} from "@/lib/admin/operator-settings";
+import { MaintenanceBannerLive } from "./maintenance-banner-live";
 
 /**
- * Server-rendered maintenance banner: shows on first paint instead of
- * popping in after a client fetch. Fail-soft — a settings read failure
- * must never take the desk down with it.
+ * Server-rendered site banner host: first paint matches the published
+ * state, then the client polls and animates changes. Fail-soft — a
+ * settings read failure must never take the desk down with it.
  */
 export async function MaintenanceBannerServer() {
-  const banner = await readMaintenanceBanner().catch(() => null);
-  if (!banner?.enabled || !banner.message) return null;
+  const [banner, update] = await Promise.all([
+    readMaintenanceBanner().catch(() => DEFAULT_BANNER),
+    readAppUpdateSettings().catch(() => DEFAULT_APP_UPDATE),
+  ]);
   return (
-    <MaintenanceBannerView
-      message={banner.message}
-      kind={banner.kind}
-      href={banner.href}
-      linkLabel={banner.linkLabel}
-      layoutOffset
+    <MaintenanceBannerLive
+      initial={banner}
+      initialUpdate={update}
+      buildStamp={getAppBuildStamp()}
     />
   );
 }

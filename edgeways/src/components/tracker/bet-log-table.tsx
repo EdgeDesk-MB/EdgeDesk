@@ -81,12 +81,14 @@ import {
 import {
   deskTableBodyCell,
   deskTableHeaderCell,
+  listRowGroup,
   tableEdgeStart,
 } from "@/lib/ui/surface-styles";
 import { betStatusBadgeVariant, formatPillLabel } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
 import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
 import { formatAccaDeskBetDisplayTitle, isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
+import { betLogTypeCaption } from "@/lib/bets/bet-log-title";
 import { stripStaleHorseFromRacingBetLabel } from "@/lib/bets/racing-bet-label";
 import { twoUpBothWinProfit } from "@/lib/bets/two-up-windfall";
 import { api } from "@/hooks/use-app-state";
@@ -96,6 +98,35 @@ import { Link2, Pencil, RotateCcw, Zap } from "lucide-react";
 function betLogTitle(bet: BetRow): string {
   if (isAccaDeskBack(bet) || isAccaDeskLay(bet)) return formatAccaDeskBetDisplayTitle(bet);
   return stripStaleHorseFromRacingBetLabel(bet.label, bet.selection);
+}
+
+function BetLogTypeLine({
+  bet,
+  title,
+  offer,
+  className,
+}: {
+  bet: BetRow;
+  title: string;
+  offer?: OfferSummary;
+  className?: string;
+}) {
+  const typeLabel = betLogTypeCaption(title, bet.betType);
+  if (!typeLabel && !bet.earlyPayout && !offer) return null;
+  return (
+    <div className={cn("mt-0.5 text-xs text-muted-foreground", className)}>
+      {typeLabel}
+      {typeLabel && bet.earlyPayout ? " · 2UP" : bet.earlyPayout ? "2UP" : ""}
+      {offer && (
+        <>
+          {typeLabel || bet.earlyPayout ? " · " : ""}
+          <Link href="/offers" className="text-primary-text hover:underline">
+            {offer.title.length > 28 ? `${offer.title.slice(0, 25)}…` : offer.title}
+          </Link>
+        </>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -112,6 +143,7 @@ export function BetLogTable({
   offerById,
   eventById,
   highlightId,
+  labelledBy,
   onEdit,
   onPatch,
   onPatchEvent,
@@ -123,6 +155,7 @@ export function BetLogTable({
   offerById: Map<number, OfferSummary>;
   eventById: Map<number, EventRow>;
   highlightId: number | null;
+  labelledBy?: string;
   onEdit: (bet: BetRow) => void;
   onPatch: (id: number, json: Record<string, unknown>, message: string) => void;
   /** Record race placings on a linked event (settles derived markets). */
@@ -147,7 +180,10 @@ export function BetLogTable({
   return (
     <>
       {/* Mobile: card list (C2 progressive disclosure - tables become cards < sm) */}
-      <div className="sm:hidden">
+      <div
+        className={cn("sm:hidden", listRowGroup)}
+        {...(labelledBy ? { "aria-labelledby": labelledBy } : {})}
+      >
         {bets.map((bet) => {
           const event = bet.eventId ? eventById.get(bet.eventId) : undefined;
           const raceOutcome = betRaceOutcome(bet, event, promoAwards);
@@ -175,6 +211,7 @@ export function BetLogTable({
           const linkedRaceBets = event
             ? bets.filter((b) => b.eventId === event.id)
             : [];
+          const title = betLogTitle(bet);
 
           return (
             <div
@@ -184,7 +221,7 @@ export function BetLogTable({
                 ? {
                     tabIndex: 0,
                     "data-open-bet-row": bet.id,
-                    "aria-label": `Open bet: ${betLogTitle(bet)}. Press S to set the result.`,
+                    "aria-label": `Open bet: ${title}. Press S to set the result.`,
                   }
                 : {})}
               className={cn(
@@ -196,19 +233,8 @@ export function BetLogTable({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">{betLogTitle(bet)}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {formatPillLabel(bet.betType)}
-                    {bet.earlyPayout ? " · 2UP" : ""}
-                    {offer && (
-                      <>
-                        {" · "}
-                        <Link href="/offers" className="text-primary-text hover:underline">
-                          {offer.title.length > 28 ? `${offer.title.slice(0, 25)}…` : offer.title}
-                        </Link>
-                      </>
-                    )}
-                  </p>
+                  <p className="line-clamp-2 text-sm font-medium leading-snug">{title}</p>
+                  <BetLogTypeLine bet={bet} title={title} offer={offer} />
                   {bet.offerId == null && linkableOffers.length > 0 && (
                     <div className="mt-1.5">
                       <LinkOfferSelect
@@ -342,7 +368,10 @@ export function BetLogTable({
       </div>
 
       <div className="hidden sm:block">
-    <Table className="min-w-[720px] table-fixed">
+    <Table
+      className="min-w-[720px] table-fixed"
+      aria-labelledby={labelledBy}
+    >
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           <TableHead className={cn(deskTableHeaderCell, tableEdgeStart, "w-[26%]")}>
@@ -391,6 +420,7 @@ export function BetLogTable({
           const linkedRaceBets = event
             ? bets.filter((b) => b.eventId === event.id)
             : [];
+          const title = betLogTitle(bet);
 
           return (
             <TableRow
@@ -400,7 +430,7 @@ export function BetLogTable({
                 ? {
                     tabIndex: 0,
                     "data-open-bet-row": bet.id,
-                    "aria-label": `Open bet: ${betLogTitle(bet)}. Press S to set the result.`,
+                    "aria-label": `Open bet: ${title}. Press S to set the result.`,
                   }
                 : {})}
               className={cn(
@@ -417,19 +447,13 @@ export function BetLogTable({
                   "whitespace-normal align-top"
                 )}
               >
-                <div className="line-clamp-2 font-medium leading-snug">{betLogTitle(bet)}</div>
-                <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                  {formatPillLabel(bet.betType)}
-                  {bet.earlyPayout ? " · 2UP" : ""}
-                  {offer && (
-                    <>
-                      {" · "}
-                      <Link href="/offers" className="text-primary-text hover:underline">
-                        {offer.title.length > 28 ? `${offer.title.slice(0, 25)}…` : offer.title}
-                      </Link>
-                    </>
-                  )}
-                </div>
+                <div className="line-clamp-2 font-medium leading-snug">{title}</div>
+                <BetLogTypeLine
+                  bet={bet}
+                  title={title}
+                  offer={offer}
+                  className="line-clamp-1"
+                />
                 {bet.offerId == null && linkableOffers.length > 0 && (
                   <div className="mt-1">
                     <LinkOfferSelect

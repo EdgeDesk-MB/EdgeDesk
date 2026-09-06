@@ -11,10 +11,13 @@
 import "server-only";
 import webpush from "web-push";
 import { eq } from "drizzle-orm";
+import { isSafePushIconPath } from "@/lib/alerts/crest-lockup";
+import { resolveCrestLockupIconForAlert } from "@/lib/alerts/crest-lockup-icon";
 import {
   NOTIFICATION_BADGE,
   NOTIFICATION_ICON,
 } from "@/lib/alerts/notification-icons";
+import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { ensureNotificationTitleEmoji } from "@/lib/alerts/notification-title";
 import { db, appSettings, pushSubscriptions, type PushSubscriptionRow } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
@@ -167,9 +170,27 @@ async function fanoutPush(payload: string, ttlSeconds: number): Promise<PushFano
   return fanoutLocalPush(payload, ttlSeconds);
 }
 
-function buildAlertPayload(
-  alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
-): string {
+type PushAlert = Pick<IncomingAlert, "title" | "body" | "href" | "key"> & {
+  icon?: string | null;
+};
+
+async function resolvePushIcon(
+  alert: PushAlert,
+  clerkUserId?: string | null
+): Promise<string> {
+  if (alert.icon && isSafePushIconPath(alert.icon)) return alert.icon;
+  const owner = clerkUserId ?? neonDeskClerkUserId();
+  const lockup = await resolveCrestLockupIconForAlert(alert.key, owner).catch(
+    () => null
+  );
+  return lockup ?? NOTIFICATION_ICON;
+}
+
+async function buildAlertPayload(
+  alert: PushAlert,
+  clerkUserId?: string | null
+): Promise<string> {
+  const icon = await resolvePushIcon(alert, clerkUserId);
   return JSON.stringify({
     // Exactly one leading emoji: keep semantic marks from alert rules
     // (🟢/⚠/🔒/⏰/🛎️), otherwise brand ⚡. Never stack a second bolt.
@@ -177,7 +198,7 @@ function buildAlertPayload(
     body: alert.body ?? "",
     href: alert.href ?? "/desk",
     tag: alert.key,
-    icon: NOTIFICATION_ICON,
+    icon,
     badge: NOTIFICATION_BADGE,
   });
 }
@@ -187,10 +208,8 @@ function buildAlertPayload(
  * from the push relay) are pruned. Failures never throw - push is a
  * best-effort channel on top of the inbox record.
  */
-export async function sendPush(
-  alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
-): Promise<PushFanoutResult> {
-  return fanoutPush(buildAlertPayload(alert), 60 * 60);
+export async function sendPush(alert: PushAlert): Promise<PushFanoutResult> {
+  return fanoutPush(await buildAlertPayload(alert), 60 * 60);
 }
 
 /**
@@ -199,13 +218,17 @@ export async function sendPush(
  */
 export async function sendPushToUser(
   clerkUserId: string,
-  alert: Pick<IncomingAlert, "title" | "body" | "href" | "key">
+  alert: PushAlert
 ): Promise<PushFanoutResult> {
   if (!process.env.DATABASE_URL?.trim()) {
     return { sent: 0, pruned: 0, failed: 0, failures: [] };
   }
   const { fanoutNeonPushToUser } = await import("@/lib/db/neon-push");
-  return fanoutNeonPushToUser(clerkUserId, buildAlertPayload(alert), 60 * 60);
+  return fanoutNeonPushToUser(
+    clerkUserId,
+    await buildAlertPayload(alert, clerkUserId),
+    60 * 60
+  );
 }
 
 /**

@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { FootballLiveTapeDialog } from "@/components/events/match-tape";
+import { useDevStickyJson } from "@/lib/dev/use-dev-sticky-open";
+import {
+  TeamCrestLockup,
+  type TeamCrestLockupPlate,
+  type TeamCrestLockupSize,
+} from "@/components/team-crest-lockup";
 import { MoneyFlow } from "@/components/money-flow";
-import type { BetRow, HistoryRow } from "@/lib/db/schema";
+import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
+import { useEventCrestMap, type EventCrest } from "@/hooks/use-event-crests";
 import {
   formatBetMeta,
   formatHistoryEventLine,
   formatHistoryPromoLine,
   formatHistoryTimeBadge,
   formatHistoryTimeBadgeParts,
+  groupHistoryFeedByDay,
   historyEntryHref,
   historyEntryLinkLabel,
+  historyEntryFixtureLockup,
+  historyEntryOpensMatchTape,
+  historyFootballEventsForCrests,
   historyEntrySubtitle,
   historyEntryTitle,
   historyEntryTitleParts,
@@ -51,6 +63,7 @@ import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Gift, History } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
+import { ListDayRule } from "@/components/layout/list-day-rule";
 
 /** Local override so a saved note paints before the parent refresh lands. */
 function useBalanceCorrectionNote(entry: HistoryRow) {
@@ -94,6 +107,8 @@ function HistoryMomentSublineDisplay({
           <span className={momentHit}>{label}</span>
           {segments?.length ? momentSublineGap : null}
         </>
+      ) : ball ? (
+        <span aria-hidden>⚽ </span>
       ) : null}
       {segments?.map((part, index) => (
         <span
@@ -112,11 +127,14 @@ function HistoryGoalScorelineDisplay({
   ctx,
   className,
   wrap = false,
+  showScorer = true,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   className?: string;
   wrap?: boolean;
+  /** Live feed omits the named scorer; History cards keep it. */
+  showScorer?: boolean;
 }) {
   const twoUp = historyGoalTwoUpTrigger(entry, ctx);
   return (
@@ -127,13 +145,16 @@ function HistoryGoalScorelineDisplay({
         className
       )}
     >
-      <HistoryMomentSublineDisplay
-        ball
-        label={historyGoalEventLabel(entry, ctx)}
-        className="min-w-0 truncate"
-      />
+      {showScorer ? (
+        <HistoryMomentSublineDisplay
+          ball
+          label={historyGoalEventLabel(entry, ctx)}
+          className="min-w-0 truncate"
+        />
+      ) : null}
       {twoUp ? <HistoryTwoUpBadge /> : null}
       <HistoryMomentSublineDisplay
+        ball={!showScorer}
         segments={historyGoalScorelineSegments(entry, ctx)}
         className={wrap ? "min-w-0 text-pretty break-words" : "min-w-0 truncate"}
       />
@@ -221,32 +242,39 @@ function HistoryTimeBadgeDisplay({
   entry,
   ctx,
   className,
-  /** Single-line "Today, 08:56" / "Yesterday, 20:43" - History page. Home keeps the stacked two-line badge. */
+  /** Single-line clock (or "Today, 08:56" when the day is not on a section header). */
   inline = false,
+  /** Day lives on `ListDaySection` / `ListDayRule`, so the badge is clock or minute only. */
+  omitDay = false,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   className?: string;
   inline?: boolean;
+  omitDay?: boolean;
 }) {
   if (inline) {
     return (
       <span className={cn("whitespace-nowrap tabular-nums", className)}>
-        {formatHistoryTimeBadge(entry, ctx)}
+        {formatHistoryTimeBadge(entry, ctx, { omitDay })}
       </span>
     );
   }
 
-  const { primary, secondary } = formatHistoryTimeBadgeParts(entry, ctx);
+  const { primary, secondary } = formatHistoryTimeBadgeParts(entry, ctx, {
+    omitDay,
+  });
 
   if (!secondary) {
     return (
-      <span className={cn("whitespace-nowrap tabular-nums", className)}>{primary}</span>
+      <span className={cn("whitespace-nowrap leading-none tabular-nums", className)}>
+        {primary}
+      </span>
     );
   }
 
   return (
-    <span className={cn("flex flex-col leading-tight tabular-nums", className)}>
+    <span className={cn("flex flex-col gap-0.5 leading-none tabular-nums", className)}>
       <span className="whitespace-nowrap">{primary}</span>
       <span className="whitespace-nowrap">{secondary}</span>
     </span>
@@ -279,14 +307,111 @@ function historyHeaderTint(entry: HistoryRow): string | null {
   return null;
 }
 
+export function useHistoryMatchTape(
+  entries: HistoryRow[],
+  ctx: HistoryContext
+): {
+  crests: Map<string, EventCrest>;
+  crestsReady: boolean;
+  onOpenMatch: (event: EventRow) => void;
+  dialog: ReactNode;
+} {
+  const [tapeEvent, setTapeEvent] = useDevStickyJson<EventRow | null>(
+    "match-tape-event",
+    null
+  );
+  const footballEvents = useMemo(
+    () => historyFootballEventsForCrests(entries, ctx),
+    [entries, ctx]
+  );
+  const { map: crests, ready: crestsReady } = useEventCrestMap(footballEvents);
+  return {
+    crests,
+    crestsReady,
+    onOpenMatch: setTapeEvent,
+    dialog: tapeEvent ? (
+      <FootballLiveTapeDialog
+        event={tapeEvent}
+        open
+        onOpenChange={(open) => {
+          if (!open) setTapeEvent(null);
+        }}
+      />
+    ) : null,
+  };
+}
+
+function HistoryFixtureLockup({
+  event,
+  crests,
+  size,
+  plate,
+  reserve = false,
+}: {
+  event: EventRow;
+  crests?: Map<string, EventCrest>;
+  size: TeamCrestLockupSize;
+  plate: TeamCrestLockupPlate;
+  reserve?: boolean;
+}) {
+  const pair = event.externalId && crests ? crests.get(event.externalId) : undefined;
+  return (
+    <TeamCrestLockup
+      homeSrc={pair?.homeLogo}
+      awaySrc={pair?.awayLogo}
+      size={size}
+      plate={plate}
+      reserve={reserve}
+    />
+  );
+}
+
+function HistoryMatchAction({
+  entry,
+  ctx,
+  onOpenMatch,
+  className,
+  children,
+}: {
+  entry: HistoryRow;
+  ctx: HistoryContext;
+  onOpenMatch?: (event: EventRow) => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const tapeEvent = historyEntryOpensMatchTape(entry, ctx);
+  const label = historyEntryLinkLabel(entry, ctx);
+  if (tapeEvent && onOpenMatch) {
+    return (
+      <button
+        type="button"
+        className={cn("min-w-0 cursor-pointer text-left", className ?? "block w-full")}
+        aria-label={label}
+        onClick={() => onOpenMatch(tapeEvent)}
+      >
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link
+      href={historyEntryHref(entry, ctx)}
+      className={cn("cursor-pointer", className)}
+      aria-label={label}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function historyRowShellClass(entry: HistoryRow, compact: boolean) {
   return cn(
     // Min height matches title + subtitle so single-line rows (e.g. bare "Bet placed")
     // align with double-line settlements and event rows.
-    "flex w-full min-w-0 items-center gap-2 rounded-md border border-transparent transition-colors hover:border-border/60 hover:bg-selection-subtle",
+    "relative z-0 flex w-full min-w-0 items-center gap-2 rounded-md border border-transparent transition-colors hover:border-border/60 hover:bg-selection-subtle",
     compact
-      ? "box-border max-w-full min-h-[3.25rem] px-2 py-2"
-      : "self-stretch min-h-[3rem] px-2 py-1.5",
+      ? "box-border max-w-full min-h-[3.25rem] pl-3 pr-3.5 pt-2 pb-2.5"
+      : "self-stretch min-h-[3rem] px-4 pt-1 pb-2",
     entryTint(entry)
   );
 }
@@ -295,12 +420,18 @@ export function HistoryEntryRow({
   entry,
   ctx,
   compact = false,
+  crests,
+  crestsReady = true,
+  onOpenMatch,
   onFreeBetAwarded,
   onNoteSaved,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   compact?: boolean;
+  crests?: Map<string, EventCrest>;
+  crestsReady?: boolean;
+  onOpenMatch?: (event: EventRow) => void;
   onFreeBetAwarded?: () => void;
   onNoteSaved?: () => void;
 }) {
@@ -329,8 +460,7 @@ export function HistoryEntryRow({
   const rowTitleParts = matchHeadline ? null : titleParts;
   const freeBetPlaced = isFreeBetPlacedHistoryEntry(entry, ctx);
   const freeBetWon = isFreeBetWonHistoryEntry(entry);
-  const href = historyEntryHref(entry, ctx);
-  const linkLabel = historyEntryLinkLabel(entry, ctx);
+  const lockupEvent = historyEntryFixtureLockup(entry, ctx);
   const offerTitle =
     bet?.offerId != null ? ctx.offerTitleById.get(bet.offerId) : undefined;
   const showEarlyAward = showEarlyFreeBetAwardButton(entry, bet, promo, offerTitle);
@@ -361,50 +491,64 @@ export function HistoryEntryRow({
   if (compact) {
     return (
       <div className={historyRowShellClass(entry, true)}>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
           <HistoryTimeBadgeDisplay
             entry={entry}
             ctx={ctx}
-            className="w-[4.75rem] shrink-0 text-left text-xs font-semibold text-muted-foreground"
+            omitDay
+            className="w-[3.25rem] shrink-0 -translate-y-px pt-0.5 text-left text-xs font-semibold text-muted-foreground"
           />
-          <div className="flex w-4 shrink-0 justify-center">
+          <div className="flex w-4 shrink-0 justify-center pt-0.5">
             <HistoryEntryIcon entry={entry} ctx={ctx} />
           </div>
           <div className="min-w-0 flex-1 text-left">
-            <Link
-              href={href}
-              className="cursor-pointer"
-              aria-label={linkLabel}
+            <HistoryMatchAction
+              entry={entry}
+              ctx={ctx}
+              onOpenMatch={onOpenMatch}
+              className="flex w-full min-w-0 items-center gap-2"
             >
-              <HistoryEntryTitleDisplay
-                title={rowTitle}
-                parts={rowTitleParts}
-                freeBetPlaced={freeBetPlaced}
-                freeBetWon={freeBetWon}
-                className="block text-[13px] font-medium leading-snug"
-              />
-              {goalScoreline ? (
-                <HistoryGoalScorelineDisplay
-                  entry={entry}
-                  ctx={ctx}
-                  className="mt-0.5 text-xs text-muted-foreground"
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <HistoryEntryTitleDisplay
+                  title={rowTitle}
+                  parts={rowTitleParts}
+                  freeBetPlaced={freeBetPlaced}
+                  freeBetWon={freeBetWon}
+                  className="min-w-0 text-[13px] font-medium leading-snug"
                 />
-              ) : racingCopy ? (
-                <HistoryMomentSublineDisplay
-                  label={racingCopy.label}
-                  segments={racingCopy.parts}
-                  className="mt-0.5 block truncate text-xs text-muted-foreground"
+                {goalScoreline ? (
+                  <HistoryGoalScorelineDisplay
+                    entry={entry}
+                    ctx={ctx}
+                    showScorer={false}
+                    className="text-xs text-muted-foreground"
+                  />
+                ) : racingCopy ? (
+                  <HistoryMomentSublineDisplay
+                    label={racingCopy.label}
+                    segments={racingCopy.parts}
+                    className="block truncate text-xs text-muted-foreground"
+                  />
+                ) : matchSubline ? (
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {matchSubline}
+                  </span>
+                ) : compactDescription ? (
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {compactDescription}
+                  </span>
+                ) : null}
+              </span>
+              {lockupEvent ? (
+                <HistoryFixtureLockup
+                  event={lockupEvent}
+                  crests={crests}
+                  size="feed"
+                  plate="page"
+                  reserve={!crestsReady}
                 />
-              ) : matchSubline ? (
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                  {matchSubline}
-                </span>
-              ) : compactDescription ? (
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                  {compactDescription}
-                </span>
               ) : null}
-            </Link>
+            </HistoryMatchAction>
             {correctionDetail}
             {earlyAwardPrompt}
           </div>
@@ -430,32 +574,50 @@ export function HistoryEntryRow({
           <HistoryEntryIcon entry={entry} ctx={ctx} />
         </div>
         <span className="min-w-0 flex-1 text-left">
-          <Link href={href} className="cursor-pointer" aria-label={linkLabel}>
-            <HistoryEntryTitleDisplay
-              title={rowTitle}
-              parts={rowTitleParts}
-              freeBetPlaced={freeBetPlaced}
-              freeBetWon={freeBetWon}
-              className="block text-[13px] font-medium"
-            />
-            {goalScoreline ? (
-              <HistoryGoalScorelineDisplay
-                entry={entry}
-                ctx={ctx}
-                className="text-xs text-muted-foreground"
+          <HistoryMatchAction
+            entry={entry}
+            ctx={ctx}
+            onOpenMatch={onOpenMatch}
+            className="flex w-full min-w-0 items-center gap-2"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <HistoryEntryTitleDisplay
+                  title={rowTitle}
+                  parts={rowTitleParts}
+                  freeBetPlaced={freeBetPlaced}
+                  freeBetWon={freeBetWon}
+                  className="min-w-0 text-[13px] font-medium"
+                />
+              </span>
+              {goalScoreline ? (
+                <HistoryGoalScorelineDisplay
+                  entry={entry}
+                  ctx={ctx}
+                  className="text-xs text-muted-foreground"
+                />
+              ) : racingCopy ? (
+                <HistoryMomentSublineDisplay
+                  label={racingCopy.label}
+                  segments={racingCopy.parts}
+                  className="block truncate text-xs text-muted-foreground"
+                />
+              ) : matchSubline ? (
+                <span className="block truncate text-xs text-muted-foreground">{matchSubline}</span>
+              ) : !isBalanceAdjustment && subtitle ? (
+                <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+              ) : null}
+            </span>
+            {lockupEvent ? (
+              <HistoryFixtureLockup
+                event={lockupEvent}
+                crests={crests}
+                size="feed"
+                plate="page"
+                reserve={!crestsReady}
               />
-            ) : racingCopy ? (
-              <HistoryMomentSublineDisplay
-                label={racingCopy.label}
-                segments={racingCopy.parts}
-                className="block truncate text-xs text-muted-foreground"
-              />
-            ) : matchSubline ? (
-              <span className="block truncate text-xs text-muted-foreground">{matchSubline}</span>
-            ) : !isBalanceAdjustment && subtitle ? (
-              <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
             ) : null}
-          </Link>
+          </HistoryMatchAction>
           {correctionDetail}
           {entry.kind === "casino_settlement" && entry.detail && !subtitle ? (
             <span className="block truncate text-xs text-muted-foreground">{entry.detail}</span>
@@ -500,6 +662,9 @@ export function HistoryEntryCard({
   ctx,
   bet,
   collapsed = false,
+  crests,
+  crestsReady = true,
+  onOpenMatch,
   onFreeBetAwarded,
   onNoteSaved,
 }: {
@@ -508,6 +673,9 @@ export function HistoryEntryCard({
   bet?: BetRow;
   /** Hide bet details band — header summary only */
   collapsed?: boolean;
+  crests?: Map<string, EventCrest>;
+  crestsReady?: boolean;
+  onOpenMatch?: (event: EventRow) => void;
   onFreeBetAwarded?: () => void;
   onNoteSaved?: () => void;
 }) {
@@ -536,8 +704,7 @@ export function HistoryEntryCard({
   const earlyAwardAmount = bet
     ? unconditionalFreeBetEffect(bet, offerTitle)?.amount
     : undefined;
-  const href = historyEntryHref(entry, ctx);
-  const linkLabel = historyEntryLinkLabel(entry, ctx);
+  const lockupEvent = historyEntryFixtureLockup(entry, ctx);
 
   return (
     <article className={cn(offerCampaignCardShell, "flex-col")}>
@@ -571,59 +738,76 @@ export function HistoryEntryCard({
                     entry={entry}
                     ctx={ctx}
                     inline
+                    omitDay
                     className="text-xs text-muted-foreground"
                   />
                 </div>
-                <Link href={href} className="cursor-pointer" aria-label={linkLabel}>
-                  <h3
-                    className={cn(
-                      "mt-0.5 leading-snug",
-                      collapsed ? "text-sm" : "text-base",
-                      rowTitleParts ? "font-medium" : "font-bold"
-                    )}
-                  >
-                    <HistoryEntryTitleDisplay
-                      title={rowTitle}
-                      parts={rowTitleParts}
-                      freeBetPlaced={freeBetPlaced}
-                      freeBetWon={freeBetWon}
-                    />
-                  </h3>
-                  {goalScoreline ? (
-                    <HistoryGoalScorelineDisplay
-                      entry={entry}
-                      ctx={ctx}
-                      wrap={!collapsed}
+                <HistoryMatchAction
+                  entry={entry}
+                  ctx={ctx}
+                  onOpenMatch={onOpenMatch}
+                  className="mt-0.5 flex w-full min-w-0 items-start justify-between gap-2"
+                >
+                  <span className="min-w-0 flex-1">
+                    <h3
                       className={cn(
-                        collapsed
-                          ? "mt-0.5 text-xs text-muted-foreground"
-                          : "mt-1 text-sm text-muted-foreground"
-                      )}
-                    />
-                  ) : racingCopy ? (
-                    <HistoryMomentSublineDisplay
-                      label={racingCopy.label}
-                      segments={racingCopy.parts}
-                      className={cn(
-                        collapsed
-                          ? "mt-0.5 block truncate text-xs text-muted-foreground"
-                          : "mt-1 block text-sm text-muted-foreground"
-                      )}
-                    />
-                  ) : matchSubline ? (
-                    <p
-                      className={cn(
-                        collapsed
-                          ? "mt-0.5 truncate text-xs text-muted-foreground"
-                          : "mt-1 text-sm text-muted-foreground"
+                        "flex min-w-0 items-center gap-1.5 leading-snug",
+                        collapsed ? "text-sm" : "text-base",
+                        rowTitleParts ? "font-medium" : "font-bold"
                       )}
                     >
-                      {matchSubline}
-                    </p>
-                  ) : !isBalanceAdjustment && !collapsed && subtitle ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+                      <HistoryEntryTitleDisplay
+                        title={rowTitle}
+                        parts={rowTitleParts}
+                        freeBetPlaced={freeBetPlaced}
+                        freeBetWon={freeBetWon}
+                      />
+                    </h3>
+                    {goalScoreline ? (
+                      <HistoryGoalScorelineDisplay
+                        entry={entry}
+                        ctx={ctx}
+                        wrap={!collapsed}
+                        className={cn(
+                          collapsed
+                            ? "mt-0.5 text-xs text-muted-foreground"
+                            : "mt-1 text-sm text-muted-foreground"
+                        )}
+                      />
+                    ) : racingCopy ? (
+                      <HistoryMomentSublineDisplay
+                        label={racingCopy.label}
+                        segments={racingCopy.parts}
+                        className={cn(
+                          collapsed
+                            ? "mt-0.5 block truncate text-xs text-muted-foreground"
+                            : "mt-1 block text-sm text-muted-foreground"
+                        )}
+                      />
+                    ) : matchSubline ? (
+                      <p
+                        className={cn(
+                          collapsed
+                            ? "mt-0.5 truncate text-xs text-muted-foreground"
+                            : "mt-1 text-sm text-muted-foreground"
+                        )}
+                      >
+                        {matchSubline}
+                      </p>
+                    ) : !isBalanceAdjustment && !collapsed && subtitle ? (
+                      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+                    ) : null}
+                  </span>
+                  {lockupEvent && !isPnlSettlementKind(entry.kind) ? (
+                    <HistoryFixtureLockup
+                      event={lockupEvent}
+                      crests={crests}
+                      size={collapsed ? "feed" : "history"}
+                      plate="card"
+                      reserve={!crestsReady}
+                    />
                   ) : null}
-                </Link>
+                </HistoryMatchAction>
                 {isBalanceAdjustment ? (
                   <BalanceCorrectionDetailLine
                     entry={displayEntry}
@@ -760,39 +944,75 @@ export function HistoryFeed({
   onFreeBetAwarded?: () => void;
   onNoteSaved?: () => void;
 }) {
+  const { crests, crestsReady, onOpenMatch, dialog } = useHistoryMatchTape(entries, ctx);
   const ordered = sortHistoryEntries(entries, ctx).filter(
     (entry) => !isHiddenHistoryFeedEntry(entry, ctx)
   );
   if (ordered.length === 0) {
     return (
-      <EmptyState
-        bare
-        compact
-        icon={History}
-        title="No history in this feed"
-        description={emptyMessage}
-        className={cn(compact && "mt-2")}
-      />
+      <>
+        <EmptyState
+          bare
+          compact
+          icon={History}
+          title="No history in this feed"
+          description={emptyMessage}
+          className={cn(compact && "mt-2")}
+        />
+        {dialog}
+      </>
     );
   }
+  const dayGroups = compact ? groupHistoryFeedByDay(ordered, ctx) : null;
+
   return (
     <div
       className={cn(
         "box-border flex w-full max-w-full min-w-0 flex-col",
-        /* Compact Home: horizontal inset lives on the scrollport so rows can be 100% of the content box. */
-        compact ? "mt-2 gap-1.5" : "gap-3"
+        /* Compact Home: flush to the scrollport so Today is already stuck. */
+        compact ? null : "gap-3"
       )}
     >
-      {ordered.map((entry) => (
-        <HistoryEntryRow
-          key={entry.id}
-          entry={entry}
-          ctx={ctx}
-          compact={compact}
-          onFreeBetAwarded={onFreeBetAwarded}
-          onNoteSaved={onNoteSaved}
-        />
-      ))}
+      {dayGroups
+        ? dayGroups.map((group, index) => (
+            <section key={group.key} className={cn(index > 0 && "mt-5")}>
+              <ListDayRule
+                kind="day"
+                sticky
+                label={group.label}
+                className="px-0"
+              />
+              <div className="flex flex-col gap-1.5 py-2">
+                {group.entries.map((entry) => (
+                  <HistoryEntryRow
+                    key={entry.id}
+                    entry={entry}
+                    ctx={ctx}
+                    compact
+                    crests={crests}
+                    crestsReady={crestsReady}
+                    onOpenMatch={onOpenMatch}
+                    onFreeBetAwarded={onFreeBetAwarded}
+                    onNoteSaved={onNoteSaved}
+                  />
+                ))}
+              </div>
+            </section>
+          ))
+        : ordered.map((entry) => (
+            <HistoryEntryRow
+              key={entry.id}
+              entry={entry}
+              ctx={ctx}
+              compact={compact}
+              crests={crests}
+              crestsReady={crestsReady}
+              onOpenMatch={onOpenMatch}
+              onFreeBetAwarded={onFreeBetAwarded}
+              onNoteSaved={onNoteSaved}
+            />
+          ))}
+      {dialog}
     </div>
   );
 }

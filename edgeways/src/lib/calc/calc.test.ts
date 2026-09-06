@@ -7,6 +7,11 @@ import {
   dutchStakeForProfit,
   dutchStakeForLegStake,
   dutchStakesForFreeLeg,
+  dutchOutcomeProfits,
+  dutchWorstProfit,
+  dutchEndBias,
+  applyDutchEndBias,
+  realiseDutch,
   eachWay,
   extraPlace,
   accaMatched,
@@ -308,6 +313,31 @@ describe("dutching", () => {
     expect(dutch(legs, stakeNeeded!).profit).toBeCloseTo(10, 6);
   });
 
+  // Everton v Man Utd (row 1188): 1.93 / 4 / 3.60 is overround, so +£200
+  // guaranteed profit is impossible. T = |P| × S / |1 − S| still equalises
+  // at a £200 loss — that is the stake set Target profit should fill.
+  it("dutchStakeForProfit on an overround 1X2 fills stakes for a loss of that amount", () => {
+    const legs = [
+      { label: "Home", odds: 1.93 },
+      { label: "Draw", odds: 4 },
+      { label: "Away", odds: 3.6 },
+    ];
+    const stakeNeeded = dutchStakeForProfit(legs, 200);
+    expect(stakeNeeded).not.toBeNull();
+    expect(stakeNeeded!).toBeGreaterThan(0);
+    expect(dutch(legs, stakeNeeded!).profit).toBeCloseTo(-200, 6);
+    expect(dutchStakeForProfit(legs, -200)).toBeCloseTo(stakeNeeded!, 8);
+  });
+
+  it("dutchStakeForProfit is null on a fair book (S = 1) or a zero target", () => {
+    const fair = [
+      { label: "A", odds: 2 },
+      { label: "B", odds: 2 },
+    ];
+    expect(dutchStakeForProfit(fair, 10)).toBeNull();
+    expect(dutchStakeForProfit([{ label: "A", odds: 2.1 }, { label: "B", odds: 2.1 }], 0)).toBeNull();
+  });
+
   // Hand-worked: odds 2.0 / 3.0, inverses 0.5 / 0.33333..., S = 0.833333...
   // Fixing leg 0 (odds 2.0) at £40: totalStake = 40 × 2 × S = 66.666667.
   // Leg 0 must recover to exactly £40; leg 1 = totalStake × (1/3)/S = 26.666667.
@@ -392,6 +422,157 @@ describe("dutching", () => {
     expect(dutchStakesForFreeLeg(legs, 0, 0, "snr")).toBeNull();
     expect(dutchStakesForFreeLeg(legs, 0, -10, "snr")).toBeNull();
     expect(dutchStakesForFreeLeg([legs[0]], 0, 20, "snr")).toBeNull();
+  });
+
+  // Spreadsheet Dutch 2025.xlsx row 1188: Man Utd / Draw / Everton.
+  // Odds 1.93 / 4.00 / 3.60. First-mode stake £275 on Man Utd.
+  // Ideal Draw = 275 × 1.93 / 4 = 132.6875; Away = 275 × 1.93 / 3.6 = 147.430555...
+  // Custom Draw £135, Away £152. Returns 530.75 / 540 / 547.20.
+  // Profits −31.25 / −22.00 / −14.80. Book 1/S = 95.61029311%.
+  it("realiseDutch: First-mode penny rounding keeps the Man Utd anchor exact", () => {
+    const legs = [
+      { label: "Man Utd", odds: 1.93 },
+      { label: "Draw", odds: 4 },
+      { label: "Everton", odds: 3.6 },
+    ];
+    const total = dutchStakeForLegStake(legs, 0, 275);
+    expect(total).not.toBeNull();
+    const ideal = dutch(legs, total!);
+    expect(ideal.legs[0].stake).toBeCloseTo(275, 8);
+    expect(ideal.legs[1].stake).toBeCloseTo(132.6875, 6);
+    expect(ideal.legs[2].stake).toBeCloseTo(147.43055555555556, 6);
+    expect(1 / ideal.totalImplied).toBeCloseTo(0.9561029311, 9);
+
+    const executed = realiseDutch(ideal, { preserveExact: [0], roundTo: 0.01 });
+    expect(executed.legs[0].stake).toBe(275);
+    expect(executed.legs[1].stake).toBe(132.69);
+    expect(executed.legs[2].stake).toBe(147.43);
+    expect(executed.totalStake).toBe(555.12);
+    expect(executed.equalised).toBe(true);
+  });
+
+  it("realiseDutch: Custom Draw £135 and Away £152 match the spreadsheet P&L", () => {
+    const legs = [
+      { label: "Man Utd", odds: 1.93 },
+      { label: "Draw", odds: 4 },
+      { label: "Everton", odds: 3.6 },
+    ];
+    const ideal = dutch(legs, dutchStakeForLegStake(legs, 0, 275)!);
+    const executed = realiseDutch(ideal, {
+      preserveExact: [0],
+      roundTo: 0.01,
+      overrides: [null, 135, 152],
+    });
+    expect(executed.legs.map((l) => l.stake)).toEqual([275, 135, 152]);
+    expect(executed.totalStake).toBe(562);
+    expect(executed.legs[0].returnIfWins).toBeCloseTo(530.75, 6);
+    expect(executed.legs[1].returnIfWins).toBeCloseTo(540, 6);
+    expect(executed.legs[2].returnIfWins).toBeCloseTo(547.2, 6);
+    expect(executed.legs[0].profitIfWins).toBeCloseTo(-31.25, 6);
+    expect(executed.legs[1].profitIfWins).toBeCloseTo(-22, 6);
+    expect(executed.legs[2].profitIfWins).toBeCloseTo(-14.8, 6);
+    expect(executed.profit).toBeCloseTo(-31.25, 6);
+    expect(executed.worstProfit).toBeCloseTo(-31.25, 6);
+    expect(executed.bestProfit).toBeCloseTo(-14.8, 6);
+    expect(executed.equalised).toBe(false);
+    expect(
+      dutchWorstProfit(executed.legs.map((l) => ({ label: l.label, odds: l.odds, stake: l.stake })))
+    ).toBeCloseTo(-31.25, 6);
+    expect(
+      dutchOutcomeProfits(executed.legs.map((l) => ({ label: l.label, odds: l.odds, stake: l.stake })))
+    ).toEqual([-31.25, -22, -14.8]);
+  });
+
+  it("realiseDutch: penny-rounds cash legs on a free-bet dutch and keeps the free stake exact", () => {
+    const legs = [
+      { label: "Free bet", odds: 2.0 },
+      { label: "Cash", odds: 1.5 },
+    ];
+    const ideal = dutchStakesForFreeLeg(legs, 0, 20, "snr");
+    expect(ideal).not.toBeNull();
+    const executed = realiseDutch(ideal!, {
+      preserveExact: [0],
+      freeLeg: { index: 0, type: "snr" },
+      roundTo: 0.01,
+    });
+    expect(executed.legs[0].stake).toBe(20);
+    expect(executed.legs[1].stake).toBe(13.33);
+    expect(executed.profit).toBeCloseTo(6.67, 6);
+    expect(executed.equalised).toBe(true);
+  });
+
+  it("realiseDutch: £1.00 rounding on First-mode ideals", () => {
+    const legs = [
+      { label: "Man Utd", odds: 1.93 },
+      { label: "Draw", odds: 4 },
+      { label: "Everton", odds: 3.6 },
+    ];
+    const ideal = dutch(legs, dutchStakeForLegStake(legs, 0, 275)!);
+    const executed = realiseDutch(ideal, { preserveExact: [0], roundTo: 1 });
+    expect(executed.legs.map((l) => l.stake)).toEqual([275, 133, 147]);
+  });
+
+  // First-vs-last weighting. Ideal 275 / 132.69 / 147.43 (Man Utd / Draw / Everton).
+  // Centre = the equal-profit split of the two ends, not a 50/50 cash split.
+  const manUtdIdealEnds = [275, 132.69, 147.43];
+
+  it("dutchEndBias: equal-profit ends sit at the centre even when Home > Away", () => {
+    expect(dutchEndBias(manUtdIdealEnds, manUtdIdealEnds)).toBe(0.5);
+  });
+
+  it("dutchEndBias: custom Away £152 sits slightly toward the last outcome", () => {
+    const bias = dutchEndBias(manUtdIdealEnds, [275, 135, 152]);
+    expect(bias).toBeGreaterThan(0.5);
+    expect(bias).toBeLessThan(0.52);
+  });
+
+  it("dutchEndBias: extra cash on the first end sits left of centre", () => {
+    expect(dutchEndBias(manUtdIdealEnds, [320, 132.69, 100])).toBeLessThan(0.5);
+  });
+
+  it("applyDutchEndBias: centre restores the ideal ends and leaves the middle alone", () => {
+    expect(applyDutchEndBias(manUtdIdealEnds, [275, 135, 152], 0.5)).toEqual([
+      275, 135, 147.43,
+    ]);
+  });
+
+  it("applyDutchEndBias: reading a custom book then applying that bias recovers the ends", () => {
+    const custom = [275, 135, 152];
+    const bias = dutchEndBias(manUtdIdealEnds, custom);
+    const applied = applyDutchEndBias(manUtdIdealEnds, custom, bias);
+    expect(applied[0]).toBeCloseTo(275, 1);
+    expect(applied[1]).toBe(135);
+    expect(applied[2]).toBeCloseTo(152, 1);
+  });
+
+  it("applyDutchEndBias: a 2-leg book keeps the pot and tilts toward the last end", () => {
+    const applied = applyDutchEndBias([50, 50], [50, 50], 0.75);
+    expect(applied[0] + applied[1]).toBeCloseTo(100, 2);
+    expect(applied[1]).toBeGreaterThan(applied[0]);
+  });
+
+  it("applyDutchEndBias: lockFirst keeps the scale stake and only moves the last end", () => {
+    const applied = applyDutchEndBias(manUtdIdealEnds, manUtdIdealEnds, 0.85, {
+      lockFirst: true,
+    });
+    expect(applied[0]).toBe(275);
+    expect(applied[1]).toBe(132.69);
+    expect(applied[2]).toBeGreaterThan(147.43);
+  });
+
+  it("applyDutchEndBias: lockLast keeps the last stake and only moves the first end", () => {
+    const applied = applyDutchEndBias(manUtdIdealEnds, manUtdIdealEnds, 0.2, {
+      lockLast: true,
+    });
+    expect(applied[2]).toBe(147.43);
+    expect(applied[0]).toBeGreaterThan(275);
+  });
+
+  it("dutchEndBias: empty or single-leg books stay at the centre", () => {
+    expect(dutchEndBias([], [])).toBe(0.5);
+    expect(dutchEndBias([10], [12])).toBe(0.5);
+    expect(applyDutchEndBias([], [], 0.3)).toEqual([]);
+    expect(applyDutchEndBias([10], [12], 0.8)).toEqual([12]);
   });
 
   it("2up dutch windfall doubles the payout", () => {

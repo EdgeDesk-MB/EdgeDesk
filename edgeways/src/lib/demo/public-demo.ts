@@ -97,7 +97,7 @@ export function publicDemoBarLine(view: PublicDemoView): string {
     return "Free: calculators, a bet log you can settle, wallets that follow results, and basic P&L.";
   }
   if (view === "core") {
-    return "Core: offers, Do Next, Daily Plan, and the Edge Report.";
+    return "Core: offers, Do Next, and the Edge Report.";
   }
   return "Edge: live racing, Offer Edge picks, and 2UP alerts.";
 }

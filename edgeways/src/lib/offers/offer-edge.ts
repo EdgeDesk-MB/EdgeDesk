@@ -426,7 +426,7 @@ export function buildOfferEdgePlays(
     .slice(0, opts.limit ?? DEFAULT_EDGE_LIMIT);
 }
 
-/** One-line summary for Do Next, the Daily Plan and the offer card. */
+/** One-line summary for Do Next and the offer card. */
 export function formatEdgePlaySummary(play: OfferEdgePlay): string {
   const ev = play.totalEv >= 0 ? `+£${play.totalEv.toFixed(2)}` : `-£${Math.abs(play.totalEv).toFixed(2)}`;
   // The off time comes from the epoch, not the racecard's "2:00" string, which

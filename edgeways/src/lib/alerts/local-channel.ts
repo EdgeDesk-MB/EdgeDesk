@@ -256,7 +256,7 @@ export function createLocalAlertChannel(): AlertChannel {
         try {
           const n = new Notification(osTitle, {
             body: osBody,
-            icon: NOTIFICATION_ICON,
+            icon: alert.icon || NOTIFICATION_ICON,
             badge: NOTIFICATION_BADGE,
             tag: alert.key,
           });
@@ -278,7 +278,7 @@ export function createLocalAlertChannel(): AlertChannel {
             if (!reg) throw new Error("no service worker registration");
             return reg.showNotification(osTitle, {
               body: osBody,
-              icon: NOTIFICATION_ICON,
+              icon: alert.icon || NOTIFICATION_ICON,
               badge: NOTIFICATION_BADGE,
               tag: alert.key,
               data: { href: alert.href },

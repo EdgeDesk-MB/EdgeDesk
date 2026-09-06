@@ -85,3 +85,28 @@ export function needsResultBackfill(
   const age = now - event.startTime;
   return age > LIVE_POLL_WINDOW_MS && age <= RESULT_BACKFILL_MAX_AGE_MS;
 }
+
+/**
+ * Finished api matches leave the live poll, so a row can have a final
+ * score and still hold an empty `goals` tape (score backfill, missed
+ * live window, or the tape request failed). One more events fetch fills
+ * the modal. Give up after {@link RESULT_BACKFILL_MAX_AGE_MS}.
+ */
+export function needsTapeBackfill(
+  event: {
+    sport: string | null;
+    source: string | null;
+    externalId: string | null;
+    status: string;
+    startTime: number;
+    goals: string | null;
+  },
+  now: number
+): boolean {
+  if ((event.sport ?? "football") !== "football") return false;
+  if (event.source !== "api" || !event.externalId) return false;
+  if (event.status !== "finished") return false;
+  if (event.goals && event.goals !== "[]") return false;
+  const age = now - event.startTime;
+  return age >= 0 && age <= RESULT_BACKFILL_MAX_AGE_MS;
+}

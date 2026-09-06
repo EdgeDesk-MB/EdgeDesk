@@ -13,12 +13,30 @@ export type MatchTapeKind = (typeof MATCH_TAPE_KINDS)[number];
 
 export interface MatchTapeEvent {
   kind: MatchTapeKind;
+  /** Elapsed + added time. Same value the feed mapper has always stored. */
   minute: number;
+  /** Added time only. When set, the clock is `{minute - extra}+{extra}'`. */
+  extra?: number;
   side: Side;
   player?: string;
   assist?: string;
   detail?: string;
   og?: boolean;
+}
+
+export const TAPE_PERIODS = ["first", "second", "extra", "penalties"] as const;
+export type TapePeriodId = (typeof TAPE_PERIODS)[number];
+
+export const TAPE_PERIOD_LABEL: Record<TapePeriodId, string> = {
+  first: "First half",
+  second: "Second half",
+  extra: "Extra time",
+  penalties: "Penalties",
+};
+
+export interface TapeScore {
+  home: number;
+  away: number;
 }
 
 const KIND_SET = new Set<string>(MATCH_TAPE_KINDS);
@@ -36,6 +54,12 @@ function asOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function asOptionalExtra(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.round(n);
 }
 
 function inferKind(row: Record<string, unknown>): MatchTapeKind {
@@ -72,6 +96,8 @@ export function parseMatchTape(raw: string | null | undefined): MatchTapeEvent[]
     if (player) event.player = player;
     if (assist) event.assist = assist;
     if (detail) event.detail = detail;
+    const extra = asOptionalExtra(row.extra);
+    if (extra != null) event.extra = extra;
     if (row.og === true) event.og = true;
     out.push(event);
   }
@@ -90,8 +116,149 @@ export function tapeGoals(raw: string | null | undefined): GoalEvent[] {
     });
 }
 
-export function formatTapeMinute(event: Pick<MatchTapeEvent, "minute">): string {
+/** Regulation minute, stripping added time when `extra` is present. */
+export function tapeElapsed(event: Pick<MatchTapeEvent, "minute" | "extra">): number {
+  const extra = event.extra ?? 0;
+  if (extra > 0 && event.minute >= extra) return event.minute - extra;
+  return event.minute;
+}
+
+export function formatTapeMinute(
+  event: Pick<MatchTapeEvent, "minute" | "extra">
+): string {
+  const extra = event.extra ?? 0;
+  if (extra > 0) return `${tapeElapsed(event)}+${extra}'`;
   return `${event.minute}'`;
+}
+
+export function tapePeriodId(event: MatchTapeEvent): TapePeriodId {
+  const elapsed = tapeElapsed(event);
+  const detail = (event.detail ?? "").toLowerCase();
+  if (elapsed > 120 || detail.includes("penalty shootout")) return "penalties";
+  if (elapsed > 90) return "extra";
+  if (elapsed > 45) return "second";
+  return "first";
+}
+
+export function sortTapeEvents(events: MatchTapeEvent[]): MatchTapeEvent[] {
+  return [...events].sort((a, b) => {
+    const elapsedDiff = tapeElapsed(a) - tapeElapsed(b);
+    if (elapsedDiff !== 0) return elapsedDiff;
+    return (a.extra ?? 0) - (b.extra ?? 0);
+  });
+}
+
+export function groupTapeByPeriod(
+  events: MatchTapeEvent[]
+): { period: TapePeriodId; events: MatchTapeEvent[] }[] {
+  const groups: { period: TapePeriodId; events: MatchTapeEvent[] }[] = [];
+  for (const event of sortTapeEvents(events)) {
+    const period = tapePeriodId(event);
+    const last = groups[groups.length - 1];
+    if (last?.period === period) last.events.push(event);
+    else groups.push({ period, events: [event] });
+  }
+  return groups;
+}
+
+export function formatTapeScore(score: TapeScore): string {
+  return `${score.home}–${score.away}`;
+}
+
+/** Running score after each row. Only `kind: "goal"` increments. */
+export function tapeRunningScores(events: MatchTapeEvent[]): TapeScore[] {
+  let home = 0;
+  let away = 0;
+  return events.map((event) => {
+    if (event.kind === "goal") {
+      if (event.side === "home") home += 1;
+      else away += 1;
+    }
+    return { home, away };
+  });
+}
+
+export function scoreThroughTape(
+  events: MatchTapeEvent[],
+  throughIndexInclusive: number
+): TapeScore {
+  const scores = tapeRunningScores(events);
+  if (throughIndexInclusive < 0) return { home: 0, away: 0 };
+  return scores[Math.min(throughIndexInclusive, scores.length - 1)] ?? {
+    home: 0,
+    away: 0,
+  };
+}
+
+export function periodEndScore(
+  events: MatchTapeEvent[],
+  period: TapePeriodId,
+  opts?: {
+    htHome?: number | null;
+    htAway?: number | null;
+    live?: TapeScore | null;
+    isLastPeriod?: boolean;
+  }
+): TapeScore {
+  if (opts?.isLastPeriod && opts.live) return opts.live;
+  if (
+    period === "first" &&
+    typeof opts?.htHome === "number" &&
+    typeof opts?.htAway === "number"
+  ) {
+    return { home: opts.htHome, away: opts.htAway };
+  }
+  const lastIdx = events.findLastIndex((event) => tapePeriodId(event) === period);
+  return scoreThroughTape(events, lastIdx);
+}
+
+const HIDDEN_DETAILS = new Set([
+  "yellow card",
+  "red card",
+  "second yellow card",
+  "normal goal",
+]);
+
+const DETAIL_LABEL: Record<string, string> = {
+  "missed penalty": "Missed penalty",
+  "own goal": "Own goal",
+  penalty: "Penalty",
+};
+
+function sentenceCaseFallback(detail: string): string {
+  const trimmed = detail.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+export function formatTapeDetail(detail: string | undefined): string | undefined {
+  if (!detail) return undefined;
+  const key = detail.trim().toLowerCase();
+  if (HIDDEN_DETAILS.has(key)) return undefined;
+  return DETAIL_LABEL[key] ?? sentenceCaseFallback(detail);
+}
+
+export function goalCaption(event: MatchTapeEvent): string | undefined {
+  if (event.og) return "Own goal";
+  const detail = formatTapeDetail(event.detail);
+  if (detail) return detail;
+  return event.assist;
+}
+
+export function cardTone(
+  detail: string | undefined
+): "yellow" | "red" | "second-yellow" {
+  const key = (detail ?? "").toLowerCase();
+  if (key.includes("second yellow")) return "second-yellow";
+  if (key.includes("red")) return "red";
+  return "yellow";
+}
+
+export function cardCaption(detail: string | undefined): string {
+  const tone = cardTone(detail);
+  if (tone === "second-yellow") return "Second yellow";
+  if (tone === "red") return "Red card";
+  return "Yellow card";
 }
 
 export function formatTapeLine(

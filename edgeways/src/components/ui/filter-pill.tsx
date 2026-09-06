@@ -59,6 +59,7 @@ export const FilterPill = React.forwardRef<HTMLButtonElement, FilterPillProps>(
           id={id}
           title={title}
           aria-label={ariaLabel}
+          aria-pressed={active}
           disabled={disabled}
           onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
           className={cn(
@@ -94,6 +95,7 @@ export const FilterPill = React.forwardRef<HTMLButtonElement, FilterPillProps>(
         containerProps={{
           "data-pill-active": active ? "true" : "false",
           "data-pill-tone": tone,
+          "aria-pressed": active,
           ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         }}
       >

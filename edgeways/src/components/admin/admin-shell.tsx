@@ -24,7 +24,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             className={cn(
               pagePanel,
               "flex w-full flex-col",
-              "max-sm:rounded-none max-sm:shadow-none max-sm:ring-0"
+              "max-sm:rounded-none max-sm:shadow-none"
             )}
           >
             {children}
