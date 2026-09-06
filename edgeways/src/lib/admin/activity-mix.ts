@@ -193,7 +193,7 @@ export function resolveActivitySport(input: {
 }
 
 function sportOrderRank(key: string): number {
-  const index = SPORT_ORDER.indexOf(key);
+  const index = (SPORT_ORDER as readonly string[]).indexOf(key);
   return index === -1 ? SPORT_ORDER.length : index;
 }
 

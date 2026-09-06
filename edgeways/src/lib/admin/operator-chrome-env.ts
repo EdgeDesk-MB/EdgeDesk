@@ -14,7 +14,7 @@ export const OPERATOR_CHROME_ENV_LABEL: Record<OperatorChromeEnv, string> = {
 };
 
 export function getOperatorChromeEnv(
-  env: NodeJS.ProcessEnv = process.env
+  env: Record<string, string | undefined> = process.env
 ): OperatorChromeEnv {
   const vercel = env.VERCEL_ENV?.trim();
   if (vercel === "production") return "live";
@@ -32,7 +32,7 @@ export function operatorChromeSettingKey(
 
 /** Neon only on Vercel production / preview. Localhost always uses SQLite. */
 export function operatorChromeUsesNeon(
-  env: NodeJS.ProcessEnv = process.env
+  env: Record<string, string | undefined> = process.env
 ): boolean {
   const vercel = env.VERCEL_ENV?.trim();
   return (
