@@ -562,11 +562,12 @@ export function isHiddenHistoryFeedEntry(
 /** Bracketed scoreline segments for the goal subline. */
 export function historyGoalScorelineSegments(
   entry: HistoryRow,
-  ctx: HistoryContext
+  ctx: HistoryContext,
+  opts?: { omitTeams?: boolean }
 ): HistoryTitlePart[] | null {
   const scoreline = historyGoalScoreline(entry, ctx);
   if (!scoreline) return null;
-  return formatGoalScorelineSegments(scoreline);
+  return formatGoalScorelineSegments(scoreline, opts);
 }
 
 function footballFullTimeScoreSuffix(
@@ -649,7 +650,9 @@ function sportMomentLinkPhrase(
     const kind = historyKindLabel(entry.kind);
     if (entry.kind === "goal") {
       const scoreline = historyGoalScoreline(entry, ctx);
-      const score = scoreline ? formatGoalScorelineText(scoreline) : null;
+      const score = scoreline
+        ? formatGoalScorelineText(scoreline, { omitTeams: Boolean(fixture) })
+        : null;
       const twoUp = historyGoalTwoUpTrigger(entry, ctx);
       return [kind, twoUp ? "2UP triggered" : null, fixture, score].filter(Boolean).join(", ");
     }

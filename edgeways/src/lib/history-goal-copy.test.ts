@@ -282,6 +282,63 @@ describe("formatGoalScorelineText", () => {
       })
     ).toBe("Wolves 2 - 2 Blackburn");
   });
+
+  it("can drop team names when the fixture is already the title", () => {
+    expect(
+      formatGoalScorelineSegments(
+        {
+          homeTeam: "Wolves",
+          awayTeam: "Blackburn",
+          homeScore: 2,
+          awayScore: 1,
+          scoringSide: "home",
+        },
+        { omitTeams: true }
+      )
+    ).toEqual([
+      { text: "[2]", emphasize: true },
+      { text: " - 1" },
+    ]);
+    expect(
+      formatGoalScorelineSegments(
+        {
+          homeTeam: "Wolves",
+          awayTeam: "Blackburn",
+          homeScore: 1,
+          awayScore: 1,
+          scoringSide: "away",
+        },
+        { omitTeams: true }
+      )
+    ).toEqual([
+      { text: "1 - " },
+      { text: "[1]", emphasize: true },
+    ]);
+    expect(
+      formatGoalScorelineSegments(
+        {
+          homeTeam: "Wolves",
+          awayTeam: "Blackburn",
+          homeScore: 2,
+          awayScore: 2,
+          scoringSide: null,
+        },
+        { omitTeams: true }
+      )
+    ).toEqual([{ text: "2 - 2" }]);
+    expect(
+      formatGoalScorelineText(
+        {
+          homeTeam: "Wolves",
+          awayTeam: "Blackburn",
+          homeScore: 2,
+          awayScore: 1,
+          scoringSide: "home",
+        },
+        { omitTeams: true }
+      )
+    ).toBe("[2] - 1");
+  });
 });
 
 describe("inferGoalScoringSidesFromEntries", () => {

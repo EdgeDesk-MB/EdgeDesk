@@ -92,11 +92,14 @@ function HistoryMomentSublineDisplay({
   label,
   segments,
   className,
+  labelGap = momentSublineGap,
 }: {
   ball?: boolean;
   label?: string | null;
   segments?: { text: string; emphasize?: boolean }[] | null;
   className?: string;
+  /** Space between the spoken label and the score / places. */
+  labelGap?: string;
 }) {
   if (!label && !segments?.length) return null;
   return (
@@ -105,7 +108,7 @@ function HistoryMomentSublineDisplay({
         <>
           {ball ? <span aria-hidden>⚽ </span> : null}
           <span className={momentHit}>{label}</span>
-          {segments?.length ? momentSublineGap : null}
+          {segments?.length ? labelGap : null}
         </>
       ) : ball ? (
         <span aria-hidden>⚽ </span>
@@ -128,15 +131,24 @@ function HistoryGoalScorelineDisplay({
   className,
   wrap = false,
   showScorer = true,
+  omitTeams = false,
 }: {
   entry: HistoryRow;
   ctx: HistoryContext;
   className?: string;
   wrap?: boolean;
-  /** Live feed omits the named scorer; History cards keep it. */
+  /** Live feed keeps a plain Goal!; History cards keep the named scorer. */
   showScorer?: boolean;
+  /** Drop club names when the fixture is already the title. */
+  omitTeams?: boolean;
 }) {
   const twoUp = historyGoalTwoUpTrigger(entry, ctx);
+  const eventLabel = historyGoalEventLabel(entry, ctx);
+  const label = showScorer
+    ? eventLabel
+    : eventLabel?.startsWith("Own goal")
+      ? "Own goal!"
+      : "Goal!";
   return (
     <span
       className={cn(
@@ -145,19 +157,14 @@ function HistoryGoalScorelineDisplay({
         className
       )}
     >
-      {showScorer ? (
-        <HistoryMomentSublineDisplay
-          ball
-          label={historyGoalEventLabel(entry, ctx)}
-          className="min-w-0 truncate"
-        />
-      ) : null}
-      {twoUp ? <HistoryTwoUpBadge /> : null}
       <HistoryMomentSublineDisplay
-        ball={!showScorer}
-        segments={historyGoalScorelineSegments(entry, ctx)}
+        ball
+        label={label}
+        segments={historyGoalScorelineSegments(entry, ctx, { omitTeams })}
+        labelGap={"\u00A0\u00A0"}
         className={wrap ? "min-w-0 text-pretty break-words" : "min-w-0 truncate"}
       />
+      {twoUp ? <HistoryTwoUpBadge /> : null}
     </span>
   );
 }
@@ -521,6 +528,7 @@ export function HistoryEntryRow({
                     entry={entry}
                     ctx={ctx}
                     showScorer={false}
+                    omitTeams={Boolean(matchHeadline)}
                     className="text-xs text-muted-foreground"
                   />
                 ) : racingCopy ? (
@@ -594,6 +602,7 @@ export function HistoryEntryRow({
                 <HistoryGoalScorelineDisplay
                   entry={entry}
                   ctx={ctx}
+                  omitTeams={Boolean(matchHeadline)}
                   className="text-xs text-muted-foreground"
                 />
               ) : racingCopy ? (
@@ -768,6 +777,7 @@ export function HistoryEntryCard({
                         entry={entry}
                         ctx={ctx}
                         wrap={!collapsed}
+                        omitTeams={Boolean(matchHeadline)}
                         className={cn(
                           collapsed
                             ? "mt-0.5 text-xs text-muted-foreground"

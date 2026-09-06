@@ -138,7 +138,7 @@ export function formatGoalHistoryCopy(input: {
   const scoringTeam =
     input.side === "home" ? input.homeTeam : input.side === "away" ? input.awayTeam : null;
   const player = input.player?.trim() || null;
-  const prefix = input.og ? "Own goal" : "Goal!";
+  const prefix = input.og ? "Own goal!" : "Goal!";
 
   // Title names the scorer when we have one. The scoring team is emphasised
   // on the scoreline, not repeated on the first line.
@@ -193,8 +193,8 @@ function parseStoredGoalTitle(
   homeTeam: string,
   awayTeam: string
 ): { side: Side | null; player: string | null; og: boolean } {
-  const og = title === "Own goal" || title.startsWith("Own goal:");
-  if (title === "Goal" || title === "Goal!" || title === "Own goal") {
+  const og = title === "Own goal" || title === "Own goal!" || title.startsWith("Own goal:");
+  if (title === "Goal" || title === "Goal!" || title === "Own goal" || title === "Own goal!") {
     return { side: null, player: null, og };
   }
 
@@ -245,10 +245,15 @@ export function goalHistoryCopyFromEntry(
     };
   }
   if (!event) {
-    if (entry.title === "Goal" || entry.title === "Goal!" || entry.title === "Own goal") {
+    if (
+      entry.title === "Goal" ||
+      entry.title === "Goal!" ||
+      entry.title === "Own goal" ||
+      entry.title === "Own goal!"
+    ) {
       return formatGoalHistoryCopy({
         side: null,
-        og: entry.title === "Own goal",
+        og: entry.title === "Own goal" || entry.title === "Own goal!",
         homeTeam: "",
         awayTeam: "",
       });
@@ -294,31 +299,51 @@ export function goalHistoryScorelineParts(
 /**
  * Goal scoreline with the scorer's new tally in brackets:
  * `Wolves [2] - 1 Blackburn` when home just made it 2-1.
+ * Pass `omitTeams` when the fixture is already on the title row.
  */
-export function formatGoalScorelineSegments(parts: GoalScorelineParts): HistoryTitlePart[] {
+export function formatGoalScorelineSegments(
+  parts: GoalScorelineParts,
+  opts?: { omitTeams?: boolean }
+): HistoryTitlePart[] {
+  const omitTeams = opts?.omitTeams === true;
   if (parts.scoringSide === "home") {
-    return [
-      { text: `${parts.homeTeam} ` },
-      { text: `[${parts.homeScore}]`, emphasize: true },
-      { text: ` - ${parts.awayScore} ${parts.awayTeam}` },
-    ];
+    return omitTeams
+      ? [
+          { text: `[${parts.homeScore}]`, emphasize: true },
+          { text: ` - ${parts.awayScore}` },
+        ]
+      : [
+          { text: `${parts.homeTeam} ` },
+          { text: `[${parts.homeScore}]`, emphasize: true },
+          { text: ` - ${parts.awayScore} ${parts.awayTeam}` },
+        ];
   }
   if (parts.scoringSide === "away") {
-    return [
-      { text: `${parts.homeTeam} ${parts.homeScore} - ` },
-      { text: `[${parts.awayScore}]`, emphasize: true },
-      { text: ` ${parts.awayTeam}` },
-    ];
+    return omitTeams
+      ? [
+          { text: `${parts.homeScore} - ` },
+          { text: `[${parts.awayScore}]`, emphasize: true },
+        ]
+      : [
+          { text: `${parts.homeTeam} ${parts.homeScore} - ` },
+          { text: `[${parts.awayScore}]`, emphasize: true },
+          { text: ` ${parts.awayTeam}` },
+        ];
   }
-  return [
-    {
-      text: `${parts.homeTeam} ${parts.homeScore} - ${parts.awayScore} ${parts.awayTeam}`,
-    },
-  ];
+  return omitTeams
+    ? [{ text: `${parts.homeScore} - ${parts.awayScore}` }]
+    : [
+        {
+          text: `${parts.homeTeam} ${parts.homeScore} - ${parts.awayScore} ${parts.awayTeam}`,
+        },
+      ];
 }
 
-export function formatGoalScorelineText(parts: GoalScorelineParts): string {
-  return formatGoalScorelineSegments(parts)
+export function formatGoalScorelineText(
+  parts: GoalScorelineParts,
+  opts?: { omitTeams?: boolean }
+): string {
+  return formatGoalScorelineSegments(parts, opts)
     .map((part) => part.text)
     .join("");
 }

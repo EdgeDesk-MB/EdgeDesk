@@ -526,6 +526,10 @@ describe("football match-moment feed copy", () => {
       { text: "[2]", emphasize: true },
       { text: " - 2 Blackburn" },
     ]);
+    expect(historyGoalScorelineSegments(g4, ctx, { omitTeams: true })).toEqual([
+      { text: "[2]", emphasize: true },
+      { text: " - 2" },
+    ]);
     expect(historyEntryLinkLabel(g4, ctx)).toBe(
       "Open match events for Wolves v Blackburn"
     );
