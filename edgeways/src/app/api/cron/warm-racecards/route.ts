@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { warmFootballCompetitionCatalog } from "@/lib/services/football-competition-store";
 import { warmFixtureStore } from "@/lib/services/fixture-store";
 import { warmRacecardStore } from "@/lib/services/racecard-store";
 
@@ -20,11 +21,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
   try {
-    const [racing, football] = await Promise.all([
+    const [racing, football, competitions] = await Promise.all([
       warmRacecardStore(),
       warmFixtureStore(),
+      warmFootballCompetitionCatalog(),
     ]);
-    return NextResponse.json({ ok: true, racing, football });
+    return NextResponse.json({ ok: true, racing, football, competitions });
   } catch (error) {
     console.error("[cron/warm-racecards] warm failed:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

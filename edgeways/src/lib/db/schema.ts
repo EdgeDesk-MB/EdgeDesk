@@ -679,6 +679,18 @@ export const fixtureCache = sqliteTable("fixture_cache", {
 });
 
 /**
+ * Current-season football competitions (API-Football `/leagues`). One shared
+ * row, store-first, no clerk scoping. Lets Fixtures list competitions with
+ * no matches today so users can still star them.
+ */
+export const footballCompetitionCatalog = sqliteTable("football_competition_catalog", {
+  id: text("id").primaryKey(),
+  /** JSON array of FootballCompetitionCatalogEntry. */
+  payload: text("payload").notNull(),
+  fetchedAt: integer("fetched_at").notNull(),
+});
+
+/**
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */

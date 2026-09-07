@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lt, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import {
   emptyActivityDaily,
@@ -7,6 +7,11 @@ import {
   type ActivityDaily,
   type ActivityStamps,
 } from "@/lib/admin/activity-charts";
+import {
+  londonDayRangeMs,
+  resolveActivityMixDay,
+  type ActivityDayRange,
+} from "@/lib/admin/activity-day";
 import {
   emptyActivityMix,
   normaliseActivityKey,
@@ -110,10 +115,24 @@ function keyedCounts(
   return out;
 }
 
+function volumeWhere(
+  userCol: VolumeUserColumn,
+  createdAt: VolumeTable["createdAt"],
+  range?: ActivityDayRange
+) {
+  if (!range) return isNotNull(userCol);
+  return and(
+    isNotNull(userCol),
+    gte(createdAt, range.start),
+    lt(createdAt, range.endExclusive)
+  );
+}
+
 async function countsByUserKey(
   table: VolumeTable,
   userCol: VolumeUserColumn,
-  keyExpr: SQL<string> | PgColumn
+  keyExpr: SQL<string> | PgColumn,
+  range?: ActivityDayRange
 ): Promise<ActivityKeyedCount[]> {
   const db = getNeonDb();
   const rows = await db
@@ -123,7 +142,7 @@ async function countsByUserKey(
       n: sql<number>`count(*)::int`,
     })
     .from(table)
-    .where(isNotNull(userCol))
+    .where(volumeWhere(userCol, table.createdAt, range))
     .groupBy(userCol, keyExpr);
   return keyedCounts(rows);
 }
@@ -144,7 +163,9 @@ const resolvedBetSport = sql<string>`coalesce(
   end
 )`;
 
-async function countsByResolvedBetSport(): Promise<ActivityKeyedCount[]> {
+async function countsByResolvedBetSport(
+  range?: ActivityDayRange
+): Promise<ActivityKeyedCount[]> {
   const db = getNeonDb();
   const rows = await db
     .select({
@@ -155,12 +176,12 @@ async function countsByResolvedBetSport(): Promise<ActivityKeyedCount[]> {
     .from(bets)
     .leftJoin(events, eq(bets.eventId, events.id))
     .leftJoin(offers, eq(bets.offerId, offers.id))
-    .where(isNotNull(bets.clerkUserId))
+    .where(volumeWhere(bets.clerkUserId, bets.createdAt, range))
     .groupBy(bets.clerkUserId, resolvedBetSport);
   return keyedCounts(rows);
 }
 
-async function loadActivityMix(): Promise<ActivityMix> {
+async function queryActivityMix(range?: ActivityDayRange): Promise<ActivityMix> {
   const [
     betTypes,
     betSports,
@@ -177,40 +198,50 @@ async function loadActivityMix(): Promise<ActivityMix> {
     casinoBrands,
     casinoStatuses,
   ] = await Promise.all([
-    countsByUserKey(bets, bets.clerkUserId, bets.betType),
-    countsByResolvedBetSport(),
-    countsByUserKey(bets, bets.clerkUserId, bets.status),
+    countsByUserKey(bets, bets.clerkUserId, bets.betType, range),
+    countsByResolvedBetSport(range),
+    countsByUserKey(bets, bets.clerkUserId, bets.status, range),
     countsByUserKey(
       bets,
       bets.clerkUserId,
-      sql<string>`case when ${bets.purpose} = 'mug' then 'mug' else 'edge' end`
+      sql<string>`case when ${bets.purpose} = 'mug' then 'mug' else 'edge' end`,
+      range
     ),
     countsByUserKey(
       bets,
       bets.clerkUserId,
-      sql<string>`case when ${bets.source} = 'import' then 'import' when ${bets.quickLogged} is not null then 'quick' else 'typed' end`
+      sql<string>`case when ${bets.source} = 'import' then 'import' when ${bets.quickLogged} is not null then 'quick' else 'typed' end`,
+      range
     ),
     countsByUserKey(
       bets,
       bets.clerkUserId,
-      sql<string>`case when ${bets.offerId} is not null then 'linked' else 'none' end`
+      sql<string>`case when ${bets.offerId} is not null then 'linked' else 'none' end`,
+      range
     ),
-    countsByUserKey(bets, bets.clerkUserId, unsetText(bets.bookmaker)),
-    countsByUserKey(offers, offers.clerkUserId, unsetText(offers.sport)),
-    countsByUserKey(offers, offers.clerkUserId, unsetText(offers.offerType)),
-    countsByUserKey(offers, offers.clerkUserId, offers.status),
+    countsByUserKey(bets, bets.clerkUserId, unsetText(bets.bookmaker), range),
+    countsByUserKey(offers, offers.clerkUserId, unsetText(offers.sport), range),
+    countsByUserKey(offers, offers.clerkUserId, unsetText(offers.offerType), range),
+    countsByUserKey(offers, offers.clerkUserId, offers.status, range),
     countsByUserKey(
       offers,
       offers.clerkUserId,
-      sql<string>`case when ${offers.source} = 'email' then 'email' else 'typed' end`
+      sql<string>`case when ${offers.source} = 'email' then 'email' else 'typed' end`,
+      range
     ),
-    countsByUserKey(offers, offers.clerkUserId, unsetText(offers.bookmaker)),
+    countsByUserKey(offers, offers.clerkUserId, unsetText(offers.bookmaker), range),
     countsByUserKey(
       casinoOffers,
       casinoOffers.clerkUserId,
-      unsetText(casinoOffers.casino)
+      unsetText(casinoOffers.casino),
+      range
     ),
-    countsByUserKey(casinoOffers, casinoOffers.clerkUserId, casinoOffers.status),
+    countsByUserKey(
+      casinoOffers,
+      casinoOffers.clerkUserId,
+      casinoOffers.status,
+      range
+    ),
   ]);
   return {
     betTypes,
@@ -228,6 +259,17 @@ async function loadActivityMix(): Promise<ActivityMix> {
     casinoBrands,
     casinoStatuses,
   };
+}
+
+export async function loadActivityMixForDay(ymd: string): Promise<ActivityMix> {
+  if (!usesHostedVolume()) return emptyActivityMix();
+  const range = londonDayRangeMs(resolveActivityMixDay(ymd));
+  if (!range) return emptyActivityMix();
+  try {
+    return await queryActivityMix(range);
+  } catch {
+    return emptyActivityMix();
+  }
 }
 
 function emptyOverview(
@@ -273,11 +315,11 @@ export async function loadActivityOverview(): Promise<ActivityOverview> {
       createdStampsSince(bets, cutoff),
       createdStampsSince(offers, cutoff),
       createdStampsSince(casinoOffers, cutoff),
-      loadActivityMix(),
+      queryActivityMix(),
     ]);
     return {
       available: true,
-      note: "Counts only. Category mix is fleet volume, not another desk's bets, wallets, or P&L.",
+      note: "Counts only. Category mix is that day's created rows, not another desk's bets, wallets, or P&L.",
       rows: users.map((user) => ({
         clerkUserId: user.clerkUserId,
         email: user.email,

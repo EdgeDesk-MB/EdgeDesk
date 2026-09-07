@@ -141,6 +141,18 @@ describe("hosted desk cutover", () => {
     expect(routeSource("fixtures/route.ts")).toMatch(/getFixturesForDate/);
     expect(routeSource("racing/racecards/route.ts")).toMatch(/getRacecardsForDate/);
     expect(routeSource("cron/warm-racecards/route.ts")).toMatch(/warmFixtureStore/);
+    expect(routeSource("cron/warm-racecards/route.ts")).toMatch(
+      /warmFootballCompetitionCatalog/
+    );
+    const competitions = readFileSync(
+      resolve(__dirname, "../services/football-competition-store.ts"),
+      "utf8"
+    );
+    expect(competitions).toMatch(/isNeonDesk/);
+    expect(routeSource("fixtures/route.ts")).toMatch(/peekFootballCompetitionCatalog/);
+    expect(routeSource("fixtures/competitions/route.ts")).toMatch(
+      /getFootballCompetitionCatalog/
+    );
   });
 
   it("match-tape miss writes Neon on the hosted desk", () => {

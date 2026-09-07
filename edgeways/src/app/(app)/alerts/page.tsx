@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/help/empty-state";
 import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
-import { PageShell } from "@/components/page-shell";
+import { PageFillScroll, PageFillShell } from "@/components/page-shell";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import { ALERT_INBOX_READ_EVENT } from "@/lib/alerts/inbox-read-event";
 import type { AlertsInboxRow } from "@/lib/db/schema";
@@ -112,9 +112,11 @@ export default function AlertsPage() {
   }
 
   return (
-    <PageShell className="gap-5">
+    <PageFillShell>
       <PageHeader
         title="Alerts"
+        rule={false}
+        toolbarRule={false}
         description="Every alert we have raised."
         icon={BellRing}
         toolbar={
@@ -126,7 +128,8 @@ export default function AlertsPage() {
         }
       />
 
-      <div className="flex flex-col gap-2 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
+      <PageFillScroll>
+      <div className="flex flex-col gap-2">
         {alerts.length === 0 ? (
           <EmptyState
             icon={BellRing}
@@ -208,6 +211,7 @@ export default function AlertsPage() {
           })
         )}
       </div>
-    </PageShell>
+      </PageFillScroll>
+    </PageFillShell>
   );
 }

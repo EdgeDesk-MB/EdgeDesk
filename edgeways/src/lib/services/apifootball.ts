@@ -5,9 +5,10 @@
  */
 
 import { isNeonDesk } from "@/lib/db/desk-backend";
+import type { FootballCompetitionCatalogEntry } from "@/lib/events/fixture-scope";
 import type { FootballLineupPlayer, FootballLineups } from "@/lib/events/lineups";
 import type { MatchTapeEvent, MatchTapeKind } from "@/lib/events/match-tape";
-import { localCalendarDate, wallClockKickoffMs } from "@/lib/events";
+import { feedHorizonDates, localCalendarDate, wallClockKickoffMs } from "@/lib/events";
 
 const BASE = "https://v3.football.api-sports.io";
 
@@ -230,6 +231,7 @@ export function footballOperation(pathAndQuery: string): string {
   if (pathAndQuery.startsWith("/fixtures?id=")) return "fixture-by-id";
   if (pathAndQuery.startsWith("/fixtures/events")) return "match-events";
   if (pathAndQuery.startsWith("/fixtures/lineups")) return "lineups";
+  if (pathAndQuery.startsWith("/leagues")) return "leagues-catalog";
   return "other";
 }
 
@@ -281,6 +283,42 @@ function formatApiErrors(errors: unknown): string | null {
 
 /** Calendar date in the operator's local timezone (API-Football dates are local-day oriented). */
 export { localCalendarDate } from "@/lib/events";
+
+function mapLeague(item: any): FootballCompetitionCatalogEntry | null {
+  const name = typeof item?.league?.name === "string" ? item.league.name.trim() : "";
+  if (!name) return null;
+  const country =
+    typeof item?.country?.name === "string" && item.country.name.trim()
+      ? String(item.country.name).trim()
+      : null;
+  const flag =
+    typeof item?.country?.flag === "string" && item.country.flag.trim()
+      ? String(item.country.flag).trim()
+      : typeof item?.league?.flag === "string" && item.league.flag.trim()
+        ? String(item.league.flag).trim()
+        : null;
+  return { name, country, flag };
+}
+
+/**
+ * Current-season competitions from API-Football `/leagues?current=true`.
+ * The feed names these `league` (type League or Cup). World Cup is a Cup
+ * with country World. Desk copy still says competitions.
+ */
+export async function currentLeagues(): Promise<FootballCompetitionCatalogEntry[]> {
+  const json = await apiGet("/leagues?current=true");
+  const mapped: FootballCompetitionCatalogEntry[] = [];
+  const seen = new Set<string>();
+  for (const item of json.response ?? []) {
+    const entry = mapLeague(item);
+    if (!entry) continue;
+    const id = `${entry.country ?? ""}::${entry.name}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    mapped.push(entry);
+  }
+  return mapped;
+}
 
 /** Upstream day fetch. Desk/API callers must use `getFixturesForDate`. */
 export async function fixturesByDate(date: string): Promise<Fixture[]> {
@@ -557,5 +595,32 @@ export function demoFixtures(): Fixture[] {
     mk("6", "Serie A", "Inter", "Juventus", k(19, 45), "Italy"),
     mk("7", "Bundesliga", "Bayern Munich", "Dortmund", k(14, 30), "Germany"),
     mk("8", "Ligue 1", "PSG", "Marseille", k(20, 45), "France"),
+  ];
+}
+
+/** Sample cards for today and tomorrow when the football feed is off. */
+export function demoFixturesForHorizon(now = Date.now()): Fixture[] {
+  return feedHorizonDates(now).flatMap((date, index) =>
+    demoFixtures().map((fixture) => ({
+      ...fixture,
+      externalId: `${fixture.externalId}-${date}`,
+      startTime: fixture.startTime + index * 86_400_000,
+    }))
+  );
+}
+
+/** Extra catalog rows so demo desks can star competitions with no matches today. */
+export function demoCompetitions(): FootballCompetitionCatalogEntry[] {
+  const fromFixtures = demoFixtures().map((fixture) => ({
+    name: fixture.competition,
+    country: fixture.leagueCountry ?? null,
+    flag: fixture.leagueFlag ?? null,
+  }));
+  return [
+    ...fromFixtures,
+    { name: "FA Cup", country: "England" },
+    { name: "EFL Cup", country: "England" },
+    { name: "UEFA Champions League", country: "World" },
+    { name: "Scottish Premiership", country: "Scotland" },
   ];
 }

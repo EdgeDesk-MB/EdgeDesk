@@ -17,6 +17,7 @@ import { ALERT_INBOX_READ_EVENT } from "@/lib/alerts/inbox-read-event";
 import { setDisplayTimeFormat } from "@/lib/time-format";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import { buildPublicDemoState } from "@/lib/demo/public-fixture";
+import { writeChromeSnapshot } from "@/lib/chrome-snapshot";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { localCalendarDate } from "@/lib/events";
 
@@ -95,8 +96,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
   }, [publicDemo.active, publicDemo.view]);
 
+  useEffect(() => {
+    if (!state || publicDemo.active) return;
+    writeChromeSnapshot(state);
+  }, [state, publicDemo.active]);
+
   const pauseCountRef = useRef(0);
   pauseCountRef.current = pauseCount;
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const fetchState = useCallback(
     async (mode: "poll" | "user") => {
@@ -108,7 +116,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return;
       }
       // A modal can pause after this poll has already left the network.
-      if (mode === "poll" && pauseCountRef.current > 0) return;
+      // Still allow the first snapshot so Home is not stuck on Loading.
+      if (mode === "poll" && pauseCountRef.current > 0 && stateRef.current) {
+        return;
+      }
       // Background polls may share an in-flight request. User refresh (after a
       // mutation) must not join a snapshot that started before the write.
       if (
@@ -126,7 +137,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const next = (await res.json()) as AppState;
           if (pollGen.current !== gen) return;
-          if (mode === "poll" && pauseCountRef.current > 0) return;
+          if (
+            mode === "poll" &&
+            pauseCountRef.current > 0 &&
+            stateRef.current
+          ) {
+            return;
+          }
           const hold = settingsHoldRef.current;
           const settings =
             hold && !settingsHoldCovered(next.settings, hold)
@@ -196,11 +213,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (publicDemo.active) return;
-    if (pollingPaused) return;
-    const initial = window.setTimeout(() => void fetchState("poll"), 0);
+    if (pollingPaused && stateRef.current) return;
+    void fetchState("poll");
     const timer = setInterval(() => void fetchState("poll"), pollMs);
     return () => {
-      window.clearTimeout(initial);
       window.clearInterval(timer);
     };
   }, [fetchState, pollMs, pollingPaused, publicDemo.active]);

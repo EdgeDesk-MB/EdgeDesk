@@ -1,0 +1,25 @@
+---
+description: Never hijack Sam's Aside session — always open a new window
+alwaysApply: true
+---
+
+# Aside: new window only
+
+When using Aside or the browser, never take over Sam's active session,
+focused window, or existing tabs. Always open a new window for agent work.
+
+## Do
+
+- Open a fresh window with `openTab(url)` (or `aside exec` that creates a
+  new window) and stay in that window.
+- `listBrowserTabs()` is allowed to inspect what is open without attaching.
+- Attach to an existing tab only if Sam explicitly names that tab and asks
+  you to use it.
+
+## Do not
+
+- Call `attachActiveBrowserTab()`.
+- Attach to or navigate a tab in his focused/active window.
+- Resume or steer his live Aside session with `--session` unless he asked
+  to continue that session.
+- Drive personal tabs that happen to be open (Rightmove, email, shopping).

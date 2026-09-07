@@ -1,29 +1,37 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { Tabs, TabsLineBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FIXTURE_SPORTS, type Fixture, type RacingFixture } from "@/components/events/types";
+import {
+  FIXTURE_SPORTS,
+  type Fixture,
+  type FootballCompetition,
+  type RacingFixture,
+} from "@/components/events/types";
+import { CalendarDayStepper } from "@/components/calendar-day-stepper";
 import { DeskFixtureBoard } from "@/components/events/desk-fixture-board";
 import { toastAddedToTrackedEvents, toastAlreadyTracked } from "@/components/events/track-toast";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
-import { api, useAppState } from "@/hooks/use-app-state";
+import { api, apiGet, useAppState } from "@/hooks/use-app-state";
 import type { EventRow } from "@/lib/db/schema";
 import { epDeskFixtureHref } from "@/lib/calc/ep/fixture-query";
-import { isCurrentOrFutureFixture, sortFixturesByKickoff } from "@/lib/events";
+import {
+  clampCalendarYmd,
+  fixtureListDayBounds,
+  sortFixturesByKickoff,
+} from "@/lib/events";
+import {
+  adjacentFixtureDays,
+  formatFixtureStepperLabel,
+} from "@/lib/events/fixture-day-groups";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
-import { racingSyncToast } from "@/lib/racing/sync-toast";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import { SportIcon } from "@/components/sport-icon";
 import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { cn } from "@/lib/utils";
-import { RefreshCw } from "lucide-react";
 
 function friendlyFixtureError(error: unknown, sport: "football" | "horse_racing"): string {
   const raw = error instanceof Error ? error.message : String(error);
@@ -40,18 +48,94 @@ function friendlyFixtureError(error: unknown, sport: "football" | "horse_racing"
   const lower = raw.toLowerCase();
   if (lower.includes("plan tier") || lower.includes("auth failed")) {
     return sport === "horse_racing"
-      ? "Could not load racecards from the racing feed. Try refresh in a moment."
-      : "Could not load fixtures from the football feed. Try refresh in a moment.";
+      ? "Could not load racecards from the racing feed. Try again in a moment."
+      : "Could not load fixtures from the football feed. Try again in a moment.";
   }
 
   return raw.replace(/^\d+:\s*/, "").slice(0, 200);
 }
 
+/** Client TTL for a fixture day. The server store is 10 minutes. */
+const FIXTURE_DAY_TTL_MS = 2 * 60_000;
+
+type CachedFixtureDay = {
+  at: number;
+  footballReady: boolean;
+  racingReady: boolean;
+  fixtures: Fixture[];
+  competitions: FootballCompetition[];
+  racecards: RacingFixture[];
+  footballError: string | null;
+  racingError: string | null;
+  warning?: string;
+};
+
+const fixtureDayCache = new Map<string, CachedFixtureDay>();
+
+function peekFixtureDay(day: string): CachedFixtureDay | null {
+  const hit = fixtureDayCache.get(day);
+  if (!hit || Date.now() - hit.at >= FIXTURE_DAY_TTL_MS) return null;
+  return hit;
+}
+
+function storeFixtureDay(day: string, value: Omit<CachedFixtureDay, "at">) {
+  fixtureDayCache.set(day, { ...value, at: Date.now() });
+}
+
+function mergeStoredDay(
+  day: string,
+  patch: Partial<Omit<CachedFixtureDay, "at">>
+): CachedFixtureDay {
+  const previous = peekFixtureDay(day);
+  const next: Omit<CachedFixtureDay, "at"> = {
+    footballReady: patch.footballReady ?? previous?.footballReady ?? false,
+    racingReady: patch.racingReady ?? previous?.racingReady ?? false,
+    fixtures: patch.fixtures ?? previous?.fixtures ?? [],
+    competitions: patch.competitions ?? previous?.competitions ?? [],
+    racecards: patch.racecards ?? previous?.racecards ?? [],
+    footballError:
+      patch.footballError !== undefined
+        ? patch.footballError
+        : (previous?.footballError ?? null),
+    racingError:
+      patch.racingError !== undefined ? patch.racingError : (previous?.racingError ?? null),
+    warning: patch.warning ?? previous?.warning,
+  };
+  storeFixtureDay(day, next);
+  return { ...next, at: Date.now() };
+}
+
+function footballDayPath(day: string) {
+  return `/api/fixtures?date=${encodeURIComponent(day)}`;
+}
+
+function racingDayPath(day: string) {
+  return `/api/racing/racecards?date=${encodeURIComponent(day)}`;
+}
+
+function requestFootballDay(day: string) {
+  return apiGet<{
+    source: string;
+    fixtures: Fixture[];
+    competitions?: FootballCompetition[];
+    warning?: string;
+  }>(footballDayPath(day), FIXTURE_DAY_TTL_MS);
+}
+
+function requestRacingDay(day: string) {
+  return apiGet<{ source: string; racecards: RacingFixture[] }>(
+    racingDayPath(day),
+    FIXTURE_DAY_TTL_MS
+  );
+}
+
 export function FixtureBrowserContent({
   variant = "page",
+  header = null,
   className,
 }: {
   variant?: "page" | "dialog";
+  header?: ReactNode;
   className?: string;
 }) {
   const router = useRouter();
@@ -59,82 +143,202 @@ export function FixtureBrowserContent({
   const { closeTrackFixture } = useTrackFixture();
   const { state, refresh } = useAppState(5000);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [competitions, setCompetitions] = useState<FootballCompetition[]>([]);
   const [racingFixtures, setRacingFixtures] = useState<RacingFixture[]>([]);
   const [footballError, setFootballError] = useState<string | null>(null);
   const [racingError, setRacingError] = useState<string | null>(null);
-  const [loadingFixtures, setLoadingFixtures] = useState(true);
+  const [loadingCompetitions, setLoadingCompetitions] = useState(false);
   const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">("football");
-  const [syncingRacing, setSyncingRacing] = useState(false);
+  const dayBounds = useMemo(() => fixtureListDayBounds(), []);
+  const [listDay, setListDay] = useState(dayBounds.today);
+  const [dayReady, setDayReady] = useState({
+    day: dayBounds.today,
+    football: false,
+    racing: false,
+  });
+  const listDayRef = useRef(listDay);
+  listDayRef.current = listDay;
+  const fixtureSportRef = useRef(fixtureSport);
+  fixtureSportRef.current = fixtureSport;
+  const loadGenRef = useRef(0);
+  const warnedDaysRef = useRef(new Set<string>());
 
   const goTracked = useCallback(() => router.push("/tracked-events"), [router]);
 
-  const loadFixtures = useCallback(async () => {
-    setLoadingFixtures(true);
-    const [footballResult, racingResult] = await Promise.allSettled([
-      api<{ source: string; fixtures: Fixture[]; warning?: string }>("/api/fixtures"),
-      api<{ source: string; racecards: RacingFixture[] }>("/api/racing/racecards"),
-    ]);
-
-    if (footballResult.status === "fulfilled") {
-      setFixtures(footballResult.value.fixtures);
-      setFootballError(null);
-      if (footballResult.value.warning) {
-        toast.message("Using demo football fixtures", {
-          description: footballResult.value.warning,
-        });
-      }
-    } else {
-      const message = friendlyFixtureError(footballResult.reason, "football");
-      setFootballError(message);
-      toast.error("Could not load football fixtures", {
-        description: message,
-      });
+  const loadCompetitionCatalog = useCallback(async (alreadyHave: boolean) => {
+    if (alreadyHave) {
+      setLoadingCompetitions(false);
+      return;
     }
-
-    if (racingResult.status === "fulfilled") {
-      setRacingFixtures(racingResult.value.racecards);
-      setRacingError(null);
-    } else {
-      const message = friendlyFixtureError(racingResult.reason, "horse_racing");
-      setRacingError(message);
-      toast.error("Could not load horse racing fixtures", {
-        description: message,
-      });
+    setLoadingCompetitions(true);
+    try {
+      const payload = await api<{ competitions?: FootballCompetition[] }>(
+        "/api/fixtures/competitions"
+      );
+      if (payload.competitions?.length) setCompetitions(payload.competitions);
+    } catch {
+      // The day list already painted. Search can retry on the next refresh.
+    } finally {
+      setLoadingCompetitions(false);
     }
-
-    setLoadingFixtures(false);
   }, []);
 
-  useEffect(() => {
-    queueMicrotask(loadFixtures);
-  }, [loadFixtures]);
+  const applyDay = useCallback((day: string, cached: CachedFixtureDay) => {
+    setFixtures(cached.fixtures);
+    setRacingFixtures(cached.racecards);
+    if (cached.competitions.length > 0) setCompetitions(cached.competitions);
+    setFootballError(cached.footballError);
+    setRacingError(cached.racingError);
+    setDayReady({
+      day,
+      football: cached.footballReady,
+      racing: cached.racingReady,
+    });
+  }, []);
 
-  const syncRacingResults = useCallback(async () => {
-    setSyncingRacing(true);
-    try {
-      const result = await api<{
-        updated: number;
-        pending: number;
-        tierBlocked?: boolean;
-        tier?: "basic" | "free" | "none";
-      }>("/api/racing/sync-results", {
-        method: "POST",
-      });
-      await refresh();
-      const msg = racingSyncToast(result);
-      if (msg.kind === "success") {
-        toast.success(msg.title, {
-          action: { label: "Tracked Events", onClick: goTracked },
-        });
-      } else {
-        toast.info(msg.title, msg.description ? { description: msg.description } : undefined);
+  const prefetchNeighbourDays = useCallback(
+    (day: string) => {
+      for (const neighbour of adjacentFixtureDays(day, dayBounds.min, dayBounds.max)) {
+        if (peekFixtureDay(neighbour)) continue;
+        void (async () => {
+          const [footballResult, racingResult] = await Promise.allSettled([
+            requestFootballDay(neighbour).then((payload) => {
+              mergeStoredDay(neighbour, {
+                footballReady: true,
+                fixtures: payload.fixtures,
+                competitions: payload.competitions ?? [],
+                footballError: null,
+                warning: payload.warning,
+              });
+              return payload;
+            }),
+            requestRacingDay(neighbour).then((payload) => {
+              mergeStoredDay(neighbour, {
+                racingReady: true,
+                racecards: payload.racecards,
+                racingError: null,
+              });
+              return payload;
+            }),
+          ]);
+          if (footballResult.status === "rejected") {
+            mergeStoredDay(neighbour, {
+              footballReady: true,
+              fixtures: [],
+              footballError: friendlyFixtureError(footballResult.reason, "football"),
+            });
+          }
+          if (racingResult.status === "rejected") {
+            mergeStoredDay(neighbour, {
+              racingReady: true,
+              racecards: [],
+              racingError: friendlyFixtureError(racingResult.reason, "horse_racing"),
+            });
+          }
+        })();
       }
-    } catch (e) {
-      toast.error("Racing sync failed", { description: String(e) });
-    } finally {
-      setSyncingRacing(false);
-    }
-  }, [refresh, goTracked]);
+    },
+    [dayBounds.max, dayBounds.min]
+  );
+
+  const loadFixtures = useCallback(
+    async (day: string) => {
+      const gen = ++loadGenRef.current;
+      const cached = peekFixtureDay(day);
+      if (cached) {
+        applyDay(day, cached);
+      } else {
+        setFixtures([]);
+        setRacingFixtures([]);
+        setFootballError(null);
+        setRacingError(null);
+        setDayReady({ day, football: false, racing: false });
+      }
+
+      prefetchNeighbourDays(day);
+
+      const preferFootball = fixtureSportRef.current === "football";
+      const applyIfCurrent = (patch: Partial<CachedFixtureDay> & { day: string }) => {
+        if (gen !== loadGenRef.current || listDayRef.current !== patch.day) return false;
+        const merged = mergeStoredDay(patch.day, {
+          fixtures: patch.fixtures,
+          competitions: patch.competitions,
+          racecards: patch.racecards,
+          footballError: patch.footballError,
+          racingError: patch.racingError,
+          warning: patch.warning,
+          footballReady:
+            patch.fixtures != null || patch.footballError != null ? true : undefined,
+          racingReady:
+            patch.racecards != null || patch.racingError != null ? true : undefined,
+        });
+        setFixtures(merged.fixtures);
+        setRacingFixtures(merged.racecards);
+        if (merged.competitions.length > 0) setCompetitions(merged.competitions);
+        setFootballError(merged.footballError);
+        setRacingError(merged.racingError);
+        setDayReady({
+          day: patch.day,
+          football: merged.footballReady,
+          racing: merged.racingReady,
+        });
+        return true;
+      };
+
+      const loadFootball = async () => {
+        try {
+          const payload = await requestFootballDay(day);
+          if (!applyIfCurrent({
+            day,
+            fixtures: payload.fixtures,
+            competitions: payload.competitions ?? [],
+            footballError: null,
+            warning: payload.warning,
+          })) {
+            return;
+          }
+          if (payload.warning && !warnedDaysRef.current.has(day)) {
+            warnedDaysRef.current.add(day);
+            toast.message("Using demo football fixtures", {
+              description: payload.warning,
+            });
+          }
+          void loadCompetitionCatalog((payload.competitions?.length ?? 0) > 0);
+        } catch (error) {
+          const message = friendlyFixtureError(error, "football");
+          if (!applyIfCurrent({ day, fixtures: [], footballError: message })) return;
+          toast.error("Could not load football fixtures", { description: message });
+          setLoadingCompetitions(false);
+        }
+      };
+
+      const loadRacing = async () => {
+        try {
+          const payload = await requestRacingDay(day);
+          applyIfCurrent({ day, racecards: payload.racecards, racingError: null });
+        } catch (error) {
+          const message = friendlyFixtureError(error, "horse_racing");
+          if (!applyIfCurrent({ day, racecards: [], racingError: message })) return;
+          toast.error("Could not load horse racing fixtures", { description: message });
+        }
+      };
+
+      if (preferFootball) {
+        await loadFootball();
+        await loadRacing();
+      } else {
+        await loadRacing();
+        await loadFootball();
+      }
+    },
+    [applyDay, loadCompetitionCatalog, prefetchNeighbourDays]
+  );
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadFixtures(listDay);
+    });
+  }, [listDay, loadFixtures]);
 
   async function trackFixture(fixture: Fixture): Promise<EventRow | null> {
     const label = `${fixture.homeTeam} v ${fixture.awayTeam}`;
@@ -231,8 +435,6 @@ export function FixtureBrowserContent({
     });
   }
 
-  // Plain derivations - the React Compiler memoizes these better than manual
-  // useMemo wrappers it cannot preserve.
   const myEvents = state?.events ?? [];
   const trackedExternalIds = new Set(
     myEvents.filter((e) => e.externalId).map((e) => e.externalId!)
@@ -240,17 +442,10 @@ export function FixtureBrowserContent({
   const canLiveRacing = canDesk(state?.settings, "racing_live_feeds");
   const racingLocked = fixtureSport === "horse_racing" && !canLiveRacing;
 
-  const filteredFixtures = useMemo(() => {
-    if (fixtureSport !== "football") return [];
-    return sortFixturesByKickoff(fixtures.filter((f) => isCurrentOrFutureFixture(f.status)));
-  }, [fixtures, fixtureSport]);
-
+  const filteredFixtures = useMemo(() => sortFixturesByKickoff(fixtures), [fixtures]);
   const filteredRaces = useMemo(
-    () =>
-      fixtureSport === "horse_racing"
-        ? sortFixturesByKickoff(racingFixtures.filter((r) => isCurrentOrFutureFixture(r.status)))
-        : [],
-    [racingFixtures, fixtureSport]
+    () => sortFixturesByKickoff(racingFixtures),
+    [racingFixtures]
   );
 
   function openEpDesk(fixture: Fixture) {
@@ -265,101 +460,71 @@ export function FixtureBrowserContent({
     );
   }
 
-  const sourceHint = racingLocked
-    ? "Live UK and Irish racecards are on Edge."
-    : fixtureSport === "horse_racing"
-      ? "UK and Irish racecards."
-      : "Live and upcoming football.";
+  const tabBleed = variant === "dialog" ? "dialog" : undefined;
+  const displayTimezone = normalizeDisplayTimezone(state?.settings?.displayTimezone);
 
-  const header = (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0">
-        {variant === "page" ? (
-          <CardTitle section>Fixture browser</CardTitle>
-        ) : null}
-        <p
-          className={cn(
-            "min-w-0 text-pretty break-words text-sm text-muted-foreground",
-            variant === "page" ? "" : "mt-0"
-          )}
-        >
-          {sourceHint}
-          {racingLocked ? (
-            <>
-              {" "}
-              Open{" "}
-              <Link
-                href="/tracked-events"
-                className="text-primary-text underline-offset-2 hover:underline"
-              >
-                Tracked Events
-              </Link>{" "}
-              for races you already added.
-            </>
-          ) : (
-            <>
-              {" "}
-              Use + to track.{" "}
-              {variant === "page" ? (
-                <>
-                  Open{" "}
-                  <Link
-                    href="/tracked-events"
-                    className="text-primary-text underline-offset-2 hover:underline"
-                  >
-                    Tracked Events
-                  </Link>{" "}
-                  for the ones you have added.
-                </>
-              ) : (
-                <>
-                  <Link href="/fixtures" className="text-primary-text underline-offset-2 hover:underline">
-                    Open Fixtures page
-                  </Link>{" "}
-                  for the full list.
-                </>
-              )}
-            </>
-          )}
-        </p>
-      </div>
-      {racingLocked ? null : (
-      <div className="flex shrink-0 gap-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={async () => {
-            await loadFixtures();
-            if (fixtureSport === "horse_racing") {
-              await syncRacingResults();
-            }
-          }}
-          disabled={loadingFixtures || syncingRacing}
-          className="gap-1.5"
-          aria-label={
-            fixtureSport === "horse_racing"
-              ? "Refresh racecards and results"
-              : "Refresh fixtures"
-          }
-        >
-          <RefreshCw
-            className={
-              loadingFixtures || syncingRacing
-                ? "size-3.5 motion-safe:animate-spin"
-                : "size-3.5"
-            }
-          />
-          Refresh
-        </Button>
-      </div>
-      )}
-    </div>
+  const sportError = fixtureSport === "horse_racing" ? racingError : footballError;
+  const emptyTitle = sportError
+    ? fixtureSport === "horse_racing"
+      ? "Could not load racecards"
+      : "Could not load fixtures"
+    : fixtureSport === "horse_racing"
+      ? "No races on this day"
+      : "No fixtures on this day";
+  const emptyDescription = sportError
+    ? "Reload the page, or try again in a moment."
+    : fixtureSport === "horse_racing"
+      ? "Finished races you tracked stay on Tracked Events. Try another day if you expected a card."
+      : "Finished matches you tracked stay on Tracked Events. Try another day if you expected a match.";
+
+  const hasSportData =
+    fixtureSport === "horse_racing" ? racingFixtures.length > 0 : fixtures.length > 0;
+  const sportReady =
+    dayReady.day === listDay &&
+    (fixtureSport === "horse_racing" ? dayReady.racing : dayReady.football);
+  const showLoadingEmpty = !sportReady && !sportError;
+
+  const dayStepper = racingLocked ? null : (
+    <CalendarDayStepper
+      day={listDay}
+      onChange={(ymd) => {
+        const next = clampCalendarYmd(ymd, dayBounds.min, dayBounds.max);
+        if (next === listDay) return;
+        setListDay(next);
+        const hit = peekFixtureDay(next);
+        const sportReadyNow =
+          hit &&
+          (fixtureSport === "horse_racing" ? hit.racingReady : hit.footballReady);
+        if (hit && sportReadyNow) {
+          applyDay(next, hit);
+          return;
+        }
+        setFixtures([]);
+        setRacingFixtures([]);
+        setFootballError(null);
+        setRacingError(null);
+        setDayReady({ day: next, football: false, racing: false });
+      }}
+      min={dayBounds.min}
+      max={dayBounds.max}
+      busy={showLoadingEmpty}
+      selectedLabel={formatFixtureStepperLabel(listDay, Date.now(), displayTimezone)}
+      ariaLabel="Fixture day"
+      pickAriaLabel="Pick fixture day"
+      fromYear={Number(dayBounds.min.slice(0, 4))}
+      toYear={Number(dayBounds.max.slice(0, 4))}
+    />
   );
 
-  const tabBleed = variant === "dialog" ? "dialog" : "card";
-
   const tabs = (
-    <TabsLineBar bleed={tabBleed} className={variant === "page" ? "mt-3" : "mt-4"}>
+    <TabsLineBar
+      bleed={tabBleed}
+      className={cn(
+        "w-full border-border",
+        variant === "page" && "mt-4 [--tabs-line-inset:0px]",
+        variant === "dialog" ? "mt-0" : undefined
+      )}
+    >
       <Tabs
         value={fixtureSport}
         onValueChange={(v) => setFixtureSport(v as "football" | "horse_racing")}
@@ -369,7 +534,7 @@ export function FixtureBrowserContent({
           variant="line"
           className="justify-start"
           fadeClassName={
-            tabBleed === "dialog" ? "from-page dark:from-card" : "from-card"
+            tabBleed === "dialog" ? "from-page dark:from-card" : "from-page"
           }
         >
           {FIXTURE_SPORTS.map((sport) => (
@@ -383,30 +548,19 @@ export function FixtureBrowserContent({
     </TabsLineBar>
   );
 
-  const sportError = fixtureSport === "horse_racing" ? racingError : footballError;
-  const emptyTitle = sportError
-    ? fixtureSport === "horse_racing"
-      ? "Could not load racecards"
-      : "Could not load fixtures"
-    : fixtureSport === "horse_racing"
-      ? "No live or upcoming races"
-      : "No live or upcoming fixtures";
-  const emptyDescription = sportError
-    ? "Use Refresh to try again."
-    : fixtureSport === "horse_racing"
-      ? "Finished races stay on Tracked Events. Try another filter if you expected a card."
-      : "Finished matches stay on Tracked Events. Try another filter if you expected a match.";
-
-  const hasSportData =
-    fixtureSport === "horse_racing" ? racingFixtures.length > 0 : fixtures.length > 0;
-  const showLoadingEmpty = loadingFixtures && !hasSportData;
-
   const board = racingLocked ? (
-    <PlanLockEmpty feature="racing_live_feeds" />
+    <div className="flex min-w-0 flex-col">
+      {header}
+      {tabs}
+      <div className="pt-4">
+        <PlanLockEmpty feature="racing_live_feeds" />
+      </div>
+    </div>
   ) : (
     <DeskFixtureBoard
       sport={fixtureSport}
       football={filteredFixtures}
+      competitions={competitions}
       racing={filteredRaces}
       trackedExternalIds={trackedExternalIds}
       onTrackFixture={trackFixture}
@@ -418,39 +572,31 @@ export function FixtureBrowserContent({
       emptyDescription={emptyDescription}
       loading={showLoadingEmpty}
       loadFailed={Boolean(sportError) && !hasSportData}
-      displayTimezone={normalizeDisplayTimezone(state?.settings?.displayTimezone)}
-      emptyCompact={variant !== "dialog"}
+      displayTimezone={displayTimezone}
+      emptyCompact={false}
+      dayControl={dayStepper}
+      listKey={listDay}
+      sportControl={tabs}
+      pageHeader={header}
     />
   );
 
   if (variant === "dialog") {
     return (
-      <div className={cn("flex min-h-0 flex-col", className)}>
-        <div className="shrink-0 px-6 pt-4">{header}</div>
-        <div className="shrink-0 px-6 pb-4">{tabs}</div>
-        <ScrollFadeEdges
-          className="min-h-0 flex-1"
-          fadeClassName="from-page dark:from-card"
-          scrollClassName="app-scroll-nested px-6 pb-6"
-        >
-          {board}
-        </ScrollFadeEdges>
+      <div className={cn("flex min-h-0 flex-1 flex-col px-6", className)}>
+        {board}
       </div>
     );
   }
 
   return (
-    <Card className={className}>
-      <CardHeader className="pb-4">
-        {header}
-        {tabs}
-      </CardHeader>
-      <CardContent className="pt-0">{board}</CardContent>
-    </Card>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+      {board}
+    </div>
   );
 }
 
 /** Full-width fixture browser for the Fixtures page. */
-export function FixtureBrowser() {
-  return <FixtureBrowserContent variant="page" />;
+export function FixtureBrowser({ header }: { header?: ReactNode }) {
+  return <FixtureBrowserContent variant="page" header={header} />;
 }

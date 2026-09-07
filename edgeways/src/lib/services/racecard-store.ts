@@ -30,7 +30,7 @@ import "server-only";
 import { eq, lt } from "drizzle-orm";
 import { db, racecardCache } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
-import { localCalendarDate } from "@/lib/events";
+import { feedHorizonDates, localCalendarDate, mergeByExternalId } from "@/lib/events";
 import {
   hasRacingApiKey,
   isRacingTierAccessError,
@@ -199,6 +199,35 @@ export async function getRacecardsForDate(date: string): Promise<StoredRacecards
   // place to keep local SQLite bounded - hosted gets pruned by the cron warmer.
   await pruneRacecardStore(now).catch(() => {});
   return { cards: live.cards, oddsTier: live.oddsTier, fetchedAt: now };
+}
+
+/**
+ * Today and tomorrow from the store. Racing has no cards beyond tomorrow.
+ * One cold miss must not blank the other day.
+ */
+export async function getRacecardsForHorizon(now = Date.now()): Promise<{
+  cards: RacingRacecard[];
+  dates: string[];
+  oddsTier: "free" | "standard";
+  fetchedAt: number;
+}> {
+  const dates = feedHorizonDates(now);
+  const settled = await Promise.allSettled(dates.map((date) => getRacecardsForDate(date)));
+  const cards: RacingRacecard[] = [];
+  let fetchedAt = 0;
+  let oddsTier: "free" | "standard" = "free";
+  let firstError: unknown;
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      cards.push(...result.value.cards);
+      fetchedAt = Math.max(fetchedAt, result.value.fetchedAt);
+      if (result.value.oddsTier === "standard") oddsTier = "standard";
+    } else if (firstError === undefined) {
+      firstError = result.reason;
+    }
+  }
+  if (cards.length === 0 && firstError !== undefined) throw firstError;
+  return { cards: mergeByExternalId(cards), dates, oddsTier, fetchedAt };
 }
 
 /**

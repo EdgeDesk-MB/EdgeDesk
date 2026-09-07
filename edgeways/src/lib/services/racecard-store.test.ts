@@ -202,6 +202,23 @@ describe("racecard-store", () => {
     expect((await store.readRacecardStore(recent))?.cards[0]?.raceName).toBe("Recent");
   });
 
+  it("getRacecardsForHorizon merges today and tomorrow", async () => {
+    const { store, racecardsByDate } = await loadStore();
+    const today = localCalendarDate();
+    const tomorrow = localCalendarDate(new Date(Date.now() + 86_400_000));
+    await store.writeRacecardStore(today, [card({ externalId: "today", raceName: "Today" })], "standard");
+    racecardsByDate.mockImplementation(async (date: string) => {
+      if (date === tomorrow) {
+        return { cards: [card({ externalId: "tom", raceName: "Tomorrow" })], oddsTier: "standard" as const };
+      }
+      throw new Error("should not refetch today");
+    });
+
+    const horizon = await store.getRacecardsForHorizon();
+    expect(horizon.dates).toEqual([today, tomorrow]);
+    expect(horizon.cards.map((c) => c.raceName).sort()).toEqual(["Today", "Tomorrow"]);
+  });
+
   it("warmRacecardStore is a no-op without feed credentials", async () => {
     const { store, racecardsByDate, hasRacingApiKey } = await loadStore();
     hasRacingApiKey.mockReturnValue(false);

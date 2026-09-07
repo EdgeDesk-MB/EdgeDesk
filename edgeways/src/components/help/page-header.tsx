@@ -12,6 +12,8 @@ export function PageHeader({
   action,
   toolbar,
   className,
+  rule = true,
+  toolbarRule = true,
 }: {
   title: string;
   description?: React.ReactNode;
@@ -21,6 +23,10 @@ export function PageHeader({
   /** Filter pills / secondary controls below the title band */
   toolbar?: React.ReactNode;
   className?: string;
+  /** Hairline under the title. Off when tabs or a toolbar follow. */
+  rule?: boolean;
+  /** Hairline under the toolbar. Off when a nested list scroll owns the seam. */
+  toolbarRule?: boolean;
 }) {
   return (
     <DeskPageHeader
@@ -29,8 +35,13 @@ export function PageHeader({
       helpId={helpId}
       icon={icon}
       action={action}
-      toolbar={toolbar ? <ToolbarRow>{toolbar}</ToolbarRow> : undefined}
+      toolbar={
+        toolbar ? (
+          <ToolbarRow className={!toolbarRule ? "border-b-0" : undefined}>{toolbar}</ToolbarRow>
+        ) : undefined
+      }
       className={cn("shrink-0", className)}
+      rule={rule}
     />
   );
 }

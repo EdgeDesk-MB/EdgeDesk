@@ -37,7 +37,7 @@ export function TrackFixtureProvider({ children }: { children: React.ReactNode }
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton
-          className="flex max-h-[min(90dvh,820px)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+          className="flex max-h-[min(90dvh,820px)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
           onFocusOutside={preventDialogDismissOnPortaledContent}
           onPointerDownOutside={preventDialogDismissOnPortaledContent}
           onInteractOutside={preventDialogDismissOnPortaledContent}

@@ -20,12 +20,17 @@ import {
   scopeActivityView,
   weeklyCountsByUser,
 } from "@/lib/admin/activity-charts";
+import { resolveActivityMixDay } from "@/lib/admin/activity-day";
 import {
   activitySportLabel,
   buildActivityMixCharts,
+  filterActivityMix,
   leadingSportByUser,
 } from "@/lib/admin/activity-mix";
-import { hiddenAccountsSub } from "@/lib/admin/exclude-accounts";
+import {
+  excludedIdSet,
+  hiddenAccountsSub,
+} from "@/lib/admin/exclude-accounts";
 import { loadAdminAccountScope } from "@/lib/admin/exclude-accounts-server";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { Button } from "@/components/ui/button";
@@ -37,15 +42,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { loadActivityOverview } from "@/lib/admin/activity";
+import { loadActivityMixForDay, loadActivityOverview } from "@/lib/admin/activity";
 import { loadFlagsLinks } from "@/lib/admin/flags";
 import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
-export default async function AdminActivityPage() {
-  const [activity, scope] = await Promise.all([
+export default async function AdminActivityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ day?: string }>;
+}) {
+  const params = await searchParams;
+  const mixDay = resolveActivityMixDay(params.day);
+  const [activity, scope, dayMix] = await Promise.all([
     loadActivityOverview(),
     loadAdminAccountScope(),
+    loadActivityMixForDay(mixDay),
   ]);
   const { excludeAdmins, excludedIds } = scope;
   const links = loadFlagsLinks();
@@ -60,7 +72,15 @@ export default async function AdminActivityPage() {
   const offers = scoped.rows.reduce((sum, row) => sum + row.offers, 0);
   const casino = scoped.rows.reduce((sum, row) => sum + row.casino, 0);
   const charts = buildActivityCharts(scoped.rows, scoped.daily);
-  const mixCharts = buildActivityMixCharts(scoped.mix);
+  const skipIds = excludedIdSet(excludedIds);
+  if (excludeAdmins) {
+    for (const row of activity.rows) {
+      if (row.admin) skipIds.add(row.clerkUserId);
+    }
+  }
+  const mixCharts = buildActivityMixCharts(
+    filterActivityMix(dayMix, skipIds.size > 0 ? skipIds : null)
+  );
   const leadingSports = leadingSportByUser(scoped.mix.betSports);
   const activityEvents = activityEventsFromStamps(
     scoped.stamps,
@@ -113,6 +133,9 @@ export default async function AdminActivityPage() {
         ]}
       />
       <AdminActivityChart events={activityEvents} />
+      {activity.available && scoped.rows.length > 0 ? (
+        <AdminActivityMix charts={mixCharts} day={mixDay} />
+      ) : null}
       <AdminChartGrid>
         <AdminChartCard
           title="Desk volume mix"
@@ -127,9 +150,6 @@ export default async function AdminActivityPage() {
           <AdminShareBars slices={charts.deskShare} />
         </AdminChartCard>
       </AdminChartGrid>
-      {activity.available && scoped.rows.length > 0 ? (
-        <AdminActivityMix charts={mixCharts} />
-      ) : null}
       {scoped.rows.length > 0 && activity.note ? (
         <p className="text-sm text-muted-foreground">{activity.note}</p>
       ) : null}

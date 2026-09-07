@@ -177,6 +177,31 @@ describe("fixture-store", () => {
     expect((await store.readFixtureStore(recent))?.fixtures[0]?.homeTeam).toBe("Recent");
   });
 
+  it("getFixturesForHorizon merges today and tomorrow and keeps a live day when the other misses", async () => {
+    const { store, fixturesByDate } = await loadStore();
+    const today = localCalendarDate();
+    const tomorrow = localCalendarDate(new Date(Date.now() + 86_400_000));
+    await store.writeFixtureStore(today, [fixture({ externalId: "today", homeTeam: "Today" })]);
+    fixturesByDate.mockImplementation(async (date: string) => {
+      if (date === tomorrow) return [fixture({ externalId: "tom", homeTeam: "Tomorrow" })];
+      throw new Error("should not refetch today");
+    });
+
+    const horizon = await store.getFixturesForHorizon();
+    expect(horizon.dates).toEqual([today, tomorrow]);
+    expect(horizon.fixtures.map((f) => f.homeTeam).sort()).toEqual(["Today", "Tomorrow"]);
+  });
+
+  it("getFixturesForHorizon still serves today when tomorrow's cold fetch fails", async () => {
+    const { store, fixturesByDate } = await loadStore();
+    const today = localCalendarDate();
+    await store.writeFixtureStore(today, [fixture({ homeTeam: "Today" })]);
+    fixturesByDate.mockRejectedValue(new Error("API-Football 500"));
+
+    const horizon = await store.getFixturesForHorizon();
+    expect(horizon.fixtures[0]?.homeTeam).toBe("Today");
+  });
+
   it("warmFixtureStore is a no-op without feed credentials", async () => {
     const { store, fixturesByDate, hasApiKey } = await loadStore();
     hasApiKey.mockReturnValue(false);

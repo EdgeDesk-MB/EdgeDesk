@@ -32,6 +32,66 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-07",
+    title: "Pin any league, race result tapes, and dates that work on the phone",
+    summary:
+      "Search every competition, keep a pin rail of shortcuts, tap a finished race for the result, and pick dates with the phone's own controls. Live clocks say HT and extra time properly.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Filter finds any competition, even when it has no match today. Pin it for a shortcut rail. Drag pins to reorder.",
+      },
+      {
+        kind: "improvement",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Step through Today and Tomorrow, or pick a day. All / Live / Scheduled sit with the day switcher. Leagues follow first kick-off, with common UK and European leagues first.",
+      },
+      {
+        kind: "feature",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Tap a finished race to open the result tape: finishing order, starting prices and distances.",
+      },
+      {
+        kind: "improvement",
+        area: "Mobile",
+        text: "Date and time fields use the phone's own picker, so they no longer fight the keyboard or lock the page.",
+      },
+      {
+        kind: "improvement",
+        area: "Tracked Events",
+        href: "/tracked-events",
+        text: "Add fixture opens the same browse list as + in the side nav.",
+      },
+      {
+        kind: "fix",
+        area: "Navigation",
+        text: "Paid desks open from your last visit instead of sitting on Checking your plan. If the page cannot load, you get Try again.",
+      },
+      {
+        kind: "fix",
+        area: "Racing Desk",
+        href: "/racing",
+        text: "Once a race has gone off, Tracked Events and the nav show Live, even if the card has not been marked finished yet.",
+      },
+      {
+        kind: "fix",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Same-named leagues stay separate, so England and Scotland Premier League do not collapse into one list.",
+      },
+      {
+        kind: "improvement",
+        area: "Live",
+        href: "/",
+        text: "Football clocks now say HT, extra time and penalties, instead of sticking on 45'.",
+      },
+    ],
+  },
+  {
     date: "2026-09-06",
     title: "A cleaner Home, Dutching stake controls, and both clubs in the feed",
     summary:

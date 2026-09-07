@@ -17,12 +17,12 @@ const dayTagClass =
   "relative z-[1] shrink-0 rounded-full border border-border/70 bg-muted px-2.5 py-0.5 text-xs font-semibold tracking-wide text-foreground";
 
 const stickyPlateClass =
-  "relative sticky top-0 z-20 isolate overflow-visible bg-page py-2";
+  "relative sticky top-0 z-20 isolate overflow-visible bg-page py-2 max-sm:bg-background";
 
 const stickyFadeClass = cn(
   // 1px into the plate only — do not climb into the pill. Pill sits z-[1]
-  // above this wash.
-  "after:pointer-events-none after:absolute after:inset-x-0 after:top-[calc(100%-var(--ew-scroll-fade-seam))] after:h-[var(--ew-scroll-fade-length)] after:bg-gradient-to-b after:from-page after:to-transparent after:content-['']",
+  // above this wash. Mobile Home deck is `--background` (`--canvas`), not `--page`.
+  "after:pointer-events-none after:absolute after:inset-x-0 after:top-[calc(100%-var(--ew-scroll-fade-seam))] after:h-[var(--ew-scroll-fade-length)] after:bg-gradient-to-b after:from-page after:to-transparent after:content-[''] max-sm:after:from-background",
   SCROLL_FADE_STOP_AFTER_CLASS
 );
 
@@ -40,7 +40,8 @@ function closestScrollParent(node: HTMLElement | null): HTMLElement | null {
  * Centred day or hour stamp on a hairline. Used in Add bet Events and the
  * Home Live feed. Page lists (Campaigns, History) keep `ListDaySection`.
  * Live feed passes `sticky` so Today / Yesterday stay readable while rows
- * scroll under a page-tone plate. The ScrollFadeEdges wash (`:after`) only
+ * scroll under a matching plate (`--page` on desktop, `--background` below
+ * `sm` for the mobile Home deck). The ScrollFadeEdges wash (`:after`) only
  * paints while the stamp is stuck at the feed top.
  */
 export function ListDayRule({

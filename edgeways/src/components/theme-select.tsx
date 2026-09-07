@@ -81,7 +81,7 @@ export function ThemeSelect({
               selected
                 ? topbar
                   ? "bg-[#111111] text-white"
-                  : "bg-background text-foreground"
+                  : "bg-stat-tile-selected text-foreground dark:bg-background dark:text-foreground"
                 : topbar
                   ? "text-[#111111]/70 hover:bg-[#111111]/10 hover:text-[#111111]"
                   : "text-muted-foreground hover:text-foreground"

@@ -111,6 +111,7 @@ describe("footballOperation", () => {
     expect(footballOperation("/fixtures?id=12345")).toBe("fixture-by-id");
     expect(footballOperation("/fixtures/events?fixture=1")).toBe("match-events");
     expect(footballOperation("/fixtures/lineups?fixture=1")).toBe("lineups");
+    expect(footballOperation("/leagues?current=true")).toBe("leagues-catalog");
     expect(footballOperation("/status")).toBe("other");
   });
 });

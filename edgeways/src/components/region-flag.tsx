@@ -20,8 +20,8 @@ export interface RegionFlagProps {
 }
 
 /**
- * Country flag from an API region/country code.
- * Uses Unicode regional indicators - no image CDN or local assets.
+ * Desk country flag. One set only: colour-emoji regional indicators
+ * (the 3D Mexico flag). Never mix in API-Football / crest images.
  */
 export function RegionFlag({
   code,
@@ -46,7 +46,7 @@ export function RegionFlag({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center leading-none",
+        "region-flag-glyph inline-flex shrink-0 items-center justify-center leading-none",
         size === "sm" ? "text-[13px]" : "text-[16px]",
         className
       )}

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { feedHorizonDates } from "@/lib/events";
 import {
+  demoCompetitions,
   demoFixtures,
+  demoFixturesForHorizon,
   hasApiKey,
-  localCalendarDate,
 } from "@/lib/services/apifootball";
-import { getFixturesForDate } from "@/lib/services/fixture-store";
+import { peekFootballCompetitionCatalog } from "@/lib/services/football-competition-store";
+import { getFixturesForDate, getFixturesForHorizon } from "@/lib/services/fixture-store";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 
@@ -20,25 +23,40 @@ function isRateLimitError(error: unknown): boolean {
 }
 
 export const GET = withDeskScope(async function GET(req: NextRequest) {
-  const date =
-    req.nextUrl.searchParams.get("date") ?? localCalendarDate();
+  const dateParam = req.nextUrl.searchParams.get("date");
+  const dates = dateParam ? [dateParam] : feedHorizonDates();
+  const date = dates[0]!;
+  const demoList = dateParam ? demoFixtures() : demoFixturesForHorizon();
 
   // Guard before the demo fallback so unsigned hosted callers get 403, not
   // free demo fixtures. Callers tolerate `{ fixtures: [] }` and paint empty.
   const locked = await lockedFeedResponse("calculators", {
     source: "locked",
     fixtures: [],
+    competitions: [],
     date,
+    dates,
   });
   if (locked) return locked;
 
   if (!hasApiKey()) {
-    return NextResponse.json({ source: "demo", fixtures: demoFixtures() });
+    return NextResponse.json({
+      source: "demo",
+      fixtures: demoList,
+      competitions: demoCompetitions(),
+      date,
+      dates,
+    });
   }
 
   try {
-    const { fixtures } = await getFixturesForDate(date);
-    return NextResponse.json({ source: "feed", fixtures, date });
+    const [{ fixtures }, competitions] = await Promise.all([
+      dateParam
+        ? getFixturesForDate(dateParam).then((row) => ({ fixtures: row.fixtures }))
+        : getFixturesForHorizon(),
+      peekFootballCompetitionCatalog(),
+    ]);
+    return NextResponse.json({ source: "feed", fixtures, competitions, date, dates });
   } catch (error) {
     // Free tier often returns HTTP 200 + errors.requests when capped -
     // fall back to demo so Fixtures / EP Desk handoff still works.
@@ -46,8 +64,10 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     if (isRateLimitError(error)) {
       return NextResponse.json({
         source: "demo",
-        fixtures: demoFixtures(),
+        fixtures: demoList,
+        competitions: demoCompetitions(),
         date,
+        dates,
         warning:
           "Football fixtures are temporarily using sample data. Live scores will return shortly.",
       });
@@ -56,8 +76,10 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         source: "demo",
-        fixtures: demoFixtures(),
+        fixtures: demoList,
+        competitions: demoCompetitions(),
         date,
+        dates,
         warning: "Football fixtures are temporarily using sample data.",
       },
       { status: 200 }

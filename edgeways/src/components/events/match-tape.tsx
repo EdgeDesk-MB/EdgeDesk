@@ -3,15 +3,22 @@
 import NumberFlow from "@number-flow/react";
 import { format } from "date-fns";
 import { enGB } from "date-fns/locale";
-import { Goal, Radio, Scale, Shirt } from "lucide-react";
+import { Flame, Goal, NotebookPen, Plus, Radio, Scale, Shirt } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/help/empty-state";
 import { TeamCrest } from "@/components/team-crest";
 import { api } from "@/hooks/use-app-state";
 import {
+  pagePrimaryButtonProps,
+  pageSecondaryButtonProps,
+} from "@/components/layout/page-header-actions";
+import { Button } from "@/components/ui/button";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -50,7 +57,6 @@ import {
 import { formatClockTime } from "@/lib/time-format";
 import {
   captionHeading,
-  deskInsetX,
   deskTableBodyCell,
   deskTableHeaderRowSticky,
   listRow,
@@ -738,10 +744,19 @@ export function FootballLiveTapeDialog({
   event,
   open,
   onOpenChange,
+  tracked = false,
+  onTrack,
+  onAddBet,
+  onEpDesk,
 }: {
   event: FootballTapeDialogEvent;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set, pin a Track / Add bet footer under the tape. */
+  tracked?: boolean;
+  onTrack?: () => void;
+  onAddBet?: () => void;
+  onEpDesk?: () => void;
 }) {
   const [frozen, setFrozen] = useState(event);
   const [hydratedGoals, setHydratedGoals] = useState<string | null>(null);
@@ -751,6 +766,7 @@ export function FootballLiveTapeDialog({
   >(() => (parseMatchTape(event.goals).length > 0 ? "ready" : "idle"));
   const [tapeRetry, setTapeRetry] = useState(0);
   const [tapeTab, setTapeTab] = useState("commentary");
+  const router = useRouter();
   const incomingKey = tapeFreezeKey(event);
   const frozenKey = tapeFreezeKey(frozen);
   if (open && incomingKey !== frozenKey) {
@@ -766,10 +782,11 @@ export function FootballLiveTapeDialog({
   const tapeRows = parseMatchTape(view.goals);
   const xi = parseFootballLineups(view.lineups);
   const hasTape = tapeRows.length > 0;
+  const canFetchTape = event.id != null || Boolean(event.externalId);
   const showLoading =
     open &&
     !hasTape &&
-    (tapeLoad === "loading" || (tapeLoad === "idle" && event.id != null));
+    (tapeLoad === "loading" || (tapeLoad === "idle" && canFetchTape));
   const showError = open && !hasTape && tapeLoad === "error";
   const showEmpty = open && !hasTape && !showLoading && !showError;
 
@@ -792,13 +809,20 @@ export function FootballLiveTapeDialog({
       return;
     }
     const id = event.id;
-    if (id == null) {
+    const externalId = event.externalId?.trim() ?? "";
+    const tapeUrl =
+      id != null
+        ? `/api/events/${id}/tape`
+        : externalId
+          ? `/api/fixtures/tape?externalId=${encodeURIComponent(externalId)}&home=${encodeURIComponent(event.homeTeam)}`
+          : null;
+    if (!tapeUrl) {
       setTapeLoad("empty");
       return;
     }
     let cancelled = false;
     setTapeLoad("loading");
-    api<{ goals: string | null; lineups: string | null }>(`/api/events/${id}/tape`)
+    api<{ goals: string | null; lineups: string | null }>(tapeUrl)
       .then((res) => {
         if (cancelled) return;
         const next = res.goals ?? null;
@@ -812,7 +836,15 @@ export function FootballLiveTapeDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, event.id, event.goals, incomingKey, tapeRetry]);
+  }, [
+    open,
+    event.id,
+    event.externalId,
+    event.homeTeam,
+    event.goals,
+    incomingKey,
+    tapeRetry,
+  ]);
 
   const commentaryEmpty = commentaryEmptyCopy(view);
   const lineupEmpty = lineupEmptyCopy(view);
@@ -821,7 +853,10 @@ export function FootballLiveTapeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="flex! min-h-0 max-h-[min(36rem,92dvh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg max-sm:overflow-hidden"
+        className="flex! min-h-0 max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 max-sm:overflow-hidden max-sm:pb-0 sm:h-[min(40rem,85dvh)] sm:max-w-lg"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+        }}
       >
         <Tabs
           value={tapeTab}
@@ -861,11 +896,13 @@ export function FootballLiveTapeDialog({
               className="min-h-0 flex-1 bg-page"
               fadeClassName="from-page"
               startFade={false}
+              overlayScrollbar
               scrollClassName="app-scroll-float overscroll-contain"
             >
               {showLoading ? (
-                <div className={cn(deskInsetX, "py-3")}>
+                <div className="flex min-h-full items-center justify-center px-6 py-8">
                   <EmptyState
+                    bare
                     compact
                     oneLine
                     busy
@@ -874,8 +911,9 @@ export function FootballLiveTapeDialog({
                   />
                 </div>
               ) : showError ? (
-                <div className={cn(deskInsetX, "py-3")}>
+                <div className="flex min-h-full items-center justify-center px-6 py-8">
                   <EmptyState
+                    bare
                     compact
                     oneLine
                     icon={Goal}
@@ -888,8 +926,9 @@ export function FootballLiveTapeDialog({
                   />
                 </div>
               ) : showEmpty ? (
-                <div className={cn(deskInsetX, "py-3")}>
+                <div className="flex min-h-full items-center justify-center px-6 py-8">
                   <EmptyState
+                    bare
                     compact
                     oneLine
                     icon={Goal}
@@ -910,13 +949,15 @@ export function FootballLiveTapeDialog({
               className="min-h-0 flex-1 bg-page"
               fadeClassName="from-page"
               startFade={false}
+              overlayScrollbar
               scrollClassName="app-scroll-float overscroll-contain"
             >
               {xi ? (
                 <MatchLineups lineups={xi} />
               ) : (
-                <div className={cn(deskInsetX, "py-3")}>
+                <div className="flex min-h-full items-center justify-center px-6 py-8">
                   <EmptyState
+                    bare
                     compact
                     oneLine
                     icon={Shirt}
@@ -928,6 +969,50 @@ export function FootballLiveTapeDialog({
             </ScrollFadeEdges>
           </TabsContent>
         </Tabs>
+        {onTrack || onAddBet || onEpDesk ? (
+          <DialogFooter className="mx-0 mb-0 shrink-0 flex-col bg-page px-6 dark:bg-card max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end">
+            {onEpDesk ? (
+              <Button
+                type="button"
+                variant="outline"
+                {...pageSecondaryButtonProps}
+                onClick={onEpDesk}
+              >
+                <Flame className="size-4 text-warning" aria-hidden />
+                2UP Desk
+              </Button>
+            ) : null}
+            {onTrack && !tracked ? (
+              <Button
+                type="button"
+                variant="outline"
+                {...pageSecondaryButtonProps}
+                onClick={onTrack}
+              >
+                <Plus className="size-4" aria-hidden />
+                Track
+              </Button>
+            ) : tracked ? (
+              <Button
+                type="button"
+                variant="outline"
+                {...pageSecondaryButtonProps}
+                onClick={() => {
+                  onOpenChange(false);
+                  router.push("/tracked-events");
+                }}
+              >
+                Tracked
+              </Button>
+            ) : null}
+            {onAddBet ? (
+              <Button type="button" {...pagePrimaryButtonProps} onClick={onAddBet}>
+                <NotebookPen className="size-4" aria-hidden />
+                Add bet
+              </Button>
+            ) : null}
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

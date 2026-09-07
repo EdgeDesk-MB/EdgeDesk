@@ -29,10 +29,10 @@ import {
   dashboardPanelColumn,
 } from "@/lib/ui/dashboard-layout";
 import {
-  DEFAULT_HOME_LAYOUT,
   applyDeckLayout,
   ensureVisibleDeckCards,
   isChartOnMobileSummary,
+  normalizeHomeLayout,
 } from "@/lib/ui/home-layout";
 import { PageLoading } from "@/components/page-loading";
 import { cn } from "@/lib/utils";
@@ -72,7 +72,7 @@ function MobileHomeSummary({
 }
 
 export default function DashboardPage() {
-  const { state } = useAppState();
+  const { state, error, refresh } = useAppState();
   // null on first paint (CSS classes handle visibility); afterwards only one
   // container stays mounted so hidden copies don't poll or drift local state.
   const isMobile = useIsMobile();
@@ -87,6 +87,17 @@ export default function DashboardPage() {
 
   // Wait for /api/state so profit never paints as £0.00 before real figures land.
   if (state == null) {
+    if (error) {
+      return (
+        <PageShell>
+          <EmptyState
+            title="Could not load the desk"
+            description="Check the connection, then try again."
+            action={{ label: "Try again", onClick: () => void refresh() }}
+          />
+        </PageShell>
+      );
+    }
     return <PageLoading label="Loading Desk" />;
   }
 
@@ -107,7 +118,7 @@ export default function DashboardPage() {
 
   const canDoNext = canDesk(state.settings, "do_next");
 
-  const homeLayout = state.settings.homeLayout ?? DEFAULT_HOME_LAYOUT;
+  const homeLayout = normalizeHomeLayout(state.settings.homeLayout);
   const desktopHidden = new Set<string>(homeLayout.desktopHidden);
   const showMobileChart = showActivity && isChartOnMobileSummary(homeLayout);
 

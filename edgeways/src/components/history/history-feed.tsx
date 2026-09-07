@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { FootballLiveTapeDialog } from "@/components/events/match-tape";
+import { useAddBet } from "@/components/add-bet-provider";
 import { useDevStickyJson } from "@/lib/dev/use-dev-sticky-open";
 import {
   TeamCrestLockup,
@@ -323,6 +324,7 @@ export function useHistoryMatchTape(
   onOpenMatch: (event: EventRow) => void;
   dialog: ReactNode;
 } {
+  const { openAddBet } = useAddBet();
   const [tapeEvent, setTapeEvent] = useDevStickyJson<EventRow | null>(
     "match-tape-event",
     null
@@ -340,6 +342,17 @@ export function useHistoryMatchTape(
       <FootballLiveTapeDialog
         event={tapeEvent}
         open
+        tracked
+        onAddBet={() => {
+          setTapeEvent(null);
+          openAddBet({
+            eventId: tapeEvent.id,
+            homeTeam: tapeEvent.homeTeam,
+            awayTeam: tapeEvent.awayTeam,
+            sport: "football",
+            labelSuggestion: `${tapeEvent.homeTeam} v ${tapeEvent.awayTeam}`,
+          });
+        }}
         onOpenChange={(open) => {
           if (!open) setTapeEvent(null);
         }}

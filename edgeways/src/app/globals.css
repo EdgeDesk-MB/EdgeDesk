@@ -380,6 +380,23 @@
   --segmented-radius: 9999px;
 }
 
+/* Native OS date/time on coarse or narrow; custom calendar/wheels otherwise.
+ * Used only while usePrefersNativePicker() is still null. */
+.picker-custom {
+  display: contents;
+}
+.picker-native {
+  display: none;
+}
+@media (any-pointer: coarse), (hover: none), (max-width: 767px) {
+  .picker-custom {
+    display: none;
+  }
+  .picker-native {
+    display: contents;
+  }
+}
+
 @media (min-width: 1024px) {
   :root {
     --layout-page-x: 1.5rem;
@@ -732,32 +749,27 @@ html[data-font="figtree"] {
   }
 
   /**
-   * Thin thumb painted over the content (no reserved gutter). Use when the
-   * list must meet the plate edge (match-events tape) but still show a bar.
+   * Hide the native bar so content stays full width. Pair with
+   * `ScrollFadeEdges overlayScrollbar` for a floating thumb (no track).
    */
   .app-scroll-float {
-    scrollbar-width: thin;
-    scrollbar-color: oklch(0.52 0 0 / 0.38) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     scrollbar-gutter: auto;
   }
-  .dark .app-scroll-float {
-    scrollbar-color: oklch(0.72 0 0 / 0.34) transparent;
-  }
   .app-scroll-float::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 0 !important;
+    height: 0 !important;
+    display: none;
   }
-  .app-scroll-float::-webkit-scrollbar-track {
+
+  /**
+   * Inset the thumb travel to the content band when the scroller itself
+   * has no pad (content uses margin, fade uses the same 16px).
+   */
+  .app-scroll-track-inset::-webkit-scrollbar-track {
+    margin-block: 1rem;
     background: transparent;
-  }
-  .app-scroll-float::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: 9999px;
-    background-color: oklch(0.52 0 0 / 0.32);
-    background-clip: padding-box;
-  }
-  .dark .app-scroll-float::-webkit-scrollbar-thumb {
-    background-color: oklch(0.72 0 0 / 0.3);
   }
 
   /**
@@ -1395,6 +1407,13 @@ html[data-font="figtree"] {
  * the default `relative` (unlayered rules were winning and broke the FAB).
  */
 @layer components {
+  /* Colour-emoji flags (same 3D set as Mexico). UI fonts paint boxed letters. */
+  .region-flag-glyph {
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    font-variant-emoji: emoji;
+    font-style: normal;
+  }
+
   /* Dialog scrim — keep blur off the overlay node if it ever gains a transform. */
   .dialog-overlay {
     -webkit-backdrop-filter: blur(var(--modal-overlay-blur));

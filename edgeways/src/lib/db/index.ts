@@ -444,6 +444,11 @@ CREATE TABLE IF NOT EXISTS fixture_cache (
   payload TEXT NOT NULL,
   fetched_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS football_competition_catalog (
+  id TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS racing_odds_overrides (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,

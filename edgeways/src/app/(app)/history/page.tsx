@@ -5,7 +5,7 @@ import {
   HistoryEntryCard,
   useHistoryMatchTape,
 } from "@/components/history/history-feed";
-import { PageShell } from "@/components/page-shell";
+import { PageFillScroll, PageFillShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { PageLoading } from "@/components/page-loading";
@@ -148,9 +148,11 @@ export default function HistoryPage() {
     : [];
 
   return (
-    <PageShell>
+    <PageFillShell>
       <PageHeader
         helpId="history"
+        rule={false}
+        toolbarRule={false}
         icon={HistoryIcon}
         title="History"
         description="Bets, settlements and match moments."
@@ -184,6 +186,7 @@ export default function HistoryPage() {
         }
       />
 
+      <PageFillScroll>
       {!loading && grouped.length === 0 && (
         <EmptyState
           icon={HistoryIcon}
@@ -219,7 +222,8 @@ export default function HistoryPage() {
           </ListDaySection>
         ))}
       </div>
+      </PageFillScroll>
       {dialog}
-    </PageShell>
+    </PageFillShell>
   );
 }

@@ -16,6 +16,8 @@ describe("toIsoCountryCode", () => {
     expect(toIsoCountryCode("UK")).toBe("GB");
     expect(toIsoCountryCode("ENGLAND")).toBe("GB");
     expect(toIsoCountryCode("SCOTLAND")).toBe("GB");
+    expect(toIsoCountryCode("NIR")).toBe("GB");
+    expect(toIsoCountryCode("NI")).toBe("NI");
   });
 
   it("passes through home-nation football flag codes", () => {
@@ -38,6 +40,17 @@ describe("countryLabelToIso", () => {
     expect(countryLabelToIso("Wales")).toBe("WLS");
     expect(countryLabelToIso("United Kingdom")).toBe("GB");
     expect(countryLabelToIso("Spain")).toBe("ES");
+  });
+
+  it("resolves API country names to the same flag codes as Mexico", () => {
+    expect(countryLabelToIso("Mexico")).toBe("MX");
+    expect(countryLabelToIso("Bolivia")).toBe("BO");
+    expect(countryLabelToIso("Korea Republic")).toBe("KR");
+    expect(countryLabelToIso("Nicaragua")).toBe("NI");
+    expect(countryLabelToIso("Russia")).toBe("RU");
+    expect(countryLabelToIso("Russian Federation")).toBe("RU");
+    expect(toIsoCountryCode("RUS")).toBe("RU");
+    expect(toIsoCountryCode("SU")).toBe("RU");
   });
 });
 

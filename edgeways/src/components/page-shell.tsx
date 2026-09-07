@@ -1,6 +1,11 @@
 import { cn } from "@/lib/utils";
+import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { pageShell, pageShellCompact, sectionBar, sectionMeta } from "@/lib/ui/layout-spacing";
-import { sectionDescription, sectionTitle } from "@/lib/ui/surface-styles";
+import {
+  FIXTURE_TAPE_GUTTER_PX,
+  sectionDescription,
+  sectionTitle,
+} from "@/lib/ui/surface-styles";
 
 /** Full width inside the centred page panel */
 export const PAGE_SHELL_CLASS = "flex w-full min-w-0 max-w-full flex-col overflow-x-clip";
@@ -32,6 +37,42 @@ export function PageShell({
     >
       {children}
     </div>
+  );
+}
+
+/** Fill-height desk page: padded column, pinned chrome, nested list scroll. */
+export function PageFillShell({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <PageShell fullHeight className={cn("p-[var(--layout-page-x)]", className)}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+    </PageShell>
+  );
+}
+
+/** Nested fade scroll under pinned header chrome. Pad matches the card gutter. */
+export function PageFillScroll({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <ScrollFadeEdges
+      className={cn("min-h-0 flex-1", className)}
+      fadeClassName="from-page"
+      fadeSize={FIXTURE_TAPE_GUTTER_PX}
+      edgeRule
+      scrollClassName="app-scroll-nested py-4"
+    >
+      {children}
+    </ScrollFadeEdges>
   );
 }
 

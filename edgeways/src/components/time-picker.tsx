@@ -5,6 +5,12 @@ import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AdaptiveTemporalPicker,
+  NativeTemporalField,
+} from "@/components/native-temporal-field";
+import { usePrefersNativePicker } from "@/hooks/use-prefers-native-picker";
+import { formatClockString } from "@/lib/time-format";
 import { filterPillGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
@@ -249,7 +255,8 @@ export function TimeWheels({
 }
 
 /**
- * Shared time field: shadcn Popover + iOS-style hour/minute wheels.
+ * Shared time field: iOS-style hour/minute wheels on fine pointers.
+ * Coarse / narrow viewports use the OS `type="time"` picker.
  * Value is always HH:mm (24h) or empty.
  */
 export function TimePicker({
@@ -270,6 +277,7 @@ export function TimePicker({
   disabled?: boolean;
   shortcuts?: "ending";
 }) {
+  const prefersNative = usePrefersNativePicker();
   const [open, setOpen] = useState(false);
   const parsed = useMemo(() => parseHm(value), [value]);
   const [hour, setHour] = useState(parsed?.hour ?? "12");
@@ -290,11 +298,11 @@ export function TimePicker({
     onChange(`${nextHour}:${nextMinute}`);
   }
 
-  return (
+  const custom = (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          id={id}
+          id={prefersNative === false ? id : undefined}
           type="button"
           variant="outline"
           disabled={disabled}
@@ -305,7 +313,7 @@ export function TimePicker({
           )}
         >
           <Clock className="size-3.5 shrink-0 text-muted-foreground" />
-          {parsed ? `${parsed.hour}:${parsed.minute}` : placeholder}
+          {parsed ? formatClockString(`${parsed.hour}:${parsed.minute}`) : placeholder}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -363,5 +371,44 @@ export function TimePicker({
         </div>
       </PopoverContent>
     </Popover>
+  );
+
+  const native = (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <NativeTemporalField
+        type="time"
+        value={parsed ? `${parsed.hour}:${parsed.minute}` : ""}
+        onChange={onChange}
+        displayLabel={
+          parsed ? formatClockString(`${parsed.hour}:${parsed.minute}`) : null
+        }
+        placeholder={placeholder}
+        icon={<Clock className="size-3.5 shrink-0 text-muted-foreground" />}
+        id={prefersNative !== false ? id : undefined}
+        disabled={disabled}
+        className={className}
+        allowClear
+        aria-label="Time"
+      />
+      {shortcuts === "ending" ? (
+        <div className={cn(filterPillGroup, "justify-center")}>
+          <FilterPill
+            compact
+            active={endOfDayActive}
+            onClick={() => onChange(END_OF_DAY_HM)}
+          >
+            End of day
+          </FilterPill>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <AdaptiveTemporalPicker
+      prefersNative={prefersNative}
+      custom={custom}
+      native={native}
+    />
   );
 }

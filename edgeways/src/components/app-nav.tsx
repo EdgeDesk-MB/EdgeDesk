@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +14,7 @@ import {
   type ReactNode,
   type TransitionEvent,
 } from "react";
+import { readChromeSnapshot, type ChromeSnapshot } from "@/lib/chrome-snapshot";
 import { SPRING_DURATION_MS } from "@/lib/ui/motion";
 import { toast } from "sonner";
 import { ExchangeNamePicker } from "@/components/bookie-name-picker";
@@ -53,7 +55,6 @@ import { canDesk } from "@/lib/entitlements/effective-plan";
 import type { FeatureFlag } from "@/lib/entitlements/features";
 import { planLockCopy } from "@/lib/entitlements/nav";
 import { FootballIcon, HorseRacingIcon } from "@/components/sport-icon";
-import { appNavColumn } from "@/lib/ui/app-shell-layout";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
@@ -288,6 +289,11 @@ export function flattenNavEntries(
   );
 }
 
+/** Parent group row should navigate unless we are already on its landing href. */
+export function isGroupLandingPath(pathname: string, firstChildHref: string): boolean {
+  return pathname === firstChildHref || pathname.startsWith(`${firstChildHref}?`);
+}
+
 export function isLinkActive(pathname: string, href: string): boolean {
   if (href === "/desk") return pathname === "/desk";
   if (href === "/offers") {
@@ -498,6 +504,11 @@ export function AppNav() {
   const { openBoostCheck } = useBoostCheck();
   const { openOffer } = useOfferDialog();
   const { state } = useAppState(5000);
+  const [cachedChrome, setCachedChrome] = useState<ChromeSnapshot | null>(null);
+  useLayoutEffect(() => {
+    setCachedChrome(readChromeSnapshot());
+  }, []);
+  const settings = state?.settings ?? cachedChrome?.settings;
   const liveTrackedCount = useMemo(
     () => countLiveNavEvents(state?.events ?? [], "all"),
     [state?.events]
@@ -529,17 +540,20 @@ export function AppNav() {
     return countDeskQueue(bets, "settle", eventById);
   }, [state?.bets, state?.events]);
 
-  const boostsOpenCount = state?.boostsOpen ?? 0;
-  const casinoNeedsActionCount = state?.casinoNeedsAction ?? 0;
-  const accaLayDueCount = state?.accaLayDue?.length ?? 0;
-  const betBuilderLayDueCount = state?.betBuilderLayDue?.length ?? 0;
+  const boostsOpenCount = state?.boostsOpen ?? cachedChrome?.boostsOpen ?? 0;
+  const casinoNeedsActionCount =
+    state?.casinoNeedsAction ?? cachedChrome?.casinoNeedsAction ?? 0;
+  const accaLayDueCount =
+    state?.accaLayDue?.length ?? cachedChrome?.accaLayDueCount ?? 0;
+  const betBuilderLayDueCount =
+    state?.betBuilderLayDue?.length ?? cachedChrome?.betBuilderLayDueCount ?? 0;
   const comboLayDueCount = accaLayDueCount + betBuilderLayDueCount;
   const racingPendingSettleCount = useMemo(
     () => (state?.events ?? []).filter((e) => isEventPendingSettle(e)).length,
     [state?.events]
   );
   const racingOfferKey = useRacingOfferEdgeKey(state?.offers);
-  const edgeRaceCount = useOfferEdgeRaceCount(state?.settings, racingOfferKey);
+  const edgeRaceCount = useOfferEdgeRaceCount(settings, racingOfferKey);
 
   /** Manual collapse per group (keyed by baseHref) while still on that group's route */
   const [userCollapsed, setUserCollapsed] = useState<Record<string, boolean>>({});
@@ -611,13 +625,13 @@ export function AppNav() {
         ? openBetCount
         : item.href === "/boosts"
           ? boostsOpenCount
-          : item.href === "/alerts"
-            ? (state?.alertsUnread ?? 0)
+            : item.href === "/alerts"
+            ? (state?.alertsUnread ?? cachedChrome?.alertsUnread ?? 0)
             : item.href === "/racing"
               ? racingPendingSettleCount
               : 0;
     const locked = Boolean(
-      item.feature && !canDesk(state?.settings, item.feature)
+      item.feature && !canDesk(settings, item.feature)
     );
 
     return (
@@ -688,21 +702,19 @@ export function AppNav() {
           ? openCasinoLog
           : undefined;
     const locked = Boolean(
-      entry.feature && !canDesk(state?.settings, entry.feature)
+      entry.feature && !canDesk(settings, entry.feature)
     );
 
     function onParentClick(e: MouseEvent<HTMLAnchorElement>) {
-      if (expanded) {
+      // Only swallow the click when we are already on the landing page
+      // (toggle the sub-nav). From Campaigns, Home, or anywhere else the
+      // parent must still navigate, even if the group is expanded.
+      if (isGroupLandingPath(pathname, firstChildHref)) {
         e.preventDefault();
-        setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: true }));
+        setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: expanded }));
         return;
       }
-      // Expanding: always land on the first sub-nav item
       setUserCollapsed((prev) => ({ ...prev, [entry.baseHref]: false }));
-      if (pathname === firstChildHref || pathname.startsWith(`${firstChildHref}?`)) {
-        e.preventDefault();
-      }
-      // else: Link navigates to firstChildHref (entry.href)
     }
 
     return (
@@ -746,7 +758,7 @@ export function AppNav() {
               const ChildIcon = child.icon;
               const childFeature = child.feature ?? entry.feature;
               const childLocked = Boolean(
-                childFeature && !canDesk(state?.settings, childFeature)
+                childFeature && !canDesk(settings, childFeature)
               );
               const childBadge =
                 child.href === "/acca"
@@ -777,13 +789,7 @@ export function AppNav() {
   }
 
   return (
-    <aside
-      className={cn(
-        "sticky top-[var(--layout-page-x)] hidden h-fit shrink-0 flex-col self-start pt-4 md:flex",
-        appNavColumn
-      )}
-    >
-      <nav className="flex flex-col px-0.5">
+    <nav className="flex flex-col px-0.5">
         {NAV_SECTIONS.map((section, i) => (
           <div key={section.label ?? "top"} className="flex flex-col gap-0.5">
             {section.label ? (
@@ -807,7 +813,6 @@ export function AppNav() {
             <NavDefaultExchange />
           </div>
         </div>
-      </nav>
-    </aside>
+    </nav>
   );
 }

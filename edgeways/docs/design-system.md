@@ -22,6 +22,7 @@ Defined in `src/app/globals.css`:
 | `--chip` / `--chip-foreground` | Ink `#111` plate + `--brand-text` — legacy ink chips / badges (segmented tabs and filter pills use solid `--brand`) |
 | Nav counters (`brandChipCount`) | Light: ink `#111` + off-white `#fafafa` type; dark: same mute as unselected filter-pill counts (`foreground/10` + `foreground/70`) |
 | `--selection-subtle` / `--selection-subdued` | Hover and selected list rows, header bands |
+| `--accent` / `accent/60` | Overlay menus: current value is full `--accent`; hover/focus is `--accent` at 60% (`overlayMenuHover`) so the two never match. Same token in light and dark. |
 | `--stat-tile-selected` / `--stat-tile-selected-border` | Interactive `StatTile` summary tabs — white plate (light) / lifted grey (dark); rim via 1px box-shadow only |
 | `--ew-stat-tile-selected-face` | Selected StatTile glossy inset face (stronger than `--ew-surface-face`) |
 | `--ew-page-panel-face` | Desk `.page-panel` inset face — top/bottom catch only (no left/right stroke) |
@@ -45,7 +46,7 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 
 **Subscription.** Settings → Subscription (first tab, `/settings?tab=subscription`): live plan and status from `app_users` (EDGE-5). A Stripe customer sees **Manage subscription** (`pagePrimary`) into the Customer Portal; return lands on this tab. Complimentary Core/Edge (no Stripe customer) hides the portal button and adds “No Stripe portal.” Tiles keep the grant status. Tab intro stays “Plan, trial and billing.” for every account. Free or cancelled shows two choice plates, not a pair of loose buttons: Core (`quietPanel`) and Edge (`edgePanel`). Each plate title is `Available on {plan} subscription` at `text-base font-semibold` (same string and scale as `PlanLockEmpty`), then `monthlyLabel`, then `SETTINGS_PLAN_HIGHLIGHTS` ticks, then the CTA: **Choose Core** as `pagePrimary`, **Start 14-day Edge trial** as `variant="edge"`. Do not add **Try Edge** or **Walk the desk first** on this tab. Upgrade prompts live on locked desks. If a preview is already on, a bare strip (not a plate) with **Back to Free / Core** exits it. Hidden for Edge subscribers and on the public demo (viewing bar). Clerk is identity only. Do not build a custom card form. Test portal can switch Core↔Edge list prices. Founding is invite-only, not a portal product.
 
-**Appearance.** Settings → Appearance: Light/Dark (`ThemeSelect`), UI font dropdown (`UiFontSelect`: Noto Sans (default), Figtree), header pattern picker (`HeaderPatternSelect`: twelve [Hero Patterns](https://heropatterns.com/) tiles, default Diagonal lines), plus brand accent presets (Amber, Viridian, Coral, Azure, Orchid, Citrine, Rose) and Custom colour picker. Default keeps next/font on `--font-sans` (Noto); Figtree sets `html[data-font="figtree"]` so `--font-sans` / `--font-heading` resolve to `--font-figtree` (persisted in localStorage, SSR cookie `edgeways-ui-font`, and `AppSettings.uiFont`; FOUC script in `<head>`). Accent apply sets `--brand` plus contrast tokens; swatches show a loader until settle, then the selected style. Non-default accent/font/pattern persist in localStorage, an SSR cookie, and `AppSettings`. Choosing the product defaults (Amber, Noto, diagonal lines) **clears** those stores so a hard refresh paints CSS defaults. Public demo never reads or writes appearance prefs (always Amber + Noto). A blocking head script mirrors localStorage/cookie before paint; brand colour transitions only run after `html.brand-accent-ready` (avoids Amber → selected flash).
+**Appearance.** Settings → Appearance: Light/Dark (`ThemeSelect`), UI font dropdown (`UiFontSelect`: Noto Sans (default), Figtree), header pattern picker (`HeaderPatternSelect`: twelve [Hero Patterns](https://heropatterns.com/) tiles, default Diagonal lines), plus brand accent presets (Amber, Viridian, Coral, Azure, Orchid, Citrine, Rose) and Custom colour picker. Light-mode selected segment uses `--stat-tile-selected` (pure white, the lightest plate) + `foreground` type; dark-mode selected stays `background` + `foreground`. Default keeps next/font on `--font-sans` (Noto); Figtree sets `html[data-font="figtree"]` so `--font-sans` / `--font-heading` resolve to `--font-figtree` (persisted in localStorage, SSR cookie `edgeways-ui-font`, and `AppSettings.uiFont`; FOUC script in `<head>`). Accent apply sets `--brand` plus contrast tokens; swatches show a loader until settle, then the selected style. Non-default accent/font/pattern persist in localStorage, an SSR cookie, and `AppSettings`. Choosing the product defaults (Amber, Noto, diagonal lines) **clears** those stores so a hard refresh paints CSS defaults. Public demo never reads or writes appearance prefs (always Amber + Noto). A blocking head script mirrors localStorage/cookie before paint; brand colour transitions only run after `html.brand-accent-ready` (avoids Amber → selected flash).
 
 **Brand contrast.** Relative luminance threshold `0.45` on the raw brand:
 
@@ -148,7 +149,10 @@ Plate colour flips with theme:
   chunky 3px lip. Meta-nav links press with a 0.25px shunt like PressButton.
   Page panel radius is `0` below `sm`.
 
-1. **`AppTopBarHeader`** — lockup, bankroll stacks, burger (mobile). Fixed `h-14` so the
+1. **`AppTopBarHeader`** — lockup, bankroll stacks, burger (mobile). The hang
+   tab paints on first chrome, using the last session snapshot
+   (`src/lib/chrome-snapshot.ts`, `CHROME_SNAPSHOT_KEY`) when `/api/state`
+   has not arrived yet. Do not hide it until the live desk loads. Fixed `h-14` so the
    balance pill can collapse without reflowing the page. Below `md`, the lockup sits in a
    `@container/brand` leftover slot: wordmark when that slot is at least `13.5rem`
    (wordmark + Beta + inset, plus a little air), otherwise the bolt (Beta stays). The
@@ -209,6 +213,107 @@ lets the title shrink into the buttons. From `md` up, title left / actions right
 Keep the description to one short sentence. Description type uses `pageDescription`
 (`text-sm` / 14px), not `sectionDescription` (`text-xs`).
 
+**Calendar day stepper** - `CalendarDayStepper` (`src/components/calendar-day-stepper.tsx`)
+is the prev / date / next control on Admin Activity and Fixtures. Outline
+`toolbarIconBox` chevrons (`size-8`) frame one outline `DatePicker`, with
+`gap-1` (4px) between each chevron and the date field. Height is
+`toolbarControlH` (`h-8` at every breakpoint). Width is
+`calendarDayStepperTriggerWidth` (`10.75rem`, year labels included). Horizontal
+pad stays `px-2` on every breakpoint (no form-field `max-sm:px-3.5`). Compact
+`selectedLabel`: Today / Tomorrow /
+Yesterday, else `d MMM`, plus the year when it is not this year. Pass `min` /
+`max` as YYYY-MM-DD so arrows and the calendar share the same bounds.
+Fixtures: lookback 6 days through tomorrow. Admin mix: two years back through
+today.
+
+**Fixtures chrome** - Flashscore-style tape, not a card inside a card. The
+page title is **Fixtures** plus one short sentence. The pin rail is a
+separate column on the **right**. Sport line tabs (`TabsLineBar`) and the feed bar span
+the **padded page column** (`--layout-page-x`, same axis as Profit
+Tracker). The hairline is full width of that column, not the raw panel
+edge; tab labels line up with **Fixtures**. No hairline under the title;
+16px (`mt-4`) sits above the sport tabs. Title, tabs and feed bar stay
+pinned; the pin rail stays put and the tape scrolls in `ScrollFadeEdges`
+(`from-page` top and bottom, matching `--page`). Tape and pin rail
+scrollers use `my-4` (16px, same as the card row gutter / `deskInsetX`)
+so the thumb starts on the first card, not the empty pad above.
+Fades are sticky inside the scroller so the thumb paints over them. Gap
+between tape and pin rail matches `--layout-page-x` (same as rail to
+page edge). A 1px top hairline spans the tape and the pin rail; cards
+and pins scroll under it. List desks that pin chrome (Tracked Events,
+History, Alerts, Campaigns, Casino Campaigns) use `PageFillShell` +
+`PageFillScroll`. Feed bar: All / Live /
+Scheduled FilterPills left (`overflow-x-auto overflow-y-clip` +
+`app-scroll-overlay` so hover never paints a vertical scrollbar);
+right cluster is `CalendarDayStepper` then
+an outline **Filter** icon (`ListFilter`, `toolbarIconBox`) with `gap-2`
+(8px) from the next-day chevron. Icon only, never the competition name.
+When a competition or course is selected the icon uses the selection
+plate (`border-selection-subdued-border` / `bg-selection-subdued`). That icon stays on the feed bar at every
+width. Day changes that are already warm (today / tomorrow after the
+first load) paint at once. A cold day clears the tape and shows the
+page loading empty until that sport's list arrives. The Filter icon
+does not spin. No Competition / Time segment.
+The tape is always grouped by competition. Football headers are
+`COUNTRY - League` (`ENGLAND - Championship`): country and name share
+`sectionTitle` (same size and colour). That country prefix is **header
+only**. Pin rail, filter menu, and empty-state copy use the competition
+name (`Championship`). World / worldwide titles stay bare. Racing
+headers use the same `REGION - COURSE` split. Pin, flag and title share
+`gap-3` (12px). A collapsed header shows a count before the chevron:
+live as `N Live` in `text-profit`, then a muted count for scheduled and
+finished (`2 Live · 3`). No count when the group is open. Country flags are `RegionFlag` only (colour-emoji set, same
+as Mexico). Do not use API-Football flag images or crests for countries.
+`RegionFlag` forces a colour-emoji face so UI fonts cannot paint boxed
+letters. Map Russia to `RU` (Intl still labels withdrawn `SU` as Russia). On All, common UK / European
+leagues sit first (Premier League, Championship, then Serie A, La Liga,
+Bundesliga, Ligue 1, Eredivisie), then the rest. Inside each band, and
+for Racing, order competitions / courses by the first kick-off
+(Flashscore). A named pin or Pinned only only lists competitions / courses that have
+a match that day. If Pinned only has none, one page empty:
+“No fixtures for your pins” (racing: races), plus secondary **Show all**.
+The pin rail (`w-56`) is reserved on first paint (spinner in the
+column) so it does not jump in after `/api/state`. After settings land
+it only stays when the desk has pins: All / Pinned only + pin
+shortcuts in the **saved pin order** (not that day's kick-off), under a
+Competitions / Courses caption (`mt-4` / 16px above the caption). Pins
+show the competition name only (flag carries country) at `text-base`,
+counts at `text-sm`. When there are
+two or more pins, muted `Drag to reorder.` sits under the list. The rail paints the same selection plate
+as All / Pinned only when a competition is the active filter. No pins:
+hide the rail. The feed-bar Filter icon is the only
+competition / course picker. Do not duplicate it on the rail. Below `lg`, Pinned is a pins-only popover when there are pins. Title, tabs, the feed bar and the pin rail stay pinned; only the tape scrolls.
+Browse fixtures uses the same chrome. Football tape rows use
+`fixtureTapeMatchGrid`: stacked teams (home over away, `gap-2` / 8px
+between crest and name), then kick-off /
+FT / live minute right-aligned in the same column as the header Hide
+eye (`fixtureTapeClockCol` starts at 3.25rem and grows for 12-hour
+times and labels such as `ET 90'`), then scores in a 2.5rem rail
+(2rem figures plus 8px after the scoreline) that shares a right edge
+with the collapse chevron (figures when live or finished, en dash
+when not started). Football rows have no trailing
+actions. Track, Add bet and 2UP Desk live on the match-events footer.
+Racing keeps `fixtureTapeRowGrid` (clock, copy, icon actions). Competition
+groups put no extra pad above or below the row list (`0px`). Competition
+headers use `py-2.5` (10px), 4px tighter than the shared section band.
+Every tape row uses `py-2.5` and `hover:bg-selection-subdued`
+(`dark:hover:bg-selection-subtle`) so the wash reads on the light
+`selection-subtle` well. Competition headers rest on `bg-page` and use a
+thinner `hover:bg-muted/25` (`dark:hover:bg-selection-subtle`). Football home / away lines (and the score stack) sit on `gap-y-1` (4px). Live minute and live score use `text-profit` plus the pulsing
+`Radio` mark (same as Tracked Events / match tape). Do not put a
+Live pill on the title line. A football row opens the commentary and
+lineup modal (`FootballLiveTapeDialog`), with the existing loading
+empty-state while tape loads. On `sm+` the plate is a fixed 4:5 card
+(`40rem` tall at `max-w-lg`, clamped to `85dvh`) so Commentary and
+Lineup share one height. A pinned `DialogFooter` keeps **Track**
+(outline) and **Add bet** (page primary) on screen while the tape
+scrolls. Tracked matches swap Track for a Tracked link. Racing clock sits
+left of the race name plus runners line (time / Off / Result), centred
+in a 4.5rem clock column. A racing row opens `RacingResultTapeDialog` at the
+same plate size: course, race, clock, then Pos / Horse / Dist / SP
+from the shared results store. SP is decimal (`2.25 F`), not fractional. The tape start fade shows only after
+scroll (`pinScrollStart`).
+
 **Ending date/time shortcuts** - expiry fields pass `shortcuts="ending"` to `DatePicker`
 (Tomorrow, 7 days), `TimePicker` / `EventTimeInput` (End of day → `23:59`), and the combined
 `DateTimePicker` (Tomorrow + 7 days under the calendar, End of day under the wheels). Compact
@@ -216,6 +321,17 @@ Keep the description to one short sentence. Description type uses `pageDescripti
 18rem popover (calendar + time wheels) and caps at `--overlay-datetime-max`
 (`min(26rem, 100vw − gutter)`) and available height, with Clear / Today / Done pinned so they
 stay on-screen. Collision padding matches `--overlay-gutter` (16px).
+
+**Native date / time on touch.** `DatePicker`, `TimePicker` / `EventTimeInput`, and
+`DateTimePicker` keep the calendar and iOS-style wheels on fine-pointer `md+` desks.
+On `(any-pointer: coarse)`, `(hover: none)`, or below `md` they use the OS pickers
+(`type="date"`, `type="time"`, `type="datetime-local"`) behind the same field chrome.
+That gate is shared (`usePrefersNativePicker`) so Add bet, Offers, Casino, reminders,
+Racing Desk, Fixtures, Tracked Events, Profit Tracker, Acca / Systems / Bet Builder,
+and free-bet expiry all behave the same. Custom wheels inside a dialog popover cannot
+scroll on iOS/Android (scroll lock). Ending chips stay visible under the native field.
+Display labels still use `d MMM yyyy` and `formatClockString`. Do not add a raw
+`type="date"` / `type="time"` / `type="datetime-local"` input in a form.
 
 **Modal headers** - every working-tool `Dialog` uses the Adjust balance band: `dialogHeaderBand` / `dialogTitle` / `dialogDescription` in `surface-styles.ts` (baked into `DialogHeader`, `DialogTitle`, `DialogDescription`). Title is 20px (`text-xl`) extrabold; the matching title icon is `dialogTitleIcon` (`size-5`). Prefer a short description; when a name or sentence needs more room it **wraps** inside the header (`text-pretty break-words`) — never truncate or overflow the modal. Extra help uses `DialogExplainer` (CircleHelp popover) immediately after the description text, not pinned to the trailing edge of the header. Not a second task. Footer actions stay fully visible (`flex-wrap`). Do not restyle a header with `text-base` or drop the hairline. `p-0` shells cancel the default bleed with `mx-0 mt-0` on the header. The football match-events dialog keeps that hairline band and puts the scoreboard in it (sr-only title); do not flatten the band to drop the rule. While a modal is open, `/api/state` polling pauses so live desk paints cannot flash through the overlay. The overlay is a stable dim (`bg-black/20`) plus `--modal-overlay-blur` (`2px`). Do not raise that blur. `prefers-reduced-transparency` drops the frost and keeps the dim. The plate lifts with `--modal-shadow` (not `--page-shadow`). The burger drawer keeps its heavier `bg-black/40` scrim.
 
@@ -234,9 +350,10 @@ stay on-screen. Collision padding matches `--overlay-gutter` (16px).
 - **Flex children shrink.** Any `flex-1` / row child that holds copy needs `min-w-0` or it will blow the page.
 - **Overlays stay on-screen.** Tooltip, popover, dropdown, and toast cap at `calc(100vw − var(--overlay-gutter))` and wrap. Do not give them a raw `w-*` without a viewport max. `DateTimePicker` uses `--overlay-datetime-max` so the plate wraps both columns; it still uses that viewport cap, plus available height so Done stays on-screen.
 - **Select menus hug content by default.** Popper `SelectContent` is `w-max`, never narrower than the trigger, capped at the tighter of Radix available width and `calc(100vw − var(--overlay-gutter))`. Names, type badges, balances, and other identity UI must stay fully readable. Do not pin every select to the trigger. Truncation is for title-style copy only.
+- **Overlay hover is weaker than selected.** Select and dropdown items use `overlayMenuHover` (`bg-accent/60`) for hover/keyboard focus. The current value (`data-[state=checked]` on `SelectItemRow`, open submenu) stays full `--accent`. Do not paint hover and selected with the same fill.
 - **`matchTrigger` is opt-in.** Use it only on full-width title lists (offer Race). Then the menu matches the field, the title truncates via `SelectItemRow`, and trailing meta (runner count) stays `shrink-0` on the right. Never use `matchTrigger` on Account, venue, exchange, or other pickers where the label is how the user identifies the row.
-- **Clip the shell.** `html` / `body` / `.app-scroll` / `PageShell` use `overflow-x: clip`. Do not remove that to “fix” a wide child — fix the child. Nested panels that must show a standing scrollbar use `.app-scroll-always` (same thin thumb as `.app-scroll-nested` hover).
-- **Fade clipped scroll.** Any nested region that scrolls (dialog body, max-height panel, card list, tab strip, select/dropdown/command list) uses `ScrollFadeEdges` (`src/components/ui/scroll-fade-edges.tsx`). Soft start/end fades appear only while more content is clipped. Washes sit 1px over the seam (`-top-px` / `-bottom-px`, `FADE_SEAM_PX`) so fractional zoom cannot leak a sliver; sibling headers stay above the wash (`z-10`). Vertical is the default; tab strips and card decks use `orientation="horizontal"`. Pass `fadeClassName` to match the surface (`from-page`, `from-card`, `from-popover`, `from-page dark:from-card`, …). Nested thumbs stay on `.app-scroll-nested` / `.app-scroll-overlay` via `scrollClassName`. Do **not** invent a second mask or a one-off gradient. Card decks that snap (Home Do next) pass `stepButtons` for overlay prev/next; those are not a second fade. Radix Select must not render scroll chevrons: they remount on first scroll and jump the list. Overlay fades with `scrollAsChild` on the Viewport instead. Pass `startFade={false}` when a sticky section header already occludes the leading edge (Match events period bars, Home Live feed `ListDayRule`, mobile Home deck cards). Exempt: the page-level `.app-scroll` shell, and time wheels (those keep their existing mask).
+- **Clip the shell.** `html` / `body` / `.app-scroll` / `PageShell` use `overflow-x: clip`. Do not remove that to “fix” a wide child — fix the child. Nested panels that must show a standing scrollbar use `.app-scroll-always` (same thin thumb as `.app-scroll-nested` hover). Overlay a thumb on the content with no track or gutter via `.app-scroll-float` plus `ScrollFadeEdges overlayScrollbar` (match-events tape).
+- **Fade clipped scroll.** Any nested region that scrolls (dialog body, max-height panel, card list, tab strip, select/dropdown/command list) uses `ScrollFadeEdges` (`src/components/ui/scroll-fade-edges.tsx`). Soft start/end fades appear only while more content is clipped. Washes sit 1px over the seam (`-top-px` / `-bottom-px` / `-left-px` / `-right-px`, `FADE_SEAM_PX`) so fractional zoom cannot leak a sliver. `edgeRule` adds a 1px hairline at `z-[2]`; the wash stays at `-top-px` / `z-[1]` so the rule never opens a zoom gap. Sibling headers stay above the wash (`z-10`). Do not clip the fade wrapper. Vertical is the default; tab strips and card decks use `orientation="horizontal"`. Pass `fadeClassName` to match the surface (`from-page`, `from-background`, `from-card`, `from-popover`, `from-page dark:from-card`, …). Nested thumbs stay on `.app-scroll-nested` / `.app-scroll-overlay` via `scrollClassName`. Do **not** invent a second mask or a one-off gradient. Card decks that snap (Home Do next) pass `stepButtons` for overlay prev/next; those are not a second fade. Radix Select must not render scroll chevrons: they remount on first scroll and jump the list. Overlay fades with `scrollAsChild` on the Viewport instead. Pass `startFade={false}` when a sticky section header already occludes the leading edge (Match events period bars, Home Live feed `ListDayRule`, mobile Home deck cards). Exempt: the page-level `.app-scroll` shell, and time wheels (those keep their existing mask).
 - List-row `truncate` is allowed only on fixed-height chrome (nav, feed rows, select items) where the full string is available elsewhere (trigger, `title`, or another surface). Never use it as the overflow strategy for tooltips, dialogs, or page titles.
 
 **`CalculatorPageHeader`** - borderless meta band for calculator shells.
@@ -315,19 +432,23 @@ From `src/lib/ui/surface-styles.ts`:
 - **`toolbarSelectTrigger`** - quiet rounded-full select / combobox beside
   FilterPills (Offers category). Transparent rest, muted type; open or applied
   value uses `bg-muted/60`. Not a raised `fieldControl` dropdown.
-- **`toolbarSelectTriggerGhost`** - fixture competition / course combobox.
-  Same type as `toolbarSelectTrigger`, but hover, open, and an applied value
-  stay transparent (no plate). Height matches FilterPills (`h-8` at every
-  breakpoint, no mobile `h-10` bump).
-- **Fixture saved star** - stroke `Star` on competition / course headers
-  and in the competitions menu, via `favouriteStarIcon(filled)`. Saved
-  uses `fill-brand text-brand`. On the active Saved FilterPill (after All)
-  use `favouriteStarIconOnBrandPlate` (`fill-current` on `--brand-foreground`).
-  Pins persist on the desk (`favouriteFootballScopes` / `favouriteRacingCourses`).
-  Hide a competition with the eye after the name (header or All competitions).
-  Saved competitions do not show hide. Restore from the Hidden group in that
+- **`toolbarSelectTriggerGhost`** - quiet ghost combobox (hover, open, and
+  an applied value stay transparent). Height matches FilterPills (`h-8` at
+  every breakpoint, no mobile `h-10` bump). Fixture competition / course
+  filter uses `face="outline"` and `labelMode` `icon` on the feed bar.
+  The menu list is `min(32rem, 70dvh)` tall.
+- **Fixture pin** - stroke `Pin` on competition / course headers and in
+  the filter menu, via `favouriteStarIcon(filled)`. Header pin is icon-wide
+  and sits with the flag and title (`gap-3` / 12px before the flag). Football
+  kick-off / FT / live minutes sit in the Hide column, right-aligned with
+  the eye. Pinned uses
+  `fill-brand text-brand`. Chrome says **Pinned** (rail: All, Pinned
+  only). Persist keys stay `favouriteFootballScopes` / `favouriteRacingCourses`.
+  Hide a competition with the eye in the clock column on the header, or
+  after the name in All competitions.
+  Pinned competitions do not show hide. Restore from the Hidden group in that
   menu (`hiddenFootballScopes` / `hiddenRacingCourses`). Hidden rows stay out
-  of All / Scheduled / Live. Saved and an explicit competition pick still show
+  of All / Scheduled / Live. Pinned and an explicit competition pick still show
   them.
 - **Page CTAs** - `pagePrimaryButtonProps` (`variant="pagePrimary"`, `size="default"` / h-8,
   bold) next to outline siblings via `pageSecondaryButtonProps` at the same height.
@@ -366,8 +487,8 @@ From `src/lib/ui/surface-styles.ts`:
 - **`listRowSelected(active)`** - grey selection for sidebar lists
 - **`sectionBar` / `sectionMeta`** - panel section headers
 - **Day-split lists** (`ListDaySection`) - Campaigns, Casino Campaigns, Tracked
-  Events, Profit Tracker, History, and Browse fixtures (inside each competition
-  / course). Label
+  Events, Profit Tracker, and History. Fixtures is one picked day, not a
+  day-split list inside each competition. Label
   (`Today` / `Yesterday` / `Monday 6th July`) plus a hairline, then that day's
   cards, table, or fixture rows. Tokens: `listDaySectionLabel` /
   `listDaySectionContent`. History cards use `listDaySectionContentCompact`
@@ -383,7 +504,8 @@ From `src/lib/ui/surface-styles.ts`:
   `Clock` before the label. In-feed stamps (Add bet Events, Home Live feed)
   use `ListDayRule` instead: a centred day pill on a hairline (`—— Today ——`).
   Home Live feed passes `sticky`: the stamp sits flush at the scrollport
-  top (`z-20`, `--page` plate, `py-2`) so Today does not nudge on first
+  top (`z-20`, `--page` plate on desktop, `--background` / `--canvas` below
+  `sm` to match the mobile Home deck, `py-2`) so Today does not nudge on first
   scroll. The Live feed title keeps its `border-b`; day stamps do not
   add a second rule above Yesterday. Rows and crest lock-ups stay
   `z-0` / `isolate` so logos scroll behind the plate. The stamp hangs
@@ -403,14 +525,20 @@ From `src/lib/ui/surface-styles.ts`:
   `deskTableWellCornerEnd` so the well can stay unclipped. Cell copy
   starts at 16px (`pl-4`) and ends at 24px (`pr-6`) so right-aligned
   clocks and scores do not kiss the rim.   The football match-events dialog
-  hugs its content (`max-h`, not a fixed 36rem).   Scoreboard and line tabs
+  is a fixed 4:5 plate on `sm+` (`h-[min(40rem,85dvh)]` at `max-w-lg`), not
+  a 9:16 phone frame and not a hug-to-content height. Mobile stays a
+  bottom sheet capped at `92dvh`.   Scoreboard and line tabs
   share one `--card` header plate (24px inset, no close control). Tape and
   XI copy use the same 24px inset, with 24px under the last row. The tape
-  stays on `--page`.
+  stays on `--page`. Commentary and Lineup scroll with
+  `app-scroll-float` (native bar hidden) plus `ScrollFadeEdges
+  overlayScrollbar`: a floating thumb on the tape, no track, no
+  gutter (`z-30`, above sticky period bars). Rows stay full well width.
   Line tabs under the scoreboard split **Commentary** and **Lineup**.
   Upcoming or live matches with no tape yet use “No commentary yet”, not
   a finished-match miss. Starting XI (and bench when stored) live on
-  Lineup. Modal loading / empty / error plates sit in `deskInsetX`.
+  Lineup. Modal loading / empty / error sit `bare` on `--page` (no
+  plate, ring, or radius), centred in the tape well.
 - **`deskTrackerSummaryBand`** - Profit Tracker Acca / Bet Builder / Systems
   strip above a bet ledger (`bg-selection-subtle` / dark `bg-input/50`) so the
   workflow block reads against the untinted table
@@ -470,8 +598,8 @@ surface. The plate switches via `in-data-[slot=card]` and
   fixtures: the lock and board empties are full-width page empties so they
   match the fixture list measure. Keep the plate
   (do not flatten with `shadow-none` unless the empty sits inside another
-  lifted card). 16px (`pb-4`) under the Football / Racing line bar before
-  the board or lock.
+  lifted card). 16px (`pb-4`) under the Football / Racing line bar, then
+  the feed bar and pinned rail stay pinned; only the list scrolls.
 - **In-feed** - `bare` (History feed and any similar live feed). Icon well
   and copy sit on the page background: no plate or radius.
   Page-level History (`/history`) still uses the plate.

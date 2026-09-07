@@ -25,6 +25,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import { FootballLiveTapeDialog } from "@/components/events/match-tape";
+import { useAddBet } from "@/components/add-bet-provider";
 import {
   parseRaceResults,
   isRaceResultIncomplete,
@@ -78,6 +79,7 @@ export function EventRowView({
   onResultDialogOpenChange?: (open: boolean) => void;
 }) {
   const [tapeOpen, setTapeOpen] = useState(false);
+  const { openAddBet } = useAddBet();
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
   const canOpenTape = !isRacing;
@@ -251,6 +253,17 @@ export function EventRowView({
               event={event}
               open={tapeOpen}
               onOpenChange={setTapeOpen}
+              tracked
+              onAddBet={() => {
+                setTapeOpen(false);
+                openAddBet({
+                  eventId: event.id,
+                  homeTeam: event.homeTeam,
+                  awayTeam: event.awayTeam,
+                  sport: "football",
+                  labelSuggestion: `${event.homeTeam} v ${event.awayTeam}`,
+                });
+              }}
             />
           ) : null}
           {isRacing && (

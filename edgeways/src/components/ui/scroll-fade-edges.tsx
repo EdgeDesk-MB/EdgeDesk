@@ -81,6 +81,11 @@ const STEP_BUTTON_FADE_PX = 36;
  *
  * `scrollAsChild` overlays the fades on an existing scroller (Radix Select
  * viewport, cmdk list) instead of wrapping children in a new overflow box.
+ *
+ * `edgeRule` paints a 1px top hairline above the wash so list chrome stays
+ * put and content scrolls underneath. The wash still sits `-top-px` so
+ * fractional zoom cannot leak a sliver under the rule. Vertical page fills
+ * use this.
  */
 export function ScrollFadeEdges({
   children,
@@ -96,6 +101,8 @@ export function ScrollFadeEdges({
   scrollStartKey,
   scrollAsChild = false,
   startFade = true,
+  edgeRule = false,
+  overlayScrollbar = false,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -124,6 +131,13 @@ export function ScrollFadeEdges({
    * `ListDayRule`).
    */
   startFade?: boolean;
+  /** Fixed top hairline; the list scrolls under it. Vertical only. */
+  edgeRule?: boolean;
+  /**
+   * Floating thumb on the content (no track, no gutter). Pair with
+   * `app-scroll-float` so the native bar is hidden. Vertical only.
+   */
+  overlayScrollbar?: boolean;
 }) {
   const horizontal = orientation === "horizontal";
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -131,6 +145,10 @@ export function ScrollFadeEdges({
   const lockStartRef = useRef(pinScrollStart);
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
+  const [overlayThumb, setOverlayThumb] = useState<{
+    top: number;
+    height: number;
+  } | null>(null);
 
   const canDrag = !scrollAsChild && horizontal && dragToScroll;
   const canStep = !scrollAsChild && horizontal && stepButtons;
@@ -158,8 +176,21 @@ export function ScrollFadeEdges({
       const canScroll = scrollHeight - clientHeight > SCROLL_EPS;
       setShowStart(canScroll && scrollTop > SCROLL_EPS);
       setShowEnd(canScroll && scrollTop + clientHeight < scrollHeight - SCROLL_EPS);
+      if (overlayScrollbar) {
+        if (!canScroll) {
+          setOverlayThumb(null);
+        } else {
+          const inset = 8;
+          const travel = Math.max(0, clientHeight - inset * 2);
+          const height = Math.max(24, (clientHeight / scrollHeight) * travel);
+          const max = Math.max(0, travel - height);
+          const top =
+            inset + (scrollTop / (scrollHeight - clientHeight)) * max;
+          setOverlayThumb({ top, height });
+        }
+      }
     }
-  }, [getScroller, horizontal]);
+  }, [getScroller, horizontal, overlayScrollbar]);
 
   const pinToStart = useCallback(() => {
     const el = getScroller();
@@ -306,6 +337,9 @@ export function ScrollFadeEdges({
         // Do not clip here: fades sit -1px over the seam so fractional
         // zoom cannot leak a sliver. Sibling headers stay above (`z-10`).
         "relative min-h-0 w-full min-w-0",
+        // Overlay thumb must sit above sticky period bars (`z-20`) and the
+        // overflow paint layer. Isolate so those z-indexes stay in this wrap.
+        overlayScrollbar && "isolate",
         // Select/cmdk already own overflow — a flex parent would let
         // `flex: 1` on the Viewport collapse or fight max-height inherit.
         scrollAsChild ? "block" : "flex flex-1 flex-col",
@@ -345,7 +379,7 @@ export function ScrollFadeEdges({
             // wrapper clipped, and nothing scrolled.
             horizontal
               ? "h-full overflow-x-auto overflow-y-clip overscroll-x-contain"
-              : "min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
+              : "relative z-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
             // Stop the browser shifting scrollLeft when cards are prepended
             // (lots/edge arriving after first paint).
             pinScrollStart && "[overflow-anchor:none]",
@@ -368,12 +402,28 @@ export function ScrollFadeEdges({
           className={cn(
             "pointer-events-none absolute z-[1]",
             horizontal
-              ? "-left-px inset-y-0 bg-gradient-to-r to-transparent"
-              : "-top-px inset-x-0 bg-gradient-to-b to-transparent",
+              ? "inset-y-0 bg-gradient-to-r to-transparent"
+              : "bg-gradient-to-b to-transparent",
             fadeStop,
             fadeBase
           )}
-          style={horizontal ? { width: fadeLength } : { height: fadeLength }}
+          style={
+            horizontal
+              ? { width: fadeLength, left: -FADE_SEAM_PX }
+              : {
+                  height: fadeLength,
+                  top: -FADE_SEAM_PX,
+                  left: -FADE_SEAM_PX,
+                  right: -FADE_SEAM_PX,
+                }
+          }
+        />
+      ) : null}
+      {edgeRule && !horizontal ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-[2] bg-border"
+          style={{ height: FADE_SEAM_PX }}
         />
       ) : null}
       {showEnd ? (
@@ -382,13 +432,33 @@ export function ScrollFadeEdges({
           className={cn(
             "pointer-events-none absolute z-[1]",
             horizontal
-              ? "-right-px inset-y-0 bg-gradient-to-l to-transparent"
-              : "-bottom-px inset-x-0 bg-gradient-to-t to-transparent",
+              ? "inset-y-0 bg-gradient-to-l to-transparent"
+              : "bg-gradient-to-t to-transparent",
             fadeStop,
             fadeBase
           )}
-          style={horizontal ? { width: fadeLength } : { height: fadeLength }}
+          style={
+            horizontal
+              ? { width: fadeLength, right: -FADE_SEAM_PX }
+              : {
+                  height: fadeLength,
+                  bottom: -FADE_SEAM_PX,
+                  left: -FADE_SEAM_PX,
+                  right: -FADE_SEAM_PX,
+                }
+          }
         />
+      ) : null}
+      {overlayScrollbar && overlayThumb ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-30 w-3"
+        >
+          <div
+            className="absolute right-1 w-1.5 rounded-full bg-foreground/25"
+            style={{ top: overlayThumb.top, height: overlayThumb.height }}
+          />
+        </div>
       ) : null}
     </div>
   );

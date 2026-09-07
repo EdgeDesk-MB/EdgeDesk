@@ -1,3 +1,4 @@
+import { deskInsetX } from "@/lib/ui/layout-spacing";
 import { cn } from "@/lib/utils";
 
 /** Untitled UI–style raised control (inset lip + soft drop) — outline / secondary */
@@ -69,6 +70,13 @@ export const deskTrackerSummaryBand =
 export const selectionSubdued = "bg-selection-subdued";
 
 /**
+ * Overlay menu hover (Select, Dropdown). 60% of `--accent` so it stays in
+ * the same family as the current value but reads weaker in light and dark.
+ * Pair with full `bg-accent` on `data-[state=checked]` / `data-open`.
+ */
+export const overlayMenuHover = "focus:bg-accent/60";
+
+/**
  * Empty-state plate. Follows the canvas → page → card stack:
  * on a page, lift to `--card` (lighter than `--page` in both themes);
  * nested in another card, sink to `--page` so the plate contrasts;
@@ -132,6 +140,10 @@ export const dialogTitleIcon = "size-5 shrink-0";
  */
 export const sectionTitle =
   "min-w-0 text-pretty break-words text-base font-semibold leading-snug tracking-tight text-foreground";
+
+/** Nested group title under a page section (Bets inside Categories). */
+export const sectionNestedTitle =
+  "min-w-0 text-pretty break-words text-sm font-semibold leading-snug tracking-tight text-foreground";
 
 export const sectionDescription =
   "min-w-0 text-pretty break-words text-xs text-muted-foreground";
@@ -217,7 +229,7 @@ export function listRowSelected(active: boolean) {
   return cn(
     listRowInteractive,
     active &&
-      "border-selection-subdued-border bg-selection-subdued text-foreground"
+      "border-selection-subdued-border bg-selection-subdued text-foreground hover:bg-selection-subdued"
   );
 }
 
@@ -441,7 +453,7 @@ export const toolbarSelectTrigger =
 export const toolbarSelectTriggerGhost =
   "h-8 max-sm:h-8 w-auto max-w-56 rounded-full border-transparent bg-transparent px-3 text-xs font-semibold text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground aria-expanded:bg-transparent aria-expanded:text-foreground data-[state=open]:bg-transparent data-[state=open]:text-foreground data-[empty=false]:bg-transparent data-[empty=false]:text-foreground dark:hover:bg-transparent";
 
-/** Stroke star; filled brand when pinned. Use on page / card chrome, not a brand plate. */
+/** Stroke pin; filled brand when pinned. Use on page / card chrome, not a brand plate. */
 export function favouriteStarIcon(filled: boolean, size: "sm" | "md" = "md") {
   return cn(size === "sm" ? "size-3.5" : "size-4", filled && "fill-brand text-brand");
 }
@@ -480,6 +492,55 @@ export const offerCampaignCardInteractive = cn(
  * shrink to its content inside the `w-max` snap row. Mobile stack stays `w-full`.
  */
 export const doNextCarouselCardWidth = "w-[300px]";
+
+/** Filter-row height: stay `h-8` on small screens (no `max-sm:h-10` bump). */
+export const toolbarControlH = "h-8 max-sm:h-8";
+
+/** Fixtures tape clock column: 24h `17:30` fits 3.25rem; 12h / `ET 90'` can grow. */
+export const fixtureTapeClockCol = "minmax(3.25rem,max-content)";
+/** Floor width for clock copy; keep in lockstep with `fixtureTapeClockCol`. */
+export const fixtureTapeClockMin = "min-w-[3.25rem]";
+/**
+ * Football score rail: 2rem figures + 8px after the scoreline (`2.5rem`).
+ * Grid track must stay a complete Tailwind literal (same width).
+ */
+export const fixtureTapeScoreCol = "2.5rem";
+export const fixtureTapeScoreRail = "w-10 pr-2";
+/** Home / away stack: 4px between the two name (and score) lines. */
+export const fixtureTapeTeamStack = "grid min-w-0 gap-y-1";
+export const fixtureTapeRowGrid = cn(
+  "grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3"
+);
+/** Racing clock / Result column: wide enough that Result sits in the middle. */
+export const fixtureTapeRacingClockMin = "min-w-[4.5rem]";
+/**
+ * Football tape: teams, then clock (right-aligned with the header eye),
+ * then scores (2rem figures + 8px after the scoreline, same right edge as
+ * the collapse chevron).
+ */
+export const fixtureTapeMatchGrid = cn(
+  "grid grid-cols-[minmax(0,1fr)_minmax(3.25rem,max-content)_2.5rem] items-center gap-3"
+);
+/** Equal `py-2.5` on every tape row. No extra pad on the list under a header. */
+export const fixtureTapeRow = cn(
+  listRow,
+  deskInsetX,
+  "py-2.5 transition-colors hover:bg-selection-subdued dark:hover:bg-selection-subtle"
+);
+/**
+ * Competition / course header hover. Rest fill is `bg-page` (darker than the
+ * row well). Keep the light wash thinner than the row hover.
+ */
+export const fixtureTapeSectionHover =
+  "transition-colors hover:bg-muted/25 dark:hover:bg-selection-subtle";
+/** Card row inset and tape scroll pad (`deskInsetX` / `px-4`). Fade length matches. */
+export const FIXTURE_TAPE_GUTTER_PX = 16;
+
+/** Square outline icon control (Filter, day-stepper chevrons). Pins `size-8`. */
+export const toolbarIconBox = cn(toolbarControlH, "size-8 max-sm:size-8 shrink-0 px-0");
+
+/** Middle DatePicker on `CalendarDayStepper` — Today / Tomorrow / `d MMM yyyy`. */
+export const calendarDayStepperTriggerWidth = "w-[10.75rem]";
 
 /** Shared type scale for Offers / Casino / Acca / Bet builder / Systems cards.
  * Half-step above the previous recipe (not a full Tailwind notch). */

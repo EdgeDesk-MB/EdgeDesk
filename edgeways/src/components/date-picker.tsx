@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AdaptiveTemporalPicker,
+  NativeTemporalField,
+} from "@/components/native-temporal-field";
+import { usePrefersNativePicker } from "@/hooks/use-prefers-native-picker";
 import { filterPillGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
@@ -34,9 +39,21 @@ export function ymdDaysFromToday(days: number, now = new Date()): string {
   return formatYmdLocal(d);
 }
 
+/** Native `min` / `max` from year bounds (inclusive calendar years). */
+export function yearBoundsToYmdRange(
+  fromYear?: number,
+  toYear?: number
+): { min?: string; max?: string } {
+  return {
+    min: fromYear != null ? `${fromYear}-01-01` : undefined,
+    max: toYear != null ? `${toYear}-12-31` : undefined,
+  };
+}
+
 /**
- * Shared date field: shadcn Popover + react-day-picker Calendar.
- * Value is always YYYY-MM-DD (or empty), matching previous native `type="date"` inputs.
+ * Shared date field: shadcn Popover + react-day-picker Calendar on fine
+ * pointers. Coarse / narrow viewports use the OS `type="date"` picker so
+ * the field does not trap scroll inside a dialog popover.
  *
  * Uses PopoverTrigger (like TimePicker) so the field stays on the flat Button path.
  * PressButton/react-3d-button hover translate jitters icon + label in dense forms.
@@ -52,12 +69,16 @@ export function DatePicker({
   captionLayout = "dropdown",
   fromYear,
   toYear,
+  min,
+  max,
   /** Ending/expiry fields: Tomorrow + 7 days chips under the calendar. */
   shortcuts,
   isDayDisabled,
   tone = "field",
   allowClear = false,
   hint,
+  nativeHint,
+  selectedLabel: selectedLabelOverride,
   "aria-label": ariaLabel,
 }: {
   value: string;
@@ -71,6 +92,9 @@ export function DatePicker({
   captionLayout?: "label" | "dropdown" | "dropdown-months" | "dropdown-years";
   fromYear?: number;
   toYear?: number;
+  /** Inclusive YYYY-MM-DD bounds for the native picker (and year fallback). */
+  min?: string;
+  max?: string;
   shortcuts?: "ending";
   /** Grey out calendar days (e.g. days with no tracked events). */
   isDayDisabled?: (date: Date) => boolean;
@@ -78,13 +102,21 @@ export function DatePicker({
   tone?: "field" | "toolbar";
   allowClear?: boolean;
   hint?: string;
+  /** Shown under the OS picker when it cannot enforce calendar-only rules. */
+  nativeHint?: string;
+  /** Override the trigger text (e.g. Today) while value stays YYYY-MM-DD. */
+  selectedLabel?: string;
   "aria-label"?: string;
 }) {
+  const prefersNative = usePrefersNativePicker();
   const [open, setOpen] = useState(false);
   const selected = parseYmdLocal(value);
   const now = new Date();
   const startYear = fromYear ?? now.getFullYear() - 5;
   const endYear = toYear ?? now.getFullYear() + 2;
+  const yearRange = yearBoundsToYmdRange(fromYear, toYear);
+  const nativeMin = min ?? yearRange.min;
+  const nativeMax = max ?? yearRange.max;
   const tomorrowYmd = ymdDaysFromToday(1, now);
   const inSevenYmd = ymdDaysFromToday(7, now);
 
@@ -94,7 +126,7 @@ export function DatePicker({
   }
 
   const selectedLabel = selected
-    ? format(selected, "d MMM yyyy", { locale: enGB })
+    ? selectedLabelOverride ?? format(selected, "d MMM yyyy", { locale: enGB })
     : null;
   const triggerName = ariaLabel
     ? selectedLabel
@@ -106,7 +138,7 @@ export function DatePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          id={id}
+          id={prefersNative === false ? id : undefined}
           type="button"
           variant={tone === "toolbar" ? "ghost" : "outline"}
           size={tone === "toolbar" ? "default" : size}
@@ -137,7 +169,7 @@ export function DatePicker({
                   )
             )}
           />
-          {selectedLabel ?? placeholder}
+          <span className="min-w-0 truncate">{selectedLabel ?? placeholder}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
@@ -186,9 +218,9 @@ export function DatePicker({
     </Popover>
   );
 
-  if (!allowClear || !selected) return picker;
-
-  return (
+  const custom = !allowClear || !selected ? (
+    picker
+  ) : (
     <div className="flex items-center gap-0.5">
       {picker}
       <Button
@@ -204,5 +236,69 @@ export function DatePicker({
         <X className="size-3" />
       </Button>
     </div>
+  );
+
+  const icon = (
+    <CalendarIcon
+      className={cn(
+        "shrink-0",
+        tone === "toolbar"
+          ? "size-3 text-current"
+          : cn("text-muted-foreground", size === "lg" ? "size-4" : "size-3.5")
+      )}
+    />
+  );
+
+  const native = (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <NativeTemporalField
+        type="date"
+        value={value}
+        onChange={onChange}
+        displayLabel={selectedLabel}
+        placeholder={placeholder}
+        icon={icon}
+        id={prefersNative !== false ? id : undefined}
+        disabled={disabled}
+        className={className}
+        min={nativeMin}
+        max={nativeMax}
+        allowClear={allowClear}
+        size={size}
+        tone={tone}
+        aria-label={ariaLabel}
+      />
+      {shortcuts === "ending" ? (
+        <div className={filterPillGroup}>
+          <FilterPill
+            compact
+            active={value === tomorrowYmd}
+            onClick={() => onChange(tomorrowYmd)}
+          >
+            Tomorrow
+          </FilterPill>
+          <FilterPill
+            compact
+            active={value === inSevenYmd}
+            onClick={() => onChange(inSevenYmd)}
+          >
+            7 days
+          </FilterPill>
+        </div>
+      ) : null}
+      {nativeHint ?? hint ? (
+        <p className="max-w-64 text-xs text-pretty text-muted-foreground">
+          {nativeHint ?? hint}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <AdaptiveTemporalPicker
+      prefersNative={prefersNative}
+      custom={custom}
+      native={native}
+    />
   );
 }

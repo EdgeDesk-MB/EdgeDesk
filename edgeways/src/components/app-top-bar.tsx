@@ -14,8 +14,9 @@ import { ChromeTab } from "@/components/chrome-tab";
 import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
 import { isNegativeGbp } from "@/lib/format-money";
 import { useFreeBets } from "@/components/accounts/free-bets-convert-dialog";
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useAppState } from "@/hooks/use-app-state";
+import { chromeFromState, readChromeSnapshot, type ChromeSnapshot } from "@/lib/chrome-snapshot";
 import { accountOwner } from "@/lib/accounts/owners";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -427,7 +428,12 @@ function MobileBalanceTab({
 function AppTopBarHeader() {
   const { state } = useAppState(5000);
   const { openFreeBets, openBalances } = useFreeBets();
-  const balances = state?.balances;
+  const [cachedChrome, setCachedChrome] = useState<ChromeSnapshot | null>(null);
+  useLayoutEffect(() => {
+    setCachedChrome(readChromeSnapshot());
+  }, []);
+  const chrome = state ? chromeFromState(state) : cachedChrome;
+  const balances = chrome?.balances;
   const exchange = balances?.exchanges ?? 0;
   const inBets = balances?.inBets ?? 0;
   const bankroll = balances?.bankroll ?? balances?.total ?? 0;
@@ -442,7 +448,7 @@ function AppTopBarHeader() {
       .map(([owner, balance]) => ({ owner, balance }))
       .sort((a, b) => (a.owner === "me" ? -1 : b.owner === "me" ? 1 : a.owner.localeCompare(b.owner)));
   }, [balances?.accounts]);
-  const profit = (state?.settledProfit ?? 0) + (state?.provisionalProfit ?? 0);
+  const profit = (chrome?.settledProfit ?? 0) + (chrome?.provisionalProfit ?? 0);
   const freeBetsTotal =
     balances?.accounts
       ?.filter((a) => a.type === "bookie")
@@ -467,51 +473,47 @@ function AppTopBarHeader() {
       </div>
 
       <div className="ml-auto flex w-max shrink-0 items-stretch justify-end gap-1 md:gap-1.5">
-        {state?.demoMode ? (
+        {chrome?.demoMode ? (
           <span className={cn(demoDataTag, "hidden self-center shrink-0 sm:inline-flex")}>
             Demo data
           </span>
         ) : null}
 
-        {state == null ? null : (
-          <>
-            <div className="hidden items-stretch overflow-visible pl-[var(--chrome-tab-r-hang)] sm:flex md:px-[var(--chrome-tab-r-hang)]">
-              <BalancePill>
-                <TopBarProfitStack
-                  profit={profit}
-                  freeBets={freeBetsTotal}
-                  onFreeBets={openFreeBets}
-                />
-                <TopBarBankrollStack
-                  exchange={exchange}
-                  inBets={inBets}
-                  total={bankroll}
-                  ownerLines={ownerBalances}
-                />
-              </BalancePill>
-            </div>
-            <div className="flex items-stretch overflow-visible pl-[var(--chrome-tab-r-hang)] sm:hidden">
-              <MobileBalanceTab
-                onOpen={() => openBalances("balances")}
-                ariaLabel={balancesSheetAriaLabel(
-                  profit,
-                  freeBetsTotal,
-                  exchange,
-                  inBets,
-                  bankroll
-                )}
-              >
-                <MobileStatStacks
-                  profit={profit}
-                  freeBets={freeBetsTotal}
-                  total={bankroll}
-                  exchange={exchange}
-                  inBets={inBets}
-                />
-              </MobileBalanceTab>
-            </div>
-          </>
-        )}
+        <div className="hidden items-stretch overflow-visible pl-[var(--chrome-tab-r-hang)] sm:flex md:px-[var(--chrome-tab-r-hang)]">
+          <BalancePill>
+            <TopBarProfitStack
+              profit={profit}
+              freeBets={freeBetsTotal}
+              onFreeBets={openFreeBets}
+            />
+            <TopBarBankrollStack
+              exchange={exchange}
+              inBets={inBets}
+              total={bankroll}
+              ownerLines={ownerBalances}
+            />
+          </BalancePill>
+        </div>
+        <div className="flex items-stretch overflow-visible pl-[var(--chrome-tab-r-hang)] sm:hidden">
+          <MobileBalanceTab
+            onOpen={() => openBalances("balances")}
+            ariaLabel={balancesSheetAriaLabel(
+              profit,
+              freeBetsTotal,
+              exchange,
+              inBets,
+              bankroll
+            )}
+          >
+            <MobileStatStacks
+              profit={profit}
+              freeBets={freeBetsTotal}
+              total={bankroll}
+              exchange={exchange}
+              inBets={inBets}
+            />
+          </MobileBalanceTab>
+        </div>
 
         <div className="ml-2 flex shrink-0 items-center md:hidden">
           <div className="mr-3 self-center">

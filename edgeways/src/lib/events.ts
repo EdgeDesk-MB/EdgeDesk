@@ -18,6 +18,71 @@ export function localCalendarDate(d = new Date(), timeZone = DEFAULT_DISPLAY_TIM
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/**
+ * Calendar days the day-card feeds actually serve: today and tomorrow (UK).
+ * Racing cards stop there. Football is fetched for the same window.
+ */
+export function feedHorizonDates(now = Date.now()): string[] {
+  return [
+    localCalendarDate(new Date(now)),
+    localCalendarDate(new Date(now + 86_400_000)),
+  ];
+}
+
+/** Last write wins when the same id appears on more than one day row. */
+export function mergeByExternalId<T extends { externalId: string }>(items: T[]): T[] {
+  const byId = new Map<string, T>();
+  for (const item of items) {
+    if (item.externalId) byId.set(item.externalId, item);
+  }
+  return [...byId.values()];
+}
+
+const CALENDAR_YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export function isCalendarYmd(value: string | null | undefined): value is string {
+  if (!value || !CALENDAR_YMD.test(value)) return false;
+  const [, year, month, day] = value.match(CALENDAR_YMD)!;
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+/** Shift a YYYY-MM-DD by whole calendar days (not a fixed 24h step). */
+export function shiftCalendarYmd(ymd: string, days: number): string {
+  if (!isCalendarYmd(ymd) || !Number.isFinite(days)) return ymd;
+  const [, year, month, day] = ymd.match(CALENDAR_YMD)!;
+  const dt = new Date(Number(year), Number(month) - 1, Number(day) + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+
+export function clampCalendarYmd(ymd: string, min: string, max: string): string {
+  if (!isCalendarYmd(ymd)) return min;
+  if (ymd < min) return min;
+  if (ymd > max) return max;
+  return ymd;
+}
+
+/** Days before today the fixture board can open (store retention window). */
+export const FIXTURE_LIST_LOOKBACK_DAYS = 6;
+
+export function fixtureListDayBounds(now = Date.now()): {
+  min: string;
+  max: string;
+  today: string;
+} {
+  const [today, tomorrow] = feedHorizonDates(now);
+  return {
+    min: shiftCalendarYmd(today!, -FIXTURE_LIST_LOOKBACK_DAYS),
+    max: tomorrow!,
+    today: today!,
+  };
+}
+
 /** UK calendar date + HH:MM → UTC epoch ms. */
 export function londonWallToUtcMs(date: string, time: string): number | null {
   const m = time.match(/^(\d{1,2}):(\d{2})/);

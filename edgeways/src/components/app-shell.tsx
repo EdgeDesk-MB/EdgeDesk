@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { isMetaPath } from "@/content/meta-nav";
 import {
+  appNavColumn,
   appShellGap,
   appShellMaxWidth,
   appShellPadding,
@@ -31,7 +32,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           appShellMaxWidth
         )}
       >
-        {meta ? null : <AppNav />}
+        {meta ? null : (
+          <aside
+            className={cn(
+              "sticky top-[var(--layout-page-x)] hidden h-fit shrink-0 flex-col self-start pt-4 md:flex",
+              appNavColumn
+            )}
+          >
+            <AppNav />
+          </aside>
+        )}
         <div className="flex min-w-0 flex-1 flex-col p-0 sm:p-1">
           <main
             className={cn(

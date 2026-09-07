@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { enGB as dayPickerEnGB } from "react-day-picker/locale";
@@ -20,7 +20,15 @@ import {
   parseYmdLocal,
   ymdDaysFromToday,
 } from "@/components/date-picker";
+import {
+  AdaptiveTemporalPicker,
+  NativeTemporalField,
+  nativeTemporalFocusWithin,
+  normalizeTemporalValue,
+  openNativePicker,
+} from "@/components/native-temporal-field";
 import { parseHm, TimeWheels } from "@/components/time-picker";
+import { usePrefersNativePicker } from "@/hooks/use-prefers-native-picker";
 import { formatClockTime } from "@/lib/time-format";
 import { cn } from "@/lib/utils";
 import { filterPillGroup } from "@/lib/ui/surface-styles";
@@ -65,7 +73,8 @@ function formatDatetimeLabel(value: string, emptyLabel: string): string {
 }
 
 /**
- * Combined date + time picker (Add bet calendar + iOS time wheels) in one popover.
+ * Combined date + time picker (calendar + iOS time wheels) in one popover
+ * on fine pointers. Coarse / narrow viewports use `datetime-local`.
  * Value is datetime-local `YYYY-MM-DDTHH:mm` or empty.
  */
 export function DateTimePicker({
@@ -98,8 +107,10 @@ export function DateTimePicker({
   defaultTime?: string;
   shortcuts?: "ending";
 }) {
+  const prefersNative = usePrefersNativePicker();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const nativeInputRef = useRef<HTMLInputElement>(null);
   const parts = splitDatetimeLocal(value);
   const parsedTime = parseHm(parts.time);
   const [draftDate, setDraftDate] = useState(parts.date);
@@ -125,7 +136,8 @@ export function DateTimePicker({
   const draftSelected = parseYmdLocal(draftDate);
   const set = Boolean(parseDatetimeLocal(value));
   const label = displayLabel ?? formatDatetimeLabel(value, vacantLabel);
-  const endOfDayActive = hour === "23" && minute === "59";
+  const draftEndOfDay = hour === "23" && minute === "59";
+  const committedEndOfDay = parts.time === "23:59";
   const now = new Date();
   const tomorrowYmd = ymdDaysFromToday(1, now);
   const inSevenYmd = ymdDaysFromToday(7, now);
@@ -230,7 +242,7 @@ export function DateTimePicker({
             <div className={cn(filterPillGroup, "justify-center border-t px-2 py-2")}>
               <FilterPill
                 compact
-                active={endOfDayActive}
+                active={draftEndOfDay}
                 onClick={handleEndOfDay}
               >
                 End of day
@@ -272,12 +284,79 @@ export function DateTimePicker({
     </PopoverContent>
   );
 
+  function applyNativeDate(ymd: string) {
+    const hm =
+      parseHm(parts.time) ??
+      parseHm(defaultTime?.trim() ?? "") ??
+      parseHm(nowHm())!;
+    onChange(joinDatetimeLocal(ymd, `${hm.hour}:${hm.minute}`));
+  }
+
+  function applyNativeEndOfDay() {
+    const date = parts.date || formatYmdLocal(new Date());
+    onChange(joinDatetimeLocal(date, "23:59"));
+  }
+
+  function openSeededNative() {
+    const input = nativeInputRef.current;
+    if (input && !input.value) {
+      const hm =
+        parseHm(defaultTime?.trim() ?? "") ?? parseHm(nowHm())!;
+      input.value = joinDatetimeLocal(
+        formatYmdLocal(new Date()),
+        `${hm.hour}:${hm.minute}`
+      );
+    }
+    openNativePicker(input);
+  }
+
+  const nativeEnding = shortcuts === "ending" ? (
+    <div className={filterPillGroup}>
+      <FilterPill
+        compact
+        active={parts.date === tomorrowYmd}
+        onClick={() => applyNativeDate(tomorrowYmd)}
+      >
+        Tomorrow
+      </FilterPill>
+      <FilterPill
+        compact
+        active={parts.date === inSevenYmd}
+        onClick={() => applyNativeDate(inSevenYmd)}
+      >
+        7 days
+      </FilterPill>
+      <FilterPill compact active={committedEndOfDay} onClick={applyNativeEndOfDay}>
+        End of day
+      </FilterPill>
+    </div>
+  ) : null;
+
+  const nativeOverlayInput = (
+    <input
+      ref={nativeInputRef}
+      id={prefersNative !== false ? id : undefined}
+      type="datetime-local"
+      value={value}
+      step={60}
+      disabled={disabled}
+      aria-label={emptyLabel ?? label}
+      onChange={(event) =>
+        onChange(normalizeTemporalValue("datetime-local", event.target.value))
+      }
+        className="absolute inset-0 z-10 cursor-pointer text-base opacity-[0.01] outline-none"
+    />
+  );
+
+  let custom: ReactNode;
+  let native: ReactNode;
+
   if (trigger === "link") {
-    return (
+    custom = (
       <Popover modal open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
-            id={id}
+            id={prefersNative === false ? id : undefined}
             type="button"
             variant="link"
             size="xs"
@@ -296,17 +375,40 @@ export function DateTimePicker({
         {panel}
       </Popover>
     );
-  }
-
-  if (trigger === "icon") {
-    return (
+    native = (
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className={cn("relative inline-flex rounded-[var(--radius-button)]", nativeTemporalFocusWithin)}>
+          <Button
+            type="button"
+            variant="link"
+            size="xs"
+            disabled={disabled}
+            aria-hidden
+            tabIndex={-1}
+            className={cn("h-auto min-h-6 justify-start px-0 underline", className)}
+            onClick={openSeededNative}
+          >
+            {set ? (
+              <CalendarCheck className="size-3 text-current" />
+            ) : (
+              <CalendarClock className="size-3 text-current" />
+            )}
+            {set ? label : placeholder}
+          </Button>
+          {nativeOverlayInput}
+        </span>
+        {nativeEnding}
+      </div>
+    );
+  } else if (trigger === "icon") {
+    custom = (
       <Popover modal open={open} onOpenChange={setOpen}>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <PopoverTrigger asChild>
                 <Button
-                  id={id}
+                  id={prefersNative === false ? id : undefined}
                   type="button"
                   variant="outline"
                   size="icon"
@@ -332,31 +434,91 @@ export function DateTimePicker({
         {panel}
       </Popover>
     );
+    native = (
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className={cn("relative inline-flex rounded-[var(--radius-button)]", nativeTemporalFocusWithin)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            aria-hidden
+            tabIndex={-1}
+            className={cn(
+              "size-9 shrink-0",
+              set && "border-primary/40 bg-primary/10 text-primary-text",
+              className
+            )}
+            onClick={openSeededNative}
+          >
+            {set ? (
+              <CalendarCheck className="size-4" />
+            ) : (
+              <CalendarClock className="size-4 text-muted-foreground" />
+            )}
+          </Button>
+          {nativeOverlayInput}
+        </span>
+        {nativeEnding}
+      </div>
+    );
+  } else {
+    custom = (
+      <Popover modal open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={prefersNative === false ? id : undefined}
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            data-empty={!set}
+            className={cn(
+              "w-full justify-start px-2.5 font-normal tabular-nums data-[empty=true]:text-muted-foreground",
+              className
+            )}
+          >
+            {set ? (
+              <CalendarCheck className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <CalendarClock className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            {set ? label : placeholder}
+          </Button>
+        </PopoverTrigger>
+        {panel}
+      </Popover>
+    );
+    native = (
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <NativeTemporalField
+          type="datetime-local"
+          value={value}
+          onChange={onChange}
+          displayLabel={set ? label : null}
+          placeholder={placeholder}
+          icon={
+            set ? (
+              <CalendarCheck className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <CalendarClock className="size-3.5 shrink-0 text-muted-foreground" />
+            )
+          }
+          id={prefersNative !== false ? id : undefined}
+          disabled={disabled}
+          className={className}
+          allowClear
+          aria-label={emptyLabel}
+        />
+        {nativeEnding}
+      </div>
+    );
   }
 
   return (
-    <Popover modal open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          id={id}
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          data-empty={!set}
-          className={cn(
-            "w-full justify-start px-2.5 font-normal tabular-nums data-[empty=true]:text-muted-foreground",
-            className
-          )}
-        >
-          {set ? (
-            <CalendarCheck className="size-3.5 shrink-0 text-muted-foreground" />
-          ) : (
-            <CalendarClock className="size-3.5 shrink-0 text-muted-foreground" />
-          )}
-          {set ? label : placeholder}
-        </Button>
-      </PopoverTrigger>
-      {panel}
-    </Popover>
+    <AdaptiveTemporalPicker
+      prefersNative={prefersNative}
+      custom={custom}
+      native={native}
+    />
   );
 }

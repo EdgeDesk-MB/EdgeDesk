@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   countLiveNavEvents,
   eventShowsScore,
+  clampCalendarYmd,
+  feedHorizonDates,
+  fixtureListDayBounds,
+  shiftCalendarYmd,
   footballClockLabel,
   formatEventStatus,
   formatRacingEventStatus,
   formatRacingOffTime,
+  mergeByExternalId,
   normaliseRacingApiOffTime,
 } from "./events";
 
@@ -193,5 +198,34 @@ describe("countLiveNavEvents", () => {
         NOW
       )
     ).toBe(1);
+  });
+});
+
+describe("feedHorizonDates", () => {
+  it("returns today and tomorrow in the UK calendar", () => {
+    expect(feedHorizonDates(NOW)).toEqual(["2026-08-01", "2026-08-02"]);
+  });
+
+  it("bounds the fixture day switcher from lookback through tomorrow", () => {
+    expect(fixtureListDayBounds(NOW)).toEqual({
+      min: "2026-07-26",
+      max: "2026-08-02",
+      today: "2026-08-01",
+    });
+    expect(shiftCalendarYmd("2026-08-01", 1)).toBe("2026-08-02");
+    expect(clampCalendarYmd("2026-08-09", "2026-07-26", "2026-08-02")).toBe("2026-08-02");
+  });
+
+  it("keeps the last write when the same id appears twice", () => {
+    expect(
+      mergeByExternalId([
+        { externalId: "a", n: 1 },
+        { externalId: "b", n: 2 },
+        { externalId: "a", n: 3 },
+      ])
+    ).toEqual([
+      { externalId: "a", n: 3 },
+      { externalId: "b", n: 2 },
+    ]);
   });
 });

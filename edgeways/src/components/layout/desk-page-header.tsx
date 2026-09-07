@@ -17,6 +17,8 @@ export function DeskPageHeader({
   meta = false,
   /** When false, header sits flush inside a parent PageShell surface */
   bordered = false,
+  /** Hairline under the title band. Off when tabs or a toolbar follow. */
+  rule = true,
 }: {
   title: string;
   description?: React.ReactNode;
@@ -29,10 +31,11 @@ export function DeskPageHeader({
   meta?: boolean;
   /** Standalone bordered shell (off when nested in PageShell surface) */
   bordered?: boolean;
+  rule?: boolean;
 }) {
   const band = (
     <>
-      <div className={cn(meta ? pageSectionMeta : pageSectionBar)}>
+      <div className={cn(meta ? pageSectionMeta : pageSectionBar, !rule && "border-b-0")}>
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 md:flex-1">
             <div className="flex min-w-0 items-start gap-2">
@@ -53,12 +56,12 @@ export function DeskPageHeader({
           )}
         </div>
       </div>
-      {toolbar}
+      {toolbar ? <div className={cn(!rule && "pt-4")}>{toolbar}</div> : null}
     </>
   );
 
   if (!bordered) {
-    return <div className={cn("shrink-0", className)}>{band}</div>;
+    return <div className={cn("relative z-10 shrink-0", className)}>{band}</div>;
   }
 
   return (

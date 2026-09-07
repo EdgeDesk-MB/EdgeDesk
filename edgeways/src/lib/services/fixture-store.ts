@@ -21,7 +21,12 @@ import "server-only";
 import { eq, lt } from "drizzle-orm";
 import { db, fixtureCache } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
-import { effectiveEventStatus, localCalendarDate } from "@/lib/events";
+import {
+  effectiveEventStatus,
+  feedHorizonDates,
+  localCalendarDate,
+  mergeByExternalId,
+} from "@/lib/events";
 import {
   fixturesByDate,
   hasApiKey,
@@ -145,6 +150,32 @@ export async function getFixturesForDate(date: string): Promise<StoredFixtures> 
   await writeFixtureStore(date, fixtures, now).catch(() => {});
   await pruneFixtureStore(now).catch(() => {});
   return { fixtures, fetchedAt: now };
+}
+
+/**
+ * Today and tomorrow from the store. One cold miss must not blank the other
+ * day. Throws only when every date fails with no payload.
+ */
+export async function getFixturesForHorizon(now = Date.now()): Promise<{
+  fixtures: Fixture[];
+  dates: string[];
+  fetchedAt: number;
+}> {
+  const dates = feedHorizonDates(now);
+  const settled = await Promise.allSettled(dates.map((date) => getFixturesForDate(date)));
+  const fixtures: Fixture[] = [];
+  let fetchedAt = 0;
+  let firstError: unknown;
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      fixtures.push(...result.value.fixtures);
+      fetchedAt = Math.max(fetchedAt, result.value.fetchedAt);
+    } else if (firstError === undefined) {
+      firstError = result.reason;
+    }
+  }
+  if (fixtures.length === 0 && firstError !== undefined) throw firstError;
+  return { fixtures: mergeByExternalId(fixtures), dates, fetchedAt };
 }
 
 export const FIXTURE_STORE_KEEP_DAYS = 7;

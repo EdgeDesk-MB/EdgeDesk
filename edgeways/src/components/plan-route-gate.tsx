@@ -1,12 +1,17 @@
 "use client";
 
+import { useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { EmptyState } from "@/components/help/empty-state";
 import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { PageLoading } from "@/components/page-loading";
 import { useAppState } from "@/hooks/use-app-state";
 import { featureForDeskPath } from "@/lib/entitlements/nav";
-import { canDesk } from "@/lib/entitlements/effective-plan";
-import { requiredPlan } from "@/lib/entitlements/plans";
+import { planGatePhase } from "@/lib/entitlements/plan-route-gate";
+import {
+  readChromeSnapshot,
+  type ChromeSnapshot,
+} from "@/lib/chrome-snapshot";
 import { PageShell } from "@/components/page-shell";
 
 /**
@@ -15,19 +20,42 @@ import { PageShell } from "@/components/page-shell";
  * signed-out sessions keep the legacy preview behaviour.
  *
  * Nav lets the user open the page. This plate is the lock, not a toast.
+ * Chrome settings unlock the first paint so Offers is not stuck on
+ * "Checking your plan" while /api/state is still in flight.
  */
 export function PlanRouteGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { state } = useAppState();
+  const { state, error, refresh } = useAppState();
+  const [cachedChrome, setCachedChrome] = useState<ChromeSnapshot | null>(null);
+  useLayoutEffect(() => {
+    setCachedChrome(readChromeSnapshot());
+  }, []);
   const feature = featureForDeskPath(pathname);
-  if (!feature || requiredPlan(feature) === "free") return children;
-  if (state == null) {
-    return <PageLoading label="Loading …" description="Checking your plan." />;
+  const settings = state?.settings ?? cachedChrome?.settings;
+  const phase = planGatePhase({
+    pathname,
+    settings,
+    hasState: state != null,
+    error,
+  });
+  if (phase === "pass") return children;
+  if (phase === "lock" && feature) {
+    return (
+      <PageShell>
+        <PlanLockEmpty feature={feature} className="flex-1" />
+      </PageShell>
+    );
   }
-  if (canDesk(state.settings, feature)) return children;
-  return (
-    <PageShell>
-      <PlanLockEmpty feature={feature} className="flex-1" />
-    </PageShell>
-  );
+  if (phase === "error") {
+    return (
+      <PageShell>
+        <EmptyState
+          title="Could not load this page"
+          description="Check the connection, then try again."
+          action={{ label: "Try again", onClick: () => void refresh() }}
+        />
+      </PageShell>
+    );
+  }
+  return <PageLoading label="Loading …" description="Checking your plan." />;
 }

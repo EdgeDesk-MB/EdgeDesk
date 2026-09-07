@@ -27,11 +27,12 @@ import {
 } from "@/lib/offers/offer-categories";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { filterPillCountState, toolbarSelectTrigger } from "@/lib/ui/surface-styles";
+import { EmptyState } from "@/components/help/empty-state";
 import { PageLoading } from "@/components/page-loading";
 import { CalendarDays, Plus } from "lucide-react";
 
 export default function OfferCalendarPage() {
-  const { state } = useAppState(4000);
+  const { state, error, refresh } = useAppState(4000);
   const { openOffer, viewOffer } = useOfferDialog();
   const [availableOnly, setAvailableOnly] = useState(false);
   const [category, setCategory] = useState<OfferCategoryId | "all">("all");
@@ -68,6 +69,15 @@ export default function OfferCalendarPage() {
   }, [bookieScoped, effectiveCategory]);
 
   if (state == null) {
+    if (error) {
+      return (
+        <EmptyState
+          title="Could not load the offer calendar"
+          description="Check the connection, then try again."
+          action={{ label: "Try again", onClick: () => void refresh() }}
+        />
+      );
+    }
     return <PageLoading label="Loading offer calendar" />;
   }
 

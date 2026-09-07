@@ -38,12 +38,12 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
   },
   fixtures: {
     title: "Fixtures",
-    summary: "Browse today, then track what you care about.",
+    summary: "Pick a sport and a day, then pin what you follow.",
     bullets: [
-      "Hit + on any row to add it to Tracked Events.",
+      "Tap + on any row to add it to Tracked Events.",
+      "Filter finds any competition. Pin one to keep a right rail of shortcuts.",
       "Football stays on this page on every plan. Live UK and Irish racecards are on Edge.",
-      "Football: live scores update about once a minute on a tracked match.",
-      "Racing feed: today and tomorrow racecards with proxy bookie odds.",
+      "All / Live / Scheduled sit with the day switcher above the list. Competitions follow first kick-off, with common UK and European leagues first.",
     ],
     guideSlug: "getting-started",
   },
@@ -157,7 +157,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     bullets: [
       "Events are grouped by kick-off day, same Today / Yesterday split as Campaigns.",
       "All, Today, Upcoming, Past, or Jump to day to open a past date.",
-      "Add a match or race from Fixtures with +, or add one manually.",
+      "Add fixture opens the same browse list as + in the side nav. Tap + on a match or race.",
       "Goal timelines fetch only when you have an open trigger bet on the match.",
       "Racing results usually land automatically while the desk is open; if not, use Set winner.",
       "Finished events stay here until you remove them.",

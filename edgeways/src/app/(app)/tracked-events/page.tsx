@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,20 +16,19 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { EventRowView } from "@/components/events/event-row-view";
-import { ManualEventDialog } from "@/components/events/manual-event-dialog";
 import { RacingSettlePrompt } from "@/components/racing/racing-settle-prompt";
+import { useTrackFixture } from "@/components/track-fixture-provider";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
 import { PageLoading } from "@/components/page-loading";
-import { PageShell } from "@/components/page-shell";
+import { PageFillScroll, PageFillShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import { EmptyState } from "@/components/help/empty-state";
 import { DatePicker, formatYmdLocal, parseYmdLocal } from "@/components/date-picker";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { ListDaySection } from "@/components/layout/list-day-section";
-import { PageHeaderButtonGroup, pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
+import { PageHeaderButtonGroup, pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { eventToPendingSettle, isEventPendingSettle } from "@/lib/racing/pending-settle";
-import { racingSyncToast } from "@/lib/racing/sync-toast";
 import {
   eventListDayBounds,
   eventListGroupDayMs,
@@ -41,14 +40,14 @@ import { filterPillCountState } from "@/lib/ui/surface-styles";
 import { formatPillLabel } from "@/lib/ui/status-badges";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import type { PromoAwardsByBetId } from "@/lib/bet-outcomes";
-import { RefreshCw, Radio } from "lucide-react";
+import { Radio } from "lucide-react";
 
 const DAY_FILTERS: EventListDayFilter[] = ["all", "today", "upcoming", "past"];
 
 export default function TrackedEventsPage() {
   const { state, refresh } = useAppState(2000);
+  const { openTrackFixture } = useTrackFixture();
   const now = useNow(60_000);
-  const [syncingRacing, setSyncingRacing] = useState(false);
   const [dayFilter, setDayFilter] = useState<EventListDayFilter>("all");
   const [jumpDay, setJumpDay] = useState("");
   const [settleEventId, setSettleEventId] = useState<number | null>(null);
@@ -65,14 +64,6 @@ export default function TrackedEventsPage() {
 
   const pendingRacingEvents = useMemo(
     () => myEvents.filter(isEventPendingSettle),
-    [myEvents]
-  );
-
-  const hasFetchableRacing = useMemo(
-    () =>
-      myEvents.some(
-        (e) => e.sport === "horse_racing" && !!e.externalId?.trim()
-      ),
     [myEvents]
   );
 
@@ -125,32 +116,6 @@ export default function TrackedEventsPage() {
     return { fromYear: Math.min(...years), toYear: Math.max(...years) };
   }, [eventDayYmds, now]);
 
-  const syncRacingResults = useCallback(async () => {
-    setSyncingRacing(true);
-    try {
-      const result = await api<{
-        updated: number;
-        pending: number;
-        tierBlocked?: boolean;
-        historicBlocked?: boolean;
-        tier?: "basic" | "free" | "none";
-      }>("/api/racing/sync-results?force=1", {
-        method: "POST",
-      });
-      await refresh();
-      const msg = racingSyncToast(result);
-      if (msg.kind === "success") {
-        toast.success(msg.title, msg.description ? { description: msg.description } : undefined);
-      } else {
-        toast.info(msg.title, msg.description ? { description: msg.description } : undefined);
-      }
-    } catch (e) {
-      toast.error("Racing sync failed", { description: String(e) });
-    } finally {
-      setSyncingRacing(false);
-    }
-  }, [refresh]);
-
   async function patchEvent(id: number, json: Record<string, unknown>) {
     try {
       await api(`/api/events/${id}`, { method: "PATCH", json });
@@ -197,10 +162,12 @@ export default function TrackedEventsPage() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <PageShell>
+    <PageFillShell>
       <PageHeader
         helpId="tracked-events"
         title="Tracked Events"
+        rule={false}
+        toolbarRule={false}
         description={
           <>
             Matches and races you are following, with more on{" "}
@@ -212,19 +179,9 @@ export default function TrackedEventsPage() {
         }
         action={
           <PageHeaderButtonGroup>
-            {hasFetchableRacing && (
-              <Button
-                variant="outline"
-                {...pageSecondaryButtonProps}
-                disabled={syncingRacing}
-                onClick={syncRacingResults}
-                className="gap-1.5"
-              >
-                <RefreshCw className={syncingRacing ? "size-3.5 animate-spin" : "size-3.5"} />
-                Sync racing results
-              </Button>
-            )}
-            <ManualEventDialog onSaved={refresh} />
+            <Button {...pagePrimaryButtonProps} onClick={openTrackFixture}>
+              Add fixture
+            </Button>
           </PageHeaderButtonGroup>
         }
         toolbar={
@@ -264,6 +221,7 @@ export default function TrackedEventsPage() {
                 allowClear
                 aria-label="Jump to day"
                 hint="Only days with tracked events can be picked."
+                nativeHint="Days without tracked events show an empty list."
                 fromYear={pickerYearRange.fromYear}
                 toYear={pickerYearRange.toYear}
                 isDayDisabled={(date) => !eventDayYmds.has(formatYmdLocal(date))}
@@ -273,6 +231,7 @@ export default function TrackedEventsPage() {
         }
       />
 
+      <PageFillScroll>
       {pendingSettleRaces.length > 0 && (
         <RacingSettlePrompt
           races={pendingSettleRaces}
@@ -282,13 +241,13 @@ export default function TrackedEventsPage() {
         />
       )}
 
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 pt-4">
         {myEvents.length === 0 ? (
           <EmptyState
             icon={Radio}
             title="Nothing tracked yet"
-            description="Browse fixtures and hit + on a match or race, or add one manually."
-            action={{ label: "Browse fixtures", href: "/fixtures" }}
+            description="Use Add fixture, then + on a match or race."
+            action={{ label: "Add fixture", onClick: openTrackFixture }}
             secondaryAction={{ label: "Getting started", href: "/help?guide=getting-started" }}
           />
         ) : filteredEmpty ? (
@@ -335,7 +294,8 @@ export default function TrackedEventsPage() {
           })
         )}
       </div>
-    </PageShell>
+      </PageFillScroll>
+    </PageFillShell>
     </TooltipProvider>
   );
 }

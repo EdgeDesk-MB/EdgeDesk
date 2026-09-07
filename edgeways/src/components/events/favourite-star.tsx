@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/tooltip";
 import { favouriteStarIcon } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { Star } from "lucide-react";
+import { Pin } from "lucide-react";
 
 export function FavouriteStar({
   favourite,
@@ -21,7 +21,7 @@ export function FavouriteStar({
   onToggle: () => void;
   size?: "header" | "menu";
 }) {
-  const action = favourite ? `Remove ${label} from saved` : `Add ${label} to saved`;
+  const action = favourite ? `Unpin ${label}` : `Pin ${label}`;
 
   return (
     <Tooltip>
@@ -45,11 +45,11 @@ export function FavouriteStar({
             "shrink-0 text-muted-foreground hover:bg-transparent hover:text-primary-text",
             size === "menu"
               ? "size-7 max-sm:size-7"
-              : "size-8 max-sm:size-8",
+              : "h-8 w-4 max-sm:h-8 max-sm:w-4 justify-start px-0",
             favourite && "text-brand hover:text-brand"
           )}
         >
-          <Star aria-hidden className={favouriteStarIcon(favourite)} />
+          <Pin aria-hidden className={favouriteStarIcon(favourite)} />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="top" align="center" sideOffset={6}>

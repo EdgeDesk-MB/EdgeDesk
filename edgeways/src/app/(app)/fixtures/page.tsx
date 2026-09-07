@@ -6,13 +6,17 @@ import { FixtureBrowser } from "@/components/events/fixture-browser";
 
 export default function FixturesPage() {
   return (
-    <PageShell>
-      <PageHeader
-        helpId="fixtures"
-        title="Fixtures"
-        description="Today's football and racing, with + on a row to track."
+    <PageShell fullHeight className="p-[var(--layout-page-x)]">
+      <FixtureBrowser
+        header={
+          <PageHeader
+            helpId="fixtures"
+            title="Fixtures"
+            description="Pick a sport and a day, then pin what you follow."
+            rule={false}
+          />
+        }
       />
-      <FixtureBrowser />
     </PageShell>
   );
 }

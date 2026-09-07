@@ -1,5 +1,7 @@
+import { format } from "date-fns";
+import { enGB } from "date-fns/locale";
 import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
-import { localCalendarDate } from "@/lib/events";
+import { localCalendarDate, shiftCalendarYmd } from "@/lib/events";
 import { formatOfferListGroupLabel } from "@/lib/offers/offer-list-groups";
 
 export type FixtureDayGroup<T> = {
@@ -27,6 +29,34 @@ export function formatFixtureListDayLabel(
   if (ymd === shiftYmd(today, -1)) return "Yesterday";
   const [year, month, day] = ymd.split("-").map(Number);
   return formatOfferListGroupLabel(new Date(year, month - 1, day).getTime(), now);
+}
+
+/** Compact label for the fixture day stepper (fits the shared DatePicker width). */
+export function formatFixtureStepperLabel(
+  ymd: string,
+  now = Date.now(),
+  timeZone = DEFAULT_DISPLAY_TIMEZONE
+): string {
+  const named = formatFixtureListDayLabel(ymd, now, timeZone);
+  if (named === "Today" || named === "Tomorrow" || named === "Yesterday") return named;
+  const [year, month, day] = ymd.split("-").map(Number);
+  const sameYear = localCalendarDate(new Date(now), timeZone).startsWith(`${year}-`);
+  return format(
+    new Date(year, month - 1, day),
+    sameYear ? "d MMM" : "d MMM yyyy",
+    { locale: enGB }
+  );
+}
+
+/** Neighbour days the fixture stepper can open, for prefetch. */
+export function adjacentFixtureDays(
+  ymd: string,
+  min: string,
+  max: string
+): string[] {
+  return [-1, 1]
+    .map((delta) => shiftCalendarYmd(ymd, delta))
+    .filter((day) => day >= min && day <= max && day !== ymd);
 }
 
 export function groupByDisplayDay<T extends { startTime: number }>(

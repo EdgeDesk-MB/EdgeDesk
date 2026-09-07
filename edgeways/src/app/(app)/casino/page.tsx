@@ -33,7 +33,7 @@ import {
   pageSecondaryButtonProps,
 } from "@/components/layout/page-header-actions";
 import { ListDaySection } from "@/components/layout/list-day-section";
-import { PageShell } from "@/components/page-shell";
+import { PageFillScroll, PageFillShell } from "@/components/page-shell";
 import { apiGet } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
 import {
@@ -113,9 +113,11 @@ export default function CasinoPage() {
   }
 
   return (
-    <PageShell className="gap-5">
+    <PageFillShell>
       <PageHeader
         title="Casino Campaigns"
+        rule={false}
+        toolbarRule={false}
         description="Wagering offers and expected value."
         helpId="casino"
         icon={Dices}
@@ -163,7 +165,8 @@ export default function CasinoPage() {
         }
       />
 
-      <div className="flex flex-col gap-8 px-[var(--layout-page-x)] pb-[var(--layout-page-x)] sm:px-0 sm:pb-0">
+      <PageFillScroll>
+      <div className="flex flex-col gap-8">
         {offers.length === 0 ? (
           <EmptyState
             icon={Dices}
@@ -210,6 +213,7 @@ export default function CasinoPage() {
           ))
         )}
       </div>
-    </PageShell>
+      </PageFillScroll>
+    </PageFillShell>
   );
 }

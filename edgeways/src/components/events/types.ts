@@ -18,6 +18,13 @@ export interface Fixture {
   leagueFlag?: string | null;
 }
 
+/** Current-season competition from the feed catalog (may have no fixtures today). */
+export interface FootballCompetition {
+  name: string;
+  country?: string | null;
+  flag?: string | null;
+}
+
 export interface RacingFixture {
   externalId: string;
   sport: "horse_racing";
@@ -30,6 +37,19 @@ export interface RacingFixture {
   offTime: string;
   runners: string[];
   winner?: string;
+  /** Finishing order from the shared results store, when the race is official. */
+  result?: {
+    winner: string;
+    runners: Array<{
+      horse: string;
+      position: number;
+      spDecimal?: number;
+      spLabel?: string;
+      isSpFavourite?: boolean;
+      btn?: string;
+      ovrBtn?: string;
+    }>;
+  };
   /** The Racing API region: GB / IRE */
   region?: string;
   /** Present on racecard API payloads; used to order Add bet Selection by odds. */

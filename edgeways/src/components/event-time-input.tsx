@@ -2,7 +2,7 @@
 
 import { TimePicker } from "@/components/time-picker";
 
-/** Event time field — shared TimePicker (same chrome as DatePicker). */
+/** Event time field — shared TimePicker (wheels on desktop, OS picker on mobile). */
 export function EventTimeInput({
   value,
   onChange,

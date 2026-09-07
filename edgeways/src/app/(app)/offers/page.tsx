@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNow } from "@/hooks/use-now";
 import { Button } from "@/components/ui/button";
-import { PageShell } from "@/components/page-shell";
+import { PageFillScroll, PageFillShell } from "@/components/page-shell";
 import { PageHeader } from "@/components/help/page-header";
 import {
   PageHeaderActions,
@@ -62,7 +62,7 @@ function OffersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightParam = searchParams.get("highlight");
-  const { state, refresh } = useAppState(4000);
+  const { state, error, refresh } = useAppState(4000);
   const { openOffer, viewOffer } = useOfferDialog();
   const offers = useMemo(() => state?.offers ?? [], [state]);
   const [filter, setFilter] = useState<
@@ -198,13 +198,24 @@ function OffersContent() {
   }, [offers, highlightId]);
 
   if (state == null) {
+    if (error) {
+      return (
+        <EmptyState
+          title="Could not load campaigns"
+          description="Check the connection, then try again."
+          action={{ label: "Try again", onClick: () => void refresh() }}
+        />
+      );
+    }
     return <PageLoading label="Loading campaigns" />;
   }
 
   return (
-    <PageShell>
+    <PageFillShell>
       <PageHeader
         helpId="offers"
+        rule={false}
+        toolbarRule={false}
         icon={Tag}
         title="Campaigns"
         description="Offers, next actions and pipeline."
@@ -294,6 +305,7 @@ function OffersContent() {
         }
       />
 
+      <PageFillScroll>
       <div className="flex flex-col gap-8">
         {filtered.length === 0 && (
           <EmptyState
@@ -346,6 +358,7 @@ function OffersContent() {
           </ListDaySection>
         ))}
       </div>
-    </PageShell>
+      </PageFillScroll>
+    </PageFillShell>
   );
 }

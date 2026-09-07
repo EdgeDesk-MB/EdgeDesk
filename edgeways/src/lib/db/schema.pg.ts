@@ -807,6 +807,15 @@ export const fixtureCache = pgTable("fixture_cache", {
 });
 
 /**
+ * Current-season football competitions. Global feed data, no clerk scoping.
+ */
+export const footballCompetitionCatalog = pgTable("football_competition_catalog", {
+  id: text("id").primaryKey(),
+  payload: text("payload").notNull(),
+  fetchedAt: epochMs("fetched_at").notNull(),
+});
+
+/**
  * Manual odds pasted over proxy/API prices on Racing Desk.
  * Free-tier workaround for live bookie odds without Racing API Standard.
  */

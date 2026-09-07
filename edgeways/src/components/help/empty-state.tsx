@@ -7,6 +7,33 @@ import { pagePrimaryButtonProps, pageSecondaryButtonProps } from "@/components/l
 import { Card, CardContent } from "@/components/ui/card";
 import { emptyStateCopyInset, emptyStateIconWell, emptyStatePlate } from "@/lib/ui/surface-styles";
 
+type EmptyStateAction = {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  /** Default primary (brand). Scoped fixture empties use secondary. */
+  variant?: "primary" | "secondary";
+};
+
+function EmptyStateButton({ action }: { action: EmptyStateAction }) {
+  const face =
+    action.variant === "secondary"
+      ? { ...pageSecondaryButtonProps, variant: "secondary" as const }
+      : pagePrimaryButtonProps;
+  if (action.href) {
+    return (
+      <Button asChild {...face}>
+        <Link href={action.href}>{action.label}</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button {...face} onClick={action.onClick}>
+      {action.label}
+    </Button>
+  );
+}
+
 export function EmptyState({
   icon: Icon,
   title,
@@ -18,12 +45,13 @@ export function EmptyState({
   oneLine,
   busy,
   bare,
+  headingLevel,
 }: {
   icon?: LucideIcon | ComponentType<{ className?: string }>;
   title: string;
   description: React.ReactNode;
-  action?: { label: string; href?: string; onClick?: () => void };
-  secondaryAction?: { label: string; href: string };
+  action?: EmptyStateAction;
+  secondaryAction?: EmptyStateAction;
   className?: string;
   compact?: boolean;
   /** Modal empty states: keep the description to a short wrap. Extra help belongs on DialogExplainer. */
@@ -32,9 +60,15 @@ export function EmptyState({
   busy?: boolean;
   /** In-feed empties: icon + copy on the page, no plate or radius. */
   bare?: boolean;
+  /** Compact defaults to h3. Nested under an h3, pass 4. */
+  headingLevel?: 2 | 3 | 4;
 }) {
   const WellIcon = busy ? Loader2 : Icon;
-  const TitleTag = compact ? "h3" : "h2";
+  const TitleTag = headingLevel
+    ? (`h${headingLevel}` as "h2" | "h3" | "h4")
+    : compact
+      ? "h3"
+      : "h2";
   const statusProps = {
     role: busy ? ("status" as const) : undefined,
     "aria-live": busy ? ("polite" as const) : undefined,
@@ -61,21 +95,8 @@ export function EmptyState({
       </div>
       {(action || secondaryAction) && (
         <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-          {action &&
-            (action.href ? (
-              <Button asChild {...pagePrimaryButtonProps}>
-                <Link href={action.href}>{action.label}</Link>
-              </Button>
-            ) : (
-              <Button {...pagePrimaryButtonProps} onClick={action.onClick}>
-                {action.label}
-              </Button>
-            ))}
-          {secondaryAction && (
-            <Button variant="outline" {...pageSecondaryButtonProps} asChild>
-              <Link href={secondaryAction.href}>{secondaryAction.label}</Link>
-            </Button>
-          )}
+          {action ? <EmptyStateButton action={action} /> : null}
+          {secondaryAction ? <EmptyStateButton action={secondaryAction} /> : null}
         </div>
       )}
     </>

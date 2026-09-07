@@ -11,6 +11,9 @@ describe("competitionFlagIso", () => {
 
   it("keeps other countries and global comps", () => {
     expect(competitionFlagIso("La Liga", "Spain")).toBe("ES");
+    expect(competitionFlagIso("Liga MX", "Mexico")).toBe("MX");
+    expect(competitionFlagIso("Primera División", "Bolivia")).toBe("BO");
     expect(competitionFlagIso("FIFA World Cup", "World")).toBeNull();
+    expect(competitionFlagIso("Second League - Group 2", "Russia")).toBe("RU");
   });
 });

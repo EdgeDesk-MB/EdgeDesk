@@ -4,7 +4,7 @@ import * as React from "react"
 import { Select as SelectPrimitive } from "radix-ui"
 
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges"
-import { fieldControl } from "@/lib/ui/surface-styles"
+import { fieldControl, overlayMenuHover } from "@/lib/ui/surface-styles"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon } from "lucide-react"
 
@@ -147,7 +147,8 @@ function SelectItem({
       data-slot="select-item"
       className={cn(
         // ItemText strips className/style in Radix — stretch it from the Item instead.
-        "relative flex w-full cursor-default items-center gap-1.5 whitespace-nowrap rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_[data-slot=select-item-text]]:flex [&_[data-slot=select-item-text]]:min-w-0 [&_[data-slot=select-item-text]]:w-full [&_[data-slot=select-item-text]]:flex-1 [&_[data-slot=select-item-text]]:items-center [&_[data-slot=select-item-text]]:gap-2 has-[[data-slot=select-item-row]]:min-w-0 has-[[data-slot=select-item-row]]:overflow-hidden has-[[data-slot=select-item-row]]:pr-1.5 has-[[data-slot=select-item-row]]:[&_[data-slot=select-item-text]]:block has-[[data-slot=select-item-row]]:[&_[data-slot=select-item-text]]:overflow-hidden has-[[data-slot=select-item-row]]:[&_[data-slot=select-item-indicator]]:hidden has-[[data-slot=select-item-row]]:data-[state=checked]:bg-accent",
+        overlayMenuHover,
+        "relative flex w-full cursor-default items-center gap-1.5 whitespace-nowrap rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_[data-slot=select-item-text]]:flex [&_[data-slot=select-item-text]]:min-w-0 [&_[data-slot=select-item-text]]:w-full [&_[data-slot=select-item-text]]:flex-1 [&_[data-slot=select-item-text]]:items-center [&_[data-slot=select-item-text]]:gap-2 has-[[data-slot=select-item-row]]:min-w-0 has-[[data-slot=select-item-row]]:overflow-hidden has-[[data-slot=select-item-row]]:pr-1.5 has-[[data-slot=select-item-row]]:[&_[data-slot=select-item-text]]:block has-[[data-slot=select-item-row]]:[&_[data-slot=select-item-text]]:overflow-hidden has-[[data-slot=select-item-row]]:[&_[data-slot=select-item-indicator]]:hidden has-[[data-slot=select-item-row]]:data-[state=checked]:bg-accent has-[[data-slot=select-item-row]]:data-[state=checked]:focus:bg-accent",
         className
       )}
       {...props}
