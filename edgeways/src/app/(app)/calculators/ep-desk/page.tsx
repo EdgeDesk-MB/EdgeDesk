@@ -1306,7 +1306,7 @@ function DutchTab({
   onTrack: (homeT: EpThreshold, awayT: EpThreshold) => void;
   exchangeName?: string;
 }) {
-  const cards: Array<{
+  const allCards: Array<{
     key: string;
     homeT: EpThreshold;
     awayT: EpThreshold;
@@ -1346,7 +1346,10 @@ function DutchTab({
       d: R.dutch1,
       highlight: R.structures[0]?.kind === "dutch_1_1",
     },
-  ].filter((card) => s.include1Up || (card.homeT === 2 && card.awayT === 2));
+  ];
+  const cards = allCards.filter(
+    (card) => s.include1Up || (card.homeT === 2 && card.awayT === 2)
+  );
 
   return (
     <div className="flex flex-col gap-3">
