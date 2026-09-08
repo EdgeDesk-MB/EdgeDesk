@@ -1498,7 +1498,7 @@ export function AddBetDialog({
       return;
     }
     const ext = liveViewExternalId(prefill);
-    if (!ext || editBet) return;
+    if (!prefill || !ext || editBet) return;
     if (racePrefillKeyRef.current === ext) return;
 
     const restoreSelection = () => {
