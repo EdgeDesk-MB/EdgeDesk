@@ -57,7 +57,6 @@ import { formatClockTime } from "@/lib/time-format";
 import {
   FIXTURE_TAPE_GUTTER_PX,
   fixtureTapeClockMin,
-  fixtureTapeRacingClockMin,
   fixtureTapeMatchGrid,
   fixtureTapeRow,
   fixtureTapeRowGrid,
@@ -300,11 +299,11 @@ function FixtureActions({
   );
 }
 
-function tapeClockClass(live: boolean, align: "end" | "center" = "end") {
+function tapeClockClass(live: boolean, align: "end" | "start" = "end") {
   return cn(
     "flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums leading-none",
-    align === "center"
-      ? cn("w-full justify-center text-center", fixtureTapeRacingClockMin)
+    align === "start"
+      ? cn("justify-start text-left", fixtureTapeClockMin)
       : cn("justify-end text-right", fixtureTapeClockMin),
     live ? "text-profit" : "text-muted-foreground"
   );
@@ -447,7 +446,7 @@ function RacingTapeRow({
       }}
     >
       <div className={fixtureTapeRowGrid}>
-        <span className={tapeClockClass(live, "center")}>
+        <span className={tapeClockClass(live, "start")}>
           {live ? (
             <Radio
               className="size-3 animate-pulse motion-reduce:animate-none"
@@ -928,9 +927,11 @@ export function DeskFixtureBoard({
   trackedExternalIds,
   onTrackFixture,
   onTrackAndBetFixture,
+  onAddBetFixture,
   onEpDesk,
   onTrackRace,
   onTrackAndBetRace,
+  onAddBetRace,
   emptyTitle,
   emptyDescription,
   loading = false,
@@ -950,9 +951,11 @@ export function DeskFixtureBoard({
   trackedExternalIds: Set<string>;
   onTrackFixture: (fixture: Fixture) => void;
   onTrackAndBetFixture: (fixture: Fixture) => void;
+  onAddBetFixture: (fixture: Fixture) => void;
   onEpDesk: (fixture: Fixture) => void;
   onTrackRace: (race: RacingFixture) => void;
   onTrackAndBetRace: (race: RacingFixture) => void;
+  onAddBetRace: (race: RacingFixture) => void;
   emptyTitle: string;
   emptyDescription: string;
   loading?: boolean;
@@ -1499,7 +1502,7 @@ export function DeskFixtureBoard({
               (row) => row.externalId === tapeEvent.externalId
             );
             setTapeEvent(null);
-            if (fixture) onTrackAndBetFixture(fixture);
+            if (fixture) onAddBetFixture(fixture);
           }}
           onEpDesk={() => {
             const fixture = football.find(
@@ -1530,7 +1533,7 @@ export function DeskFixtureBoard({
             const race =
               racing.find((row) => row.externalId === tapeRace.externalId) ?? tapeRace;
             setTapeRace(null);
-            onTrackAndBetRace(race);
+            onAddBetRace(race);
           }}
           onOpenChange={(open) => {
             if (!open) setTapeRace(null);

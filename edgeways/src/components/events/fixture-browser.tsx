@@ -21,8 +21,13 @@ import { epDeskFixtureHref } from "@/lib/calc/ep/fixture-query";
 import {
   clampCalendarYmd,
   fixtureListDayBounds,
+  formatRacingEventTitle,
   sortFixturesByKickoff,
 } from "@/lib/events";
+import {
+  liveViewFootballAddBetPrefill,
+  liveViewRacingAddBetPrefill,
+} from "@/lib/events/live-view-add-bet";
 import {
   adjacentFixtureDays,
   formatFixtureStepperLabel,
@@ -388,8 +393,18 @@ export function FixtureBrowserContent({
     });
   }
 
+  function addBetFromLiveFixture(fixture: Fixture) {
+    const tracked = myEvents.find((e) => e.externalId === fixture.externalId);
+    if (variant === "dialog") closeTrackFixture();
+    openAddBet(liveViewFootballAddBetPrefill(fixture, tracked?.id));
+  }
+
   async function trackRace(race: RacingFixture): Promise<EventRow | null> {
-    const label = `${race.course} · ${race.offTime || race.raceName}`;
+    const label = formatRacingEventTitle({
+      competition: race.course,
+      startTime: race.startTime,
+      awayTeam: race.offTime,
+    });
     if (trackedExternalIds.has(race.externalId)) {
       toastAlreadyTracked(goTracked);
       return myEvents.find((e) => e.externalId === race.externalId) ?? null;
@@ -423,16 +438,18 @@ export function FixtureBrowserContent({
   async function trackAndBetRace(race: RacingFixture) {
     const event =
       myEvents.find((e) => e.externalId === race.externalId) ?? (await trackRace(race));
-    if (!event) return;
     if (variant === "dialog") closeTrackFixture();
-    openAddBet({
-      eventId: event.id,
-      homeTeam: race.raceName,
-      awayTeam: race.offTime,
-      sport: "horse_racing",
-      market: "win",
-      labelSuggestion: `${race.course} · ${race.offTime || race.raceName}`,
-    });
+    if (!event) {
+      openAddBet(liveViewRacingAddBetPrefill(race));
+      return;
+    }
+    openAddBet(liveViewRacingAddBetPrefill(race, event.id));
+  }
+
+  function addBetFromLiveRace(race: RacingFixture) {
+    const tracked = myEvents.find((e) => e.externalId === race.externalId);
+    if (variant === "dialog") closeTrackFixture();
+    openAddBet(liveViewRacingAddBetPrefill(race, tracked?.id));
   }
 
   const myEvents = state?.events ?? [];
@@ -565,9 +582,11 @@ export function FixtureBrowserContent({
       trackedExternalIds={trackedExternalIds}
       onTrackFixture={trackFixture}
       onTrackAndBetFixture={trackAndBetFixture}
+      onAddBetFixture={addBetFromLiveFixture}
       onEpDesk={openEpDesk}
       onTrackRace={trackRace}
       onTrackAndBetRace={trackAndBetRace}
+      onAddBetRace={addBetFromLiveRace}
       emptyTitle={emptyTitle}
       emptyDescription={emptyDescription}
       loading={showLoadingEmpty}

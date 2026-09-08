@@ -385,7 +385,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Pro",
         bullets: [
-          "2UP Desk - full 2UP/1UP modelling with Dixon-Coles probabilities, dutch vs lay ranking, mixed thresholds and live settlement. Use when you want model-driven EV, not just snapshot maths.",
+          "2UP Desk - Dixon-Coles 2UP modelling with dutch vs lay ranking and live settlement. Turn on 1UP to add those prices and mixed thresholds. Use when you want model-driven EV, not just snapshot maths.",
         ],
       },
       {

@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookieChip } from "@/components/calc/bookie-chip";
 import { BookmakerSelect } from "@/components/calc/bookmaker-select";
@@ -108,6 +110,7 @@ interface DeskState {
   stakeMode: StakeMode;
   stakeAmt: number;
   rounding: number;
+  include1Up: boolean;
 }
 
 const DEFAULTS: DeskState = {
@@ -132,6 +135,7 @@ const DEFAULTS: DeskState = {
   stakeMode: "total",
   stakeAmt: 100,
   rounding: 0.01,
+  include1Up: false,
 };
 
 const STORAGE_KEY = "edgeways.epdesk.v1";
@@ -258,6 +262,7 @@ function EpDeskContent() {
         stakeMode: prev.stakeMode,
         stakeAmt: prev.stakeAmt,
         rounding: prev.rounding,
+        include1Up: prev.include1Up,
         oComm: prev.oComm,
         homeTeam: fixture.home,
         awayTeam: fixture.away,
@@ -381,7 +386,9 @@ function EpDeskContent() {
   const result = liveResult(hg, ag);
 
   const gubbedWarning = useMemo(() => {
-    const names = [s.bkH2, s.bkA2, s.bkH1, s.bkA1];
+    const names = s.include1Up
+      ? [s.bkH2, s.bkA2, s.bkH1, s.bkA1]
+      : [s.bkH2, s.bkA2];
     const gubbed = bookieWallets.filter(
       (b) =>
         b.accessStatus === "gubbed" &&
@@ -482,7 +489,7 @@ function EpDeskContent() {
       <DeskPageHeader
         bordered={false}
         title={`${s.homeTeam || "Home"} v ${s.awayTeam || "Away"}`}
-        description="Dixon-Coles 2UP model, dutch versus lay on the same stake."
+        description="Dixon-Coles 2UP model, dutch versus lay on the same stake. 1UP is optional."
         action={
           <Button variant="outline" {...pageSecondaryButtonProps} onClick={() => setPlaybookOpen(true)}>
             <Flag className="size-4" /> Scouting Playbook
@@ -555,8 +562,8 @@ function EpDeskContent() {
       <p className="pb-4 text-xs leading-relaxed text-muted-foreground">
         Dixon-Coles model (win market + Over 2.5 + BTTS). Dutch EV is the sum of three edges - when EP
         odds sit near the exchange win price, lay hedges usually win on EV; dutch wins when EP is soft
-        or you need the windfall ladder. Mixed 2UP/1UP is ranked automatically. Live tab shows
-        remaining-goals model EV vs snapshot. Not betting advice.
+        or you need the windfall ladder. Turn on 1UP to add those prices and mixed dutch to the
+        stack. Live tab shows remaining-goals model EV vs snapshot. Not betting advice.
       </p>
 
       <PlaybookOverlay open={playbookOpen} onClose={() => setPlaybookOpen(false)} />
@@ -619,9 +626,13 @@ function compute(s: DeskState) {
 
   const offers: Offer[] = [
     mkOffer("H2", "Home · 2UP", s.bkH2, s.oH2, ep.pH2, ep.pWinH, Xh),
-    mkOffer("H1", "Home · 1UP", s.bkH1, s.oH1, ep.pH1, ep.pWinH, Xh),
+    ...(s.include1Up
+      ? [mkOffer("H1", "Home · 1UP", s.bkH1, s.oH1, ep.pH1, ep.pWinH, Xh)]
+      : []),
     mkOffer("A2", "Away · 2UP", s.bkA2, s.oA2, ep.pA2, ep.pWinA, Xa),
-    mkOffer("A1", "Away · 1UP", s.bkA1, s.oA1, ep.pA1, ep.pWinA, Xa),
+    ...(s.include1Up
+      ? [mkOffer("A1", "Away · 1UP", s.bkA1, s.oA1, ep.pA1, ep.pWinA, Xa)]
+      : []),
   ].filter((o) => o.odds > 1);
 
   const best = offers.reduce<Offer | null>(
@@ -667,6 +678,7 @@ function compute(s: DeskState) {
     stakeMode: s.stakeMode,
     stakeAmt: s.stakeAmt,
     rounding: s.rounding,
+    include1Up: s.include1Up,
     homeName: s.homeTeam,
     awayName: s.awayTeam,
     offerEdges: offers.map(
@@ -987,14 +999,25 @@ function InputMatrix({
                 <td className="text-center text-muted-foreground">-</td>
                 <td><BookOdds book={s.bkA2} odds={s.oA2} onBook={(v) => set("bkA2", v)} onOdds={(v) => set("oA2", v)} /></td>
               </tr>
-              <tr>
-                <td className="text-[11px] uppercase tracking-wide text-muted-foreground">EP 1UP</td>
-                <td><BookOdds book={s.bkH1} odds={s.oH1} onBook={(v) => set("bkH1", v)} onOdds={(v) => set("oH1", v)} /></td>
-                <td className="text-center text-muted-foreground">-</td>
-                <td><BookOdds book={s.bkA1} odds={s.oA1} onBook={(v) => set("bkA1", v)} onOdds={(v) => set("oA1", v)} /></td>
-              </tr>
+              {s.include1Up ? (
+                <tr>
+                  <td className="text-[11px] uppercase tracking-wide text-muted-foreground">EP 1UP</td>
+                  <td><BookOdds book={s.bkH1} odds={s.oH1} onBook={(v) => set("bkH1", v)} onOdds={(v) => set("oH1", v)} /></td>
+                  <td className="text-center text-muted-foreground">-</td>
+                  <td><BookOdds book={s.bkA1} odds={s.oA1} onBook={(v) => set("bkA1", v)} onOdds={(v) => set("oA1", v)} /></td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex w-fit items-center gap-2">
+          <Switch
+            id="ep-desk-include-1up"
+            checked={s.include1Up}
+            onCheckedChange={(on) => set("include1Up", on)}
+          />
+          <Label htmlFor="ep-desk-include-1up">Include 1UP</Label>
         </div>
 
         {/* Staking bar */}
@@ -1258,8 +1281,10 @@ function OffersTab({ R, s }: { R: Computed; s: DeskState }) {
           <p className="pt-3 text-[11px] leading-relaxed text-muted-foreground">
             *Bonus event = P(team leads by the threshold, then fails to win) - the &quot;went ahead then got pegged
             back&quot; scenario. Total xG here is {f2(R.fit.lh + R.fit.la)} ({R.fit.lh + R.fit.la < 2.8 ? "low" : "goal-friendly"}
-            -scoring): few goals → few leads surrendered → small bonus for 2UP; 1UP beats 2UP only if sourced near fair
-            ({f3(1 / R.ep.pH1)} home / {f3(1 / R.ep.pA1)} away).
+            -scoring): few goals → few leads surrendered → small bonus for 2UP
+            {s.include1Up
+              ? `; 1UP beats 2UP only if sourced near fair (${f3(1 / R.ep.pH1)} home / ${f3(1 / R.ep.pA1)} away).`
+              : "."}
           </p>
         </CardContent>
       </Card>
@@ -1321,16 +1346,18 @@ function DutchTab({
       d: R.dutch1,
       highlight: R.structures[0]?.kind === "dutch_1_1",
     },
-  ];
+  ].filter((card) => s.include1Up || (card.homeT === 2 && card.awayT === 2));
 
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Equalised H / A / Draw for a covered match. Mixed rows put 1UP on the outsider when they
-        rarely lead by two. Ranked against lay in the panel above - equalising is coverage, not max
-        EV.
+        Equalised H / A / Draw for a covered match.
+        {s.include1Up
+          ? " Mixed rows put 1UP on the outsider when they rarely lead by two."
+          : " Turn on Include 1UP to add mixed and 1UP-only dutch."}{" "}
+        Ranked against lay in the panel above - equalising is coverage, not max EV.
       </p>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className={cn("grid gap-4", s.include1Up ? "lg:grid-cols-2" : "lg:grid-cols-1")}>
         {cards.map(({ key, homeT, awayT, title, d, highlight }) => {
           const bkH = homeT === 2 ? s.bkH2 : s.bkH1;
           const bkA = awayT === 2 ? s.bkA2 : s.bkA1;
@@ -1474,7 +1501,7 @@ function LayTab({ R, s, exchangeName }: { R: Computed; s: DeskState; exchangeNam
     { key: "A2", label: `${s.awayTeam} 2UP`, lay: R.layA2, X: R.Xa, book: s.bkA2 },
     { key: "H1", label: `${s.homeTeam} 1UP`, lay: R.layH1, X: R.Xh, book: s.bkH1 },
     { key: "A1", label: `${s.awayTeam} 1UP`, lay: R.layA1, X: R.Xa, book: s.bkA1 },
-  ].filter((x) => Number.isFinite(x.lay.EV));
+  ].filter((x) => Number.isFinite(x.lay.EV) && (s.include1Up || !x.key.endsWith("1")));
   const combined2 = R.layH2.EV + R.layA2.EV;
   return (
     <div className="flex flex-col gap-4">
@@ -1671,13 +1698,33 @@ function LiveTab({
         model: liveModel.dutch12.ev,
       },
     ] as const;
-    return [...rows].sort((a, b) => b.model - a.model);
-  }, [dutch2PL, dutch1PL, dutch21PL, dutch12PL, liveModel]);
+    return [...rows]
+      .filter((row) => s.include1Up || row.key === "2/2")
+      .sort((a, b) => b.model - a.model);
+  }, [dutch2PL, dutch1PL, dutch21PL, dutch12PL, liveModel, s.include1Up]);
 
   const toggles: { label: string; on: boolean; locked: boolean; set: (v: boolean) => void }[] = [
-    { label: "H 1UP", on: trig.eH1, locked: lead >= 1 || trig.eH2, set: manual.setMH1 },
+    ...(s.include1Up
+      ? [
+          {
+            label: "H 1UP",
+            on: trig.eH1,
+            locked: lead >= 1 || trig.eH2,
+            set: manual.setMH1,
+          },
+        ]
+      : []),
     { label: "H 2UP", on: trig.eH2, locked: lead >= 2, set: manual.setMH2 },
-    { label: "A 1UP", on: trig.eA1, locked: -lead >= 1 || trig.eA2, set: manual.setMA1 },
+    ...(s.include1Up
+      ? [
+          {
+            label: "A 1UP",
+            on: trig.eA1,
+            locked: -lead >= 1 || trig.eA2,
+            set: manual.setMA1,
+          },
+        ]
+      : []),
     { label: "A 2UP", on: trig.eA2, locked: -lead >= 2, set: manual.setMA2 },
   ];
 
@@ -1770,7 +1817,12 @@ function LiveTab({
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={cn(
+          "grid gap-3 sm:grid-cols-2",
+          s.include1Up ? "lg:grid-cols-4" : "lg:grid-cols-1"
+        )}
+      >
         {rankedLive.map((row, i) => (
           <Card
             key={row.key}
@@ -1812,12 +1864,12 @@ function LiveTab({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className={cn("grid gap-3", s.include1Up ? "grid-cols-2" : "grid-cols-1")}>
         {(
           [
-            ["Lay 2UP (both)", lay2PL],
-            ["Lay 1UP (both)", lay1PL],
-          ] as const
+            ["Lay 2UP (both)", lay2PL] as const,
+            ...(s.include1Up ? ([["Lay 1UP (both)", lay1PL]] as const) : []),
+          ]
         ).map(([label, pl]) => (
           <Card key={label}>
             <CardContent className="pt-4 text-center">

@@ -1,9 +1,35 @@
 "use client";
 
-import { bookieInitials, bookiePillStyle } from "@/lib/brands/bookies";
+import { useMemo } from "react";
+import { useAppState } from "@/hooks/use-app-state";
+import { bookiePillStyle } from "@/lib/brands/bookies";
 import { cn } from "@/lib/utils";
 
-/** Brand-coloured monogram chip - not a real logo (spec §7.3). */
+/** 8px compact / 12px menu bookie mark. Hairline from `pillBorderColor`. */
+export function BookieColourDot({
+  name,
+  brandColor,
+  size = "sm",
+}: {
+  name: string;
+  brandColor?: string | null;
+  size?: "sm" | "md";
+}) {
+  if (!name.trim()) return null;
+  const style = bookiePillStyle(name, brandColor);
+  return (
+    <span
+      className={cn(
+        "inline-block shrink-0 rounded-full border",
+        size === "sm" ? "size-2" : "size-3"
+      )}
+      style={{ backgroundColor: style.bg, borderColor: style.border }}
+      aria-hidden
+    />
+  );
+}
+
+/** Brand-colour dot plus bookie name (2UP Desk and compact venue rows). */
 export function BookieChip({
   name,
   brandColor,
@@ -13,21 +39,24 @@ export function BookieChip({
   brandColor?: string | null;
   className?: string;
 }) {
-  if (!name.trim()) return null;
-  const style = bookiePillStyle(name, brandColor);
+  const trimmed = name.trim();
+  const { state } = useAppState(0);
+  const resolved = useMemo(() => {
+    if (brandColor?.trim()) return brandColor.trim();
+    if (!trimmed) return null;
+    const key = trimmed.toLowerCase();
+    return (
+      state?.balances?.accounts?.find(
+        (a) => a.name.toLowerCase() === key && a.brandColor?.trim()
+      )?.brandColor?.trim() ?? null
+    );
+  }, [brandColor, trimmed, state?.balances?.accounts]);
+
+  if (!trimmed) return null;
   return (
-    <span className={cn("inline-flex items-center gap-1.5", className)}>
-      <span
-        className="flex size-5 items-center justify-center rounded border text-[11px] font-bold"
-        style={{
-          backgroundColor: style.bg,
-          color: style.fg,
-          borderColor: style.border,
-        }}
-      >
-        {bookieInitials(name)}
-      </span>
-      <span className="text-sm">{name}</span>
+    <span className={cn("inline-flex items-center gap-1.5", className)} title={trimmed}>
+      <BookieColourDot name={trimmed} brandColor={resolved} />
+      <span className="text-sm">{trimmed}</span>
     </span>
   );
 }

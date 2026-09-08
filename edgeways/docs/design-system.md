@@ -81,6 +81,8 @@ Movement / profit uses semantic green/red via `MoneyFlow` - primary is for chrom
 
 **Fields.** `fieldControl` (`.skeuo-solid.field-control`) on `Input`, `SelectTrigger`, `VenueSelect`, and field textareas. **Text inputs** rest on `--ew-btn-shadow-pressed` (recessed well). **Dropdowns** rest raised (`--ew-btn-shadow`) and press on click/open. Focus-visible adds the brand ring on the face. Don’t use flat `border-input` + `bg-transparent` for new fields.
 
+**Bookie colour.** Compact `VenueSelect` (2UP Desk bookie picker) and `<BookieChip>` show an 8px (`size-2`) brand-colour circle left of the name. Menus and the full venue field use 12px (`size-3`). Colour comes from the wallet `brandColor` / bookie palette. Dots take the existing `pillBorderColor` hairline so pale and near-black brands still read on `--page`. Truncated picker names expose the full string on `title`. Do not shrink the compact mark to 6px.
+
 **Edge vs free-bet violet.** Prefer `--edge` (`text-edge`, `bg-edge`, …) for campaign free-bet chrome that must read in both themes (pipeline stage label + fill, FB badge via `campaignFbBadge`, Convert, awarded/retained figures). Ad-hoc `violet-*` is legacy; new work should not add more. Wallet Gift / promo-balance rows may keep `violet-*` so they stay distinct from modelled “Edge tier” picks — do not casually recolour those rows onto `--edge`.
 
 **Pipeline under playbook.** When Steps is primary, dim the pipeline strip with opacity only. Do not force `text-muted-foreground` onto child labels — a parent `[&_p]:…` colour beats light-mode utilities on specificity while `dark:` variants still win, which made stage labels purple in dark and grey in light.
@@ -307,9 +309,14 @@ empty-state while tape loads. On `sm+` the plate is a fixed 4:5 card
 (`40rem` tall at `max-w-lg`, clamped to `85dvh`) so Commentary and
 Lineup share one height. A pinned `DialogFooter` keeps **Track**
 (outline) and **Add bet** (page primary) on screen while the tape
-scrolls. Tracked matches swap Track for a Tracked link. Racing clock sits
-left of the race name plus runners line (time / Off / Result), centred
-in a 4.5rem clock column. A racing row opens `RacingResultTapeDialog` at the
+scrolls. Finished football matches and racing results hide Add bet.
+Tracked matches swap Track for a Tracked link. Live-view Add bet
+(`liveView*AddBetPrefill`) links the feed card and only tracks when the
+bet is saved. Racing also sets `raceExternalId` so Events selects the
+card, not only the label. Racing clock sits
+left of the race name plus runners line (time / Off / Result),
+left-aligned in `fixtureTapeClockCol` (3.25rem floor, grows for Result).
+A racing row opens `RacingResultTapeDialog` at the
 same plate size: course, race, clock, then Pos / Horse / Dist / SP
 from the shared results store. SP is decimal (`2.25 F`), not fractional. The tape start fade shows only after
 scroll (`pinScrollStart`).

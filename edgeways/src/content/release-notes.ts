@@ -89,6 +89,18 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         href: "/",
         text: "Football clocks now say HT, extra time and penalties, instead of sticking on 45'.",
       },
+      {
+        kind: "improvement",
+        area: "2UP Desk",
+        href: "/calculators/ep-desk",
+        text: "1UP is optional. The desk starts on 2UP only; turn on Include 1UP to add those prices and mixed dutch.",
+      },
+      {
+        kind: "improvement",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Add bet from a live match or race without tracking it first. Add bet hides once the fixture has finished.",
+      },
     ],
   },
   {

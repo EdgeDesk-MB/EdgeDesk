@@ -509,10 +509,8 @@ export const fixtureTapeScoreRail = "w-10 pr-2";
 /** Home / away stack: 4px between the two name (and score) lines. */
 export const fixtureTapeTeamStack = "grid min-w-0 gap-y-1";
 export const fixtureTapeRowGrid = cn(
-  "grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3"
+  "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_auto] items-center gap-3"
 );
-/** Racing clock / Result column: wide enough that Result sits in the middle. */
-export const fixtureTapeRacingClockMin = "min-w-[4.5rem]";
 /**
  * Football tape: teams, then clock (right-aligned with the header eye),
  * then scores (2rem figures + 8px after the scoreline, same right edge as

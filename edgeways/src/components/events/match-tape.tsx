@@ -782,6 +782,13 @@ export function FootballLiveTapeDialog({
   const tapeRows = parseMatchTape(view.goals);
   const xi = parseFootballLineups(view.lineups);
   const hasTape = tapeRows.length > 0;
+  const matchFinished =
+    effectiveEventStatus({
+      status: view.status ?? "upcoming",
+      source: view.source,
+      startTime: view.startTime,
+      sport: view.sport,
+    }) === "finished";
   const canFetchTape = event.id != null || Boolean(event.externalId);
   const showLoading =
     open &&
@@ -969,7 +976,7 @@ export function FootballLiveTapeDialog({
             </ScrollFadeEdges>
           </TabsContent>
         </Tabs>
-        {onTrack || onAddBet || onEpDesk ? (
+        {onTrack || (onAddBet && !matchFinished) || onEpDesk ? (
           <DialogFooter className="mx-0 mb-0 shrink-0 flex-col bg-page px-6 dark:bg-card max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end">
             {onEpDesk ? (
               <Button
@@ -1005,7 +1012,7 @@ export function FootballLiveTapeDialog({
                 Tracked
               </Button>
             ) : null}
-            {onAddBet ? (
+            {onAddBet && !matchFinished ? (
               <Button type="button" {...pagePrimaryButtonProps} onClick={onAddBet}>
                 <NotebookPen className="size-4" aria-hidden />
                 Add bet

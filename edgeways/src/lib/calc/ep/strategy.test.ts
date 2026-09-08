@@ -98,6 +98,34 @@ describe("rankEpStructures", () => {
     expect(note).toBeTruthy();
   });
 
+  it("omits 1UP dutch and lay when include1Up is off", () => {
+    const { probs } = stripMargin([3.2, 3.15, 2.65]);
+    const fit = fitModel(probs[0], probs[1], probs[2], 1 / 2.65, 1 / 2.05);
+    const wfn = gridFn(fit.lh, fit.la, fit.rho);
+    const ranked = rankEpStructures({
+      scen: scenariosW(wfn),
+      ep: epProbsW(wfn),
+      oH2: 3.0,
+      oA2: 2.5,
+      oH1: 1.9,
+      oA1: 1.7,
+      oDraw: 3.15,
+      oLayH: 3.25,
+      oLayA: 3.2,
+      commission: 0,
+      stakeMode: "total",
+      stakeAmt: 100,
+      rounding: 0.01,
+      include1Up: false,
+    });
+    const kinds = ranked.map((r) => r.kind);
+    expect(kinds).toContain("dutch_2_2");
+    expect(kinds).toContain("lay_2_both");
+    expect(kinds).toContain("lay_home_2");
+    expect(kinds).toContain("lay_away_2");
+    expect(kinds.some((k) => k.includes("_1"))).toBe(false);
+  });
+
   it("explains generous single offer vs covered dutch", () => {
     const note = generousOfferNote(
       {

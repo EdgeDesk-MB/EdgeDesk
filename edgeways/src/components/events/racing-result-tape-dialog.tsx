@@ -112,6 +112,7 @@ export function RacingResultTapeDialog({
   const router = useRouter();
   const rows = resultRows(race);
   const finished = race.status === "finished" || Boolean(race.result);
+  const showAddBet = Boolean(onAddBet) && !finished;
   const showDist = finished && rows.some((r) => r.dist);
   const clock = finished
     ? "Result"
@@ -240,7 +241,7 @@ export function RacingResultTapeDialog({
             </div>
           )}
         </ScrollFadeEdges>
-        {onTrack || onAddBet ? (
+        {onTrack || showAddBet ? (
           <DialogFooter className="mx-0 mb-0 shrink-0 flex-col bg-page px-6 dark:bg-card max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end">
             {onTrack && !tracked ? (
               <Button
@@ -265,7 +266,7 @@ export function RacingResultTapeDialog({
                 Tracked
               </Button>
             ) : null}
-            {onAddBet ? (
+            {showAddBet ? (
               <Button type="button" {...pagePrimaryButtonProps} onClick={onAddBet}>
                 <NotebookPen className="size-4" aria-hidden />
                 Add bet

@@ -12,6 +12,7 @@ import {
 } from "@/lib/accounts/access";
 import { inferBackVenueKind } from "@/lib/accounts/resolve-venue";
 import { filterBookmakers } from "@/lib/bookmakers";
+import { BookieColourDot } from "@/components/calc/bookie-chip";
 import { bookieBrandColor } from "@/lib/brands/bookies";
 import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -402,10 +403,7 @@ export function VenueSelect({
           )}
           onClick={() => void pick(row.name, row.kind, false)}
         >
-          <span
-            className="inline-block size-3 shrink-0 rounded-full"
-            style={{ backgroundColor: color }}
-          />
+          <BookieColourDot name={row.name} brandColor={color} size="md" />
           <span className="min-w-0 flex-1 truncate">{row.name}</span>
           {status && status !== "available" && (
             <span
@@ -527,18 +525,23 @@ export function VenueSelect({
       onClick={() => setOpen((o) => !o)}
       className={cn(
         // Ghost on the panel tint: quiet hover only; brand ring on keyboard focus, not click
-        "flex h-[33px] max-w-[148px] items-center gap-1 rounded-md border-0 bg-transparent px-2 text-xs font-bold text-black/85 outline-none transition-colors",
+        "flex h-[33px] max-w-[148px] items-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-xs font-bold text-black/85 outline-none transition-colors",
         "hover:bg-black/8 dark:text-white/95 dark:hover:bg-white/10",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         open && "bg-black/8 dark:bg-white/10",
         !value && "text-black/45 dark:text-white/45"
       )}
       title={
-        valueStatus && valueStatus !== "available"
-          ? `${value} · ${accessStatusLabel(normalizeAccessStatus(valueStatus))}`
+        value
+          ? valueStatus && valueStatus !== "available"
+            ? `${value} · ${accessStatusLabel(normalizeAccessStatus(valueStatus))}`
+            : value
           : undefined
       }
     >
+      {value ? (
+        <BookieColourDot name={value} brandColor={valueBrandColor} />
+      ) : null}
       <span className="min-w-0 flex-1 truncate text-left">{value || "Bookie"}</span>
       {valueStatus === "gubbed" && (
         <span className="shrink-0 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
@@ -564,14 +567,19 @@ export function VenueSelect({
           : "h-9 px-3 text-sm",
         !value && "text-muted-foreground"
       )}
+      title={
+        value
+          ? valueStatus && valueStatus !== "available"
+            ? `${value} · ${accessStatusLabel(normalizeAccessStatus(valueStatus))}`
+            : value
+          : undefined
+      }
     >
       {value ? (
-        <span
-          className={cn(
-            "inline-block shrink-0 rounded-full",
-            size === "sm" ? "size-2" : "size-3"
-          )}
-          style={{ backgroundColor: valueBrandColor ?? undefined }}
+        <BookieColourDot
+          name={value}
+          brandColor={valueBrandColor}
+          size={size === "sm" ? "sm" : "md"}
         />
       ) : null}
       <span className="min-w-0 flex-1 truncate text-left">{value || placeholder}</span>

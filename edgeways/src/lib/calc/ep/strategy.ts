@@ -92,6 +92,12 @@ export interface EpStrategyInput {
   awayName?: string;
   /** Optional offer edges for dilution copy */
   offerEdges?: EpOfferEdge[];
+  /**
+   * Include 1UP dutch / lay structures. Default true so callers that omit
+   * the flag still get the full stack. The 2UP Desk passes false unless
+   * the user turns 1UP on.
+   */
+  include1Up?: boolean;
 }
 
 function mkDutch(
@@ -270,12 +276,13 @@ function mkLaySingle(
 
 /** Build and rank all viable structures. Higher `ev` first (absolute £ at desk stakes). */
 export function rankEpStructures(input: EpStrategyInput): EpStructureCandidate[] {
+  const include1Up = input.include1Up !== false;
   const candidates: EpStructureCandidate[] = [];
 
   const d22 = mkDutch(input, input.oH2, input.oA2, 2, 2);
-  const d11 = mkDutch(input, input.oH1, input.oA1, 1, 1);
-  const d21 = mkDutch(input, input.oH2, input.oA1, 2, 1);
-  const d12 = mkDutch(input, input.oH1, input.oA2, 1, 2);
+  const d11 = include1Up ? mkDutch(input, input.oH1, input.oA1, 1, 1) : null;
+  const d21 = include1Up ? mkDutch(input, input.oH2, input.oA1, 2, 1) : null;
+  const d12 = include1Up ? mkDutch(input, input.oH1, input.oA2, 1, 2) : null;
   for (const d of [d22, d11, d21, d12]) if (d) candidates.push(d);
 
   // Lay stakes: use equalised dutch home/away stakes so outlay is comparable
@@ -285,16 +292,23 @@ export function rankEpStructures(input: EpStrategyInput): EpStructureCandidate[]
   const stakeA1 = d11?.dutch?.stakes.SA ?? input.stakeAmt / 3;
 
   const lay2 = mkLayBoth(input, 2, stakeH2, stakeA2);
-  const lay1 = mkLayBoth(input, 1, stakeH1, stakeA1);
   if (lay2) candidates.push(lay2);
-  if (lay1) candidates.push(lay1);
+  if (include1Up) {
+    const lay1 = mkLayBoth(input, 1, stakeH1, stakeA1);
+    if (lay1) candidates.push(lay1);
+  }
 
-  for (const c of [
+  const laySingles = [
     mkLaySingle(input, "H", 2, stakeH2),
     mkLaySingle(input, "A", 2, stakeA2),
-    mkLaySingle(input, "H", 1, stakeH1),
-    mkLaySingle(input, "A", 1, stakeA1),
-  ]) {
+    ...(include1Up
+      ? [
+          mkLaySingle(input, "H", 1, stakeH1),
+          mkLaySingle(input, "A", 1, stakeA1),
+        ]
+      : []),
+  ];
+  for (const c of laySingles) {
     if (c) candidates.push(c);
   }
 

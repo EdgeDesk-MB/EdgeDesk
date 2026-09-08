@@ -125,6 +125,7 @@ import {
   teamsMatch,
   type TrackedEventLike,
 } from "@/lib/events";
+import { liveViewExternalId } from "@/lib/events/live-view-add-bet";
 import { findRewardEventMatch } from "@/lib/offers/reward-event-scope";
 import {
   bandNotTrackedFixtures,
@@ -219,6 +220,11 @@ export interface AddBetPrefill {
   homeTeam?: string;
   awayTeam?: string;
   eventId?: number;
+  /**
+   * Live-view / feed card: pre-select this fixture in Events without tracking
+   * until the bet is saved. Football and future live sports use this.
+   */
+  liveExternalId?: string;
   /**
    * Racing: pre-select this racecard in Events (tracked id or not-yet-tracked
    * fixture). Used when placing from a race-scoped campaign.
@@ -1491,8 +1497,8 @@ export function AddBetDialog({
       racePrefillKeyRef.current = null;
       return;
     }
-    if (!prefill?.raceExternalId || editBet) return;
-    const ext = prefill.raceExternalId;
+    const ext = liveViewExternalId(prefill);
+    if (!ext || editBet) return;
     if (racePrefillKeyRef.current === ext) return;
 
     const restoreSelection = () => {
@@ -1503,7 +1509,10 @@ export function AddBetDialog({
     if (tracked) {
       racePrefillKeyRef.current = ext;
       queueMicrotask(() => {
-        applyTrackedEvent(tracked, "horse_racing");
+        applyTrackedEvent(
+          tracked,
+          isKnownSport(tracked.sport) ? tracked.sport : prefill.sport
+        );
         if (prefill.market) setMarket(prefill.market);
         restoreSelection();
       });
@@ -1513,14 +1522,14 @@ export function AddBetDialog({
     if (fixture) {
       racePrefillKeyRef.current = ext;
       queueMicrotask(() => {
-        setSport("horse_racing");
+        if (isKnownSport(fixture.sport)) setSport(fixture.sport);
         if (prefill.market) setMarket(prefill.market);
         applyPendingFixture(fixture);
         restoreSelection();
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, prefill?.raceExternalId, editBet, events, knownFixtures]);
+  }, [open, prefill?.liveExternalId, prefill?.raceExternalId, editBet, events, knownFixtures]);
 
   // Convert: pick the named reward fixture once tracked events / cards load.
   const rewardPrefillKeyRef = useRef<string | null>(null);
@@ -1910,15 +1919,32 @@ export function AddBetDialog({
 
     let resolvedEventId = editBet?.eventId ?? undefined;
 
-    if (!resolvedEventId && prefill?.raceExternalId?.trim()) {
-      const ext = prefill.raceExternalId.trim();
-      const existing = events.find((e) => e.externalId === ext);
-      if (existing) {
-        resolvedEventId = existing.id;
-      } else {
-        const fixture = knownFixtures.find((f) => f.externalId === ext);
-        if (fixture) {
-          resolvedEventId = await trackRacingFixtureForSave(fixture);
+    if (!resolvedEventId) {
+      const ext = liveViewExternalId(prefill);
+      if (ext) {
+        const existing = events.find((e) => e.externalId === ext);
+        if (existing) {
+          resolvedEventId = existing.id;
+        } else {
+          const fixture = knownFixtures.find((f) => f.externalId === ext);
+          if (fixture?.sport === "horse_racing") {
+            resolvedEventId = await trackRacingFixtureForSave(fixture);
+          } else if (fixture) {
+            const tracked = await api<{ event: { id: number } }>("/api/events", {
+              method: "POST",
+              json: {
+                sport: "football",
+                homeTeam: fixture.homeTeam,
+                awayTeam: fixture.awayTeam,
+                competition: fixture.competition,
+                startTime: fixture.startTime,
+                source: "api",
+                externalId: fixture.externalId,
+                status: fixture.status,
+              },
+            });
+            resolvedEventId = linked(tracked.event.id);
+          }
         }
       }
     }
