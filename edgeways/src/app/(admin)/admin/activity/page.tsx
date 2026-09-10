@@ -6,8 +6,10 @@ import {
   AdminDonutChart,
   AdminShareBars,
 } from "@/components/admin/admin-charts";
+import { AdminActivityBoard } from "@/components/admin/admin-activity-board";
 import { AdminActivityChart } from "@/components/admin/admin-activity-chart";
 import { AdminActivityMix } from "@/components/admin/admin-activity-mix";
+import { AdminActivityPins } from "@/components/admin/admin-activity-pins";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
 import { AdminAccountFilters } from "@/components/admin/admin-account-filters";
@@ -42,7 +44,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { loadActivityMixForDay, loadActivityOverview } from "@/lib/admin/activity";
+import { loadActivityMixForDay, loadActivityOverview, loadActivityPins } from "@/lib/admin/activity";
+import { readActivityBoardLayout } from "@/lib/admin/activity-board-server";
+import {
+  attachActivityPins,
+  buildActivityPinView,
+  filterActivityPins,
+} from "@/lib/admin/activity-pins";
 import { loadFlagsLinks } from "@/lib/admin/flags";
 import { tableBodyCell, tableHeaderCell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -54,10 +62,12 @@ export default async function AdminActivityPage({
 }) {
   const params = await searchParams;
   const mixDay = resolveActivityMixDay(params.day);
-  const [activity, scope, dayMix] = await Promise.all([
+  const [activity, scope, dayMix, pinDesks, board] = await Promise.all([
     loadActivityOverview(),
     loadAdminAccountScope(),
     loadActivityMixForDay(mixDay),
+    loadActivityPins(),
+    readActivityBoardLayout(),
   ]);
   const { excludeAdmins, excludedIds } = scope;
   const links = loadFlagsLinks();
@@ -70,7 +80,6 @@ export default async function AdminActivityPage({
   );
   const bets = scoped.rows.reduce((sum, row) => sum + row.bets, 0);
   const offers = scoped.rows.reduce((sum, row) => sum + row.offers, 0);
-  const casino = scoped.rows.reduce((sum, row) => sum + row.casino, 0);
   const charts = buildActivityCharts(scoped.rows, scoped.daily);
   const skipIds = excludedIdSet(excludedIds);
   if (excludeAdmins) {
@@ -93,11 +102,22 @@ export default async function AdminActivityPage({
   const hiddenAdmins = activity.rows.filter(
     (row) => row.admin && !scoped.rows.some((visible) => visible.clerkUserId === row.clerkUserId)
   ).length;
+  const allPinAccounts = attachActivityPins(activity.rows, pinDesks);
+  const pinView = buildActivityPinView(
+    attachActivityPins(
+      scoped.rows,
+      filterActivityPins(pinDesks, skipIds.size > 0 ? skipIds : null)
+    )
+  );
+  const pinsFilteredOut =
+    pinView.desksWithPins === 0 &&
+    (excludeAdmins || excludedIds.length > 0) &&
+    allPinAccounts.some((row) => row.football.length + row.racing.length > 0);
 
   return (
     <AdminPage
       title="Activity"
-      description="Desk volume by account. Counts only."
+      description="Feature usage and desk volume. Counts only."
       icon={Activity}
       action={
         <Button variant="outline" {...pageSecondaryButtonProps} asChild>
@@ -122,7 +142,15 @@ export default async function AdminActivityPage({
         />
         <StatTile label="Bets" value={String(bets)} />
         <StatTile label="Offers" value={String(offers)} />
-        <StatTile label="Casino" value={String(casino)} />
+        <StatTile
+          label="Pins"
+          value={String(pinView.desksWithPins)}
+          sub={
+            pinView.desks > 0
+              ? `${pinView.desksWithPins} of ${pinView.desks}`
+              : undefined
+          }
+        />
       </StatStrip>
       <AdminCompareStrip
         heading="Versus last week"
@@ -132,106 +160,152 @@ export default async function AdminActivityPage({
           { label: "Casino", compare: charts.week.casino, period: "week" },
         ]}
       />
-      <AdminActivityChart events={activityEvents} />
-      {activity.available && scoped.rows.length > 0 ? (
-        <AdminActivityMix charts={mixCharts} day={mixDay} />
-      ) : null}
-      <AdminChartGrid>
-        <AdminChartCard
-          title="Desk volume mix"
-          description="Lifetime bets, sports offers, and casino campaigns, not the last 60 days."
-        >
-          <AdminDonutChart slices={charts.kindShare} label="Desk volume mix" />
-        </AdminChartCard>
-        <AdminChartCard
-          title="Volume by desk"
-          description="Lifetime bets, sports offers, and casino. Email only, never another desk's bets."
-        >
-          <AdminShareBars slices={charts.deskShare} />
-        </AdminChartCard>
-      </AdminChartGrid>
+      <AdminActivityBoard
+        layout={board}
+        pins={
+          <AdminActivityPins
+            key="pins"
+            view={pinView}
+            available={activity.available}
+            filteredOut={pinsFilteredOut}
+            compact
+          />
+        }
+        timeline={
+          <AdminActivityChart key="timeline" events={activityEvents} compact />
+        }
+        volume={
+          <AdminChartGrid key="volume">
+            <AdminChartCard
+              title="Desk volume mix"
+              description="Lifetime bets, sports offers, and casino campaigns, not the last 60 days."
+            >
+              <AdminDonutChart slices={charts.kindShare} label="Desk volume mix" />
+            </AdminChartCard>
+            <AdminChartCard
+              title="Volume by desk"
+              description="Lifetime bets, sports offers, and casino. Email only, never another desk's bets."
+            >
+              <AdminShareBars slices={charts.deskShare} />
+            </AdminChartCard>
+          </AdminChartGrid>
+        }
+        categories={
+          activity.available && scoped.rows.length > 0 ? (
+            <AdminActivityMix key="categories" charts={mixCharts} day={mixDay} />
+          ) : undefined
+        }
+        desks={
+          scoped.rows.length === 0 ? (
+            <EmptyState
+              key="desks-empty"
+              icon={Activity}
+              title={
+                !activity.available
+                  ? "Hosted desk needed"
+                  : activity.rows.length === 0
+                    ? "No accounts yet"
+                    : "No customer accounts"
+              }
+              description={
+                activity.rows.length > 0 &&
+                (excludeAdmins || excludedIds.length > 0)
+                  ? "Turn off Exclude admins, or include test accounts on Users, to see more desks."
+                  : (activity.note ??
+                    "Accounts appear here after someone signs in on the hosted desk.")
+              }
+            />
+          ) : (
+            <AdminSection key="desks" title="Per desk">
+              <AdminTableFrame>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={tableHeaderCell}>Email</TableHead>
+                      <TableHead className={tableHeaderCell}>Plan</TableHead>
+                      <TableHead className={tableHeaderCell}>
+                        Top sport
+                      </TableHead>
+                      <TableHead className={tableHeaderCell}>
+                        This week
+                      </TableHead>
+                      <TableHead className={tableHeaderCell}>Bets</TableHead>
+                      <TableHead className={tableHeaderCell}>Offers</TableHead>
+                      <TableHead className={tableHeaderCell}>Casino</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedRows.map((row) => {
+                      const lead = leadingSports.get(row.clerkUserId);
+                      const leadLabel = lead
+                        ? activitySportLabel(lead.key)
+                        : null;
+                      return (
+                        <TableRow key={row.clerkUserId}>
+                          <TableCell
+                            className={cn(
+                              tableBodyCell,
+                              "max-w-[18rem] truncate"
+                            )}
+                            title={row.email ?? row.clerkUserId}
+                          >
+                            {row.email ?? row.clerkUserId}
+                          </TableCell>
+                          <TableCell
+                            className={cn(tableBodyCell, "capitalize")}
+                          >
+                            {row.plan}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              tableBodyCell,
+                              "min-w-0 whitespace-normal"
+                            )}
+                            title={leadLabel ?? undefined}
+                          >
+                            {lead && leadLabel ? (
+                              <div className="min-w-0">
+                                <p className="font-medium text-pretty break-words">
+                                  {leadLabel}
+                                </p>
+                                <p className="text-xs text-muted-foreground tabular-nums">
+                                  {lead.n} of {lead.total}
+                                </p>
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              tableBodyCell,
+                              "font-semibold tabular-nums"
+                            )}
+                          >
+                            {weekly.get(row.clerkUserId) ?? 0}
+                          </TableCell>
+                          <TableCell className={tableBodyCell}>
+                            {row.bets}
+                          </TableCell>
+                          <TableCell className={tableBodyCell}>
+                            {row.offers}
+                          </TableCell>
+                          <TableCell className={tableBodyCell}>
+                            {row.casino}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </AdminTableFrame>
+            </AdminSection>
+          )
+        }
+      />
       {scoped.rows.length > 0 && activity.note ? (
         <p className="text-sm text-muted-foreground">{activity.note}</p>
       ) : null}
-      {scoped.rows.length === 0 ? (
-        <EmptyState
-          icon={Activity}
-          title={
-            !activity.available
-              ? "Hosted desk needed"
-              : activity.rows.length === 0
-                ? "No accounts yet"
-                : "No customer accounts"
-          }
-          description={
-            activity.rows.length > 0 && (excludeAdmins || excludedIds.length > 0)
-              ? "Turn off Exclude admins, or include test accounts on Users, to see more desks."
-              : (activity.note ??
-                "Accounts appear here after someone signs in on the hosted desk.")
-          }
-        />
-      ) : (
-        <AdminSection title="Per desk">
-        <AdminTableFrame>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className={tableHeaderCell}>Email</TableHead>
-              <TableHead className={tableHeaderCell}>Plan</TableHead>
-              <TableHead className={tableHeaderCell}>Top sport</TableHead>
-              <TableHead className={tableHeaderCell}>This week</TableHead>
-              <TableHead className={tableHeaderCell}>Bets</TableHead>
-              <TableHead className={tableHeaderCell}>Offers</TableHead>
-              <TableHead className={tableHeaderCell}>Casino</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedRows.map((row) => {
-              const lead = leadingSports.get(row.clerkUserId);
-              const leadLabel = lead ? activitySportLabel(lead.key) : null;
-              return (
-                <TableRow key={row.clerkUserId}>
-                  <TableCell
-                    className={cn(tableBodyCell, "max-w-[18rem] truncate")}
-                    title={row.email ?? row.clerkUserId}
-                  >
-                    {row.email ?? row.clerkUserId}
-                  </TableCell>
-                  <TableCell className={cn(tableBodyCell, "capitalize")}>{row.plan}</TableCell>
-                  <TableCell
-                    className={cn(
-                      tableBodyCell,
-                      "min-w-0 whitespace-normal"
-                    )}
-                    title={leadLabel ?? undefined}
-                  >
-                    {lead && leadLabel ? (
-                      <div className="min-w-0">
-                        <p className="font-medium text-pretty break-words">
-                          {leadLabel}
-                        </p>
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {lead.n} of {lead.total}
-                        </p>
-                      </div>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className={cn(tableBodyCell, "font-semibold tabular-nums")}>
-                    {weekly.get(row.clerkUserId) ?? 0}
-                  </TableCell>
-                  <TableCell className={tableBodyCell}>{row.bets}</TableCell>
-                  <TableCell className={tableBodyCell}>{row.offers}</TableCell>
-                  <TableCell className={tableBodyCell}>{row.casino}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        </AdminTableFrame>
-        </AdminSection>
-      )}
     </AdminPage>
   );
 }

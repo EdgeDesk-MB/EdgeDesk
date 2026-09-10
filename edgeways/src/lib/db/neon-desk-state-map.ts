@@ -11,7 +11,10 @@ import type {
   OfferRow,
 } from "@/lib/db/schema";
 import { computePnlBuckets } from "@/lib/pnl/pnl-buckets";
-import { sumOpenWorstCaseProfit } from "@/lib/pnl/open-bet-worst-case";
+import {
+  sumLiveChartProvisional,
+  sumOpenWorstCaseProfit,
+} from "@/lib/pnl/open-bet-worst-case";
 import { isCasinoInMainFeed } from "@/lib/offers/casino-list-groups";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/services/settings-shared";
 import { hasApiKey, apiUsageToday } from "@/lib/services/apifootball";
@@ -230,6 +233,7 @@ export function appStateFromNeonDesk(input: NeonDeskSnapshot): AppState {
     bettingProfit: pnl.bettingProfit,
     casinoProfit: pnl.casinoProfit,
     provisionalProfit: Math.round(provisional * 100) / 100,
+    liveChartProfit: sumLiveChartProvisional(bets, derived.livePositions),
     pnlAdjustments,
     casinoSettlements,
     planRaces: derived.planRaces,

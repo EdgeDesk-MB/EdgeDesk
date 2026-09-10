@@ -752,6 +752,9 @@ export function publicDemoApiGet(path: string, now = Date.now()): unknown | unde
   // session never reads live balances - the server routes reuse these.
   if (path === "/api/accounts") return buildPublicDemoState("edge", now).balances;
   if (path === "/api/accounts/pending") return { pending: [] };
+  if (pathname === "/api/fixtures/twoup-scout") {
+    return { source: "demo", date, items: [] };
+  }
   if (pathname === "/api/exchange/football-odds") {
     return {
       status: "unmatched",

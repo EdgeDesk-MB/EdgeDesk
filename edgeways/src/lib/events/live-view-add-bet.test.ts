@@ -38,6 +38,7 @@ describe("liveViewAddBetPrefill", () => {
     expect(prefill.eventId).toBeUndefined();
     expect(prefill.liveExternalId).toBe("fx-1");
     expect(prefill.sport).toBe("football");
+    expect(prefill.market).toBe("match_odds");
     expect(prefill.labelSuggestion).toBe("Elche v Real Sociedad");
   });
 

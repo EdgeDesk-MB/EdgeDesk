@@ -112,6 +112,7 @@ describe("footballOperation", () => {
     expect(footballOperation("/fixtures/events?fixture=1")).toBe("match-events");
     expect(footballOperation("/fixtures/lineups?fixture=1")).toBe("lineups");
     expect(footballOperation("/leagues?current=true")).toBe("leagues-catalog");
+    expect(footballOperation("/standings?league=39&season=2026")).toBe("standings");
     expect(footballOperation("/status")).toBe("other");
   });
 });

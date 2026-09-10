@@ -62,6 +62,8 @@ export const events = pgTable("events", {
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
   simStartedAt: epochMs("sim_started_at"),
+  /** Epoch ms when the API first posted FT / AET / PEN (or a race result). */
+  resultPostedAt: epochMs("result_posted_at"),
   createdAt: epochMs("created_at").notNull(),
 });
 
@@ -811,6 +813,24 @@ export const fixtureCache = pgTable("fixture_cache", {
  */
 export const footballCompetitionCatalog = pgTable("football_competition_catalog", {
   id: text("id").primaryKey(),
+  payload: text("payload").notNull(),
+  fetchedAt: epochMs("fetched_at").notNull(),
+});
+
+export const footballOddsCache = pgTable("football_odds_cache", {
+  fixtureKey: text("fixture_key").primaryKey(),
+  date: text("date").notNull(),
+  home: text("home").notNull(),
+  away: text("away").notNull(),
+  startTime: epochMs("start_time").notNull(),
+  payload: text("payload").notNull(),
+  fetchedAt: epochMs("fetched_at").notNull(),
+});
+
+export const footballStandingsCache = pgTable("football_standings_cache", {
+  scopeId: text("scope_id").primaryKey(),
+  leagueId: integer("league_id"),
+  season: integer("season"),
   payload: text("payload").notNull(),
   fetchedAt: epochMs("fetched_at").notNull(),
 });

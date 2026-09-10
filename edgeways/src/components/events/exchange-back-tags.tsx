@@ -7,6 +7,11 @@ import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import { liveOddsFlash, type LiveMatchBackTag } from "@/lib/events/live-match-backs";
 import { formatDecimalOdds } from "@/lib/racing/odds";
 import { oddsCellClass, oddsCellStyle } from "@/lib/ui/odds-cell";
+import {
+  fixtureTapeOddsStack,
+  fixtureTapeScoreLine,
+  fixtureTapeScoreRail,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 const BETFAIR_BACK =
@@ -49,7 +54,7 @@ function useOddsFlash(
       window.cancelAnimationFrame(frame);
       window.clearTimeout(clear);
     };
-  }, [trend, paused, quoteSeq]);
+  }, [trend, paused, quoteSeq, odds]);
 
   return { flash, trend };
 }
@@ -151,6 +156,69 @@ export function ExchangeBackTags({
           </span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function validTapeBack(odds: number | undefined): odds is number {
+  return typeof odds === "number" && Number.isFinite(odds) && odds > 1;
+}
+
+/** Same Betfair back cell as the fixture tape. */
+export function ExchangeBackCell({
+  odds,
+  label,
+}: {
+  odds: number | undefined;
+  label: string;
+}) {
+  if (!validTapeBack(odds)) {
+    return (
+      <span className={cn(fixtureTapeScoreLine, "text-muted-foreground")}>–</span>
+    );
+  }
+  const price = formatDecimalOdds(odds);
+  return (
+    <span className={fixtureTapeScoreLine}>
+      <span
+        style={oddsCellStyle(BETFAIR_BACK)}
+        aria-label={`${label} ${price}`}
+        className={cn(
+          "surface-glass relative inline-flex items-baseline rounded-sm px-1.5 py-0.5 text-xs tabular-nums",
+          oddsCellClass
+        )}
+      >
+        <LiveBackOdds odds={odds} paused={false} quoteSeq={0} />
+      </span>
+    </span>
+  );
+}
+
+/** Home / away backs stacked like the football score rail. Same Betfair cell as Home Live. */
+export function ExchangeBackStack({
+  homeOdds,
+  awayOdds,
+  homeLabel,
+  awayLabel,
+  className,
+}: {
+  homeOdds?: number;
+  awayOdds?: number;
+  homeLabel: string;
+  awayLabel: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        fixtureTapeOddsStack,
+        "justify-items-end",
+        fixtureTapeScoreRail,
+        className
+      )}
+    >
+      <ExchangeBackCell odds={homeOdds} label={`${homeLabel} back`} />
+      <ExchangeBackCell odds={awayOdds} label={`${awayLabel} back`} />
     </div>
   );
 }

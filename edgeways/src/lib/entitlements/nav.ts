@@ -53,6 +53,8 @@ export const FEATURE_LOCK_BODIES: Record<FeatureFlag, string> = {
     "Today's UK and Irish racecards and results. Demo cards are shown on Racing Desk.",
   football_live_feeds:
     "Who scored, bookings, and the named lineups on tracked football.",
+  twoup_scout:
+    "2UP Edge picks on upcoming matches in your pinned competitions.",
   push_alerts:
     "Push to your phone or desktop when a 2UP position needs a decision.",
   exchange_lay:

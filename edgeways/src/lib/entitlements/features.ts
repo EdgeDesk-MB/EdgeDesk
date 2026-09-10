@@ -16,6 +16,7 @@ export const FEATURES = [
   "offer_edge",
   "racing_live_feeds",
   "football_live_feeds",
+  "twoup_scout",
   "push_alerts",
   "exchange_lay",
 ] as const;
@@ -34,6 +35,7 @@ export const FEATURE_LABELS: Record<FeatureFlag, string> = {
   offer_edge: "Offer Edge model + Race picks + recommended desk chrome",
   racing_live_feeds: "Live/delayed Racing Desk feeds",
   football_live_feeds: "Football live card: scorers, bookings and lineups",
+  twoup_scout: "2UP Edge picks on pinned football fixtures",
   push_alerts: "2UP sentinel + web push",
   exchange_lay: "Exchange lay integration on desk",
 };

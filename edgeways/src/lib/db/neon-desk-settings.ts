@@ -74,3 +74,62 @@ export async function patchNeonDeskSettings(
 
   return next;
 }
+
+export type NeonDeskFavouritePins = {
+  clerkUserId: string;
+  football: string[];
+  racing: string[];
+};
+
+/** Per-desk pins from hosted settings (admin activity, cron warm). */
+export async function listNeonDeskFavouritePins(): Promise<
+  NeonDeskFavouritePins[]
+> {
+  await ensureNeonDeskSettingsColumn();
+  const rows = await getNeonDb()
+    .select({
+      clerkUserId: pgUsers.clerkUserId,
+      deskSettings: pgUsers.deskSettings,
+    })
+    .from(pgUsers);
+  return rows.map((row) => {
+    const parsed = parseStoredSettings(row.deskSettings ?? null);
+    return {
+      clerkUserId: row.clerkUserId,
+      football: parsed.favouriteFootballScopes ?? [],
+      racing: parsed.favouriteRacingCourses ?? [],
+    };
+  });
+}
+
+/** Pins for desks allowed to use 2UP scout (desk preview + Edge). */
+export async function listNeonFavouriteFootballScopes(): Promise<string[]> {
+  const { readDeskPreviews, entitledTwoupScoutClerkIds } = await import(
+    "@/lib/admin/desk-previews"
+  );
+  const { clerkIdsForPreviewWarm } = await import(
+    "@/lib/admin/desk-previews-shared"
+  );
+  const { listAppUsers } = await import("@/lib/services/app-users");
+  const [{ settings, persisted }, users, pins] = await Promise.all([
+    readDeskPreviews(),
+    listAppUsers(),
+    listNeonDeskFavouritePins(),
+  ]);
+  const rule = settings.twoup_scout;
+  const allowed = new Set(
+    clerkIdsForPreviewWarm({
+      mode: persisted ? rule.mode : "allowlist",
+      allowlist: persisted
+        ? rule.clerkUserIds
+        : users.filter((user) => user.owner).map((user) => user.clerkUserId),
+      entitledClerkUserIds: entitledTwoupScoutClerkIds(users),
+    })
+  );
+  const out = new Set<string>();
+  for (const row of pins) {
+    if (!allowed.has(row.clerkUserId)) continue;
+    for (const id of row.football) out.add(id);
+  }
+  return [...out];
+}

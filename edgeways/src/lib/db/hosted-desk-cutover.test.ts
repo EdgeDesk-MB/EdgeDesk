@@ -144,6 +144,31 @@ describe("hosted desk cutover", () => {
     expect(routeSource("cron/warm-racecards/route.ts")).toMatch(
       /warmFootballCompetitionCatalog/
     );
+    expect(routeSource("cron/warm-racecards/route.ts")).toMatch(/warmFootballOddsStore/);
+    expect(routeSource("cron/warm-racecards/route.ts")).toMatch(/warmFootballStandingsStore/);
+    const footballOdds = readFileSync(
+      resolve(__dirname, "../services/football-odds-store.ts"),
+      "utf8"
+    );
+    const standings = readFileSync(
+      resolve(__dirname, "../services/football-standings-store.ts"),
+      "utf8"
+    );
+    expect(footballOdds).toMatch(/isNeonDesk/);
+    expect(standings).toMatch(/isNeonDesk/);
+    const neonOdds = readFileSync(
+      resolve(__dirname, "neon-football-odds-cache.ts"),
+      "utf8"
+    );
+    expect(neonOdds).toMatch(/ensureNeonFootballScoutTables/);
+    expect(routeSource("fixtures/twoup-scout/route.ts")).toMatch(/getTwoupScoutForDate/);
+    expect(routeSource("fixtures/twoup-scout/route.ts")).toMatch(/twoup_scout/);
+    expect(routeSource("fixtures/twoup-scout/route.ts")).toMatch(
+      /resolveTwoupScoutPreview/
+    );
+    expect(routeSource("settings/route.ts")).toMatch(/resolveTwoupScoutPreview/);
+    expect(routeSource("state/route.ts")).toMatch(/resolveTwoupScoutPreview/);
+    expect(routeSource("admin/releases/route.ts")).toMatch(/writeDeskPreviews/);
     const competitions = readFileSync(
       resolve(__dirname, "../services/football-competition-store.ts"),
       "utf8"

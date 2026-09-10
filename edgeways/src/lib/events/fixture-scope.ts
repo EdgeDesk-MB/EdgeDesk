@@ -11,6 +11,10 @@ export type FootballCompetitionCatalogEntry = {
   name: string;
   country?: string | null;
   flag?: string | null;
+  /** API-Football league id, when the catalog row was fetched with it. */
+  leagueId?: number | null;
+  /** Current season year for standings lookups. */
+  season?: number | null;
 };
 
 export type FootballLeagueGroup<T extends FootballScopeFixture> = {

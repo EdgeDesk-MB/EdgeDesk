@@ -53,6 +53,22 @@ describe("favourite fixture scopes", () => {
   });
 });
 
+describe("fixture board view", () => {
+  it("round-trips pinned only and the sport tab", () => {
+    expect(getAppSettings().fixtureBoardView.football.rail).toBe("all");
+    patchAppSettings({
+      fixtureBoardView: { football: { rail: "pins", status: "live" }, sport: "football" },
+    });
+    expect(getAppSettings().fixtureBoardView.football).toEqual({
+      rail: "pins",
+      status: "live",
+    });
+    patchAppSettings({ fixtureBoardView: { sport: "horse_racing" } });
+    expect(getAppSettings().fixtureBoardView.sport).toBe("horse_racing");
+    expect(getAppSettings().fixtureBoardView.football.rail).toBe("pins");
+  });
+});
+
 describe("normalizeDefaultSport", () => {
   it("accepts known sports and falls back to football", () => {
     expect(normalizeDefaultSport("horse_racing")).toBe("horse_racing");

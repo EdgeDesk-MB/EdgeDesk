@@ -3,8 +3,8 @@
  *
  * Matched bets store worst-case guaranteed profit as `expectedProfit` at placement.
  * Until settlement, that worst case is the headline Prov contribution.
- * Live football "if ended now" is a Home Events reading only — it does not
- * replace this floor.
+ * Live football "if ended now" is a Home Events reading and the Live chart
+ * tip. It does not replace this headline floor.
  *
  * Labelling: when both matched outcomes are equal (within a penny), the figure is
  * locked — not an estimate. When they diverge, show the worse side as

@@ -31,7 +31,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     bullets: [
       "Profit = settled + Prov. Prov is always the worst outcome of open positions. A lock-in and its parent count as one pair.",
       "Home → Live → Events shows if ended now on football, plus live exchange match-odds backs when the exchange feed is connected. Positions still lists each leg.",
-      "The Liveline chart streams while tracked matches or races are live.",
+      "The Liveline chart streams if-ended-now while tracked matches or races are live. Headline Prov stays the worst-case floor.",
       "History column shows goals (with a 2UP mark when a side goes two ahead) and settlements in real time.",
     ],
     guideSlug: "getting-started",
@@ -41,7 +41,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     summary: "Pick a sport and a day, then pin what you follow.",
     bullets: [
       "Tap + on any row to add it to Tracked Events.",
-      "Filter finds any competition. Pin one to keep a right rail of shortcuts.",
+      "Filter finds any competition. Pin one to keep a right rail of shortcuts. Backed only lists matches you have a desk back on.",
       "Football stays on this page on every plan. Live UK and Irish racecards are on Edge.",
       "All / Live / Scheduled sit with the day switcher above the list. Competitions follow first kick-off, with common UK and European leagues first.",
     ],

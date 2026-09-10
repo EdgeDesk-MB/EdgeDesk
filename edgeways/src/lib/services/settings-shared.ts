@@ -7,9 +7,19 @@ import { DEFAULT_TIME_FORMAT, type TimeFormatPreference } from "@/lib/time-forma
 import { DEFAULT_HOME_LAYOUT, type HomeLayoutSettings } from "@/lib/ui/home-layout";
 import type { PlanPreview } from "@/lib/entitlements/acca-desk";
 import type { EntitlementBilling } from "@/lib/entitlements/effective-plan";
+import {
+  DEFAULT_FIXTURE_BOARD_VIEW,
+  normalizeFixtureBoardView,
+  type FixtureBoardViewSettings,
+} from "@/lib/events/fixture-board-view";
 import { isKnownSport, type SportValue } from "@/lib/sports";
 
 export { normalizeHomeLayout, type HomeLayoutSettings } from "@/lib/ui/home-layout";
+export {
+  DEFAULT_FIXTURE_BOARD_VIEW,
+  normalizeFixtureBoardView,
+  type FixtureBoardViewSettings,
+} from "@/lib/events/fixture-board-view";
 
 export type { PlanPreview };
 
@@ -84,6 +94,8 @@ export interface AppSettings {
   hiddenFootballScopes: string[];
   /** Racing course names hidden from the fixture board. */
   hiddenRacingCourses: string[];
+  /** Last Fixtures tape sport, rail (All / Pinned only / Backed only / one scope), and status pills. */
+  fixtureBoardView: FixtureBoardViewSettings;
   /** Brand accent preset id (amber, viridian, …, custom). */
   brandAccentPreset: string;
   /** Brand accent hex (#RRGGBB); used with custom or as resolved colour. */
@@ -106,6 +118,11 @@ export interface AppSettings {
    * Present for signed-in sessions; absent/null in the public demo.
    */
   billing?: EntitlementBilling | null;
+  /**
+   * 2UP scout latch from Releases desk previews, injected per API response.
+   * Never stored. Hosted Edge customers stay closed until allowlisted or entitled.
+   */
+  twoupScoutPreview?: boolean;
 }
 
 /**
@@ -218,6 +235,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   favouriteRacingCourses: [],
   hiddenFootballScopes: [],
   hiddenRacingCourses: [],
+  fixtureBoardView: DEFAULT_FIXTURE_BOARD_VIEW,
   brandAccentPreset: "amber",
   brandAccentHex: "#FFC71E",
   uiFont: "default",

@@ -99,7 +99,11 @@ export function AdminChartCard({
 }
 
 export function AdminChartGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-4 lg:grid-cols-2">{children}</div>;
+  return (
+    <div className="grid items-start gap-4 lg:grid-cols-2 lg:gap-[var(--layout-stack-gap)]">
+      {children}
+    </div>
+  );
 }
 
 export function AdminBarChart({

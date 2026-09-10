@@ -26,6 +26,7 @@ export function liveViewFootballAddBetPrefill(
     homeTeam: fixture.homeTeam,
     awayTeam: fixture.awayTeam,
     sport: "football",
+    market: "match_odds",
     labelSuggestion: `${fixture.homeTeam} v ${fixture.awayTeam}`,
   };
 }

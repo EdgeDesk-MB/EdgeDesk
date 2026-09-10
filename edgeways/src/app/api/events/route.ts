@@ -153,6 +153,7 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
           : null,
       simScript: null,
       simStartedAt: null,
+      resultPostedAt: null,
       createdAt: now,
     })
     .returning()

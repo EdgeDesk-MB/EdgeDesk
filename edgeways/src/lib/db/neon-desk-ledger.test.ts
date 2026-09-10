@@ -223,6 +223,7 @@ function raceEvent(partial: Partial<EventRow> = {}): EventRow {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: 1,
     ...partial,
   };

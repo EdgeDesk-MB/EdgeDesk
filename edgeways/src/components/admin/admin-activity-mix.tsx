@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Activity } from "lucide-react";
 import { AdminActivityDayStepper } from "@/components/admin/admin-activity-day-stepper";
 import {
@@ -11,7 +12,6 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminSection } from "@/components/admin/admin-section";
 import { EmptyState } from "@/components/help/empty-state";
-import { Button } from "@/components/ui/button";
 import {
   londonYmd,
   resolveActivityMixDay,
@@ -80,45 +80,27 @@ function BetHeadlineGrid({
   );
 }
 
-function syncDayUrl(ymd: string) {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  if (ymd === londonYmd()) url.searchParams.delete("day");
-  else url.searchParams.set("day", ymd);
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-}
-
 export function AdminActivityMix({
-  charts: initialCharts,
+  charts,
   variant = "full",
-  day: initialDay,
+  day: dayParam,
 }: {
   charts: ActivityMixCharts;
   variant?: "full" | "preview";
   day?: string;
 }) {
-  const [day, setDay] = useState(() => resolveActivityMixDay(initialDay));
-  const [charts, setCharts] = useState(initialCharts);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [pending, startTransition] = useTransition();
+  const day = resolveActivityMixDay(dayParam);
 
-  async function selectDay(next: string) {
+  function selectDay(next: string) {
     const resolved = resolveActivityMixDay(next);
-    setDay(resolved);
-    syncDayUrl(resolved);
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/activity-mix?date=${resolved}`);
-      if (!res.ok) throw new Error("Could not load this day.");
-      const data = (await res.json()) as { charts?: ActivityMixCharts };
-      if (!data.charts) throw new Error("Could not load this day.");
-      setCharts(data.charts);
-    } catch {
-      setError("Could not load this day. Try again.");
-    } finally {
-      setPending(false);
-    }
+    const href =
+      resolved === londonYmd() ? pathname : `${pathname}?day=${resolved}`;
+    startTransition(() => {
+      router.replace(href, { scroll: false });
+    });
   }
 
   const hasBets = shareTotal(charts.betTypes) > 0;
@@ -153,19 +135,6 @@ export function AdminActivityMix({
         className={cn(sectionStack, pending && "pointer-events-none opacity-60")}
         aria-busy={pending}
       >
-        {error ? (
-          <p className="text-sm text-destructive" role="status">
-            {error}{" "}
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto px-0 text-sm"
-              onClick={() => void selectDay(day)}
-            >
-              Try again
-            </Button>
-          </p>
-        ) : null}
       <AdminSection
         headingLevel={3}
         title="Bets"

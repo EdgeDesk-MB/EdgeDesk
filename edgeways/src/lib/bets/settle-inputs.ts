@@ -6,7 +6,10 @@
  * state service. `state.ts` re-exports them, so its public API is unchanged.
  */
 import { betWinRuleForBet, type DutchLegRecord, type MatchResult, type SettleableBet, type TriggerContext, type TriggerRule } from "@/lib/calc";
-import { tapeGoals } from "@/lib/events/match-tape";
+import {
+  footballNinetyMinuteGoals,
+  footballNinetyMinuteScore,
+} from "@/lib/events/football-full-time";
 import { parseEwMeta } from "@/lib/bets/ew-meta";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 
@@ -29,14 +32,10 @@ export function toSettleable(bet: BetRow): SettleableBet {
 }
 
 export function toMatchResult(event: EventRow): MatchResult {
-  // Bets settle at 90 minutes (FT). Use the stored 90-min score for AET/PEN matches.
-  const usesFtScore =
-    (event.matchEnding === "aet" || event.matchEnding === "pen") &&
-    event.ftHomeScore != null &&
-    event.ftAwayScore != null;
+  const score = footballNinetyMinuteScore(event);
   return {
-    homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
-    awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
+    homeScore: score.home,
+    awayScore: score.away,
     homeLed2: !!event.homeLed2,
     awayLed2: !!event.awayLed2,
     inPlay: event.status === "live",
@@ -44,17 +43,14 @@ export function toMatchResult(event: EventRow): MatchResult {
 }
 
 export function toTriggerContext(event: EventRow): TriggerContext {
-  const usesFtScore =
-    (event.matchEnding === "aet" || event.matchEnding === "pen") &&
-    event.ftHomeScore != null &&
-    event.ftAwayScore != null;
+  const score = footballNinetyMinuteScore(event);
   return {
     homeTeam: event.homeTeam,
     awayTeam: event.awayTeam,
-    homeScore: usesFtScore ? event.ftHomeScore! : event.homeScore,
-    awayScore: usesFtScore ? event.ftAwayScore! : event.awayScore,
+    homeScore: score.home,
+    awayScore: score.away,
     finished: event.status === "finished",
-    goals: tapeGoals(event.goals),
+    goals: footballNinetyMinuteGoals(event),
   };
 }
 

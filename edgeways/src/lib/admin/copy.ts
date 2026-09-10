@@ -13,7 +13,7 @@ export const ADMIN_GRANT_CAN: string[] = [
   "See live charts, in-app toasts, and the Live log while Admin is open",
   "Grant or revoke operator admin for other accounts (except the owner, bootstrap operators, and the last admin)",
   "Run feed connection tests and see provider budgets",
-  "Toggle PostHog flags used for staged rollouts",
+  "Toggle desk previews and PostHog flags used for staged rollouts",
 ];
 
 export const ADMIN_GRANT_CANNOT: string[] = [

@@ -15,6 +15,7 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     bettingProfit: 0,
     casinoProfit: 0,
     provisionalProfit: 0,
+    liveChartProfit: 0,
     retention: { rate: 0, sampleSize: 0 },
     effortMeasured: {},
     accaLayDue: [],

@@ -4,9 +4,19 @@
  *
  * A £0 banner value must not stick after the user later enters odds. Key the
  * override to the stake/odds it was chosen for, and drop it when they change.
+ * An Underlay / Standard / Overlay snap stays locked across those changes and
+ * re-derives the lay from the current bounds.
  */
 
-import { executableLayStake, type BetMode, type LayPlanInput } from "@/lib/calc";
+import {
+  executableLayStake,
+  layBounds,
+  type BetMode,
+  type LayBounds,
+  type LayPlanInput,
+} from "@/lib/calc";
+
+export type LaySnapTarget = keyof LayBounds;
 
 export type KeyedLayOverride = {
   stake: number;
@@ -39,12 +49,29 @@ export function commitLayStakeOverride(
   return { stake: value, key: currentKey };
 }
 
+/** Only one snap pill is active. Clustered bounds default to Standard. */
+export function highlightedLaySnap(
+  stake: number,
+  bounds: LayBounds,
+  locked: LaySnapTarget | null
+): LaySnapTarget | null {
+  if (locked) return locked;
+  const order: LaySnapTarget[] = ["standard", "underlay", "overlay"];
+  return (
+    order.find((key) => Math.abs(stake - bounds[key]) < 0.005) ?? null
+  );
+}
+
 export function resolveAddBetLayStake(
   planInput: LayPlanInput | null,
   override: KeyedLayOverride | null,
-  currentKey: string
+  currentKey: string,
+  snap: LaySnapTarget | null = null
 ): number {
   if (!planInput) return 0;
+  if (snap) {
+    return executableLayStake(planInput, layBounds(planInput)[snap]);
+  }
   const active =
     override != null && override.key === currentKey ? override.stake : null;
   return executableLayStake(planInput, active);

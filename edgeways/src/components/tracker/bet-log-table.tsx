@@ -89,15 +89,17 @@ import { cn } from "@/lib/utils";
 import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
 import { formatAccaDeskBetDisplayTitle, isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { betLogTypeCaption } from "@/lib/bets/bet-log-title";
+import { repairCollapsedFootballFixtureLabel } from "@/lib/bets/football-bet-label";
 import { stripStaleHorseFromRacingBetLabel } from "@/lib/bets/racing-bet-label";
 import { twoUpBothWinProfit } from "@/lib/bets/two-up-windfall";
 import { api } from "@/hooks/use-app-state";
 import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
 import { Link2, Pencil, RotateCcw, Zap } from "lucide-react";
 
-function betLogTitle(bet: BetRow): string {
+function betLogTitle(bet: BetRow, event?: EventRow | null): string {
   if (isAccaDeskBack(bet) || isAccaDeskLay(bet)) return formatAccaDeskBetDisplayTitle(bet);
-  return stripStaleHorseFromRacingBetLabel(bet.label, bet.selection);
+  const stripped = stripStaleHorseFromRacingBetLabel(bet.label, bet.selection);
+  return repairCollapsedFootballFixtureLabel(stripped, event?.homeTeam, event?.awayTeam);
 }
 
 function BetLogTypeLine({
@@ -211,7 +213,7 @@ export function BetLogTable({
           const linkedRaceBets = event
             ? bets.filter((b) => b.eventId === event.id)
             : [];
-          const title = betLogTitle(bet);
+          const title = betLogTitle(bet, event);
 
           return (
             <div
@@ -420,7 +422,7 @@ export function BetLogTable({
           const linkedRaceBets = event
             ? bets.filter((b) => b.eventId === event.id)
             : [];
-          const title = betLogTitle(bet);
+          const title = betLogTitle(bet, event);
 
           return (
             <TableRow

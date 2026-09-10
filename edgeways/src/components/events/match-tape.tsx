@@ -6,6 +6,9 @@ import { enGB } from "date-fns/locale";
 import { Flame, Goal, NotebookPen, Plus, Radio, Scale, Shirt } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { ExchangeBackCell } from "@/components/events/exchange-back-tags";
+import { TwoupFitTicks } from "@/components/events/twoup-openness-meter";
+import { TwoupScoutPanel } from "@/components/events/twoup-scout-panel";
 import { EmptyState } from "@/components/help/empty-state";
 import { TeamCrest } from "@/components/team-crest";
 import { api } from "@/hooks/use-app-state";
@@ -31,7 +34,17 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { useEventCrests } from "@/hooks/use-event-crests";
+import {
+  TWOUP_TIER_SHORT,
+  twoupIsEdgePick,
+  twoupSideTierFromPct,
+  type TwoupOpennessResult,
+} from "@/lib/calc/ep/twoup-openness";
 import { effectiveEventStatus, eventShowsScore } from "@/lib/events";
+import {
+  footballFinishedNameWeight,
+  matchTapeNameWeightClass,
+} from "@/lib/events/fixture-result-weight";
 import {
   formatLineupsCaption,
   lineupGridRows,
@@ -83,6 +96,7 @@ export type FootballTapeDialogEvent = {
   minute?: number | null;
   startTime?: number;
   competition?: string | null;
+  leagueCountry?: string | null;
   externalId?: string | null;
   source?: string | null;
   sport?: string;
@@ -452,25 +466,40 @@ function TeamBlock({
   formation,
   logo,
   align,
+  odds,
+  take = false,
+  resultWeight = "base",
 }: {
   name: string;
   formation?: string | null;
   logo?: string | null;
   align: "home" | "away";
+  odds?: number;
+  take?: boolean;
+  resultWeight?: ReturnType<typeof footballFinishedNameWeight>;
 }) {
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-1 flex-col gap-1",
+        "flex min-w-0 flex-1 flex-col gap-2",
         align === "away" ? "items-end text-right" : "items-start text-left"
       )}
     >
       <div className="flex size-10 items-center justify-center">
         <TeamCrest src={logo} alt="" size="xl" />
       </div>
-      <p className="min-w-0 text-pretty break-words text-xs font-semibold leading-snug">
+      <p
+        className={cn(
+          "min-w-0 text-pretty break-words text-base leading-snug",
+          matchTapeNameWeightClass(resultWeight),
+          take ? "text-primary-text" : "text-foreground"
+        )}
+      >
         {name}
       </p>
+      {typeof odds === "number" && Number.isFinite(odds) && odds > 1 ? (
+        <ExchangeBackCell odds={odds} label={`${name} back`} />
+      ) : null}
       {formation ? (
         <p className="text-xs tabular-nums text-muted-foreground">{formation}</p>
       ) : null}
@@ -482,11 +511,23 @@ function MatchScoreboard({
   event,
   homeLogo,
   awayLogo,
+  homeOdds,
+  awayOdds,
+  take,
 }: {
   event: FootballTapeDialogEvent;
   homeLogo?: string | null;
   awayLogo?: string | null;
+  homeOdds?: number;
+  awayOdds?: number;
+  take?: "home" | "away" | null;
 }) {
+  const resultStatus = effectiveEventStatus({
+    status: event.status ?? "upcoming",
+    source: event.source,
+    startTime: event.startTime,
+    sport: event.sport,
+  });
   const lineups = parseFootballLineups(event.lineups);
   const kickoff =
     event.startTime != null
@@ -507,6 +548,12 @@ function MatchScoreboard({
         formation={lineups?.homeFormation}
         logo={homeLogo}
         align="home"
+        odds={homeOdds}
+        take={take === "home"}
+        resultWeight={footballFinishedNameWeight("home", {
+          ...event,
+          status: resultStatus,
+        })}
       />
       <div className="flex min-w-0 shrink-0 flex-col items-center gap-1 px-1 text-center">
         {event.competition ? (
@@ -529,6 +576,12 @@ function MatchScoreboard({
         formation={lineups?.awayFormation}
         logo={awayLogo}
         align="away"
+        odds={awayOdds}
+        take={take === "away"}
+        resultWeight={footballFinishedNameWeight("away", {
+          ...event,
+          status: resultStatus,
+        })}
       />
     </div>
   );
@@ -748,6 +801,9 @@ export function FootballLiveTapeDialog({
   onTrack,
   onAddBet,
   onEpDesk,
+  showTwoupScout = false,
+  scout: scoutProp = null,
+  scoutLoading: scoutLoadingProp = false,
 }: {
   event: FootballTapeDialogEvent;
   open: boolean;
@@ -757,6 +813,9 @@ export function FootballLiveTapeDialog({
   onTrack?: () => void;
   onAddBet?: () => void;
   onEpDesk?: () => void;
+  showTwoupScout?: boolean;
+  scout?: TwoupOpennessResult | null;
+  scoutLoading?: boolean;
 }) {
   const [frozen, setFrozen] = useState(event);
   const [hydratedGoals, setHydratedGoals] = useState<string | null>(null);
@@ -766,6 +825,10 @@ export function FootballLiveTapeDialog({
   >(() => (parseMatchTape(event.goals).length > 0 ? "ready" : "idle"));
   const [tapeRetry, setTapeRetry] = useState(0);
   const [tapeTab, setTapeTab] = useState("commentary");
+  const [scoutFetched, setScoutFetched] = useState<TwoupOpennessResult | null>(null);
+  const [scoutFetchLoad, setScoutFetchLoad] = useState(false);
+  const [scoutFetchError, setScoutFetchError] = useState(false);
+  const [scoutRetry, setScoutRetry] = useState(0);
   const router = useRouter();
   const incomingKey = tapeFreezeKey(event);
   const frozenKey = tapeFreezeKey(frozen);
@@ -782,13 +845,33 @@ export function FootballLiveTapeDialog({
   const tapeRows = parseMatchTape(view.goals);
   const xi = parseFootballLineups(view.lineups);
   const hasTape = tapeRows.length > 0;
-  const matchFinished =
-    effectiveEventStatus({
-      status: view.status ?? "upcoming",
-      source: view.source,
-      startTime: view.startTime,
-      sport: view.sport,
-    }) === "finished";
+  const matchStatus = effectiveEventStatus({
+    status: view.status ?? "upcoming",
+    source: view.source,
+    startTime: view.startTime,
+    sport: view.sport,
+  });
+  const matchFinished = matchStatus === "finished";
+  const scout = scoutProp ?? scoutFetched;
+  const scoutBusy =
+    scoutLoadingProp || (showTwoupScout && scoutProp == null && scoutFetchLoad);
+  const scoutFetchFailed = scoutFetchError && !scoutBusy && scoutProp == null;
+  const pickWindfallPct =
+    scout?.pick === "home"
+      ? scout.windfallHomePct
+      : scout?.pick === "away"
+        ? scout.windfallAwayPct
+        : scout?.windfallPct;
+  const pickTier = twoupSideTierFromPct(pickWindfallPct);
+  const hasSideWindfall =
+    (scout?.windfallHomePct ?? 0) > 0 || (scout?.windfallAwayPct ?? 0) > 0;
+  const scoutWellEmpty =
+    scoutBusy ||
+    scoutFetchFailed ||
+    !scout ||
+    (scout.tier === "unknown" && !hasSideWindfall);
+  const twoupTabGlimpse =
+    !scoutBusy && scout ? TWOUP_TIER_SHORT[pickTier] : null;
   const canFetchTape = event.id != null || Boolean(event.externalId);
   const showLoading =
     open &&
@@ -801,6 +884,64 @@ export function FootballLiveTapeDialog({
     if (!open) setFrozen(event);
     else setTapeTab("commentary");
   }, [open, event, incomingKey]);
+
+  useEffect(() => {
+    if (!open || !showTwoupScout) {
+      setScoutFetched(null);
+      setScoutFetchLoad(false);
+      setScoutFetchError(false);
+      return;
+    }
+    if (scoutProp) {
+      setScoutFetched(null);
+      setScoutFetchLoad(false);
+      setScoutFetchError(false);
+      return;
+    }
+    if (event.startTime == null) return;
+    let cancelled = false;
+    setScoutFetchLoad(true);
+    setScoutFetchError(false);
+    const params = new URLSearchParams({
+      home: event.homeTeam,
+      away: event.awayTeam,
+      start: String(event.startTime),
+    });
+    if (event.competition) params.set("competition", event.competition);
+    if (event.leagueCountry) params.set("country", event.leagueCountry);
+    void api<{ items?: Array<{ openness: TwoupOpennessResult }> }>(
+      `/api/fixtures/twoup-scout?${params.toString()}`
+    )
+      .then((payload) => {
+        if (!cancelled) {
+          setScoutFetched(payload.items?.[0]?.openness ?? null);
+          setScoutFetchError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScoutFetched(null);
+          setScoutFetchError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setScoutFetchLoad(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    showTwoupScout,
+    scoutProp,
+    event.homeTeam,
+    event.awayTeam,
+    event.startTime,
+    event.competition,
+    event.leagueCountry,
+    incomingKey,
+    scoutRetry,
+  ]);
 
   useEffect(() => {
     if (!open) {
@@ -876,12 +1017,22 @@ export function FootballLiveTapeDialog({
                 {view.homeTeam} v {view.awayTeam}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Home on the left, away on the right. Commentary and starting XI.
+                Home on the left, away on the right.
+                {showTwoupScout
+                  ? " Commentary, starting XI and 2UP take."
+                  : " Commentary and starting XI."}
               </DialogDescription>
               <MatchScoreboard
                 event={view}
                 homeLogo={crests.homeLogo}
                 awayLogo={crests.awayLogo}
+                homeOdds={scout?.markets.home}
+                awayOdds={scout?.markets.away}
+                take={
+                  scout?.pick && pickTier !== "skip" && pickTier !== "unknown"
+                    ? scout.pick
+                    : null
+                }
               />
             </DialogHeader>
             <TabsLineBar className="bg-transparent [--tabs-line-inset:1.5rem]">
@@ -892,9 +1043,52 @@ export function FootballLiveTapeDialog({
               >
                 <TabsTrigger value="commentary">Commentary</TabsTrigger>
                 <TabsTrigger value="lineup">Lineup</TabsTrigger>
+                {showTwoupScout ? (
+                  <TabsTrigger
+                    value="twoup"
+                    aria-label={
+                      twoupTabGlimpse
+                        ? twoupIsEdgePick(pickTier)
+                          ? `2UP, Edge, ${twoupTabGlimpse}`
+                          : `2UP, ${twoupTabGlimpse}`
+                        : "2UP"
+                    }
+                  >
+                    2UP
+                    {!scoutBusy && scout ? (
+                      <TwoupFitTicks
+                        tier={pickTier}
+                        size="list"
+                        edge={twoupIsEdgePick(pickTier)}
+                      />
+                    ) : null}
+                  </TabsTrigger>
+                ) : null}
               </TabsList>
             </TabsLineBar>
           </div>
+          {showTwoupScout ? (
+            <TabsContent
+              value="twoup"
+              className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
+              <div
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col overflow-hidden bg-page px-6",
+                  scoutWellEmpty ? "items-center justify-center py-4" : "h-full py-4"
+                )}
+              >
+                <TwoupScoutPanel
+                  homeTeam={view.homeTeam}
+                  awayTeam={view.awayTeam}
+                  result={scout}
+                  loading={scoutBusy}
+                  error={scoutFetchFailed}
+                  onRetry={() => setScoutRetry((n) => n + 1)}
+                />
+              </div>
+            </TabsContent>
+          ) : null}
           <TabsContent
             value="commentary"
             className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"

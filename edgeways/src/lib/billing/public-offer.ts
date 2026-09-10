@@ -126,6 +126,11 @@ export const COMPARISON_FEATURES: Record<
     description:
       "Who scored, bookings, and the named lineups on tracked matches.",
   },
+  twoup_scout: {
+    title: "2UP Edge picks",
+    description:
+      "Ranked Fair or Strong 2UP takes on upcoming matches in your pinned competitions.",
+  },
   push_alerts: {
     title: "2UP alerts",
     description:
@@ -145,8 +150,11 @@ export type ComparisonRow = {
   included: Record<PlanId, boolean>;
 };
 
+/** Hide unfinished flags from the public plan table. */
+const PUBLIC_OFFER_HIDDEN = new Set<FeatureFlag>(["twoup_scout"]);
+
 export function comparisonRows(): ComparisonRow[] {
-  return FEATURES.map((flag) => ({
+  return FEATURES.filter((flag) => !PUBLIC_OFFER_HIDDEN.has(flag)).map((flag) => ({
     flag,
     title: COMPARISON_FEATURES[flag].title,
     description: COMPARISON_FEATURES[flag].description,

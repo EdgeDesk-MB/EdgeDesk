@@ -26,6 +26,7 @@ const MATRIX: Record<FeatureFlag, { free: boolean; core: boolean; edge: boolean 
   offer_edge: { free: false, core: false, edge: true },
   racing_live_feeds: { free: false, core: false, edge: true },
   football_live_feeds: { free: false, core: false, edge: true },
+  twoup_scout: { free: false, core: false, edge: true },
   push_alerts: { free: false, core: false, edge: true },
   exchange_lay: { free: false, core: false, edge: true },
 };

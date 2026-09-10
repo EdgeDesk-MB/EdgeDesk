@@ -20,6 +20,7 @@ import { buildPublicDemoState } from "@/lib/demo/public-fixture";
 import { writeChromeSnapshot } from "@/lib/chrome-snapshot";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { localCalendarDate } from "@/lib/events";
+import { jsonSnapshotUnchanged } from "@/lib/services/app-state-snapshot";
 
 const FALLBACK_POLL_MS = 3000;
 
@@ -153,7 +154,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             settingsHoldRef.current = null;
           }
           setDisplayTimeFormat(settings.timeFormat);
-          setState({ ...next, settings });
+          const applied = { ...next, settings };
+          if (
+            mode === "poll" &&
+            jsonSnapshotUnchanged(stateRef.current, applied)
+          ) {
+            setError(null);
+            return;
+          }
+          setState(applied);
           setError(null);
         } catch (e) {
           if (pollGen.current !== gen) return;
@@ -214,10 +223,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (publicDemo.active) return;
     if (pollingPaused && stateRef.current) return;
-    void fetchState("poll");
-    const timer = setInterval(() => void fetchState("poll"), pollMs);
+
+    function pollIfVisible() {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void fetchState("poll");
+    }
+
+    pollIfVisible();
+    const timer = setInterval(pollIfVisible, pollMs);
+    document.addEventListener("visibilitychange", pollIfVisible);
     return () => {
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", pollIfVisible);
     };
   }, [fetchState, pollMs, pollingPaused, publicDemo.active]);
 

@@ -88,6 +88,12 @@ export interface AppState {
   /** Completed casino campaign realised P&L only. */
   casinoProfit: number;
   provisionalProfit: number;
+  /**
+   * Open contribution for the Home Live chart: if-ended-now on live
+   * tracker positions, worst-case on the rest. Headline Prov stays
+   * `provisionalProfit`.
+   */
+  liveChartProfit: number;
   retention: RetentionState;
   /** J1: per-action-kind median execution minutes from logged samples */
   effortMeasured: Record<string, { minutes: number; sampleSize: number }>;

@@ -37,6 +37,7 @@ const RACING_STYLE: MarketDef[] = [
   { value: "other", label: "Other" },
 ];
 
+/** Auto-settled football markets are 90-minute / full time. Extra time later. */
 const FOOTBALL_MARKETS: MarketDef[] = [
   { value: "match_odds", label: "Match odds", auto: true, options: ["home", "draw", "away"] },
   { value: "btts", label: "Both teams to score", auto: true, options: ["yes", "no"] },

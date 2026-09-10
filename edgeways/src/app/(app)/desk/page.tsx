@@ -104,6 +104,7 @@ export default function DashboardPage() {
   const settled = state.settledProfit;
   const provisional = state.provisionalProfit;
   const liveTotal = settled + provisional;
+  const chartLiveTotal = settled + (state.liveChartProfit ?? provisional);
   const betCount = state.bets.length;
   const livePositionCount = state.livePositions.length;
   const showLive = liveEvents.length > 0 || livePositionCount > 0;
@@ -123,7 +124,7 @@ export default function DashboardPage() {
   const showMobileChart = showActivity && isChartOnMobileSummary(homeLayout);
 
   const chartProps = {
-    liveTotal,
+    liveTotal: chartLiveTotal,
     historicSeries: state.series,
     bets: state.bets,
     adjustments: state.pnlAdjustments,

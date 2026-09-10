@@ -449,6 +449,23 @@ CREATE TABLE IF NOT EXISTS football_competition_catalog (
   payload TEXT NOT NULL,
   fetched_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS football_odds_cache (
+  fixture_key TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  home TEXT NOT NULL,
+  away TEXT NOT NULL,
+  start_time INTEGER NOT NULL,
+  payload TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_football_odds_cache_date ON football_odds_cache(date);
+CREATE TABLE IF NOT EXISTS football_standings_cache (
+  scope_id TEXT PRIMARY KEY,
+  league_id INTEGER,
+  season INTEGER,
+  payload TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS racing_odds_overrides (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id TEXT NOT NULL,
@@ -566,6 +583,7 @@ CREATE TABLE IF NOT EXISTS casino_games (
   addColumn("events", "ht_away_score INTEGER");
   addColumn("events", "lineups TEXT");
   addColumn("events", "tape_fetched_at INTEGER");
+  addColumn("events", "result_posted_at INTEGER");
   addColumn("bets", "trigger_text TEXT");
   addColumn("bets", "trigger_rule TEXT");
   addColumn("bets", "exchange_id INTEGER");

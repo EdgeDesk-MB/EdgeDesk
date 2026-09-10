@@ -12,7 +12,8 @@
  *
  * Past dates are immutable. Stored rows re-derive upcoming/live from
  * kick-off (same 4h window as `effectiveEventStatus`) so LIVE still shows
- * between cron ticks. Live scores stay on the short poll, not this store.
+ * between cron ticks. Live scores overlay from the 60s `liveFixtures`
+ * poll on read and are not written back into the day row.
  *
  * Global feed data, not desk data - no clerk scoping.
  */
@@ -27,9 +28,11 @@ import {
   localCalendarDate,
   mergeByExternalId,
 } from "@/lib/events";
+import { mergeLiveFixtureOverlay } from "@/lib/events/live-fixture-overlay";
 import {
   fixturesByDate,
   hasApiKey,
+  liveFixtures,
   type Fixture,
 } from "@/lib/services/apifootball";
 
@@ -64,6 +67,22 @@ function withCurrentStatus(fixtures: Fixture[], now: number): Fixture[] {
     );
     return status === fixture.status ? fixture : { ...fixture, status };
   });
+}
+
+function dateMayHaveLive(date: string, now: number): boolean {
+  const today = localCalendarDate(new Date(now));
+  const yesterday = localCalendarDate(new Date(now - 86_400_000));
+  return date === today || date === yesterday;
+}
+
+async function withLiveScores(date: string, fixtures: Fixture[], now: number): Promise<Fixture[]> {
+  const current = withCurrentStatus(fixtures, now);
+  if (!dateMayHaveLive(date, now)) return current;
+  try {
+    return mergeLiveFixtureOverlay(current, await liveFixtures());
+  } catch {
+    return current;
+  }
 }
 
 export async function readFixtureStore(date: string): Promise<StoredFixtures | null> {
@@ -139,17 +158,17 @@ export async function getFixturesForDate(date: string): Promise<StoredFixtures> 
   const now = Date.now();
 
   if (stored) {
-    const fixtures = withCurrentStatus(stored.fixtures, now);
+    const fixtures = await withLiveScores(date, stored.fixtures, now);
     const fresh = now - stored.fetchedAt < FIXTURE_STORE_FRESH_MS;
     if (fresh || date < localCalendarDate()) return { ...stored, fixtures };
     scheduleBackgroundRefresh(date);
     return { ...stored, fixtures };
   }
 
-  const fixtures = await fixturesByDate(date);
-  await writeFixtureStore(date, fixtures, now).catch(() => {});
+  const fetched = await fixturesByDate(date);
+  await writeFixtureStore(date, fetched, now).catch(() => {});
   await pruneFixtureStore(now).catch(() => {});
-  return { fixtures, fetchedAt: now };
+  return { fixtures: await withLiveScores(date, fetched, now), fetchedAt: now };
 }
 
 /**

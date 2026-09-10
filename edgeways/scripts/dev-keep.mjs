@@ -23,6 +23,8 @@ import {
   readFileSync,
   unlinkSync,
   existsSync,
+  lstatSync,
+  realpathSync,
 } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -93,6 +95,20 @@ function stop(signal) {
   setTimeout(() => process.exit(0), 500).unref();
 }
 
+/** If node_modules is a symlink to ~/Library/Caches/…, install there. */
+function installRoot() {
+  const nm = path.join(root, "node_modules");
+  try {
+    if (lstatSync(nm).isSymbolicLink()) {
+      const candidate = path.dirname(realpathSync(nm));
+      if (existsSync(path.join(candidate, "package-lock.json"))) return candidate;
+    }
+  } catch {
+    // Fall through to the repo root.
+  }
+  return root;
+}
+
 /** iCloud Documents evicts node_modules to dataless stubs; Next then exits 0. */
 function nextLooksEvicted() {
   if (!existsSync(nextBin) || !existsSync(sendJs)) return true;
@@ -156,7 +172,7 @@ function restoreNextIfEvicted() {
     "iCloud evicted node_modules files (Documents is synced). Restoring with npm install"
   );
   execFileSync("npm", ["install", "--no-fund", "--no-audit"], {
-    cwd: root,
+    cwd: installRoot(),
     stdio: "inherit",
   });
   execFileSync("rm", ["-rf", path.join(root, ".next/dev")]);
@@ -174,14 +190,12 @@ function start() {
 
   restoreNextIfEvicted();
 
-  const nodeOptions = [
-    process.env.NODE_OPTIONS,
-    // Raise the V8 heap so the 80% auto-restart threshold is farther out.
-    // Next.js respects an existing max-old-space-size and will not override it.
-    "--max-old-space-size=8192",
-  ]
-    .filter(Boolean)
-    .join(" ")
+  // Do not set --max-old-space-size here. Next 16 restarts the worker when
+  // heap crosses 80% of that limit, and every open tab flashes. If we pin
+  // 8GB, the recycle hits at ~6.5GB (fixtures + admin get there quickly).
+  // Leave it unset so Next sizes heap to 50% of RAM (~48GB on this Studio)
+  // and the threshold sits near 38GB instead.
+  const nodeOptions = (process.env.NODE_OPTIONS || "")
     .replace(/\s+/g, " ")
     .trim();
 

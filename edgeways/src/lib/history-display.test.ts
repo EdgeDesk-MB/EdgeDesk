@@ -253,6 +253,7 @@ describe("historyEntryTitle for goals", () => {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: Date.now(),
   };
   const ctx = buildHistoryContext([event], [], {});
@@ -339,6 +340,7 @@ describe("football match-moment feed copy", () => {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: Date.now(),
   };
 
@@ -448,6 +450,7 @@ describe("football match-moment feed copy", () => {
       side: "home",
       eventId: 8,
       team: "Wolves",
+      backed: false,
     });
     expect(isAbsorbedTwoUpHistoryEntry(twoUp, ctx)).toBe(true);
     expect(isHiddenHistoryFeedEntry(twoUp, ctx)).toBe(true);
@@ -455,6 +458,131 @@ describe("football match-moment feed copy", () => {
     expect(historyEntryLinkLabel(g2, ctx)).toBe(
       "Open match events for Wolves v Blackburn"
     );
+  });
+
+  it("marks the 2UP goal as backed when that side has a desk back", () => {
+    const g2 = row({
+      id: 32,
+      kind: "goal",
+      title: "Goal!",
+      eventId: 8,
+      betId: undefined,
+      minute: 38,
+      detail: "Wolves 2-0 Blackburn",
+    });
+    const twoUp = row({
+      id: 33,
+      kind: "two_up",
+      title: "2UP triggered",
+      eventId: 8,
+      betId: undefined,
+      minute: 38,
+      dedupe: "2up:8:home",
+      detail: "Wolves went 2 goals ahead",
+    });
+    const homeBack: BetRow = {
+      id: 70,
+      eventId: 8,
+      label: "Wolves",
+      market: "match_odds",
+      selection: "home",
+      betType: "qualifying",
+      bookmaker: "Bet365",
+      exchangeId: 1,
+      backStake: 10,
+      backOdds: 2.1,
+      layStake: 9.5,
+      layOdds: 2.2,
+      commission: 0.02,
+      earlyPayout: 1,
+      refundAmount: null,
+      refundRetention: null,
+      legs: null,
+      triggerText: null,
+      triggerRule: null,
+      status: "open",
+      expectedProfit: 0.4,
+      actualProfit: null,
+      notes: null,
+      balanceLedgered: 1,
+      balanceSettled: 0,
+      createdAt: Date.now(),
+      settledAt: null,
+      offerId: null,
+      source: null,
+      quickLogged: null,
+      sport: "football",
+      purpose: null,
+      importFingerprint: null,
+      importMeta: null,
+    };
+    const ctx = buildHistoryContext([event], [homeBack], {}, [], [g2, twoUp]);
+    expect(historyGoalTwoUpTrigger(g2, ctx)?.backed).toBe(true);
+  });
+
+  it("dates 2UP paid early at the two-ahead kick, not the morning settle poll", () => {
+    const kickoff = Date.parse("2026-09-09T19:00:00+01:00");
+    const settlePoll = Date.parse("2026-09-10T08:04:00+01:00");
+    const chelsea: EventRow = {
+      ...event,
+      id: 21,
+      homeTeam: "Chelsea",
+      awayTeam: "Leeds",
+      startTime: kickoff,
+      homeLed2: 1,
+      awayLed2: 0,
+      goals: JSON.stringify([
+        { kind: "goal", minute: 12, side: "home" },
+        { kind: "goal", minute: 38, side: "home" },
+      ]),
+    };
+    const twoUpBet: BetRow = {
+      id: 81,
+      eventId: 21,
+      label: "2UP Chelsea",
+      market: "match_odds",
+      selection: "home",
+      betType: "qualifying",
+      bookmaker: "Bet365",
+      exchangeId: 1,
+      backStake: 10,
+      backOdds: 2.1,
+      layStake: 9.5,
+      layOdds: 2.2,
+      commission: 0.02,
+      earlyPayout: 1,
+      refundAmount: null,
+      refundRetention: null,
+      legs: null,
+      triggerText: null,
+      triggerRule: null,
+      status: "early_payout",
+      expectedProfit: 0.4,
+      actualProfit: 589.53,
+      notes: null,
+      balanceLedgered: 1,
+      balanceSettled: 1,
+      createdAt: kickoff,
+      settledAt: settlePoll,
+      offerId: null,
+      source: null,
+      quickLogged: null,
+      sport: "football",
+      purpose: null,
+      importFingerprint: null,
+      importMeta: null,
+    };
+    const paid = row({
+      id: 90,
+      kind: "settlement",
+      title: "2UP paid early",
+      eventId: 21,
+      betId: 81,
+      createdAt: settlePoll,
+    });
+    const ctx = buildHistoryContext([chelsea], [twoUpBet], {}, [], [paid]);
+    expect(historyOccurredAt(paid, ctx)).toBe(kickoff + 38 * 60 * 1000);
+    expect(historyOccurredAt(paid, ctx)).not.toBe(settlePoll);
   });
 
   it("keeps a 2UP row when no goal shows the two-ahead score", () => {
@@ -609,6 +737,7 @@ describe("formatHistoryTimeBadge", () => {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: kickoffAt.getTime(),
   };
 
@@ -652,6 +781,77 @@ describe("formatHistoryTimeBadge", () => {
     expect(historyUsesMinuteBadge(entry, ctx)).toBe(false);
     expect(formatHistoryTimeBadge(entry, ctx)).toBe("Today, 21:00");
     expect(historyOccurredAt(entry, ctx)).toBe(kickoffAt.getTime() + 90 * 60 * 1000);
+
+    vi.useRealTimers();
+  });
+
+  it("shows 120' for extra-time full time", () => {
+    const aetCtx = buildHistoryContext([{ ...event, matchEnding: "aet" }], [], {});
+    const entry = row({
+      kind: "full_time",
+      title: "Full time",
+      eventId: 1,
+      minute: 120,
+      betId: undefined,
+    });
+
+    expect(historyUsesMinuteBadge(entry, aetCtx)).toBe(true);
+    expect(formatHistoryTimeBadge(entry, aetCtx)).toBe("120'");
+  });
+
+  it("does not throw when the fixture is missing from context", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-08T21:00:00"));
+
+    const emptyCtx = buildHistoryContext([], [], {});
+    const kinds = [
+      "full_time",
+      "goal",
+      "kickoff",
+      "two_up",
+      "bet_placed",
+      "settlement",
+    ] as const;
+
+    for (const kind of kinds) {
+      const entry = row({
+        kind,
+        title: kind === "full_time" ? "Full time" : kind,
+        eventId: 99,
+        minute: kind === "goal" ? 23 : kind === "full_time" ? 90 : null,
+        betId: undefined,
+        createdAt: new Date("2026-07-08T20:10:00").getTime(),
+      });
+
+      expect(() => {
+        historyUsesMinuteBadge(entry, emptyCtx);
+        formatHistoryTimeBadgeParts(entry, emptyCtx);
+        formatHistoryTimeBadge(entry, emptyCtx);
+        historyOccurredAt(entry, emptyCtx);
+        historyEntryTitle(entry, emptyCtx);
+        historyEntryHref(entry, emptyCtx);
+        historyEntryLinkLabel(entry, emptyCtx);
+        historySportMomentHeadline(entry, emptyCtx);
+        historyMatchMomentSubline(entry, emptyCtx);
+        historyGoalScoreline(entry, emptyCtx);
+        isFootballMatchMoment(entry, emptyCtx);
+        historyEntryOpensMatchTape(entry, emptyCtx);
+        historyEntryFixtureLockup(entry, emptyCtx);
+        isHiddenHistoryFeedEntry(entry, emptyCtx);
+        sortHistoryEntries([entry], emptyCtx);
+      }).not.toThrow();
+    }
+
+    const orphanFt = row({
+      kind: "full_time",
+      title: "Full time",
+      eventId: 99,
+      minute: 90,
+      betId: undefined,
+      createdAt: new Date("2026-07-08T21:00:00").getTime(),
+    });
+    expect(historyUsesMinuteBadge(orphanFt, emptyCtx)).toBe(false);
+    expect(formatHistoryTimeBadge(orphanFt, emptyCtx)).toBe("Today, 21:00");
 
     vi.useRealTimers();
   });
@@ -889,6 +1089,7 @@ describe("sortHistoryEntries", () => {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: raceTime,
   };
   const bet: BetRow = {
@@ -996,6 +1197,96 @@ describe("sortHistoryEntries", () => {
     expect(sorted).toEqual(["settlement", "full_time", "bet_placed"]);
   });
 
+  it("orders football rows by when they happened, not full-time for every settlement", () => {
+    const kickoff = Date.parse("2026-09-09T20:00:00+01:00");
+    const football: EventRow = {
+      ...event,
+      id: 21,
+      sport: "football",
+      homeTeam: "Chelsea",
+      awayTeam: "Leeds",
+      startTime: kickoff,
+      status: "finished",
+      homeScore: 6,
+      awayScore: 3,
+      minute: 90,
+      homeLed2: 1,
+      goals: JSON.stringify([
+        { kind: "goal", minute: 12, side: "home" },
+        { kind: "goal", minute: 48, side: "home" },
+        { kind: "goal", minute: 94, side: "home" },
+      ]),
+    };
+    const twoUpBet: BetRow = {
+      ...bet,
+      id: 81,
+      eventId: 21,
+      market: "match_odds",
+      selection: "home",
+      earlyPayout: 1,
+      status: "early_payout",
+      backStake: 100,
+      backOdds: 6,
+      layStake: 90,
+      layOdds: 5.5,
+      settledAt: Date.parse("2026-09-10T08:04:00+01:00"),
+    };
+    const footCtx = buildHistoryContext([football], [twoUpBet], {});
+    const goalTwoNil = row({
+      id: 1,
+      kind: "goal",
+      title: "Goal!",
+      eventId: 21,
+      betId: undefined,
+      minute: 48,
+      createdAt: kickoff + 48 * 60 * 1000,
+      detail: "Chelsea 2-0 Leeds",
+    });
+    const paid = row({
+      id: 2,
+      kind: "settlement",
+      title: "2UP paid early",
+      eventId: 21,
+      betId: 81,
+      minute: 94,
+      createdAt: twoUpBet.settledAt!,
+      amount: 588.2,
+    });
+    const lateGoal = row({
+      id: 3,
+      kind: "goal",
+      title: "Goal!",
+      eventId: 21,
+      betId: undefined,
+      minute: 94,
+      createdAt: kickoff + 94 * 60 * 1000,
+      detail: "Chelsea 6-3 Leeds",
+    });
+    const fullTime = row({
+      id: 4,
+      kind: "full_time",
+      title: "Full time",
+      eventId: 21,
+      betId: undefined,
+      minute: 90,
+      createdAt: kickoff + 90 * 60 * 1000,
+      detail: "Chelsea 6-3 Leeds",
+    });
+    const sorted = sortHistoryEntries([paid, lateGoal, goalTwoNil, fullTime], footCtx);
+    expect(sorted.map((e) => e.title)).toEqual([
+      "Lay lost",
+      "Full time",
+      "Goal!",
+      "2UP paid early",
+      "Goal!",
+    ]);
+    expect(historyOccurredAt(sorted[0]!, footCtx)).toBe(kickoff + 94 * 60 * 1000 + 1000);
+    expect(historyOccurredAt(sorted[1]!, footCtx)).toBe(kickoff + 94 * 60 * 1000 + 1000);
+    expect(sorted[2]!.minute).toBe(94);
+    expect(sorted[3]!.title).toBe("2UP paid early");
+    expect(historyOccurredAt(sorted[3]!, footCtx)).toBe(kickoff + 48 * 60 * 1000);
+  });
+
   it("puts the latest moment at the top", () => {
     const older = row({
       id: 10,
@@ -1047,6 +1338,7 @@ describe("historyEntryHref", () => {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: raceTime,
   };
   const bet: BetRow = {

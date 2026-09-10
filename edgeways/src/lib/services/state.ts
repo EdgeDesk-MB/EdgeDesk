@@ -33,6 +33,7 @@ import {
   toSettleable,
   toTriggerContext,
 } from "@/lib/bets/settle-inputs";
+import { footballFtResultReady } from "@/lib/events/football-full-time";
 import {
   backfillMissingCasinoOfferBalances,
   ledgerFromSettledBet,
@@ -78,7 +79,10 @@ import {
 } from "@/lib/services/exchange";
 import type { ExchangeProviderStatus } from "@/lib/services/exchange/types";
 import { openBetExpectedProfit } from "@/lib/pnl/open-bet-valuation";
-import { sumOpenWorstCaseProfit } from "@/lib/pnl/open-bet-worst-case";
+import {
+  sumLiveChartProvisional,
+  sumOpenWorstCaseProfit,
+} from "@/lib/pnl/open-bet-worst-case";
 import {
   freeBetAwardPhrase,
   freeBetEffectsForBet,
@@ -105,6 +109,10 @@ import {
 } from "@/lib/racing";
 import { formatFinishingPosition, formatPromoTooltip } from "@/lib/bet-outcomes";
 import { formatEventTitle, racingVenueLabel } from "@/lib/events";
+import {
+  earlyPayoutLeadMinute,
+  settlementOccurredAt,
+} from "@/lib/history-twoup-moment";
 import { livePositionValuation } from "@/lib/calc/ep/live-pnl";
 import {
   formatLiveMarkets,
@@ -149,7 +157,10 @@ import { listInboxDedupes, recordAlerts, unreadCount } from "@/lib/services/aler
 import { sendPush } from "@/lib/services/push";
 import { fireDueUserReminders } from "@/lib/services/user-reminders";
 import {
-  LIVE_POLL_WINDOW_MS,
+  footballEventPatch,
+  isFootballLivePollCandidate,
+} from "@/lib/services/feed-sync-rules";
+import {
   needsResultBackfill,
   needsTapeBackfill,
   shouldFetchGoalTimeline,
@@ -233,14 +244,7 @@ async function refreshApiEvents(): Promise<void> {
     .where(eq(events.source, "api"))
     .all();
 
-  const apiEvents = allApiRows.filter(
-    (e) =>
-      (e.sport ?? "football") === "football" &&
-      e.externalId &&
-      e.status !== "finished" &&
-      e.startTime < now + 5 * 60 * 1000 && // kickoff imminent or passed
-      e.startTime > now - LIVE_POLL_WINDOW_MS // and not ancient
-  );
+  const apiEvents = allApiRows.filter((e) => isFootballLivePollCandidate(e, now));
 
   // Matches that missed their live window (budget ran dry, desk was closed)
   // get one cheap result fetch instead of freezing at the last polled minute.
@@ -259,10 +263,6 @@ async function refreshApiEvents(): Promise<void> {
     for (const event of apiEvents) {
       const fixture = fixtures.find((f) => f.externalId === event.externalId);
       if (!fixture) continue;
-      // 2UP flags must be tracked from score progression: once a side leads by 2, latch it.
-      const homeLed2 = event.homeLed2 || (fixture.homeScore - fixture.awayScore >= 2 ? 1 : 0);
-      const awayLed2 = event.awayLed2 || (fixture.awayScore - fixture.homeScore >= 2 ? 1 : 0);
-
       let goals = event.goals;
       let tapeFetchedAt = event.tapeFetchedAt ?? null;
       if (shouldFetchGoalTimeline(event, fixture, now)) {
@@ -285,31 +285,13 @@ async function refreshApiEvents(): Promise<void> {
       }
 
       db.update(events)
-        .set({
-          status: fixture.status,
-          homeScore: fixture.homeScore,
-          awayScore: fixture.awayScore,
-          minute: fixture.minute,
-          period: fixture.period ?? null,
-          homeLed2,
-          awayLed2,
-          goals,
-          lineups,
-          tapeFetchedAt,
-          ...(typeof fixture.htHomeScore === "number" || typeof fixture.htAwayScore === "number"
-            ? {
-                htHomeScore: fixture.htHomeScore ?? null,
-                htAwayScore: fixture.htAwayScore ?? null,
-              }
-            : {}),
-          ...(fixture.matchEnding != null
-            ? {
-                matchEnding: fixture.matchEnding,
-                ftHomeScore: fixture.ftHomeScore ?? null,
-                ftAwayScore: fixture.ftAwayScore ?? null,
-              }
-            : {}),
-        })
+        .set(
+          footballEventPatch(event, fixture, goals, {
+            lineups,
+            tapeFetchedAt,
+            now,
+          })
+        )
         .where(eq(events.id, event.id))
         .run();
     }
@@ -378,11 +360,17 @@ function settleTriggers(): void {
 
     const outcome = settleFromOutcome(toSettleable(bet), verdict.status === "won");
     const explanation = `Trigger ${verdict.status}: ${verdict.reason} - ${outcome.explanation}`;
+    const settledAt = settlementOccurredAt({
+      status: outcome.status,
+      now: Date.now(),
+      event,
+      bet,
+    });
     db.update(bets)
       .set({
         status: outcome.status,
         actualProfit: outcome.profit,
-        settledAt: Date.now(),
+        settledAt,
         notes: bet.notes ? `${bet.notes} | ${explanation}` : explanation,
       })
       .where(eq(bets.id, bet.id))
@@ -416,6 +404,7 @@ function autoSettle(): void {
       if (!racingMarketReadyToSettle(settleable.market, race)) continue;
       outcome = settleRacingBet(settleable, race);
     } else {
+      if (!footballFtResultReady(event)) continue;
       outcome = settleBet(toSettleable(bet), toMatchResult(event));
     }
     if (!outcome) continue; // underivable market → stays open for manual settlement
@@ -427,11 +416,17 @@ function autoSettle(): void {
         if (posLabel) explanation = `${explanation} · ${posLabel}`;
       }
     }
+    const settledAt = settlementOccurredAt({
+      status: outcome.status,
+      now: Date.now(),
+      event,
+      bet,
+    });
     db.update(bets)
       .set({
         status: outcome.status,
         actualProfit: outcome.profit,
-        settledAt: Date.now(),
+        settledAt,
         notes: bet.notes ? `${bet.notes} | ${explanation}` : explanation,
       })
       .where(eq(bets.id, bet.id))
@@ -520,7 +515,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
           eventId: row.eventId ?? null,
           betId: row.betId ?? null,
           ...(row.createdAt != null ? { createdAt: row.createdAt } : {}),
-          ...(existing.minute == null && row.minute != null ? { minute: row.minute } : {}),
+          ...(row.minute != null ? { minute: row.minute } : {}),
         })
         .where(eq(history.dedupe, row.dedupe))
         .run();
@@ -632,10 +627,16 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
     if (promo && !accaDetail) {
       detail = `${bet.label} · ${formatPromoTooltip(promo.amount, promo.reason)}`;
     }
-    const settlementTime =
-      linkedEvent?.sport === "horse_racing" && linkedEvent.startTime
-        ? linkedEvent.startTime
-        : bet.settledAt;
+    const settlementTime = settlementOccurredAt({
+      status: bet.status,
+      now: bet.settledAt,
+      event: linkedEvent,
+      bet,
+    });
+    const twoUpMinute =
+      bet.status === "early_payout" && linkedEvent
+        ? earlyPayoutLeadMinute(bet, linkedEvent)
+        : null;
     // Acca lays are History-silent: the back row carries the consolidated
     // campaign P&L so History matches the Home chart marker / series step.
     let amount: number | null =
@@ -651,6 +652,7 @@ function syncHistory(allEvents: EventRow[], allBets: BetRow[]): void {
       kind: "settlement",
       betId: bet.id,
       eventId: bet.eventId,
+      minute: twoUpMinute,
       title,
       detail,
       amount,
@@ -991,10 +993,14 @@ export async function getAppState(): Promise<AppState> {
   const accaDeskIds = allBets
     .filter((b) => isAccaDeskLay(b) || isAccaDeskBack(b))
     .map((b) => b.id);
+  const accaSquare = sumAccaSquareProvisional(accaBundles);
   let provisionalTotal =
-    sumOpenWorstCaseProfit(allBets, { excludeBetIds: accaDeskIds }) +
-    sumAccaSquareProvisional(accaBundles);
+    sumOpenWorstCaseProfit(allBets, { excludeBetIds: accaDeskIds }) + accaSquare;
   provisionalTotal = Math.round(provisionalTotal * 100) / 100;
+  const liveChartProfit = sumLiveChartProvisional(allBets, livePositions, {
+    excludeBetIds: accaDeskIds,
+    extraProvisional: accaSquare,
+  });
 
   const promoAwards = getPromoAwardsByBetId();
   const { entries: historyRows } = getHistoryFeed({ limit: 40 });
@@ -1064,6 +1070,7 @@ export async function getAppState(): Promise<AppState> {
     bettingProfit: pnlBuckets.bettingProfit,
     casinoProfit: pnlBuckets.casinoProfit,
     provisionalProfit: provisionalTotal,
+    liveChartProfit,
     pnlAdjustments,
     casinoSettlements,
     planRaces,

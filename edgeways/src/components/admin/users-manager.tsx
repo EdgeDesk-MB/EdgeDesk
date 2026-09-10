@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,16 @@ export function UsersManager({
   const [pending, setPending] = useState<AdminUserRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [excludeBusyId, setExcludeBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (pending || busy) return;
+    setUsers(initialUsers);
+  }, [initialUsers, pending, busy]);
+
+  useEffect(() => {
+    if (excludeBusyId) return;
+    setExcludedIds(new Set(initialExcludedIds));
+  }, [initialExcludedIds, excludeBusyId]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();

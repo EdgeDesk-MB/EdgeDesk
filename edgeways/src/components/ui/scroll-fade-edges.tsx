@@ -9,6 +9,7 @@ import {
   readHorizontalSnapPositions,
   scrollToAdjacentSnap,
 } from "@/lib/ui/drag-scroll";
+import { SCROLL_BAR_REVEAL_IDLE_MS } from "@/lib/ui/scroll-bar-reveal";
 import { cn } from "@/lib/utils";
 
 const SCROLL_EPS = 2;
@@ -101,6 +102,7 @@ export function ScrollFadeEdges({
   scrollStartKey,
   scrollAsChild = false,
   startFade = true,
+  fadeOnScroll = false,
   edgeRule = false,
   overlayScrollbar = false,
 }: {
@@ -131,6 +133,12 @@ export function ScrollFadeEdges({
    * `ListDayRule`).
    */
   startFade?: boolean;
+  /**
+   * Paint start/end washes only while the scroller is moving (same idle
+   * as overlay thumbs). Use on page tapes so the first card is not
+   * washed at rest.
+   */
+  fadeOnScroll?: boolean;
   /** Fixed top hairline; the list scrolls under it. Vertical only. */
   edgeRule?: boolean;
   /**
@@ -145,6 +153,8 @@ export function ScrollFadeEdges({
   const lockStartRef = useRef(pinScrollStart);
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
+  const [scrolling, setScrolling] = useState(false);
+  const scrollIdleRef = useRef<number | null>(null);
   const [overlayThumb, setOverlayThumb] = useState<{
     top: number;
     height: number;
@@ -254,6 +264,14 @@ export function ScrollFadeEdges({
         }
       }
       if (el.hasAttribute("data-ew-panning")) return;
+      if (fadeOnScroll) {
+        setScrolling(true);
+        if (scrollIdleRef.current != null) window.clearTimeout(scrollIdleRef.current);
+        scrollIdleRef.current = window.setTimeout(() => {
+          setScrolling(false);
+          scrollIdleRef.current = null;
+        }, SCROLL_BAR_REVEAL_IDLE_MS);
+      }
       nextUpdate();
     };
 
@@ -280,8 +298,12 @@ export function ScrollFadeEdges({
       el.removeEventListener("scroll", onScroll);
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchstart", onTouch);
+      if (scrollIdleRef.current != null) {
+        window.clearTimeout(scrollIdleRef.current);
+        scrollIdleRef.current = null;
+      }
     };
-  }, [getScroller, scrollAsChild]);
+  }, [fadeOnScroll, getScroller, scrollAsChild]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -329,6 +351,7 @@ export function ScrollFadeEdges({
   const edgeFadeSize = canStep ? Math.max(fadeSize, STEP_BUTTON_FADE_PX) : fadeSize;
   const fadeLength = edgeFadeSize + FADE_OVERHANG_PX;
   const fadeStop = SCROLL_FADE_STOP_CLASS;
+  const fadesOpen = !fadeOnScroll || scrolling;
 
   return (
     <div
@@ -396,7 +419,7 @@ export function ScrollFadeEdges({
           {children}
         </div>
       )}
-      {showStart && startFade ? (
+      {showStart && startFade && fadesOpen ? (
         <div
           aria-hidden
           className={cn(
@@ -426,7 +449,7 @@ export function ScrollFadeEdges({
           style={{ height: FADE_SEAM_PX }}
         />
       ) : null}
-      {showEnd ? (
+      {showEnd && fadesOpen ? (
         <div
           aria-hidden
           className={cn(
@@ -452,7 +475,7 @@ export function ScrollFadeEdges({
       {overlayScrollbar && overlayThumb ? (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 z-30 w-3"
+          className="app-scroll-overlay-thumb pointer-events-none absolute inset-y-0 right-0 z-30 w-3"
         >
           <div
             className="absolute right-1 w-1.5 rounded-full bg-foreground/25"

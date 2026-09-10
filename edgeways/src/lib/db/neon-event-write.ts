@@ -134,6 +134,7 @@ export async function createOrRefreshNeonEvent(input: {
         : null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: now,
   };
   return { event: await withFollow(await insertNeonEvent(values)), existing: false };

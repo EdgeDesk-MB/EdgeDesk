@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countLiveNavEvents,
+  effectiveEventStatus,
   eventShowsScore,
   clampCalendarYmd,
   feedHorizonDates,
@@ -12,6 +13,7 @@ import {
   formatRacingOffTime,
   mergeByExternalId,
   normaliseRacingApiOffTime,
+  withEffectiveFeedStatus,
 } from "./events";
 
 const NOW = Date.parse("2026-08-01T14:00:00+01:00");
@@ -80,6 +82,64 @@ describe("footballClockLabel", () => {
     expect(footballClockLabel({ minute: 105, period: "ET" })).toBe("ET 105'");
     expect(footballClockLabel({ minute: 120, period: "P" })).toBe("Pens");
     expect(footballClockLabel({ minute: 90, period: "BT" })).toBe("BT");
+  });
+});
+
+describe("effectiveEventStatus", () => {
+  it("flips API football to live once kick-off has passed", () => {
+    expect(
+      effectiveEventStatus(
+        {
+          sport: "football",
+          status: "upcoming",
+          source: "api",
+          startTime: NOW - 60_000,
+        },
+        NOW
+      )
+    ).toBe("live");
+  });
+
+  it("keeps API football upcoming before kick-off", () => {
+    expect(
+      effectiveEventStatus(
+        {
+          sport: "football",
+          status: "upcoming",
+          source: "api",
+          startTime: NOW + 60_000,
+        },
+        NOW
+      )
+    ).toBe("upcoming");
+  });
+});
+
+describe("withEffectiveFeedStatus", () => {
+  it("treats football day-cards without source as API-fed", () => {
+    expect(
+      withEffectiveFeedStatus(
+        {
+          sport: "football" as const,
+          status: "upcoming" as const,
+          startTime: NOW - 60_000,
+        },
+        NOW
+      ).status
+    ).toBe("live");
+  });
+
+  it("does not invent live for a finished match", () => {
+    expect(
+      withEffectiveFeedStatus(
+        {
+          sport: "football" as const,
+          status: "finished" as const,
+          startTime: NOW - 60_000,
+        },
+        NOW
+      ).status
+    ).toBe("finished");
   });
 });
 

@@ -29,6 +29,7 @@ function event(id: number): EventRow {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: 1,
   };
 }

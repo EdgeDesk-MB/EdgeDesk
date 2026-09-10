@@ -9,12 +9,22 @@
 import "server-only";
 
 import { eq, inArray } from "drizzle-orm";
-import { getNeonDb } from "@/lib/db/neon";
+import { getNeonDb, getNeonSql } from "@/lib/db/neon";
 import { toSqliteEventRow } from "@/lib/db/neon-desk-map";
 import { events as pgEvents } from "@/lib/db/schema.pg";
 import type { EventRow } from "@/lib/db/schema";
 
+let resultPostedColumnReady = false;
+
+async function ensureResultPostedColumn(): Promise<void> {
+  if (resultPostedColumnReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS result_posted_at bigint`;
+  resultPostedColumnReady = true;
+}
+
 export async function listNeonEvents(): Promise<EventRow[]> {
+  await ensureResultPostedColumn();
   const rows = await getNeonDb().select().from(pgEvents).orderBy(pgEvents.startTime);
   return rows.map(toSqliteEventRow);
 }
@@ -22,6 +32,7 @@ export async function listNeonEvents(): Promise<EventRow[]> {
 export async function findNeonEventByExternalId(
   externalId: string
 ): Promise<EventRow | null> {
+  await ensureResultPostedColumn();
   const trimmed = externalId.trim();
   if (!trimmed) return null;
   const rows = await getNeonDb()
@@ -33,6 +44,7 @@ export async function findNeonEventByExternalId(
 }
 
 export async function getNeonEvent(id: number): Promise<EventRow | null> {
+  await ensureResultPostedColumn();
   const rows = await getNeonDb()
     .select()
     .from(pgEvents)
@@ -66,10 +78,12 @@ export type NeonEventValues = {
   tapeFetchedAt?: number | null;
   simScript?: string | null;
   simStartedAt?: number | null;
+  resultPostedAt?: number | null;
   createdAt: number;
 };
 
 export async function insertNeonEvent(values: NeonEventValues): Promise<EventRow> {
+  await ensureResultPostedColumn();
   const rows = await getNeonDb()
     .insert(pgEvents)
     .values({
@@ -97,6 +111,7 @@ export async function insertNeonEvent(values: NeonEventValues): Promise<EventRow
       tapeFetchedAt: values.tapeFetchedAt ?? null,
       simScript: values.simScript ?? null,
       simStartedAt: values.simStartedAt ?? null,
+      resultPostedAt: values.resultPostedAt ?? null,
       createdAt: values.createdAt,
     })
     .returning();
@@ -114,6 +129,7 @@ export async function deleteNeonEvent(id: number): Promise<boolean> {
 }
 
 export async function listNeonEventsByIds(ids: number[]): Promise<EventRow[]> {
+  await ensureResultPostedColumn();
   if (ids.length === 0) return [];
   const rows = await getNeonDb()
     .select()
@@ -139,6 +155,7 @@ export type NeonEventFeedPatch = Partial<{
   matchEnding: string | null;
   ftHomeScore: number | null;
   ftAwayScore: number | null;
+  resultPostedAt: number | null;
   competition: string | null;
   homeTeam: string;
   awayTeam: string;
@@ -148,6 +165,7 @@ export async function updateNeonEvent(
   id: number,
   patch: NeonEventFeedPatch
 ): Promise<EventRow | null> {
+  await ensureResultPostedColumn();
   if (Object.keys(patch).length === 0) {
     return getNeonEvent(id);
   }

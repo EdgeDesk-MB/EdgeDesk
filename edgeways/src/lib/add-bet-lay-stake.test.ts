@@ -4,9 +4,10 @@ import {
   addBetMatchedSaveEnabled,
   addBetPlanMode,
   commitLayStakeOverride,
+  highlightedLaySnap,
   resolveAddBetLayStake,
 } from "./add-bet-lay-stake";
-import type { LayPlanInput } from "@/lib/calc";
+import { executableLayStake, layBounds, type LayPlanInput } from "@/lib/calc";
 
 /** Screenshot case: £10 @ 5.5 vs 6, Betdaq 0% commission. */
 const screenshot: LayPlanInput = {
@@ -49,6 +50,67 @@ describe("resolveAddBetLayStake", () => {
 
   it("is 0 until the plan is ready", () => {
     expect(resolveAddBetLayStake(null, null, screenshotKey)).toBe(0);
+  });
+
+  it("holds underlay / overlay / standard when stake or odds change", () => {
+    const underlayAtSix = executableLayStake(
+      screenshot,
+      layBounds(screenshot).underlay
+    );
+    const staleUnderlay = commitLayStakeOverride(underlayAtSix, screenshotKey);
+    const nextOdds = { ...screenshot, layOdds: 6.8 };
+    const nextStake = { ...screenshot, backStake: 20 };
+
+    expect(
+      resolveAddBetLayStake(
+        nextOdds,
+        staleUnderlay,
+        addBetLayCalcKey(nextOdds),
+        "underlay"
+      )
+    ).toBe(executableLayStake(nextOdds, layBounds(nextOdds).underlay));
+    expect(
+      resolveAddBetLayStake(
+        nextStake,
+        staleUnderlay,
+        addBetLayCalcKey(nextStake),
+        "underlay"
+      )
+    ).toBe(executableLayStake(nextStake, layBounds(nextStake).underlay));
+    expect(
+      resolveAddBetLayStake(
+        nextOdds,
+        staleUnderlay,
+        addBetLayCalcKey(nextOdds),
+        "overlay"
+      )
+    ).toBe(executableLayStake(nextOdds, layBounds(nextOdds).overlay));
+    expect(
+      resolveAddBetLayStake(
+        nextOdds,
+        staleUnderlay,
+        addBetLayCalcKey(nextOdds),
+        "standard"
+      )
+    ).toBe(resolveAddBetLayStake(nextOdds, null, addBetLayCalcKey(nextOdds)));
+  });
+});
+
+describe("highlightedLaySnap", () => {
+  const clustered = { underlay: 20, standard: 20, overlay: 20 };
+
+  it("picks only Standard when the three snaps sit on the same stake", () => {
+    expect(highlightedLaySnap(20, clustered, null)).toBe("standard");
+  });
+
+  it("keeps a locked underlay even when the numbers coincide", () => {
+    expect(highlightedLaySnap(20, clustered, "underlay")).toBe("underlay");
+  });
+
+  it("highlights none when the stake is off every snap", () => {
+    expect(
+      highlightedLaySnap(18.5, { underlay: 20, standard: 19, overlay: 17 }, null)
+    ).toBe(null);
   });
 });
 

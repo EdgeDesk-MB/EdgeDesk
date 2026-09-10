@@ -111,6 +111,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-tape-score-live: var(--tape-score-live);
+  --color-tape-score-live-fg: var(--tape-score-live-fg);
   --color-negative: var(--negative);
   --color-success: var(--success);
   --color-profit: var(--profit);
@@ -275,6 +277,9 @@
   --accent: oklch(0.965 0.002 250);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.48 0.22 27);
+  /* Fixture scoreboard: same red + white in both themes (TV live board). */
+  --tape-score-live: oklch(0.48 0.22 27);
+  --tape-score-live-fg: oklch(1 0 0);
   /* Loss / holding status — price-tape red (CMC / exchange pair). 3:1 on page. */
   --negative: oklch(0.62 0.205 25);
   --success: oklch(0.45 0.12 150);
@@ -339,6 +344,10 @@
   /* Page / section stack — room between graph and breakdown lists, etc. */
   --layout-stack-gap: 2rem;
   --layout-stack-gap-compact: 0.75rem;
+  /* Admin Activity board: full / half-width plot, compact pin table. */
+  --layout-admin-chart-h: 18rem;
+  --layout-admin-chart-compact-h: 14rem;
+  --layout-admin-table-compact-max-h: 12rem;
   --layout-card-x: 1.25rem;
   --layout-section-y: 0.75rem;
   /* Mobile Home swipe-deck section headers. Tall enough for Do next
@@ -643,10 +652,10 @@ html[data-font="figtree"] {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
   }
-  .app-scroll:hover {
+  .app-scroll[data-scrolling] {
     scrollbar-color: oklch(0.52 0 0 / 0.38) transparent;
   }
-  .dark .app-scroll:hover {
+  .dark .app-scroll[data-scrolling] {
     scrollbar-color: oklch(0.72 0 0 / 0.34) transparent;
   }
   .app-scroll::-webkit-scrollbar {
@@ -662,10 +671,10 @@ html[data-font="figtree"] {
     background-color: transparent;
     background-clip: padding-box;
   }
-  .app-scroll:hover::-webkit-scrollbar-thumb {
+  .app-scroll[data-scrolling]::-webkit-scrollbar-thumb {
     background-color: oklch(0.52 0 0 / 0.32);
   }
-  .dark .app-scroll:hover::-webkit-scrollbar-thumb {
+  .dark .app-scroll[data-scrolling]::-webkit-scrollbar-thumb {
     background-color: oklch(0.72 0 0 / 0.3);
   }
 
@@ -673,41 +682,23 @@ html[data-font="figtree"] {
    * Nested panels - never reserve a classic scrollbar gutter.
    * Classic thin scrollbars steal ~11px on the right only and make
    * full-bleed rows (e.g. History tints) look right-heavy.
-   * Overlay via transparent track; thumb appears on hover when supported.
+   * WebKit width stays 0 (no 8px jump while scrolling). Firefox can
+   * colour a thin overlay thumb via scrollbar-color.
    */
   .app-scroll-nested {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
     scrollbar-gutter: auto;
   }
-  .app-scroll-nested:hover {
+  .app-scroll-nested[data-scrolling] {
     scrollbar-color: oklch(0.52 0 0 / 0.38) transparent;
   }
-  .dark .app-scroll-nested:hover {
+  .dark .app-scroll-nested[data-scrolling] {
     scrollbar-color: oklch(0.72 0 0 / 0.34) transparent;
   }
   .app-scroll-nested::-webkit-scrollbar {
     width: 0;
     height: 0;
-  }
-  .app-scroll-nested:hover::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  .app-scroll-nested::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .app-scroll-nested::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: 9999px;
-    background-color: transparent;
-    background-clip: padding-box;
-  }
-  .app-scroll-nested:hover::-webkit-scrollbar-thumb {
-    background-color: oklch(0.52 0 0 / 0.32);
-  }
-  .dark .app-scroll-nested:hover::-webkit-scrollbar-thumb {
-    background-color: oklch(0.72 0 0 / 0.3);
   }
 
   /** Nested panel with a standing thin scrollbar (more-below cue). */
@@ -770,6 +761,17 @@ html[data-font="figtree"] {
   .app-scroll-track-inset::-webkit-scrollbar-track {
     margin-block: 1rem;
     background: transparent;
+  }
+
+  /**
+   * Floating custom thumb (ScrollFadeEdges overlayScrollbar). Hidden until
+   * the paired `.app-scroll-float` scroller is moving.
+   */
+  .app-scroll-overlay-thumb {
+    opacity: 0;
+  }
+  .app-scroll-float[data-scrolling] ~ .app-scroll-overlay-thumb {
+    opacity: 1;
   }
 
   /**

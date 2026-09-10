@@ -413,6 +413,8 @@ export interface HistoryTwoUpTrigger {
   side: Side;
   eventId: number;
   team: string | null;
+  /** Solid badge when this side was backed; outline when only watching. */
+  backed: boolean;
 }
 
 /**
@@ -436,6 +438,7 @@ export function inferTwoUpTriggerGoalIds(
           side: "home",
           eventId,
           team: event?.homeTeam ?? score.homeTeam,
+          backed: false,
         });
         homeTriggered = true;
       } else if (!awayTriggered && lead <= -2 && prevLead > -2) {
@@ -443,6 +446,7 @@ export function inferTwoUpTriggerGoalIds(
           side: "away",
           eventId,
           team: event?.awayTeam ?? score.awayTeam,
+          backed: false,
         });
         awayTriggered = true;
       }

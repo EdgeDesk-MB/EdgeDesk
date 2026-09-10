@@ -222,6 +222,10 @@ describe("public demo fixture", () => {
       "/api/exchange/football-odds?home=Everton&away=Crystal%20Palace"
     ) as { status: string };
     expect(footballOdds.status).toBe("unmatched");
+    const twoupScout = publicDemoApiGet("/api/fixtures/twoup-scout?date=2026-09-08") as {
+      items: unknown[];
+    };
+    expect(twoupScout.items).toEqual([]);
     const lots = publicDemoApiGet("/api/accounts/free-bets") as { lots: unknown[] };
     expect(lots.lots.length).toBeGreaterThan(3);
     // EDGE-106: the accounts list and pending queue are canned too, so a demo

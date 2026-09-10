@@ -75,6 +75,7 @@ import {
   commitLayStakeOverride,
   resolveAddBetLayStake,
   type KeyedLayOverride,
+  type LaySnapTarget,
 } from "@/lib/add-bet-lay-stake";
 import {
   dutchWorstProfit,
@@ -111,6 +112,7 @@ import {
   stripStaleHorseFromRacingBetLabel,
   syncRacingBetLabelOnSelectionChange,
 } from "@/lib/bets/racing-bet-label";
+import { syncFootballBetLabelOnSelectionChange } from "@/lib/bets/football-bet-label";
 import {
   defaultEventDateTime,
   effectiveEventStatus,
@@ -399,6 +401,18 @@ export function AddBetDialog({
     setLabel((current) => syncRacingBetLabelOnSelectionChange(current, selection, next));
     setSelection(next);
   };
+  const commitFootballSelection = (next: string) => {
+    setLabel((current) =>
+      syncFootballBetLabelOnSelectionChange(
+        current,
+        selection,
+        next,
+        effectiveHome,
+        effectiveAway
+      )
+    );
+    setSelection(next);
+  };
   const [betType, setBetType] = useState<UiBetType>(appSettings?.defaultBetType ?? "qualifying");
   /** The calc/settlement mode behind the UI type */
   const calcBetType: BetMode =
@@ -426,6 +440,7 @@ export function AddBetDialog({
   const [advanced, setAdvanced] = useState(false);
   const [partLays, setPartLays] = useState<PartLay[]>([]);
   const [layStakeOverride, setLayStakeOverride] = useState<KeyedLayOverride | null>(null);
+  const [laySnap, setLaySnap] = useState<LaySnapTarget | null>(null);
   const [triggerText, setTriggerText] = useState("");
   const [triggerLinkedFromLabel, setTriggerLinkedFromLabel] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
@@ -467,6 +482,7 @@ export function AddBetDialog({
     setAdvanced(false);
     setPartLays([]);
     setLayStakeOverride(null);
+    setLaySnap(null);
     setTriggerText("");
     setTriggerLinkedFromLabel(false);
     setManualEntry(false);
@@ -921,8 +937,8 @@ export function AddBetDialog({
 
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
   const layStake = useMemo(
-    () => resolveAddBetLayStake(planInput, layStakeOverride, layCalcKey),
-    [planInput, layStakeOverride, layCalcKey]
+    () => resolveAddBetLayStake(planInput, layStakeOverride, layCalcKey, laySnap),
+    [planInput, layStakeOverride, layCalcKey, laySnap]
   );
   const preview = useMemo(
     () => (planInput ? layPlanOutcome({ ...planInput, layStake }) : null),
@@ -1704,6 +1720,7 @@ export function AddBetDialog({
         setLayOdds(fields.layOdds);
       }
       if (fields.layStake != null && fields.layStake > 0 && source === "exchange") {
+        setLaySnap(null);
         setLayStakeOverride(
           commitLayStakeOverride(
             fields.layStake,
@@ -2029,6 +2046,16 @@ export function AddBetDialog({
       toast.error(`Pick a ${courseScopeLabel ?? "scoped"} race for this campaign`);
       return;
     }
+    const withFootballSelectionLabel = (raw: string) =>
+      sport === "football" && editBet
+        ? syncFootballBetLabelOnSelectionChange(
+            raw,
+            editBet.selection,
+            selection,
+            effectiveHome,
+            effectiveAway
+          )
+        : raw;
     if (dutchLegs?.length) {
       setSaving(true);
       try {
@@ -2037,12 +2064,13 @@ export function AddBetDialog({
           selectedOfferId ?? prefill?.offerId ?? editBet?.offerId ?? undefined;
         const dutchBookmaker = bookmaker || prefill?.bookmaker || undefined;
         const payload = {
-          label:
+          label: withFootballSelectionLabel(
             label ||
-            prefill?.labelSuggestion ||
-            `Dutch · ${dutchLegs.map((l) => l.label).join(" / ")}`,
+              prefill?.labelSuggestion ||
+              `Dutch · ${dutchLegs.map((l) => l.label).join(" / ")}`
+          ),
           market: dutchLegs[0]?.market ?? "match_odds",
-          selection: "",
+          selection: selection || "",
           betType: "dutch",
           bookmaker: dutchBookmaker,
           backStake: dutchLegs.reduce((a, l) => a + l.stake, 0),
@@ -2115,9 +2143,11 @@ export function AddBetDialog({
 
       const payload = {
         label: stripStaleHorseFromRacingBetLabel(
-          label ||
-            prefill?.labelSuggestion ||
-            `${currentMarket?.label ?? market} ${selection}`.trim(),
+          withFootballSelectionLabel(
+            label ||
+              prefill?.labelSuggestion ||
+              `${currentMarket?.label ?? market} ${selection}`.trim()
+          ),
           selection
         ),
         eventId: resolvedEventId ?? null,
@@ -2793,7 +2823,7 @@ export function AddBetDialog({
                 <PanelIconSelect
                   label="Selection"
                   value={selection}
-                  onChange={setSelection}
+                  onChange={usesTeamLabels ? commitFootballSelection : setSelection}
                   sport={sport}
                   selectClassName={ring(!selection.trim())}
                   options={currentMarket.options.map((option) => ({
@@ -3010,6 +3040,9 @@ export function AddBetDialog({
                         if (!on) {
                           setPartLays([]);
                           setLayStakeOverride(null);
+                          setLaySnap(null);
+                        } else {
+                          setLaySnap("standard");
                         }
                       }}
                     />
@@ -3043,6 +3076,8 @@ export function AddBetDialog({
                     onLayStake={(v) =>
                       setLayStakeOverride(commitLayStakeOverride(v, layCalcKey))
                     }
+                    lockedSnap={laySnap}
+                    onLockedSnap={setLaySnap}
                     partLays={partLays}
                     onPartLays={setPartLays}
                     accent={exchange?.brandColor ?? "#1e293b"}
@@ -3057,9 +3092,10 @@ export function AddBetDialog({
                 value={layStake}
                 fillSelection={selection || label}
                 pending={!planInput}
-                onChange={(v) =>
-                  setLayStakeOverride(commitLayStakeOverride(v, layCalcKey))
-                }
+                onChange={(v) => {
+                  setLaySnap(null);
+                  setLayStakeOverride(commitLayStakeOverride(v, layCalcKey));
+                }}
               />
             </LayPanel>
             )}

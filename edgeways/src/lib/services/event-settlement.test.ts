@@ -50,6 +50,7 @@ function event(partial: Partial<EventRow> = {}): EventRow {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: NOW - 3 * 60 * 60 * 1000,
     ...partial,
   };
@@ -136,6 +137,21 @@ describe("settlementForBetOnEvent — football final result", () => {
     expect(actual.status).toBe("lost");
   });
 
+  it("leaves the bet open after AET if the 90-minute score was never stored", () => {
+    expect(
+      settlementForBetOnEvent(
+        bet(),
+        event({
+          homeScore: 3,
+          awayScore: 2,
+          matchEnding: "aet",
+          ftHomeScore: null,
+          ftAwayScore: null,
+        })
+      )
+    ).toBeNull();
+  });
+
   it("pays a 2UP bet early once the home side has led by two", () => {
     const b = bet({ earlyPayout: 1 });
     const e = event({ homeScore: 2, awayScore: 2, homeLed2: 1 });
@@ -150,6 +166,12 @@ describe("settlementForBetOnEvent — football final result", () => {
   it("leaves the bet open while the match is unfinished", () => {
     expect(settlementForBetOnEvent(bet(), event({ status: "live" }))).toBeNull();
     expect(settlementForBetOnEvent(bet(), event({ status: "upcoming" }))).toBeNull();
+    expect(
+      settlementForBetOnEvent(
+        bet(),
+        event({ status: "live", period: "ET", minute: 105, homeScore: 2, awayScore: 2 })
+      )
+    ).toBeNull();
   });
 
   it("ignores bets that are not open, or not linked to this event", () => {

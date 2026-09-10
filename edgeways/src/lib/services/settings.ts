@@ -8,6 +8,7 @@ import {
   DEFAULT_SETTINGS,
   bookmakerFromOfferPrefs,
   normalizeDefaultSport,
+  normalizeFixtureBoardView,
   normalizeHomeLayout,
   normalizeMobileDeckPin,
   normalizePlanPreview,
@@ -19,6 +20,7 @@ import {
   type OfferBetPref,
   type TuningSettings,
 } from "./settings-shared";
+import { mergeFixtureBoardView } from "@/lib/events/fixture-board-view";
 import { normalizeFavouriteScopeIds } from "@/lib/events/fixture-scope";
 import {
   DEFAULT_BRAND_ACCENT_HEX,
@@ -98,6 +100,15 @@ function parseHomeLayout(raw: string | undefined): HomeLayoutSettings {
   }
 }
 
+function parseFixtureBoardView(raw: string | undefined) {
+  if (!raw) return normalizeFixtureBoardView(undefined);
+  try {
+    return normalizeFixtureBoardView(JSON.parse(raw));
+  } catch {
+    return normalizeFixtureBoardView(undefined);
+  }
+}
+
 function parseFavouriteScopeIds(raw: string | undefined): string[] {
   if (!raw) return [];
   try {
@@ -159,6 +170,7 @@ export function getAppSettings(): AppSettings {
     favouriteRacingCourses: parseFavouriteScopeIds(readRaw("favouriteRacingCourses")),
     hiddenFootballScopes: parseFavouriteScopeIds(readRaw("hiddenFootballScopes")),
     hiddenRacingCourses: parseFavouriteScopeIds(readRaw("hiddenRacingCourses")),
+    fixtureBoardView: parseFixtureBoardView(readRaw("fixtureBoardView")),
     ...(() => {
       const rawPreset = readRaw("brandAccentPreset");
       const presetId = isBrandAccentPresetId(rawPreset)
@@ -318,6 +330,13 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
       "hiddenRacingCourses",
       JSON.stringify(normalizeFavouriteScopeIds(patch.hiddenRacingCourses))
     );
+  }
+  if (patch.fixtureBoardView != null) {
+    const merged = mergeFixtureBoardView(
+      parseFixtureBoardView(readRaw("fixtureBoardView")),
+      patch.fixtureBoardView
+    );
+    writeRaw("fixtureBoardView", JSON.stringify(merged));
   }
   if (patch.brandAccentPreset != null) {
     const id = isBrandAccentPresetId(patch.brandAccentPreset)

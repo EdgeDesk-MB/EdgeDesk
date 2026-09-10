@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/session";
 import { setPosthogFlagActive } from "@/lib/admin/flags";
+import { writeDeskPreviews } from "@/lib/admin/desk-previews";
+import {
+  isDeskPreviewId,
+  isDeskPreviewMode,
+  normalizeClerkUserIds,
+} from "@/lib/admin/desk-previews-shared";
 import {
   writeAppUpdateSettings,
   writeMaintenanceBanner,
@@ -30,6 +36,11 @@ export async function PATCH(request: Request) {
       message?: string;
     };
     flag?: { id?: number; active?: boolean };
+    preview?: {
+      id?: string;
+      mode?: string;
+      clerkUserIds?: unknown;
+    };
   };
   try {
     body = (await request.json()) as typeof body;
@@ -108,6 +119,28 @@ export async function PATCH(request: Request) {
       message: body.update.message ?? "",
     });
     return NextResponse.json({ update });
+  }
+
+  if (body.preview) {
+    if (!isDeskPreviewId(body.preview.id)) {
+      return NextResponse.json(
+        { error: "Pick a desk preview." },
+        { status: 400 }
+      );
+    }
+    if (body.preview.mode != null && !isDeskPreviewMode(body.preview.mode)) {
+      return NextResponse.json(
+        { error: "Pick off, allowlist, or entitled." },
+        { status: 400 }
+      );
+    }
+    const previews = await writeDeskPreviews({
+      [body.preview.id]: {
+        mode: isDeskPreviewMode(body.preview.mode) ? body.preview.mode : "off",
+        clerkUserIds: normalizeClerkUserIds(body.preview.clerkUserIds),
+      },
+    });
+    return NextResponse.json({ previews });
   }
 
   const flagId = body.flag?.id;

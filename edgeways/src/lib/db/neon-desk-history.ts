@@ -72,6 +72,7 @@ export async function upsertNeonDeskHistory(
         eventId: values.eventId ?? null,
         betId: values.betId ?? null,
         minute: values.minute ?? null,
+        createdAt: values.createdAt,
       },
     });
 }
@@ -99,7 +100,6 @@ export async function syncNeonDeskEventHistory(
       clerkUserId,
     });
     for (const fact of facts) {
-      if (seen.has(fact.dedupe)) continue;
       const values: NeonDeskHistoryValues = {
         dedupe: fact.dedupe,
         kind: fact.kind,
@@ -111,9 +111,11 @@ export async function syncNeonDeskEventHistory(
       };
       if (fact.write === "upsert") {
         await upsertNeonDeskHistory(values, clerkUserId);
-      } else {
-        await insertNeonDeskHistory(values, clerkUserId);
+        seen.add(fact.dedupe);
+        continue;
       }
+      if (seen.has(fact.dedupe)) continue;
+      await insertNeonDeskHistory(values, clerkUserId);
       seen.add(fact.dedupe);
     }
     const staleScoreTicks = obsoleteScoreHistoryDedupes(event);

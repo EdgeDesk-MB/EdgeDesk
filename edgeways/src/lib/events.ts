@@ -427,6 +427,31 @@ export function effectiveEventStatus(
   return "upcoming";
 }
 
+/**
+ * Day-card / feed-list status. Football fixtures omit `source` on the
+ * client payload, but they are API-fed — treat a missing source as `api`
+ * so kick-off still flips LIVE between store refreshes.
+ */
+export function withEffectiveFeedStatus<
+  T extends {
+    sport?: string | null;
+    status: "upcoming" | "live" | "finished";
+    startTime: number;
+    source?: string | null;
+  },
+>(item: T, now = Date.now()): T {
+  const status = effectiveEventStatus(
+    {
+      sport: item.sport,
+      status: item.status,
+      source: item.source ?? "api",
+      startTime: item.startTime,
+    },
+    now
+  );
+  return status === item.status ? item : { ...item, status };
+}
+
 export type NavLivePulseScope = "all" | "racing";
 
 type LiveNavEvent = {

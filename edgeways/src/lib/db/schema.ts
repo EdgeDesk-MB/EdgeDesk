@@ -39,6 +39,8 @@ export const events = sqliteTable("events", {
   simScript: text("sim_script"),
   /** Real-world kickoff anchor for the simulation clock */
   simStartedAt: integer("sim_started_at"),
+  /** Epoch ms when the API first posted FT / AET / PEN (or a race result). */
+  resultPostedAt: integer("result_posted_at"),
   createdAt: integer("created_at").notNull(),
 });
 
@@ -686,6 +688,30 @@ export const fixtureCache = sqliteTable("fixture_cache", {
 export const footballCompetitionCatalog = sqliteTable("football_competition_catalog", {
   id: text("id").primaryKey(),
   /** JSON array of FootballCompetitionCatalogEntry. */
+  payload: text("payload").notNull(),
+  fetchedAt: integer("fetched_at").notNull(),
+});
+
+/**
+ * Shared exchange 1X2 + O2.5 + BTTS for 2UP scout. Global feed, no clerk.
+ */
+export const footballOddsCache = sqliteTable("football_odds_cache", {
+  fixtureKey: text("fixture_key").primaryKey(),
+  date: text("date").notNull(),
+  home: text("home").notNull(),
+  away: text("away").notNull(),
+  startTime: integer("start_time").notNull(),
+  payload: text("payload").notNull(),
+  fetchedAt: integer("fetched_at").notNull(),
+});
+
+/**
+ * League GF/GA rates for 2UP scout. Global feed, no clerk. One row per scope.
+ */
+export const footballStandingsCache = sqliteTable("football_standings_cache", {
+  scopeId: text("scope_id").primaryKey(),
+  leagueId: integer("league_id"),
+  season: integer("season"),
   payload: text("payload").notNull(),
   fetchedAt: integer("fetched_at").notNull(),
 });

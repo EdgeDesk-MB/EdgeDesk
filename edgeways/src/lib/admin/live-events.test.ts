@@ -82,6 +82,8 @@ describe("serialiseLiveFingerprint", () => {
       offers: { n: 0, maxAt: 0 },
       casino: { n: 0, maxAt: 0 },
       signups: { n: 0, maxAt: 0 },
+      inbox: { n: 0, maxAt: 0 },
+      waitlist: { n: 0, maxAt: 0 },
       footballUsed: 10,
       racingUsed: 0,
       health: "ok",
@@ -92,5 +94,11 @@ describe("serialiseLiveFingerprint", () => {
     expect(serialiseLiveFingerprint({ ...base, health: "down" })).not.toBe(
       serialiseLiveFingerprint(base)
     );
+    expect(
+      serialiseLiveFingerprint({ ...base, signups: { n: 0, maxAt: 9 } })
+    ).not.toBe(serialiseLiveFingerprint(base));
+    expect(
+      serialiseLiveFingerprint({ ...base, inbox: { n: 1, maxAt: 4 } })
+    ).not.toBe(serialiseLiveFingerprint(base));
   });
 });

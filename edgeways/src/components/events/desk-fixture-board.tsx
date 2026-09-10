@@ -1,12 +1,26 @@
 "use client";
 
+import NumberFlow from "@number-flow/react";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FavouriteStar } from "@/components/events/favourite-star";
 import { HideScopeButton } from "@/components/events/hide-scope-button";
 import { FixtureScopeFilter } from "@/components/events/fixture-scope-filter";
 import { FixtureSavedRail } from "@/components/events/fixture-saved-rail";
+import {
+  ExchangeBackStack,
+  validTapeBack,
+} from "@/components/events/exchange-back-tags";
+import {
+  TwoupEdgeMark,
+  TwoupFitTickSlot,
+  TwoupOpennessMeter,
+  twoupSideFitSummary,
+  twoupSideIsEdgePick,
+} from "@/components/events/twoup-openness-meter";
+import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { useNow } from "@/hooks/use-now";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FilterPill } from "@/components/ui/filter-pill";
@@ -20,7 +34,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { Fixture, FootballCompetition, RacingFixture } from "@/components/events/types";
 import { RegionFlag, GlobalFlag } from "@/components/region-flag";
-import { SportIcon } from "@/components/sport-icon";
+import { FootballIcon, SportIcon } from "@/components/sport-icon";
 import { TeamCrest } from "@/components/team-crest";
 import {
   FootballLiveTapeDialog,
@@ -51,30 +65,65 @@ import {
 } from "@/lib/events/fixture-scope";
 import { competitionFlagIso } from "@/lib/geo/competition";
 import { toIsoCountryCode, racingRegionLabel } from "@/lib/geo/region";
-import { footballClockLabel, sortFixturesByKickoff } from "@/lib/events";
+import {
+  twoupHasEdgePick,
+  twoupScoutKey,
+  twoupTakeWindfallPct,
+  type TwoupOpennessResult,
+} from "@/lib/calc/ep/twoup-openness";
+import { canUseTwoupScout } from "@/lib/entitlements/twoup-scout";
+import {
+  alignSideBackMarksToFixture,
+  eventHasAnyUserBack,
+  eventSideBackMark,
+  type SideBackMark,
+} from "@/lib/events/twoup-backed";
+import { footballClockLabel, sortFixturesByKickoff, withEffectiveFeedStatus } from "@/lib/events";
+import {
+  fixtureTapeNameWeightClass,
+  footballFinishedNameWeight,
+} from "@/lib/events/fixture-result-weight";
+import { mergeLiveFixtureOverlay } from "@/lib/events/live-fixture-overlay";
+import {
+  applyFixtureBoardRail,
+  fixtureBoardSportView,
+  mergeFixtureBoardView,
+  normalizeFixtureBoardView,
+} from "@/lib/events/fixture-board-view";
 import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
 import { formatClockTime } from "@/lib/time-format";
 import {
   FIXTURE_TAPE_GUTTER_PX,
   fixtureTapeClockMin,
   fixtureTapeMatchGrid,
+  fixtureTapeFootballRow,
   fixtureTapeRow,
   fixtureTapeRowGrid,
+  fixtureTapeSectionBar,
+  fixtureTapeSectionBody,
   fixtureTapeSectionHover,
-  fixtureTapeScoreRail,
+  fixtureTapeScoreboard,
+  fixtureTapeScoreboardCell,
+  fixtureTapeScoreboardLive,
+  fixtureTapeScoreboardRest,
+  fixtureTapeScoreboardRuleLive,
+  fixtureTapeScoreboardRuleRest,
+  fixtureTapeTeamLine,
   fixtureTapeTeamStack,
+  fixtureTapeTrailing,
+  twoupTickSlotBox,
   favouriteStarIcon,
+  backedNavTag,
   filterPillCountState,
   filterPillGroup,
   listRowGroup,
-  deskInsetX,
   sectionTitle,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { CalendarDays, ChevronDown, Flame, Loader2, NotebookPen, Pin, Plus, Radio } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Flame, Loader2, NotebookPen, Pin, Plus, Radio, Zap } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
 
-export type FixtureStatusFilter = "all" | "live" | "scheduled";
+export type FixtureStatusFilter = "all" | "live" | "scheduled" | "picks";
 
 function matchesStatusFilter(
   status: "upcoming" | "live" | "finished",
@@ -82,8 +131,43 @@ function matchesStatusFilter(
 ): boolean {
   if (filter === "all") return true;
   if (filter === "live") return status === "live";
+  if (filter === "picks" || filter === "scheduled") return status === "upcoming";
   return status === "upcoming";
 }
+
+function fixtureScoutKey(fixture: Fixture): string {
+  return twoupScoutKey({
+    homeTeam: fixture.homeTeam,
+    awayTeam: fixture.awayTeam,
+    startTime: fixture.startTime,
+  });
+}
+
+function fixtureHasTwoupEdgePick(
+  fixture: Fixture,
+  scoutByKey: Map<string, TwoupOpennessResult>
+): boolean {
+  if (fixture.status !== "upcoming") return false;
+  return twoupHasEdgePick(scoutByKey.get(fixtureScoutKey(fixture)));
+}
+
+function sortFixturesByTwoupPick(
+  fixtures: Fixture[],
+  scoutByKey: Map<string, TwoupOpennessResult>
+): Fixture[] {
+  return [...fixtures].sort((a, b) => {
+    const awayFirst =
+      (twoupTakeWindfallPct(scoutByKey.get(fixtureScoutKey(b))) ?? 0) -
+      (twoupTakeWindfallPct(scoutByKey.get(fixtureScoutKey(a))) ?? 0);
+    if (awayFirst !== 0) return awayFirst;
+    return a.startTime - b.startTime;
+  });
+}
+
+const TWOUP_PICKS_EMPTY =
+  "A Fair or Strong take on a pinned match.";
+const TWOUP_PICKS_EMPTY_RETRY =
+  "A Fair or Strong take on a pinned match. Try another day, or show all.";
 
 function fixtureBoardEmptyCopy(
   sport: "football" | "horse_racing",
@@ -95,8 +179,32 @@ function fixtureBoardEmptyCopy(
   favouritesOnly?: boolean,
   hasFavouritePins?: boolean,
   hasHiddenPins?: boolean,
+  backedOnly?: boolean,
 ) {
   if (loadFailed) return { title: emptyTitle, description: emptyDescription };
+  if (backedOnly) {
+    const statusBit =
+      statusFilter === "live"
+        ? sport === "horse_racing"
+          ? "live races"
+          : "live fixtures"
+        : statusFilter === "scheduled"
+          ? sport === "horse_racing"
+            ? "scheduled races"
+            : "scheduled fixtures"
+          : statusFilter === "picks"
+            ? "2UP picks"
+            : sport === "horse_racing"
+              ? "races"
+              : "fixtures";
+    return {
+      title: `No backed ${statusBit}`,
+      description:
+        sport === "horse_racing"
+          ? "None of today's cards have a desk back. Show all, or try another day."
+          : "None of today's matches have a desk back. Show all, or try another day.",
+    };
+  }
   if (favouritesOnly && !hasFavouritePins) {
     return {
       title:
@@ -108,6 +216,13 @@ function fixtureBoardEmptyCopy(
     };
   }
   if (favouritesOnly && hasFavouritePins) {
+    if (statusFilter === "picks") {
+      return {
+        title: "No 2UP picks in Pinned only",
+        description:
+          TWOUP_PICKS_EMPTY_RETRY,
+      };
+    }
     const statusBit =
       statusFilter === "live"
         ? sport === "horse_racing"
@@ -163,6 +278,19 @@ function fixtureBoardEmptyCopy(
           ? `No scheduled races${scoped}`
           : `No scheduled fixtures${scoped}`,
       description: clearHint ?? "Nothing upcoming in this feed. Try All or Live.",
+    };
+  }
+  if (statusFilter === "picks") {
+    return {
+      title: favouritesOnly && !hasFavouritePins
+        ? "No pinned competitions"
+        : `No 2UP picks${scoped}`,
+      description:
+        favouritesOnly && !hasFavouritePins
+          ? "Pin a competition. 2UP picks come from the competitions you follow."
+          : scopeLabel || favouritesOnly
+            ? TWOUP_PICKS_EMPTY_RETRY
+            : TWOUP_PICKS_EMPTY,
     };
   }
   if (scopeLabel) {
@@ -299,12 +427,65 @@ function FixtureActions({
   );
 }
 
+const tapeFigureTimings = {
+  transformTiming: { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  spinTiming: { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  opacityTiming: { duration: 100, easing: "ease-out" },
+} as const;
+
+function TapeScoreFigure({ value }: { value: number }) {
+  return (
+    <span className={fixtureTapeScoreboardCell}>
+      <NumberFlow
+        value={value}
+        trend={0}
+        {...tapeFigureTimings}
+        format={{ useGrouping: false, maximumFractionDigits: 0 }}
+      />
+    </span>
+  );
+}
+
+function FixtureScoreboard({
+  home,
+  away,
+  live,
+}: {
+  home?: number | null;
+  away?: number | null;
+  live: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        fixtureTapeScoreboard,
+        live ? fixtureTapeScoreboardLive : fixtureTapeScoreboardRest
+      )}
+      aria-label={
+        live
+          ? `Live ${home ?? 0}–${away ?? 0}`
+          : `Full time ${home ?? 0}–${away ?? 0}`
+      }
+    >
+      <TapeScoreFigure value={home ?? 0} />
+      <div
+        className={cn(
+          "h-px",
+          live ? fixtureTapeScoreboardRuleLive : fixtureTapeScoreboardRuleRest
+        )}
+        aria-hidden
+      />
+      <TapeScoreFigure value={away ?? 0} />
+    </div>
+  );
+}
+
 function tapeClockClass(live: boolean, align: "end" | "start" = "end") {
   return cn(
-    "flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums leading-none",
+    "flex items-center gap-1 text-sm font-semibold tabular-nums leading-none",
     align === "start"
-      ? cn("justify-start text-left", fixtureTapeClockMin)
-      : cn("justify-end text-right", fixtureTapeClockMin),
+      ? cn("shrink-0 justify-start text-left", fixtureTapeClockMin)
+      : "shrink-0 justify-end text-right",
     live ? "text-profit" : "text-muted-foreground"
   );
 }
@@ -323,10 +504,43 @@ function fixtureTapeEvent(
     minute: fixture.minute,
     startTime: fixture.startTime,
     competition: fixture.competition,
+    leagueCountry: fixture.leagueCountry,
     externalId: fixture.externalId,
     source: "api",
     sport: "football",
   };
+}
+
+function fixtureTeamBack(
+  fixture: Fixture,
+  eventId: number | undefined,
+  teamBackByEventId: Map<number, { home: SideBackMark | null; away: SideBackMark | null }>,
+  footballEventById: Map<number, { homeTeam: string; awayTeam: string }>
+) {
+  if (eventId == null) return undefined;
+  const marks = teamBackByEventId.get(eventId);
+  const event = footballEventById.get(eventId);
+  if (!marks || !event) return marks;
+  return alignSideBackMarksToFixture(event, fixture, marks);
+}
+
+function FixtureBackedTag({ mark }: { mark: SideBackMark | null | undefined }) {
+  if (!mark) return null;
+  const detail =
+    mark.kind === "open"
+      ? mark.betCount > 1
+        ? `${mark.betCount} open bets on this team`
+        : "Open bet on this team"
+      : mark.betCount > 1
+        ? `${mark.betCount} settled bets on this team`
+        : "Settled bet on this team";
+  return (
+    <span className={cn(backedNavTag, "shrink-0")} title={detail} aria-label={detail}>
+      <Check className="size-3 stroke-[2.5]" aria-hidden />
+      Backed
+      {mark.betCount > 1 ? ` · ${mark.betCount}` : ""}
+    </span>
+  );
 }
 
 function FootballTapeRow({
@@ -335,12 +549,22 @@ function FootballTapeRow({
   displayTimezone,
   scope,
   onOpenTape,
+  showMeter,
+  scout,
+  scoutLoading,
+  homeBack,
+  awayBack,
 }: {
   fixture: Fixture;
   eventId?: number;
   displayTimezone: string;
   scope?: string;
   onOpenTape: (event: FootballTapeDialogEvent) => void;
+  showMeter?: boolean;
+  scout?: TwoupOpennessResult | null;
+  scoutLoading?: boolean;
+  homeBack?: SideBackMark | null;
+  awayBack?: SideBackMark | null;
 }) {
   const live = fixture.status === "live";
   const showScore = live || fixture.status === "finished";
@@ -349,14 +573,37 @@ function FootballTapeRow({
     : fixture.status === "finished"
       ? "FT"
       : formatClockTime(fixture.startTime, { timeZone: displayTimezone });
-  const scoreClass = cn(
-    "text-sm font-semibold tabular-nums",
-    live ? "text-profit" : showScore ? "text-foreground" : "text-muted-foreground"
-  );
+  const showOdds =
+    !showScore &&
+    Boolean(showMeter) &&
+    !scoutLoading &&
+    (validTapeBack(scout?.markets.home) || validTapeBack(scout?.markets.away));
+  function fitMeter(side: "home" | "away") {
+    if (!showMeter) {
+      return (
+        <span
+          className="w-0 shrink-0 overflow-hidden"
+          style={{ height: twoupTickSlotBox("list").height }}
+          aria-hidden
+        />
+      );
+    }
+    return (
+      <TwoupFitTickSlot>
+        <TwoupOpennessMeter
+          result={scout}
+          loading={scoutLoading}
+          side={side}
+          homeTeam={fixture.homeTeam}
+          awayTeam={fixture.awayTeam}
+        />
+      </TwoupFitTickSlot>
+    );
+  }
 
   return (
     <li
-      className={cn(fixtureTapeRow, "cursor-pointer")}
+      className={cn(fixtureTapeFootballRow, "cursor-pointer")}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest("a, button")) return;
         onOpenTape(fixtureTapeEvent(fixture, eventId));
@@ -364,33 +611,74 @@ function FootballTapeRow({
     >
       <div className={fixtureTapeMatchGrid}>
         <div className={fixtureTapeTeamStack}>
-          <span
-            className="flex min-w-0 items-center gap-2 truncate font-medium"
-            title={fixture.homeTeam}
-          >
+          <span className={fixtureTapeTeamLine}>
             <TeamCrest src={fixture.homeLogo} alt={fixture.homeTeam} />
-            {fixture.homeTeam}
+            <span
+              className={cn(
+                "min-w-0 truncate",
+                fixtureTapeNameWeightClass(
+                  footballFinishedNameWeight("home", fixture)
+                )
+              )}
+              title={fixture.homeTeam}
+            >
+              {fixture.homeTeam}
+            </span>
+            {fitMeter("home")}
+            {showMeter && !scoutLoading && twoupSideIsEdgePick(scout, "home") ? (
+              <TwoupEdgeMark />
+            ) : null}
+            <FixtureBackedTag mark={homeBack} />
           </span>
-          <span
-            className="flex min-w-0 items-center gap-2 truncate font-medium"
-            title={fixture.awayTeam}
-          >
+          <span className={fixtureTapeTeamLine}>
             <TeamCrest src={fixture.awayLogo} alt={fixture.awayTeam} />
-            {fixture.awayTeam}
+            <span
+              className={cn(
+                "min-w-0 truncate",
+                fixtureTapeNameWeightClass(
+                  footballFinishedNameWeight("away", fixture)
+                )
+              )}
+              title={fixture.awayTeam}
+            >
+              {fixture.awayTeam}
+            </span>
+            {fitMeter("away")}
+            {showMeter && !scoutLoading && twoupSideIsEdgePick(scout, "away") ? (
+              <TwoupEdgeMark />
+            ) : null}
+            <FixtureBackedTag mark={awayBack} />
           </span>
         </div>
-        <span className={tapeClockClass(live)}>
-          {live ? (
-            <Radio
-              className="size-3 animate-pulse motion-reduce:animate-none"
-              aria-hidden
+        <div
+          className={cn(
+            fixtureTapeTrailing,
+            (showScore || showOdds) && "items-stretch pr-0 gap-6"
+          )}
+        >
+          <span className={cn(tapeClockClass(live), "self-center")}>
+            {live && clock !== "HT" ? (
+              <Radio
+                className="size-3 animate-pulse motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : null}
+            {clock}
+          </span>
+          {showOdds ? (
+            <ExchangeBackStack
+              homeOdds={scout?.markets.home}
+              awayOdds={scout?.markets.away}
+              homeLabel={fixture.homeTeam}
+              awayLabel={fixture.awayTeam}
+            />
+          ) : showScore ? (
+            <FixtureScoreboard
+              home={fixture.homeScore}
+              away={fixture.awayScore}
+              live={live}
             />
           ) : null}
-          {clock}
-        </span>
-        <div className={cn(fixtureTapeTeamStack, "justify-items-end", fixtureTapeScoreRail)}>
-          <span className={scoreClass}>{showScore ? fixture.homeScore : "–"}</span>
-          <span className={scoreClass}>{showScore ? fixture.awayScore : "–"}</span>
         </div>
       </div>
       <button
@@ -399,14 +687,27 @@ function FootballTapeRow({
         onClick={() => onOpenTape(fixtureTapeEvent(fixture, eventId))}
       >
         Open match events for {fixture.homeTeam} v {fixture.awayTeam}
+        {homeBack ? `. ${fixture.homeTeam} backed` : null}
+        {awayBack ? `. ${fixture.awayTeam} backed` : null}
+        {showMeter
+          ? `. ${twoupSideFitSummary({
+              result: scout,
+              loading: scoutLoading,
+              side: "home",
+              homeTeam: fixture.homeTeam,
+              awayTeam: fixture.awayTeam,
+            })}. ${twoupSideFitSummary({
+              result: scout,
+              loading: scoutLoading,
+              side: "away",
+              homeTeam: fixture.homeTeam,
+              awayTeam: fixture.awayTeam,
+            })}`
+          : null}
       </button>
       {scope ? (
-        <p className={cn(fixtureTapeMatchGrid, "mt-0.5")}>
-          <span className="min-w-0 truncate text-xs text-muted-foreground" title={scope}>
-            {scope}
-          </span>
-          <span aria-hidden />
-          <span aria-hidden />
+        <p className="mt-0.5 min-w-0 truncate text-xs text-muted-foreground" title={scope}>
+          {scope}
         </p>
       ) : null}
     </li>
@@ -491,12 +792,6 @@ function RacingTapeRow({
   );
 }
 
-const sectionHeaderBar = cn(
-  deskInsetX,
-  "border-b border-border/60 bg-page py-2.5 dark:bg-selection-subtle/80"
-);
-const sectionBody = "bg-selection-subtle dark:bg-transparent";
-
 function CollapsedScopeCount({
   items,
 }: {
@@ -564,7 +859,7 @@ function CollapsibleSectionHeader({
     return (
       <div
         className={cn(
-          sectionHeaderBar,
+          fixtureTapeSectionBar,
           fixtureTapeMatchGrid,
           fixtureTapeSectionHover,
         )}
@@ -573,11 +868,11 @@ function CollapsibleSectionHeader({
           {leading}
           {titleButton}
         </div>
-        <div className="flex items-center justify-end gap-1">
+        <div className={cn(fixtureTapeTrailing, "pr-0")}>
           {trailing}
           {meta}
+          {chevron}
         </div>
-        {chevron}
       </div>
     );
   }
@@ -585,7 +880,7 @@ function CollapsibleSectionHeader({
   return (
     <div
       className={cn(
-        sectionHeaderBar,
+        fixtureTapeSectionBar,
         "flex w-full items-center gap-3",
         fixtureTapeSectionHover,
       )}
@@ -633,12 +928,17 @@ function FootballCompetitionSection({
   fixtures,
   onOpenTape,
   eventIdByExternalId,
+  teamBackByEventId,
+  footballEventById,
   displayTimezone,
   favourite,
   onToggleFavourite,
   hidden,
   onToggleHidden,
   empty,
+  showScout,
+  scoutByKey,
+  scoutLoading,
 }: {
   scopeId: string;
   competition: string;
@@ -648,6 +948,8 @@ function FootballCompetitionSection({
   fixtures: Fixture[];
   onOpenTape: (event: FootballTapeDialogEvent) => void;
   eventIdByExternalId: Map<string, number>;
+  teamBackByEventId: Map<number, { home: SideBackMark | null; away: SideBackMark | null }>;
+  footballEventById: Map<number, { homeTeam: string; awayTeam: string }>;
   displayTimezone: string;
   favourite: boolean;
   onToggleFavourite: () => void;
@@ -659,6 +961,9 @@ function FootballCompetitionSection({
     action?: { label: string; onClick: () => void; variant?: "primary" | "secondary" };
     secondaryAction?: { label: string; onClick: () => void; variant?: "primary" | "secondary" };
   };
+  showScout?: boolean;
+  scoutByKey?: Map<string, TwoupOpennessResult>;
+  scoutLoading?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const headingId = fixtureDayHeadingId(scopeId, "day");
@@ -699,7 +1004,7 @@ function FootballCompetitionSection({
         </p>
       </CollapsibleSectionHeader>
       {open ? (
-        <div className={cn(sectionBody, fixtures.length === 0 && empty && "p-4")}>
+        <div className={cn(fixtureTapeSectionBody, fixtures.length === 0 && empty && "p-4")}>
           {fixtures.length === 0 && empty ? (
             <EmptyState
               compact
@@ -712,15 +1017,37 @@ function FootballCompetitionSection({
             />
           ) : (
             <ul aria-labelledby={headingId} className={listRowGroup}>
-              {fixtures.map((fixture) => (
-                <FootballTapeRow
-                  key={fixture.externalId}
-                  fixture={fixture}
-                  displayTimezone={displayTimezone}
-                  onOpenTape={onOpenTape}
-                  eventId={eventIdByExternalId.get(fixture.externalId)}
-                />
-              ))}
+              {fixtures.map((fixture) => {
+                const eventId = eventIdByExternalId.get(fixture.externalId);
+                const teamBack = fixtureTeamBack(
+                  fixture,
+                  eventId,
+                  teamBackByEventId,
+                  footballEventById
+                );
+                return (
+                  <FootballTapeRow
+                    key={fixture.externalId}
+                    fixture={fixture}
+                    displayTimezone={displayTimezone}
+                    onOpenTape={onOpenTape}
+                    eventId={eventId}
+                    homeBack={teamBack?.home}
+                    awayBack={teamBack?.away}
+                    showMeter={showScout && fixture.status === "upcoming"}
+                    scout={
+                      scoutByKey?.get(
+                        twoupScoutKey({
+                          homeTeam: fixture.homeTeam,
+                          awayTeam: fixture.awayTeam,
+                          startTime: fixture.startTime,
+                        })
+                      ) ?? null
+                    }
+                    scoutLoading={scoutLoading}
+                  />
+                );
+              })}
             </ul>
           )}
         </div>
@@ -803,7 +1130,7 @@ function RacingCourseSection({
       </CollapsibleSectionHeader>
 
       {open ? (
-        <div className={cn(sectionBody, races.length === 0 && empty && "p-4")}>
+        <div className={cn(fixtureTapeSectionBody, races.length === 0 && empty && "p-4")}>
           {races.length === 0 && empty ? (
             <EmptyState
               compact
@@ -839,14 +1166,26 @@ function FootballKickoffList({
   fixtures,
   onOpenTape,
   eventIdByExternalId,
+  teamBackByEventId,
+  footballEventById,
   displayTimezone,
   showScope = true,
+  favouriteScopeIds,
+  showScout,
+  scoutByKey,
+  scoutLoading,
 }: {
   fixtures: Fixture[];
   onOpenTape: (event: FootballTapeDialogEvent) => void;
   eventIdByExternalId: Map<string, number>;
+  teamBackByEventId: Map<number, { home: SideBackMark | null; away: SideBackMark | null }>;
+  footballEventById: Map<number, { homeTeam: string; awayTeam: string }>;
   displayTimezone: string;
   showScope?: boolean;
+  favouriteScopeIds?: Set<string>;
+  showScout?: boolean;
+  scoutByKey?: Map<string, TwoupOpennessResult>;
+  scoutLoading?: boolean;
 }) {
   return (
     <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
@@ -862,6 +1201,13 @@ function FootballKickoffList({
                 fixture.leagueCountry ?? null
               )
             : undefined;
+          const eventId = eventIdByExternalId.get(fixture.externalId);
+          const teamBack = fixtureTeamBack(
+            fixture,
+            eventId,
+            teamBackByEventId,
+            footballEventById
+          );
           return (
             <FootballTapeRow
               key={fixture.externalId}
@@ -869,7 +1215,26 @@ function FootballKickoffList({
               displayTimezone={displayTimezone}
               scope={scope}
               onOpenTape={onOpenTape}
-              eventId={eventIdByExternalId.get(fixture.externalId)}
+              eventId={eventId}
+              homeBack={teamBack?.home}
+              awayBack={teamBack?.away}
+              showMeter={Boolean(
+                showScout &&
+                  fixture.status === "upcoming" &&
+                  favouriteScopeIds?.has(
+                    footballScopeId(fixture.competition, fixture.leagueCountry)
+                  )
+              )}
+              scout={
+                scoutByKey?.get(
+                  twoupScoutKey({
+                    homeTeam: fixture.homeTeam,
+                    awayTeam: fixture.awayTeam,
+                    startTime: fixture.startTime,
+                  })
+                ) ?? null
+              }
+              scoutLoading={scoutLoading}
             />
           );
         })}
@@ -921,9 +1286,9 @@ function RacingKickoffList({
 
 export function DeskFixtureBoard({
   sport,
-  football,
+  football: footballRaw,
   competitions = [],
-  racing,
+  racing: racingRaw,
   trackedExternalIds,
   onTrackFixture,
   onTrackAndBetFixture,
@@ -971,9 +1336,44 @@ export function DeskFixtureBoard({
   className?: string;
 }) {
   const { state, applyLocalSettingsPatch } = useAppState();
-  const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>("all");
-  const [scopeFilter, setScopeFilter] = useState("all");
-  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const now = useNow(15_000);
+  const football = useMemo(() => {
+    const tracked = (state?.events ?? []).filter(
+      (event) => event.externalId && (event.sport ?? "football") !== "horse_racing"
+    );
+    return mergeLiveFixtureOverlay(footballRaw, tracked).map((fixture) =>
+      withEffectiveFeedStatus(fixture, now)
+    );
+  }, [footballRaw, now, state?.events]);
+  const racing = useMemo(
+    () => racingRaw.map((race) => withEffectiveFeedStatus(race, now)),
+    [racingRaw, now]
+  );
+  const boardView = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
+  const sportView = fixtureBoardSportView(boardView, sport);
+  const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>(sportView.status);
+  const [scopeFilter, setScopeFilter] = useState(
+    () => applyFixtureBoardRail(sportView.rail).scopeFilter
+  );
+  const [favouritesOnly, setFavouritesOnly] = useState(
+    () => applyFixtureBoardRail(sportView.rail).favouritesOnly
+  );
+  const [backedOnly, setBackedOnly] = useState(
+    () => applyFixtureBoardRail(sportView.rail).backedOnly
+  );
+  const [scoutByKey, setScoutByKey] = useState<Map<string, TwoupOpennessResult>>(
+    () => new Map()
+  );
+  const [scoutLoading, setScoutLoading] = useState(false);
+  const [scoutFailed, setScoutFailed] = useState(false);
+  const [scoutRetry, setScoutRetry] = useState(0);
+  const [scoutLocked, setScoutLocked] = useState(false);
+  const canScoutPlan = canUseTwoupScout(state?.settings);
+  const canScout = canScoutPlan && !scoutLocked;
+  if (!canScoutPlan && statusFilter === "picks") {
+    setStatusFilter("all");
+  }
+  const scoutReadyRef = useRef(false);
   const settingsFavouriteIds =
     sport === "football"
       ? state?.settings.favouriteFootballScopes ?? []
@@ -985,10 +1385,15 @@ export function DeskFixtureBoard({
   const [favouriteIds, setFavouriteIds] = useState<string[]>(settingsFavouriteIds);
   const [hiddenIds, setHiddenIds] = useState<string[]>(settingsHiddenIds);
 
-  const [prevSport, setPrevSport] = useState(sport);
-  if (prevSport !== sport) {
-    setPrevSport(sport);
-    setScopeFilter("all");
+  const sportViewKey = `${sport}\0${sportView.rail}\0${sportView.status}`;
+  const [appliedViewKey, setAppliedViewKey] = useState(sportViewKey);
+  if (appliedViewKey !== sportViewKey) {
+    setAppliedViewKey(sportViewKey);
+    const nextRail = applyFixtureBoardRail(sportView.rail);
+    setFavouritesOnly(nextRail.favouritesOnly);
+    setBackedOnly(nextRail.backedOnly);
+    setScopeFilter(nextRail.scopeFilter);
+    setStatusFilter(sportView.status);
   }
 
   const settingsFavouriteKey = settingsFavouriteIds.join("\0");
@@ -1002,6 +1407,73 @@ export function DeskFixtureBoard({
 
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+  const footballPinKey = sport === "football" ? favouriteIds.join("\0") : "";
+
+  useEffect(() => {
+    if (sport !== "football" || !listKey || footballPinKey.length === 0) {
+      scoutReadyRef.current = false;
+      setScoutByKey(new Map());
+      setScoutLoading(false);
+      setScoutFailed(false);
+      return;
+    }
+    if (!canScoutPlan) {
+      scoutReadyRef.current = false;
+      setScoutByKey(new Map());
+      setScoutLoading(false);
+      setScoutFailed(false);
+      return;
+    }
+    let cancelled = false;
+    function loadScout() {
+      if (!scoutReadyRef.current) setScoutLoading(true);
+      setScoutFailed(false);
+      void api<{
+        source?: string;
+        items?: Array<{ key: string; openness: TwoupOpennessResult }>;
+      }>(`/api/fixtures/twoup-scout?date=${encodeURIComponent(listKey)}`)
+        .then((payload) => {
+          if (cancelled) return;
+          if (payload.source === "locked") {
+            setScoutLocked(true);
+            setScoutByKey(new Map());
+            setScoutFailed(false);
+            scoutReadyRef.current = false;
+            return;
+          }
+          if (payload.source === "error") {
+            setScoutLocked(false);
+            if (!scoutReadyRef.current) setScoutByKey(new Map());
+            setScoutFailed(true);
+            return;
+          }
+          setScoutLocked(false);
+          setScoutFailed(false);
+          const next = new Map<string, TwoupOpennessResult>();
+          for (const item of payload.items ?? []) {
+            if (item.key && item.openness) next.set(item.key, item.openness);
+          }
+          setScoutByKey(next);
+          scoutReadyRef.current = true;
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (!scoutReadyRef.current) {
+            setScoutByKey(new Map());
+            setScoutFailed(true);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setScoutLoading(false);
+        });
+    }
+    loadScout();
+    const poll = window.setInterval(loadScout, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [canScoutPlan, sport, listKey, footballPinKey, scoutRetry]);
   const [tapeEvent, setTapeEvent] = useState<FootballTapeDialogEvent | null>(null);
   const [tapeRace, setTapeRace] = useState<RacingFixture | null>(null);
   const eventIdByExternalId = useMemo(() => {
@@ -1013,6 +1485,84 @@ export function DeskFixtureBoard({
     }
     return map;
   }, [state?.events]);
+  const footballEventById = useMemo(() => {
+    const map = new Map<number, { homeTeam: string; awayTeam: string }>();
+    for (const event of state?.events ?? []) {
+      if ((event.sport ?? "football") === "horse_racing") continue;
+      map.set(event.id, event);
+    }
+    return map;
+  }, [state?.events]);
+  const teamBackByEventId = useMemo(() => {
+    const map = new Map<number, { home: SideBackMark | null; away: SideBackMark | null }>();
+    const bets = state?.bets ?? [];
+    for (const event of state?.events ?? []) {
+      if ((event.sport ?? "football") === "horse_racing") continue;
+      const home = eventSideBackMark(event, "home", bets);
+      const away = eventSideBackMark(event, "away", bets);
+      if (home || away) map.set(event.id, { home, away });
+    }
+    return map;
+  }, [state?.bets, state?.events]);
+  const backedExternalIds = useMemo(() => {
+    const ids = new Set<string>();
+    const bets = state?.bets ?? [];
+    for (const event of state?.events ?? []) {
+      if (!event.externalId) continue;
+      if (eventHasAnyUserBack(event, bets)) ids.add(event.externalId);
+    }
+    return ids;
+  }, [state?.bets, state?.events]);
+
+  function persistBoardView(next: { rail?: string; status?: FixtureStatusFilter }) {
+    const current = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
+    const side = sport === "horse_racing" ? "racing" : "football";
+    const fixtureBoardView = mergeFixtureBoardView(current, {
+      sport,
+      [side]: {
+        ...fixtureBoardSportView(current, sport),
+        ...(next.rail != null ? { rail: next.rail } : {}),
+        ...(next.status != null ? { status: next.status } : {}),
+      },
+    });
+    applyLocalSettingsPatch({ fixtureBoardView });
+    void api("/api/settings", { method: "PATCH", json: { fixtureBoardView } }).catch(() => {
+      applyLocalSettingsPatch({ fixtureBoardView: current });
+    });
+  }
+
+  function selectAllRail() {
+    setFavouritesOnly(false);
+    setBackedOnly(false);
+    setScopeFilter("all");
+    persistBoardView({ rail: "all" });
+  }
+
+  function selectPinnedRail() {
+    setFavouritesOnly(true);
+    setBackedOnly(false);
+    setScopeFilter("all");
+    persistBoardView({ rail: "pins" });
+  }
+
+  function selectBackedRail() {
+    setFavouritesOnly(false);
+    setBackedOnly(true);
+    setScopeFilter("all");
+    persistBoardView({ rail: "backed" });
+  }
+
+  function selectScopeRail(id: string) {
+    setFavouritesOnly(false);
+    setBackedOnly(false);
+    setScopeFilter(id);
+    persistBoardView({ rail: id });
+  }
+
+  function selectStatus(id: FixtureStatusFilter) {
+    setStatusFilter(id);
+    persistBoardView({ status: id });
+  }
 
   async function persistFavourites(next: string[]) {
     const previous = favouriteIds;
@@ -1022,7 +1572,10 @@ export function DeskFixtureBoard({
         ? { favouriteFootballScopes: next }
         : { favouriteRacingCourses: next };
     applyLocalSettingsPatch(json);
-    if (next.length === 0) setFavouritesOnly(false);
+    if (next.length === 0 && favouritesOnly) {
+      setFavouritesOnly(false);
+      persistBoardView({ rail: "all" });
+    }
     try {
       await api("/api/settings", { method: "PATCH", json });
     } catch (error) {
@@ -1079,13 +1632,15 @@ export function DeskFixtureBoard({
 
   function toggleHidden(id: string) {
     const next = toggleFavouriteScopeId(hiddenIds, id);
-    if (scopeFilter === id && next.includes(id)) setScopeFilter("all");
+    if (scopeFilter === id && next.includes(id)) {
+      setScopeFilter("all");
+      persistBoardView({ rail: "all" });
+    }
     void persistHidden(next);
   }
 
   function changeScope(id: string) {
-    setFavouritesOnly(false);
-    setScopeFilter(id);
+    selectScopeRail(id);
   }
 
   const filteredFootball = useMemo(
@@ -1134,36 +1689,71 @@ export function DeskFixtureBoard({
       scopeFilter === "all"
         ? filteredFootball
         : filteredFootball.filter((f) => fixtureMatchesFootballScope(f, scopeFilter));
-    if (!favouritesOnly) {
-      if (scopeFilter !== "all") return scoped;
-      return scoped.filter(
-        (f) => !hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
-      );
-    }
-    return scoped.filter((f) =>
-      favouriteSet.has(footballScopeId(f.competition, f.leagueCountry))
-    );
-  }, [filteredFootball, scopeFilter, favouritesOnly, favouriteSet, hiddenSet]);
+    const visible = backedOnly
+      ? scoped.filter((f) => backedExternalIds.has(f.externalId))
+      : !favouritesOnly
+        ? scopeFilter !== "all"
+          ? scoped
+          : scoped.filter(
+              (f) => !hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
+            )
+        : scoped.filter((f) =>
+            favouriteSet.has(footballScopeId(f.competition, f.leagueCountry))
+          );
+    if (statusFilter !== "picks") return visible;
+    return visible.filter((f) => fixtureHasTwoupEdgePick(f, scoutByKey));
+  }, [
+    filteredFootball,
+    scopeFilter,
+    favouritesOnly,
+    backedOnly,
+    backedExternalIds,
+    favouriteSet,
+    hiddenSet,
+    statusFilter,
+    scoutByKey,
+  ]);
   const scopedRacing = useMemo(() => {
     const scoped =
       scopeFilter === "all"
         ? filteredRacing
         : filteredRacing.filter((r) => r.course === scopeFilter);
+    if (backedOnly) return scoped.filter((r) => backedExternalIds.has(r.externalId));
     if (!favouritesOnly) {
       if (scopeFilter !== "all") return scoped;
       return scoped.filter((r) => !hiddenSet.has(r.course));
     }
     return scoped.filter((r) => favouriteSet.has(r.course));
-  }, [filteredRacing, scopeFilter, favouritesOnly, favouriteSet, hiddenSet]);
+  }, [
+    filteredRacing,
+    scopeFilter,
+    favouritesOnly,
+    backedOnly,
+    backedExternalIds,
+    favouriteSet,
+    hiddenSet,
+  ]);
 
   const footballGroups = useMemo(() => {
     if (sport !== "football") return [];
     const peers = [...football, ...footballCatalogAsFixtures(competitions)];
     const groups = groupFootballByLeague(scopedFootball, peers).map((group) => ({
       ...group,
-      fixtures: sortFixturesByKickoff(group.fixtures),
+      fixtures:
+        statusFilter === "picks"
+          ? sortFixturesByTwoupPick(group.fixtures, scoutByKey)
+          : sortFixturesByKickoff(group.fixtures),
     }));
     const withMatches = groups.filter((group) => group.fixtures.length > 0);
+    if (statusFilter === "picks") {
+      return [...withMatches].sort((a, b) => {
+        const topA =
+          twoupTakeWindfallPct(scoutByKey.get(fixtureScoutKey(a.fixtures[0]!))) ?? 0;
+        const topB =
+          twoupTakeWindfallPct(scoutByKey.get(fixtureScoutKey(b.fixtures[0]!))) ?? 0;
+        return topB - topA;
+      });
+    }
     if (favouritesOnly) return sortGroupsByFavouriteOrder(withMatches, favouriteIds);
     return sortFootballTapeGroups(withMatches, scopeFilter === "all");
   }, [
@@ -1174,6 +1764,8 @@ export function DeskFixtureBoard({
     scopeFilter,
     favouritesOnly,
     favouriteIds,
+    statusFilter,
+    scoutByKey,
   ]);
   const racingGroups = useMemo(() => {
     if (sport !== "horse_racing") return [];
@@ -1193,6 +1785,7 @@ export function DeskFixtureBoard({
             (f) => !hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
           )
         : football.filter((f) => fixtureMatchesFootballScope(f, scopeFilter));
+    if (backedOnly) return scoped.filter((f) => backedExternalIds.has(f.externalId));
     if (!favouritesOnly) return scoped;
     return scoped.filter((f) =>
       favouriteSet.has(footballScopeId(f.competition, f.leagueCountry))
@@ -1203,6 +1796,7 @@ export function DeskFixtureBoard({
       scopeFilter === "all"
         ? racing.filter((r) => !hiddenSet.has(r.course))
         : racing.filter((r) => r.course === scopeFilter);
+    if (backedOnly) return scoped.filter((r) => backedExternalIds.has(r.externalId));
     if (!favouritesOnly) return scoped;
     return scoped.filter((r) => favouriteSet.has(r.course));
   })();
@@ -1219,6 +1813,10 @@ export function DeskFixtureBoard({
 
   const totalCount =
     sport === "football" ? scopedSourceFootball.length : scopedSourceRacing.length;
+  const picksCount =
+    sport === "football"
+      ? scopedSourceFootball.filter((f) => fixtureHasTwoupEdgePick(f, scoutByKey)).length
+      : 0;
   const visibleCount = sport === "football" ? scopedFootball.length : scopedRacing.length;
   const selectedScope = scopeOptions.find((option) => option.id === scopeFilter);
   const scopeLabel =
@@ -1247,7 +1845,19 @@ export function DeskFixtureBoard({
             hiddenSet.has(footballScopeId(f.competition, f.leagueCountry))
           )
         : racing.some((r) => hiddenSet.has(r.course))),
+    backedOnly,
   );
+  const dayBackedCount =
+    sport === "football"
+      ? football.filter((f) => backedExternalIds.has(f.externalId)).length
+      : racing.filter((r) => backedExternalIds.has(r.externalId)).length;
+  useEffect(() => {
+    if (state == null || !backedOnly || dayBackedCount > 0) return;
+    setFavouritesOnly(false);
+    setBackedOnly(false);
+    setScopeFilter("all");
+    persistBoardView({ rail: "all" });
+  }, [state, backedOnly, dayBackedCount]);
   const pinnedOptions = useMemo(() => {
     const byId = new Map(scopeOptions.map((option) => [option.id, option]));
     return orderByFavouriteIds(favouriteIds, byId, (id) => {
@@ -1272,7 +1882,7 @@ export function DeskFixtureBoard({
   const pinnedNoun = sport === "horse_racing" ? "courses" : "competitions";
   const settingsReady = state != null;
   const hasPins = favouriteSet.size > 0;
-  const showPinRail = !settingsReady || hasPins;
+  const showPinRail = !settingsReady || hasPins || dayBackedCount > 0;
   const footballFilterIcon = sport === "football"
     ? (option: { name?: string; label: string; country?: string | null }) => (
         <CompetitionHeaderIcon
@@ -1306,18 +1916,12 @@ export function DeskFixtureBoard({
     pinned: pinnedOptions,
     scopeFilter,
     favouritesOnly,
-    onSelectAll: () => {
-      setFavouritesOnly(false);
-      setScopeFilter("all");
-    },
-    onSelectSaved: () => {
-      setFavouritesOnly(true);
-      setScopeFilter("all");
-    },
-    onSelectScope: (id: string) => {
-      setFavouritesOnly(false);
-      setScopeFilter(id);
-    },
+    backedOnly,
+    backedCount: dayBackedCount,
+    onSelectAll: selectAllRail,
+    onSelectSaved: selectPinnedRail,
+    onSelectBacked: selectBackedRail,
+    onSelectScope: selectScopeRail,
     onReorderPinned: reorderFavourite,
     hydrated: state != null,
   } as const;
@@ -1374,7 +1978,7 @@ export function DeskFixtureBoard({
               <FilterPill
                 key={f.id}
                 active={active}
-                onClick={() => setStatusFilter(f.id)}
+                onClick={() => selectStatus(f.id)}
                 hasCount
               >
                 {f.label}
@@ -1382,6 +1986,23 @@ export function DeskFixtureBoard({
               </FilterPill>
             );
           })}
+          {sport === "football" && canScoutPlan ? (
+            <FilterPill
+              tone="edge"
+              active={statusFilter === "picks"}
+              onClick={() => selectStatus("picks")}
+              hasCount
+            >
+              <Zap
+                className={cn("size-3", statusFilter !== "picks" && "text-edge")}
+                aria-hidden
+              />
+              2UP picks
+              <span className={filterPillCountState(statusFilter === "picks")}>
+                {picksCount}
+              </span>
+            </FilterPill>
+          ) : null}
         </div>
         <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-2">
@@ -1405,6 +2026,32 @@ export function DeskFixtureBoard({
                 : "This day's list will appear here."
             }
           />
+        ) : sport === "football" && statusFilter === "picks" && !canScoutPlan ? (
+          <PlanLockEmpty compact={emptyCompact} feature="twoup_scout" />
+        ) : sport === "football" &&
+          statusFilter === "picks" &&
+          scoutFailed &&
+          !scoutLoading ? (
+          <EmptyState
+            compact={emptyCompact}
+            icon={FootballIcon}
+            title="Could not load 2UP picks"
+            description="Check the connection, then try again."
+            action={{
+              label: "Try again",
+              onClick: () => setScoutRetry((n) => n + 1),
+            }}
+          />
+        ) : sport === "football" &&
+          statusFilter === "picks" &&
+          scoutLoading &&
+          footballGroups.length === 0 ? (
+          <EmptyState
+            compact={emptyCompact}
+            busy
+            title="Finding 2UP picks…"
+            description={TWOUP_PICKS_EMPTY}
+          />
         ) : sport === "football" && footballGroups.length > 0 ? (
           <div className="space-y-4">
             {footballGroups.map((group) => (
@@ -1418,11 +2065,16 @@ export function DeskFixtureBoard({
                 fixtures={group.fixtures}
                 onOpenTape={setTapeEvent}
                 eventIdByExternalId={eventIdByExternalId}
+                teamBackByEventId={teamBackByEventId}
+                footballEventById={footballEventById}
                 displayTimezone={displayTimezone}
                 favourite={favouriteSet.has(group.id)}
                 onToggleFavourite={() => toggleFavourite(group.id)}
                 hidden={hiddenSet.has(group.id)}
                 onToggleHidden={() => toggleHidden(group.id)}
+                showScout={canScout && favouriteSet.has(group.id)}
+                scoutByKey={scoutByKey}
+                scoutLoading={scoutLoading}
               />
             ))}
           </div>
@@ -1453,14 +2105,11 @@ export function DeskFixtureBoard({
             title={emptyCopy.title}
             description={emptyCopy.description}
             action={
-              scopeFilter !== "all" || favouritesOnly
+              scopeFilter !== "all" || favouritesOnly || backedOnly
                 ? {
                     label: "Show all",
                     variant: "secondary",
-                    onClick: () => {
-                      setFavouritesOnly(false);
-                      setScopeFilter("all");
-                    },
+                    onClick: selectAllRail,
                   }
                 : undefined
             }
@@ -1469,10 +2118,7 @@ export function DeskFixtureBoard({
                 ? {
                     label: "Show pinned",
                     variant: "secondary",
-                    onClick: () => {
-                      setFavouritesOnly(true);
-                      setScopeFilter("all");
-                    },
+                    onClick: selectPinnedRail,
                   }
                 : undefined
             }
@@ -1485,6 +2131,19 @@ export function DeskFixtureBoard({
         <FootballLiveTapeDialog
           event={tapeEvent}
           open
+          showTwoupScout={canScout}
+          scout={
+            tapeEvent.startTime != null
+              ? scoutByKey.get(
+                  twoupScoutKey({
+                    homeTeam: tapeEvent.homeTeam,
+                    awayTeam: tapeEvent.awayTeam,
+                    startTime: tapeEvent.startTime,
+                  })
+                ) ?? null
+              : null
+          }
+          scoutLoading={scoutLoading}
           tracked={Boolean(
             tapeEvent.id ??
               (tapeEvent.externalId
@@ -1551,9 +2210,10 @@ export function DeskFixtureBoard({
             className="my-4 min-h-0 min-w-0 flex-1"
             fadeClassName="from-page"
             fadeSize={FIXTURE_TAPE_GUTTER_PX}
+            fadeOnScroll
             overlayScrollbar
             pinScrollStart
-            scrollStartKey={`${listKey ?? ""}:${sport}:${statusFilter}:${scopeFilter}:${favouritesOnly ? "pins" : "all"}`}
+            scrollStartKey={`${listKey ?? ""}:${sport}:${statusFilter}:${scopeFilter}:${backedOnly ? "backed" : favouritesOnly ? "pins" : "all"}`}
             scrollClassName="app-scroll-float"
           >
             {body}
@@ -1564,9 +2224,10 @@ export function DeskFixtureBoard({
                 className="min-h-0 h-full"
                 fadeClassName="from-page"
                 fadeSize={FIXTURE_TAPE_GUTTER_PX}
+                fadeOnScroll
                 overlayScrollbar
                 pinScrollStart
-                scrollStartKey={`${listKey ?? ""}:${sport}:${scopeFilter}:${favouritesOnly ? "pins" : "all"}`}
+                scrollStartKey={`${listKey ?? ""}:${sport}:${scopeFilter}:${backedOnly ? "backed" : favouritesOnly ? "pins" : "all"}`}
                 scrollClassName="app-scroll-float"
               >
                 {settingsReady ? (

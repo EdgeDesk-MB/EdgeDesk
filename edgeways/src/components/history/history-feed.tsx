@@ -165,7 +165,7 @@ function HistoryGoalScorelineDisplay({
         labelGap={"\u00A0\u00A0"}
         className={wrap ? "min-w-0 text-pretty break-words" : "min-w-0 truncate"}
       />
-      {twoUp ? <HistoryTwoUpBadge /> : null}
+      {twoUp ? <HistoryTwoUpBadge backed={twoUp.backed} /> : null}
     </span>
   );
 }

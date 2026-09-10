@@ -35,6 +35,7 @@ export {
 
 const BANNER_KEY_BASE = "maintenance_banner";
 const APP_UPDATE_KEY_BASE = "app_update";
+const DESK_PREVIEWS_KEY_BASE = "desk_previews";
 
 function chromeKey(base: string): string {
   return operatorChromeSettingKey(base, getOperatorChromeEnv());
@@ -103,4 +104,12 @@ export async function writeAppUpdateSettings(
   const next = normalizeAppUpdate(update);
   await writeChromeValue(APP_UPDATE_KEY_BASE, JSON.stringify(next));
   return next;
+}
+
+export async function readDeskPreviewValue(): Promise<string | undefined> {
+  return readChromeValue(DESK_PREVIEWS_KEY_BASE);
+}
+
+export async function writeDeskPreviewValue(value: string): Promise<void> {
+  await writeChromeValue(DESK_PREVIEWS_KEY_BASE, value);
 }

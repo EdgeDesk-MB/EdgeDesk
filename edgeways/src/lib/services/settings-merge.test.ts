@@ -7,6 +7,15 @@ import {
 } from "./settings-merge";
 
 describe("parseStoredSettings", () => {
+  it("does not persist the injected 2UP scout preview latch", () => {
+    expect(
+      parseStoredSettings({
+        ...DEFAULT_SETTINGS,
+        twoupScoutPreview: true,
+      }).twoupScoutPreview
+    ).toBeUndefined();
+  });
+
   it("returns defaults for empty or invalid input", () => {
     expect(parseStoredSettings(null).ageConfirmedAt).toBeNull();
     expect(parseStoredSettings("").defaultBackStake).toBe(DEFAULT_SETTINGS.defaultBackStake);
@@ -71,7 +80,27 @@ describe("mergeAppSettings", () => {
     expect(isFixtureScopeSettingsPatch({ hiddenFootballScopes: ["Germany::Bundesliga"] })).toBe(
       true
     );
+    expect(
+      isFixtureScopeSettingsPatch({
+        fixtureBoardView: { football: { rail: "pins" } },
+      })
+    ).toBe(true);
     expect(isFixtureScopeSettingsPatch({ defaultBackStake: 10 })).toBe(false);
+  });
+
+  it("merges fixture board view without dropping the other sport", () => {
+    const pinned = mergeAppSettings(DEFAULT_SETTINGS, {
+      fixtureBoardView: { football: { rail: "pins", status: "live" } },
+    });
+    expect(pinned.fixtureBoardView.football).toEqual({ rail: "pins", status: "live" });
+    const withSport = mergeAppSettings(pinned, {
+      fixtureBoardView: { sport: "horse_racing" },
+    });
+    expect(withSport.fixtureBoardView).toEqual({
+      sport: "horse_racing",
+      football: { rail: "pins", status: "live" },
+      racing: { rail: "all", status: "all" },
+    });
   });
 
   it("merges one offer pref without dropping the rest", () => {

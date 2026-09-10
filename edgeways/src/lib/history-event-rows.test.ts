@@ -26,6 +26,7 @@ function event(overrides: Partial<EventHistorySource> = {}): EventHistorySource 
     ftHomeScore: null,
     ftAwayScore: null,
     competition: "Championship",
+    resultPostedAt: null,
     ...overrides,
   };
 }
@@ -132,6 +133,28 @@ describe("eventHistoryFacts", () => {
     ).toEqual(["score:69:1-1"]);
   });
 
+  it("stamps 2UP on the two-ahead kick, not the current clock", () => {
+    const facts = eventHistoryFacts(
+      event({
+        homeLed2: 1,
+        minute: 94,
+        homeScore: 6,
+        awayScore: 3,
+        goals: JSON.stringify([
+          { kind: "goal", minute: 12, side: "home" },
+          { kind: "goal", minute: 38, side: "home" },
+        ]),
+      }),
+      1
+    );
+    const twoUp = facts.find((row) => row.kind === "two_up");
+    expect(twoUp).toMatchObject({
+      minute: 38,
+      createdAt: 1_700_000_000_000 + 38 * 60 * 1000,
+      write: "upsert",
+    });
+  });
+
   it("uses the clerk-scoped full-time key on the hosted desk", () => {
     const facts = eventHistoryFacts(
       event({ status: "finished", minute: 90, homeScore: 4, awayScore: 0 }),
@@ -140,5 +163,26 @@ describe("eventHistoryFacts", () => {
     );
     const ft = facts.find((row) => row.kind === "full_time");
     expect(ft?.dedupe).toBe("ft:9:user_1");
+  });
+
+  it("puts full time after added-time goals when the clock snapped to 90", () => {
+    const facts = eventHistoryFacts(
+      event({
+        status: "finished",
+        minute: 90,
+        homeScore: 2,
+        awayScore: 0,
+        goals: JSON.stringify([
+          { kind: "goal", minute: 12, side: "home" },
+          { kind: "goal", minute: 94, side: "home" },
+        ]),
+      }),
+      1
+    );
+    const ft = facts.find((row) => row.kind === "full_time");
+    const lastGoal = facts.filter((row) => row.kind === "goal").at(-1);
+    expect(ft?.minute).toBe(90);
+    expect(lastGoal?.minute).toBe(94);
+    expect(ft?.createdAt).toBe((lastGoal?.createdAt ?? 0) + 1000);
   });
 });

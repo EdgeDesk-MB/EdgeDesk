@@ -9,7 +9,14 @@ import {
   type PositiveLiveKind,
 } from "@/lib/admin/live-bundle";
 import { getNeonDb } from "@/lib/db/neon";
-import { appUsers, bets, casinoOffers, offers } from "@/lib/db/schema.pg";
+import {
+  appUsers,
+  bets,
+  casinoOffers,
+  feedbackReports,
+  offers,
+  waitlistSignups,
+} from "@/lib/db/schema.pg";
 import { listAppUsers } from "@/lib/services/app-users";
 
 export const LIVE_EVENT_CAP = 200;
@@ -20,11 +27,15 @@ export type LiveActorFilter = {
   adminIds: ReadonlySet<string>;
 };
 
+export type LiveFingerprintAgg = { n: number; maxAt: number };
+
 export type LiveFingerprintParts = {
-  bets: { n: number; maxAt: number };
-  offers: { n: number; maxAt: number };
-  casino: { n: number; maxAt: number };
-  signups: { n: number; maxAt: number };
+  bets: LiveFingerprintAgg;
+  offers: LiveFingerprintAgg;
+  casino: LiveFingerprintAgg;
+  signups: LiveFingerprintAgg;
+  inbox: LiveFingerprintAgg;
+  waitlist: LiveFingerprintAgg;
   footballUsed: number;
   racingUsed: number;
   health: string;
@@ -66,6 +77,10 @@ export function serialiseLiveFingerprint(parts: LiveFingerprintParts): string {
     parts.casino.maxAt,
     parts.signups.n,
     parts.signups.maxAt,
+    parts.inbox.n,
+    parts.inbox.maxAt,
+    parts.waitlist.n,
+    parts.waitlist.maxAt,
     parts.footballUsed,
     parts.racingUsed,
     parts.health,
@@ -165,17 +180,41 @@ export function activeCriticalKeysFromEvents(events: LiveEvent[]): string[] {
   return [...keys];
 }
 
-function emptyAgg(): { n: number; maxAt: number } {
+function emptyAgg(): LiveFingerprintAgg {
   return { n: 0, maxAt: 0 };
 }
 
 async function volumeAgg(
-  table: typeof bets | typeof offers | typeof casinoOffers | typeof appUsers
-): Promise<{ n: number; maxAt: number }> {
+  table: typeof bets | typeof offers | typeof casinoOffers | typeof appUsers,
+  touchedAt?:
+    | typeof bets.settledAt
+    | typeof offers.completedAt
+    | typeof casinoOffers.completedAt
+    | typeof appUsers.updatedAt
+): Promise<LiveFingerprintAgg> {
+  const createdAt = table.createdAt;
+  const maxAt = touchedAt
+    ? sql<number>`coalesce(max(greatest(${createdAt}, coalesce(${touchedAt}, 0))), 0)`
+    : sql<number>`coalesce(max(${createdAt}), 0)`;
   const rows = await getNeonDb()
     .select({
       n: sql<number>`count(*)::int`,
-      maxAt: sql<number>`coalesce(max(created_at), 0)`,
+      maxAt,
+    })
+    .from(table);
+  return {
+    n: Number(rows[0]?.n ?? 0) || 0,
+    maxAt: Number(rows[0]?.maxAt ?? 0) || 0,
+  };
+}
+
+async function createdAgg(
+  table: typeof feedbackReports | typeof waitlistSignups
+): Promise<LiveFingerprintAgg> {
+  const rows = await getNeonDb()
+    .select({
+      n: sql<number>`count(*)::int`,
+      maxAt: sql<number>`coalesce(max(${table.createdAt}), 0)`,
     })
     .from(table);
   return {
@@ -339,21 +378,27 @@ export async function loadLiveSnapshot(input: {
 
   const volumeFingerprint = usesHostedVolume()
     ? await Promise.all([
-        volumeAgg(bets),
-        volumeAgg(offers),
-        volumeAgg(casinoOffers),
-        volumeAgg(appUsers),
-      ]).then(([betsAgg, offersAgg, casinoAgg, signupsAgg]) => ({
+        volumeAgg(bets, bets.settledAt),
+        volumeAgg(offers, offers.completedAt),
+        volumeAgg(casinoOffers, casinoOffers.completedAt),
+        volumeAgg(appUsers, appUsers.updatedAt),
+        createdAgg(feedbackReports),
+        createdAgg(waitlistSignups),
+      ]).then(([betsAgg, offersAgg, casinoAgg, signupsAgg, inboxAgg, waitlistAgg]) => ({
         bets: betsAgg,
         offers: offersAgg,
         casino: casinoAgg,
         signups: signupsAgg,
+        inbox: inboxAgg,
+        waitlist: waitlistAgg,
       }))
     : {
         bets: emptyAgg(),
         offers: emptyAgg(),
         casino: emptyAgg(),
         signups: emptyAgg(),
+        inbox: emptyAgg(),
+        waitlist: emptyAgg(),
       };
 
   const opsEvents = [

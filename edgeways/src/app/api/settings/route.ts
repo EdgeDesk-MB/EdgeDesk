@@ -17,15 +17,23 @@ import {
 } from "@/lib/db/neon-desk-settings";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { resolveEntitlementBilling } from "@/lib/entitlements/resolve-billing";
+import { resolveTwoupScoutPreview } from "@/lib/entitlements/twoup-scout-preview";
+
+async function withDeskGates<T extends object>(settings: T) {
+  const [billing, twoupScoutPreview] = await Promise.all([
+    resolveEntitlementBilling(),
+    resolveTwoupScoutPreview(),
+  ]);
+  return { ...settings, billing, twoupScoutPreview };
+}
 
 export const GET = withDeskScope(async function GET() {
-  const billing = await resolveEntitlementBilling();
   if (isNeonDesk()) {
     const settings = await getNeonDeskSettings();
-    return NextResponse.json({ ...settings, billing });
+    return NextResponse.json(await withDeskGates(settings));
   }
   const { getAppSettings } = await import("@/lib/services/settings");
-  return NextResponse.json({ ...getAppSettings(), billing });
+  return NextResponse.json(await withDeskGates(getAppSettings()));
 });
 
 export const PATCH = withDeskScope(async function PATCH(req: Request) {
@@ -112,6 +120,13 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
       (id): id is string => typeof id === "string"
     );
   }
+  if (
+    body.fixtureBoardView &&
+    typeof body.fixtureBoardView === "object" &&
+    !Array.isArray(body.fixtureBoardView)
+  ) {
+    patch.fixtureBoardView = body.fixtureBoardView as AppSettingsPatch["fixtureBoardView"];
+  }
   if (typeof body.brandAccentPreset === "string") {
     patch.brandAccentPreset = body.brandAccentPreset;
   }
@@ -150,8 +165,7 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
       if (isFixtureScopeSettingsPatch(patch)) {
         return NextResponse.json(next);
       }
-      const billing = await resolveEntitlementBilling();
-      return NextResponse.json({ ...next, billing });
+      return NextResponse.json(await withDeskGates(next));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not save settings.";
       if (message.includes("Sign in")) {
@@ -165,6 +179,5 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
   if (isFixtureScopeSettingsPatch(patch)) {
     return NextResponse.json(next);
   }
-  const billing = await resolveEntitlementBilling();
-  return NextResponse.json({ ...next, billing });
+  return NextResponse.json(await withDeskGates(next));
 });

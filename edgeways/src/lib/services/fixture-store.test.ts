@@ -8,6 +8,7 @@ vi.mock("@/lib/services/apifootball", async (importOriginal) => {
     ...actual,
     hasApiKey: vi.fn(() => true),
     fixturesByDate: vi.fn(),
+    liveFixtures: vi.fn(async () => []),
   };
 });
 
@@ -46,6 +47,7 @@ async function loadStore() {
   return {
     store,
     fixturesByDate: vi.mocked(api.fixturesByDate),
+    liveFixtures: vi.mocked(api.liveFixtures),
     hasApiKey: vi.mocked(api.hasApiKey),
   };
 }
@@ -142,6 +144,35 @@ describe("fixture-store", () => {
 
     const served = await store.getFixturesForDate(today);
     expect(served.fixtures[0]?.status).toBe("live");
+  });
+
+  it("overlays the live poll score without writing it back to the day store", async () => {
+    const { store, liveFixtures } = await loadStore();
+    const today = localCalendarDate();
+    await store.writeFixtureStore(today, [
+      fixture({
+        externalId: "stuttgart-viking",
+        status: "live",
+        startTime: Date.now() - 10 * 60 * 1000,
+        homeScore: 0,
+        awayScore: 0,
+        minute: 7,
+      }),
+    ]);
+    liveFixtures.mockResolvedValue([
+      fixture({
+        externalId: "stuttgart-viking",
+        status: "live",
+        homeScore: 2,
+        awayScore: 1,
+        minute: 28,
+      }),
+    ]);
+
+    const served = await store.getFixturesForDate(today);
+    expect(served.fixtures[0]).toMatchObject({ homeScore: 2, awayScore: 1, minute: 28 });
+    const stored = await store.readFixtureStore(today);
+    expect(stored?.fixtures[0]).toMatchObject({ homeScore: 0, awayScore: 0, minute: 7 });
   });
 
   it("throws on a cold miss when the live fetch fails", async () => {

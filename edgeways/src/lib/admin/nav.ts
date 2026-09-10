@@ -72,7 +72,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     href: "/admin/releases",
     label: "Releases",
     icon: Flag,
-    blurb: "PostHog flags and a site banner. No deploy button.",
+    blurb: "Desk previews, PostHog flags, and a site banner. No deploy button.",
   },
   {
     href: "/admin/health",

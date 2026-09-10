@@ -32,6 +32,12 @@
 import "server-only";
 
 import { settlementForBetOnEvent } from "@/lib/services/event-settlement";
+import { eventResultPostedAt } from "@/lib/events/result-posted";
+import { regulationEndMinute } from "@/lib/history-match-clock";
+import {
+  earlyPayoutLeadMinute,
+  settlementOccurredAt,
+} from "@/lib/history-twoup-moment";
 import {
   footballEventPatch,
   racingResultPatch,
@@ -226,6 +232,7 @@ async function syncFootball(
       const patch = footballEventPatch(event, fixture, goals, {
         lineups,
         tapeFetchedAt,
+        now,
       });
       await deps.updateEvent(event.id, patch);
       // Keep the in-memory row current so the settlement pass below sees the
@@ -342,7 +349,12 @@ async function settleOpenBets(
     const outcome = settlementForBetOnEvent(bet, event);
     if (!outcome) continue;
 
-    const settledAt = deps.now();
+    const settledAt = settlementOccurredAt({
+      status: outcome.status,
+      now: deps.now(),
+      event,
+      bet,
+    });
     const applied = await deps.settleBet({
       id: bet.id,
       status: outcome.status,
@@ -376,6 +388,10 @@ async function settleOpenBets(
         kind: "settlement",
         betId: bet.id,
         eventId: bet.eventId,
+        minute:
+          outcome.status === "early_payout"
+            ? earlyPayoutLeadMinute(bet, event)
+            : null,
         title: settlementTitle(outcome.status),
         detail: bet.label,
         amount:
@@ -461,10 +477,12 @@ function fullTimeHistory(event: EventRow, clerkUserId: string): OwnedHistoryValu
     dedupe: `ft:${event.id}:${clerkUserId}`,
     kind: "full_time",
     eventId: event.id,
-    minute: event.minute || 90,
+    minute: regulationEndMinute(event.matchEnding),
     title: `Full time${titleSuffix}`,
     detail: detail || formatEventTitle(event),
-    createdAt: event.startTime + (event.minute || 90) * 60 * 1000,
+    createdAt:
+      eventResultPostedAt(event) ??
+      event.startTime + regulationEndMinute(event.matchEnding) * 60 * 1000,
   };
 }
 

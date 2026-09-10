@@ -70,7 +70,7 @@ function RailRow({
       onDragEnd={draggable ? onDragEnd : undefined}
       className={cn(
         listRowSelected(active),
-        "flex w-full min-w-0 items-center gap-3 px-2 py-1.5 text-left text-base",
+        "flex w-full min-w-0 items-center gap-3 px-2 py-1.5 text-left text-sm",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         draggable && "cursor-grab active:cursor-grabbing",
         dragging && "opacity-50",
@@ -87,8 +87,11 @@ export function FixtureSavedRail({
   pinned,
   scopeFilter,
   favouritesOnly,
+  backedOnly,
+  backedCount,
   onSelectAll,
   onSelectSaved,
+  onSelectBacked,
   onSelectScope,
   onReorderPinned,
   showScopes = true,
@@ -99,15 +102,18 @@ export function FixtureSavedRail({
   pinned: FixtureScopeOption[];
   scopeFilter: string;
   favouritesOnly: boolean;
+  backedOnly: boolean;
+  backedCount: number;
   onSelectAll: () => void;
   onSelectSaved: () => void;
+  onSelectBacked: () => void;
   onSelectScope: (id: string) => void;
   onReorderPinned?: (sourceId: string, targetId: string) => void;
   showScopes?: boolean;
   hydrated?: boolean;
   className?: string;
 }) {
-  const allActive = !favouritesOnly && scopeFilter === "all";
+  const allActive = !favouritesOnly && !backedOnly && scopeFilter === "all";
   const noun = sport === "horse_racing" ? "courses" : "competitions";
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
@@ -140,11 +146,19 @@ export function FixtureSavedRail({
           <RailRow active={favouritesOnly} onClick={onSelectSaved}>
             <span className="min-w-0 flex-1 truncate">Pinned only</span>
             {hydrated ? (
-              <span className="shrink-0 tabular-nums text-sm text-muted-foreground">
+              <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
                 {pinned.length}
               </span>
             ) : null}
           </RailRow>
+          {hydrated && backedCount > 0 ? (
+            <RailRow active={backedOnly} onClick={onSelectBacked}>
+              <span className="min-w-0 flex-1 truncate">Backed only</span>
+              <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                {backedCount}
+              </span>
+            </RailRow>
+          ) : null}
         </div>
       ) : null}
       {!hydrated ? null : (
@@ -155,7 +169,7 @@ export function FixtureSavedRail({
           {pinned.length > 0 ? (
         <ul className="flex flex-col gap-0.5">
           {pinned.map((option, index) => {
-            const selected = !favouritesOnly && scopeFilter === option.id;
+            const selected = !favouritesOnly && !backedOnly && scopeFilter === option.id;
             return (
               <li key={option.id}>
                 <RailRow
@@ -207,7 +221,7 @@ export function FixtureSavedRail({
                     {option.name ?? option.label}
                   </span>
                   {option.count > 0 ? (
-                    <span className="shrink-0 tabular-nums text-sm text-muted-foreground">
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
                       {option.count}
                     </span>
                   ) : null}

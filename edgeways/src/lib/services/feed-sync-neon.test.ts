@@ -45,6 +45,7 @@ function event(partial: Partial<EventRow> = {}): EventRow {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: NOW - 4 * 60 * 60 * 1000,
     ...partial,
   };

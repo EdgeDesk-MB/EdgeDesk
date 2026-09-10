@@ -34,6 +34,10 @@ import {
 } from "@/lib/events/fixture-day-groups";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
 import { canDesk } from "@/lib/entitlements/effective-plan";
+import {
+  mergeFixtureBoardView,
+  normalizeFixtureBoardView,
+} from "@/lib/events/fixture-board-view";
 import { SportIcon } from "@/components/sport-icon";
 import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { cn } from "@/lib/utils";
@@ -62,6 +66,8 @@ function friendlyFixtureError(error: unknown, sport: "football" | "horse_racing"
 
 /** Client TTL for a fixture day. The server store is 10 minutes. */
 const FIXTURE_DAY_TTL_MS = 2 * 60_000;
+/** Today’s football list follows the 60s live-score poll. */
+const LIVE_FIXTURE_POLL_MS = 60_000;
 
 type CachedFixtureDay = {
   at: number;
@@ -146,14 +152,20 @@ export function FixtureBrowserContent({
   const router = useRouter();
   const { openAddBet } = useAddBet();
   const { closeTrackFixture } = useTrackFixture();
-  const { state, refresh } = useAppState(5000);
+  const { state, refresh, applyLocalSettingsPatch } = useAppState(5000);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [competitions, setCompetitions] = useState<FootballCompetition[]>([]);
   const [racingFixtures, setRacingFixtures] = useState<RacingFixture[]>([]);
   const [footballError, setFootballError] = useState<string | null>(null);
   const [racingError, setRacingError] = useState<string | null>(null);
   const [loadingCompetitions, setLoadingCompetitions] = useState(false);
-  const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">("football");
+  const savedSport = normalizeFixtureBoardView(state?.settings.fixtureBoardView).sport;
+  const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">(savedSport);
+  const [appliedSport, setAppliedSport] = useState(savedSport);
+  if (state != null && appliedSport !== savedSport) {
+    setAppliedSport(savedSport);
+    setFixtureSport(savedSport);
+  }
   const dayBounds = useMemo(() => fixtureListDayBounds(), []);
   const [listDay, setListDay] = useState(dayBounds.today);
   const [dayReady, setDayReady] = useState({
@@ -169,6 +181,16 @@ export function FixtureBrowserContent({
   const warnedDaysRef = useRef(new Set<string>());
 
   const goTracked = useCallback(() => router.push("/tracked-events"), [router]);
+
+  function persistFixtureSport(next: "football" | "horse_racing") {
+    setFixtureSport(next);
+    const current = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
+    const fixtureBoardView = mergeFixtureBoardView(current, { sport: next });
+    applyLocalSettingsPatch({ fixtureBoardView });
+    void api("/api/settings", { method: "PATCH", json: { fixtureBoardView } }).catch(() => {
+      applyLocalSettingsPatch({ fixtureBoardView: current });
+    });
+  }
 
   const loadCompetitionCatalog = useCallback(async (alreadyHave: boolean) => {
     if (alreadyHave) {
@@ -345,6 +367,44 @@ export function FixtureBrowserContent({
     });
   }, [listDay, loadFixtures]);
 
+  useEffect(() => {
+    if (listDay !== dayBounds.today || fixtureSport !== "football") return;
+    let cancelled = false;
+    const refreshLive = () =>
+      api<{
+        fixtures: Fixture[];
+        competitions?: FootballCompetition[];
+        warning?: string;
+      }>(footballDayPath(listDay))
+        .then((payload) => {
+          if (cancelled || listDayRef.current !== listDay) return;
+          mergeStoredDay(listDay, {
+            footballReady: true,
+            fixtures: payload.fixtures,
+            competitions: payload.competitions ?? [],
+            footballError: null,
+            warning: payload.warning,
+          });
+          setFixtures(payload.fixtures);
+          if (payload.competitions?.length) setCompetitions(payload.competitions);
+          setFootballError(null);
+        })
+        .catch(() => {
+          /* keep the last card; the next tick retries */
+        });
+    const kick = window.setTimeout(() => {
+      void refreshLive();
+    }, 1_000);
+    const id = window.setInterval(() => {
+      void refreshLive();
+    }, LIVE_FIXTURE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(kick);
+      window.clearInterval(id);
+    };
+  }, [dayBounds.today, fixtureSport, listDay]);
+
   async function trackFixture(fixture: Fixture): Promise<EventRow | null> {
     const label = `${fixture.homeTeam} v ${fixture.awayTeam}`;
     if (trackedExternalIds.has(fixture.externalId)) {
@@ -389,6 +449,7 @@ export function FixtureBrowserContent({
       homeTeam: fixture.homeTeam,
       awayTeam: fixture.awayTeam,
       sport: "football",
+      market: "match_odds",
       labelSuggestion: `${fixture.homeTeam} v ${fixture.awayTeam}`,
     });
   }
@@ -544,7 +605,7 @@ export function FixtureBrowserContent({
     >
       <Tabs
         value={fixtureSport}
-        onValueChange={(v) => setFixtureSport(v as "football" | "horse_racing")}
+        onValueChange={(v) => persistFixtureSport(v as "football" | "horse_racing")}
         className="gap-0"
       >
         <TabsList

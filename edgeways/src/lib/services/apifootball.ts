@@ -184,7 +184,7 @@ export async function pingApiFootball(): Promise<{
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapFixture(item: any): Fixture {
   const shortStatus: string = item.fixture?.status?.short ?? "NS";
-  const liveStatuses = ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"];
+  const liveStatuses = ["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT", "BREAK", "SUSP"];
   const finishedStatuses = ["FT", "AET", "PEN"];
   const elapsed = item.fixture?.status?.elapsed;
   const isAet = shortStatus === "AET";
@@ -231,6 +231,7 @@ export function footballOperation(pathAndQuery: string): string {
   if (pathAndQuery.startsWith("/fixtures?id=")) return "fixture-by-id";
   if (pathAndQuery.startsWith("/fixtures/events")) return "match-events";
   if (pathAndQuery.startsWith("/fixtures/lineups")) return "lineups";
+  if (pathAndQuery.startsWith("/standings")) return "standings";
   if (pathAndQuery.startsWith("/leagues")) return "leagues-catalog";
   return "other";
 }
@@ -297,7 +298,24 @@ function mapLeague(item: any): FootballCompetitionCatalogEntry | null {
       : typeof item?.league?.flag === "string" && item.league.flag.trim()
         ? String(item.league.flag).trim()
         : null;
-  return { name, country, flag };
+  const leagueIdRaw = item?.league?.id;
+  const leagueId =
+    typeof leagueIdRaw === "number" && Number.isFinite(leagueIdRaw)
+      ? leagueIdRaw
+      : typeof leagueIdRaw === "string" && Number.isFinite(Number(leagueIdRaw))
+        ? Number(leagueIdRaw)
+        : null;
+  const seasons = Array.isArray(item?.seasons) ? item.seasons : [];
+  const current =
+    seasons.find((row: { current?: boolean }) => row?.current) ?? seasons[seasons.length - 1];
+  const seasonRaw = current?.year;
+  const season =
+    typeof seasonRaw === "number" && Number.isFinite(seasonRaw)
+      ? seasonRaw
+      : typeof seasonRaw === "string" && Number.isFinite(Number(seasonRaw))
+        ? Number(seasonRaw)
+        : null;
+  return { name, country, flag, leagueId, season };
 }
 
 /**
@@ -318,6 +336,71 @@ export async function currentLeagues(): Promise<FootballCompetitionCatalogEntry[
     mapped.push(entry);
   }
   return mapped;
+}
+
+export type FootballTeamGoalRates = {
+  name: string;
+  gf: number;
+  ga: number;
+  played: number;
+  homeGf?: number;
+  homeGa?: number;
+  homePlayed?: number;
+  awayGf?: number;
+  awayGa?: number;
+  awayPlayed?: number;
+};
+
+/** League table GF/GA per game. Empty when the competition has no table. */
+export async function leagueStandings(
+  leagueId: number,
+  season: number
+): Promise<FootballTeamGoalRates[]> {
+  if (!Number.isFinite(leagueId) || !Number.isFinite(season)) return [];
+  const json = await apiGet(`/standings?league=${leagueId}&season=${season}`);
+  const tables = json.response ?? [];
+  const out: FootballTeamGoalRates[] = [];
+  for (const block of tables) {
+    const groups = block?.league?.standings;
+    const rows = Array.isArray(groups) ? groups.flat() : [];
+    for (const row of rows) {
+      const name = typeof row?.team?.name === "string" ? row.team.name.trim() : "";
+      const played = Number(row?.all?.played ?? 0);
+      const gf = Number(row?.all?.goals?.for ?? 0);
+      const ga = Number(row?.all?.goals?.against ?? 0);
+      if (!name || !Number.isFinite(played) || played <= 0) continue;
+      if (!Number.isFinite(gf) || !Number.isFinite(ga)) continue;
+      const homePlayed = Number(row?.home?.played ?? 0);
+      const homeGf = Number(row?.home?.goals?.for ?? NaN);
+      const homeGa = Number(row?.home?.goals?.against ?? NaN);
+      const awayPlayed = Number(row?.away?.played ?? 0);
+      const awayGf = Number(row?.away?.goals?.for ?? NaN);
+      const awayGa = Number(row?.away?.goals?.against ?? NaN);
+      const homeSplit =
+        Number.isFinite(homePlayed) &&
+        homePlayed > 0 &&
+        Number.isFinite(homeGf) &&
+        Number.isFinite(homeGa);
+      const awaySplit =
+        Number.isFinite(awayPlayed) &&
+        awayPlayed > 0 &&
+        Number.isFinite(awayGf) &&
+        Number.isFinite(awayGa);
+      out.push({
+        name,
+        gf: gf / played,
+        ga: ga / played,
+        played,
+        ...(homeSplit
+          ? { homeGf: homeGf / homePlayed, homeGa: homeGa / homePlayed, homePlayed }
+          : {}),
+        ...(awaySplit
+          ? { awayGf: awayGf / awayPlayed, awayGa: awayGa / awayPlayed, awayPlayed }
+          : {}),
+      });
+    }
+  }
+  return out;
 }
 
 /** Upstream day fetch. Desk/API callers must use `getFixturesForDate`. */

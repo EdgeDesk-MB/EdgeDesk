@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import {
-  appUsers,
   db,
   offerInboxAddresses,
   offerInboundMessages,
@@ -238,29 +237,9 @@ describe("ingestInboundEmail (local desk)", () => {
   });
 });
 
-describe("rollout gate (admin-only)", () => {
-  function addUser(clerkUserId: string, email: string, role: string) {
-    db.insert(appUsers)
-      .values({
-        clerkUserId,
-        email,
-        role,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      })
-      .run();
-  }
-
-  it("allows operator admins and bootstrap emails", async () => {
-    addUser("u_admin", "someone@example.com", "admin");
-    addUser("u_bootstrap", "samhayter.design@gmail.com", "user");
-    expect(await isOfferInboxAllowed("u_admin")).toBe(true);
-    expect(await isOfferInboxAllowed("u_bootstrap")).toBe(true);
-  });
-
-  it("denies plain users and unknown accounts", async () => {
-    addUser("u_plain", "punters@example.com", "user");
-    expect(await isOfferInboxAllowed("u_plain")).toBe(false);
-    expect(await isOfferInboxAllowed("u_missing")).toBe(false);
+describe("rollout gate", () => {
+  it("is always on for the local desk", async () => {
+    expect(await isOfferInboxAllowed("u_plain")).toBe(true);
+    expect(await isOfferInboxAllowed("u_missing")).toBe(true);
   });
 });

@@ -5,7 +5,10 @@ import {
 } from "@/components/admin/admin-charts";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
+import { DeskPreviewsPanel } from "@/components/admin/desk-previews-panel";
 import { ReleasesPanel } from "@/components/admin/releases-panel";
+import { readDeskPreviews } from "@/lib/admin/desk-previews";
+import { listAppUsers } from "@/lib/services/app-users";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { buildFlagShare } from "@/lib/admin/activity-charts";
 import { loadFlagsOverview } from "@/lib/admin/flags";
@@ -13,7 +16,10 @@ import {
   readAppUpdateSettings,
   readMaintenanceBanner,
 } from "@/lib/admin/operator-settings";
-import { getOperatorChromeEnv } from "@/lib/admin/operator-chrome-env";
+import {
+  getOperatorChromeEnv,
+  OPERATOR_CHROME_ENV_LABEL,
+} from "@/lib/admin/operator-chrome-env";
 import { getLandingVariant, getSiteSurface } from "@/lib/site-surface";
 import { surfaceLift } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -42,10 +48,12 @@ function deployIdentity() {
 
 export default async function AdminReleasesPage() {
   const chromeEnv = getOperatorChromeEnv();
-  const [flags, banner, update] = await Promise.all([
+  const [flags, banner, update, deskPreviews, users] = await Promise.all([
     loadFlagsOverview(),
     readMaintenanceBanner(),
     readAppUpdateSettings(),
+    readDeskPreviews(),
+    listAppUsers(),
   ]);
   const flagsOn = flags.flags.filter((flag) => flag.active).length;
   const flagShare = buildFlagShare(flagsOn, flags.flags.length - flagsOn);
@@ -67,7 +75,7 @@ export default async function AdminReleasesPage() {
   return (
     <AdminPage
       title="Releases"
-      description="Flags, the site banner, and app update. Saves stay on this environment."
+      description="Desk previews, flags, the site banner, and app update. Saves stay on this environment."
       icon={Flag}
     >
       <AdminSection title="This deploy">
@@ -107,7 +115,7 @@ export default async function AdminReleasesPage() {
         </dl>
       </AdminSection>
 
-      <StatStrip columns={4}>
+      <StatStrip columns={5}>
         <StatTile
           label="Flags"
           value={String(flags.flags.length)}
@@ -117,6 +125,19 @@ export default async function AdminReleasesPage() {
         <StatTile
           label="App update"
           value={update.mode === "auto" ? "Auto" : update.mode === "force" ? "Force" : "Off"}
+        />
+        <StatTile
+          label="Desk previews"
+          value={
+            deskPreviews.persisted
+              ? String(
+                  Object.values(deskPreviews.settings).filter(
+                    (rule) => rule.mode !== "off"
+                  ).length
+                )
+              : "Built-in"
+          }
+          sub={deskPreviews.persisted ? "saved rows on" : "save to take control"}
         />
         <StatTile label="PostHog" value={flags.configured ? "Linked" : "Unset"} />
       </StatStrip>
@@ -166,6 +187,18 @@ export default async function AdminReleasesPage() {
           <AdminDonutChart slices={flagShare} label="Flag state" />
         </AdminChartCard>
       ) : null}
+      <DeskPreviewsPanel
+        initial={deskPreviews.settings}
+        persisted={deskPreviews.persisted}
+        envLabel={OPERATOR_CHROME_ENV_LABEL[chromeEnv]}
+        accounts={users.map((user) => ({
+          clerkUserId: user.clerkUserId,
+          email: user.email,
+          plan: user.plan,
+          owner: user.owner,
+          admin: user.admin,
+        }))}
+      />
       <ReleasesPanel
         flags={flags}
         banner={banner}

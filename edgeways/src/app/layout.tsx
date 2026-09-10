@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { BrandAccentProvider } from "@/components/brand-accent-provider";
 import { UiFontProvider } from "@/components/ui-font-provider";
 import { HeaderPatternProvider } from "@/components/header-pattern-provider";
+import { ScrollIdleBars } from "@/components/scroll-idle-bars";
 import { BrandStorageMigration } from "@/components/brand-storage-migration";
 import { PostHogIdentify } from "@/components/analytics/posthog-identify";
 import { SyncAppUser } from "@/components/sync-app-user";
@@ -151,6 +152,7 @@ export default async function RootLayout({
           localization={EDGEWAYS_CLERK_LOCALIZATION}
         >
           <BrandStorageMigration />
+          <ScrollIdleBars />
           <SyncAppUser />
           <PostHogIdentify />
           <ThemeProvider>

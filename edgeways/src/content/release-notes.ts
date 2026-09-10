@@ -32,6 +32,50 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-10",
+    title: "Fixture page improvements and other fixes",
+    summary:
+      "Fixtures can show only matches you have already backed, and it remembers how you last left the page. Home Prov no longer double-counts a lock-in. History times and a few Add bet bugs are cleaned up.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Fixtures",
+        href: "/fixtures",
+        text: "Backed only shows matches you already have a back on. The page also keeps the sport and filters you last used.",
+      },
+      {
+        kind: "improvement",
+        area: "Home",
+        href: "/",
+        text: "If you lock in a bet, Prov now treats the lock-in and the original as one position, not two.",
+      },
+      {
+        kind: "improvement",
+        area: "History",
+        href: "/history",
+        text: "Kick-off, goals and full time now show the time they happened.",
+      },
+      {
+        kind: "improvement",
+        area: "History",
+        href: "/history",
+        text: "New 2UP bets can show two lines: the early bookie payout, then the lay. Older 2UP bets stay as one line.",
+      },
+      {
+        kind: "improvement",
+        area: "Tracked Events",
+        href: "/tracked-events",
+        text: "Substitutions are easier to see on the match tape. You can still tap a finished football match for a short while after full time.",
+      },
+      {
+        kind: "fix",
+        area: "Add bet",
+        href: "/tracker",
+        text: "Changing the football pick no longer changes the match name. A £0 lay you typed no longer sticks after you change the odds.",
+      },
+    ],
+  },
+  {
     date: "2026-09-07",
     title: "Pin any league, race result tapes, and dates that work on the phone",
     summary:

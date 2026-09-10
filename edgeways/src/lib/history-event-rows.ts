@@ -12,6 +12,9 @@ import {
   previousScorelineFromDedupe,
 } from "@/lib/history-goal-copy";
 import { parseRaceResults } from "@/lib/racing";
+import { eventResultPostedAt } from "@/lib/events/result-posted";
+import { regulationEndMinute } from "@/lib/history-match-clock";
+import { twoUpLeadMinute, twoUpOccurredAt } from "@/lib/history-twoup-moment";
 
 export type EventHistoryWrite = "put" | "upsert";
 
@@ -46,6 +49,7 @@ export type EventHistorySource = Pick<
   | "ftHomeScore"
   | "ftAwayScore"
   | "competition"
+  | "resultPostedAt"
 >;
 
 function occurredAt(event: EventHistorySource, minute: number): number {
@@ -219,27 +223,35 @@ export function eventHistoryFacts(
   }
 
   if (event.homeLed2) {
+    const minute = twoUpLeadMinute(event.goals, "home");
     facts.push({
       dedupe: `2up:${event.id}:home`,
       kind: "two_up",
       eventId: event.id,
-      minute: event.minute,
+      minute: minute ?? event.minute,
       title: "2UP triggered",
       detail: `${event.homeTeam} went 2 goals ahead`,
-      createdAt: occurredAt(event, event.minute || 0),
-      write: "put",
+      createdAt:
+        minute != null
+          ? twoUpOccurredAt(event.startTime, minute)
+          : occurredAt(event, event.minute || 0),
+      write: "upsert",
     });
   }
   if (event.awayLed2) {
+    const minute = twoUpLeadMinute(event.goals, "away");
     facts.push({
       dedupe: `2up:${event.id}:away`,
       kind: "two_up",
       eventId: event.id,
-      minute: event.minute,
+      minute: minute ?? event.minute,
       title: "2UP triggered",
       detail: `${event.awayTeam} went 2 goals ahead`,
-      createdAt: occurredAt(event, event.minute || 0),
-      write: "put",
+      createdAt:
+        minute != null
+          ? twoUpOccurredAt(event.startTime, minute)
+          : occurredAt(event, event.minute || 0),
+      write: "upsert",
     });
   }
 
@@ -255,14 +267,17 @@ export function eventHistoryFacts(
     } else {
       scoreDetail = `${event.homeTeam} ${event.homeScore}-${event.awayScore} ${event.awayTeam}`;
     }
+    const posted =
+      eventResultPostedAt({ ...event, status: "finished" }) ??
+      occurredAt(event, regulationEndMinute(event.matchEnding));
     facts.push({
       dedupe: fullTimeDedupe(event, options?.clerkUserId),
       kind: "full_time",
       eventId: event.id,
-      minute: event.minute || 90,
+      minute: regulationEndMinute(event.matchEnding),
       title: `Full time${titleSuffix}`,
       detail: scoreDetail || formatEventTitle(event),
-      createdAt: occurredAt(event, event.minute || 90),
+      createdAt: posted,
       write: "upsert",
     });
   }

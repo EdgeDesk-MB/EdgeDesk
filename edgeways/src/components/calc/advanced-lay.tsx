@@ -8,6 +8,7 @@ import {
 } from "@/lib/calc/exchange-odds-step";
 import { layStakeStepHandlers } from "@/lib/calc/exchange-stake-step";
 import { cn } from "@/lib/utils";
+import { highlightedLaySnap } from "@/lib/add-bet-lay-stake";
 import type { LayBounds, PartLay } from "@/lib/calc";
 import { Plus, X } from "lucide-react";
 
@@ -28,6 +29,8 @@ export function AdvancedLaySection({
   onPartLays,
   accent = "#1e293b",
   className,
+  lockedSnap = null,
+  onLockedSnap,
 }: {
   bounds: LayBounds;
   layStake: number;
@@ -37,6 +40,9 @@ export function AdvancedLaySection({
   /** Slider/button accent (exchange brand colour) */
   accent?: string;
   className?: string;
+  /** Parent-owned Underlay / Standard / Overlay lock. */
+  lockedSnap?: keyof LayBounds | null;
+  onLockedSnap?: (snap: keyof LayBounds | null) => void;
 }) {
   const [minOverride, setMinOverride] = useState<number | null>(null);
   const [maxOverride, setMaxOverride] = useState<number | null>(null);
@@ -100,7 +106,12 @@ export function AdvancedLaySection({
     { key: "overlay", label: "Overlay", hint: "£0 if bookie bet wins" },
   ];
 
-  const active = (v: number) => Math.abs(displayStake - v) < 0.005;
+  const activeSnap = highlightedLaySnap(displayStake, bounds, lockedSnap);
+  const snapSelected = (key: keyof LayBounds) => activeSnap === key;
+
+  function clearLockedSnap() {
+    if (lockedSnap != null) onLockedSnap?.(null);
+  }
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
@@ -157,18 +168,20 @@ export function AdvancedLaySection({
             key={snap.key}
             type="button"
             title={snap.hint}
+            aria-pressed={snapSelected(snap.key)}
             onClick={() => {
               setDragStake(null);
               flushLayStake();
+              onLockedSnap?.(snap.key);
               onLayStake(Math.round(bounds[snap.key] * 100) / 100);
             }}
             className={cn(
               "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-              active(bounds[snap.key])
+              snapSelected(snap.key)
                 ? "text-white"
                 : "bg-black/15 text-black/70 hover:bg-black/25 dark:bg-white/15 dark:text-white/80 dark:hover:bg-white/25"
             )}
-            style={active(bounds[snap.key]) ? { backgroundColor: accent } : undefined}
+            style={snapSelected(snap.key) ? { backgroundColor: accent } : undefined}
           >
             {snap.label}
           </button>
@@ -184,6 +197,7 @@ export function AdvancedLaySection({
         value={Math.min(Math.max(displayStake, min), max)}
         onChange={(e) => {
           const next = parseFloat(e.target.value);
+          clearLockedSnap();
           setDragStake(next);
           scheduleLayStake(next);
         }}

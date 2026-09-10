@@ -61,6 +61,7 @@ export function toSqliteEventRow(row: PgEventRow): EventRow {
     tapeFetchedAt: row.tapeFetchedAt,
     simScript: row.simScript,
     simStartedAt: row.simStartedAt,
+    resultPostedAt: row.resultPostedAt,
     createdAt: row.createdAt,
   };
 }

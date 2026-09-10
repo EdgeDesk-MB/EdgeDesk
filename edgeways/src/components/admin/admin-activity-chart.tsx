@@ -36,7 +36,12 @@ import {
   ensureWindowLinePoints,
   PNL_CHART_PADDING_PANEL,
 } from "@/lib/pnl/chart-bet-markers";
-import { filterPillCountState, filterPillGroup } from "@/lib/ui/surface-styles";
+import {
+  adminChartPlot,
+  adminChartPlotCompact,
+  filterPillCountState,
+  filterPillGroup,
+} from "@/lib/ui/surface-styles";
 import {
   resolveCssColor,
   useLivelineHoverOutline,
@@ -83,7 +88,13 @@ function kindCount(events: ActivityEvent[], kind: ActivityKind): number {
   return events.reduce((sum, event) => sum + (event.kind === kind ? 1 : 0), 0);
 }
 
-export function AdminActivityChart({ events }: { events: ActivityEvent[] }) {
+export function AdminActivityChart({
+  events,
+  compact = false,
+}: {
+  events: ActivityEvent[];
+  compact?: boolean;
+}) {
   const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
@@ -158,12 +169,13 @@ export function AdminActivityChart({ events }: { events: ActivityEvent[] }) {
 
   return (
     <Card>
-      <CardHeader className="gap-3">
+      <CardHeader className={compact ? "gap-2" : "gap-3"}>
         <div className="min-w-0">
           <CardTitle className="text-base">Desk activity</CardTitle>
-          <CardDescription>
-            Running count of rows created in the last 60 days. Each marker is
-            one bet, sports offer, or casino campaign, at the time it was written.
+          <CardDescription compact={compact}>
+            {compact
+              ? "Rows created in the last 60 days."
+              : "Running count of rows created in the last 60 days. Each marker is one bet, sports offer, or casino campaign, at the time it was written."}
           </CardDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -204,7 +216,12 @@ export function AdminActivityChart({ events }: { events: ActivityEvent[] }) {
       </CardHeader>
       <CardContent>
         {visibleEvents.length === 0 ? (
-          <div className="flex h-[18rem] items-center justify-center">
+          <div
+            className={cn(
+              "flex items-center justify-center",
+              compact ? adminChartPlotCompact : adminChartPlot
+            )}
+          >
             <EmptyState
               compact
               icon={Activity}
@@ -215,7 +232,13 @@ export function AdminActivityChart({ events }: { events: ActivityEvent[] }) {
           </div>
         ) : (
           <>
-            <div ref={chartHostRef} className="relative isolate h-[18rem]">
+            <div
+              ref={chartHostRef}
+              className={cn(
+                "relative isolate",
+                compact ? adminChartPlotCompact : adminChartPlot
+              )}
+            >
               {mounted ? (
                 <>
                   <Liveline

@@ -18,8 +18,13 @@ import {
   type ActivityKeyedCount,
   type ActivityMix,
 } from "@/lib/admin/activity-mix";
+import {
+  emptyActivityPinDesks,
+  type ActivityPinDesk,
+} from "@/lib/admin/activity-pins";
 import { SERIES_COMPARE_DAYS } from "@/lib/admin/series";
 import { getNeonDb } from "@/lib/db/neon";
+import { listNeonDeskFavouritePins } from "@/lib/db/neon-desk-settings";
 import { bets, casinoOffers, events, offers } from "@/lib/db/schema.pg";
 import { listAppUsers, type AdminUserRow } from "@/lib/services/app-users";
 
@@ -259,6 +264,15 @@ async function queryActivityMix(range?: ActivityDayRange): Promise<ActivityMix> 
     casinoBrands,
     casinoStatuses,
   };
+}
+
+export async function loadActivityPins(): Promise<ActivityPinDesk[]> {
+  if (!usesHostedVolume()) return emptyActivityPinDesks();
+  try {
+    return await listNeonDeskFavouritePins();
+  } catch {
+    return emptyActivityPinDesks();
+  }
 }
 
 export async function loadActivityMixForDay(ymd: string): Promise<ActivityMix> {

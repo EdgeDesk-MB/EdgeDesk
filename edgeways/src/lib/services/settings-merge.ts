@@ -22,19 +22,31 @@ import {
   normalizePlanPreview,
   normalizeTuning,
   type AppSettings,
+  type FixtureBoardViewSettings,
   type HomeLayoutSettings,
   type OfferBetPref,
   type TuningSettings,
 } from "@/lib/services/settings-shared";
+import {
+  mergeFixtureBoardView,
+  normalizeFixtureBoardView,
+} from "@/lib/events/fixture-board-view";
 import { normalizeFavouriteScopeIds } from "@/lib/events/fixture-scope";
 
-export type AppSettingsPatch = Partial<Omit<AppSettings, "tuning" | "homeLayout">> & {
+export type AppSettingsPatch = Partial<
+  Omit<
+    AppSettings,
+    "tuning" | "homeLayout" | "fixtureBoardView" | "billing" | "twoupScoutPreview"
+  >
+> & {
   /** Merge a single offer pref without replacing the whole map. */
   offerBetPref?: { offerId: number; stake: number; bookmaker?: string };
   /** Partial merge into the tuning object; each field clamped on write. */
   tuning?: Partial<TuningSettings>;
   /** Partial merge into the Home layout; normalised on write. */
   homeLayout?: Partial<HomeLayoutSettings>;
+  /** Partial merge into the Fixtures tape view; normalised on write. */
+  fixtureBoardView?: Partial<FixtureBoardViewSettings>;
 };
 
 const FIXTURE_SCOPE_SETTING_KEYS = [
@@ -42,6 +54,7 @@ const FIXTURE_SCOPE_SETTING_KEYS = [
   "favouriteRacingCourses",
   "hiddenFootballScopes",
   "hiddenRacingCourses",
+  "fixtureBoardView",
 ] as const;
 
 /** Hide / saved patches only. Skip billing and a full desk refresh. */
@@ -75,6 +88,7 @@ function cloneSettings(settings: AppSettings): AppSettings {
     favouriteRacingCourses: [...(settings.favouriteRacingCourses ?? [])],
     hiddenFootballScopes: [...(settings.hiddenFootballScopes ?? [])],
     hiddenRacingCourses: [...(settings.hiddenRacingCourses ?? [])],
+    fixtureBoardView: normalizeFixtureBoardView(settings.fixtureBoardView),
   };
 }
 
@@ -215,6 +229,7 @@ export function parseStoredSettings(raw: unknown): AppSettings {
     favouriteRacingCourses: normalizeFavouriteScopeIds(o.favouriteRacingCourses),
     hiddenFootballScopes: normalizeFavouriteScopeIds(o.hiddenFootballScopes),
     hiddenRacingCourses: normalizeFavouriteScopeIds(o.hiddenRacingCourses),
+    fixtureBoardView: normalizeFixtureBoardView(o.fixtureBoardView),
     ...brand,
     uiFont: normalizeUiFont(typeof o.uiFont === "string" ? o.uiFont : undefined),
     headerPattern: normalizeHeaderPattern(
@@ -308,6 +323,9 @@ export function mergeAppSettings(
   }
   if (patch.hiddenRacingCourses != null) {
     next.hiddenRacingCourses = normalizeFavouriteScopeIds(patch.hiddenRacingCourses);
+  }
+  if (patch.fixtureBoardView != null) {
+    next.fixtureBoardView = mergeFixtureBoardView(next.fixtureBoardView, patch.fixtureBoardView);
   }
   if (patch.brandAccentPreset != null) {
     const id = isBrandAccentPresetId(patch.brandAccentPreset)

@@ -91,6 +91,7 @@ describe("appStateFromNeonBets", () => {
     expect(state.series).toHaveLength(1);
     expect(state.series[0]?.value).toBe(1.25);
     expect(state.provisionalProfit).toBe(0.5);
+    expect(state.liveChartProfit).toBe(0.5);
   });
 });
 

@@ -151,6 +151,12 @@ export const sectionDescription =
 /** Vertical gap between stacked page sections / breakdown blocks after a main item */
 export const sectionStack = "flex flex-col gap-[var(--layout-stack-gap)]";
 
+/** Admin Activity / Racing-style plot. Compact is the half-width board tile. */
+export const adminChartPlot = "h-[var(--layout-admin-chart-h)]";
+export const adminChartPlotCompact = "h-[var(--layout-admin-chart-compact-h)]";
+export const adminTableCompactMax =
+  "max-h-[var(--layout-admin-table-compact-max-h)]";
+
 /** Small uppercase caption for nav sections and column headers outside tables */
 export const captionHeading =
   "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
@@ -334,11 +340,13 @@ export const adminOwnerTag = edgeNavTag;
 export const adminTestTag = `${navTag} bg-foreground/10 text-muted-foreground`;
 
 /**
- * Settled/open bet mark on Racing Desk runners — same box as `edgeNavTag`
- * (11px, px-1.5 py-0.5, rounded-[3px]); ink plate + canvas type.
+ * Settled/open bet mark on Racing Desk runners and Fixtures football
+ * teams — same box as `edgeNavTag` (11px, px-1.5 py-0.5, rounded-[3px]).
+ * Outline + quiet fill, same recipe as the Home live-feed 2UP watch mark
+ * (`bg/10` + `ring/40`), in ink so it does not shout over Edge.
  */
 export const backedNavTag =
-  "inline-flex items-center gap-1 rounded-[3px] bg-foreground px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-background";
+  "inline-flex items-center gap-1 rounded-[3px] bg-foreground/10 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none tracking-wide text-foreground ring-1 ring-foreground/40";
 
 /**
  * Brand-plate counter for sitting on ink / neutral chrome (not on active
@@ -501,36 +509,105 @@ export const fixtureTapeClockCol = "minmax(3.25rem,max-content)";
 /** Floor width for clock copy; keep in lockstep with `fixtureTapeClockCol`. */
 export const fixtureTapeClockMin = "min-w-[3.25rem]";
 /**
- * Football score rail: 2rem figures + 8px after the scoreline (`2.5rem`).
- * Grid track must stay a complete Tailwind literal (same width).
+ * Football score / back stack: shrink-wrap, right-hug with the clock.
  */
-export const fixtureTapeScoreCol = "2.5rem";
-export const fixtureTapeScoreRail = "w-10 pr-2";
-/** Home / away stack: 4px between the two name (and score) lines. */
-export const fixtureTapeTeamStack = "grid min-w-0 gap-y-1";
+export const fixtureTapeScoreCol = "auto";
+export const fixtureTapeScoreRail = "shrink-0 justify-items-end";
+/** Home / away stack. Tight 8px gap; line-height carries the descenders. */
+export const fixtureTapeTeamStack = "grid min-w-0 grid-rows-2 gap-y-2";
+/**
+ * One football name line. `text-sm` + `leading-normal` (~21px) keeps
+ * descenders inside the box. Floor still covers the 2UP tick slot
+ * (15px) and crest (`size-4`). Do not use `leading-none`: `truncate` clips.
+ */
+export const fixtureTapeTeamLine =
+  "flex min-w-0 items-center gap-2 text-sm font-medium leading-normal";
+/** Odds chips: same two-track gap as the name stack. */
+export const fixtureTapeOddsStack = "grid h-full min-w-0 grid-rows-2 gap-y-2";
+/** One line in the odds rail. */
+export const fixtureTapeScoreLine =
+  "flex items-center justify-end text-sm font-semibold tabular-nums leading-none";
+/** Clock hugging a scoreboard / back stack, with room after the board. */
+export const fixtureTapeTrailing = "flex shrink-0 items-center gap-3 pr-3";
+/** Stacked TV-style scoreline (home over away). */
+export const fixtureTapeScoreboard =
+  "flex h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-sm ring-1";
+export const fixtureTapeScoreboardRest =
+  "bg-muted-foreground text-tape-score-live-fg ring-transparent dark:bg-muted dark:ring-border/80";
+export const fixtureTapeScoreboardLive =
+  "bg-tape-score-live text-tape-score-live-fg ring-transparent";
+/** Hairline between stacked scores. Stronger on live red, quieter on FT. */
+export const fixtureTapeScoreboardRuleLive = "bg-tape-score-live-fg/45";
+export const fixtureTapeScoreboardRuleRest = "bg-tape-score-live-fg/12";
+export const fixtureTapeScoreboardCell =
+  "flex flex-1 items-center justify-center px-2 py-px text-center font-heading text-sm font-black tabular-nums leading-none";
 export const fixtureTapeRowGrid = cn(
   "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_auto] items-center gap-3"
 );
 /**
- * Football tape: teams, then clock (right-aligned with the header eye),
- * then scores (2rem figures + 8px after the scoreline, same right edge as
- * the collapse chevron).
+ * Football tape: teams left, clock hugging the score / back stack on
+ * the right. Do not give the clock its own wide track.
  */
 export const fixtureTapeMatchGrid = cn(
-  "grid grid-cols-[minmax(0,1fr)_minmax(3.25rem,max-content)_2.5rem] items-center gap-3"
+  "grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-3"
 );
-/** Equal `py-2.5` on every tape row. No extra pad on the list under a header. */
+/**
+ * Whole 2UP tick mark is one traffic-light colour, not a rainbow per bar.
+ * Skip 1 red, Thin 2 amber, Fair 3 yellow, Strong 4 green.
+ */
+export const TWOUP_TICK_TONE = {
+  skip: "text-destructive",
+  thin: "text-warning",
+  ok: "text-brand",
+  strong: "text-success",
+  unknown: "text-muted-foreground",
+} as const;
+/** Edge take: Fair is light violet, Strong is full `--edge`. */
+export const TWOUP_TICK_TONE_EDGE = {
+  ok: "text-edge/70",
+  strong: "text-edge",
+} as const;
+/** Take word on the 2UP plate. Fair and Strong stay readable ink, not raw brand. */
+export const TWOUP_FIT_WORD_TONE = {
+  skip: "text-destructive",
+  thin: "text-warning",
+  ok: "text-primary-text",
+  strong: "text-primary-text",
+  unknown: "text-muted-foreground",
+} as const;
+/** `list` = fixture tape and 2UP tab. `modal` = larger dialog ticks if shown. */
+export const TWOUP_TICK_SIZE = {
+  list: { width: 2, gap: 1, heights: [6, 8, 11, 13, 15] },
+  modal: { width: 4, gap: 3, heights: [8, 11, 14, 19, 23] },
+} as const;
+
+export function twoupTickSlotBox(size: keyof typeof TWOUP_TICK_SIZE) {
+  const box = TWOUP_TICK_SIZE[size];
+  return {
+    width: box.heights.length * box.width + (box.heights.length - 1) * box.gap,
+    height: box.heights[box.heights.length - 1],
+  };
+}
+/** Racing tape row. Football uses `fixtureTapeFootballRow`. */
 export const fixtureTapeRow = cn(
   listRow,
   deskInsetX,
   "py-2.5 transition-colors hover:bg-selection-subdued dark:hover:bg-selection-subtle"
 );
+/** Football match block: extra pad so names and ticks clear the dividers. */
+export const fixtureTapeFootballRow = cn(fixtureTapeRow, "py-3.5");
 /**
- * Competition / course header hover. Rest fill is `bg-page` (darker than the
- * row well). Keep the light wash thinner than the row hover.
+ * Competition / course header. Light: same `--card` plate as the rows
+ * (surface-lift), hairline only. Dark: selection wash on the header.
  */
+export const fixtureTapeSectionBar = cn(
+  deskInsetX,
+  "border-b border-border/60 bg-transparent py-2.5 pr-2.5 dark:bg-selection-subtle/80"
+);
+export const fixtureTapeSectionBody = "bg-transparent";
+/** Header hover matches tape rows. */
 export const fixtureTapeSectionHover =
-  "transition-colors hover:bg-muted/25 dark:hover:bg-selection-subtle";
+  "transition-colors hover:bg-selection-subdued dark:hover:bg-selection-subtle";
 /** Card row inset and tape scroll pad (`deskInsetX` / `px-4`). Fade length matches. */
 export const FIXTURE_TAPE_GUTTER_PX = 16;
 
@@ -586,11 +663,21 @@ export const qualifyMarkerPill =
   "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-success/15 px-1.5 text-[12px] font-bold tabular-nums leading-none text-success";
 
 /**
- * 2UP trigger mark on a Goal! history row — solid brand plate, same box as
- * edgeMarkerPill. Do not also render a standalone two_up feed row.
+ * 2UP trigger mark on a Goal! history row — same box as edgeMarkerPill.
+ * Solid when that side was backed; outline when the desk is only watching.
+ * Do not also render a standalone two_up feed row.
  */
 export const historyTwoUpBadge =
-  "inline-flex h-5 min-w-5 shrink-0 items-center justify-center gap-0.5 rounded-full bg-brand px-1.5 text-[12px] font-bold leading-none text-brand-foreground";
+  "inline-flex h-5 min-w-5 shrink-0 items-center justify-center gap-0.5 rounded-full px-1.5 text-[12px] font-bold leading-none";
+
+export function historyTwoUpBadgeState(backed: boolean) {
+  return cn(
+    historyTwoUpBadge,
+    backed
+      ? "bg-brand text-brand-foreground"
+      : "bg-brand/10 text-primary-text ring-1 ring-brand/40"
+  );
+}
 
 /**
  * White L→R wash (10% → 5%) with mix-blend overlay — lifts tinted outline

@@ -38,6 +38,7 @@ function event(partial: Partial<EventRow> = {}): EventRow {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: NOW - 3 * 60 * 60 * 1000,
     ...partial,
   };
@@ -110,6 +111,9 @@ describe("appStateFromNeonDesk with global events", () => {
     expect(position.minute).toBe(40);
     expect(position.score).toBe("1-0");
     expect(position.provisional).not.toBeNull();
+    expect(position.snapshotProvisional).not.toBeNull();
+    expect(state.liveChartProfit).toBeCloseTo(position.snapshotProvisional!, 2);
+    expect(state.liveChartProfit).not.toBe(state.provisionalProfit);
   });
 
   it("publishes live model prices for live football", () => {

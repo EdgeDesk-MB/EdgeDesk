@@ -38,6 +38,7 @@ function event(partial: Partial<EventRow> = {}): EventRow {
     tapeFetchedAt: null,
     simScript: null,
     simStartedAt: null,
+    resultPostedAt: null,
     createdAt: NOW - 60 * 60 * 1000,
     ...partial,
   };
@@ -112,6 +113,12 @@ describe("selectFootballSyncEvents", () => {
   it("agrees with the single-event predicate", () => {
     expect(isFootballLivePollCandidate(event(), NOW)).toBe(true);
     expect(isFootballLivePollCandidate(event({ status: "finished" }), NOW)).toBe(false);
+    expect(
+      isFootballLivePollCandidate(
+        event({ status: "finished", matchEnding: "ft", resultPostedAt: NOW - 60_000 }),
+        NOW
+      )
+    ).toBe(true);
   });
 });
 
@@ -181,6 +188,53 @@ describe("footballEventPatch", () => {
   it("carries the timeline the caller decided to fetch", () => {
     const goals = JSON.stringify([{ minute: 12, side: "home", player: "Saka" }]);
     expect(footballEventPatch(event(), fixture(), goals).goals).toBe(goals);
+  });
+
+  it("stamps the API finish on the first FT poll and reopens for extra time", () => {
+    const now = NOW;
+    const finished = footballEventPatch(
+      event(),
+      fixture({ status: "finished", matchEnding: "ft", minute: 20, period: undefined }),
+      JSON.stringify([{ kind: "goal", minute: 12, side: "home" }]),
+      { now }
+    );
+    expect(finished.status).toBe("finished");
+    expect(finished.resultPostedAt).toBe(now);
+
+    const extra = footballEventPatch(
+      event({
+        status: "finished",
+        matchEnding: "ft",
+        resultPostedAt: now,
+        homeScore: 1,
+        awayScore: 1,
+      }),
+      fixture({ status: "live", period: "ET", minute: 91, matchEnding: null }),
+      null,
+      { now: now + 60_000 }
+    );
+    expect(extra.status).toBe("live");
+    expect(extra.resultPostedAt).toBeNull();
+    expect(extra.matchEnding).toBeNull();
+    expect(extra.ftHomeScore).toBe(1);
+    expect(extra.ftAwayScore).toBe(1);
+    expect(extra.homeLed2).toBe(0);
+  });
+
+  it("does not latch 2UP from an extra-time scoreline", () => {
+    const patch = footballEventPatch(
+      event({ homeLed2: 0, awayLed2: 0, ftHomeScore: 1, ftAwayScore: 1 }),
+      fixture({
+        status: "live",
+        period: "ET",
+        homeScore: 3,
+        awayScore: 1,
+        minute: 105,
+        matchEnding: null,
+      }),
+      null
+    );
+    expect(patch.homeLed2).toBe(0);
   });
 });
 

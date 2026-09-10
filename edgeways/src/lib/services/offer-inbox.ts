@@ -27,8 +27,7 @@ import {
   type OfferInboxAddressRow,
 } from "@/lib/db";
 import { isNeonDesk } from "@/lib/db/desk-backend";
-import { isOperatorAdmin } from "@/lib/admin/emails";
-import { findAppUserByClerkId } from "@/lib/services/app-users";
+import { resolveDeskPreview } from "@/lib/admin/desk-previews";
 import { buildEmailDraft } from "@/lib/services/email-intake";
 import { synthesiseRawEmail } from "@/lib/services/inbound-webhook";
 import { recordAlerts, type IncomingAlert } from "@/lib/services/alerts-inbox";
@@ -63,16 +62,14 @@ export function formatInboxAddress(token: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* Rollout gate: admin-only while the inbox is proven. Admin → Users   */
-/* is the control surface; the local single-operator desk is always    */
-/* allowed, so the check only bites on the hosted multi-tenant desk.   */
+/* Rollout gate: Releases → Desk previews. Local desk is always on.    */
+/* Hosted uses the saved rule, or the built-in admin list until saved. */
 /* ------------------------------------------------------------------ */
 
 export async function isOfferInboxAllowed(
   clerkUserId: string
 ): Promise<boolean> {
-  const user = await findAppUserByClerkId(clerkUserId);
-  return isOperatorAdmin({ email: user?.email ?? null, role: user?.role ?? null });
+  return resolveDeskPreview("offer_inbox", clerkUserId);
 }
 
 /** Actor-context gate for the settings route. Local desk: always on. */
@@ -404,7 +401,7 @@ export async function ingestInboundEmail(
     const clerkUserId = await neon.findNeonInboxOwnerByToken(token);
     if (!clerkUserId) return { status: "unknown_address" };
     if (!(await isOfferInboxAllowed(clerkUserId))) {
-      // Gated rollout: non-admin addresses drop silently, same as unknown
+      // Gated rollout: closed desks drop silently, same as unknown
       // tokens - the gate's existence is never revealed to senders.
       return { status: "unknown_address" };
     }

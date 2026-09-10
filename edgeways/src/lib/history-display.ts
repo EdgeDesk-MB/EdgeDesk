@@ -27,6 +27,13 @@ import {
   type HistoryTwoUpTrigger,
 } from "@/lib/history-goal-copy";
 import type { Side } from "@/lib/calc/trigger";
+import { eventSideHasUserBack } from "@/lib/events/twoup-backed";
+import { eventResultPostedAt } from "@/lib/events/result-posted";
+import { earlyPayoutOccurredAt } from "@/lib/history-twoup-moment";
+import {
+  expandTwoUpHistoryEntries,
+  isTwoUpLayHistoryDedupe,
+} from "@/lib/history-twoup-split";
 import { racingResultCopyFromGoals, type RacingResultCopy } from "@/lib/history-racing-copy";
 
 export type HistoryFilter =
@@ -78,8 +85,28 @@ export function buildHistoryContext(
     promoByBetId,
     offerTitleById: new Map(offerTitles.map((o) => [o.id, o.title])),
     goalScoringSideById: inferGoalScoringSidesFromEntries(historyEntries, eventsById),
-    twoUpTriggerByGoalId: inferTwoUpTriggerGoalIds(historyEntries, eventsById),
+    twoUpTriggerByGoalId: markTwoUpTriggersBacked(
+      inferTwoUpTriggerGoalIds(historyEntries, eventsById),
+      eventsById,
+      bets
+    ),
   };
+}
+
+function markTwoUpTriggersBacked(
+  triggers: Map<number, HistoryTwoUpTrigger>,
+  eventsById: Map<number, EventRow>,
+  bets: BetRow[]
+): Map<number, HistoryTwoUpTrigger> {
+  const out = new Map<number, HistoryTwoUpTrigger>();
+  for (const [goalId, trigger] of triggers) {
+    const event = eventsById.get(trigger.eventId);
+    out.set(goalId, {
+      ...trigger,
+      backed: event ? eventSideHasUserBack(event, trigger.side, bets) : false,
+    });
+  }
+  return out;
 }
 
 export function resolveHistoryEvent(
@@ -103,14 +130,34 @@ export function historyOccurredAt(entry: HistoryRow, ctx: HistoryContext): numbe
     return bet?.createdAt ?? entry.createdAt;
   }
 
+  if (
+    entry.kind === "settlement" &&
+    bet &&
+    event &&
+    !isTwoUpLayHistoryDedupe(entry.dedupe)
+  ) {
+    const twoUpAt = earlyPayoutOccurredAt(bet, event);
+    if (twoUpAt != null && (bet.status === "early_payout" || bet.earlyPayout)) {
+      return twoUpAt;
+    }
+  }
+
   if (entry.kind === "kickoff" && event?.startTime) {
     return event.startTime;
   }
 
   if (entry.kind === "full_time" && event?.startTime) {
-    if (event.sport === "horse_racing") return event.startTime;
-    const minute = entry.minute ?? 90;
-    return event.startTime + minute * 60 * 1000;
+    if (event.sport === "horse_racing") return eventResultPostedAt(event) ?? event.startTime;
+    return eventResultPostedAt(event) ?? event.startTime + (entry.minute ?? 90) * 60 * 1000;
+  }
+
+  if (
+    entry.kind === "settlement" &&
+    event?.startTime &&
+    event.sport !== "horse_racing" &&
+    event.status === "finished"
+  ) {
+    return eventResultPostedAt(event) ?? event.startTime + (entry.minute ?? 90) * 60 * 1000;
   }
 
   if (event?.sport === "horse_racing" && event.startTime) {
@@ -179,13 +226,23 @@ export function historyBetPlacedMatchMinute(
   return historyInPlayPlacementMinute(bet?.createdAt ?? entry.createdAt, event);
 }
 
+function isExtraTimeMatchEnding(event: EventRow | undefined): boolean {
+  return event?.matchEnding === "aet" || event?.matchEnding === "pen";
+}
+
 /** True when the badge should show a live minute (e.g. 23') instead of a clock time. */
 export function historyUsesMinuteBadge(entry: HistoryRow, ctx: HistoryContext): boolean {
   const event = resolveHistoryEvent(entry, ctx);
   if (historyBetPlacedMatchMinute(entry, ctx) != null) return true;
   // AET/extra-time full_time entries show the match minute ("120'") not the wall clock
   // so they read consistently alongside AET goals at the same minute.
-  if (entry.kind === "full_time" && (entry.minute ?? 90) > 90 && event?.sport !== "horse_racing") {
+  // Missing fixtures must not throw: `event?.sport !== "horse_racing"` is true when event is undefined.
+  if (
+    entry.kind === "full_time" &&
+    event != null &&
+    event.sport !== "horse_racing" &&
+    isExtraTimeMatchEnding(event)
+  ) {
     return true;
   }
   return (
@@ -214,7 +271,11 @@ export function formatHistoryTimeBadgeParts(
   const now = new Date();
 
   if (historyUsesMinuteBadge(entry, ctx)) {
-    const minute = historyBetPlacedMatchMinute(entry, ctx) ?? entry.minute;
+    const minute =
+      historyBetPlacedMatchMinute(entry, ctx) ??
+      (entry.kind === "full_time" && isExtraTimeMatchEnding(resolveHistoryEvent(entry, ctx))
+        ? 120
+        : entry.minute);
     return { primary: `${minute}'` };
   }
 
@@ -754,9 +815,6 @@ function historySortAt(entry: HistoryRow, ctx: HistoryContext): number {
         return event.startTime;
       }
     }
-    if (entry.kind === "settlement") {
-      return event.startTime + (entry.minute ?? 90) * 60 * 1000;
-    }
   }
 
   return historyOccurredAt(entry, ctx);
@@ -766,7 +824,8 @@ export function sortHistoryEntries(
   rows: HistoryRow[],
   ctx: HistoryContext
 ): HistoryRow[] {
-  return [...rows].sort((a, b) => {
+  const expanded = expandTwoUpHistoryEntries(rows, ctx.betsById, ctx.eventsById);
+  return [...expanded].sort((a, b) => {
     const ta = historySortAt(a, ctx);
     const tb = historySortAt(b, ctx);
     if (tb !== ta) return tb - ta;

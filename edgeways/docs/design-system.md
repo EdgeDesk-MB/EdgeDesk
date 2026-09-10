@@ -228,6 +228,16 @@ Yesterday, else `d MMM`, plus the year when it is not this year. Pass `min` /
 Fixtures: lookback 6 days through tomorrow. Admin mix: two years back through
 today.
 
+**Admin Activity board.** Stats stay in the header strip, not inside widgets.
+Half-width pins and desk activity are matching Cards, top-aligned
+(`lg:items-start`). Full-width volume, categories, and per desk sit below.
+Focus pills Pins / Volume / Mix rewrite the order. Arrange moves widgets and
+saves a custom order; a Custom pill shows while that order is active. Cookie
+`ew_admin_activity_board` (this browser, `/admin` only). Default focus is Pins
+so a new feature can sit above the fold beside the activity line. Compact plot
+height is `--layout-admin-chart-compact-h` (`adminChartPlotCompact`); pin table
+cap is `--layout-admin-table-compact-max-h`. Full plot is `--layout-admin-chart-h`.
+
 **Fixtures chrome** - Flashscore-style tape, not a card inside a card. The
 page title is **Fixtures** plus one short sentence. The pin rail is a
 separate column on the **right**. Sport line tabs (`TabsLineBar`) and the feed bar span
@@ -236,7 +246,8 @@ Tracker). The hairline is full width of that column, not the raw panel
 edge; tab labels line up with **Fixtures**. No hairline under the title;
 16px (`mt-4`) sits above the sport tabs. Title, tabs and feed bar stay
 pinned; the pin rail stays put and the tape scrolls in `ScrollFadeEdges`
-(`from-page` top and bottom, matching `--page`). Tape and pin rail
+(`from-page` top and bottom, matching `--page`, `fadeOnScroll` so the
+washes appear only while the list is moving). Tape and pin rail
 scrollers use `my-4` (16px, same as the card row gutter / `deskInsetX`)
 so the thumb starts on the first card, not the empty pad above.
 Fades are sticky inside the scroller so the thumb paints over them. Gap
@@ -276,36 +287,109 @@ a match that day. If Pinned only has none, one page empty:
 “No fixtures for your pins” (racing: races), plus secondary **Show all**.
 The pin rail (`w-56`) is reserved on first paint (spinner in the
 column) so it does not jump in after `/api/state`. After settings land
-it only stays when the desk has pins: All / Pinned only + pin
-shortcuts in the **saved pin order** (not that day's kick-off), under a
-Competitions / Courses caption (`mt-4` / 16px above the caption). Pins
-show the competition name only (flag carries country) at `text-base`,
-counts at `text-sm`. When there are
+it only stays when the desk has pins or a backed card: All / Pinned only
++ pin shortcuts in the **saved pin order** (not that day's kick-off),
+under a Competitions / Courses caption (`mt-4` / 16px above the caption).
+**Backed only** appears under Pinned only only when a fixture (or race)
+on this day has a desk back; hide it at 0. Pins
+show the competition name only (flag carries country) at `text-sm`
+(same as the app nav), counts at `text-xs`. When there are
 two or more pins, muted `Drag to reorder.` sits under the list. The rail paints the same selection plate
 as All / Pinned only when a competition is the active filter. No pins:
 hide the rail. The feed-bar Filter icon is the only
 competition / course picker. Do not duplicate it on the rail. Below `lg`, Pinned is a pins-only popover when there are pins. Title, tabs, the feed bar and the pin rail stay pinned; only the tape scrolls.
 Browse fixtures uses the same chrome. Football tape rows use
-`fixtureTapeMatchGrid`: stacked teams (home over away, `gap-2` / 8px
-between crest and name), then kick-off /
-FT / live minute right-aligned in the same column as the header Hide
-eye (`fixtureTapeClockCol` starts at 3.25rem and grows for 12-hour
-times and labels such as `ET 90'`), then scores in a 2.5rem rail
-(2rem figures plus 8px after the scoreline) that shares a right edge
-with the collapse chevron (figures when live or finished, en dash
-when not started). Football rows have no trailing
+`fixtureTapeMatchGrid`: stacked teams left (`text-sm`, `gap-y-2`),
+then a right-hugging cluster (`fixtureTapeTrailing`,
+`gap-3` plus `pr-3`; score or odds rows use `gap-6`, drop the trailing
+pad, and stretch to the name stack): kick-off / FT / live minute immediately left of
+the scoreline or Betfair backs. Scores sit in a stacked TV board
+(`fixtureTapeScoreboard`) that fills the name-stack height:
+`text-sm` / `font-black`, `px-2 py-px`
+cells so the board matches the odds-row height. Odds chips use
+`fixtureTapeOddsStack` (same `grid-rows-2 gap-y-2` as the names).
+Live is `--tape-score-live` red with white figures in both
+themes, no outer ring. Finished uses `bg-muted-foreground` in light (not chip ink)
+and `bg-muted` in dark, same white figures. The 1px rule between
+scores is `fg/45` on live red and `fg/12` on FT, so the hairline
+reads on red and stays quiet on the dark board. Upcoming
+without exchange backs shows only the kick-off, no dash board.
+Do not give the clock its own wide column. Upcoming pinned matches on Edge replace the en
+dashes with Betfair match-odds backs, stacked home over away, using
+`ExchangeBackStack` (same `oddsCellStyle` cell as Home → Live →
+Events). When a stored match-odds back moves by a displayed tick, the
+cell uses the same green/red flash and last-direction chevron as Home →
+Live. First paint does not flash. Hide a
+side when that back is missing (en dash). Do not fetch the exchange
+from the tape; read the scout store on a 20s poll. Football rows have no trailing
 actions. Track, Add bet and 2UP Desk live on the match-events footer.
+Pinned football groups (Edge) keep the same three-track tape as
+every other football group, so kick-off and scores stay on the
+chevron edge. Clock hugs the score or back stack; that pair hugs
+the trailing edge. The 2UP hint sits beside both team names: a
+five-step tick meter (one Skip, two Thin, three Fair, four Strong).
+Each side uses that side's windfall (go two ahead, then fail to win),
+not a duplicated match-shape score. Home ticks can differ from away.
+Do not put the % on the tape. It lives in the match 2UP tab. Ticks are
+glance chrome, not tab stops. Every football name line reserves the tick
+slot (`TWOUP_TICK_SIZE.list` / `TwoupFitTickSlot`) so live, finished and
+upcoming rows share the odds-row height. Scout load cannot change row
+height. Both sides' fit rides on the existing
+Open match events control. Hover tooltip on fine pointers only. The whole mark is one traffic-light colour, not a rainbow per bar:
+Skip `--destructive` (red), Thin `--warning` (amber), Fair `--brand`
+(yellow), Strong `--success` (green). Ghost ticks stay at 20% of that
+colour. Do not use `--profit` on this chrome. A Fair
+or Strong take shows the same `edgeNavTag` **Edge** mark as Racing Desk
+recommended runners, to the **right** of the ticks. A team with a desk
+back (not tracked-only, not lay-only or lock-in) shows the same
+`backedNavTag` **Backed** mark as Racing Desk runners, at the **end** of
+the name line (after ticks, after Edge when both show). The check stays
+left of Backed. Backed follows the bet's current selection, not the
+first pick or leftover dutch legs. Edge Fair fills
+four of five ticks in `text-edge/70`; Edge Strong fills all five in
+`text-edge`. Football filters add **2UP picks** (`tone="edge"`,
+Zap + count, locked Lock + Edge like Race picks): upcoming pinned
+matches with an Edge take, ranked by windfall. Opening a match on Edge adds a **2UP** line
+tab beside Commentary and Lineup. The tab ticks are the take side
+(`TWOUP_TICK_SIZE.list`). Do not put an Edge pill or flame on the tab.
+Loading, empty and error on that tab use `EmptyState`, same as commentary.
 Racing keeps `fixtureTapeRowGrid` (clock, copy, icon actions). Competition
 groups put no extra pad above or below the row list (`0px`). Competition
-headers use `py-2.5` (10px), 4px tighter than the shared section band.
-Every tape row uses `py-2.5` and `hover:bg-selection-subdued`
+headers use `py-2.5` (10px), 4px tighter than the shared section band,
+and `pr-2.5` so the collapse chevron matches that inset on the right.
+Racing tape rows use `py-2.5`. Football match rows use
+`fixtureTapeFootballRow` (`py-3.5`) so names, ticks and the scoreboard
+clear the dividers. Hover is `hover:bg-selection-subdued`
 (`dark:hover:bg-selection-subtle`) so the wash reads on the light
-`selection-subtle` well. Competition headers rest on `bg-page` and use a
-thinner `hover:bg-muted/25` (`dark:hover:bg-selection-subtle`). Football home / away lines (and the score stack) sit on `gap-y-1` (4px). Live minute and live score use `text-profit` plus the pulsing
-`Radio` mark (same as Tracked Events / match tape). Do not put a
+`selection-subtle` well. Competition headers rest on the same `--card` plate as the rows
+(`bg-transparent` on `surface-lift`). A hairline, not a grey fill,
+splits title from tape. Hover matches the rows
+(`hover:bg-selection-subdued`, `dark:hover:bg-selection-subtle`).
+Dark keeps a selection wash on the header. Football home / away name lines use `text-sm` and `leading-normal` (~21px) with `gap-y-2` (8px). Do not use `leading-none` on those names: `truncate` clips g/y. Finished matches step the winning name one weight up (`font-semibold`) and the losing name one down (`font-normal`). A draw keeps both at `font-medium`. The match-events header does the same step from its `font-semibold` base (`font-bold` / `font-medium`). Live and upcoming stay even. Live minute uses `text-profit` plus the pulsing
+`Radio` mark (same as Tracked Events / match tape). Half-time is `HT`
+only, no Radio. Do not put a
 Live pill on the title line. A football row opens the commentary and
 lineup modal (`FootballLiveTapeDialog`), with the existing loading
-empty-state while tape loads. On `sm+` the plate is a fixed 4:5 card
+empty-state while tape loads. Edge desks add a **2UP** line tab after
+Lineup. The tab ticks are the take side. Do not put a flame icon or
+Edge pill on the tab. The dialog opens on Commentary. The 2UP panel has one verdict plate,
+then a quiet compare table, then muted match prices. The verdict is
+the only loud block: `Take 2UP on {team}` or `Skip this match`, take word
+(Strong / Fair / Weak take), and `Pays in n% of matches`. Do not say
+fit, Thin, or windfall in customer copy. No ticks, no Home / Away
+label, and no pointer on the plate. Win prices sit under the
+scoreboard team names (`text-base`) in the same Betfair `ExchangeBackCell`
+as the fixture tape, not in the compare table. The
+take name uses `text-primary-text` in that header. Compare columns
+are Home / Away only. The loaded 2UP tab does not scroll; it must
+fit the dialog well. Fair or Strong uses `qualifyPanel` plus the Edge mark.
+Weak and Skip stay on `quietPanel`. Fair and Strong words use
+`text-primary-text`, not raw `--brand` or `--success`. Compare is home left, away
+right: 2UP pays, go two ahead, fail from 2 up. Take figures are
+semibold, the other side is muted. No second ticks, no bars, no
+“Take 2UP here”. Markets (Over 2.5, BTTS, xG) stay muted. Do
+not name a favourite. One `DialogExplainer` on the verdict, one
+on markets. No essay. On `sm+` the plate is a fixed 4:5 card
 (`40rem` tall at `max-w-lg`, clamped to `85dvh`) so Commentary and
 Lineup share one height. A pinned `DialogFooter` keeps **Track**
 (outline) and **Add bet** (page primary) on screen while the tape
@@ -359,8 +443,9 @@ Display labels still use `d MMM yyyy` and `formatClockString`. Do not add a raw
 - **Select menus hug content by default.** Popper `SelectContent` is `w-max`, never narrower than the trigger, capped at the tighter of Radix available width and `calc(100vw − var(--overlay-gutter))`. Names, type badges, balances, and other identity UI must stay fully readable. Do not pin every select to the trigger. Truncation is for title-style copy only.
 - **Overlay hover is weaker than selected.** Select and dropdown items use `overlayMenuHover` (`bg-accent/60`) for hover/keyboard focus. The current value (`data-[state=checked]` on `SelectItemRow`, open submenu) stays full `--accent`. Do not paint hover and selected with the same fill.
 - **`matchTrigger` is opt-in.** Use it only on full-width title lists (offer Race). Then the menu matches the field, the title truncates via `SelectItemRow`, and trailing meta (runner count) stays `shrink-0` on the right. Never use `matchTrigger` on Account, venue, exchange, or other pickers where the label is how the user identifies the row.
-- **Clip the shell.** `html` / `body` / `.app-scroll` / `PageShell` use `overflow-x: clip`. Do not remove that to “fix” a wide child — fix the child. Nested panels that must show a standing scrollbar use `.app-scroll-always` (same thin thumb as `.app-scroll-nested` hover). Overlay a thumb on the content with no track or gutter via `.app-scroll-float` plus `ScrollFadeEdges overlayScrollbar` (match-events tape).
-- **Fade clipped scroll.** Any nested region that scrolls (dialog body, max-height panel, card list, tab strip, select/dropdown/command list) uses `ScrollFadeEdges` (`src/components/ui/scroll-fade-edges.tsx`). Soft start/end fades appear only while more content is clipped. Washes sit 1px over the seam (`-top-px` / `-bottom-px` / `-left-px` / `-right-px`, `FADE_SEAM_PX`) so fractional zoom cannot leak a sliver. `edgeRule` adds a 1px hairline at `z-[2]`; the wash stays at `-top-px` / `z-[1]` so the rule never opens a zoom gap. Sibling headers stay above the wash (`z-10`). Do not clip the fade wrapper. Vertical is the default; tab strips and card decks use `orientation="horizontal"`. Pass `fadeClassName` to match the surface (`from-page`, `from-background`, `from-card`, `from-popover`, `from-page dark:from-card`, …). Nested thumbs stay on `.app-scroll-nested` / `.app-scroll-overlay` via `scrollClassName`. Do **not** invent a second mask or a one-off gradient. Card decks that snap (Home Do next) pass `stepButtons` for overlay prev/next; those are not a second fade. Radix Select must not render scroll chevrons: they remount on first scroll and jump the list. Overlay fades with `scrollAsChild` on the Viewport instead. Pass `startFade={false}` when a sticky section header already occludes the leading edge (Match events period bars, Home Live feed `ListDayRule`, mobile Home deck cards). Exempt: the page-level `.app-scroll` shell, and time wheels (those keep their existing mask).
+- **Clip the shell.** `html` / `body` / `.app-scroll` / `PageShell` use `overflow-x: clip`. Do not remove that to “fix” a wide child — fix the child. Nested panels that must show a standing scrollbar use `.app-scroll-always` (same thin thumb as the page shell). Overlay a thumb on the content with no track or gutter via `.app-scroll-float` plus `ScrollFadeEdges overlayScrollbar` (match-events tape).
+- **Scrollbars appear only while scrolling.** The page shell (`.app-scroll`) keeps a stable gutter and paints the thin thumb only while that scroller moves (`data-scrolling`), then hides after a short idle. Nested WebKit bars stay width 0 so full-bleed rows never reflow; Firefox may colour a thin overlay thumb. Hover must not paint a standing bar. `.app-scroll-always` stays visible. `.app-scroll-overlay` stays hidden. Floating tape thumbs follow the same scroll-only reveal. `ScrollIdleBars` in the root layout owns the attribute.
+- **Fade clipped scroll.** Any nested region that scrolls (dialog body, max-height panel, card list, tab strip, select/dropdown/command list) uses `ScrollFadeEdges` (`src/components/ui/scroll-fade-edges.tsx`). Soft start/end fades appear only while more content is clipped. Page tapes that must stay crisp at rest pass `fadeOnScroll` (same idle as overlay thumbs). Washes sit 1px over the seam (`-top-px` / `-bottom-px` / `-left-px` / `-right-px`, `FADE_SEAM_PX`) so fractional zoom cannot leak a sliver. `edgeRule` adds a 1px hairline at `z-[2]`; the wash stays at `-top-px` / `z-[1]` so the rule never opens a zoom gap. Sibling headers stay above the wash (`z-10`). Do not clip the fade wrapper. Vertical is the default; tab strips and card decks use `orientation="horizontal"`. Pass `fadeClassName` to match the surface (`from-page`, `from-background`, `from-card`, `from-popover`, `from-page dark:from-card`, …). Nested thumbs stay on `.app-scroll-nested` / `.app-scroll-overlay` via `scrollClassName`. Do **not** invent a second mask or a one-off gradient. Card decks that snap (Home Do next) pass `stepButtons` for overlay prev/next; those are not a second fade. Radix Select must not render scroll chevrons: they remount on first scroll and jump the list. Overlay fades with `scrollAsChild` on the Viewport instead. Pass `startFade={false}` when a sticky section header already occludes the leading edge (Match events period bars, Home Live feed `ListDayRule`, mobile Home deck cards). Exempt: the page-level `.app-scroll` shell, and time wheels (those keep their existing mask).
 - List-row `truncate` is allowed only on fixed-height chrome (nav, feed rows, select items) where the full string is available elsewhere (trigger, `title`, or another surface). Never use it as the overflow strategy for tooltips, dialogs, or page titles.
 
 **`CalculatorPageHeader`** - borderless meta band for calculator shells.
@@ -460,11 +545,22 @@ From `src/lib/ui/surface-styles.ts`:
 - **Page CTAs** - `pagePrimaryButtonProps` (`variant="pagePrimary"`, `size="default"` / h-8,
   bold) next to outline siblings via `pageSecondaryButtonProps` at the same height.
 - **`listPillState(active)`** - time/selection pills on racecards
-- **History 2UP mark** (`historyTwoUpBadge` / `<HistoryTwoUpBadge>`) - compact brand
-  pill (`Zap` + `2UP`) on the Goal! row that first puts a side two ahead. Do not
-  also render a standalone `two_up` feed row for that trigger.
+- **History 2UP mark** (`historyTwoUpBadgeState` / `<HistoryTwoUpBadge>`) - compact
+  brand pill (`Zap` + `2UP`) on the Goal! row that first puts a side two ahead.
+  Solid `--brand` plate when that side was backed on the desk. Watching mark
+  uses `bg-brand/10` + `ring-brand/40` with `text-primary-text` (ink in light,
+  `--brand-text` in dark) when the fixture is only tracked, or the back is on
+  the other side. Name it with `role="img"`. Do not also render a standalone
+  `two_up` feed row for that trigger.
+- **2UP fit ticks** (`TWOUP_TICK_TONE` / `TWOUP_TICK_TONE_EDGE` / `TWOUP_TICK_SIZE`) -
+  five-step mark on Fixtures (`list`) and the match 2UP tab (`list`). Traffic-light
+  colour unless the side is an Edge take (`TWOUP_TICK_TONE_EDGE`). On the fixture
+  tape, **Edge** sits after the ticks. Upcoming tape lines reserve that
+  list slot before scout returns, so ticks do not change row height. The tab is ticks only. `TWOUP_TICK_SIZE.modal` is the larger geometry if ticks
+  return inside the match dialog.
 - **Exchange back tags** (`ExchangeBackTags`) - live match-odds backs on Home →
-  Live → Events. Betfair back plate (`exchanges.ts` `backColor`) via the shared
+  Live → Events. Fixtures tape upcoming scores use `ExchangeBackStack` (home /
+  away only, no Draw, no name labels). Betfair back plate (`exchanges.ts` `backColor`) via the shared
   `oddsCellStyle` / `oddsCellClass` recipe in `lib/ui/odds-cell.ts` (same as
   Racing Desk odds cells). Radius is `rounded-sm` (2px tighter than `rounded-md`).
   Each badge uses `.surface-glass` for the shared inset rim. No tooltip.
@@ -501,10 +597,9 @@ From `src/lib/ui/surface-styles.ts`:
   `listDaySectionContent`. History cards use `listDaySectionContentCompact`
   (`gap-3`; collapsed `gap-2`). Inside a competition/course plate with hairline
   rows, use `listDaySectionContentNested` (`mt-1.5 gap-0`) instead of the
-  campaign-card stack. Light-mode fixture accordions invert the band: the
-  header uses `--page` so it reads as the surrounding page plate; expanded
-  rows use `bg-selection-subtle` (the old header face). Dark keeps the wash
-  on the header. Labels from `formatOfferListGroupLabel` (or the
+  campaign-card stack. Light-mode fixture accordions are one `--card`
+  plate: header and rows share the lift, split by a hairline. Dark
+  keeps the wash on the header. Labels from `formatOfferListGroupLabel` (or the
   display-timezone wrapper `formatFixtureListDayLabel`). Page lists keep this
   header. Profit Tracker lists newest calendar day first (future, Today,
   Yesterday). Days after today pass `upcoming` on `ListDaySection`: a muted
@@ -555,6 +650,11 @@ From `src/lib/ui/surface-styles.ts`:
   Combo Desk children. Do not put a section-level Pro tag on Combo Desk or Edge
   Report; those are Core. Offer Edge chrome (Race picks count) stays Edge-only.
   In-page lock titles use `Available on {plan} subscription`.
+- **`backedNavTag`** — outline + quiet fill (`bg-foreground/10`,
+  `ring-foreground/40`, ink type), same box as `edgeNavTag`. Same
+  subdued language as the Home live-feed 2UP watch mark. Racing Desk
+  runners and Fixtures football teams when that selection has a desk
+  back. Check + BACKED, plus ` · N` when more than one bet.
 - **`demoDataTag`** — solid `--warning` plate + white type. Header Demo data
   mark (`sm+` only, see AppTopBarHeader) and Race picks (dialog, confidence
   chip, trigger) share this so invented numbers cannot look live.
@@ -798,6 +898,6 @@ Agent rule: `edgeways/.cursor/rules/lay-fields.mdc`.
 
 ## Marketing canvas
 
-Waitlist / launch pages live on `.marketing-root` (`--marketing-brand` yellow, `--marketing-canvas` `#0c0c0c` page plate, `--marketing-ink` for type on yellow, `--marketing-band` / `--marketing-band-deep`, `--marketing-rule` for how-it-helps and legal `h2` hairlines). Doc pages (`/contact`, `/terms`, `/privacy`, `/refund`) share `MarketingDocPage` on that canvas. Auth (`/login`, `/sign-up`) uses the same canvas. The desk does not. They pin `--edge` / `--edge-foreground` to the **dark-theme** Offer Edge plate so tags read on ink and do not follow the user’s desk accent. Shared FAQ and How-it-helps copy lives in `src/lib/marketing/landing-faq.ts`: we supplement finders, we do not send bookie offers, and the public offer stays Free / Core / Edge. FAQ answers use the section rail, not a nested `max-w-3xl`. Below-fold blocks settle in once (`[data-reveal]`, same 10px rise as `.marketing-fade-up`). Hide only after `html.marketing-reveal-armed` (client, after hash and on-screen marks), so no-JS and `#section` landings stay visible. Re-bind on each marketing pathname: the layout stays mounted, and a client nav (Refunds logo → home) would otherwise leave new reveal nodes at opacity 0. Peer columns (how-it-helps, plan cards) stagger 70ms from `sm` up via `[data-reveal-stagger]`. Hash links use `html.marketing-smooth-scroll { scroll-behavior: smooth }` after first paint so a `#section` landing still jumps. `scroll-padding-top` 1.5rem only (no extra `scroll-mt`). Off under `prefers-reduced-motion`. Hero stays the load fade, not a scroll reveal. Footer stays still. Legal nav is Terms, Privacy, Contact, Refunds. Post-checkout success (`/subscribe/success`) is a still thermal slip on `--marketing-fg` (`.marketing-receipt`, serrated teeth cut to `--marketing-canvas`, dashed `Paid today` rule). Not a printer animation and not a replacement for hosted Stripe Checkout. Paint the slip from the plan immediately; hydrate Stripe ref and email after first paint. Signature is the paid-today line. Yellow CTA is the only accent: **Set up the desk** → `/setup` (waitlist: **Back to Edgeways**). Launch homepage **Try the desk** → `/demo` (read-only fixture, Core/Edge bar). Full-page `/setup` is desk canvas + `panelSurface`, no side nav. Trust copy: subscription confirmed, manage billing (also Settings → Subscription), prices in GBP. No fake lock badges. No “confirming” after Checkout has returned.
+Waitlist / launch pages live on `.marketing-root` (`--marketing-brand` yellow, `--marketing-canvas` `#0c0c0c` page plate, `--marketing-ink` for type on yellow, `--marketing-band` / `--marketing-band-deep`, `--marketing-rule` for how-it-helps and legal `h2` hairlines). Doc pages (`/contact`, `/terms`, `/privacy`, `/refund`) and root `error` / `not-found` share `MarketingDocPage`, which applies `.marketing-root` so the tokens exist even when those routes sit outside `(marketing)/layout`. Recovery actions use the `actions` slot (filled yellow plate + ink type), not the prose `[&_a]` well. Auth (`/login`, `/sign-up`) uses the same canvas. The desk does not. They pin `--edge` / `--edge-foreground` to the **dark-theme** Offer Edge plate so tags read on ink and do not follow the user’s desk accent. Shared FAQ and How-it-helps copy lives in `src/lib/marketing/landing-faq.ts`: we supplement finders, we do not send bookie offers, and the public offer stays Free / Core / Edge. FAQ answers use the section rail, not a nested `max-w-3xl`. Below-fold blocks settle in once (`[data-reveal]`, same 10px rise as `.marketing-fade-up`). Hide only after `html.marketing-reveal-armed` (client, after hash and on-screen marks), so no-JS and `#section` landings stay visible. Re-bind on each marketing pathname: the layout stays mounted, and a client nav (Refunds logo → home) would otherwise leave new reveal nodes at opacity 0. Peer columns (how-it-helps, plan cards) stagger 70ms from `sm` up via `[data-reveal-stagger]`. Hash links use `html.marketing-smooth-scroll { scroll-behavior: smooth }` after first paint so a `#section` landing still jumps. `scroll-padding-top` 1.5rem only (no extra `scroll-mt`). Off under `prefers-reduced-motion`. Hero stays the load fade, not a scroll reveal. Footer stays still. Legal nav is Terms, Privacy, Contact, Refunds. Post-checkout success (`/subscribe/success`) is a still thermal slip on `--marketing-fg` (`.marketing-receipt`, serrated teeth cut to `--marketing-canvas`, dashed `Paid today` rule). Not a printer animation and not a replacement for hosted Stripe Checkout. Paint the slip from the plan immediately; hydrate Stripe ref and email after first paint. Signature is the paid-today line. Yellow CTA is the only accent: **Set up the desk** → `/setup` (waitlist: **Back to Edgeways**). Launch homepage **Try the desk** → `/demo` (read-only fixture, Core/Edge bar). Full-page `/setup` is desk canvas + `panelSurface`, no side nav. Trust copy: subscription confirmed, manage billing (also Settings → Subscription), prices in GBP. No fake lock badges. No “confirming” after Checkout has returned.
 
 Product peeks use `.marketing-panel` + `.marketing-panel-shine` (border-only conic shine; off under `prefers-reduced-motion`). Plan cards share `.marketing-panel`. The featured **Edge** plan adds `.marketing-panel-plan`: rim mixed from `--edge` into the default white/10 (not a solid chroma frame), shine, and a purple trial button. **Choose Core** is the yellow fill CTA. Free stays outline (`hover:bg-white/5`). Card titles are the same species: `text-lg font-semibold` white type, no plates. “Recommended” is `text-xs` sentence case, `text-edge` violet, on the right of the Edge title row. Core gets “Popular” in the same spot, muted grey (`text-white/55`). Comparison ticks follow the column (`size-6`): Free white, Core `--marketing-brand`, Edge `--edge`. Crosses stay muted white so colour means included. Table headers are coloured type (Core yellow, Edge `--edge`), not tags. The monthly/yearly control is centred under the heading: a silver chip (“2 months free with yearly”), then the supplied doodle arrow in the gap pointing at **Bill yearly**, then flanking labels plus a recessed track with a **solid** silver thumb (`--marketing-silver` + `--marketing-silver-face`), `radiogroup` / `radio`. Monthly is the default. The chip is a shortcut onto yearly. Sentence case, not brand yellow or money green. Do not override `edgeNavTag` with brand colours. The logo Beta chip stays on the scaled lockup box (`text-xs` + `scale-[0.625]`).

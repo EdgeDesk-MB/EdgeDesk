@@ -5,8 +5,9 @@
  * event + market + selection, so the pair is valued together:
  * min(sum if selection wins, sum if selection loses).
  *
- * Live "if ended now" is a separate football display reading — see
- * sumEventIfEndedNow. It must not feed headline profit.
+ * Live "if ended now" is a football display reading (sumEventIfEndedNow)
+ * and the Home Live chart tip (sumLiveChartProvisional). It must not feed
+ * headline Prov.
  */
 import { settleFromOutcome, type BetType, type SettleableBet } from "@/lib/calc/settlement";
 import { roundPence } from "@/lib/calc/money";
@@ -160,4 +161,41 @@ export function sumEventIfEndedNow(
     any = true;
   }
   return any ? roundPence(total) : null;
+}
+
+export type LiveChartPosition = {
+  betId: number;
+  kind?: string;
+  snapshotProvisional: number | null;
+};
+
+/**
+ * Open contribution for the Home Live chart: if-ended-now snapshots on
+ * live tracker positions, worst-case on everything else.
+ *
+ * Desk campaign rows (acca / bet builder / systems) stay on
+ * `extraProvisional` so their square is not double-counted.
+ */
+export function sumLiveChartProvisional(
+  bets: WorstCaseBet[],
+  livePositions: LiveChartPosition[],
+  opts?: { excludeBetIds?: Iterable<number>; extraProvisional?: number }
+): number {
+  const exclude = new Set(opts?.excludeBetIds ?? []);
+  const snapshots = new Map<number, number>();
+  for (const position of livePositions) {
+    if (position.kind && position.kind !== "bet") continue;
+    if (exclude.has(position.betId)) continue;
+    if (position.snapshotProvisional == null || Number.isNaN(position.snapshotProvisional)) {
+      continue;
+    }
+    snapshots.set(position.betId, position.snapshotProvisional);
+  }
+
+  const rest = sumOpenWorstCaseProfit(bets, {
+    excludeBetIds: [...exclude, ...snapshots.keys()],
+  });
+  let liveNow = 0;
+  for (const value of snapshots.values()) liveNow += value;
+  return roundPence(rest + liveNow + (opts?.extraProvisional ?? 0));
 }

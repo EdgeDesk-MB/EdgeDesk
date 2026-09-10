@@ -29,6 +29,7 @@ import {
   settleRacingBet,
 } from "@/lib/calc";
 import type { BetRow, EventRow } from "@/lib/db/schema";
+import { footballFtResultReady } from "@/lib/events/football-full-time";
 import { parseRaceResults, selectionPosition } from "@/lib/racing";
 
 export type EventSettlement = {
@@ -85,6 +86,7 @@ function finalResultSettlement(bet: BetRow, event: EventRow): EventSettlement | 
       if (posLabel) explanationSuffix = ` · ${posLabel}`;
     }
   } else {
+    if (!footballFtResultReady(event)) return null;
     outcome = settleBet(settleable, toMatchResult(event));
   }
 

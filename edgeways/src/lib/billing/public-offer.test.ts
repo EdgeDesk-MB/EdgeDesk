@@ -65,6 +65,7 @@ describe("public offer", () => {
       expect(row.title.length).toBeGreaterThan(0);
       expect(row.description.length).toBeGreaterThan(20);
     }
+    expect(rows.some((r) => r.flag === "twoup_scout")).toBe(false);
     const calcs = rows.find((r) => r.flag === "calculators");
     expect(calcs?.title).toBe("Calculators and bet log");
     expect(calcs?.included).toEqual({

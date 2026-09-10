@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   sumEventIfEndedNow,
+  sumLiveChartProvisional,
   sumOpenWorstCaseProfit,
 } from "./open-bet-worst-case";
 
@@ -183,5 +184,43 @@ describe("sumEventIfEndedNow", () => {
       sumEventIfEndedNow([{ eventId: 10, snapshotProvisional: null }], 10)
     ).toBeNull();
     expect(sumEventIfEndedNow([], 10)).toBeNull();
+  });
+});
+
+describe("sumLiveChartProvisional", () => {
+  it("uses if-ended-now on a live 2UP instead of the worst-case floor: +£250 not −£10", () => {
+    // Stored floor is the unmatched-path −£10. Current score already paid 2UP.
+    const open = [
+      bet({
+        id: 1,
+        market: "two_up",
+        expectedProfit: -10,
+      }),
+    ];
+    expect(sumOpenWorstCaseProfit(open)).toBe(-10);
+    expect(
+      sumLiveChartProvisional(open, [{ betId: 1, snapshotProvisional: 250 }])
+    ).toBe(250);
+  });
+
+  it("keeps worst-case on open bets that are not live", () => {
+    const open = [
+      bet({ id: 1, expectedProfit: 4.2 }),
+      bet({ id: 2, expectedProfit: -1.1, eventId: 11 }),
+    ];
+    expect(
+      sumLiveChartProvisional(open, [{ betId: 2, snapshotProvisional: 18 }])
+    ).toBe(22.2);
+  });
+
+  it("does not double-count a desk acca snapshot already in extraProvisional", () => {
+    const open = [bet({ id: 9, expectedProfit: 3 })];
+    expect(
+      sumLiveChartProvisional(
+        open,
+        [{ betId: 9, kind: "acca", snapshotProvisional: 40 }],
+        { extraProvisional: 12 }
+      )
+    ).toBe(15);
   });
 });

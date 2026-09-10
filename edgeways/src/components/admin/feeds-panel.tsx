@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +67,11 @@ export function FeedsPanel({
   const [testing, setTesting] = useState<"football" | "racing" | "exchange" | null>(
     null
   );
+
+  useEffect(() => {
+    if (testing) return;
+    setStatus(initial);
+  }, [initial, testing]);
 
   async function test(kind: "football" | "racing" | "exchange") {
     setTesting(kind);

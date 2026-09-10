@@ -13,6 +13,11 @@ import type { Fixture } from "@/lib/services/apifootball";
 import type { NeonEventFeedPatch } from "@/lib/db/neon-events";
 import type { EventRow } from "@/lib/db/schema";
 import {
+  isExtraTimePeriod,
+  stampResultPostedAt,
+  stillWatchingAfterWhistle,
+} from "@/lib/events/result-posted";
+import {
   LIVE_POLL_WINDOW_MS,
   needsResultBackfill,
   needsTapeBackfill,
@@ -27,17 +32,25 @@ import {
 
 /** Football events inside the live window: kickoff imminent or recently passed. */
 export function isFootballLivePollCandidate(
-  event: Pick<EventRow, "sport" | "externalId" | "status" | "startTime" | "source">,
+  event: Pick<
+    EventRow,
+    | "sport"
+    | "externalId"
+    | "status"
+    | "startTime"
+    | "source"
+    | "matchEnding"
+    | "resultPostedAt"
+  >,
   now: number
 ): boolean {
-  return (
-    event.source === "api" &&
-    (event.sport ?? "football") === "football" &&
-    Boolean(event.externalId) &&
-    event.status !== "finished" &&
-    event.startTime < now + 5 * 60 * 1000 &&
-    event.startTime > now - LIVE_POLL_WINDOW_MS
-  );
+  if (event.source !== "api") return false;
+  if ((event.sport ?? "football") !== "football") return false;
+  if (!event.externalId) return false;
+  if (event.startTime >= now + 5 * 60 * 1000) return false;
+  if (event.startTime <= now - LIVE_POLL_WINDOW_MS) return false;
+  if (event.status !== "finished") return true;
+  return stillWatchingAfterWhistle(event, now);
 }
 
 /**
@@ -81,23 +94,64 @@ export function selectFootballSyncEvents<
  * match even if the lead is pegged back.
  */
 export function footballEventPatch(
-  event: Pick<EventRow, "homeLed2" | "awayLed2">,
+  event: Pick<
+    EventRow,
+    | "homeLed2"
+    | "awayLed2"
+    | "status"
+    | "startTime"
+    | "minute"
+    | "homeScore"
+    | "awayScore"
+    | "ftHomeScore"
+    | "ftAwayScore"
+    | "resultPostedAt"
+  >,
   fixture: Fixture,
   goals: string | null,
   extras?: {
     lineups?: string | null;
     tapeFetchedAt?: number | null;
+    now?: number;
   }
 ): NeonEventFeedPatch {
+  const now = extras?.now ?? Date.now();
+  const reopenedForExtraTime =
+    event.status === "finished" &&
+    fixture.status === "live" &&
+    isExtraTimePeriod(fixture.period);
+  const resultPostedAt = stampResultPostedAt({
+    previousStatus: event.status,
+    previousPostedAt: event.resultPostedAt,
+    startTime: event.startTime,
+    goals,
+    minute: fixture.minute,
+    now,
+    incomingStatus: fixture.status,
+    incomingPeriod: fixture.period,
+  });
   return {
     status: fixture.status,
     homeScore: fixture.homeScore,
     awayScore: fixture.awayScore,
     minute: fixture.minute,
     period: fixture.period ?? null,
-    homeLed2: event.homeLed2 || (fixture.homeScore - fixture.awayScore >= 2 ? 1 : 0),
-    awayLed2: event.awayLed2 || (fixture.awayScore - fixture.homeScore >= 2 ? 1 : 0),
+    homeLed2:
+      event.homeLed2 ||
+      (!reopenedForExtraTime &&
+      !isExtraTimePeriod(fixture.period) &&
+      fixture.homeScore - fixture.awayScore >= 2
+        ? 1
+        : 0),
+    awayLed2:
+      event.awayLed2 ||
+      (!reopenedForExtraTime &&
+      !isExtraTimePeriod(fixture.period) &&
+      fixture.awayScore - fixture.homeScore >= 2
+        ? 1
+        : 0),
     goals,
+    resultPostedAt,
     ...(typeof fixture.htHomeScore === "number" || typeof fixture.htAwayScore === "number"
       ? {
           htHomeScore: fixture.htHomeScore ?? null,
@@ -106,13 +160,19 @@ export function footballEventPatch(
       : {}),
     ...(extras?.lineups !== undefined ? { lineups: extras.lineups } : {}),
     ...(extras?.tapeFetchedAt !== undefined ? { tapeFetchedAt: extras.tapeFetchedAt } : {}),
-    ...(fixture.matchEnding != null
+    ...(reopenedForExtraTime
       ? {
-          matchEnding: fixture.matchEnding,
-          ftHomeScore: fixture.ftHomeScore ?? null,
-          ftAwayScore: fixture.ftAwayScore ?? null,
+          matchEnding: null,
+          ftHomeScore: event.ftHomeScore ?? event.homeScore,
+          ftAwayScore: event.ftAwayScore ?? event.awayScore,
         }
-      : {}),
+      : fixture.matchEnding != null
+        ? {
+            matchEnding: fixture.matchEnding,
+            ftHomeScore: fixture.ftHomeScore ?? null,
+            ftAwayScore: fixture.ftAwayScore ?? null,
+          }
+        : {}),
   };
 }
 
@@ -122,9 +182,10 @@ export function footballEventPatch(
  * winner-only unless forced).
  */
 export function racingResultPatch(
-  event: Pick<EventRow, "goals">,
+  event: Pick<EventRow, "goals" | "resultPostedAt">,
   result: RaceResult,
-  force = false
+  force = false,
+  now = Date.now()
 ): NeonEventFeedPatch | null {
   const existing = parseRaceResults(event.goals);
   if (!force && existing && !isRaceResultIncomplete(existing) && isRaceResultIncomplete(result)) {
@@ -135,5 +196,6 @@ export function racingResultPatch(
     goals: serializeRaceResults(withPreservedRaceDisplayMeta(result, event.goals)),
     homeScore: 1,
     awayScore: 0,
+    resultPostedAt: event.resultPostedAt ?? now,
   };
 }

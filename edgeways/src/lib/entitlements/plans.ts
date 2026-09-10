@@ -31,6 +31,7 @@ const EDGE: readonly FeatureFlag[] = [
   "offer_edge",
   "racing_live_feeds",
   "football_live_feeds",
+  "twoup_scout",
   "push_alerts",
   "exchange_lay",
 ];

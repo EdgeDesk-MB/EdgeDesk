@@ -8,6 +8,7 @@ import type { OfferSummary } from "@/lib/services/offers.types";
 import type { AppState, LivePosition } from "@/lib/services/state.types";
 import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
 import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
+import { sumLiveChartProvisional } from "@/lib/pnl/open-bet-worst-case";
 import { DEFAULT_SETTINGS } from "@/lib/services/settings-shared";
 import type { PublicDemoView } from "@/lib/demo/public-demo";
 import { buildHistoryContext, sortHistoryEntries } from "@/lib/history-display";
@@ -143,8 +144,10 @@ function offer(input: {
   };
 }
 
-function event(row: EventRow): EventRow {
-  return row;
+function event(
+  row: Omit<EventRow, "resultPostedAt"> & { resultPostedAt?: number | null }
+): EventRow {
+  return { resultPostedAt: null, ...row };
 }
 
 function bet(row: Omit<BetRow, "exchangeId" | "earlyPayout" | "refundAmount" | "refundRetention" | "legs" | "triggerText" | "triggerRule" | "notes" | "quickLogged" | "source" | "purpose" | "importFingerprint" | "importMeta"> & Partial<BetRow>): BetRow {
@@ -369,6 +372,7 @@ export function buildPublicDemoState(
     tapeFetchedAt: null,
       simScript: null,
       simStartedAt: null,
+      resultPostedAt: null,
       createdAt: t(2, 9, now),
     }),
     event({
@@ -397,6 +401,7 @@ export function buildPublicDemoState(
     tapeFetchedAt: null,
       simScript: null,
       simStartedAt: null,
+      resultPostedAt: null,
       createdAt: t(0, 8, now),
     }),
     event({
@@ -430,6 +435,7 @@ export function buildPublicDemoState(
     tapeFetchedAt: null,
       simScript: null,
       simStartedAt: null,
+      resultPostedAt: null,
       createdAt: t(7, 9, now),
     }),
   ];
@@ -1204,6 +1210,7 @@ export function buildPublicDemoState(
     bettingProfit,
     casinoProfit,
     provisionalProfit: 46.4,
+    liveChartProfit: sumLiveChartProvisional(bets, livePositions),
     retention: { rate: 0.81, sampleSize: 14 },
     effortMeasured: {
       qualify: { minutes: 8, sampleSize: 12 },

@@ -6,6 +6,8 @@ import { MaintenanceBannerServer } from "@/components/admin/maintenance-banner-s
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { requireAdminPage } from "@/lib/admin/session";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Admin",
 };

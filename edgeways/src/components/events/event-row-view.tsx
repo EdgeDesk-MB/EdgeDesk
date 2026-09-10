@@ -26,6 +26,8 @@ import { Switch } from "@/components/ui/switch";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import { FootballLiveTapeDialog } from "@/components/events/match-tape";
 import { useAddBet } from "@/components/add-bet-provider";
+import { useAppState } from "@/hooks/use-app-state";
+import { canUseTwoupScout } from "@/lib/entitlements/twoup-scout";
 import {
   parseRaceResults,
   isRaceResultIncomplete,
@@ -80,6 +82,8 @@ export function EventRowView({
 }) {
   const [tapeOpen, setTapeOpen] = useState(false);
   const { openAddBet } = useAddBet();
+  const { state } = useAppState();
+  const showTwoupScout = canUseTwoupScout(state?.settings);
   const isManual = event.source === "manual";
   const isRacing = event.sport === "horse_racing";
   const canOpenTape = !isRacing;
@@ -253,6 +257,7 @@ export function EventRowView({
               event={event}
               open={tapeOpen}
               onOpenChange={setTapeOpen}
+              showTwoupScout={showTwoupScout}
               tracked
               onAddBet={() => {
                 setTapeOpen(false);
@@ -261,6 +266,7 @@ export function EventRowView({
                   homeTeam: event.homeTeam,
                   awayTeam: event.awayTeam,
                   sport: "football",
+                  market: "match_odds",
                   labelSuggestion: `${event.homeTeam} v ${event.awayTeam}`,
                 });
               }}

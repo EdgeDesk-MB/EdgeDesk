@@ -412,6 +412,7 @@ describe("inferTwoUpTriggerGoalIds", () => {
       side: "home",
       eventId: 9,
       team: "Hull City",
+      backed: false,
     });
     expect(triggers.get(3)).toBeUndefined();
   });
