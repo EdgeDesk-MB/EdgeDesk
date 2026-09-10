@@ -1424,6 +1424,7 @@ export function DeskFixtureBoard({
       setScoutFailed(false);
       return;
     }
+    const scoutDate = listKey;
     let cancelled = false;
     function loadScout() {
       if (!scoutReadyRef.current) setScoutLoading(true);
@@ -1431,7 +1432,7 @@ export function DeskFixtureBoard({
       void api<{
         source?: string;
         items?: Array<{ key: string; openness: TwoupOpennessResult }>;
-      }>(`/api/fixtures/twoup-scout?date=${encodeURIComponent(listKey)}`)
+      }>(`/api/fixtures/twoup-scout?date=${encodeURIComponent(scoutDate)}`)
         .then((payload) => {
           if (cancelled) return;
           if (payload.source === "locked") {
