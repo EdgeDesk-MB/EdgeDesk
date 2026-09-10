@@ -187,15 +187,10 @@ export function refreshFootballStandingsStore(input: {
   return work;
 }
 
-export async function getFootballStandingsForScope(
-  scopeId: string
-): Promise<StoredStandingsRates | null> {
-  const stored = await readFootballStandingsStore(scopeId).catch(() => null);
-  const now = Date.now();
-  if (stored && now - stored.fetchedAt < FOOTBALL_STANDINGS_STORE_FRESH_MS) {
-    return stored;
-  }
-
+async function standingsRefreshTarget(scopeId: string): Promise<{
+  leagueId: number;
+  season: number;
+} | null> {
   const catalog = await peekFootballCompetitionCatalog();
   const entry = catalog.find(
     (row) => footballScopeId(row.name, row.country) === scopeId
@@ -206,23 +201,57 @@ export async function getFootballStandingsForScope(
     !Number.isFinite(entry.leagueId) ||
     !Number.isFinite(entry.season)
   ) {
+    return null;
+  }
+  return { leagueId: entry.leagueId, season: entry.season };
+}
+
+export async function getFootballStandingsForScope(
+  scopeId: string
+): Promise<StoredStandingsRates | null> {
+  const stored = await readFootballStandingsStore(scopeId).catch(() => null);
+  const now = Date.now();
+  if (stored && now - stored.fetchedAt < FOOTBALL_STANDINGS_STORE_FRESH_MS) {
     return stored;
   }
+
+  const target = await standingsRefreshTarget(scopeId);
+  if (!target) return stored;
 
   if (stored) {
     void refreshFootballStandingsStore({
       scopeId,
-      leagueId: entry.leagueId,
-      season: entry.season,
+      leagueId: target.leagueId,
+      season: target.season,
     }).catch(() => null);
     return stored;
   }
 
   return refreshFootballStandingsStore({
     scopeId,
-    leagueId: entry.leagueId,
-    season: entry.season,
+    leagueId: target.leagueId,
+    season: target.season,
   }).catch(() => null);
+}
+
+/** Desk scout: stored rates only. A miss must not wait on the provider. */
+export async function peekFootballStandingsForScope(
+  scopeId: string
+): Promise<StoredStandingsRates | null> {
+  const stored = await readFootballStandingsStore(scopeId).catch(() => null);
+  const now = Date.now();
+  if (stored && now - stored.fetchedAt < FOOTBALL_STANDINGS_STORE_FRESH_MS) {
+    return stored;
+  }
+  const target = await standingsRefreshTarget(scopeId);
+  if (target) {
+    void refreshFootballStandingsStore({
+      scopeId,
+      leagueId: target.leagueId,
+      season: target.season,
+    }).catch(() => null);
+  }
+  return stored;
 }
 
 export async function warmFootballStandingsStore(

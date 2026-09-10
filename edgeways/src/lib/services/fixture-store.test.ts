@@ -9,6 +9,8 @@ vi.mock("@/lib/services/apifootball", async (importOriginal) => {
     hasApiKey: vi.fn(() => true),
     fixturesByDate: vi.fn(),
     liveFixtures: vi.fn(async () => []),
+    peekLiveFixtures: vi.fn(() => null),
+    scheduleLiveFixturesRefresh: vi.fn(),
   };
 });
 
@@ -48,6 +50,8 @@ async function loadStore() {
     store,
     fixturesByDate: vi.mocked(api.fixturesByDate),
     liveFixtures: vi.mocked(api.liveFixtures),
+    peekLiveFixtures: vi.mocked(api.peekLiveFixtures),
+    scheduleLiveFixturesRefresh: vi.mocked(api.scheduleLiveFixturesRefresh),
     hasApiKey: vi.mocked(api.hasApiKey),
   };
 }
@@ -146,8 +150,8 @@ describe("fixture-store", () => {
     expect(served.fixtures[0]?.status).toBe("live");
   });
 
-  it("overlays the live poll score without writing it back to the day store", async () => {
-    const { store, liveFixtures } = await loadStore();
+  it("overlays a warm live peek without writing it back to the day store", async () => {
+    const { store, peekLiveFixtures, liveFixtures } = await loadStore();
     const today = localCalendarDate();
     await store.writeFixtureStore(today, [
       fixture({
@@ -159,7 +163,7 @@ describe("fixture-store", () => {
         minute: 7,
       }),
     ]);
-    liveFixtures.mockResolvedValue([
+    peekLiveFixtures.mockReturnValue([
       fixture({
         externalId: "stuttgart-viking",
         status: "live",
@@ -171,8 +175,36 @@ describe("fixture-store", () => {
 
     const served = await store.getFixturesForDate(today);
     expect(served.fixtures[0]).toMatchObject({ homeScore: 2, awayScore: 1, minute: 28 });
+    expect(liveFixtures).not.toHaveBeenCalled();
     const stored = await store.readFixtureStore(today);
     expect(stored?.fixtures[0]).toMatchObject({ homeScore: 0, awayScore: 0, minute: 7 });
+  });
+
+  it("serves the day card when the live poll has not warmed yet", async () => {
+    const { store, liveFixtures, peekLiveFixtures, scheduleLiveFixturesRefresh } =
+      await loadStore();
+    peekLiveFixtures.mockReturnValue(null);
+    const today = localCalendarDate();
+    await store.writeFixtureStore(today, [
+      fixture({
+        externalId: "stuttgart-viking",
+        status: "live",
+        startTime: Date.now() - 10 * 60 * 1000,
+        homeScore: 0,
+        awayScore: 0,
+        minute: 7,
+      }),
+    ]);
+    liveFixtures.mockImplementation(
+      () => new Promise(() => {
+        /* hang — the day card must not wait */
+      })
+    );
+
+    const served = await store.getFixturesForDate(today);
+    expect(served.fixtures[0]).toMatchObject({ homeScore: 0, awayScore: 0, minute: 7 });
+    expect(liveFixtures).not.toHaveBeenCalled();
+    expect(scheduleLiveFixturesRefresh).toHaveBeenCalledTimes(1);
   });
 
   it("throws on a cold miss when the live fetch fails", async () => {

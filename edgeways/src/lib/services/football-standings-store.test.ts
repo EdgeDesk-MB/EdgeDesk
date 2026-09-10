@@ -101,4 +101,15 @@ describe("football-standings-store", () => {
     await expect(store.getFootballStandingsForScope("England::Premier League")).resolves.toBeNull();
     expect(await store.readFootballStandingsStore("England::Premier League")).toBeNull();
   });
+
+  it("peek returns stored rates without waiting on a cold provider miss", async () => {
+    const { store, leagueStandings } = await loadStore();
+    leagueStandings.mockImplementation(
+      () => new Promise(() => {
+        /* hang */
+      })
+    );
+    await expect(store.peekFootballStandingsForScope("England::Premier League")).resolves.toBeNull();
+    expect(leagueStandings).toHaveBeenCalled();
+  });
 });

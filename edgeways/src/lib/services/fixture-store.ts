@@ -12,8 +12,9 @@
  *
  * Past dates are immutable. Stored rows re-derive upcoming/live from
  * kick-off (same 4h window as `effectiveEventStatus`) so LIVE still shows
- * between cron ticks. Live scores overlay from the 60s `liveFixtures`
- * poll on read and are not written back into the day row.
+ * between cron ticks. Live scores overlay from a warm in-process peek
+ * only — never wait on the provider on this read. The 60s desk poll
+ * and a background refresh warm that peek. Overlay is not written back.
  *
  * Global feed data, not desk data - no clerk scoping.
  */
@@ -32,7 +33,8 @@ import { mergeLiveFixtureOverlay } from "@/lib/events/live-fixture-overlay";
 import {
   fixturesByDate,
   hasApiKey,
-  liveFixtures,
+  peekLiveFixtures,
+  scheduleLiveFixturesRefresh,
   type Fixture,
 } from "@/lib/services/apifootball";
 
@@ -75,14 +77,13 @@ function dateMayHaveLive(date: string, now: number): boolean {
   return date === today || date === yesterday;
 }
 
-async function withLiveScores(date: string, fixtures: Fixture[], now: number): Promise<Fixture[]> {
+function withLiveScores(date: string, fixtures: Fixture[], now: number): Fixture[] {
   const current = withCurrentStatus(fixtures, now);
   if (!dateMayHaveLive(date, now)) return current;
-  try {
-    return mergeLiveFixtureOverlay(current, await liveFixtures());
-  } catch {
-    return current;
-  }
+  const peek = peekLiveFixtures();
+  if (peek) return mergeLiveFixtureOverlay(current, peek);
+  scheduleLiveFixturesRefresh();
+  return current;
 }
 
 export async function readFixtureStore(date: string): Promise<StoredFixtures | null> {
@@ -158,7 +159,7 @@ export async function getFixturesForDate(date: string): Promise<StoredFixtures> 
   const now = Date.now();
 
   if (stored) {
-    const fixtures = await withLiveScores(date, stored.fixtures, now);
+    const fixtures = withLiveScores(date, stored.fixtures, now);
     const fresh = now - stored.fetchedAt < FIXTURE_STORE_FRESH_MS;
     if (fresh || date < localCalendarDate()) return { ...stored, fixtures };
     scheduleBackgroundRefresh(date);
@@ -168,7 +169,7 @@ export async function getFixturesForDate(date: string): Promise<StoredFixtures> 
   const fetched = await fixturesByDate(date);
   await writeFixtureStore(date, fetched, now).catch(() => {});
   await pruneFixtureStore(now).catch(() => {});
-  return { fixtures: await withLiveScores(date, fetched, now), fetchedAt: now };
+  return { fixtures: withLiveScores(date, fetched, now), fetchedAt: now };
 }
 
 /**

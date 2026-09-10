@@ -430,6 +430,33 @@ export async function liveFixtures(): Promise<Fixture[]> {
   return data;
 }
 
+/** In-process live list only. Never hits the provider. */
+export function peekLiveFixtures(): Fixture[] | null {
+  const hit = cache.get("live");
+  if (!hit || Date.now() - hit.at >= LIVE_TTL) return null;
+  return hit.data;
+}
+
+/** Warm the live list after the day card has already been served. */
+export function scheduleLiveFixturesRefresh(): void {
+  if (peekLiveFixtures()) return;
+  const work = async () => {
+    try {
+      await liveFixtures();
+    } catch (error) {
+      console.error("[apifootball] live refresh failed:", error);
+    }
+  };
+  void (async () => {
+    try {
+      const { after } = await import("next/server");
+      after(work);
+    } catch {
+      void work();
+    }
+  })();
+}
+
 /** Single fixture by id - works on the free API tier (`ids` batch is pro-only). */
 export async function fixtureById(id: string): Promise<Fixture | null> {
   if (!id.trim()) return null;

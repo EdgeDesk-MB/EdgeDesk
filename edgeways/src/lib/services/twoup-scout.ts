@@ -17,7 +17,7 @@ import {
   type StoredFootballOdds,
 } from "@/lib/services/football-odds-store";
 import {
-  getFootballStandingsForScope,
+  peekFootballStandingsForScope,
   lookupVenueGoalRates,
   type StoredStandingsRates,
 } from "@/lib/services/football-standings-store";
@@ -66,6 +66,8 @@ function opennessFromStored(
   });
 }
 
+const SCOUT_ODDS_ENQUEUE_CAP = 6;
+
 export async function getTwoupScoutForDate(date: string): Promise<TwoupScoutItem[]> {
   const scopes = await listPinnedFootballScopesForDesk();
   if (scopes.length === 0) return [];
@@ -82,27 +84,44 @@ export async function getTwoupScoutForDate(date: string): Promise<TwoupScoutItem
     ])
   );
   const now = Date.now();
-  const standingsByScope = new Map<string, StoredStandingsRates | null>();
+  const scopeIds = [
+    ...new Set(
+      candidates.map((fixture) => footballScopeId(fixture.competition, fixture.leagueCountry))
+    ),
+  ];
+  const standingsByScope = new Map<string, StoredStandingsRates | null>(
+    await Promise.all(
+      scopeIds.map(
+        async (scopeId) =>
+          [
+            scopeId,
+            await peekFootballStandingsForScope(scopeId).catch(() => null),
+          ] as const
+      )
+    )
+  );
   const items: TwoupScoutItem[] = [];
+  let enqueued = 0;
 
   for (const fixture of candidates) {
     const scopeId = footballScopeId(fixture.competition, fixture.leagueCountry);
-    if (!standingsByScope.has(scopeId)) {
-      standingsByScope.set(scopeId, await getFootballStandingsForScope(scopeId).catch(() => null));
-    }
     const key = twoupScoutKey({
       homeTeam: fixture.homeTeam,
       awayTeam: fixture.awayTeam,
       startTime: fixture.startTime,
     });
     const stored = storedByKey.get(key) ?? null;
-    if (!stored || now - stored.fetchedAt >= FOOTBALL_ODDS_STORE_FRESH_MS) {
+    if (
+      enqueued < SCOUT_ODDS_ENQUEUE_CAP &&
+      (!stored || now - stored.fetchedAt >= FOOTBALL_ODDS_STORE_FRESH_MS)
+    ) {
       enqueueFootballOddsRefresh({
         home: fixture.homeTeam,
         away: fixture.awayTeam,
         startTime: fixture.startTime,
         date: localCalendarDate(new Date(fixture.startTime)),
       });
+      enqueued += 1;
     }
     items.push({
       key,
@@ -144,7 +163,7 @@ export async function getTwoupScoutForFixture(input: {
   let standings: StoredStandingsRates | null = null;
   if (fixture.competition) {
     const scopeId = footballScopeId(fixture.competition, fixture.leagueCountry);
-    standings = await getFootballStandingsForScope(scopeId).catch(() => null);
+    standings = await peekFootballStandingsForScope(scopeId).catch(() => null);
   }
 
   const stored = await getFootballOddsForFixture({
