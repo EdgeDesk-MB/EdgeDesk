@@ -62,7 +62,15 @@ export function isFootballLivePollCandidate(
 export function selectFootballSyncEvents<
   T extends Pick<
     EventRow,
-    "id" | "sport" | "externalId" | "status" | "startTime" | "source" | "goals"
+    | "id"
+    | "sport"
+    | "externalId"
+    | "status"
+    | "startTime"
+    | "source"
+    | "goals"
+    | "matchEnding"
+    | "resultPostedAt"
   >,
 >(
   rows: T[],
