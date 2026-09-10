@@ -40,10 +40,10 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     title: "Fixtures",
     summary: "Pick a sport and a day, then pin what you follow.",
     bullets: [
-      "Tap + on any row to add it to Tracked Events.",
-      "Filter finds any competition. Pin one to keep a right rail of shortcuts. Backed only lists matches you have a desk back on.",
+      "Upcoming matches show a radio on the right to add or remove them from Tracked Events. Live and finished rows show the score instead. The same radio is on the match footer while the game is still upcoming.",
+      "Filter finds any competition. Pin one to keep a right rail of shortcuts and, on Edge, to load exchange backs for that league. Backed only lists matches you have a desk back on.",
       "Football stays on this page on every plan. Live UK and Irish racecards are on Edge.",
-      "All / Live / Scheduled sit with the day switcher above the list. Competitions follow first kick-off, with common UK and European leagues first.",
+      "All / Live / Scheduled sit with the day switcher above the list. Score sits left of the crests. When a live side scores, Goal flashes after that name and the digit rolls up. Exchange backs sit left of the radio. Track upcoming and live matches; finished stays off. Competitions follow first kick-off, with common UK and European leagues first.",
     ],
     guideSlug: "getting-started",
   },

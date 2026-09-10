@@ -92,7 +92,10 @@ describe("mergeAppSettings", () => {
     const pinned = mergeAppSettings(DEFAULT_SETTINGS, {
       fixtureBoardView: { football: { rail: "pins", status: "live" } },
     });
-    expect(pinned.fixtureBoardView.football).toEqual({ rail: "pins", status: "live" });
+    expect(pinned.fixtureBoardView.football).toEqual({
+      rail: "pins",
+      status: "live",
+    });
     const withSport = mergeAppSettings(pinned, {
       fixtureBoardView: { sport: "horse_racing" },
     });

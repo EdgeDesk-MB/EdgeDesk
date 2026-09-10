@@ -113,6 +113,8 @@
   --color-destructive: var(--destructive);
   --color-tape-score-live: var(--tape-score-live);
   --color-tape-score-live-fg: var(--tape-score-live-fg);
+  --color-tape-goal: var(--tape-goal);
+  --color-tape-goal-fg: var(--tape-goal-fg);
   --color-negative: var(--negative);
   --color-success: var(--success);
   --color-profit: var(--profit);
@@ -280,6 +282,9 @@
   /* Fixture scoreboard: same red + white in both themes (TV live board). */
   --tape-score-live: oklch(0.48 0.22 27);
   --tape-score-live-fg: oklch(1 0 0);
+  /* Tape Goal plate. Fixed gold + ink — not --brand. */
+  --tape-goal: #f5c400;
+  --tape-goal-fg: #111111;
   /* Loss / holding status — price-tape red (CMC / exchange pair). 3:1 on page. */
   --negative: oklch(0.62 0.205 25);
   --success: oklch(0.45 0.12 150);
@@ -1370,11 +1375,26 @@ html[data-font="figtree"] {
   animation: live-odds-chevron-down 0.75s ease-in-out 4;
 }
 
+@keyframes tape-goal-tag {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.animate-tape-goal-tag {
+  animation: tape-goal-tag 1.44s ease-in-out 2;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .live-odds-flash-up,
   .live-odds-flash-down,
   .live-odds-chevron-up,
-  .live-odds-chevron-down {
+  .live-odds-chevron-down,
+  .animate-tape-goal-tag {
     animation: none;
   }
 }
@@ -1954,6 +1974,7 @@ html[data-font="figtree"] {
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
   .animate-spin,
+  .animate-tape-goal-tag,
   .do-next-best-pill::after,
   .edge-count-mark.is-shining::after {
     animation: none !important;

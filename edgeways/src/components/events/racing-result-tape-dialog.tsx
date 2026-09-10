@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { TrackToggleButton } from "@/components/events/track-toggle-button";
 import {
   Dialog,
   DialogContent,
@@ -14,10 +14,7 @@ import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { EmptyState } from "@/components/help/empty-state";
 import { RegionFlag } from "@/components/region-flag";
 import type { RacingFixture } from "@/components/events/types";
-import {
-  pagePrimaryButtonProps,
-  pageSecondaryButtonProps,
-} from "@/components/layout/page-header-actions";
+import { pagePrimaryButtonProps } from "@/components/layout/page-header-actions";
 import { formatPositionOrdinal } from "@/lib/racing";
 import { formatSpOddsDisplay } from "@/lib/racing/odds";
 import { racingRegionLabel } from "@/lib/geo/region";
@@ -35,7 +32,7 @@ import {
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { HorseRacingIcon } from "@/components/sport-icon";
-import { NotebookPen, Plus } from "lucide-react";
+import { NotebookPen } from "lucide-react";
 
 /** Match the header / footer inset (24px), not Racing Desk table edges. */
 const tapeEdgeStart = "pl-6";
@@ -99,6 +96,7 @@ export function RacingResultTapeDialog({
   tracked,
   displayTimezone,
   onTrack,
+  onUntrack,
   onAddBet,
 }: {
   race: RacingFixture;
@@ -107,11 +105,12 @@ export function RacingResultTapeDialog({
   tracked?: boolean;
   displayTimezone: string;
   onTrack?: () => void;
+  onUntrack?: () => void;
   onAddBet?: () => void;
 }) {
-  const router = useRouter();
   const rows = resultRows(race);
   const finished = race.status === "finished" || Boolean(race.result);
+  const canTrack = race.status === "upcoming";
   const showAddBet = Boolean(onAddBet) && !finished;
   const showDist = finished && rows.some((r) => r.dist);
   const clock = finished
@@ -241,30 +240,15 @@ export function RacingResultTapeDialog({
             </div>
           )}
         </ScrollFadeEdges>
-        {onTrack || showAddBet ? (
+        {(canTrack && (onTrack || onUntrack)) || showAddBet ? (
           <DialogFooter className="mx-0 mb-0 shrink-0 flex-col bg-page px-6 dark:bg-card max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end">
-            {onTrack && !tracked ? (
-              <Button
-                type="button"
-                variant="outline"
-                {...pageSecondaryButtonProps}
-                onClick={onTrack}
-              >
-                <Plus className="size-4" aria-hidden />
-                Track
-              </Button>
-            ) : tracked ? (
-              <Button
-                type="button"
-                variant="outline"
-                {...pageSecondaryButtonProps}
-                onClick={() => {
-                  onOpenChange(false);
-                  router.push("/tracked-events");
-                }}
-              >
-                Tracked
-              </Button>
+            {canTrack && (onTrack || onUntrack) ? (
+              <TrackToggleButton
+                appearance="label"
+                tracked={Boolean(tracked)}
+                onTrack={onTrack}
+                onUntrack={onUntrack}
+              />
             ) : null}
             {showAddBet ? (
               <Button type="button" {...pagePrimaryButtonProps} onClick={onAddBet}>

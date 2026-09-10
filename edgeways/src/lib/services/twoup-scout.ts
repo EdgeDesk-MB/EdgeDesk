@@ -9,9 +9,11 @@ import { footballScopeId } from "@/lib/events/fixture-scope";
 import { pickTwoupScoutFixtures } from "@/lib/events/twoup-scout-fixtures";
 import { getFixturesForDate } from "@/lib/services/fixture-store";
 import {
+  enqueueFootballOddsRefresh,
+  FOOTBALL_ODDS_STORE_FRESH_MS,
   getFootballOddsForFixture,
   listPinnedFootballScopesForDesk,
-  readFootballOddsStore,
+  readFootballOddsStoreForDate,
   type StoredFootballOdds,
 } from "@/lib/services/football-odds-store";
 import {
@@ -68,7 +70,18 @@ export async function getTwoupScoutForDate(date: string): Promise<TwoupScoutItem
   const scopes = await listPinnedFootballScopesForDesk();
   if (scopes.length === 0) return [];
   const { fixtures } = await getFixturesForDate(date);
-  const candidates = pickTwoupScoutFixtures(fixtures, scopes, Date.now(), null);
+  const candidates = pickTwoupScoutFixtures(fixtures, scopes, Date.now(), null, true);
+  const storedByKey = new Map(
+    (await readFootballOddsStoreForDate(date).catch(() => [])).map((row) => [
+      twoupScoutKey({
+        homeTeam: row.home,
+        awayTeam: row.away,
+        startTime: row.startTime,
+      }),
+      row,
+    ])
+  );
+  const now = Date.now();
   const standingsByScope = new Map<string, StoredStandingsRates | null>();
   const items: TwoupScoutItem[] = [];
 
@@ -82,21 +95,14 @@ export async function getTwoupScoutForDate(date: string): Promise<TwoupScoutItem
       awayTeam: fixture.awayTeam,
       startTime: fixture.startTime,
     });
-    let stored = await readFootballOddsStore(key).catch(() => null);
-    if (!stored) {
-      stored = await getFootballOddsForFixture({
+    const stored = storedByKey.get(key) ?? null;
+    if (!stored || now - stored.fetchedAt >= FOOTBALL_ODDS_STORE_FRESH_MS) {
+      enqueueFootballOddsRefresh({
         home: fixture.homeTeam,
         away: fixture.awayTeam,
         startTime: fixture.startTime,
         date: localCalendarDate(new Date(fixture.startTime)),
-      }).catch(() => null);
-    } else {
-      void getFootballOddsForFixture({
-        home: fixture.homeTeam,
-        away: fixture.awayTeam,
-        startTime: fixture.startTime,
-        date: localCalendarDate(new Date(fixture.startTime)),
-      }).catch(() => null);
+      });
     }
     items.push({
       key,

@@ -340,6 +340,14 @@ export const adminOwnerTag = edgeNavTag;
 export const adminTestTag = `${navTag} bg-foreground/10 text-muted-foreground`;
 
 /**
+ * Live tape goal mark. Same box as Edge / Backed, inverted live plate.
+ */
+export const tapeGoalTag = cn(
+  navTag,
+  "bg-tape-goal px-1 text-tape-goal-fg"
+);
+
+/**
  * Settled/open bet mark on Racing Desk runners and Fixtures football
  * teams — same box as `edgeNavTag` (11px, px-1.5 py-0.5, rounded-[3px]).
  * Outline + quiet fill, same recipe as the Home live-feed 2UP watch mark
@@ -509,47 +517,140 @@ export const fixtureTapeClockCol = "minmax(3.25rem,max-content)";
 /** Floor width for clock copy; keep in lockstep with `fixtureTapeClockCol`. */
 export const fixtureTapeClockMin = "min-w-[3.25rem]";
 /**
- * Football score / back stack: shrink-wrap, right-hug with the clock.
+ * Odds rail. Wide enough for `32.00` chips. Fixed so the result
+ * column does not shift when a back is missing.
+ */
+export const fixtureTapeOddsCol =
+  "flex min-h-0 w-[3.75rem] shrink-0 items-stretch justify-end";
+/**
+ * Score rail on the trailing edge. Kick-off / FT / live sit on the
+ * left (Sofascore), not here.
+ */
+export const fixtureTapeResultCol =
+  "flex min-h-0 shrink-0 items-stretch justify-end";
+export const fixtureTapeTimeCol = cn(
+  "flex shrink-0 items-center justify-end self-center",
+  fixtureTapeClockMin
+);
+/**
+ * Football score / back stack: shrink-wrap, right-hug in the odds rail.
  */
 export const fixtureTapeScoreCol = "auto";
 export const fixtureTapeScoreRail = "shrink-0 justify-items-end";
-/** Home / away stack. Tight 8px gap; line-height carries the descenders. */
-export const fixtureTapeTeamStack = "grid min-w-0 grid-rows-2 gap-y-2";
+/** Home / away stack. Tight 6px gap; line-height carries the descenders. */
+export const fixtureTapeTeamStack = "grid min-w-0 grid-rows-2 gap-y-1.5";
+/**
+ * Shared football tape line floor. Odds chips are `h-6` (`ExchangeBackCell`).
+ * Name, score and kick-off-only rows all use this so the match grid
+ * does not jump when backs appear.
+ */
+export const fixtureTapeLineMin = "min-h-6";
 /**
  * One football name line. `text-sm` + `leading-normal` (~21px) keeps
  * descenders inside the box. Floor still covers the 2UP tick slot
- * (15px) and crest (`size-4`). Do not use `leading-none`: `truncate` clips.
+ * (15px), crest (`size-4`), and the 24px odds chip. Do not use
+ * `leading-none`: `truncate` clips.
  */
-export const fixtureTapeTeamLine =
-  "flex min-w-0 items-center gap-2 text-sm font-medium leading-normal";
+export const fixtureTapeTeamLine = cn(
+  "flex min-w-0 items-center gap-2 text-sm font-medium leading-normal",
+  fixtureTapeLineMin
+);
 /** Odds chips: same two-track gap as the name stack. */
-export const fixtureTapeOddsStack = "grid h-full min-w-0 grid-rows-2 gap-y-2";
-/** One line in the odds rail. */
-export const fixtureTapeScoreLine =
-  "flex items-center justify-end text-sm font-semibold tabular-nums leading-none";
+export const fixtureTapeOddsStack = "grid h-full min-w-0 grid-rows-2 gap-y-1.5";
+/** One line in the odds rail. Same 24px floor as the name. */
+export const fixtureTapeScoreLine = cn(
+  "flex items-center justify-end text-sm font-semibold tabular-nums leading-none",
+  fixtureTapeLineMin
+);
 /** Clock hugging a scoreboard / back stack, with room after the board. */
 export const fixtureTapeTrailing = "flex shrink-0 items-center gap-3 pr-3";
 /** Stacked TV-style scoreline (home over away). */
 export const fixtureTapeScoreboard =
   "flex h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-sm ring-1";
 export const fixtureTapeScoreboardRest =
-  "bg-muted-foreground text-tape-score-live-fg ring-transparent dark:bg-muted dark:ring-border/80";
+  "bg-muted-foreground text-tape-score-live-fg ring-transparent dark:bg-foreground dark:text-page dark:ring-muted-foreground/55";
 export const fixtureTapeScoreboardLive =
-  "bg-tape-score-live text-tape-score-live-fg ring-transparent";
+  "bg-transparent text-tape-score-live-fg ring-transparent";
 /** Hairline between stacked scores. Stronger on live red, quieter on FT. */
-export const fixtureTapeScoreboardRuleLive = "bg-tape-score-live-fg/45";
-export const fixtureTapeScoreboardRuleRest = "bg-tape-score-live-fg/12";
+export const fixtureTapeScoreboardRuleLive = "bg-tape-score-live-fg/20";
+export const fixtureTapeScoreboardRuleRest =
+  "bg-tape-score-live-fg/12 dark:bg-muted-foreground/55";
 export const fixtureTapeScoreboardCell =
   "flex flex-1 items-center justify-center px-2 py-px text-center font-heading text-sm font-black tabular-nums leading-none";
+/** Live cell fill. The shell is transparent so a Goal cell cannot leak red. */
+export const fixtureTapeScoreboardCellLive =
+  "bg-tape-score-live text-tape-score-live-fg";
+/** Goal window: fixed gold plate, ink digit. Not `--brand`. */
+export const fixtureTapeScoreboardCellGoal =
+  "bg-tape-goal text-tape-goal-fg";
+/** Match dialog: same TV plate as the list, horizontal and larger. */
+export const matchTapeScoreboard =
+  "flex overflow-hidden rounded-sm ring-1 ring-transparent";
+export const matchTapeScoreboardCell =
+  "flex h-11 min-w-11 items-center justify-center px-2.5 pb-1 font-heading text-3xl font-black tabular-nums leading-none";
+export const matchTapeScoreboardRule = "w-px shrink-0 self-stretch bg-tape-score-live-fg/20";
 export const fixtureTapeRowGrid = cn(
   "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_auto] items-center gap-3"
 );
+/** Clock, score (left of crests), teams, odds, track. */
+export const fixtureTapeFootballGrid = cn(
+  "grid grid-cols-[minmax(3.25rem,max-content)_auto_minmax(0,1fr)_3.75rem_2.25rem] items-stretch gap-3"
+);
+/** No score yet: crests sit on the clock’s trailing edge. */
+export const fixtureTapeFootballGridNoScore = cn(
+  "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_3.75rem_2.25rem] items-stretch gap-3"
+);
+export const fixtureTapeScoreLead =
+  "flex min-h-0 shrink-0 items-stretch justify-center pr-2";
+export const fixtureTapeTrackCol =
+  "flex w-9 shrink-0 items-center justify-end self-center";
 /**
- * Football tape: teams left, clock hugging the score / back stack on
- * the right. Do not give the clock its own wide track.
+ * Sofascore-style football tape. Drop empty Odds / Score tracks so
+ * prices never sit under a Score label.
  */
-export const fixtureTapeMatchGrid = cn(
-  "grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-3"
+const FIXTURE_TAPE_MATCH_TRACKS = {
+  "1-1-0":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_3.75rem_minmax(2.25rem,max-content)] items-stretch gap-3",
+  "1-0-0":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_3.75rem] items-stretch gap-3",
+  "0-1-0":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_minmax(2.25rem,max-content)] items-stretch gap-3",
+  "0-0-0":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)] items-stretch gap-3",
+  "1-1-1":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_3.75rem_minmax(2.25rem,max-content)_2.25rem] items-stretch gap-3",
+  "1-0-1":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_3.75rem_2.25rem] items-stretch gap-3",
+  "0-1-1":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_minmax(2.25rem,max-content)_2.25rem] items-stretch gap-3",
+  "0-0-1":
+    "grid grid-cols-[minmax(3.25rem,max-content)_minmax(0,1fr)_2.25rem] items-stretch gap-3",
+} as const;
+
+export function fixtureTapeMatchTracks(
+  odds: boolean,
+  score: boolean,
+  track = false
+) {
+  const key = `${odds ? "1" : "0"}-${score ? "1" : "0"}-${track ? "1" : "0"}` as
+    keyof typeof FIXTURE_TAPE_MATCH_TRACKS;
+  return FIXTURE_TAPE_MATCH_TRACKS[key];
+}
+export const fixtureTapeMatchGrid = fixtureTapeMatchTracks(true, true);
+export const fixtureTapeMatchGridNoOdds = fixtureTapeMatchTracks(false, true);
+export const fixtureTapeStatusStack = cn(
+  "flex h-full w-full -ml-1 shrink-0 flex-col items-center justify-center gap-y-1",
+  fixtureTapeClockMin
+);
+/** Live and rest: same plain clock column. Minute sits under kick-off. */
+export const fixtureTapeStatusLine =
+  "flex items-center justify-center text-center text-sm font-semibold tabular-nums leading-none text-muted-foreground";
+export const fixtureTapeStatusMeta =
+  "flex items-center justify-center gap-1 text-center text-xs font-semibold tabular-nums leading-none text-muted-foreground";
+/** Column labels under a competition accordion. Pair with a match grid. */
+export const fixtureTapeColHeader = cn(
+  deskInsetX,
+  "border-b border-border/60 py-1.5"
 );
 /**
  * Whole 2UP tick mark is one traffic-light colour, not a rainbow per bar.
@@ -594,15 +695,15 @@ export const fixtureTapeRow = cn(
   deskInsetX,
   "py-2.5 transition-colors hover:bg-selection-subdued dark:hover:bg-selection-subtle"
 );
-/** Football match block: extra pad so names and ticks clear the dividers. */
-export const fixtureTapeFootballRow = cn(fixtureTapeRow, "py-3.5");
+/** Football match block: same 10px pad as racing; the 24px line floor
+ * already keeps names, ticks and chips off the dividers. */
+export const fixtureTapeFootballRow = cn(fixtureTapeRow, "py-2.5");
 /**
  * Competition / course header. Light: same `--card` plate as the rows
  * (surface-lift), hairline only. Dark: selection wash on the header.
  */
 export const fixtureTapeSectionBar = cn(
-  deskInsetX,
-  "border-b border-border/60 bg-transparent py-2.5 pr-2.5 dark:bg-selection-subtle/80"
+  "border-b border-border/60 bg-transparent p-2.5 dark:bg-selection-subtle/80"
 );
 export const fixtureTapeSectionBody = "bg-transparent";
 /** Header hover matches tape rows. */

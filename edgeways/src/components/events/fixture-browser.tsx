@@ -12,7 +12,11 @@ import {
 } from "@/components/events/types";
 import { CalendarDayStepper } from "@/components/calendar-day-stepper";
 import { DeskFixtureBoard } from "@/components/events/desk-fixture-board";
-import { toastAddedToTrackedEvents, toastAlreadyTracked } from "@/components/events/track-toast";
+import {
+  toastAddedToTrackedEvents,
+  toastAlreadyTracked,
+  toastRemovedFromTrackedEvents,
+} from "@/components/events/track-toast";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useTrackFixture } from "@/components/track-fixture-provider";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
@@ -178,6 +182,12 @@ export function FixtureBrowserContent({
   const fixtureSportRef = useRef(fixtureSport);
   fixtureSportRef.current = fixtureSport;
   const loadGenRef = useRef(0);
+  const [trackOverride, setTrackOverride] = useState<Record<string, boolean>>({});
+  const trackInflight = useRef(new Map<string, Promise<EventRow | null>>());
+
+  function overrideTrack(externalId: string, on: boolean) {
+    setTrackOverride((prev) => (prev[externalId] === on ? prev : { ...prev, [externalId]: on }));
+  }
   const warnedDaysRef = useRef(new Set<string>());
 
   const goTracked = useCallback(() => router.push("/tracked-events"), [router]);
@@ -407,34 +417,65 @@ export function FixtureBrowserContent({
 
   async function trackFixture(fixture: Fixture): Promise<EventRow | null> {
     const label = `${fixture.homeTeam} v ${fixture.awayTeam}`;
-    if (trackedExternalIds.has(fixture.externalId)) {
+    const existing = myEvents.find((e) => e.externalId === fixture.externalId);
+    if (existing) {
+      overrideTrack(fixture.externalId, true);
       toastAlreadyTracked(goTracked);
-      return myEvents.find((e) => e.externalId === fixture.externalId) ?? null;
+      return existing;
     }
+    overrideTrack(fixture.externalId, true);
+    const run = (async () => {
+      try {
+        const res = await api<{ event: EventRow; existing?: boolean }>("/api/events", {
+          method: "POST",
+          json: {
+            sport: "football",
+            homeTeam: fixture.homeTeam,
+            awayTeam: fixture.awayTeam,
+            competition: fixture.competition,
+            startTime: fixture.startTime,
+            source: "api",
+            externalId: fixture.externalId,
+            status: fixture.status,
+            homeScore: fixture.homeScore,
+            awayScore: fixture.awayScore,
+            minute: fixture.minute,
+          },
+        });
+        if (res.existing) toastAlreadyTracked(goTracked);
+        else toastAddedToTrackedEvents(label, goTracked);
+        refresh();
+        return res.event;
+      } catch (e) {
+        overrideTrack(fixture.externalId, false);
+        toast.error("Could not track fixture", { description: String(e) });
+        return null;
+      }
+    })();
+    trackInflight.current.set(fixture.externalId, run);
+    const event = await run;
+    trackInflight.current.delete(fixture.externalId);
+    return event;
+  }
+
+  async function untrackFixture(fixture: Fixture) {
+    const label = `${fixture.homeTeam} v ${fixture.awayTeam}`;
+    overrideTrack(fixture.externalId, false);
     try {
-      const res = await api<{ event: EventRow; existing?: boolean }>("/api/events", {
-        method: "POST",
-        json: {
-          sport: "football",
-          homeTeam: fixture.homeTeam,
-          awayTeam: fixture.awayTeam,
-          competition: fixture.competition,
-          startTime: fixture.startTime,
-          source: "api",
-          externalId: fixture.externalId,
-          status: fixture.status,
-          homeScore: fixture.homeScore,
-          awayScore: fixture.awayScore,
-          minute: fixture.minute,
-        },
-      });
-      if (res.existing) toastAlreadyTracked(goTracked);
-      else toastAddedToTrackedEvents(label, goTracked);
+      let event = myEvents.find((row) => row.externalId === fixture.externalId) ?? null;
+      if (!event) {
+        const pending = trackInflight.current.get(fixture.externalId);
+        event = pending ? await pending : null;
+      }
+      if (!event) return;
+      await api(`/api/events/${event.id}`, { method: "DELETE" });
+      toastRemovedFromTrackedEvents(label);
       refresh();
-      return res.event;
     } catch (e) {
-      toast.error("Could not track fixture", { description: String(e) });
-      return null;
+      overrideTrack(fixture.externalId, true);
+      toast.error("Could not remove this fixture from Tracked Events", {
+        description: String(e),
+      });
     }
   }
 
@@ -466,33 +507,68 @@ export function FixtureBrowserContent({
       startTime: race.startTime,
       awayTeam: race.offTime,
     });
-    if (trackedExternalIds.has(race.externalId)) {
+    const existing = myEvents.find((e) => e.externalId === race.externalId);
+    if (existing) {
+      overrideTrack(race.externalId, true);
       toastAlreadyTracked(goTracked);
-      return myEvents.find((e) => e.externalId === race.externalId) ?? null;
+      return existing;
     }
+    overrideTrack(race.externalId, true);
+    const run = (async () => {
+      try {
+        const res = await api<{ event: EventRow; existing?: boolean }>("/api/events", {
+          method: "POST",
+          json: {
+            sport: "horse_racing",
+            homeTeam: race.raceName,
+            awayTeam: race.offTime,
+            competition: race.course,
+            startTime: race.startTime,
+            source: "api",
+            externalId: race.externalId,
+            status: race.status,
+            runners: race.runners,
+          },
+        });
+        await api("/api/racing/sync-results?eventId=" + res.event.id, { method: "POST" });
+        if (res.existing) toastAlreadyTracked(goTracked);
+        else toastAddedToTrackedEvents(label, goTracked);
+        refresh();
+        return res.event;
+      } catch (e) {
+        overrideTrack(race.externalId, false);
+        toast.error("Could not track race", { description: String(e) });
+        return null;
+      }
+    })();
+    trackInflight.current.set(race.externalId, run);
+    const event = await run;
+    trackInflight.current.delete(race.externalId);
+    return event;
+  }
+
+  async function untrackRace(race: RacingFixture) {
+    const label = formatRacingEventTitle({
+      competition: race.course,
+      startTime: race.startTime,
+      awayTeam: race.offTime,
+    });
+    overrideTrack(race.externalId, false);
     try {
-      const res = await api<{ event: EventRow; existing?: boolean }>("/api/events", {
-        method: "POST",
-        json: {
-          sport: "horse_racing",
-          homeTeam: race.raceName,
-          awayTeam: race.offTime,
-          competition: race.course,
-          startTime: race.startTime,
-          source: "api",
-          externalId: race.externalId,
-          status: race.status,
-          runners: race.runners,
-        },
-      });
-      await api("/api/racing/sync-results?eventId=" + res.event.id, { method: "POST" });
-      if (res.existing) toastAlreadyTracked(goTracked);
-      else toastAddedToTrackedEvents(label, goTracked);
+      let event = myEvents.find((row) => row.externalId === race.externalId) ?? null;
+      if (!event) {
+        const pending = trackInflight.current.get(race.externalId);
+        event = pending ? await pending : null;
+      }
+      if (!event) return;
+      await api(`/api/events/${event.id}`, { method: "DELETE" });
+      toastRemovedFromTrackedEvents(label);
       refresh();
-      return res.event;
     } catch (e) {
-      toast.error("Could not track race", { description: String(e) });
-      return null;
+      overrideTrack(race.externalId, true);
+      toast.error("Could not remove this race from Tracked Events", {
+        description: String(e),
+      });
     }
   }
 
@@ -514,9 +590,31 @@ export function FixtureBrowserContent({
   }
 
   const myEvents = state?.events ?? [];
-  const trackedExternalIds = new Set(
-    myEvents.filter((e) => e.externalId).map((e) => e.externalId!)
-  );
+  const trackedExternalIds = useMemo(() => {
+    const ids = new Set(
+      myEvents.filter((event) => event.externalId).map((event) => event.externalId!)
+    );
+    for (const [externalId, on] of Object.entries(trackOverride)) {
+      if (on) ids.add(externalId);
+      else ids.delete(externalId);
+    }
+    return ids;
+  }, [myEvents, trackOverride]);
+
+  useEffect(() => {
+    setTrackOverride((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+      let next: Record<string, boolean> | null = null;
+      for (const [externalId, on] of Object.entries(prev)) {
+        const actual = myEvents.some((event) => event.externalId === externalId);
+        if (actual === on) {
+          next ??= { ...prev };
+          delete next[externalId];
+        }
+      }
+      return next ?? prev;
+    });
+  }, [myEvents]);
   const canLiveRacing = canDesk(state?.settings, "racing_live_feeds");
   const racingLocked = fixtureSport === "horse_racing" && !canLiveRacing;
 
@@ -642,10 +740,12 @@ export function FixtureBrowserContent({
       racing={filteredRaces}
       trackedExternalIds={trackedExternalIds}
       onTrackFixture={trackFixture}
+      onUntrackFixture={untrackFixture}
       onTrackAndBetFixture={trackAndBetFixture}
       onAddBetFixture={addBetFromLiveFixture}
       onEpDesk={openEpDesk}
       onTrackRace={trackRace}
+      onUntrackRace={untrackRace}
       onTrackAndBetRace={trackAndBetRace}
       onAddBetRace={addBetFromLiveRace}
       emptyTitle={emptyTitle}

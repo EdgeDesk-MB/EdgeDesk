@@ -51,6 +51,7 @@ function ScopeOptionRow({
   onPick,
   onToggleFavourite,
   onToggleHidden,
+  unlockOdds,
 }: {
   option: FixtureScopeOption;
   selected: boolean;
@@ -60,6 +61,7 @@ function ScopeOptionRow({
   onPick: () => void;
   onToggleFavourite: () => void;
   onToggleHidden: () => void;
+  unlockOdds?: boolean;
 }) {
   return (
     <CommandItem
@@ -72,6 +74,7 @@ function ScopeOptionRow({
         favourite={favourite}
         label={option.name ?? option.label}
         onToggle={onToggleFavourite}
+        unlockOdds={unlockOdds}
       />
       <span
         aria-hidden
@@ -119,6 +122,7 @@ export function FixtureScopeFilter({
   align = "end",
   labelMode = "full",
   className,
+  unlockOdds = false,
 }: {
   sport: "football" | "horse_racing";
   options: FixtureScopeOption[];
@@ -136,6 +140,7 @@ export function FixtureScopeFilter({
   align?: "start" | "end";
   labelMode?: "full" | "filter" | "icon";
   className?: string;
+  unlockOdds?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -335,6 +340,7 @@ export function FixtureScopeFilter({
                   onPick={() => pick(option.id)}
                   onToggleFavourite={() => onToggleFavourite(option.id)}
                   onToggleHidden={() => onToggleHidden(option.id)}
+                  unlockOdds={unlockOdds}
                 />
               ))}
             </CommandGroup>
@@ -356,6 +362,7 @@ export function FixtureScopeFilter({
                     onPick={() => pick(option.id)}
                     onToggleFavourite={() => onToggleFavourite(option.id)}
                     onToggleHidden={() => onToggleHidden(option.id)}
+                    unlockOdds={unlockOdds}
                   />
                 ))}
               </CommandGroup>

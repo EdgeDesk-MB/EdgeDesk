@@ -332,6 +332,7 @@ export function formatEventTitle(ev: {
 /**
  * Live football clock: HT / Pens / ET from API-Football period, else the minute.
  * Half-time is `status.short === "HT"`; we used to store that as 45'.
+ * Finished shorts (FT / AET / PEN) come from the same field, never the clock.
  */
 export function footballClockLabel(ev: {
   minute?: number | null;
@@ -341,6 +342,9 @@ export function footballClockLabel(ev: {
   if (period === "HT") return "HT";
   if (period === "BT") return "BT";
   if (period === "P") return "Pens";
+  if (period === "FT") return "FT";
+  if (period === "AET") return "AET";
+  if (period === "PEN") return "PEN";
   if (period === "ET") {
     const extra = ev.minute ?? 0;
     return extra > 0 ? `ET ${extra}'` : "ET";
@@ -348,6 +352,19 @@ export function footballClockLabel(ev: {
   const minute = ev.minute ?? 0;
   if (minute <= 0) return null;
   return `${minute}'`;
+}
+
+/** Tape phase under kick-off. API short or stored ending only, not elapsed time. */
+export function footballPhaseLabel(ev: {
+  minute?: number | null;
+  period?: string | null;
+  matchEnding?: string | null;
+}): string | null {
+  if (ev.period?.trim()) return footballClockLabel(ev);
+  if (ev.matchEnding === "ft") return "FT";
+  if (ev.matchEnding === "aet") return "AET";
+  if (ev.matchEnding === "pen") return "PEN";
+  return null;
 }
 
 /** Tracker / dashboard event status subtitle. */

@@ -26,6 +26,14 @@ describe("normalizeFixtureBoardView", () => {
     });
   });
 
+  it("drops the old Odds toggle from stored views", () => {
+    expect(
+      normalizeFixtureBoardView({
+        football: { rail: "all", status: "all", odds: false },
+      }).football
+    ).toEqual({ rail: "all", status: "all" });
+  });
+
   it("drops unknown status and the old favourites rail alias", () => {
     expect(
       normalizeFixtureBoardView({

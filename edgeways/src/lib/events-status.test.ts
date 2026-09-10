@@ -8,6 +8,7 @@ import {
   fixtureListDayBounds,
   shiftCalendarYmd,
   footballClockLabel,
+  footballPhaseLabel,
   formatEventStatus,
   formatRacingEventStatus,
   formatRacingOffTime,
@@ -82,6 +83,21 @@ describe("footballClockLabel", () => {
     expect(footballClockLabel({ minute: 105, period: "ET" })).toBe("ET 105'");
     expect(footballClockLabel({ minute: 120, period: "P" })).toBe("Pens");
     expect(footballClockLabel({ minute: 90, period: "BT" })).toBe("BT");
+  });
+
+  it("prints FT / AET / PEN from the API short, not the minute", () => {
+    expect(footballClockLabel({ minute: 90, period: "FT" })).toBe("FT");
+    expect(footballClockLabel({ minute: 120, period: "AET" })).toBe("AET");
+    expect(footballClockLabel({ minute: 120, period: "PEN" })).toBe("PEN");
+    expect(footballClockLabel({ minute: 90, period: "2H" })).toBe("90'");
+  });
+});
+
+describe("footballPhaseLabel", () => {
+  it("does not invent FT from a 90th-minute clock", () => {
+    expect(footballPhaseLabel({ minute: 90 })).toBeNull();
+    expect(footballPhaseLabel({ minute: 90, matchEnding: "ft" })).toBe("FT");
+    expect(footballPhaseLabel({ minute: 45, period: "HT" })).toBe("HT");
   });
 });
 

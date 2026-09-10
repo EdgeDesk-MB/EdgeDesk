@@ -210,7 +210,10 @@ function mapFixture(item: any): Fixture {
     ftHomeScore: (isAet || isPen) ? (ftScore?.home ?? null) : null,
     ftAwayScore: (isAet || isPen) ? (ftScore?.away ?? null) : null,
     matchEnding: isAet ? "aet" : isPen ? "pen" : shortStatus === "FT" ? "ft" : null,
-    period: liveStatuses.includes(shortStatus) ? shortStatus : null,
+    period:
+      liveStatuses.includes(shortStatus) || finishedStatuses.includes(shortStatus)
+        ? shortStatus
+        : null,
     htHomeScore: typeof htScore?.home === "number" ? htScore.home : null,
     htAwayScore: typeof htScore?.away === "number" ? htScore.away : null,
     homeLogo: item.teams?.home?.logo ? String(item.teams.home.logo) : null,

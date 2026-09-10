@@ -15,13 +15,20 @@ export function FavouriteStar({
   label,
   onToggle,
   size = "header",
+  unlockOdds = false,
 }: {
   favourite: boolean;
   label: string;
   onToggle: () => void;
   size?: "header" | "menu";
+  /** Football Edge: pinning warms exchange backs for that competition. */
+  unlockOdds?: boolean;
 }) {
-  const action = favourite ? `Unpin ${label}` : `Pin ${label}`;
+  const action = favourite
+    ? `Unpin ${label}`
+    : unlockOdds
+      ? `Pin ${label} to see odds`
+      : `Pin ${label}`;
 
   return (
     <Tooltip>
@@ -45,7 +52,7 @@ export function FavouriteStar({
             "shrink-0 text-muted-foreground hover:bg-transparent hover:text-primary-text",
             size === "menu"
               ? "size-7 max-sm:size-7"
-              : "h-8 w-4 max-sm:h-8 max-sm:w-4 justify-start px-0",
+              : "size-8 max-sm:size-8",
             favourite && "text-brand hover:text-brand"
           )}
         >

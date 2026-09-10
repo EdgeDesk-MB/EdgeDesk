@@ -36,6 +36,7 @@ Defined in `src/app/globals.css`:
 | `--negative` | Loss P&L + Racing Desk holding/elapsed status. Light = price-tape red (`oklch` 0.62 / 0.205 / 25, ≥ 3:1 on `--page`); dark = lighter red for canvas contrast |
 | `--success` | Qualifying / completed / positive eligibility (not P&L) |
 | `--profit` | **P&L / “it paid” type** (`text-profit`, `moneyPositiveClass`). Light is a price-tape green (`oklch` 0.585 / 0.16 / 162, ≥ 3:1 on `--page` / `--canvas`) — CoinMarketCap / exchange up-tick, not olive. Dark is the old emerald-400 lift. Do not reuse `--success` for money |
+| `--tape-goal` / `--tape-goal-fg` | Fixture tape Goal plate. Fixed `#f5c400` / `#111111` in both themes. Not `--brand` |
 | `--warning` | Caution and execution risk only (near-min fields, NR traps, real warnings). Light = mid amber (`oklch` 0.54 / 0.18 / 68) so type and 10% washes stay amber, not khaki. Dark = lifted gold (`oklch` 0.72 / 0.13 / 75) for canvas contrast |
 | `--warning-foreground` | Type **on** solid `bg-warning` plates (site banner maintenance, warning FilterPill). White in light, ink in dark, same flip as `--edge-foreground` |
 | `--edge` | **Offer Edge / free-bet campaign signature** (violet). Race picks, recommended markers, Edge today, side-nav `Pro` mark (`proNavTag` = same plate as `edgeNavTag`) with `--edge-foreground` on the plate. Also: FB badge, Convert CTA, campaign pipeline **awarded / converting** label + bar (`text-edge` / `bg-edge`). Gift / promo-balance rows may still use historical `violet-*`; Zap there is the shared lightning motif. Marketing Edge plan: mixed rim, shine, and trial button use `--edge`. Choose Core uses `--marketing-brand`. |
@@ -272,8 +273,14 @@ The tape is always grouped by competition. Football headers are
 `sectionTitle` (same size and colour). That country prefix is **header
 only**. Pin rail, filter menu, and empty-state copy use the competition
 name (`Championship`). World / worldwide titles stay bare. Racing
-headers use the same `REGION - COURSE` split. Pin, flag and title share
-`gap-3` (12px). A collapsed header shows a count before the chevron:
+headers use the same `REGION - COURSE` split. Pin and collapse chevron
+are `size-8` in a `p-2.5` band, so the pin has equal left / top / bottom
+inset and the chevron has the same on the right. 8px (`pr-2`) sits
+right of the pin. On Edge, an unpinned football pin tooltip is
+`Pin {competition} to see odds`. Unpin stays `Unpin {competition}`.
+The flag sits `gap-2`
+(8px) left of the title. A collapsed header shows the count `12px`
+(`gap-3`) after the competition name, not beside the chevron:
 live as `N Live` in `text-profit`, then a muted count for scheduled and
 finished (`2 Live · 3`). No count when the group is open. Country flags are `RegionFlag` only (colour-emoji set, same
 as Mexico). Do not use API-Football flag images or crests for countries.
@@ -298,35 +305,51 @@ two or more pins, muted `Drag to reorder.` sits under the list. The rail paints 
 as All / Pinned only when a competition is the active filter. No pins:
 hide the rail. The feed-bar Filter icon is the only
 competition / course picker. Do not duplicate it on the rail. Below `lg`, Pinned is a pins-only popover when there are pins. Title, tabs, the feed bar and the pin rail stay pinned; only the tape scrolls.
-Browse fixtures uses the same chrome. Football tape rows use
-`fixtureTapeMatchGrid`: stacked teams left (`text-sm`, `gap-y-2`),
-then a right-hugging cluster (`fixtureTapeTrailing`,
-`gap-3` plus `pr-3`; score or odds rows use `gap-6`, drop the trailing
-pad, and stretch to the name stack): kick-off / FT / live minute immediately left of
-the scoreline or Betfair backs. Scores sit in a stacked TV board
-(`fixtureTapeScoreboard`) that fills the name-stack height:
-`text-sm` / `font-black`, `px-2 py-px`
-cells so the board matches the odds-row height. Odds chips use
-`fixtureTapeOddsStack` (same `grid-rows-2 gap-y-2` as the names).
+Browse fixtures uses the same chrome. Football tape rows follow
+Sofascore: kick-off on the left. Live, upcoming and finished share
+the same plain clock column (kick-off, with the minute under it when
+live). No well, no dash, no FT copy. Score sits left of the crests
+(live red / FT muted board). Upcoming has no score slot, so crests
+sit left against the clock. Exchange backs sit left of the Radio. No Odds
+FilterPill. No Teams / Odds / Score / Track column
+headers. Stacked teams use `text-sm`,
+`gap-y-1.5`. Betfair backs sit in `fixtureTapeOddsCol` (3.75rem). The
+TV board fills the name-stack height: `text-sm` / `font-black`,
+`px-2 py-px`
+cells so the board matches the odds-row height. Each name, score and
+odds line floors at `min-h-6` (`fixtureTapeLineMin`). Odds chips are
+`h-6` with no vertical pad, so kick-off-only rows match rows with
+backs. Odds chips use
+`fixtureTapeOddsStack` (same `grid-rows-2 gap-y-1.5` as the names).
 Live is `--tape-score-live` red with white figures in both
-themes, no outer ring. Finished uses `bg-muted-foreground` in light (not chip ink)
-and `bg-muted` in dark, same white figures. The 1px rule between
-scores is `fg/45` on live red and `fg/12` on FT, so the hairline
-reads on red and stays quiet on the dark board. Upcoming
-without exchange backs shows only the kick-off, no dash board.
-Do not give the clock its own wide column. Upcoming pinned matches on Edge replace the en
-dashes with Betfair match-odds backs, stacked home over away, using
+themes, no outer ring. A Goal paints `--tape-goal` (`#f5c400`) with
+`--tape-goal-fg` (`#111111`) on that cell only — fixed, not `--brand`.
+Finished uses `bg-muted-foreground` in light (not chip ink)
+and a grey-white plate in dark (`bg-foreground`, `text-page`,
+`muted-foreground/55` ring). 8px
+(`pr-2`) sits between the board and the crests. The 1px rule between
+scores is `fg/20` on live red and `fg/12` on FT (light),
+`muted-foreground/55` on FT in dark. Upcoming
+without exchange backs leave the price rail empty so the Radio does
+not shift. Do not put the score under Odds. Pinned matches on Edge
+show Betfair match-odds backs, stacked home over away, using
 `ExchangeBackStack` (same `oddsCellStyle` cell as Home → Live →
 Events). When a stored match-odds back moves by a displayed tick, the
 cell uses the same green/red flash and last-direction chevron as Home →
 Live. First paint does not flash. Hide a
 side when that back is missing (en dash). Do not fetch the exchange
-from the tape; read the scout store on a 20s poll. Football rows have no trailing
-actions. Track, Add bet and 2UP Desk live on the match-events footer.
-Pinned football groups (Edge) keep the same three-track tape as
-every other football group, so kick-off and scores stay on the
-chevron edge. Clock hugs the score or back stack; that pair hugs
-the trailing edge. The 2UP hint sits beside both team names: a
+from the tape; read the scout store on a 20s poll. The list Radio
+(`TrackToggleButton`, ghost icon) shows on upcoming and live rows.
+Finished rows never show Track. Outline Radio adds the match, the same
+stroke in `text-highlight` removes it. Idle is `muted-foreground/55` in
+light (`muted-foreground` in dark). Do not fill the glyph. Do not use a PressButton success toggle here (that
+pattern is Racing Desk). Tooltip and `aria-label` are Track / Untrack.
+The match-events footer Radio matches the tape (upcoming and live;
+Track / Tracked, hover Untrack). Add bet and 2UP Desk stay on that
+footer.
+Pinned football groups (Edge) keep the same kick-off-left tape as
+every other football group.
+The 2UP hint sits beside both team names: a
 five-step tick meter (one Skip, two Thin, three Fair, four Strong).
 Each side uses that side's windfall (go two ahead, then fail to win),
 not a duplicated match-shape score. Home ticks can differ from away.
@@ -355,19 +378,20 @@ tab beside Commentary and Lineup. The tab ticks are the take side
 Loading, empty and error on that tab use `EmptyState`, same as commentary.
 Racing keeps `fixtureTapeRowGrid` (clock, copy, icon actions). Competition
 groups put no extra pad above or below the row list (`0px`). Competition
-headers use `py-2.5` (10px), 4px tighter than the shared section band,
-and `pr-2.5` so the collapse chevron matches that inset on the right.
+headers use `p-2.5` (10px) so the pin and collapse chevron share the
+same inset.
 Racing tape rows use `py-2.5`. Football match rows use
-`fixtureTapeFootballRow` (`py-3.5`) so names, ticks and the scoreboard
-clear the dividers. Hover is `hover:bg-selection-subdued`
+`fixtureTapeFootballRow` (`py-2.5`) so the tape stays dense; the 24px
+line floor keeps names, ticks and chips off the dividers. Hover is `hover:bg-selection-subdued`
 (`dark:hover:bg-selection-subtle`) so the wash reads on the light
 `selection-subtle` well. Competition headers rest on the same `--card` plate as the rows
 (`bg-transparent` on `surface-lift`). A hairline, not a grey fill,
 splits title from tape. Hover matches the rows
 (`hover:bg-selection-subdued`, `dark:hover:bg-selection-subtle`).
-Dark keeps a selection wash on the header. Football home / away name lines use `text-sm` and `leading-normal` (~21px) with `gap-y-2` (8px). Do not use `leading-none` on those names: `truncate` clips g/y. Finished matches step the winning name one weight up (`font-semibold`) and the losing name one down (`font-normal`). A draw keeps both at `font-medium`. The match-events header does the same step from its `font-semibold` base (`font-bold` / `font-medium`). Live and upcoming stay even. Live minute uses `text-profit` plus the pulsing
-`Radio` mark (same as Tracked Events / match tape). Half-time is `HT`
-only, no Radio. Do not put a
+Dark keeps a selection wash on the header. Football home / away name lines use `text-sm` and `leading-normal` (~21px) with `gap-y-1.5` (6px). Do not use `leading-none` on those names: `truncate` clips g/y. Finished matches step the winning name one weight up (`font-semibold`) and the losing name one down (`font-normal`). A draw keeps both at `font-medium`. The match-events header does the same step from its `font-semibold` base (`font-bold` / `font-medium`). Live and upcoming stay even. Live minute uses `text-profit` under the kick-off,
+no pulsing Radio. Half-time is `HT` and full time is `FT` only
+when API-Football `status.short` is HT or FT (or the stored
+`matchEnding`). Do not infer them from the minute. Do not put a
 Live pill on the title line. A football row opens the commentary and
 lineup modal (`FootballLiveTapeDialog`), with the existing loading
 empty-state while tape loads. Edge desks add a **2UP** line tab after
@@ -392,9 +416,12 @@ not name a favourite. One `DialogExplainer` on the verdict, one
 on markets. No essay. On `sm+` the plate is a fixed 4:5 card
 (`40rem` tall at `max-w-lg`, clamped to `85dvh`) so Commentary and
 Lineup share one height. A pinned `DialogFooter` keeps **Track**
-(outline) and **Add bet** (page primary) on screen while the tape
-scrolls. Finished football matches and racing results hide Add bet.
-Tracked matches swap Track for a Tracked link. Live-view Add bet
+(outline Radio, upcoming only) and **Add bet** (page primary) on screen
+while the tape scrolls. Live and finished football hide Track. Finished
+football matches and racing results hide Add bet. Tracked upcoming
+matches keep the same control: coloured Radio (`text-highlight`),
+Tracked, hover Untrack. Same stroke weight as Track.
+Live-view Add bet
 (`liveView*AddBetPrefill`) links the feed card and only tracks when the
 bet is saved. Racing also sets `raceExternalId` so Events selects the
 card, not only the label. Racing clock sits
@@ -558,6 +585,18 @@ From `src/lib/ui/surface-styles.ts`:
   tape, **Edge** sits after the ticks. Upcoming tape lines reserve that
   list slot before scout returns, so ticks do not change row height. The tab is ticks only. `TWOUP_TICK_SIZE.modal` is the larger geometry if ticks
   return inside the match dialog.
+- **Tape Goal flash** (`tapeGoalTag` / `useTapeGoalFlash`) - when a live
+  list score ticks up, that side shows **Goal** 8px after the name (`gap-2`,
+  same box as Edge / Backed, `px-1`). The scored cell and the Goal mark
+  use `--tape-goal` / `--tape-goal-fg` (fixed `#f5c400` / `#111111`, never
+  `--brand`) for `TAPE_GOAL_FLASH_MS` (20s). Live cells paint their own
+  red; the shell is transparent so Goal cannot leak live red at the radius.
+  NumberFlow `trend={1}` at 750ms rolls the new score. The tag blinks twice
+  at 1.44s then holds. First paint and score corrections do not flash.
+  Reduced motion keeps the plate and tag, no blink.
+  Localhost only: `/fixtures?previewGoal=1` bumps the first two live homes
+  and leaves the score. Goal holds 20s then clears. It does not write the
+  store.
 - **Exchange back tags** (`ExchangeBackTags`) - live match-odds backs on Home →
   Live → Events. Fixtures tape upcoming scores use `ExchangeBackStack` (home /
   away only, no Draw, no name labels). Betfair back plate (`exchanges.ts` `backColor`) via the shared
@@ -630,7 +669,14 @@ From `src/lib/ui/surface-styles.ts`:
   is a fixed 4:5 plate on `sm+` (`h-[min(40rem,85dvh)]` at `max-w-lg`), not
   a 9:16 phone frame and not a hug-to-content height. Mobile stays a
   bottom sheet capped at `92dvh`.   Scoreboard and line tabs
-  share one `--card` header plate (24px inset, no close control). Tape and
+  share one `--card` header plate (24px inset, no close control). A live
+  score is a larger horizontal TV board: live red / FT muted, same
+  tokens as the fixture list. Team names and the score sit on one
+  grid row. Score cells add a little bottom padding so heading
+  figures sit optically centred (list cells use the same 1px lift).
+  A Goal inverts the scoring cell to
+  `--tape-goal` for 20s and rolls the digit. No Goal tag on the names.
+  Tape and
   XI copy use the same 24px inset, with 24px under the last row. The tape
   stays on `--page`. Commentary and Lineup scroll with
   `app-scroll-float` (native bar hidden) plus `ScrollFadeEdges

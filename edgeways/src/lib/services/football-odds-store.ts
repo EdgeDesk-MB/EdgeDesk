@@ -11,7 +11,7 @@ import { isNeonDesk } from "@/lib/db/desk-backend";
 import { twoupScoutKey, twoupWindfallFromOdds } from "@/lib/calc/ep/twoup-openness";
 import { localCalendarDate } from "@/lib/events";
 import {
-  pickTwoupScoutFixtures,
+  pickTwoupScoutWarmFixtures,
   TWOUP_SCOUT_WARM_CAP,
 } from "@/lib/events/twoup-scout-fixtures";
 import { getFixturesForHorizon } from "@/lib/services/fixture-store";
@@ -259,7 +259,7 @@ export function refreshFootballOddsStore(input: {
   return work;
 }
 
-function scheduleBackgroundRefresh(input: {
+export function enqueueFootballOddsRefresh(input: {
   home: string;
   away: string;
   startTime: number;
@@ -297,7 +297,7 @@ export async function getFootballOddsForFixture(input: {
   const now = Date.now();
   if (stored) {
     if (now - stored.fetchedAt < FOOTBALL_ODDS_STORE_FRESH_MS) return stored;
-    scheduleBackgroundRefresh(input);
+    enqueueFootballOddsRefresh(input);
     return stored;
   }
   return refreshFootballOddsStore(input).catch(() => null);
@@ -341,7 +341,11 @@ export async function warmFootballOddsStore(): Promise<{
   const scopes = await listPinnedFootballScopesForWarm();
   if (scopes.length === 0) return { warmed: 0, skipped: 0 };
   const { fixtures } = await getFixturesForHorizon();
-  const candidates = pickTwoupScoutFixtures(fixtures, scopes);
+  const candidates = pickTwoupScoutWarmFixtures(
+    fixtures,
+    scopes,
+    localCalendarDate()
+  );
   let warmed = 0;
   let skipped = 0;
   for (const fixture of candidates) {

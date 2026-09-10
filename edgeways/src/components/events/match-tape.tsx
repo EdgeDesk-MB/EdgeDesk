@@ -3,9 +3,9 @@
 import NumberFlow from "@number-flow/react";
 import { format } from "date-fns";
 import { enGB } from "date-fns/locale";
-import { Flame, Goal, NotebookPen, Plus, Radio, Scale, Shirt } from "lucide-react";
+import { Flame, Goal, NotebookPen, Scale, Shirt } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { TrackToggleButton } from "@/components/events/track-toggle-button";
 import { ExchangeBackCell } from "@/components/events/exchange-back-tags";
 import { TwoupFitTicks } from "@/components/events/twoup-openness-meter";
 import { TwoupScoutPanel } from "@/components/events/twoup-scout-panel";
@@ -34,13 +34,15 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { useEventCrests } from "@/hooks/use-event-crests";
+import { useTapeGoalFlash } from "@/hooks/use-tape-goal-flash";
 import {
   TWOUP_TIER_SHORT,
   twoupIsEdgePick,
   twoupSideTierFromPct,
   type TwoupOpennessResult,
 } from "@/lib/calc/ep/twoup-openness";
-import { effectiveEventStatus, eventShowsScore } from "@/lib/events";
+import { effectiveEventStatus, eventShowsScore, footballPhaseLabel } from "@/lib/events";
+import type { TapeGoalFlash } from "@/lib/events/fixture-tape-goal";
 import {
   footballFinishedNameWeight,
   matchTapeNameWeightClass,
@@ -74,6 +76,12 @@ import {
   deskTableHeaderRowSticky,
   listRow,
   listRowGroup,
+  fixtureTapeScoreboardCellGoal,
+  fixtureTapeScoreboardCellLive,
+  fixtureTapeScoreboardRest,
+  matchTapeScoreboard,
+  matchTapeScoreboardCell,
+  matchTapeScoreboardRule,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +101,7 @@ export type FootballTapeDialogEvent = {
   htAwayScore?: number | null;
   status?: string;
   period?: string | null;
+  matchEnding?: string | null;
   minute?: number | null;
   startTime?: number;
   competition?: string | null;
@@ -100,6 +109,8 @@ export type FootballTapeDialogEvent = {
   externalId?: string | null;
   source?: string | null;
   sport?: string;
+  /** List Goal window, if the row was already flashing when opened. */
+  goalSeed?: TapeGoalFlash;
 };
 
 function CardMark({
@@ -309,6 +320,43 @@ const minuteFlowTimings = {
   opacityTiming: { duration: 100, easing: "ease-out" },
 } as const;
 
+const scoreGoalTimings = {
+  transformTiming: { duration: 750, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  spinTiming: { duration: 750, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  opacityTiming: { duration: 250, easing: "ease-out" },
+} as const;
+
+function MatchScoreDigit({
+  value,
+  scored,
+  live,
+}: {
+  value: number;
+  scored?: boolean;
+  live: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        matchTapeScoreboardCell,
+        live
+          ? scored
+            ? fixtureTapeScoreboardCellGoal
+            : fixtureTapeScoreboardCellLive
+          : fixtureTapeScoreboardRest
+      )}
+    >
+      <NumberFlow
+        value={value}
+        trend={1}
+        {...(scored ? scoreGoalTimings : minuteFlowTimings)}
+        format={{ useGrouping: false, maximumFractionDigits: 0 }}
+        className="tabular-nums bg-transparent! [&_*]:bg-transparent!"
+      />
+    </span>
+  );
+}
+
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -377,26 +425,30 @@ function MatchStatusMark({ event }: { event: FootballTapeDialogEvent }) {
       : null;
   const minute = useTickingLiveMinute(rawMinute, inPlay);
 
-  if (status === "finished") {
-    return <p className={cn(captionHeading, "mt-2")}>Finished</p>;
-  }
-  if (status === "upcoming") {
-    return <p className={cn(captionHeading, "mt-2")}>Upcoming</p>;
-  }
-  if (period === "HT") {
-    return <p className={cn(captionHeading, "mt-2")}>Half time</p>;
-  }
-  if (period === "P") {
-    return <p className={cn(captionHeading, "mt-2")}>Penalties</p>;
-  }
+  const live = status === "live";
+  const phase =
+    footballPhaseLabel({
+      minute: event.minute,
+      period: event.period,
+      matchEnding: event.matchEnding,
+    }) ?? (live ? "Live" : status === "finished" ? "FT" : null);
+  if (!phase) return null;
 
-  const liveWord = period === "ET" ? "ET" : "Live";
+  const showTickingMinute =
+    live &&
+    period !== "HT" &&
+    period !== "P" &&
+    /^\d/.test(phase) &&
+    minute != null;
 
   return (
-    <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-profit">
-      <Radio className="size-3 animate-pulse motion-reduce:animate-none" />
-      {liveWord}
-      {minute != null ? <LiveMinute minute={minute} /> : null}
+    <span
+      className={cn(
+        "justify-self-center text-xs font-semibold tabular-nums leading-none",
+        live ? "text-profit" : "text-muted-foreground"
+      )}
+    >
+      {showTickingMinute ? <LiveMinute minute={minute} /> : phase}
     </span>
   );
 }
@@ -461,45 +513,44 @@ export function hasFootballLiveMeta(event: {
   );
 }
 
-function TeamBlock({
-  name,
-  formation,
-  logo,
+function teamNameClass({
   align,
-  odds,
-  take = false,
-  resultWeight = "base",
+  take,
+  resultWeight,
 }: {
-  name: string;
-  formation?: string | null;
-  logo?: string | null;
   align: "home" | "away";
-  odds?: number;
   take?: boolean;
   resultWeight?: ReturnType<typeof footballFinishedNameWeight>;
 }) {
+  return cn(
+    "min-w-0 self-center text-pretty break-words text-base leading-snug",
+    align === "away" ? "text-right" : "text-left",
+    matchTapeNameWeightClass(resultWeight ?? "base"),
+    take ? "text-primary-text" : "text-foreground"
+  );
+}
+
+function TeamSideMeta({
+  name,
+  formation,
+  odds,
+  align,
+}: {
+  name: string;
+  formation?: string | null;
+  odds?: number;
+  align: "home" | "away";
+}) {
+  const showOdds = typeof odds === "number" && Number.isFinite(odds) && odds > 1;
+  if (!showOdds && !formation) return <div />;
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-1 flex-col gap-2",
+        "flex min-w-0 flex-col gap-2",
         align === "away" ? "items-end text-right" : "items-start text-left"
       )}
     >
-      <div className="flex size-10 items-center justify-center">
-        <TeamCrest src={logo} alt="" size="xl" />
-      </div>
-      <p
-        className={cn(
-          "min-w-0 text-pretty break-words text-base leading-snug",
-          matchTapeNameWeightClass(resultWeight),
-          take ? "text-primary-text" : "text-foreground"
-        )}
-      >
-        {name}
-      </p>
-      {typeof odds === "number" && Number.isFinite(odds) && odds > 1 ? (
-        <ExchangeBackCell odds={odds} label={`${name} back`} />
-      ) : null}
+      {showOdds ? <ExchangeBackCell odds={odds} label={`${name} back`} /> : null}
       {formation ? (
         <p className="text-xs tabular-nums text-muted-foreground">{formation}</p>
       ) : null}
@@ -540,48 +591,99 @@ function MatchScoreboard({
       source: event.source,
       startTime: event.startTime,
     }) || parseMatchTape(event.goals).some((row) => row.kind === "goal");
+  const live = resultStatus === "live";
+  const goalFlash = useTapeGoalFlash(
+    event.externalId ?? `${event.homeTeam}\0${event.awayTeam}\0${event.startTime ?? ""}`,
+    event.homeScore ?? 0,
+    event.awayScore ?? 0,
+    live,
+    event.goalSeed
+  );
+
+  const homeWeight = footballFinishedNameWeight("home", {
+    ...event,
+    status: resultStatus,
+  });
+  const awayWeight = footballFinishedNameWeight("away", {
+    ...event,
+    status: resultStatus,
+  });
 
   return (
-    <div className="flex items-start justify-between gap-3">
-      <TeamBlock
-        name={event.homeTeam}
-        formation={lineups?.homeFormation}
-        logo={homeLogo}
-        align="home"
-        odds={homeOdds}
-        take={take === "home"}
-        resultWeight={footballFinishedNameWeight("home", {
-          ...event,
-          status: resultStatus,
-        })}
-      />
-      <div className="flex min-w-0 shrink-0 flex-col items-center gap-1 px-1 text-center">
+    <div
+      className="grid grid-cols-3 gap-x-3 gap-y-3"
+      style={{ paddingTop: 32 }}
+    >
+      <div className="flex size-10 items-center justify-start">
+        <TeamCrest src={homeLogo} alt="" size="xl" />
+      </div>
+      <div className="flex min-w-0 flex-col items-center justify-self-center gap-1 px-1 text-center">
         {event.competition ? (
-          <p className="max-w-40 text-pretty break-words text-xs text-muted-foreground">
+          <p className="text-pretty break-words text-xs text-muted-foreground">
             {event.competition}
           </p>
         ) : null}
         {kickoff ? (
           <p className="text-xs tabular-nums text-muted-foreground">{kickoff}</p>
         ) : null}
-        {showScore ? (
-          <p className="font-heading text-2xl font-extrabold tabular-nums leading-none tracking-tight">
-            {event.homeScore ?? 0} – {event.awayScore ?? 0}
-          </p>
-        ) : null}
+      </div>
+      <div className="flex size-10 items-center justify-center justify-self-end">
+        <TeamCrest src={awayLogo} alt="" size="xl" />
+      </div>
+
+      <p
+        className={teamNameClass({
+          align: "home",
+          take: take === "home",
+          resultWeight: homeWeight,
+        })}
+      >
+        {event.homeTeam}
+      </p>
+      {showScore ? (
+        <div
+          className={cn(matchTapeScoreboard, "justify-self-center self-center")}
+          aria-label={`${event.homeScore ?? 0}–${event.awayScore ?? 0}`}
+        >
+          <MatchScoreDigit
+            value={event.homeScore ?? 0}
+            scored={goalFlash.home}
+            live={live}
+          />
+          <div className={matchTapeScoreboardRule} aria-hidden />
+          <MatchScoreDigit
+            value={event.awayScore ?? 0}
+            scored={goalFlash.away}
+            live={live}
+          />
+        </div>
+      ) : (
+        <div />
+      )}
+      <p
+        className={teamNameClass({
+          align: "away",
+          take: take === "away",
+          resultWeight: awayWeight,
+        })}
+      >
+        {event.awayTeam}
+      </p>
+
+      <TeamSideMeta
+        name={event.homeTeam}
+        formation={lineups?.homeFormation}
+        odds={homeOdds}
+        align="home"
+      />
+      <div className="justify-self-center">
         <MatchStatusMark event={event} />
       </div>
-      <TeamBlock
+      <TeamSideMeta
         name={event.awayTeam}
         formation={lineups?.awayFormation}
-        logo={awayLogo}
-        align="away"
         odds={awayOdds}
-        take={take === "away"}
-        resultWeight={footballFinishedNameWeight("away", {
-          ...event,
-          status: resultStatus,
-        })}
+        align="away"
       />
     </div>
   );
@@ -799,6 +901,7 @@ export function FootballLiveTapeDialog({
   onOpenChange,
   tracked = false,
   onTrack,
+  onUntrack,
   onAddBet,
   onEpDesk,
   showTwoupScout = false,
@@ -811,6 +914,7 @@ export function FootballLiveTapeDialog({
   /** When set, pin a Track / Add bet footer under the tape. */
   tracked?: boolean;
   onTrack?: () => void;
+  onUntrack?: () => void;
   onAddBet?: () => void;
   onEpDesk?: () => void;
   showTwoupScout?: boolean;
@@ -829,7 +933,6 @@ export function FootballLiveTapeDialog({
   const [scoutFetchLoad, setScoutFetchLoad] = useState(false);
   const [scoutFetchError, setScoutFetchError] = useState(false);
   const [scoutRetry, setScoutRetry] = useState(0);
-  const router = useRouter();
   const incomingKey = tapeFreezeKey(event);
   const frozenKey = tapeFreezeKey(frozen);
   if (open && incomingKey !== frozenKey) {
@@ -838,8 +941,17 @@ export function FootballLiveTapeDialog({
   const base = open && incomingKey !== frozenKey ? event : frozen;
   const view = {
     ...base,
-    goals: hydratedGoals ?? base.goals,
-    lineups: hydratedLineups ?? base.lineups,
+    homeScore: event.homeScore ?? base.homeScore,
+    awayScore: event.awayScore ?? base.awayScore,
+    status: event.status ?? base.status,
+    minute: event.minute ?? base.minute,
+    period: event.period ?? base.period,
+    matchEnding: event.matchEnding ?? base.matchEnding,
+    htHomeScore: event.htHomeScore ?? base.htHomeScore,
+    htAwayScore: event.htAwayScore ?? base.htAwayScore,
+    goals: hydratedGoals ?? event.goals ?? base.goals,
+    lineups: hydratedLineups ?? event.lineups ?? base.lineups,
+    goalSeed: event.goalSeed,
   };
   const crests = useEventCrests(view, open);
   const tapeRows = parseMatchTape(view.goals);
@@ -852,6 +964,7 @@ export function FootballLiveTapeDialog({
     sport: view.sport,
   });
   const matchFinished = matchStatus === "finished";
+  const canTrack = matchStatus !== "finished";
   const scout = scoutProp ?? scoutFetched;
   const scoutBusy =
     scoutLoadingProp || (showTwoupScout && scoutProp == null && scoutFetchLoad);
@@ -1012,7 +1125,7 @@ export function FootballLiveTapeDialog({
           className="flex min-h-0 flex-1 flex-col !gap-0 overflow-hidden"
         >
           <div className="shrink-0 bg-card">
-            <DialogHeader className="relative mx-0 mt-0 border-b-0 bg-transparent px-6">
+            <DialogHeader className="relative mx-0 mt-0! border-b-0 bg-transparent px-6 pt-0! pb-3.5 pr-6">
               <DialogTitle className="sr-only">
                 {view.homeTeam} v {view.awayTeam}
               </DialogTitle>
@@ -1035,7 +1148,7 @@ export function FootballLiveTapeDialog({
                 }
               />
             </DialogHeader>
-            <TabsLineBar className="bg-transparent [--tabs-line-inset:1.5rem]">
+            <TabsLineBar className="mt-3 bg-transparent [--tabs-line-inset:1.5rem]">
               <TabsList
                 variant="line"
                 className="justify-start"
@@ -1170,7 +1283,7 @@ export function FootballLiveTapeDialog({
             </ScrollFadeEdges>
           </TabsContent>
         </Tabs>
-        {onTrack || (onAddBet && !matchFinished) || onEpDesk ? (
+        {onEpDesk || (canTrack && (onTrack || onUntrack)) || (onAddBet && !matchFinished) ? (
           <DialogFooter className="mx-0 mb-0 shrink-0 flex-col bg-page px-6 dark:bg-card max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end">
             {onEpDesk ? (
               <Button
@@ -1183,28 +1296,13 @@ export function FootballLiveTapeDialog({
                 2UP Desk
               </Button>
             ) : null}
-            {onTrack && !tracked ? (
-              <Button
-                type="button"
-                variant="outline"
-                {...pageSecondaryButtonProps}
-                onClick={onTrack}
-              >
-                <Plus className="size-4" aria-hidden />
-                Track
-              </Button>
-            ) : tracked ? (
-              <Button
-                type="button"
-                variant="outline"
-                {...pageSecondaryButtonProps}
-                onClick={() => {
-                  onOpenChange(false);
-                  router.push("/tracked-events");
-                }}
-              >
-                Tracked
-              </Button>
+            {canTrack && (onTrack || onUntrack) ? (
+              <TrackToggleButton
+                appearance="label"
+                tracked={tracked}
+                onTrack={onTrack}
+                onUntrack={onUntrack}
+              />
             ) : null}
             {onAddBet && !matchFinished ? (
               <Button type="button" {...pagePrimaryButtonProps} onClick={onAddBet}>

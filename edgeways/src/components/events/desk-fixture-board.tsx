@@ -1,8 +1,8 @@
 "use client";
 
 import NumberFlow from "@number-flow/react";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { TrackToggleButton } from "@/components/events/track-toggle-button";
 import { FavouriteStar } from "@/components/events/favourite-star";
 import { HideScopeButton } from "@/components/events/hide-scope-button";
 import { FixtureScopeFilter } from "@/components/events/fixture-scope-filter";
@@ -21,6 +21,7 @@ import {
 import { PlanLockEmpty } from "@/components/plan-lock-empty";
 import { api, useAppState } from "@/hooks/use-app-state";
 import { useNow } from "@/hooks/use-now";
+import { useLocalTapeGoalPreview, useTapeGoalFlash } from "@/hooks/use-tape-goal-flash";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FilterPill } from "@/components/ui/filter-pill";
@@ -78,7 +79,11 @@ import {
   eventSideBackMark,
   type SideBackMark,
 } from "@/lib/events/twoup-backed";
-import { footballClockLabel, sortFixturesByKickoff, withEffectiveFeedStatus } from "@/lib/events";
+import { footballPhaseLabel, sortFixturesByKickoff, withEffectiveFeedStatus } from "@/lib/events";
+import {
+  bumpTapeGoalPreviewHome,
+  tapeGoalPreviewRequested,
+} from "@/lib/events/fixture-tape-goal";
 import {
   fixtureTapeNameWeightClass,
   footballFinishedNameWeight,
@@ -95,8 +100,10 @@ import { formatClockTime } from "@/lib/time-format";
 import {
   FIXTURE_TAPE_GUTTER_PX,
   fixtureTapeClockMin,
-  fixtureTapeMatchGrid,
   fixtureTapeFootballRow,
+  fixtureTapeFootballGrid,
+  fixtureTapeFootballGridNoScore,
+  fixtureTapeOddsCol,
   fixtureTapeRow,
   fixtureTapeRowGrid,
   fixtureTapeSectionBar,
@@ -104,23 +111,30 @@ import {
   fixtureTapeSectionHover,
   fixtureTapeScoreboard,
   fixtureTapeScoreboardCell,
+  fixtureTapeScoreboardCellGoal,
+  fixtureTapeScoreboardCellLive,
   fixtureTapeScoreboardLive,
   fixtureTapeScoreboardRest,
   fixtureTapeScoreboardRuleLive,
   fixtureTapeScoreboardRuleRest,
+  fixtureTapeScoreLead,
+  fixtureTapeStatusLine,
+  fixtureTapeStatusMeta,
+  fixtureTapeStatusStack,
   fixtureTapeTeamLine,
   fixtureTapeTeamStack,
-  fixtureTapeTrailing,
+  fixtureTapeTrackCol,
   twoupTickSlotBox,
   favouriteStarIcon,
   backedNavTag,
+  tapeGoalTag,
   filterPillCountState,
   filterPillGroup,
   listRowGroup,
   sectionTitle,
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Check, ChevronDown, Flame, Loader2, NotebookPen, Pin, Plus, Radio, Zap } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Flame, Loader2, NotebookPen, Pin, Radio, Zap } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
 
 export type FixtureStatusFilter = "all" | "live" | "scheduled" | "picks";
@@ -334,12 +348,14 @@ function groupRacesByCourse(races: RacingFixture[]) {
 function FixtureActions({
   isTracked,
   onTrack,
+  onUntrack,
   onTrackAndBet,
   onEpDesk,
   showEpDesk,
 }: {
   isTracked: boolean;
   onTrack: () => void;
+  onUntrack: () => void;
   onTrackAndBet: () => void;
   onEpDesk?: () => void;
   showEpDesk?: boolean;
@@ -365,82 +381,67 @@ function FixtureActions({
           </TooltipContent>
         </Tooltip>
       ) : null}
-      {isTracked ? (
-        <>
-          <Link
-            href="/tracked-events"
-            className="mr-1 text-xs font-medium text-muted-foreground hover:text-primary-text"
+      <TrackToggleButton
+        appearance="icon"
+        tracked={isTracked}
+        onTrack={onTrack}
+        onUntrack={onUntrack}
+      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            aria-label={isTracked ? "Add bet on this event" : "Track and add bet"}
+            onClick={onTrackAndBet}
           >
-            Tracked
-          </Link>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Add bet on this event"
-                onClick={onTrackAndBet}
-              >
-                <NotebookPen className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>Add bet</TooltipContent>
-          </Tooltip>
-        </>
-      ) : (
-        <>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Track and add bet"
-                onClick={onTrackAndBet}
-              >
-                <NotebookPen className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>Track &amp; add bet</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Add to Tracked Events"
-                onClick={onTrack}
-              >
-                <Plus className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>Track only</TooltipContent>
-          </Tooltip>
-        </>
-      )}
+            <NotebookPen className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={6}>
+          {isTracked ? "Add bet" : "Track and add bet"}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
 
-const tapeFigureTimings = {
+const tapeFigureRestTimings = {
   transformTiming: { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
   spinTiming: { duration: 200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
   opacityTiming: { duration: 100, easing: "ease-out" },
 } as const;
 
-function TapeScoreFigure({ value }: { value: number }) {
+const tapeFigureGoalTimings = {
+  transformTiming: { duration: 750, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  spinTiming: { duration: 750, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+  opacityTiming: { duration: 250, easing: "ease-out" },
+} as const;
+
+function TapeScoreFigure({
+  value,
+  scored,
+  live,
+}: {
+  value: number;
+  scored?: boolean;
+  live: boolean;
+}) {
   return (
-    <span className={fixtureTapeScoreboardCell}>
+    <span
+      className={cn(
+        fixtureTapeScoreboardCell,
+        live && (scored ? fixtureTapeScoreboardCellGoal : fixtureTapeScoreboardCellLive)
+      )}
+    >
       <NumberFlow
         value={value}
-        trend={0}
-        {...tapeFigureTimings}
+        trend={1}
+        {...(scored ? tapeFigureGoalTimings : tapeFigureRestTimings)}
         format={{ useGrouping: false, maximumFractionDigits: 0 }}
+        className="translate-y-[-1px] tabular-nums leading-none"
       />
     </span>
   );
@@ -450,10 +451,14 @@ function FixtureScoreboard({
   home,
   away,
   live,
+  homeScored,
+  awayScored,
 }: {
   home?: number | null;
   away?: number | null;
   live: boolean;
+  homeScored?: boolean;
+  awayScored?: boolean;
 }) {
   return (
     <div
@@ -467,7 +472,11 @@ function FixtureScoreboard({
           : `Full time ${home ?? 0}–${away ?? 0}`
       }
     >
-      <TapeScoreFigure value={home ?? 0} />
+      <TapeScoreFigure
+        value={home ?? 0}
+        scored={homeScored}
+        live={live}
+      />
       <div
         className={cn(
           "h-px",
@@ -475,8 +484,23 @@ function FixtureScoreboard({
         )}
         aria-hidden
       />
-      <TapeScoreFigure value={away ?? 0} />
+      <TapeScoreFigure
+        value={away ?? 0}
+        scored={awayScored}
+        live={live}
+      />
     </div>
+  );
+}
+
+function TapeGoalMark({ team }: { team: string }) {
+  return (
+    <span
+      className={cn(tapeGoalTag, "animate-tape-goal-tag shrink-0")}
+      aria-label={`${team} scored`}
+    >
+      Goal
+    </span>
   );
 }
 
@@ -492,8 +516,13 @@ function tapeClockClass(live: boolean, align: "end" | "start" = "end") {
 
 function fixtureTapeEvent(
   fixture: Fixture,
-  eventId?: number
+  eventId?: number,
+  goalSeed?: FootballTapeDialogEvent["goalSeed"]
 ): FootballTapeDialogEvent {
+  const extra = fixture as Fixture & {
+    period?: string | null;
+    matchEnding?: "ft" | "aet" | "pen" | null;
+  };
   return {
     id: eventId,
     homeTeam: fixture.homeTeam,
@@ -502,12 +531,37 @@ function fixtureTapeEvent(
     awayScore: fixture.awayScore,
     status: fixture.status,
     minute: fixture.minute,
+    period: extra.period ?? undefined,
+    matchEnding: extra.matchEnding ?? undefined,
     startTime: fixture.startTime,
     competition: fixture.competition,
     leagueCountry: fixture.leagueCountry,
     externalId: fixture.externalId,
     source: "api",
     sport: "football",
+    goalSeed:
+      goalSeed && (goalSeed.home || goalSeed.away) ? goalSeed : undefined,
+  };
+}
+
+function liveTapeDialogEvent(
+  tape: FootballTapeDialogEvent,
+  fixtures: Fixture[]
+): FootballTapeDialogEvent {
+  const row = fixtures.find((fixture) => fixture.externalId === tape.externalId);
+  if (!row) return tape;
+  const extra = row as Fixture & {
+    period?: string | null;
+    matchEnding?: "ft" | "aet" | "pen" | null;
+  };
+  return {
+    ...tape,
+    homeScore: row.homeScore,
+    awayScore: row.awayScore,
+    status: row.status,
+    minute: row.minute,
+    period: extra.period ?? tape.period,
+    matchEnding: extra.matchEnding ?? tape.matchEnding,
   };
 }
 
@@ -543,6 +597,48 @@ function FixtureBackedTag({ mark }: { mark: SideBackMark | null | undefined }) {
   );
 }
 
+function fixtureTapeScout(
+  fixture: Fixture,
+  scoutByKey?: Map<string, TwoupOpennessResult>
+): TwoupOpennessResult | null {
+  return (
+    scoutByKey?.get(
+      twoupScoutKey({
+        homeTeam: fixture.homeTeam,
+        awayTeam: fixture.awayTeam,
+        startTime: fixture.startTime,
+      })
+    ) ?? null
+  );
+}
+
+function FootballTapeStatus({
+  fixture,
+  displayTimezone,
+}: {
+  fixture: Fixture;
+  displayTimezone: string;
+}) {
+  const live = fixture.status === "live";
+  const kickoff = formatClockTime(fixture.startTime, { timeZone: displayTimezone });
+  const phase = footballPhaseLabel(fixture) ?? (live ? "Live" : null);
+  return (
+    <div className={fixtureTapeStatusStack}>
+      <span className={fixtureTapeStatusLine}>{kickoff}</span>
+      {phase ? (
+        <span
+          className={cn(
+            fixtureTapeStatusMeta,
+            live ? "text-profit" : "text-muted-foreground"
+          )}
+        >
+          {phase}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function FootballTapeRow({
   fixture,
   eventId,
@@ -554,6 +650,10 @@ function FootballTapeRow({
   scoutLoading,
   homeBack,
   awayBack,
+  tracked,
+  onTrack,
+  onUntrack,
+  goalPreview,
 }: {
   fixture: Fixture;
   eventId?: number;
@@ -565,19 +665,28 @@ function FootballTapeRow({
   scoutLoading?: boolean;
   homeBack?: SideBackMark | null;
   awayBack?: SideBackMark | null;
+  tracked?: boolean;
+  onTrack?: () => void;
+  onUntrack?: () => void;
+  goalPreview?: boolean;
 }) {
   const live = fixture.status === "live";
-  const showScore = live || fixture.status === "finished";
-  const clock = live
-    ? footballClockLabel(fixture) ?? "Live"
-    : fixture.status === "finished"
-      ? "FT"
-      : formatClockTime(fixture.startTime, { timeZone: displayTimezone });
+  const rowRef = useRef<HTMLLIElement>(null);
+  const upcoming = fixture.status === "upcoming";
+  const finished = fixture.status === "finished";
+  const goalFlash = useTapeGoalFlash(
+    fixture.externalId ?? fixtureScoutKey(fixture),
+    fixture.homeScore ?? 0,
+    fixture.awayScore ?? 0,
+    live
+  );
+  useEffect(() => {
+    if (!goalPreview) return;
+    rowRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [goalPreview]);
+  const canTrack = !finished;
   const showOdds =
-    !showScore &&
-    Boolean(showMeter) &&
-    !scoutLoading &&
-    (validTapeBack(scout?.markets.home) || validTapeBack(scout?.markets.away));
+    validTapeBack(scout?.markets.home) || validTapeBack(scout?.markets.away);
   function fitMeter(side: "home" | "away") {
     if (!showMeter) {
       return (
@@ -603,13 +712,33 @@ function FootballTapeRow({
 
   return (
     <li
+      ref={rowRef}
       className={cn(fixtureTapeFootballRow, "cursor-pointer")}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest("a, button")) return;
-        onOpenTape(fixtureTapeEvent(fixture, eventId));
+        onOpenTape(
+          fixtureTapeEvent(
+            fixture,
+            eventId,
+            goalFlash.home || goalFlash.away ? goalFlash : undefined
+          )
+        );
       }}
     >
-      <div className={fixtureTapeMatchGrid}>
+      <div className={upcoming ? fixtureTapeFootballGridNoScore : fixtureTapeFootballGrid}>
+        <FootballTapeStatus fixture={fixture} displayTimezone={displayTimezone} />
+        {upcoming ? null : (
+          <div className={fixtureTapeScoreLead}>
+            <FixtureScoreboard
+              home={fixture.homeScore}
+              away={fixture.awayScore}
+              live={live}
+              homeScored={goalFlash.home}
+              awayScored={goalFlash.away}
+            />
+          </div>
+        )}
+        <div className="min-w-0">
         <div className={fixtureTapeTeamStack}>
           <span className={fixtureTapeTeamLine}>
             <TeamCrest src={fixture.homeLogo} alt={fixture.homeTeam} />
@@ -624,6 +753,7 @@ function FootballTapeRow({
             >
               {fixture.homeTeam}
             </span>
+            {goalFlash.home ? <TapeGoalMark team={fixture.homeTeam} /> : null}
             {fitMeter("home")}
             {showMeter && !scoutLoading && twoupSideIsEdgePick(scout, "home") ? (
               <TwoupEdgeMark />
@@ -643,6 +773,7 @@ function FootballTapeRow({
             >
               {fixture.awayTeam}
             </span>
+            {goalFlash.away ? <TapeGoalMark team={fixture.awayTeam} /> : null}
             {fitMeter("away")}
             {showMeter && !scoutLoading && twoupSideIsEdgePick(scout, "away") ? (
               <TwoupEdgeMark />
@@ -650,21 +781,13 @@ function FootballTapeRow({
             <FixtureBackedTag mark={awayBack} />
           </span>
         </div>
-        <div
-          className={cn(
-            fixtureTapeTrailing,
-            (showScore || showOdds) && "items-stretch pr-0 gap-6"
-          )}
-        >
-          <span className={cn(tapeClockClass(live), "self-center")}>
-            {live && clock !== "HT" ? (
-              <Radio
-                className="size-3 animate-pulse motion-reduce:animate-none"
-                aria-hidden
-              />
-            ) : null}
-            {clock}
-          </span>
+        {scope ? (
+          <p className="mt-0.5 min-w-0 truncate text-xs text-muted-foreground" title={scope}>
+            {scope}
+          </p>
+        ) : null}
+        </div>
+        <div className={cn(fixtureTapeOddsCol, "justify-self-end")}>
           {showOdds ? (
             <ExchangeBackStack
               homeOdds={scout?.markets.home}
@@ -672,11 +795,15 @@ function FootballTapeRow({
               homeLabel={fixture.homeTeam}
               awayLabel={fixture.awayTeam}
             />
-          ) : showScore ? (
-            <FixtureScoreboard
-              home={fixture.homeScore}
-              away={fixture.awayScore}
-              live={live}
+          ) : null}
+        </div>
+        <div className={fixtureTapeTrackCol}>
+          {canTrack ? (
+            <TrackToggleButton
+              appearance="icon"
+              tracked={Boolean(tracked)}
+              onTrack={onTrack}
+              onUntrack={onUntrack}
             />
           ) : null}
         </div>
@@ -684,7 +811,15 @@ function FootballTapeRow({
       <button
         type="button"
         className="sr-only"
-        onClick={() => onOpenTape(fixtureTapeEvent(fixture, eventId))}
+        onClick={() =>
+          onOpenTape(
+            fixtureTapeEvent(
+              fixture,
+              eventId,
+              goalFlash.home || goalFlash.away ? goalFlash : undefined
+            )
+          )
+        }
       >
         Open match events for {fixture.homeTeam} v {fixture.awayTeam}
         {homeBack ? `. ${fixture.homeTeam} backed` : null}
@@ -705,11 +840,6 @@ function FootballTapeRow({
             })}`
           : null}
       </button>
-      {scope ? (
-        <p className="mt-0.5 min-w-0 truncate text-xs text-muted-foreground" title={scope}>
-          {scope}
-        </p>
-      ) : null}
     </li>
   );
 }
@@ -721,6 +851,7 @@ function RacingTapeRow({
   scope,
   onOpenTape,
   onTrack,
+  onUntrack,
   onTrackAndBet,
 }: {
   race: RacingFixture;
@@ -729,6 +860,7 @@ function RacingTapeRow({
   scope?: string;
   onOpenTape: (race: RacingFixture) => void;
   onTrack: (race: RacingFixture) => void;
+  onUntrack: (race: RacingFixture) => void;
   onTrackAndBet: (race: RacingFixture) => void;
 }) {
   const live = race.status === "live";
@@ -777,6 +909,7 @@ function RacingTapeRow({
         <FixtureActions
           isTracked={tracked}
           onTrack={() => onTrack(race)}
+          onUntrack={() => onUntrack(race)}
           onTrackAndBet={() => onTrackAndBet(race)}
         />
       </div>
@@ -813,7 +946,6 @@ function CollapsibleSectionHeader({
   onToggle,
   leading,
   trailing,
-  meta,
   expandLabel,
   columns = "flex",
   children,
@@ -822,7 +954,6 @@ function CollapsibleSectionHeader({
   onToggle: () => void;
   leading?: ReactNode;
   trailing?: ReactNode;
-  meta?: ReactNode;
   expandLabel?: string;
   columns?: "flex" | "match";
   children: ReactNode;
@@ -860,19 +991,16 @@ function CollapsibleSectionHeader({
       <div
         className={cn(
           fixtureTapeSectionBar,
-          fixtureTapeMatchGrid,
+          "grid grid-cols-[auto_minmax(0,1fr)_2rem] items-center",
           fixtureTapeSectionHover,
         )}
       >
+        <div className="pr-2">{leading}</div>
         <div className="flex min-w-0 items-center gap-3">
-          {leading}
           {titleButton}
-        </div>
-        <div className={cn(fixtureTapeTrailing, "pr-0")}>
           {trailing}
-          {meta}
-          {chevron}
         </div>
+        {chevron}
       </div>
     );
   }
@@ -888,7 +1016,6 @@ function CollapsibleSectionHeader({
       {leading}
       {titleButton}
       {trailing}
-      {meta}
       {chevron}
     </div>
   );
@@ -937,8 +1064,13 @@ function FootballCompetitionSection({
   onToggleHidden,
   empty,
   showScout,
+  unlockOdds,
   scoutByKey,
   scoutLoading,
+  trackedExternalIds,
+  onTrackFixture,
+  onUntrackFixture,
+  goalPreviewKey,
 }: {
   scopeId: string;
   competition: string;
@@ -962,8 +1094,13 @@ function FootballCompetitionSection({
     secondaryAction?: { label: string; onClick: () => void; variant?: "primary" | "secondary" };
   };
   showScout?: boolean;
+  unlockOdds?: boolean;
   scoutByKey?: Map<string, TwoupOpennessResult>;
   scoutLoading?: boolean;
+  trackedExternalIds: Set<string>;
+  onTrackFixture: (fixture: Fixture) => void;
+  onUntrackFixture: (fixture: Fixture) => void;
+  goalPreviewKey?: string | null;
 }) {
   const [open, setOpen] = useState(true);
   const headingId = fixtureDayHeadingId(scopeId, "day");
@@ -977,29 +1114,36 @@ function FootballCompetitionSection({
         onToggle={() => setOpen((v) => !v)}
         columns="match"
         leading={
-          <FavouriteStar favourite={favourite} label={label} onToggle={onToggleFavourite} />
+          <FavouriteStar
+            favourite={favourite}
+            label={label}
+            onToggle={onToggleFavourite}
+            unlockOdds={unlockOdds}
+          />
         }
         trailing={
           hidden || !favourite ? (
             <HideScopeButton hidden={hidden} label={label} onToggle={onToggleHidden} />
           ) : null
         }
-        meta={!open ? <CollapsedScopeCount items={fixtures} /> : null}
         expandLabel={countCopy.aria ? `Expand, ${countCopy.aria}` : undefined}
       >
-        <p id={headingId} className={cn(sectionTitle, "flex items-center gap-3")}>
+        <p id={headingId} className={cn(sectionTitle, "flex min-w-0 items-center gap-2")}>
           <CompetitionHeaderIcon
             competition={competition}
             leagueCountry={leagueCountry}
           />
-          <span className="flex min-w-0 items-baseline gap-1.5 truncate" title={label}>
-            {heading.country ? (
-              <>
-                <span className="shrink-0">{heading.country}</span>
-                <span className="shrink-0">-</span>
-              </>
-            ) : null}
-            <span className="min-w-0 truncate">{heading.name}</span>
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex min-w-0 items-baseline gap-1.5 truncate" title={label}>
+              {heading.country ? (
+                <>
+                  <span className="shrink-0">{heading.country}</span>
+                  <span className="shrink-0">-</span>
+                </>
+              ) : null}
+              <span className="min-w-0 truncate">{heading.name}</span>
+            </span>
+            {!open ? <CollapsedScopeCount items={fixtures} /> : null}
           </span>
         </p>
       </CollapsibleSectionHeader>
@@ -1034,17 +1178,16 @@ function FootballCompetitionSection({
                     eventId={eventId}
                     homeBack={teamBack?.home}
                     awayBack={teamBack?.away}
-                    showMeter={showScout && fixture.status === "upcoming"}
-                    scout={
-                      scoutByKey?.get(
-                        twoupScoutKey({
-                          homeTeam: fixture.homeTeam,
-                          awayTeam: fixture.awayTeam,
-                          startTime: fixture.startTime,
-                        })
-                      ) ?? null
-                    }
+                    showMeter={Boolean(showScout && fixture.status === "upcoming")}
+                    scout={fixtureTapeScout(fixture, scoutByKey)}
                     scoutLoading={scoutLoading}
+                    tracked={trackedExternalIds.has(fixture.externalId)}
+                    onTrack={() => onTrackFixture(fixture)}
+                    onUntrack={() => onUntrackFixture(fixture)}
+                    goalPreview={
+                      (fixture.externalId ?? fixtureScoutKey(fixture)) ===
+                      goalPreviewKey
+                    }
                   />
                 );
               })}
@@ -1063,6 +1206,7 @@ function RacingCourseSection({
   trackedExternalIds,
   onOpenTape,
   onTrack,
+  onUntrack,
   onTrackAndBet,
   displayTimezone,
   favourite,
@@ -1077,6 +1221,7 @@ function RacingCourseSection({
   trackedExternalIds: Set<string>;
   onOpenTape: (race: RacingFixture) => void;
   onTrack: (race: RacingFixture) => void;
+  onUntrack: (race: RacingFixture) => void;
   onTrackAndBet: (race: RacingFixture) => void;
   displayTimezone: string;
   favourite: boolean;
@@ -1101,6 +1246,7 @@ function RacingCourseSection({
       <CollapsibleSectionHeader
         open={open}
         onToggle={() => setOpen((v) => !v)}
+        columns="match"
         leading={
           <FavouriteStar favourite={favourite} label={course} onToggle={onToggleFavourite} />
         }
@@ -1109,22 +1255,24 @@ function RacingCourseSection({
             <HideScopeButton hidden={hidden} label={course} onToggle={onToggleHidden} />
           ) : null
         }
-        meta={!open ? <CollapsedScopeCount items={races} /> : null}
         expandLabel={countCopy.aria ? `Expand, ${countCopy.aria}` : undefined}
       >
-        <p id={headingId} className={cn(sectionTitle, "flex items-center gap-3")}>
+        <p id={headingId} className={cn(sectionTitle, "flex min-w-0 items-center gap-2")}>
           {hasRegionFlag ? (
             <RegionFlag code={region} size="md" />
           ) : (
             <SportIcon sport="horse_racing" size={16} className="text-muted-foreground" />
           )}
-          <span
-            className="flex min-w-0 items-baseline gap-1.5 truncate"
-            title={`${racingRegionLabel(region).toUpperCase()} - ${course.toUpperCase()}`}
-          >
-            <span className="shrink-0">{racingRegionLabel(region).toUpperCase()}</span>
-            <span className="shrink-0">-</span>
-            <span className="min-w-0 truncate">{course.toUpperCase()}</span>
+          <span className="flex min-w-0 items-center gap-3">
+            <span
+              className="flex min-w-0 items-baseline gap-1.5 truncate"
+              title={`${racingRegionLabel(region).toUpperCase()} - ${course.toUpperCase()}`}
+            >
+              <span className="shrink-0">{racingRegionLabel(region).toUpperCase()}</span>
+              <span className="shrink-0">-</span>
+              <span className="min-w-0 truncate">{course.toUpperCase()}</span>
+            </span>
+            {!open ? <CollapsedScopeCount items={races} /> : null}
           </span>
         </p>
       </CollapsibleSectionHeader>
@@ -1151,6 +1299,7 @@ function RacingCourseSection({
                   displayTimezone={displayTimezone}
                   onOpenTape={onOpenTape}
                   onTrack={onTrack}
+                  onUntrack={onUntrack}
                   onTrackAndBet={onTrackAndBet}
                 />
               ))}
@@ -1174,6 +1323,9 @@ function FootballKickoffList({
   showScout,
   scoutByKey,
   scoutLoading,
+  trackedExternalIds,
+  onTrackFixture,
+  onUntrackFixture,
 }: {
   fixtures: Fixture[];
   onOpenTape: (event: FootballTapeDialogEvent) => void;
@@ -1186,6 +1338,9 @@ function FootballKickoffList({
   showScout?: boolean;
   scoutByKey?: Map<string, TwoupOpennessResult>;
   scoutLoading?: boolean;
+  trackedExternalIds: Set<string>;
+  onTrackFixture: (fixture: Fixture) => void;
+  onUntrackFixture: (fixture: Fixture) => void;
 }) {
   return (
     <div className="surface-lift overflow-hidden rounded-lg ring-1 ring-border/40 dark:ring-0">
@@ -1225,16 +1380,11 @@ function FootballKickoffList({
                     footballScopeId(fixture.competition, fixture.leagueCountry)
                   )
               )}
-              scout={
-                scoutByKey?.get(
-                  twoupScoutKey({
-                    homeTeam: fixture.homeTeam,
-                    awayTeam: fixture.awayTeam,
-                    startTime: fixture.startTime,
-                  })
-                ) ?? null
-              }
+              scout={fixtureTapeScout(fixture, scoutByKey)}
               scoutLoading={scoutLoading}
+              tracked={trackedExternalIds.has(fixture.externalId)}
+              onTrack={() => onTrackFixture(fixture)}
+              onUntrack={() => onUntrackFixture(fixture)}
             />
           );
         })}
@@ -1248,6 +1398,7 @@ function RacingKickoffList({
   trackedExternalIds,
   onOpenTape,
   onTrack,
+  onUntrack,
   onTrackAndBet,
   displayTimezone,
   showScope = true,
@@ -1256,6 +1407,7 @@ function RacingKickoffList({
   trackedExternalIds: Set<string>;
   onOpenTape: (race: RacingFixture) => void;
   onTrack: (race: RacingFixture) => void;
+  onUntrack: (race: RacingFixture) => void;
   onTrackAndBet: (race: RacingFixture) => void;
   displayTimezone: string;
   showScope?: boolean;
@@ -1276,6 +1428,7 @@ function RacingKickoffList({
             }
             onOpenTape={onOpenTape}
             onTrack={onTrack}
+            onUntrack={onUntrack}
             onTrackAndBet={onTrackAndBet}
           />
         ))}
@@ -1291,10 +1444,12 @@ export function DeskFixtureBoard({
   racing: racingRaw,
   trackedExternalIds,
   onTrackFixture,
+  onUntrackFixture,
   onTrackAndBetFixture,
   onAddBetFixture,
   onEpDesk,
   onTrackRace,
+  onUntrackRace,
   onTrackAndBetRace,
   onAddBetRace,
   emptyTitle,
@@ -1315,10 +1470,12 @@ export function DeskFixtureBoard({
   racing: RacingFixture[];
   trackedExternalIds: Set<string>;
   onTrackFixture: (fixture: Fixture) => void;
+  onUntrackFixture: (fixture: Fixture) => void;
   onTrackAndBetFixture: (fixture: Fixture) => void;
   onAddBetFixture: (fixture: Fixture) => void;
   onEpDesk: (fixture: Fixture) => void;
   onTrackRace: (race: RacingFixture) => void;
+  onUntrackRace: (race: RacingFixture) => void;
   onTrackAndBetRace: (race: RacingFixture) => void;
   onAddBetRace: (race: RacingFixture) => void;
   emptyTitle: string;
@@ -1337,7 +1494,7 @@ export function DeskFixtureBoard({
 }) {
   const { state, applyLocalSettingsPatch } = useAppState();
   const now = useNow(15_000);
-  const football = useMemo(() => {
+  const footballBase = useMemo(() => {
     const tracked = (state?.events ?? []).filter(
       (event) => event.externalId && (event.sport ?? "football") !== "horse_racing"
     );
@@ -1345,6 +1502,27 @@ export function DeskFixtureBoard({
       withEffectiveFeedStatus(fixture, now)
     );
   }, [footballRaw, now, state?.events]);
+  const livePreviewKeys = useMemo(() => {
+    const live = footballBase.filter((fixture) => fixture.status === "live");
+    const first = live[0];
+    if (!first) return [];
+    const scope = footballScopeId(first.competition, first.leagueCountry);
+    const peers = live.filter(
+      (fixture) =>
+        footballScopeId(fixture.competition, fixture.leagueCountry) === scope
+    );
+    const pick = peers.length >= 2 ? peers.slice(0, 2) : live.slice(0, 2);
+    return pick.map((fixture) => fixture.externalId ?? fixtureScoutKey(fixture));
+  }, [footballBase]);
+  const goalPreviewKeys = useLocalTapeGoalPreview(livePreviewKeys);
+  const football = useMemo(() => {
+    if (goalPreviewKeys.length === 0) return footballBase;
+    const bump = new Set(goalPreviewKeys);
+    return footballBase.map((fixture) => {
+      const key = fixture.externalId ?? fixtureScoutKey(fixture);
+      return bump.has(key) ? bumpTapeGoalPreviewHome(fixture) : fixture;
+    });
+  }, [footballBase, goalPreviewKeys]);
   const racing = useMemo(
     () => racingRaw.map((race) => withEffectiveFeedStatus(race, now)),
     [racingRaw, now]
@@ -1352,6 +1530,13 @@ export function DeskFixtureBoard({
   const boardView = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
   const sportView = fixtureBoardSportView(boardView, sport);
   const [statusFilter, setStatusFilter] = useState<FixtureStatusFilter>(sportView.status);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!tapeGoalPreviewRequested(window.location.hostname, window.location.search)) {
+      return;
+    }
+    setStatusFilter("live");
+  }, []);
   const [scopeFilter, setScopeFilter] = useState(
     () => applyFixtureBoardRail(sportView.rail).scopeFilter
   );
@@ -1515,7 +1700,10 @@ export function DeskFixtureBoard({
     return ids;
   }, [state?.bets, state?.events]);
 
-  function persistBoardView(next: { rail?: string; status?: FixtureStatusFilter }) {
+  function persistBoardView(next: {
+    rail?: string;
+    status?: FixtureStatusFilter;
+  }) {
     const current = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
     const side = sport === "horse_racing" ? "racing" : "football";
     const fixtureBoardView = mergeFixtureBoardView(current, {
@@ -1909,6 +2097,7 @@ export function DeskFixtureBoard({
       align="end"
       labelMode="icon"
       renderIcon={footballFilterIcon}
+      unlockOdds={sport === "football" && canScoutPlan}
     />
   );
 
@@ -2074,8 +2263,13 @@ export function DeskFixtureBoard({
                 hidden={hiddenSet.has(group.id)}
                 onToggleHidden={() => toggleHidden(group.id)}
                 showScout={canScout && favouriteSet.has(group.id)}
+                unlockOdds={canScoutPlan}
                 scoutByKey={scoutByKey}
                 scoutLoading={scoutLoading}
+                trackedExternalIds={trackedExternalIds}
+                onTrackFixture={onTrackFixture}
+                onUntrackFixture={onUntrackFixture}
+                goalPreviewKey={goalPreviewKeys[0] ?? null}
               />
             ))}
           </div>
@@ -2090,6 +2284,7 @@ export function DeskFixtureBoard({
                 trackedExternalIds={trackedExternalIds}
                 onOpenTape={setTapeRace}
                 onTrack={onTrackRace}
+                onUntrack={onUntrackRace}
                 onTrackAndBet={onTrackAndBetRace}
                 displayTimezone={displayTimezone}
                 favourite={favouriteSet.has(group.course)}
@@ -2130,7 +2325,7 @@ export function DeskFixtureBoard({
     <TooltipProvider delayDuration={200}>
       {tapeEvent ? (
         <FootballLiveTapeDialog
-          event={tapeEvent}
+          event={liveTapeDialogEvent(tapeEvent, football)}
           open
           showTwoupScout={canScout}
           scout={
@@ -2146,16 +2341,19 @@ export function DeskFixtureBoard({
           }
           scoutLoading={scoutLoading}
           tracked={Boolean(
-            tapeEvent.id ??
-              (tapeEvent.externalId
-                ? eventIdByExternalId.get(tapeEvent.externalId)
-                : undefined)
+            tapeEvent.externalId && trackedExternalIds.has(tapeEvent.externalId)
           )}
           onTrack={() => {
             const fixture = football.find(
               (row) => row.externalId === tapeEvent.externalId
             );
             if (fixture) onTrackFixture(fixture);
+          }}
+          onUntrack={() => {
+            const fixture = football.find(
+              (row) => row.externalId === tapeEvent.externalId
+            );
+            if (fixture) onUntrackFixture(fixture);
           }}
           onAddBet={() => {
             const fixture = football.find(
@@ -2188,6 +2386,11 @@ export function DeskFixtureBoard({
             const race =
               racing.find((row) => row.externalId === tapeRace.externalId) ?? tapeRace;
             onTrackRace(race);
+          }}
+          onUntrack={() => {
+            const race =
+              racing.find((row) => row.externalId === tapeRace.externalId) ?? tapeRace;
+            onUntrackRace(race);
           }}
           onAddBet={() => {
             const race =

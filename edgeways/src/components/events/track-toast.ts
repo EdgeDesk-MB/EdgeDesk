@@ -12,3 +12,9 @@ export function toastAlreadyTracked(onView: () => void) {
     action: { label: "View", onClick: onView },
   });
 }
+
+export function toastRemovedFromTrackedEvents(label: string) {
+  toast.success("Removed from Tracked Events", {
+    description: label,
+  });
+}
