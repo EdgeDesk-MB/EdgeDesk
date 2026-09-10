@@ -13,7 +13,7 @@ export type LiveScoreFields = {
   htAwayScore?: number | null;
   ftHomeScore?: number | null;
   ftAwayScore?: number | null;
-  matchEnding?: "ft" | "aet" | "pen" | null;
+  matchEnding?: string | null;
 };
 
 function goals(row: LiveScoreFields): number {
