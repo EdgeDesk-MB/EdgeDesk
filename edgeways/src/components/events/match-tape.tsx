@@ -523,26 +523,52 @@ function teamNameClass({
   resultWeight?: ReturnType<typeof footballFinishedNameWeight>;
 }) {
   return cn(
-    "min-w-0 self-center text-pretty break-words text-base leading-snug",
+    "min-w-0 text-pretty break-words text-base leading-snug",
     align === "away" ? "text-right" : "text-left",
     matchTapeNameWeightClass(resultWeight ?? "base"),
     take ? "text-primary-text" : "text-foreground"
   );
 }
 
-function TeamSideMeta({
+function TeamNameBlock({
   name,
   formation,
+  align,
+  take,
+  resultWeight,
+}: {
+  name: string;
+  formation?: string | null;
+  align: "home" | "away";
+  take?: boolean;
+  resultWeight?: ReturnType<typeof footballFinishedNameWeight>;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-col gap-1 self-center",
+        align === "away" ? "items-end" : "items-start"
+      )}
+    >
+      <p className={teamNameClass({ align, take, resultWeight })}>{name}</p>
+      {formation ? (
+        <p className="text-xs tabular-nums text-muted-foreground">{formation}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function TeamSideMeta({
+  name,
   odds,
   align,
 }: {
   name: string;
-  formation?: string | null;
   odds?: number;
   align: "home" | "away";
 }) {
   const showOdds = typeof odds === "number" && Number.isFinite(odds) && odds > 1;
-  if (!showOdds && !formation) return <div />;
+  if (!showOdds) return <div />;
   return (
     <div
       className={cn(
@@ -550,10 +576,7 @@ function TeamSideMeta({
         align === "away" ? "items-end text-right" : "items-start text-left"
       )}
     >
-      {showOdds ? <ExchangeBackCell odds={odds} label={`${name} back`} /> : null}
-      {formation ? (
-        <p className="text-xs tabular-nums text-muted-foreground">{formation}</p>
-      ) : null}
+      <ExchangeBackCell odds={odds} label={`${name} back`} />
     </div>
   );
 }
@@ -631,15 +654,13 @@ function MatchScoreboard({
         <TeamCrest src={awayLogo} alt="" size="xl" />
       </div>
 
-      <p
-        className={teamNameClass({
-          align: "home",
-          take: take === "home",
-          resultWeight: homeWeight,
-        })}
-      >
-        {event.homeTeam}
-      </p>
+      <TeamNameBlock
+        name={event.homeTeam}
+        formation={lineups?.homeFormation}
+        align="home"
+        take={take === "home"}
+        resultWeight={homeWeight}
+      />
       {showScore ? (
         <div
           className={cn(matchTapeScoreboard, "justify-self-center self-center")}
@@ -660,19 +681,16 @@ function MatchScoreboard({
       ) : (
         <div />
       )}
-      <p
-        className={teamNameClass({
-          align: "away",
-          take: take === "away",
-          resultWeight: awayWeight,
-        })}
-      >
-        {event.awayTeam}
-      </p>
+      <TeamNameBlock
+        name={event.awayTeam}
+        formation={lineups?.awayFormation}
+        align="away"
+        take={take === "away"}
+        resultWeight={awayWeight}
+      />
 
       <TeamSideMeta
         name={event.homeTeam}
-        formation={lineups?.homeFormation}
         odds={homeOdds}
         align="home"
       />
@@ -681,7 +699,6 @@ function MatchScoreboard({
       </div>
       <TeamSideMeta
         name={event.awayTeam}
-        formation={lineups?.awayFormation}
         odds={awayOdds}
         align="away"
       />
