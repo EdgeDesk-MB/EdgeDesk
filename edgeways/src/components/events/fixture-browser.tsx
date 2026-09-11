@@ -37,7 +37,7 @@ import {
   formatFixtureStepperLabel,
 } from "@/lib/events/fixture-day-groups";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
-import { LIVE_TTL_MS } from "@/lib/live-poll-rules";
+import { footballBoardShouldPollDay, LIVE_TTL_MS } from "@/lib/live-poll-rules";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import {
   mergeFixtureBoardView,
@@ -378,8 +378,12 @@ export function FixtureBrowserContent({
     });
   }, [listDay, loadFixtures]);
 
+  const shouldPollFootball =
+    fixtureSport === "football" &&
+    footballBoardShouldPollDay(listDay, dayBounds.today, fixtures);
+
   useEffect(() => {
-    if (listDay !== dayBounds.today || fixtureSport !== "football") return;
+    if (!shouldPollFootball) return;
     let cancelled = false;
     const refreshLive = () =>
       api<{
@@ -414,7 +418,7 @@ export function FixtureBrowserContent({
       window.clearTimeout(kick);
       window.clearInterval(id);
     };
-  }, [dayBounds.today, fixtureSport, listDay]);
+  }, [dayBounds.today, fixtureSport, listDay, shouldPollFootball]);
 
   async function trackFixture(fixture: Fixture): Promise<EventRow | null> {
     const label = `${fixture.homeTeam} v ${fixture.awayTeam}`;

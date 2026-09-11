@@ -5,6 +5,7 @@ import {
   needsResultBackfill,
   needsTapeBackfill,
   matchViewShouldPollTape,
+  footballBoardShouldPollDay,
   LIVE_POLL_WINDOW_MS,
   RESULT_BACKFILL_MAX_AGE_MS,
   TAPE_REFRESH_MS,
@@ -193,5 +194,31 @@ describe("matchViewShouldPollTape", () => {
     expect(matchViewShouldPollTape("upcoming", NOW + 30 * 60 * 1000, NOW)).toBe(
       false
     );
+  });
+});
+
+describe("footballBoardShouldPollDay", () => {
+  const today = "2026-09-11";
+
+  it("always polls today", () => {
+    expect(footballBoardShouldPollDay(today, today, [])).toBe(true);
+  });
+
+  it("polls a past lookback day while a card is still open", () => {
+    expect(
+      footballBoardShouldPollDay("2026-09-08", today, [{ status: "live" }])
+    ).toBe(true);
+  });
+
+  it("stops a past day once every card is finished", () => {
+    expect(
+      footballBoardShouldPollDay("2026-09-08", today, [{ status: "finished" }])
+    ).toBe(false);
+  });
+
+  it("does not poll tomorrow", () => {
+    expect(
+      footballBoardShouldPollDay("2026-09-12", today, [{ status: "upcoming" }])
+    ).toBe(false);
   });
 });

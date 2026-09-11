@@ -8,6 +8,8 @@ import {
   groupTapeByPeriod,
   parseMatchTape,
   periodEndScore,
+  mergeMatchTapeKeys,
+  preferAlignedScore,
   preferPublishedScore,
   tapeGoals,
   tapePeriodId,
@@ -187,6 +189,28 @@ describe("preferPublishedScore", () => {
 
   it("follows the tape when VAR has already taken the goal off", () => {
     expect(preferPublishedScore(1, 0, { tapeHasGoalCancel: true })).toBe(0);
+  });
+});
+
+describe("preferAlignedScore", () => {
+  it("keeps the list score when the id fetch dropped the first-half goal", () => {
+    expect(preferAlignedScore(0, 1)).toBe(1);
+    expect(preferAlignedScore(1, 1)).toBe(1);
+    expect(preferAlignedScore(2, 1)).toBe(2);
+  });
+
+  it("follows a VAR drop", () => {
+    expect(preferAlignedScore(0, 1, { tapeHasGoalCancel: true })).toBe(0);
+  });
+});
+
+describe("mergeMatchTapeKeys", () => {
+  it("unions first-half and second-half rows", () => {
+    const merged = mergeMatchTapeKeys(
+      [{ kind: "goal", minute: 72, side: "away", player: "Thomaz" }],
+      [{ kind: "goal", minute: 33, side: "home", player: "Ramiro" }]
+    );
+    expect(merged.map((row) => row.player)).toEqual(["Ramiro", "Thomaz"]);
   });
 });
 

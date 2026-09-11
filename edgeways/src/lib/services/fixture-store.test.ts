@@ -128,7 +128,7 @@ describe("fixture-store", () => {
     expect(stored?.fixtures[0]?.homeTeam).toBe("Old");
   });
 
-  it("never refetches past dates", async () => {
+  it("never refetches a finished past date", async () => {
     const { store, fixturesByDate } = await loadStore();
     const yesterday = localCalendarDate(new Date(Date.now() - 86400000));
     await store.writeFixtureStore(yesterday, [fixture()], Date.now() - 86400000);
@@ -137,6 +137,76 @@ describe("fixture-store", () => {
     expect(served.fixtures).toHaveLength(1);
     await flushBackground();
     expect(fixturesByDate).not.toHaveBeenCalled();
+  });
+
+  it("serves a frozen overnight live row and writes the FT result behind it", async () => {
+    const { store, fixturesByDate } = await loadStore();
+    const yesterday = localCalendarDate(new Date(Date.now() - 86400000));
+    await store.writeFixtureStore(
+      yesterday,
+      [
+        fixture({
+          externalId: "tomayapo-ready",
+          homeTeam: "Real Tomayapo",
+          awayTeam: "Always Ready",
+          status: "live",
+          startTime: Date.now() - 12 * 60 * 60 * 1000,
+          homeScore: 0,
+          awayScore: 0,
+          minute: 26,
+        }),
+      ],
+      Date.now() - 12 * 60 * 60 * 1000
+    );
+    fixturesByDate.mockResolvedValue([
+      fixture({
+        externalId: "tomayapo-ready",
+        homeTeam: "Real Tomayapo",
+        awayTeam: "Always Ready",
+        status: "finished",
+        homeScore: 2,
+        awayScore: 0,
+        minute: 90,
+        matchEnding: "ft",
+      }),
+    ]);
+
+    const served = await store.getFixturesForDate(yesterday);
+    expect(served.fixtures[0]).toMatchObject({
+      homeScore: 0,
+      awayScore: 0,
+      minute: 26,
+    });
+
+    await flushBackground(() => fixturesByDate.mock.calls.length > 0);
+    expect(fixturesByDate).toHaveBeenCalledWith(yesterday);
+    const stored = await store.readFixtureStore(yesterday);
+    expect(stored?.fixtures[0]).toMatchObject({
+      homeScore: 2,
+      awayScore: 0,
+      status: "finished",
+    });
+  });
+
+  it("warmFixtureStore catches a lookback day up when a result is missing", async () => {
+    const { store, fixturesByDate } = await loadStore();
+    const threeDaysAgo = localCalendarDate(new Date(Date.now() - 3 * 86400000));
+    await store.writeFixtureStore(threeDaysAgo, [
+      fixture({
+        status: "live",
+        startTime: Date.now() - 3 * 24 * 60 * 60 * 1000,
+        homeScore: 0,
+        awayScore: 0,
+        minute: 26,
+      }),
+    ]);
+    fixturesByDate.mockResolvedValue([
+      fixture({ status: "finished", homeScore: 2, awayScore: 0 }),
+    ]);
+
+    const result = await store.warmFixtureStore();
+    expect(result.warmed).toContain(threeDaysAgo);
+    expect(fixturesByDate).toHaveBeenCalledWith(threeDaysAgo);
   });
 
   it("re-derives live from kick-off when serving stored fixtures", async () => {

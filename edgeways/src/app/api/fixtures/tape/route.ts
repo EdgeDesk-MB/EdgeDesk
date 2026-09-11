@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { rateLimitResponse } from "@/lib/api-rate-limit";
 import {
-  fixtureById,
+  fixtureDetail,
   fixtureLineups,
   fixtureMatchEvents,
 } from "@/lib/services/apifootball";
@@ -26,11 +26,14 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [tape, lineups, fixture] = await Promise.all([
+  const detail = await fixtureDetail(externalId, home);
+  const [tape, lineups] = await Promise.all([
     fixtureMatchEvents(externalId, home),
-    fixtureLineups(externalId),
-    fixtureById(externalId),
+    detail?.lineups
+      ? Promise.resolve(detail.lineups)
+      : fixtureLineups(externalId),
   ]);
+  const fixture = detail?.fixture;
 
   return NextResponse.json({
     goals: JSON.stringify(tape),

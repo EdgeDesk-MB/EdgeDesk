@@ -9,8 +9,12 @@
  * 2. MISS: one live fetch, written straight through so the next reader on
  *    any instance is a database read. Empty upstream payloads are not stored.
  * 3. WARM: the cron warmer refreshes today and tomorrow on a slow cadence.
+ *    Any lookback day still open after the result window is included so a
+ *    missed FT is written through once.
  *
- * Past dates are immutable. Stored rows re-derive upcoming/live from
+ * Past dates with a finished snapshot are immutable. A day frozen mid-match
+ * (still `live` / not finished, kick-off more than three hours ago) gets
+ * one background write-through. Stored rows re-derive upcoming/live from
  * kick-off (same 4h window as `effectiveEventStatus`) so LIVE still shows
  * between cron ticks. Live scores overlay from a warm in-process peek
  * only — never wait on the provider on this read. The 15s desk poll
@@ -26,6 +30,7 @@ import { isNeonDesk } from "@/lib/db/desk-backend";
 import {
   effectiveEventStatus,
   feedHorizonDates,
+  FIXTURE_LIST_LOOKBACK_DAYS,
   localCalendarDate,
   mergeByExternalId,
 } from "@/lib/events";
@@ -40,6 +45,21 @@ import {
 
 /** Matches the in-memory TTL in apifootball - stale rows still serve. */
 export const FIXTURE_STORE_FRESH_MS = 10 * 60 * 1000;
+
+/** Kick-off this old, and not finished, means the day card is missing FT. */
+export const FOOTBALL_RESULT_CATCH_UP_MS = 3 * 60 * 60 * 1000;
+
+export function footballDayNeedsResultCatchUp(
+  fixtures: readonly Fixture[],
+  now: number = Date.now()
+): boolean {
+  return fixtures.some((fixture) => {
+    if ((fixture.sport ?? "football") !== "football") return false;
+    if (fixture.status === "finished") return false;
+    if (!Number.isFinite(fixture.startTime)) return false;
+    return fixture.startTime <= now - FOOTBALL_RESULT_CATCH_UP_MS;
+  });
+}
 
 export interface StoredFixtures {
   fixtures: Fixture[];
@@ -161,7 +181,10 @@ export async function getFixturesForDate(date: string): Promise<StoredFixtures> 
   if (stored) {
     const fixtures = withLiveScores(date, stored.fixtures, now);
     const fresh = now - stored.fetchedAt < FIXTURE_STORE_FRESH_MS;
-    if (fresh || date < localCalendarDate()) return { ...stored, fixtures };
+    const past = date < localCalendarDate();
+    const catchUp = footballDayNeedsResultCatchUp(stored.fixtures, now);
+    if (past && !catchUp) return { ...stored, fixtures };
+    if (fresh && !catchUp) return { ...stored, fixtures };
     scheduleBackgroundRefresh(date);
     return { ...stored, fixtures };
   }
@@ -212,14 +235,26 @@ export async function pruneFixtureStore(now: number = Date.now()): Promise<void>
 
 export async function warmFixtureStore(): Promise<{ warmed: string[]; skipped: string[] }> {
   if (!hasApiKey()) return { warmed: [], skipped: [] };
-  const today = localCalendarDate();
-  const tomorrow = localCalendarDate(new Date(Date.now() + 86400000));
+  const now = Date.now();
+  const today = localCalendarDate(new Date(now));
+  const tomorrow = localCalendarDate(new Date(now + 86400000));
+  const dates = [today, tomorrow];
+  for (let daysAgo = 1; daysAgo <= FIXTURE_LIST_LOOKBACK_DAYS; daysAgo += 1) {
+    const date = localCalendarDate(new Date(now - daysAgo * 86400000));
+    const row = await readFixtureStore(date).catch(() => null);
+    if (row && footballDayNeedsResultCatchUp(row.fixtures, now)) {
+      dates.push(date);
+    }
+  }
 
   const warmed: string[] = [];
   const skipped: string[] = [];
-  for (const date of [today, tomorrow]) {
+  for (const date of dates) {
     const stored = await readFixtureStore(date).catch(() => null);
-    if (stored && Date.now() - stored.fetchedAt < FIXTURE_STORE_FRESH_MS) {
+    const catchUp = stored
+      ? footballDayNeedsResultCatchUp(stored.fixtures, now)
+      : false;
+    if (stored && !catchUp && now - stored.fetchedAt < FIXTURE_STORE_FRESH_MS) {
       skipped.push(date);
       continue;
     }

@@ -66,6 +66,7 @@ import {
   groupTapeByPeriod,
   parseMatchTape,
   periodEndScore,
+  preferAlignedScore,
   preferPublishedScore,
   tapeRunningScores,
   TAPE_PERIOD_LABEL,
@@ -1011,12 +1012,20 @@ export function FootballLiveTapeDialog({
   const view = {
     ...base,
     homeScore: preferPublishedScore(
-      livePatch?.homeScore ?? event.homeScore ?? base.homeScore,
+      preferAlignedScore(
+        livePatch?.homeScore,
+        event.homeScore ?? base.homeScore,
+        { tapeHasGoalCancel }
+      ),
       tapeScore?.home,
       { tapeHasGoalCancel }
     ),
     awayScore: preferPublishedScore(
-      livePatch?.awayScore ?? event.awayScore ?? base.awayScore,
+      preferAlignedScore(
+        livePatch?.awayScore,
+        event.awayScore ?? base.awayScore,
+        { tapeHasGoalCancel }
+      ),
       tapeScore?.away,
       { tapeHasGoalCancel }
     ),

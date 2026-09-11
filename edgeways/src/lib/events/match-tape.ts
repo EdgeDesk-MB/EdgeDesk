@@ -186,6 +186,45 @@ export function preferPublishedScore(
   return published;
 }
 
+/**
+ * Keep the list score when a later id fetch published a lower figure and
+ * VAR has not taken a goal off. A missing first-half `goals.home` must not
+ * paint 0 over the day-card 1.
+ */
+export function preferAlignedScore(
+  incoming: number | undefined,
+  existing: number | undefined,
+  opts?: { tapeHasGoalCancel?: boolean }
+): number | undefined {
+  if (incoming == null) return existing;
+  if (existing == null) return incoming;
+  if (opts?.tapeHasGoalCancel && incoming < existing) return incoming;
+  return Math.max(incoming, existing);
+}
+
+function tapeEventKey(event: MatchTapeEvent): string {
+  return [
+    event.kind,
+    event.minute,
+    event.extra ?? 0,
+    event.side,
+    event.player ?? "",
+    event.detail ?? "",
+  ].join("|");
+}
+
+/** Union two tapes and keep chronological order. */
+export function mergeMatchTapeKeys(
+  first: MatchTapeEvent[],
+  second: MatchTapeEvent[]
+): MatchTapeEvent[] {
+  const byKey = new Map<string, MatchTapeEvent>();
+  for (const event of [...first, ...second]) {
+    byKey.set(tapeEventKey(event), event);
+  }
+  return sortTapeEvents([...byKey.values()]);
+}
+
 /** Regulation minute, stripping added time when `extra` is present. */
 export function tapeElapsed(event: Pick<MatchTapeEvent, "minute" | "extra">): number {
   const extra = event.extra ?? 0;

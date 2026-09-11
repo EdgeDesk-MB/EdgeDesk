@@ -75,6 +75,46 @@ describe("hydrateMatchTapeOnEvent", () => {
     expect(JSON.parse(result.event.goals ?? "[]")).toHaveLength(2);
   });
 
+  it("writes through the fixture score when first hydrating an empty tape", async () => {
+    const persist = vi.fn(async (patch: Record<string, unknown>) =>
+      event({
+        goals: String(patch.goals),
+        tapeFetchedAt: Number(patch.tapeFetchedAt),
+        homeScore: Number(patch.homeScore),
+        awayScore: Number(patch.awayScore),
+      })
+    );
+    const result = await hydrateMatchTapeOnEvent(event({ homeScore: 0, awayScore: 0 }), persist, {
+      fetchTape: async () => tape,
+      fetchFixture: async () => ({
+        externalId: "lin-sot",
+        sport: "football",
+        competition: "Championship",
+        homeTeam: "Lincoln",
+        awayTeam: "Southampton",
+        startTime: NOW,
+        status: "finished",
+        homeScore: 1,
+        awayScore: 1,
+        minute: 90,
+        matchEnding: "ft",
+        period: "FT",
+        htHomeScore: 0,
+        htAwayScore: 1,
+      }),
+      now: () => NOW,
+    });
+    expect(result.event.homeScore).toBe(1);
+    expect(result.event.awayScore).toBe(1);
+    expect(persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        homeScore: 1,
+        awayScore: 1,
+        goals: JSON.stringify(tape),
+      })
+    );
+  });
+
   it("does not fetch for manual rows or other sports", async () => {
     const fetchTape = vi.fn();
     const persist = vi.fn();

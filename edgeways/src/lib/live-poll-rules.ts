@@ -128,6 +128,22 @@ export function needsTapeBackfill(
   return age >= 0 && age <= RESULT_BACKFILL_MAX_AGE_MS;
 }
 
+/**
+ * The fixtures board polls today for live scores. Any earlier day in the
+ * lookback window polls only while a card is still open: FT never appears
+ * on `live=all`, so the day store must be re-read after catch-up writes
+ * through. Tomorrow is store-only.
+ */
+export function footballBoardShouldPollDay(
+  day: string,
+  today: string,
+  fixtures: readonly { status: string }[]
+): boolean {
+  if (day === today) return true;
+  if (day > today) return false;
+  return fixtures.some((fixture) => fixture.status !== "finished");
+}
+
 /** Keep fetching tape while the match view is open on a live (or imminent) row. */
 export function matchViewShouldPollTape(
   status: string,

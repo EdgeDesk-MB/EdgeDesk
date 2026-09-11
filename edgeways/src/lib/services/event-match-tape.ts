@@ -61,7 +61,7 @@ export async function hydrateMatchTapeOnEvent(
   const keepExisting = hasTape && tape.length === 0;
   const goals = keepExisting ? (event.goals ?? "[]") : JSON.stringify(tape);
   const fixture =
-    liveRefresh && deps.fetchFixture
+    deps.fetchFixture && (liveRefresh || !hasTape)
       ? await deps.fetchFixture(event.externalId)
       : null;
 
