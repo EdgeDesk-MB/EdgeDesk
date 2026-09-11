@@ -24,6 +24,7 @@ import { FilterPill } from "@/components/ui/filter-pill";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { formatAdminDateTime } from "@/lib/admin/format";
 import {
+  activityEventsInWindow,
   buildActivityTimeline,
   filterActivityEvents,
   type ActivityEvent,
@@ -126,9 +127,13 @@ export function AdminActivityChart({
     () => filterActivityEvents(events, kind),
     [events, kind]
   );
+  const windowEvents = useMemo(
+    () => activityEventsInWindow(visibleEvents, chartWindowSecs, nowTick),
+    [visibleEvents, chartWindowSecs, nowTick]
+  );
   const timeline = useMemo(
-    () => buildActivityTimeline(visibleEvents, nowTick),
-    [visibleEvents, nowTick]
+    () => buildActivityTimeline(windowEvents, nowTick),
+    [windowEvents, nowTick]
   );
   const liveTotal = timeline.points.at(-1)?.value ?? 0;
   const effectiveWindowSecs = useMemo(() => {

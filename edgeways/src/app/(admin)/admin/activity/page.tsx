@@ -22,7 +22,7 @@ import {
   scopeActivityView,
   weeklyCountsByUser,
 } from "@/lib/admin/activity-charts";
-import { resolveActivityMixDay } from "@/lib/admin/activity-day";
+import { latestActivityYmd, resolveActivityMixDay } from "@/lib/admin/activity-day";
 import {
   activitySportLabel,
   buildActivityMixCharts,
@@ -61,11 +61,9 @@ export default async function AdminActivityPage({
   searchParams: Promise<{ day?: string }>;
 }) {
   const params = await searchParams;
-  const mixDay = resolveActivityMixDay(params.day);
-  const [activity, scope, dayMix, pinDesks, board] = await Promise.all([
+  const [activity, scope, pinDesks, board] = await Promise.all([
     loadActivityOverview(),
     loadAdminAccountScope(),
-    loadActivityMixForDay(mixDay),
     loadActivityPins(),
     readActivityBoardLayout(),
   ]);
@@ -78,6 +76,14 @@ export default async function AdminActivityPage({
     undefined,
     excludedIds
   );
+  const mixDay = params.day
+    ? resolveActivityMixDay(params.day)
+    : latestActivityYmd([
+        ...scoped.stamps.bets.map((stamp) => stamp.at),
+        ...scoped.stamps.offers.map((stamp) => stamp.at),
+        ...scoped.stamps.casino.map((stamp) => stamp.at),
+      ]);
+  const dayMix = await loadActivityMixForDay(mixDay);
   const bets = scoped.rows.reduce((sum, row) => sum + row.bets, 0);
   const offers = scoped.rows.reduce((sum, row) => sum + row.offers, 0);
   const charts = buildActivityCharts(scoped.rows, scoped.daily);

@@ -55,6 +55,26 @@ export function resolveActivityMixDay(
   return raw;
 }
 
+/**
+ * Latest London calendar day that has a stamp, clamped to today.
+ * Used when Activity opens with no `?day=` so an empty today does not hide
+ * volume Live already showed from a catch-up ingest.
+ */
+export function latestActivityYmd(
+  epochs: Iterable<number>,
+  now = new Date()
+): string {
+  const today = londonYmd(now);
+  let latest: string | null = null;
+  for (const at of epochs) {
+    if (!Number.isFinite(at) || at <= 0) continue;
+    const day = londonYmd(new Date(at));
+    if (day > today) continue;
+    if (!latest || day > latest) latest = day;
+  }
+  return latest ?? today;
+}
+
 export function activityDayLabel(ymd: string, now = new Date()): string {
   if (!isActivityYmd(ymd)) return "Today";
   return formatFixtureStepperLabel(ymd, now.getTime(), "Europe/London");

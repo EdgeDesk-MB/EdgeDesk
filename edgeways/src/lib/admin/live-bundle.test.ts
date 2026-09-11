@@ -48,6 +48,16 @@ describe("crossedDigestCount", () => {
 });
 
 describe("bundleNewEvents", () => {
+  it("ignores catch-up bets older than 15 minutes", () => {
+    const result = bundleNewEvents({
+      events: [bet("old", NOW - 16 * 60 * 1000), bet("fresh", NOW - 1000)],
+      now: NOW,
+      memory: emptyLiveBundleMemory(),
+    });
+    expect(result.bundles).toHaveLength(1);
+    expect(result.bundles[0]?.id).toBe("fresh");
+  });
+
   it("toasts each bet while the hour stays under 10", () => {
     const first = bundleNewEvents({
       events: [bet("1", NOW - 1000), bet("2", NOW - 500)],

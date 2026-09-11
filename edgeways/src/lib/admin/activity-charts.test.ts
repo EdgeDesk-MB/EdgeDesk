@@ -3,6 +3,7 @@ import { fillDailySeries } from "@/lib/admin/feed-monitor";
 import {
   buildActivityCharts,
   activityEventsFromStamps,
+  activityEventsInWindow,
   buildActivityTimeline,
   buildFlagShare,
   filterActivityEvents,
@@ -206,6 +207,26 @@ describe("activityEventsFromStamps", () => {
     expect(events.map((event) => event.kind)).toEqual(["offers", "bets", "casino"]);
     expect(events[0]?.email).toBe("a@example.com");
     expect(filterActivityEvents(events, "bets")).toHaveLength(1);
+  });
+});
+
+describe("activityEventsInWindow", () => {
+  it("keeps only stamps inside the visible window so the line starts at zero", () => {
+    const events = activityEventsFromStamps(
+      {
+        bets: [
+          { at: Date.parse("2026-08-24T12:00:00Z"), clerkUserId: "user_a" },
+          { at: Date.parse("2026-08-26T10:00:00Z"), clerkUserId: "user_a" },
+        ],
+        offers: [],
+        casino: [],
+      },
+      new Map([["user_a", "a@example.com"]])
+    );
+    const nowSec = Date.parse("2026-08-26T12:00:00Z") / 1000;
+    const windowed = activityEventsInWindow(events, 86_400, nowSec);
+    expect(windowed).toHaveLength(1);
+    expect(windowed[0]?.at).toBe(Date.parse("2026-08-26T10:00:00Z"));
   });
 });
 

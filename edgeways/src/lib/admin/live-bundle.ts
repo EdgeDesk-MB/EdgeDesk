@@ -57,6 +57,9 @@ export const DEFAULT_LIVE_BUNDLE_CONFIG: LiveBundleConfig = {
   windowMs: 60 * 60 * 1000,
 };
 
+/** Skip catch-up rows older than this so Live does not look like activity just landed. */
+export const LIVE_EVENT_FRESH_MS = 15 * 60 * 1000;
+
 export type LiveBundleMemory = {
   window: Array<{ kind: PositiveLiveKind; at: number }>;
   critical: Record<string, "warning" | "error">;
@@ -162,6 +165,7 @@ export function bundleNewEvents(input: {
 
   for (const event of sorted) {
     if (isPositiveLiveKind(event.kind)) {
+      if (input.now - event.at > LIVE_EVENT_FRESH_MS) continue;
       window.push({ kind: event.kind, at: event.at });
       newcomers[event.kind].push(event);
       continue;

@@ -1,14 +1,13 @@
 import { withoutAdmins } from "@/lib/admin/exclude-admins";
 import { excludedIdSet, withoutExcludedAccounts } from "@/lib/admin/exclude-accounts";
+import { londonYmd, shiftActivityYmd } from "@/lib/admin/activity-day";
 import {
   emptyActivityMix,
   filterActivityMix,
   type ActivityMix,
 } from "@/lib/admin/activity-mix";
-import { fillDailySeries } from "@/lib/admin/feed-monitor";
 import {
   compareTrailingWindows,
-  dailyCountsFromEpochs,
   lastDays,
   rankShare,
   shareSlices,
@@ -102,11 +101,26 @@ function deskLabel(row: ActivityChartRow): string {
   return row.email ?? row.clerkUserId;
 }
 
+function fillLondonDailySeries(
+  rows: DayCount[],
+  days: number,
+  now: Date
+): DayCount[] {
+  const byDay = new Map(rows.map((row) => [row.day, row.used]));
+  const today = londonYmd(now);
+  const series: DayCount[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = shiftActivityYmd(today, -i);
+    series.push({ day, used: byDay.get(day) ?? 0 });
+  }
+  return series;
+}
+
 export function emptyActivityDaily(now: Date = new Date()): ActivityDaily {
   return {
-    bets: fillDailySeries([], SERIES_COMPARE_DAYS, now),
-    offers: fillDailySeries([], SERIES_COMPARE_DAYS, now),
-    casino: fillDailySeries([], SERIES_COMPARE_DAYS, now),
+    bets: fillLondonDailySeries([], SERIES_COMPARE_DAYS, now),
+    offers: fillLondonDailySeries([], SERIES_COMPARE_DAYS, now),
+    casino: fillLondonDailySeries([], SERIES_COMPARE_DAYS, now),
   };
 }
 
@@ -124,7 +138,17 @@ function stampsToDaily(
   const epochs = skipIds
     ? stamps.filter((stamp) => !skipIds.has(stamp.clerkUserId)).map((stamp) => stamp.at)
     : stamps.map((stamp) => stamp.at);
-  return dailyCountsFromEpochs(epochs, SERIES_COMPARE_DAYS, now);
+  const byDay = new Map<string, number>();
+  for (const ms of epochs) {
+    if (!Number.isFinite(ms) || ms <= 0) continue;
+    const day = londonYmd(new Date(ms));
+    byDay.set(day, (byDay.get(day) ?? 0) + 1);
+  }
+  return fillLondonDailySeries(
+    [...byDay.entries()].map(([day, used]) => ({ day, used })),
+    SERIES_COMPARE_DAYS,
+    now
+  );
 }
 
 function filterStamps(
@@ -211,6 +235,17 @@ export function activityEventsFromStamps(
   }
   events.sort((a, b) => a.at - b.at || a.id - b.id);
   return events;
+}
+
+/** Events that fall inside a Liveline window. `windowSecs <= 0` means all. */
+export function activityEventsInWindow(
+  events: ActivityEvent[],
+  windowSecs: number,
+  nowSec: number
+): ActivityEvent[] {
+  if (windowSecs <= 0) return events;
+  const leftMs = (nowSec - windowSecs) * 1000;
+  return events.filter((event) => event.at >= leftMs);
 }
 
 export function filterActivityEvents(

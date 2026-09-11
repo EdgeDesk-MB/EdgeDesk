@@ -314,23 +314,21 @@ export async function loadActivityOverview(): Promise<ActivityOverview> {
 
   try {
     const cutoff = now.getTime() - SERIES_COMPARE_DAYS * 24 * 60 * 60 * 1000;
-    const [
-      betMap,
-      offerMap,
-      casinoMap,
-      betStamps,
-      offerStamps,
-      casinoStamps,
-      mix,
-    ] = await Promise.all([
-      countsByUser(bets.clerkUserId, bets),
-      countsByUser(offers.clerkUserId, offers),
-      countsByUser(casinoOffers.clerkUserId, casinoOffers),
-      createdStampsSince(bets, cutoff),
-      createdStampsSince(offers, cutoff),
-      createdStampsSince(casinoOffers, cutoff),
-      queryActivityMix(),
-    ]);
+    const [betMap, offerMap, casinoMap, betStamps, offerStamps, casinoStamps] =
+      await Promise.all([
+        countsByUser(bets.clerkUserId, bets),
+        countsByUser(offers.clerkUserId, offers),
+        countsByUser(casinoOffers.clerkUserId, casinoOffers),
+        createdStampsSince(bets, cutoff),
+        createdStampsSince(offers, cutoff),
+        createdStampsSince(casinoOffers, cutoff),
+      ]);
+    let mix = emptyActivityMix();
+    try {
+      mix = await queryActivityMix();
+    } catch {
+      // Lifetime mix is secondary. Keep stamps so the graph still paints.
+    }
     return {
       available: true,
       note: "Counts only. Category mix is that day's created rows, not another desk's bets, wallets, or P&L.",

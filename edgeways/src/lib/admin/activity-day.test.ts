@@ -5,6 +5,7 @@ import {
   isFutureActivityDay,
   londonDayRangeMs,
   londonYmd,
+  latestActivityYmd,
   resolveActivityMixDay,
   shiftActivityYmd,
 } from "@/lib/admin/activity-day";
@@ -51,6 +52,14 @@ describe("activity mix day", () => {
       start: Date.parse("2026-09-06T23:00:00.000Z"),
       endExclusive: Date.parse("2026-09-07T23:00:00.000Z"),
     });
+  });
+
+  it("opens on the latest London day that has volume", () => {
+    const now = new Date("2026-09-11T08:30:00Z");
+    expect(
+      latestActivityYmd([Date.parse("2026-09-10T17:26:00Z")], now)
+    ).toBe("2026-09-10");
+    expect(latestActivityYmd([], now)).toBe("2026-09-11");
   });
 
   it("bounds a London winter day in UTC", () => {
