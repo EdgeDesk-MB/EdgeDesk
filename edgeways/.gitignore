@@ -17,10 +17,14 @@
 /coverage
 
 # next.js
+/.next
 /.next/
 /.next.nosync
 /.next.evicted.nosync
 /out/
+
+# local visual-qa / agent screenshots
+/artifacts/
 
 # production
 /build
