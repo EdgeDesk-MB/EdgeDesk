@@ -7,11 +7,7 @@
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import type { FootballCompetitionCatalogEntry } from "@/lib/events/fixture-scope";
 import type { FootballLineupPlayer, FootballLineups } from "@/lib/events/lineups";
-import {
-  standingTapeGoals,
-  type MatchTapeEvent,
-  type MatchTapeKind,
-} from "@/lib/events/match-tape";
+import type { MatchTapeEvent, MatchTapeKind } from "@/lib/events/match-tape";
 import { feedHorizonDates, localCalendarDate, wallClockKickoffMs } from "@/lib/events";
 import { LIVE_TTL_MS } from "@/lib/live-poll-rules";
 
@@ -518,7 +514,6 @@ function mapTapeEvent(e: any, homeTeamName: string): MatchTapeEvent | null {
   if (e.player?.name) event.player = String(e.player.name);
   if (e.assist?.name) event.assist = String(e.assist.name);
   if (e.detail) event.detail = String(e.detail);
-  if (e.comments) event.comments = String(e.comments);
   if (e.detail === "Own Goal") event.og = true;
   return event;
 }
@@ -550,7 +545,9 @@ export async function fixtureGoalEvents(
   homeTeamName: string
 ): Promise<FixtureGoal[]> {
   const tape = await fixtureMatchEvents(externalId, homeTeamName);
-  return standingTapeGoals(tape).map((e) => ({
+  return tape
+    .filter((e) => e.kind === "goal")
+    .map((e) => ({
       minute: e.minute,
       side: e.side,
       player: e.player,
