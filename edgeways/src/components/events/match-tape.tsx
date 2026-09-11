@@ -57,6 +57,8 @@ import {
 import {
   cardCaption,
   cardTone,
+  disallowedGoalIndexes,
+  isGoalCancelVar,
   formatTapeDetail,
   formatTapeMinute,
   formatTapeScore,
@@ -64,11 +66,17 @@ import {
   groupTapeByPeriod,
   parseMatchTape,
   periodEndScore,
+  preferPublishedScore,
   tapeRunningScores,
   TAPE_PERIOD_LABEL,
+  varCaption,
   type MatchTapeEvent,
   type TapeScore,
 } from "@/lib/events/match-tape";
+import {
+  MATCH_VIEW_TAPE_POLL_MS,
+  matchViewShouldPollTape,
+} from "@/lib/live-poll-rules";
 import { formatClockTime } from "@/lib/time-format";
 import {
   captionHeading,
@@ -190,12 +198,14 @@ function playerLabel(
 
 function tapeRowLabel(
   event: MatchTapeEvent,
-  teams: { homeTeam: string; awayTeam: string }
+  teams: { homeTeam: string; awayTeam: string },
+  disallowed = false
 ): string {
   const clock = formatTapeMinute(event);
   const who = playerLabel(event, teams);
   switch (event.kind) {
     case "goal": {
+      if (disallowed) return `Disallowed goal, ${who}, ${clock}`;
       const extra = goalCaption(event);
       return extra ? `Goal, ${who} (${extra}), ${clock}` : `Goal, ${who}, ${clock}`;
     }
@@ -206,7 +216,7 @@ function tapeRowLabel(
         ? `Substitution, ${event.assist} on for ${who}, ${clock}`
         : `Substitution, ${who}, ${clock}`;
     case "var":
-      return `${formatTapeDetail(event.detail) ?? "VAR"}, ${clock}`;
+      return `${varCaption(event)}, ${clock}`;
     default:
       return `${formatTapeDetail(event.detail) ?? who}, ${clock}`;
   }
@@ -217,11 +227,13 @@ function EventCopy({
   teams,
   score,
   align,
+  disallowed = false,
 }: {
   event: MatchTapeEvent;
   teams: { homeTeam: string; awayTeam: string };
   score?: TapeScore;
   align: "home" | "away";
+  disallowed?: boolean;
 }) {
   const away = align === "away";
   const clock = (
@@ -232,7 +244,12 @@ function EventCopy({
   const glyph = <TapeGlyph event={event} />;
   const scoreMark =
     event.kind === "goal" && score ? (
-      <span className="shrink-0 tabular-nums text-muted-foreground">
+      <span
+        className={cn(
+          "shrink-0 tabular-nums text-muted-foreground",
+          disallowed && "line-through"
+        )}
+      >
         {formatTapeScore(score)}
       </span>
     ) : null;
@@ -257,12 +274,21 @@ function EventCopy({
   } else {
     const caption =
       event.kind === "goal"
-        ? goalCaption(event)
+        ? disallowed
+          ? "Disallowed"
+          : goalCaption(event)
         : event.kind === "card"
           ? cardCaption(event.detail)
-          : formatTapeDetail(event.detail);
+          : event.kind === "var"
+            ? varCaption(event)
+            : formatTapeDetail(event.detail);
     const who = (
-      <span className="font-medium text-foreground">
+      <span
+        className={cn(
+          "font-medium",
+          disallowed ? "text-muted-foreground line-through" : "text-foreground"
+        )}
+      >
         {playerLabel(event, teams)}
       </span>
     );
@@ -348,8 +374,7 @@ function MatchScoreDigit({
     >
       <NumberFlow
         value={value}
-        trend={1}
-        {...(scored ? scoreGoalTimings : minuteFlowTimings)}
+        {...(scored ? { trend: 1 as const, ...scoreGoalTimings } : minuteFlowTimings)}
         format={{ useGrouping: false, maximumFractionDigits: 0 }}
         className="tabular-nums bg-transparent! [&_*]:bg-transparent!"
       />
@@ -713,6 +738,7 @@ function MatchTimeline({ event }: { event: FootballTapeDialogEvent }) {
   const groups = groupTapeByPeriod(tape);
   const flat = groups.flatMap((group) => group.events);
   const running = tapeRunningScores(flat);
+  const cancelled = disallowedGoalIndexes(flat);
   const runningByKey = new Map<MatchTapeEvent, TapeScore>();
   flat.forEach((row, i) => {
     runningByKey.set(row, running[i]!);
@@ -748,10 +774,13 @@ function MatchTimeline({ event }: { event: FootballTapeDialogEvent }) {
                 </p>
               </div>
               <ol className={cn("min-w-0", listRowGroup)}>
-                {group.events.map((row, i) => (
+                {group.events.map((row, i) => {
+                  const flatIndex = flat.indexOf(row);
+                  const disallowed = cancelled.has(flatIndex);
+                  return (
                   <li
                     key={`${row.kind}-${row.minute}-${row.extra ?? 0}-${i}`}
-                    aria-label={tapeRowLabel(row, event)}
+                    aria-label={tapeRowLabel(row, event, disallowed)}
                     className={cn(
                       listRow,
                       deskTableBodyCell,
@@ -765,9 +794,11 @@ function MatchTimeline({ event }: { event: FootballTapeDialogEvent }) {
                       teams={event}
                       score={runningByKey.get(row)}
                       align={row.side === "away" ? "away" : "home"}
+                      disallowed={disallowed}
                     />
                   </li>
-                ))}
+                  );
+                })}
               </ol>
             </section>
           );
@@ -912,6 +943,19 @@ function tapeFreezeKey(event: FootballTapeDialogEvent): string {
   return `${event.id ?? ""}:${event.externalId ?? ""}:${event.startTime ?? ""}:${event.homeTeam}:${event.awayTeam}`;
 }
 
+type MatchTapePayload = {
+  goals: string | null;
+  lineups: string | null;
+  homeScore?: number;
+  awayScore?: number;
+  minute?: number | null;
+  period?: string | null;
+  status?: string;
+  matchEnding?: string | null;
+  htHomeScore?: number | null;
+  htAwayScore?: number | null;
+};
+
 export function FootballLiveTapeDialog({
   event,
   open,
@@ -941,6 +985,9 @@ export function FootballLiveTapeDialog({
   const [frozen, setFrozen] = useState(event);
   const [hydratedGoals, setHydratedGoals] = useState<string | null>(null);
   const [hydratedLineups, setHydratedLineups] = useState<string | null>(null);
+  const [livePatch, setLivePatch] = useState<Partial<FootballTapeDialogEvent> | null>(
+    null
+  );
   const [tapeLoad, setTapeLoad] = useState<
     "idle" | "loading" | "ready" | "empty" | "error"
   >(() => (parseMatchTape(event.goals).length > 0 ? "ready" : "idle"));
@@ -956,16 +1003,29 @@ export function FootballLiveTapeDialog({
     setFrozen(event);
   }
   const base = open && incomingKey !== frozenKey ? event : frozen;
+  const tapeForScore = parseMatchTape(hydratedGoals ?? event.goals ?? base.goals);
+  const tapeScore = tapeForScore.length
+    ? tapeRunningScores(tapeForScore).at(-1)
+    : undefined;
+  const tapeHasGoalCancel = tapeForScore.some(isGoalCancelVar);
   const view = {
     ...base,
-    homeScore: event.homeScore ?? base.homeScore,
-    awayScore: event.awayScore ?? base.awayScore,
-    status: event.status ?? base.status,
-    minute: event.minute ?? base.minute,
-    period: event.period ?? base.period,
-    matchEnding: event.matchEnding ?? base.matchEnding,
-    htHomeScore: event.htHomeScore ?? base.htHomeScore,
-    htAwayScore: event.htAwayScore ?? base.htAwayScore,
+    homeScore: preferPublishedScore(
+      livePatch?.homeScore ?? event.homeScore ?? base.homeScore,
+      tapeScore?.home,
+      { tapeHasGoalCancel }
+    ),
+    awayScore: preferPublishedScore(
+      livePatch?.awayScore ?? event.awayScore ?? base.awayScore,
+      tapeScore?.away,
+      { tapeHasGoalCancel }
+    ),
+    status: livePatch?.status ?? event.status ?? base.status,
+    minute: livePatch?.minute ?? event.minute ?? base.minute,
+    period: livePatch?.period ?? event.period ?? base.period,
+    matchEnding: livePatch?.matchEnding ?? event.matchEnding ?? base.matchEnding,
+    htHomeScore: livePatch?.htHomeScore ?? event.htHomeScore ?? base.htHomeScore,
+    htAwayScore: livePatch?.htAwayScore ?? event.htAwayScore ?? base.htAwayScore,
     goals: hydratedGoals ?? event.goals ?? base.goals,
     lineups: hydratedLineups ?? event.lineups ?? base.lineups,
     goalSeed: event.goalSeed,
@@ -1012,8 +1072,11 @@ export function FootballLiveTapeDialog({
 
   useEffect(() => {
     if (!open) setFrozen(event);
-    else setTapeTab("commentary");
-  }, [open, event, incomingKey]);
+  }, [open, event]);
+
+  useEffect(() => {
+    if (open) setTapeTab("commentary");
+  }, [open, incomingKey]);
 
   useEffect(() => {
     if (!open || !showTwoupScout) {
@@ -1077,14 +1140,15 @@ export function FootballLiveTapeDialog({
     if (!open) {
       setHydratedGoals(null);
       setHydratedLineups(null);
+      setLivePatch(null);
       setTapeLoad(parseMatchTape(event.goals).length > 0 ? "ready" : "idle");
       return;
     }
     if (event.lineups) setHydratedLineups(event.lineups);
-    if (parseMatchTape(event.goals).length > 0) {
+    const storedTape = parseMatchTape(event.goals);
+    if (storedTape.length > 0) {
       setHydratedGoals(event.goals ?? null);
       setTapeLoad("ready");
-      return;
     }
     const id = event.id;
     const externalId = event.externalId?.trim() ?? "";
@@ -1095,31 +1159,69 @@ export function FootballLiveTapeDialog({
           ? `/api/fixtures/tape?externalId=${encodeURIComponent(externalId)}&home=${encodeURIComponent(event.homeTeam)}`
           : null;
     if (!tapeUrl) {
-      setTapeLoad("empty");
+      if (storedTape.length === 0) setTapeLoad("empty");
       return;
     }
+    const status = effectiveEventStatus({
+      status: event.status ?? "upcoming",
+      source: event.source,
+      startTime: event.startTime,
+      sport: event.sport,
+    });
+    const shouldPoll = matchViewShouldPollTape(status, event.startTime);
     let cancelled = false;
-    setTapeLoad("loading");
-    api<{ goals: string | null; lineups: string | null }>(tapeUrl)
-      .then((res) => {
-        if (cancelled) return;
-        const next = res.goals ?? null;
-        setHydratedGoals(next);
-        if (res.lineups) setHydratedLineups(res.lineups);
-        setTapeLoad(parseMatchTape(next).length > 0 ? "ready" : "empty");
-      })
-      .catch(() => {
-        if (!cancelled) setTapeLoad("error");
+
+    function applyTape(res: MatchTapePayload) {
+      const next = res.goals ?? null;
+      setHydratedGoals(next);
+      if (res.lineups) setHydratedLineups(res.lineups);
+      setLivePatch({
+        homeScore: res.homeScore,
+        awayScore: res.awayScore,
+        minute: res.minute,
+        period: res.period,
+        status: res.status,
+        matchEnding: res.matchEnding,
+        htHomeScore: res.htHomeScore,
+        htAwayScore: res.htAwayScore,
       });
+      setTapeLoad(parseMatchTape(next).length > 0 ? "ready" : "empty");
+    }
+
+    async function load(refresh: boolean) {
+      const sep = tapeUrl!.includes("?") ? "&" : "?";
+      const url = refresh ? `${tapeUrl}${sep}refresh=1` : tapeUrl!;
+      const res = await api<MatchTapePayload>(url);
+      if (!cancelled) applyTape(res);
+    }
+
+    if (storedTape.length === 0) setTapeLoad("loading");
+    void load(shouldPoll || storedTape.length === 0).catch(() => {
+      if (!cancelled && storedTape.length === 0) setTapeLoad("error");
+    });
+
+    if (!shouldPoll) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = window.setInterval(() => {
+      void load(true).catch(() => {});
+    }, MATCH_VIEW_TAPE_POLL_MS);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, [
     open,
     event.id,
     event.externalId,
     event.homeTeam,
-    event.goals,
+    event.status,
+    event.startTime,
+    event.source,
+    event.sport,
     incomingKey,
     tapeRetry,
   ]);

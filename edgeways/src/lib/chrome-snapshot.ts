@@ -58,7 +58,10 @@ export function parseChromeSnapshot(raw: string | null): ChromeSnapshot | null {
 export function readChromeSnapshot(): ChromeSnapshot | null {
   if (typeof window === "undefined") return null;
   try {
-    return parseChromeSnapshot(sessionStorage.getItem(CHROME_SNAPSHOT_KEY));
+    return parseChromeSnapshot(
+      sessionStorage.getItem(CHROME_SNAPSHOT_KEY) ??
+        localStorage.getItem(CHROME_SNAPSHOT_KEY)
+    );
   } catch {
     return null;
   }
@@ -66,12 +69,15 @@ export function readChromeSnapshot(): ChromeSnapshot | null {
 
 export function writeChromeSnapshot(state: AppState) {
   if (typeof window === "undefined") return;
+  const raw = JSON.stringify(chromeFromState(state));
   try {
-    sessionStorage.setItem(
-      CHROME_SNAPSHOT_KEY,
-      JSON.stringify(chromeFromState(state))
-    );
+    sessionStorage.setItem(CHROME_SNAPSHOT_KEY, raw);
   } catch {
     /* private mode / quota */
+  }
+  try {
+    localStorage.setItem(CHROME_SNAPSHOT_KEY, raw);
+  } catch {
+    /* quota: session copy is enough for this tab */
   }
 }

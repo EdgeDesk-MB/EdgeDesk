@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   cardCaption,
+  disallowedGoalIndexes,
   formatTapeDetail,
   formatTapeLine,
   formatTapeMinute,
   groupTapeByPeriod,
   parseMatchTape,
   periodEndScore,
+  preferPublishedScore,
   tapeGoals,
   tapePeriodId,
   tapeRunningScores,
+  varCaption,
 } from "./match-tape";
 
 const teams = { homeTeam: "Arsenal", awayTeam: "Liverpool" };
@@ -77,6 +80,22 @@ describe("tapeGoals", () => {
       { minute: 55, side: "away", player: "Foden", og: true },
     ]);
   });
+
+  it("drops a goal later cancelled by VAR", () => {
+    const raw = JSON.stringify([
+      { kind: "goal", minute: 35, side: "home", player: "Ayaosi" },
+      {
+        kind: "var",
+        minute: 38,
+        side: "home",
+        player: "Ayaosi",
+        detail: "Goal cancelled",
+        comments: "Offside",
+      },
+    ]);
+    expect(tapeGoals(raw)).toEqual([]);
+    expect(disallowedGoalIndexes(parseMatchTape(raw))).toEqual(new Set([0]));
+  });
 });
 
 describe("formatTapeLine", () => {
@@ -122,10 +141,67 @@ describe("tapeRunningScores", () => {
       { home: 1, away: 1 },
     ]);
   });
+
+  it("takes the score back after VAR cancels a goal", () => {
+    const events = [
+      { kind: "goal" as const, minute: 35, side: "home" as const, player: "Ayaosi" },
+      {
+        kind: "var" as const,
+        minute: 38,
+        side: "home" as const,
+        player: "Ayaosi",
+        detail: "Goal cancelled",
+        comments: "Offside",
+      },
+    ];
+    expect(tapeRunningScores(events)).toEqual([
+      { home: 1, away: 0 },
+      { home: 0, away: 0 },
+    ]);
+  });
+
+  it("cancels only the latest goal on that side", () => {
+    const events = [
+      { kind: "goal" as const, minute: 12, side: "home" as const, player: "One" },
+      { kind: "goal" as const, minute: 40, side: "home" as const, player: "Two" },
+      {
+        kind: "var" as const,
+        minute: 42,
+        side: "home" as const,
+        detail: "Goal cancelled",
+      },
+    ];
+    expect(tapeRunningScores(events).at(-1)).toEqual({ home: 1, away: 0 });
+    expect(tapeGoals(JSON.stringify(events))).toEqual([
+      { minute: 12, side: "home", player: "One" },
+    ]);
+  });
+});
+
+describe("preferPublishedScore", () => {
+  it("keeps the official score when the tape is still ahead", () => {
+    expect(preferPublishedScore(0, 1)).toBe(0);
+    expect(preferPublishedScore(undefined, 1)).toBe(1);
+    expect(preferPublishedScore(2, 1)).toBe(2);
+  });
+
+  it("follows the tape when VAR has already taken the goal off", () => {
+    expect(preferPublishedScore(1, 0, { tapeHasGoalCancel: true })).toBe(0);
+  });
 });
 
 describe("formatTapeDetail", () => {
   it("sentence-cases feed captions and keeps mapped labels", () => {
+    expect(formatTapeDetail("Goal cancelled")).toBe("Goal cancelled");
+    expect(
+      varCaption({
+        kind: "var",
+        minute: 38,
+        side: "home",
+        detail: "Goal cancelled",
+        comments: "Offside",
+      })
+    ).toBe("Goal cancelled · Offside");
     expect(formatTapeDetail("Penalty")).toBe("Penalty");
     expect(formatTapeDetail("Penalty - Saved")).toBe("Penalty - saved");
     expect(formatTapeDetail("Yellow Card")).toBeUndefined();

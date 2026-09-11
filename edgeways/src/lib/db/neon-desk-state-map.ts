@@ -41,7 +41,7 @@ import type { AppState } from "@/lib/services/state.types";
 import { dedupeHistoryForDisplay } from "@/lib/history-feed-display";
 
 /** Same window as local `getHistoryFeed({ limit: 40 })` on Home. */
-const HOME_HISTORY_LIMIT = 40;
+export const HOME_HISTORY_LIMIT = 40;
 
 export type NeonDeskSnapshot = {
   bets: BetRow[];

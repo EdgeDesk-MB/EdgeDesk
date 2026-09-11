@@ -21,7 +21,8 @@ export const GET = withDeskScope(async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const event = await ensureEventMatchTape(eventId);
+  const refresh = req.nextUrl.searchParams.get("refresh") === "1";
+  const event = await ensureEventMatchTape(eventId, { refresh });
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json({
@@ -29,5 +30,13 @@ export const GET = withDeskScope(async function GET(
     goals: event.goals,
     lineups: event.lineups,
     tapeFetchedAt: event.tapeFetchedAt ?? null,
+    homeScore: event.homeScore,
+    awayScore: event.awayScore,
+    minute: event.minute,
+    period: event.period,
+    status: event.status,
+    matchEnding: event.matchEnding,
+    htHomeScore: event.htHomeScore,
+    htAwayScore: event.htAwayScore,
   });
 });

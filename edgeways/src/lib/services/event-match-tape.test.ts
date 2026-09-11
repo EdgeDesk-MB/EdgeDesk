@@ -97,4 +97,68 @@ describe("hydrateMatchTapeOnEvent", () => {
     ).rejects.toThrow("budget");
     expect(persist).not.toHaveBeenCalled();
   });
+
+  it("refetches a live tape even when one is already stored", async () => {
+    const nextTape: MatchTapeEvent[] = [
+      ...tape,
+      { kind: "card", minute: 54, side: "home", player: "Hackett", detail: "Yellow Card" },
+    ];
+    const persist = vi.fn(async (patch: { goals: string; tapeFetchedAt: number }) =>
+      event({
+        status: "live",
+        startTime: NOW - 60 * 60 * 1000,
+        goals: patch.goals,
+        tapeFetchedAt: patch.tapeFetchedAt,
+      })
+    );
+    const result = await hydrateMatchTapeOnEvent(
+      event({
+        status: "live",
+        startTime: NOW - 60 * 60 * 1000,
+        goals: JSON.stringify(tape),
+        tapeFetchedAt: NOW - 60_000,
+      }),
+      persist,
+      {
+        fetchTape: async () => nextTape,
+        refresh: true,
+        now: () => NOW,
+      }
+    );
+    expect(result.fetched).toBe(true);
+    expect(persist).toHaveBeenCalledWith({
+      goals: JSON.stringify(nextTape),
+      tapeFetchedAt: NOW,
+    });
+  });
+
+  it("does not refresh a finished match that already has a tape", async () => {
+    const fetchTape = vi.fn();
+    const persist = vi.fn();
+    const existing = event({ goals: JSON.stringify(tape) });
+    const result = await hydrateMatchTapeOnEvent(existing, persist, {
+      fetchTape,
+      refresh: true,
+      now: () => NOW,
+    });
+    expect(result.fetched).toBe(false);
+    expect(fetchTape).not.toHaveBeenCalled();
+  });
+
+  it("keeps the stored tape when a live refresh returns empty", async () => {
+    const persist = vi.fn();
+    const existing = event({
+      status: "live",
+      startTime: NOW - 60 * 60 * 1000,
+      goals: JSON.stringify(tape),
+    });
+    const result = await hydrateMatchTapeOnEvent(existing, persist, {
+      fetchTape: async () => [],
+      refresh: true,
+      now: () => NOW,
+    });
+    expect(result.fetched).toBe(true);
+    expect(result.event).toBe(existing);
+    expect(persist).not.toHaveBeenCalled();
+  });
 });

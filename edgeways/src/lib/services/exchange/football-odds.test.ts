@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { footballOddsTimeWindow } from "./football-odds";
+import { footballOddsCatalogueTextQuery, footballOddsTimeWindow } from "./football-odds";
 import {
   betfairBookTrading,
   extractFootballOdds,
@@ -215,5 +215,12 @@ describe("footballOddsTimeWindow", () => {
       from: "2026-08-22T12:00:00.000Z",
       to: "2026-08-22T16:00:00.000Z",
     });
+  });
+});
+
+describe("footballOddsCatalogueTextQuery", () => {
+  it("uses a distinctive home-team token", () => {
+    expect(footballOddsCatalogueTextQuery("Manchester United")).toBe("manchester");
+    expect(footballOddsCatalogueTextQuery("Slavia Praha")).toBe("slavia");
   });
 });

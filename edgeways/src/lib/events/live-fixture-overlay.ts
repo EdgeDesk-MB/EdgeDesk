@@ -20,7 +20,7 @@ function goals(row: LiveScoreFields): number {
   return (row.homeScore ?? 0) + (row.awayScore ?? 0);
 }
 
-/** Prefer the row that has actually moved on. Never replace 2-1 with 0-0. */
+/** Prefer the row that has actually moved on. Keep a real score over a stale 0-0 peek. */
 export function preferFresherLiveScore<T extends LiveScoreFields>(
   current: T,
   incoming: T
@@ -35,7 +35,21 @@ export function preferFresherLiveScore<T extends LiveScoreFields>(
   if (incoming.status === "finished" && current.status !== "finished") return incoming;
   const currentGoals = goals(current);
   const incomingGoals = goals(incoming);
-  if (incomingGoals !== currentGoals) return incomingGoals > currentGoals ? incoming : current;
+  if (incomingGoals !== currentGoals) {
+    if (incomingGoals > currentGoals) return incoming;
+    const currentMinute = current.minute ?? 0;
+    const incomingMinute = incoming.minute ?? 0;
+    // VAR / disallowed: accept a live drop once the clock has moved on.
+    // A stale 0-0 peek (earlier minute) must not wipe a real score.
+    if (
+      incoming.status === "live" &&
+      incomingMinute > 0 &&
+      incomingMinute >= currentMinute
+    ) {
+      return incoming;
+    }
+    return current;
+  }
   const currentMinute = current.minute ?? 0;
   const incomingMinute = incoming.minute ?? 0;
   if (incomingMinute !== currentMinute) {

@@ -76,6 +76,7 @@ import {
   useOfferEdgeRaceCount,
   useRacingOfferEdgeKey,
 } from "@/hooks/use-offer-edge-race-count";
+import { prefetchDeskPageApis } from "@/lib/prefetch-desk-pages";
 
 type NavIcon = ComponentType<{ className?: string }>;
 
@@ -108,6 +109,10 @@ type NavGroup = {
   feature?: FeatureFlag;
   quickAction?: "newOffer" | "casinoLog";
 };
+
+function prefetchNavHref(href: string) {
+  prefetchDeskPageApis(href);
+}
 
 function groupMatchPrefixes(group: NavGroup): string[] {
   return group.matchPrefixes ?? [group.baseHref];
@@ -639,6 +644,8 @@ export function AppNav() {
         <Link
           href={href}
           prefetch
+          onPointerEnter={() => prefetchNavHref(item.href)}
+          onFocus={() => prefetchNavHref(item.href)}
           className={cn(navLinkState(active), quickAction && !locked && "pr-10")}
         >
           <Icon
@@ -723,6 +730,8 @@ export function AppNav() {
           <Link
             href={firstChildHref}
             prefetch
+            onPointerEnter={() => prefetchNavHref(firstChildHref)}
+            onFocus={() => prefetchNavHref(firstChildHref)}
             onClick={onParentClick}
             className={cn(navLinkState(parentActive), onQuickAction && !locked && "pr-10")}
             aria-expanded={expanded}
@@ -771,6 +780,8 @@ export function AppNav() {
                   key={child.href}
                   href={child.href}
                   prefetch
+                  onPointerEnter={() => prefetchNavHref(child.href)}
+                  onFocus={() => prefetchNavHref(child.href)}
                   className={cn(navLinkState(active), "py-1.5 pl-9 text-[13px]")}
                   tabIndex={expanded ? undefined : -1}
                 >

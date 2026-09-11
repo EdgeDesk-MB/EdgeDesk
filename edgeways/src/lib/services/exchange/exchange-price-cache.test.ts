@@ -352,6 +352,26 @@ describe("football odds cache", () => {
     expect(result.stale).toBeUndefined();
   });
 
+  it("retries with a team text query when the window catalogue misses the fixture", async () => {
+    const betfair = fakeBetfair({
+      catalogue: (body) => {
+        const filter = body.filter as { textQuery?: string };
+        return filter.textQuery ? matchOdds : [];
+      },
+      book: () => book(3.2),
+    });
+    vi.stubGlobal("fetch", betfair.fetch);
+    const { fetchBetfairFootballOdds } = await import("./football-odds");
+
+    const result = await fetchBetfairFootballOdds(query);
+    expect(result.status).toBe("live");
+    expect(result.odds.homeBack).toBe(3.2);
+    expect(betfair.calls.listMarketCatalogue).toBe(2);
+    expect(betfair.bodies.listMarketCatalogue[1]?.filter).toEqual(
+      expect.objectContaining({ textQuery: "everton" })
+    );
+  });
+
   it("never shares a catalogue entry between two kick-off windows", async () => {
     const betfair = setup();
     const { fetchBetfairFootballOdds } = await import("./football-odds");

@@ -37,4 +37,17 @@ describe("cachedGet", () => {
     await cachedGet("/z", fetcher, 60_000);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+
+  it("returns a stale hit immediately and refreshes behind it", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn(async () => ({ n: fetcher.mock.calls.length }));
+    const first = await cachedGet("/stale", fetcher, 1_000);
+    expect(first).toEqual({ n: 1 });
+    await vi.advanceTimersByTimeAsync(1_001);
+    const second = await cachedGet("/stale", fetcher, 1_000);
+    expect(second).toEqual({ n: 1 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
 });

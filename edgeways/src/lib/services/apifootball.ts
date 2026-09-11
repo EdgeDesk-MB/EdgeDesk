@@ -614,18 +614,23 @@ export async function fixturesByIds(ids: string[]): Promise<Fixture[]> {
   const unique = [...new Set(ids.filter(Boolean))];
   const liveById = new Map((await liveFixtures()).map((f) => [f.externalId, f]));
   const out: Fixture[] = [];
+  const missing: string[] = [];
   for (const id of unique) {
     const live = liveById.get(id);
-    if (live) {
-      out.push(live);
-      continue;
-    }
-    try {
-      const fixture = await fixtureById(id);
-      if (fixture) out.push(fixture);
-    } catch {
-      // skip - next poll retries
-    }
+    if (live) out.push(live);
+    else missing.push(id);
+  }
+  const fetched = await Promise.all(
+    missing.map(async (id) => {
+      try {
+        return await fixtureById(id);
+      } catch {
+        return null;
+      }
+    })
+  );
+  for (const fixture of fetched) {
+    if (fixture) out.push(fixture);
   }
   return out;
 }

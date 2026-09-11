@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { localCalendarDate } from "@/lib/events";
 import {
+  pickScoutOddsRefreshTargets,
   pickTwoupScoutFixtures,
   pickTwoupScoutWarmFixtures,
 } from "./twoup-scout-fixtures";
@@ -95,6 +96,25 @@ describe("pickTwoupScoutFixtures", () => {
       2
     );
     expect(picked.map((f) => f.homeTeam)).toEqual(["Today A", "Tomorrow A"]);
+  });
+
+  it("refreshes every missing pin before a few stale ones", () => {
+    const picked = pickScoutOddsRefreshTargets(
+      [
+        { key: "stale-early" },
+        { key: "fresh" },
+        { key: "missing-a" },
+        { key: "stale-late" },
+        { key: "missing-b" },
+      ],
+      (key) => {
+        if (key.startsWith("missing")) return "missing";
+        if (key.startsWith("stale")) return "stale";
+        return "fresh";
+      },
+      1
+    );
+    expect(picked.map((row) => row.key)).toEqual(["missing-a", "missing-b", "stale-early"]);
   });
 
   it("does not cap when cap is null", () => {

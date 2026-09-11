@@ -48,6 +48,15 @@ describe("scoreFootballEvent", () => {
     expect(scoreFootballEvent("Everton vs Crystal Palace", "Everton", "Palace")).toBeGreaterThanOrEqual(120);
   });
 
+  it("matches Slavia Praha and Lens against Betfair shorts", () => {
+    expect(
+      scoreFootballEvent("SK Slavia Prague v Lens", "Slavia Praha", "Lens")
+    ).toBeGreaterThanOrEqual(120);
+    expect(
+      scoreFootballEvent("Man Utd v Atalanta", "Manchester United", "Atalanta")
+    ).toBeGreaterThanOrEqual(120);
+  });
+
   it("matches Man Utd v Nottm Forest against full names", () => {
     expect(
       scoreFootballEvent("Man Utd v Nottm Forest", "Manchester United", "Nottingham Forest")

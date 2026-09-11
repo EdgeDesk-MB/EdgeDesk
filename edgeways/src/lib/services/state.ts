@@ -158,11 +158,9 @@ import { sendPush } from "@/lib/services/push";
 import { fireDueUserReminders } from "@/lib/services/user-reminders";
 import {
   footballEventPatch,
-  isFootballLivePollCandidate,
+  selectFootballSyncEvents,
 } from "@/lib/services/feed-sync-rules";
 import {
-  needsResultBackfill,
-  needsTapeBackfill,
   shouldFetchGoalTimeline,
   shouldFetchLineups,
 } from "@/lib/live-poll-rules";
@@ -244,44 +242,50 @@ async function refreshApiEvents(): Promise<void> {
     .where(eq(events.source, "api"))
     .all();
 
-  const apiEvents = allApiRows.filter((e) => isFootballLivePollCandidate(e, now));
-
-  // Matches that missed their live window (budget ran dry, desk was closed)
-  // get one cheap result fetch instead of freezing at the last polled minute.
-  const backfillEvents = allApiRows.filter(
-    (e) =>
-      (needsResultBackfill(e, now) || needsTapeBackfill(e, now)) &&
-      !backfillAttempted.has(e.id)
+  const { poll, backfill } = selectFootballSyncEvents(
+    allApiRows,
+    now,
+    backfillAttempted
   );
-  for (const e of backfillEvents) backfillAttempted.add(e.id);
-
-  if (apiEvents.length === 0 && backfillEvents.length === 0) return;
-  apiEvents.push(...backfillEvents);
+  for (const e of backfill) backfillAttempted.add(e.id);
+  const apiEvents = [...poll, ...backfill];
+  if (apiEvents.length === 0) return;
 
   try {
     const fixtures = await fixturesByIds(apiEvents.map((e) => e.externalId!));
+    const tapeLater = new Map<
+      number,
+      { event: (typeof apiEvents)[number]; fixture: (typeof fixtures)[number] }
+    >();
     for (const event of apiEvents) {
       const fixture = fixtures.find((f) => f.externalId === event.externalId);
       if (!fixture) continue;
       let goals = event.goals;
       let tapeFetchedAt = event.tapeFetchedAt ?? null;
-      if (shouldFetchGoalTimeline(event, fixture, now)) {
+      // Score / period / empty tape stay on the snapshot path so first-goal
+      // triggers can settle. Cards and the 30s refresh wait until after().
+      if (shouldFetchGoalTimeline(event, fixture, now, "critical")) {
         try {
           goals = JSON.stringify(await fixtureMatchEvents(event.externalId!, fixture.homeTeam));
           tapeFetchedAt = now;
         } catch {
           // keep the previous timeline; the next poll retries
         }
+      } else if (shouldFetchGoalTimeline(event, fixture, now, "live")) {
+        tapeLater.set(event.id, { event, fixture });
       }
 
       let lineups = event.lineups ?? null;
-      if (shouldFetchLineups(event, fixture, now)) {
+      const wantLineups = shouldFetchLineups(event, fixture, now);
+      if (wantLineups && fixture.status === "finished") {
         try {
           const xi = await fixtureLineups(event.externalId!);
           if (xi) lineups = JSON.stringify(xi);
         } catch {
           // keep the previous XI
         }
+      } else if (wantLineups) {
+        tapeLater.set(event.id, { event, fixture });
       }
 
       db.update(events)
@@ -294,6 +298,52 @@ async function refreshApiEvents(): Promise<void> {
         )
         .where(eq(events.id, event.id))
         .run();
+    }
+
+    if (tapeLater.size > 0) {
+      const work = async () => {
+        for (const { event, fixture } of tapeLater.values()) {
+          const latest = db.select().from(events).where(eq(events.id, event.id)).get();
+          if (!latest) continue;
+          let goals = latest.goals;
+          let tapeFetchedAt = latest.tapeFetchedAt ?? null;
+          if (shouldFetchGoalTimeline(latest, fixture, Date.now(), "live")) {
+            try {
+              goals = JSON.stringify(
+                await fixtureMatchEvents(latest.externalId!, fixture.homeTeam)
+              );
+              tapeFetchedAt = Date.now();
+            } catch {
+              continue;
+            }
+          }
+          let lineups = latest.lineups ?? null;
+          if (shouldFetchLineups(latest, fixture, Date.now())) {
+            try {
+              const xi = await fixtureLineups(latest.externalId!);
+              if (xi) lineups = JSON.stringify(xi);
+            } catch {
+              // keep the previous XI
+            }
+          }
+          db.update(events)
+            .set(
+              footballEventPatch(latest, fixture, goals, {
+                lineups,
+                tapeFetchedAt,
+                now: Date.now(),
+              })
+            )
+            .where(eq(events.id, latest.id))
+            .run();
+        }
+      };
+      try {
+        const { after } = await import("next/server");
+        after(work);
+      } catch {
+        await work();
+      }
     }
   } catch {
     // API hiccups must never break the dashboard; scores just refresh next poll

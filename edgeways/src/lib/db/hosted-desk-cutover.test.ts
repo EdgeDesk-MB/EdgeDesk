@@ -213,9 +213,23 @@ describe("hosted desk cutover", () => {
     expect(neonSettings).toMatch(/deskSettings: JSON\.stringify\(next\)/);
   });
 
+  it("serves hosted Home with ETag revalidation", () => {
+    const stateRoute = routeSource("state/route.ts");
+    expect(stateRoute).toMatch(/slimAppStateForWire/);
+    expect(stateRoute).toMatch(/etagForJsonBody/);
+    expect(stateRoute).toMatch(/304/);
+  });
+
   it("builds Home from Neon when the hosted desk flag is on", () => {
     expect(appStateSource).toMatch(/isNeonDesk\(\)/);
     expect(appStateSource).toMatch(/buildNeonDeskAppState/);
+  });
+
+  it("does not block the hosted Home snapshot on sequential housekeeping", () => {
+    expect(stateSource).toMatch(/scheduleHostedDeskHousekeeping/);
+    expect(stateSource).toMatch(/listNeonEventsByIds/);
+    expect(stateSource).toMatch(/HOME_HISTORY_LIMIT/);
+    expect(stateSource).toMatch(/after\(/);
   });
 
   it("narrates hosted History goals onto Neon, not SQLite", () => {

@@ -62,6 +62,11 @@ const TEAM_CANONICAL: Record<string, string> = {
   "club atletico de madrid": "atletico madrid",
   "bayern munich": "bayern",
   "bayern munchen": "bayern",
+  "slavia praha": "slavia prague",
+  "sk slavia prague": "slavia prague",
+  "sk slavia praha": "slavia prague",
+  "rc lens": "lens",
+  "lensois": "lens",
   "sporting lisbon": "sporting",
   "sporting cp": "sporting",
   "athletic bilbao": "athletic",
@@ -81,7 +86,8 @@ export function normalizeFootballTeam(name: string): string {
     .replace(/&/g, " and ")
     .replace(/[''`´]/g, "")
     .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\b(fc|afc|cfc|sc|cf|women|ladies)\b/g, " ")
+    .replace(/\b(fc|afc|cfc|sc|cf|sk|fk|as|ac|rc|ud|cd|women|ladies)\b/g, " ")
+    .replace(/\bpraha\b/g, "prague")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -27,6 +27,24 @@ describe("preferFresherLiveScore", () => {
     ).toMatchObject({ homeScore: 2, awayScore: 1 });
   });
 
+  it("keeps a live score over a stale earlier 0-0 peek", () => {
+    expect(
+      preferFresherLiveScore(
+        row({ homeScore: 1, awayScore: 0, minute: 35 }),
+        row({ homeScore: 0, awayScore: 0, minute: 7 })
+      )
+    ).toMatchObject({ homeScore: 1, awayScore: 0, minute: 35 });
+  });
+
+  it("accepts a live drop when the clock has moved on", () => {
+    expect(
+      preferFresherLiveScore(
+        row({ homeScore: 1, awayScore: 0, minute: 35 }),
+        row({ homeScore: 0, awayScore: 0, minute: 39 })
+      )
+    ).toMatchObject({ homeScore: 0, awayScore: 0, minute: 39 });
+  });
+
   it("does not regress a finished score to live", () => {
     expect(
       preferFresherLiveScore(

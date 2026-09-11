@@ -51,7 +51,8 @@ export function shouldFetchGoalTimeline(
     awayScore: number;
     period?: string | null;
   },
-  now = Date.now()
+  now = Date.now(),
+  mode: "live" | "critical" = "live"
 ): boolean {
   if (fixture.status === "upcoming") return false;
   const scoreChanged =
@@ -59,11 +60,13 @@ export function shouldFetchGoalTimeline(
   const periodChanged =
     fixture.period != null && fixture.period !== (event.period ?? null);
   const noTimelineYet = !event.goals || event.goals === "[]";
+  if (scoreChanged || periodChanged || noTimelineYet) return true;
+  if (mode === "critical") return false;
   const stale =
     fixture.status === "live" &&
     event.tapeFetchedAt != null &&
     now - event.tapeFetchedAt >= TAPE_REFRESH_MS;
-  return scoreChanged || periodChanged || noTimelineYet || stale;
+  return stale;
 }
 
 export function shouldFetchLineups(

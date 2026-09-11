@@ -21,6 +21,8 @@ export interface MatchTapeEvent {
   player?: string;
   assist?: string;
   detail?: string;
+  /** Provider VAR reason (`Offside`, `Foul`, …). */
+  comments?: string;
   og?: boolean;
 }
 
@@ -93,9 +95,11 @@ export function parseMatchTape(raw: string | null | undefined): MatchTapeEvent[]
     const player = asOptionalString(row.player);
     const assist = asOptionalString(row.assist);
     const detail = asOptionalString(row.detail);
+    const comments = asOptionalString(row.comments);
     if (player) event.player = player;
     if (assist) event.assist = assist;
     if (detail) event.detail = detail;
+    if (comments) event.comments = comments;
     const extra = asOptionalExtra(row.extra);
     if (extra != null) event.extra = extra;
     if (row.og === true) event.og = true;
@@ -104,16 +108,82 @@ export function parseMatchTape(raw: string | null | undefined): MatchTapeEvent[]
   return out;
 }
 
-/** Goals only, in trigger-engine shape. Cards / subs / VAR are dropped. */
+/** VAR rows that take a goal off the board. Penalty reviews do not. */
+export function isGoalCancelVar(event: Pick<MatchTapeEvent, "kind" | "detail">): boolean {
+  if (event.kind !== "var") return false;
+  const detail = (event.detail ?? "").toLowerCase();
+  if (detail.includes("penalty")) return false;
+  return (
+    detail.includes("goal cancelled") ||
+    detail.includes("goal canceled") ||
+    detail.includes("goal disallowed")
+  );
+}
+
+/**
+ * Indexes of `kind: "goal"` rows later cancelled by VAR.
+ * Matches the latest still-standing goal on that side.
+ */
+export function disallowedGoalIndexes(events: MatchTapeEvent[]): Set<number> {
+  const open: { index: number; side: Side }[] = [];
+  const cancelled = new Set<number>();
+  events.forEach((event, index) => {
+    if (event.kind === "goal") {
+      open.push({ index, side: event.side });
+      return;
+    }
+    if (!isGoalCancelVar(event)) return;
+    let found = -1;
+    for (let i = open.length - 1; i >= 0; i--) {
+      if (open[i]!.side === event.side) {
+        found = i;
+        break;
+      }
+    }
+    if (found < 0) return;
+    cancelled.add(open[found]!.index);
+    open.splice(found, 1);
+  });
+  return cancelled;
+}
+
+function toGoalEvent(event: MatchTapeEvent): GoalEvent {
+  const goal: GoalEvent = { minute: event.minute, side: event.side };
+  if (event.player) goal.player = event.player;
+  if (event.og) goal.og = true;
+  return goal;
+}
+
+/** Standing goals only. Cards, subs, VAR, and cancelled goals are dropped. */
 export function tapeGoals(raw: string | null | undefined): GoalEvent[] {
-  return parseMatchTape(raw)
-    .filter((event) => event.kind === "goal")
-    .map((event) => {
-      const goal: GoalEvent = { minute: event.minute, side: event.side };
-      if (event.player) goal.player = event.player;
-      if (event.og) goal.og = true;
-      return goal;
-    });
+  return standingTapeGoals(parseMatchTape(raw)).map(toGoalEvent);
+}
+
+/** Goal rows that still count after VAR cancellations. */
+export function standingTapeGoals(events: MatchTapeEvent[]): MatchTapeEvent[] {
+  const cancelled = disallowedGoalIndexes(events);
+  return events.filter((event, index) => event.kind === "goal" && !cancelled.has(index));
+}
+
+/**
+ * Official fixture score wins when both exist, so a cancelled goal still on
+ * the tape cannot hold the board at 1–0. If VAR has already taken a goal off
+ * the tape and the fixture score has not dropped yet, follow the tape.
+ */
+export function preferPublishedScore(
+  published: number | undefined,
+  fromTape: number | undefined,
+  opts?: { tapeHasGoalCancel?: boolean }
+): number | undefined {
+  if (published == null) return fromTape;
+  if (
+    opts?.tapeHasGoalCancel &&
+    fromTape != null &&
+    fromTape < published
+  ) {
+    return fromTape;
+  }
+  return published;
 }
 
 /** Regulation minute, stripping added time when `extra` is present. */
@@ -165,14 +235,23 @@ export function formatTapeScore(score: TapeScore): string {
   return `${score.home}–${score.away}`;
 }
 
-/** Running score after each row. Only `kind: "goal"` increments. */
+/** Running score after each row. Goals increment; VAR goal-cancelled decrements. */
 export function tapeRunningScores(events: MatchTapeEvent[]): TapeScore[] {
+  const open: Side[] = [];
   let home = 0;
   let away = 0;
   return events.map((event) => {
     if (event.kind === "goal") {
       if (event.side === "home") home += 1;
       else away += 1;
+      open.push(event.side);
+    } else if (isGoalCancelVar(event)) {
+      const found = open.lastIndexOf(event.side);
+      if (found >= 0) {
+        open.splice(found, 1);
+        if (event.side === "home") home = Math.max(0, home - 1);
+        else away = Math.max(0, away - 1);
+      }
     }
     return { home, away };
   });
@@ -223,6 +302,9 @@ const DETAIL_LABEL: Record<string, string> = {
   "missed penalty": "Missed penalty",
   "own goal": "Own goal",
   penalty: "Penalty",
+  "goal cancelled": "Goal cancelled",
+  "goal canceled": "Goal cancelled",
+  "goal disallowed": "Goal disallowed",
 };
 
 function sentenceCaseFallback(detail: string): string {
@@ -243,6 +325,15 @@ export function goalCaption(event: MatchTapeEvent): string | undefined {
   const detail = formatTapeDetail(event.detail);
   if (detail) return detail;
   return event.assist;
+}
+
+export function varCaption(event: MatchTapeEvent): string {
+  const detail = formatTapeDetail(event.detail) ?? "VAR";
+  const reason = formatTapeDetail(event.comments);
+  if (reason && reason.toLowerCase() !== detail.toLowerCase()) {
+    return `${detail} · ${reason}`;
+  }
+  return detail;
 }
 
 export function cardTone(
@@ -278,7 +369,7 @@ export function formatTapeLine(
         ? `${event.assist} on for ${who} ${clock}`
         : `${who} ${clock} · Sub`;
     case "var":
-      return `${event.detail ?? "VAR"} ${clock}`;
+      return `${varCaption(event)} ${clock}`;
     default:
       return event.detail ? `${event.detail} ${clock}` : `${who} ${clock}`;
   }

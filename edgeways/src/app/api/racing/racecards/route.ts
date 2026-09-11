@@ -9,6 +9,7 @@ import { getRacecardsForDate, getRacecardsForHorizon } from "@/lib/services/race
 import { withRacingCardResult } from "@/lib/events/racing-card-result";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { STORE_FIRST_CACHE } from "@/lib/services/app-state-wire";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +27,17 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   if (denied) return denied;
 
   if (!hasRacingApiKey()) {
-    return NextResponse.json({
-      source: "demo",
-      racecards: dateParam
-        ? demoRacecards(date)
-        : dates.flatMap((day) => demoRacecards(day)),
-      date,
-      dates,
-    });
+    return NextResponse.json(
+      {
+        source: "demo",
+        racecards: dateParam
+          ? demoRacecards(date)
+          : dates.flatMap((day) => demoRacecards(day)),
+        date,
+        dates,
+      },
+      { headers: { "Cache-Control": STORE_FIRST_CACHE } }
+    );
   }
 
   try {
@@ -49,13 +53,16 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
       withRacingCardResult(card, results.get(card.externalId))
     );
 
-    return NextResponse.json({
-      source: "racing-api",
-      oddsTier,
-      racecards: enriched,
-      date,
-      dates,
-    });
+    return NextResponse.json(
+      {
+        source: "racing-api",
+        oddsTier,
+        racecards: enriched,
+        date,
+        dates,
+      },
+      { headers: { "Cache-Control": STORE_FIRST_CACHE } }
+    );
   } catch (error) {
     // D8: never name the data provider in a client-facing error.
     console.error("[racecards] racing feed failed:", error);

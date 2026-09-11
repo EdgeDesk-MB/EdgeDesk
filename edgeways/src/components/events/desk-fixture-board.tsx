@@ -438,8 +438,7 @@ function TapeScoreFigure({
     >
       <NumberFlow
         value={value}
-        trend={1}
-        {...(scored ? tapeFigureGoalTimings : tapeFigureRestTimings)}
+        {...(scored ? { trend: 1 as const, ...tapeFigureGoalTimings } : tapeFigureRestTimings)}
         format={{ useGrouping: false, maximumFractionDigits: 0 }}
         className="translate-y-[-1px] tabular-nums leading-none"
       />

@@ -41,6 +41,17 @@ describe("shouldFetchGoalTimeline", () => {
     ).toBe(true);
   });
 
+  it("keeps a stale live tape off the desk snapshot path", () => {
+    expect(
+      shouldFetchGoalTimeline(
+        { ...event, tapeFetchedAt: NOW - TAPE_REFRESH_MS },
+        { status: "live", homeScore: 1, awayScore: 0 },
+        NOW,
+        "critical"
+      )
+    ).toBe(false);
+  });
+
   it("fetches when the period flips (HT / FT) even if the score is unchanged", () => {
     expect(
       shouldFetchGoalTimeline(

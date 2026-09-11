@@ -2,6 +2,8 @@ import { footballScopeId } from "@/lib/events/fixture-scope";
 import { localCalendarDate } from "@/lib/events";
 
 export const TWOUP_SCOUT_WARM_CAP = 40;
+/** Stale-but-present prices can wait; missing pinned rows must not. */
+export const SCOUT_ODDS_STALE_ENQUEUE_CAP = 6;
 
 export type TwoupScoutFixture = {
   homeTeam: string;
@@ -54,4 +56,25 @@ export function pickTwoupScoutWarmFixtures<T extends TwoupScoutFixture>(
     ...todayPick,
     ...pickTwoupScoutFixtures(later, scopeIds, now, remaining),
   ];
+}
+
+export type ScoutOddsFreshness = "fresh" | "stale" | "missing";
+
+/**
+ * Page-load refresh: every pinned row with no store price, then a few stale
+ * ones. Earlier kick-offs must not starve later 20:00 pins.
+ */
+export function pickScoutOddsRefreshTargets<T extends { key: string }>(
+  items: T[],
+  freshness: (key: string) => ScoutOddsFreshness,
+  staleCap: number = SCOUT_ODDS_STALE_ENQUEUE_CAP
+): T[] {
+  const missing: T[] = [];
+  const stale: T[] = [];
+  for (const item of items) {
+    const state = freshness(item.key);
+    if (state === "missing") missing.push(item);
+    else if (state === "stale") stale.push(item);
+  }
+  return [...missing, ...stale.slice(0, Math.max(0, staleCap))];
 }

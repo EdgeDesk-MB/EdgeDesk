@@ -15,6 +15,19 @@ import {
   obsoleteScoreHistoryDedupes,
 } from "@/lib/history-event-rows";
 
+export async function listNeonDeskHistoryKeysForEvents(
+  eventIds: number[],
+  clerkUserId = neonDeskClerkUserId()
+): Promise<Array<Pick<HistoryRow, "eventId" | "dedupe">>> {
+  if (!clerkUserId || eventIds.length === 0) return [];
+  return getNeonDb()
+    .select({ eventId: pgHistory.eventId, dedupe: pgHistory.dedupe })
+    .from(pgHistory)
+    .where(
+      and(eq(pgHistory.clerkUserId, clerkUserId), inArray(pgHistory.eventId, eventIds))
+    );
+}
+
 export async function listNeonDeskHistory(limit = 500): Promise<HistoryRow[]> {
   const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return [];
@@ -80,7 +93,7 @@ export async function upsertNeonDeskHistory(
 /** Write kick-off / goal / 2UP / full-time rows for this login's desk events. */
 export async function syncNeonDeskEventHistory(
   events: EventRow[],
-  existing: HistoryRow[] = [],
+  existing: Array<Pick<HistoryRow, "eventId" | "dedupe">> = [],
   clerkUserId = neonDeskClerkUserId()
 ): Promise<void> {
   if (!clerkUserId) return;

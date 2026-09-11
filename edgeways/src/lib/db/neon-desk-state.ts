@@ -18,11 +18,19 @@ import {
   listNeonDeskAccounts,
   listNeonDeskBalanceTransactions,
 } from "@/lib/db/neon-desk-accounts";
-import { listNeonDeskHistory, syncNeonDeskEventHistory } from "@/lib/db/neon-desk-history";
+import {
+  listNeonDeskHistory,
+  listNeonDeskHistoryKeysForEvents,
+  syncNeonDeskEventHistory,
+} from "@/lib/db/neon-desk-history";
 import { getNeonDeskSettings } from "@/lib/db/neon-desk-settings";
-import { listNeonEvents } from "@/lib/db/neon-events";
+import { listNeonEventsByIds } from "@/lib/db/neon-events";
 import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
-import { filterEventsForDesk } from "@/lib/events/desk-tracked-events";
+import { getDeskActor, runWithDeskActor } from "@/lib/db/desk-scope";
+import {
+  deskVisibleEventIds,
+  filterEventsForDesk,
+} from "@/lib/events/desk-tracked-events";
 import {
   listNeonInboxDedupes,
   unreadNeonCount,
@@ -40,7 +48,10 @@ import { runNeonDeskLiveness } from "@/lib/db/neon-desk-liveness";
 import { syncNeonOfferStatuses } from "@/lib/db/neon-desk-offer-liveness";
 import { syncNeonOfferSeriesInstances } from "@/lib/db/neon-desk-offer-series";
 import { syncNeonCasinoOfferSeriesInstances } from "@/lib/db/neon-desk-casino-series";
-import { appStateFromNeonDesk } from "@/lib/db/neon-desk-state-map";
+import {
+  HOME_HISTORY_LIMIT,
+  appStateFromNeonDesk,
+} from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
 import {
@@ -54,40 +65,22 @@ export {
   appStateFromNeonDesk,
 } from "@/lib/db/neon-desk-state-map";
 
-export async function buildNeonDeskAppState(): Promise<AppState> {
-  let [bets, feedEvents, followedIds, offers, accounts, transactions, history, casinoOffers, settings, apiUsage, alertsUnread, deliveredAlertKeys] =
-    await Promise.all([
-      listNeonDeskBets(),
-      listNeonEvents().catch(() => []),
-      listNeonDeskTrackedEventIds().catch(() => []),
-      listNeonDeskOffers(),
-      listNeonDeskAccounts(),
-      listNeonDeskBalanceTransactions(),
-      listNeonDeskHistory(),
-      listNeonDeskCasinoOffers(),
-      getNeonDeskSettings(),
-      apiUsageTodayAsync(),
-      // EDGE-110: the badge and the watcher's durable seen-set come from the
-      // per-user Neon inbox. Fail soft: an inbox hiccup must not 500 Home.
-      unreadNeonCount().catch(() => 0),
-      listNeonInboxDedupes().catch(() => []),
-      // Every hosted dashboard poll is a chance to advance the shared feed.
-      // Taking the lease is one cheap query alongside the snapshot reads; the
-      // sync itself is handed to `after()`, so the response is never blocked.
-      maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
-    ]);
-  const events = filterEventsForDesk(feedEvents, followedIds, bets);
+const HOUSEKEEPING_MIN_MS = 20_000;
+let lastHousekeepingAt = 0;
+
+async function runHostedDeskHousekeeping(input: {
+  events: Awaited<ReturnType<typeof listNeonEventsByIds>>;
+  bets: Awaited<ReturnType<typeof listNeonDeskBets>>;
+  transactions: Awaited<ReturnType<typeof listNeonDeskBalanceTransactions>>;
+}): Promise<void> {
   try {
-    await syncNeonDeskEventHistory(events, history);
-    history = await listNeonDeskHistory();
+    const keys = await listNeonDeskHistoryKeysForEvents(input.events.map((e) => e.id));
+    await syncNeonDeskEventHistory(input.events, keys);
   } catch {
     // Commentary backfill is best-effort; settlements still render.
   }
   try {
-    const resolved = await runNeonDeskLiveness(events);
-    if (resolved > 0) {
-      bets = await listNeonDeskBets();
-    }
+    await runNeonDeskLiveness(input.events);
   } catch {
     // Auto-result and lay-due alerts are best-effort; the snapshot still renders.
   }
@@ -98,45 +91,18 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     // Recurrence materialise is best-effort; the snapshot still renders.
   }
   try {
-    const statusChanged = await syncNeonOfferStatuses();
-    if (statusChanged > 0) {
-      const [nextOffers, nextBets] = await Promise.all([
-        listNeonDeskOffers(),
-        listNeonDeskBets(),
-      ]);
-      offers = nextOffers;
-      bets = nextBets;
-    }
+    await syncNeonOfferStatuses();
   } catch {
     // Offer status tick is best-effort; the snapshot still renders.
   }
   try {
-    const healed = await healNeonDeskLedgers(bets);
-    if (healed > 0) {
-      const [nextBets, nextAccounts, nextTxs] = await Promise.all([
-        listNeonDeskBets(),
-        listNeonDeskAccounts(),
-        listNeonDeskBalanceTransactions(),
-      ]);
-      bets = nextBets;
-      accounts = nextAccounts;
-      transactions = nextTxs;
-    }
+    await healNeonDeskLedgers(input.bets);
   } catch {
     // Heal is best-effort; the snapshot still renders.
   }
   try {
-    const awarded =
-      (await awardNeonUnconditionalFreeBetsDue(bets, transactions)) +
-      (await awardNeonPlaceFreeBetsDue(bets, events, transactions));
-    if (awarded > 0) {
-      const [nextTxs, nextHistory] = await Promise.all([
-        listNeonDeskBalanceTransactions(),
-        listNeonDeskHistory(),
-      ]);
-      transactions = nextTxs;
-      history = nextHistory;
-    }
+    await awardNeonUnconditionalFreeBetsDue(input.bets, input.transactions);
+    await awardNeonPlaceFreeBetsDue(input.bets, input.events, input.transactions);
   } catch {
     // Award is best-effort; the snapshot still renders.
   }
@@ -150,15 +116,76 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
   } catch {
     // Digest is best-effort; the snapshot still renders.
   }
-  const [effortMeasured, mugPlanRows, boostsOpen, accaBundles, systemBundles, bbBundles] =
-    await Promise.all([
-      neonEffortMeasured().catch(() => ({})),
-      listNeonMugPlansForState().catch(() => []),
-      countNeonBoostsNeedingAction().catch(() => 0),
-      listNeonAccaRuns().catch(() => []),
-      listNeonSystemRuns().catch(() => []),
-      listNeonBetBuilderRuns().catch(() => []),
-    ]);
+}
+
+async function scheduleHostedDeskHousekeeping(
+  work: () => Promise<void>
+): Promise<void> {
+  const now = Date.now();
+  if (now - lastHousekeepingAt < HOUSEKEEPING_MIN_MS) return;
+  lastHousekeepingAt = now;
+  const actor = getDeskActor();
+  const run = () => runWithDeskActor(actor, work);
+  try {
+    const { after } = await import("next/server");
+    after(() => {
+      void run();
+    });
+  } catch {
+    await run();
+  }
+}
+
+export async function buildNeonDeskAppState(): Promise<AppState> {
+  const [
+    bets,
+    followedIds,
+    offers,
+    accounts,
+    transactions,
+    history,
+    casinoOffers,
+    settings,
+    apiUsage,
+    alertsUnread,
+    deliveredAlertKeys,
+    effortMeasured,
+    mugPlanRows,
+    boostsOpen,
+    accaBundles,
+    systemBundles,
+    bbBundles,
+  ] = await Promise.all([
+    listNeonDeskBets(),
+    listNeonDeskTrackedEventIds().catch(() => []),
+    listNeonDeskOffers(),
+    listNeonDeskAccounts(),
+    listNeonDeskBalanceTransactions(),
+    listNeonDeskHistory(HOME_HISTORY_LIMIT),
+    listNeonDeskCasinoOffers(),
+    getNeonDeskSettings(),
+    apiUsageTodayAsync(),
+    // EDGE-110: the badge and the watcher's durable seen-set come from the
+    // per-user Neon inbox. Fail soft: an inbox hiccup must not 500 Home.
+    unreadNeonCount().catch(() => 0),
+    listNeonInboxDedupes().catch(() => []),
+    neonEffortMeasured().catch(() => ({})),
+    listNeonMugPlansForState().catch(() => []),
+    countNeonBoostsNeedingAction().catch(() => 0),
+    listNeonAccaRuns().catch(() => []),
+    listNeonSystemRuns().catch(() => []),
+    listNeonBetBuilderRuns().catch(() => []),
+    // Every hosted dashboard poll is a chance to advance the shared feed.
+    // Taking the lease is one cheap query alongside the snapshot reads; the
+    // sync itself is handed to `after()`, so the response is never blocked.
+    maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
+  ]);
+  const eventIds = [...deskVisibleEventIds(followedIds, bets)];
+  const feedEvents = await listNeonEventsByIds(eventIds).catch(() => []);
+  const events = filterEventsForDesk(feedEvents, followedIds, bets);
+  await scheduleHostedDeskHousekeeping(() =>
+    runHostedDeskHousekeeping({ events, bets, transactions })
+  );
   const snapshot = appStateFromNeonDesk({
     bets,
     events,

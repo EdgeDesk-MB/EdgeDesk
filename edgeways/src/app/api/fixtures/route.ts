@@ -10,6 +10,7 @@ import { peekFootballCompetitionCatalog } from "@/lib/services/football-competit
 import { getFixturesForDate, getFixturesForHorizon } from "@/lib/services/fixture-store";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { lockedFeedResponse } from "@/lib/entitlements/feed-guard";
+import { STORE_FIRST_CACHE } from "@/lib/services/app-state-wire";
 
 export const dynamic = "force-dynamic";
 
@@ -40,13 +41,16 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
   if (locked) return locked;
 
   if (!hasApiKey()) {
-    return NextResponse.json({
-      source: "demo",
-      fixtures: demoList,
-      competitions: demoCompetitions(),
-      date,
-      dates,
-    });
+    return NextResponse.json(
+      {
+        source: "demo",
+        fixtures: demoList,
+        competitions: demoCompetitions(),
+        date,
+        dates,
+      },
+      { headers: { "Cache-Control": STORE_FIRST_CACHE } }
+    );
   }
 
   try {
@@ -56,7 +60,10 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
         : getFixturesForHorizon(),
       peekFootballCompetitionCatalog(),
     ]);
-    return NextResponse.json({ source: "feed", fixtures, competitions, date, dates });
+    return NextResponse.json(
+      { source: "feed", fixtures, competitions, date, dates },
+      { headers: { "Cache-Control": STORE_FIRST_CACHE } }
+    );
   } catch (error) {
     // Free tier often returns HTTP 200 + errors.requests when capped -
     // fall back to demo so Fixtures / EP Desk handoff still works.

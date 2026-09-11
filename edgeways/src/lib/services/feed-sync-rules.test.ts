@@ -103,6 +103,21 @@ describe("selectFootballSyncEvents", () => {
     expect(selectFootballSyncEvents([filled], NOW, new Set()).backfill).toEqual([]);
   });
 
+  it("caps missed-window backfill so one poll cannot walk a weekend", () => {
+    const stale = Array.from({ length: 8 }, (_, i) =>
+      event({
+        id: 20 + i,
+        externalId: String(200 + i),
+        status: "finished",
+        startTime: NOW - 24 * 60 * 60 * 1000,
+        goals: null,
+      })
+    );
+    const { backfill } = selectFootballSyncEvents(stale, NOW, new Set());
+    expect(backfill).toHaveLength(3);
+    expect(backfill.map((e) => e.id)).toEqual([20, 21, 22]);
+  });
+
   it("never lists an event as both a poll and a backfill", () => {
     const live = event({ id: 1 });
     const { poll, backfill } = selectFootballSyncEvents([live], NOW, new Set());

@@ -72,8 +72,16 @@ function emptyResult(
   };
 }
 
+export function footballOddsCatalogueTextQuery(homeTeam: string): string {
+  return (
+    canonicalizeTeam(homeTeam).split(" ").find((part) => part.length >= 4) ??
+    homeTeam.trim()
+  );
+}
+
 async function listMatchOddsCatalogues(
-  query: FootballOddsQuery
+  query: FootballOddsQuery,
+  textQuery?: string
 ): Promise<{ markets: FootballCatalogueMarket[]; stale: boolean }> {
   const window = footballOddsTimeWindow(query.startTime);
   const filter: Record<string, unknown> = {
@@ -81,24 +89,17 @@ async function listMatchOddsCatalogues(
     marketTypeCodes: ["MATCH_ODDS"],
     marketStartTime: window,
   };
+  if (textQuery) filter.textQuery = textQuery;
   const windowKey = `${window.from}|${window.to}`;
+  const cacheKey = textQuery ? `mo:${windowKey}|q=${textQuery}` : `mo:${windowKey}`;
   try {
-    const read = await cachedFetch(catalogueCache, `mo:${windowKey}`, CATALOGUE_TTL_MS, () =>
-      betfairListMarketCatalogue(filter, { maxResults: 200 })
+    const read = await cachedFetch(catalogueCache, cacheKey, CATALOGUE_TTL_MS, () =>
+      betfairListMarketCatalogue(filter, { maxResults: textQuery ? 80 : 1000 })
     );
     return { markets: read.data, stale: read.stale };
   } catch (error) {
-    if (!String(error).includes("TOO_MUCH_DATA")) throw error;
-    const token =
-      canonicalizeTeam(query.homeTeam).split(" ").find((part) => part.length >= 4) ??
-      query.homeTeam;
-    const read = await cachedFetch(
-      catalogueCache,
-      `mo:${windowKey}|q=${token}`,
-      CATALOGUE_TTL_MS,
-      () => betfairListMarketCatalogue({ ...filter, textQuery: token }, { maxResults: 80 })
-    );
-    return { markets: read.data, stale: read.stale };
+    if (textQuery || !String(error).includes("TOO_MUCH_DATA")) throw error;
+    return listMatchOddsCatalogues(query, footballOddsCatalogueTextQuery(query.homeTeam));
   }
 }
 
@@ -134,9 +135,16 @@ export async function fetchBetfairFootballOdds(
   const feedType = betfairFeedType();
 
   try {
-    const catalogue = await listMatchOddsCatalogues({ homeTeam, awayTeam, startTime: query.startTime });
+    const lookup = { homeTeam, awayTeam, startTime: query.startTime };
+    const catalogue = await listMatchOddsCatalogues(lookup);
     let stale = catalogue.stale;
-    const picked = pickFootballMatchOddsMarket(catalogue.markets, { homeTeam, awayTeam, startTime: query.startTime });
+    let picked = pickFootballMatchOddsMarket(catalogue.markets, lookup);
+    if (!picked) {
+      const token = footballOddsCatalogueTextQuery(homeTeam);
+      const narrowed = await listMatchOddsCatalogues(lookup, token);
+      if (narrowed.stale) stale = true;
+      picked = pickFootballMatchOddsMarket(narrowed.markets, lookup);
+    }
     if (!picked) {
       return emptyResult("unmatched", "No matching exchange market", { feedType });
     }

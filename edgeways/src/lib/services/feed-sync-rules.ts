@@ -53,6 +53,9 @@ export function isFootballLivePollCandidate(
   return stillWatchingAfterWhistle(event, now);
 }
 
+/** Missed-window catch-up per sync. Live poll candidates are uncapped. */
+export const MAX_FOOTBALL_BACKFILL_PER_RUN = 3;
+
 /**
  * Which football events this poll should fetch. Same split as the local path:
  * the live window, one cheap result backfill for matches that never
@@ -90,7 +93,12 @@ export function selectFootballSyncEvents<
       needsTapeBackfill(e, now) &&
       !backfillAttempted.has(e.id)
   );
-  return { poll, backfill: [...resultBackfill, ...tapeBackfill] };
+  // Result first, then empty-tape catch-up. Cap so one desk poll cannot
+  // walk three days of missed matches as sequential provider calls.
+  return {
+    poll,
+    backfill: [...resultBackfill, ...tapeBackfill].slice(0, MAX_FOOTBALL_BACKFILL_PER_RUN),
+  };
 }
 
 /**

@@ -19,7 +19,7 @@ import {
 import { settledResultAlertCopy } from "@/lib/alerts/rules";
 import { getNeonDb } from "@/lib/db/neon";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
-import { listNeonEvents } from "@/lib/db/neon-events";
+import { listNeonEventsByIds } from "@/lib/db/neon-events";
 import {
   alertsInbox as pgAlertsInbox,
   bets as pgBets,
@@ -199,7 +199,7 @@ export async function pruneNeonOrphanConditionAlerts(): Promise<number> {
           .from(pgOffers)
           .where(and(eq(pgOffers.clerkUserId, clerkUserId), inArray(pgOffers.id, offerIds)))
       : Promise.resolve([]),
-    eventIds.length > 0 ? listNeonEvents().catch(() => []) : Promise.resolve([]),
+    eventIds.length > 0 ? listNeonEventsByIds(eventIds).catch(() => []) : Promise.resolve([]),
   ]);
   const gone = orphanConditionDedupes(
     subjects.map((row) => row.dedupe),

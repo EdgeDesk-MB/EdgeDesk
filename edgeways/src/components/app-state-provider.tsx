@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { OfferSummary } from "@/lib/services/offers.types";
@@ -18,6 +19,11 @@ import { setDisplayTimeFormat } from "@/lib/time-format";
 import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import { buildPublicDemoState } from "@/lib/demo/public-fixture";
 import { writeChromeSnapshot } from "@/lib/chrome-snapshot";
+import {
+  readDeskSnapshot,
+  subscribeDeskSnapshot,
+  writeDeskSnapshot,
+} from "@/lib/desk-snapshot";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { localCalendarDate } from "@/lib/events";
 import { jsonSnapshotUnchanged } from "@/lib/services/app-state-snapshot";
@@ -63,13 +69,20 @@ function settingsHoldCovered(
 /** One poll loop for the whole app - avoids N duplicate /api/state fetches per page. */
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const publicDemo = usePublicDemo();
-  const [state, setState] = useState<AppState | null>(() =>
+  const cached = useSyncExternalStore(
+    subscribeDeskSnapshot,
+    readDeskSnapshot,
+    () => null
+  );
+  const [live, setLive] = useState<AppState | null>(() =>
     publicDemo.active ? buildPublicDemoState(publicDemo.view) : null
   );
+  const state = publicDemo.active ? live : live ?? cached;
   const [error, setError] = useState<string | null>(null);
   const [pauseCount, setPauseCount] = useState(0);
   const inFlight = useRef<Promise<void> | null>(null);
   const inFlightStartedAt = useRef(0);
+  const stateEtag = useRef<string | null>(null);
   /** Bumped on user refresh / local patches so a slower poll cannot clobber newer state. */
   const pollGen = useRef(0);
   /** Hide / saved keys stay until /api/state echoes them, so a poll cannot flash them back. */
@@ -85,7 +98,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   ) {
     setPrevDemo({ active: publicDemo.active, view: publicDemo.view });
     if (publicDemo.active) {
-      setState(buildPublicDemoState(publicDemo.view));
+      setLive(buildPublicDemoState(publicDemo.view));
       setError(null);
     }
   }
@@ -98,9 +111,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [publicDemo.active, publicDemo.view]);
 
   useEffect(() => {
-    if (!state || publicDemo.active) return;
-    writeChromeSnapshot(state);
-  }, [state, publicDemo.active]);
+    if (!live || publicDemo.active) return;
+    writeChromeSnapshot(live);
+    writeDeskSnapshot(live);
+  }, [live, publicDemo.active]);
 
   const pauseCountRef = useRef(0);
   pauseCountRef.current = pauseCount;
@@ -112,7 +126,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (publicDemo.active) {
         const next = buildPublicDemoState(publicDemo.view);
         setDisplayTimeFormat(next.settings.timeFormat);
-        setState(next);
+        setLive(next);
         setError(null);
         return;
       }
@@ -134,8 +148,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const gen = ++pollGen.current;
       const run: Promise<void> = (async () => {
         try {
-          const res = await fetch("/api/state", { cache: "no-store" });
+          const res = await fetch("/api/state", {
+            cache: "no-store",
+            headers: stateEtag.current
+              ? { "If-None-Match": stateEtag.current }
+              : undefined,
+          });
+          if (res.status === 304) {
+            if (pollGen.current !== gen) return;
+            setError(null);
+            return;
+          }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const nextEtag = res.headers.get("etag");
+          if (nextEtag) stateEtag.current = nextEtag;
           const next = (await res.json()) as AppState;
           if (pollGen.current !== gen) return;
           if (
@@ -162,7 +188,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             setError(null);
             return;
           }
-          setState(applied);
+          setLive(applied);
           setError(null);
         } catch (e) {
           if (pollGen.current !== gen) return;
@@ -186,26 +212,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const applyLocalOfferPatch = useCallback(
     (offerId: number, patch: Partial<OfferSummary>) => {
       pollGen.current += 1;
-      setState((current) => {
-        if (current == null) return current;
+      setLive((current) => {
+        const base = current ?? cached;
+        if (base == null) return current;
         return {
-          ...current,
-          offers: current.offers.map((row) =>
+          ...base,
+          offers: base.offers.map((row) =>
             row.id === offerId ? { ...row, ...patch } : row
           ),
         };
       });
     },
-    []
+    [cached]
   );
 
   const applyLocalSettingsPatch = useCallback((patch: Partial<AppSettings>) => {
     settingsHoldRef.current = { ...settingsHoldRef.current, ...patch };
-    setState((current) => {
-      if (current == null) return current;
-      return { ...current, settings: { ...current.settings, ...patch } };
+    setLive((current) => {
+      const base = current ?? cached;
+      if (base == null) return current;
+      return { ...base, settings: { ...base.settings, ...patch } };
     });
-  }, []);
+  }, [cached]);
 
   const pausePolling = useCallback(() => {
     setPauseCount((n) => n + 1);
@@ -251,6 +279,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           .join(",")
       : "";
 
+  const deskReady = state != null;
+
+  useEffect(() => {
+    if (publicDemo.active || !deskReady) return;
+    void import("@/lib/prefetch-desk-pages").then((mod) => {
+      mod.prefetchWarmDeskPages();
+    });
+  }, [deskReady, publicDemo.active]);
+
   useEffect(() => {
     if (publicDemo.active || !edgePrefetchKey) return;
     const date = localCalendarDate();
@@ -264,7 +301,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (publicDemo.active) return;
     const onInboxRead = () => {
-      setState((current) =>
+      setLive((current) =>
         current == null
           ? current
           : { ...current, alertsUnread: Math.max(0, current.alertsUnread - 1) }

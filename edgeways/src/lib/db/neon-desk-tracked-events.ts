@@ -8,9 +8,9 @@ import { and, eq } from "drizzle-orm";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
-import { listNeonEvents } from "@/lib/db/neon-events";
+import { listNeonEventsByIds } from "@/lib/db/neon-events";
 import { deskTrackedEvents } from "@/lib/db/schema.pg";
-import { filterEventsForDesk } from "@/lib/events/desk-tracked-events";
+import { deskVisibleEventIds, filterEventsForDesk } from "@/lib/events/desk-tracked-events";
 import type { EventRow } from "@/lib/db/schema";
 
 export async function listNeonDeskTrackedEventIds(): Promise<number[]> {
@@ -48,10 +48,11 @@ export async function unfollowNeonEvent(eventId: number): Promise<void> {
 }
 
 export async function listNeonEventsForDesk(): Promise<EventRow[]> {
-  const [events, followedIds, bets] = await Promise.all([
-    listNeonEvents(),
+  const [followedIds, bets] = await Promise.all([
     listNeonDeskTrackedEventIds(),
     listNeonDeskBets(),
   ]);
+  const ids = [...deskVisibleEventIds(followedIds, bets)];
+  const events = await listNeonEventsByIds(ids);
   return filterEventsForDesk(events, followedIds, bets);
 }
