@@ -8,6 +8,7 @@
 
 import { usePathname } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
+import { BetaFeedbackPrompt } from "@/components/feedback/beta-feedback-prompt";
 import { isMetaPath } from "@/content/meta-nav";
 import {
   appNavColumn,
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </aside>
         )}
         <div className="flex min-w-0 flex-1 flex-col p-0 sm:p-1">
+          <BetaFeedbackPrompt />
           <main
             className={cn(
               pagePanel,

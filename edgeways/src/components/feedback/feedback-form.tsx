@@ -21,6 +21,7 @@ import {
   type FeedbackDiagnostics,
   type FeedbackKind,
 } from "@/lib/feedback/types";
+import { FEEDBACK_SUBMITTED_KEY } from "@/lib/feedback/prompt-shared";
 import { ROADMAP_VERSION } from "@/content/roadmap";
 import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,12 @@ export function FeedbackForm() {
         );
       }
 
+      // Suppress the beta feedback prompt for a month after sending.
+      try {
+        window.localStorage.setItem(FEEDBACK_SUBMITTED_KEY, String(Date.now()));
+      } catch {
+        /* storage optional */
+      }
       toast.success(THANKS[kind].title, { description: THANKS[kind].description });
       setSummary("");
       setDetails("");

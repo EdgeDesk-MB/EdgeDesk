@@ -3,6 +3,7 @@
  * user's desk), then email the owner. Linear filing stays a later step.
  */
 import "server-only";
+import { captureServerEvent } from "@/lib/analytics/server-capture";
 import { getDeskActor } from "@/lib/db/desk-scope";
 import { loadFeedbackCustomerContext } from "@/lib/feedback/customer-context";
 import {
@@ -67,6 +68,19 @@ export async function submitFeedback(
       ? persistError
       : new Error("Could not send feedback");
   }
+
+  // Mirror the submission into product analytics so responses can be
+  // read next to usage. Best-effort, never blocks the caller.
+  captureServerEvent(
+    actor.clerkUserId ?? diagnostics.signedInEmail ?? "",
+    "feedback_submitted",
+    {
+      kind: input.kind,
+      has_reply_email: Boolean(input.replyEmail),
+      report_id: report?.id ?? null,
+      emailed: notify.sent,
+    }
+  );
 
   return { report, emailed: notify.sent };
 }
