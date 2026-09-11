@@ -171,7 +171,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Subscription: plan, trial, Preview Edge and Manage subscription. Card, invoices and cancel open in Stripe.",
       "Default bookie and exchange are set in Preferences - saved as you pick them.",
       "Exchanges and bookie status: Accounts → Manage venues.",
-      "Racing cards refresh about every 15 minutes. Exchange prices are delayed about 1–3 minutes. Football live scores update about once a minute.",
+      "Racing cards refresh about every 15 minutes. Exchange prices are delayed about 1–3 minutes. Football live scores update about every 15 seconds.",
       "Export bets, settlements and accounts as CSV anytime from Data & backup.",
     ],
     guideSlug: "faq",

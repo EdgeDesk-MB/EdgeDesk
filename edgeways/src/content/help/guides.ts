@@ -125,7 +125,7 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Home updates every few seconds while you are on the desk (you can change that in Settings). Digests, acca auto-results and lay-due alerts run while the desk is open, and stay quiet when it is not.",
         ],
         bullets: [
-          "Live football scores refresh about once a minute on a tracked match; goal timelines update when the score changes.",
+          "Live football scores refresh about every 15 seconds on a tracked match; the goal tape updates when the score changes, or about every 30 seconds for cards and substitutions.",
           "Racing cards refresh throughout the day; delayed exchange prices run 1-3 minutes behind live.",
           "While the desk is open it also sends the Monday weekly digest, auto-results acca legs, and lay-due alerts.",
           "Alerts update in place rather than stacking copies; web push mirrors them to your phone.",
@@ -533,7 +533,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         heading: "How live football scores work",
         bullets: [
           "Fixture lists refresh through the day",
-          "Live scores update about once a minute while a tracked match is in play",
+          "Live scores update about every 15 seconds while a tracked match is in play",
           "Track the matches you are working, rather than every league at once",
         ],
       },

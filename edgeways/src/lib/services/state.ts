@@ -228,7 +228,7 @@ function tickSimulations(): void {
   }
 }
 
-/** Refresh imported API events that are tracked (scores poll every ~60s via fixtures cache). */
+/** Refresh imported API events that are tracked (scores poll every ~15s via live cache). */
 /** One result-backfill attempt per event per server session. */
 const backfillAttempted = new Set<number>();
 /** One budget-exhausted alert latch per day per server session. */

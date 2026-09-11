@@ -7,8 +7,13 @@
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import type { FootballCompetitionCatalogEntry } from "@/lib/events/fixture-scope";
 import type { FootballLineupPlayer, FootballLineups } from "@/lib/events/lineups";
-import type { MatchTapeEvent, MatchTapeKind } from "@/lib/events/match-tape";
+import {
+  standingTapeGoals,
+  type MatchTapeEvent,
+  type MatchTapeKind,
+} from "@/lib/events/match-tape";
 import { feedHorizonDates, localCalendarDate, wallClockKickoffMs } from "@/lib/events";
+import { LIVE_TTL_MS } from "@/lib/live-poll-rules";
 
 const BASE = "https://v3.football.api-sports.io";
 
@@ -48,13 +53,9 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const FIXTURES_TTL = 10 * 60 * 1000; // fixtures list: 10 min
-// Live scores at 60s keeps a full 90-min match around ~100 requests - the free
-// tier's whole daily allowance. One live-tracked match per day fits; the budget
-// guard below stops us blowing past the cap if more are tracked.
-const LIVE_TTL = 60 * 1000;
+const FIXTURES_TTL = 10 * 60 * 1000; // fixtures list: 10 min (store-first day cards)
 
-/** Daily request budget: the free tier allows 100/day. Leave headroom for fixture browsing. */
+/** Fallback daily cap when admin `feed_caps` is unset (local SQLite / first boot). */
 export const DAILY_BUDGET = 95;
 let budgetDay = "";
 let requestsToday = 0;
@@ -423,7 +424,7 @@ export async function fixturesByDate(date: string): Promise<Fixture[]> {
 
 export async function liveFixtures(): Promise<Fixture[]> {
   const hit = cache.get("live");
-  if (hit && Date.now() - hit.at < LIVE_TTL) return hit.data;
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) return hit.data;
   const json = await apiGet(`/fixtures?live=all`);
   const data: Fixture[] = (json.response ?? []).map(mapFixture);
   cache.set("live", { at: Date.now(), data });
@@ -433,7 +434,7 @@ export async function liveFixtures(): Promise<Fixture[]> {
 /** In-process live list only. Never hits the provider. */
 export function peekLiveFixtures(): Fixture[] | null {
   const hit = cache.get("live");
-  if (!hit || Date.now() - hit.at >= LIVE_TTL) return null;
+  if (!hit || Date.now() - hit.at >= LIVE_TTL_MS) return null;
   return hit.data;
 }
 
@@ -462,7 +463,7 @@ export async function fixtureById(id: string): Promise<Fixture | null> {
   if (!id.trim()) return null;
   const cacheKey = `id:${id}`;
   const hit = cache.get(cacheKey);
-  if (hit && Date.now() - hit.at < LIVE_TTL) return hit.data[0] ?? null;
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) return hit.data[0] ?? null;
   const json = await apiGet(`/fixtures?id=${id}`);
   const data: Fixture[] = (json.response ?? []).map(mapFixture);
   cache.set(cacheKey, { at: Date.now(), data });
@@ -517,12 +518,13 @@ function mapTapeEvent(e: any, homeTeamName: string): MatchTapeEvent | null {
   if (e.player?.name) event.player = String(e.player.name);
   if (e.assist?.name) event.assist = String(e.assist.name);
   if (e.detail) event.detail = String(e.detail);
+  if (e.comments) event.comments = String(e.comments);
   if (e.detail === "Own Goal") event.og = true;
   return event;
 }
 
 /**
- * Full match tape (goals, cards, subs, VAR). One request per fixture per LIVE_TTL.
+ * Full match tape (goals, cards, subs, VAR). One request per fixture per LIVE_TTL_MS.
  */
 export async function fixtureMatchEvents(
   externalId: string,
@@ -530,7 +532,7 @@ export async function fixtureMatchEvents(
 ): Promise<MatchTapeEvent[]> {
   const cacheKey = `tape:${externalId}`;
   const hit = tapeCache.get(cacheKey);
-  if (hit && Date.now() - hit.at < LIVE_TTL) return hit.data;
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) return hit.data;
   const json = await apiGet(`/fixtures/events?fixture=${externalId}`);
   const data: MatchTapeEvent[] = (json.response ?? [])
     .map((e: any) => mapTapeEvent(e, homeTeamName))
@@ -548,9 +550,7 @@ export async function fixtureGoalEvents(
   homeTeamName: string
 ): Promise<FixtureGoal[]> {
   const tape = await fixtureMatchEvents(externalId, homeTeamName);
-  return tape
-    .filter((e) => e.kind === "goal")
-    .map((e) => ({
+  return standingTapeGoals(tape).map((e) => ({
       minute: e.minute,
       side: e.side,
       player: e.player,

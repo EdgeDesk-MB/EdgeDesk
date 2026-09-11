@@ -4,6 +4,7 @@ import {
   shouldFetchLineups,
   needsResultBackfill,
   needsTapeBackfill,
+  matchViewShouldPollTape,
   LIVE_POLL_WINDOW_MS,
   RESULT_BACKFILL_MAX_AGE_MS,
   TAPE_REFRESH_MS,
@@ -30,7 +31,7 @@ describe("shouldFetchGoalTimeline", () => {
     ).toBe(false);
   });
 
-  it("refetches a live tape after five minutes so cards land without a goal", () => {
+  it("refetches a live tape after the refresh interval so cards land without a goal", () => {
     expect(
       shouldFetchGoalTimeline(
         { ...event, tapeFetchedAt: NOW - TAPE_REFRESH_MS },
@@ -165,5 +166,21 @@ describe("needsTapeBackfill", () => {
       )
     ).toBe(false);
     expect(needsTapeBackfill({ ...finished, source: "manual" }, NOW)).toBe(false);
+  });
+});
+
+describe("matchViewShouldPollTape", () => {
+  it("polls live matches and kick-offs inside five minutes", () => {
+    expect(matchViewShouldPollTape("live", NOW - 60 * 60 * 1000, NOW)).toBe(true);
+    expect(matchViewShouldPollTape("upcoming", NOW + 4 * 60 * 1000, NOW)).toBe(true);
+  });
+
+  it("leaves finished and far-off upcoming matches alone", () => {
+    expect(matchViewShouldPollTape("finished", NOW - 2 * 60 * 60 * 1000, NOW)).toBe(
+      false
+    );
+    expect(matchViewShouldPollTape("upcoming", NOW + 30 * 60 * 1000, NOW)).toBe(
+      false
+    );
   });
 });

@@ -13,7 +13,7 @@
  * Past dates are immutable. Stored rows re-derive upcoming/live from
  * kick-off (same 4h window as `effectiveEventStatus`) so LIVE still shows
  * between cron ticks. Live scores overlay from a warm in-process peek
- * only — never wait on the provider on this read. The 60s desk poll
+ * only — never wait on the provider on this read. The 15s desk poll
  * and a background refresh warm that peek. Overlay is not written back.
  *
  * Global feed data, not desk data - no clerk scoping.

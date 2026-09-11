@@ -37,6 +37,7 @@ import {
   formatFixtureStepperLabel,
 } from "@/lib/events/fixture-day-groups";
 import { normalizeDisplayTimezone } from "@/lib/display-timezone";
+import { LIVE_TTL_MS } from "@/lib/live-poll-rules";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import {
   mergeFixtureBoardView,
@@ -70,8 +71,8 @@ function friendlyFixtureError(error: unknown, sport: "football" | "horse_racing"
 
 /** Client TTL for a fixture day. The server store is 10 minutes. */
 const FIXTURE_DAY_TTL_MS = 2 * 60_000;
-/** Today’s football list follows the 60s live-score poll. */
-const LIVE_FIXTURE_POLL_MS = 60_000;
+/** Today’s football list follows the live-score cache. */
+const LIVE_FIXTURE_POLL_MS = LIVE_TTL_MS;
 
 type CachedFixtureDay = {
   at: number;
