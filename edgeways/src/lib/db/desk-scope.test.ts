@@ -2,9 +2,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_DESK_OWNER_EMAIL,
+  DEFAULT_DESK_OWNER_USER_ID,
   deskFileKind,
   deskFileToken,
   deskOwnerEmail,
+  deskOwnerUserId,
   isDeskOwnerEmail,
   pickCanonicalNeonClerkUserId,
   resolveScopedDbPath,
@@ -27,6 +29,11 @@ describe("desk-scope", () => {
     expect(deskOwnerEmail()).toBe(DEFAULT_DESK_OWNER_EMAIL);
     expect(isDeskOwnerEmail("SamHayter.Design@gmail.com")).toBe(true);
     expect(isDeskOwnerEmail("sonicactivity@gmail.com")).toBe(false);
+  });
+
+  it("defaults the owner Clerk id to the localhost desk", () => {
+    delete process.env.EDGEWAYS_DESK_OWNER_USER_ID;
+    expect(deskOwnerUserId()).toBe(DEFAULT_DESK_OWNER_USER_ID);
   });
 
   it("honours EDGEWAYS_DESK_OWNER_EMAIL", () => {
@@ -188,58 +195,58 @@ describe("desk-scope", () => {
 });
 
 describe("pickCanonicalNeonClerkUserId", () => {
-  const live = "user_3IT7V2FQfFhC2ZNg9Q4FjAbDEgQ";
-  const local = "user_3HqzZ0vGHKdHGozq8a064YzgQWk";
+  const local = DEFAULT_DESK_OWNER_USER_ID;
+  const production = "user_3HqzZ0vGHKdHGozq8a064YzgQWk";
 
   it("keeps the signed-in id when there is no other account", () => {
     expect(
       pickCanonicalNeonClerkUserId({
-        signedInUserId: local,
+        signedInUserId: production,
         candidates: [],
       })
-    ).toBe(local);
+    ).toBe(production);
     expect(
       pickCanonicalNeonClerkUserId({
-        signedInUserId: local,
-        candidates: [{ clerkUserId: local, createdAt: 1, offerCount: 0 }],
+        signedInUserId: production,
+        candidates: [{ clerkUserId: production, createdAt: 1, offerCount: 0 }],
+      })
+    ).toBe(production);
+  });
+
+  it("follows the localhost desk even when Live Clerk is signed in", () => {
+    expect(
+      pickCanonicalNeonClerkUserId({
+        signedInUserId: production,
+        preferredUserId: production,
+        candidates: [
+          { clerkUserId: production, createdAt: 2, offerCount: 200 },
+          { clerkUserId: local, createdAt: 1, offerCount: 1 },
+        ],
       })
     ).toBe(local);
   });
 
-  it("prefers an explicit owner id when it is one of the accounts", () => {
+  it("picks the desk with more offers when the owner id is not a candidate", () => {
     expect(
       pickCanonicalNeonClerkUserId({
-        signedInUserId: local,
-        preferredUserId: live,
+        signedInUserId: "user_a",
         candidates: [
-          { clerkUserId: local, createdAt: 2, offerCount: 200 },
-          { clerkUserId: live, createdAt: 1, offerCount: 1 },
+          { clerkUserId: "user_a", createdAt: 1, offerCount: 159 },
+          { clerkUserId: "user_b", createdAt: 2, offerCount: 160 },
         ],
       })
-    ).toBe(live);
-  });
-
-  it("picks the desk with more offers so localhost follows Live", () => {
-    expect(
-      pickCanonicalNeonClerkUserId({
-        signedInUserId: local,
-        candidates: [
-          { clerkUserId: local, createdAt: 1, offerCount: 159 },
-          { clerkUserId: live, createdAt: 2, offerCount: 160 },
-        ],
-      })
-    ).toBe(live);
+    ).toBe("user_b");
   });
 
   it("breaks a tie with the newer account row", () => {
     expect(
       pickCanonicalNeonClerkUserId({
-        signedInUserId: local,
+        signedInUserId: "user_a",
         candidates: [
-          { clerkUserId: local, createdAt: 1, offerCount: 10 },
-          { clerkUserId: live, createdAt: 9, offerCount: 10 },
+          { clerkUserId: "user_a", createdAt: 1, offerCount: 10 },
+          { clerkUserId: "user_b", createdAt: 9, offerCount: 10 },
         ],
       })
-    ).toBe(live);
+    ).toBe("user_b");
   });
 });

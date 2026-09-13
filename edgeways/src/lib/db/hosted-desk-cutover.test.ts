@@ -232,11 +232,32 @@ describe("hosted desk cutover", () => {
     expect(stateSource).toMatch(/after\(/);
   });
 
+  it("re-derives hosted settlements after a runner edit", () => {
+    const src = routeSource("bets/[id]/route.ts");
+    expect(src).toMatch(/resyncNeonSettledBetAgainstEvent/);
+    expect(src).toMatch(/resyncSettledBetAgainstEvent/);
+    expect(stateSource).toMatch(/resyncNeonStaleSettlements/);
+    expect(stateSource).toMatch(/settleOpenNeonDeskBets/);
+    expect(stateSource).toMatch(/alignEventRowsWithStoredFixtures/);
+    expect(stateSource).toMatch(/awardNeonUnconditionalFreeBetsDue/);
+  });
+
   it("narrates hosted History goals onto Neon, not SQLite", () => {
     const historyRoute = routeSource("history/route.ts");
     expect(historyRoute).toMatch(/isNeonDesk/);
     expect(historyRoute).toMatch(/syncNeonDeskEventHistory/);
     expect(stateSource).toMatch(/syncNeonDeskEventHistory/);
+  });
+
+  it("binds the owner Gmail to the canonical Neon desk", () => {
+    const alias = readFileSync(
+      resolve(__dirname, "neon-desk-alias.ts"),
+      "utf8"
+    );
+    expect(alias).toMatch(/isDeskOwnerEmail\(email\)/);
+    expect(alias).toMatch(/deskOwnerUserId\(\)/);
+    const scope = readFileSync(resolve(__dirname, "with-desk-scope.ts"), "utf8");
+    expect(scope).toMatch(/if \(email\) emailByUserId\.set/);
   });
 
   it("Racing Desk reads follow the Neon alias, not the raw Clerk id", () => {

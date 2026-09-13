@@ -30,6 +30,7 @@ export async function assembleLiveBundles(input: {
   pingNeon: boolean;
   critical: LiveBundleMemory["critical"];
   config: LiveBundleConfig;
+  purpose?: "alert" | "log";
 }): Promise<AssembledLiveBundles> {
   const [excludedIds, context] = await Promise.all([
     readExcludedAccountIds(),
@@ -67,6 +68,7 @@ export async function assembleLiveBundles(input: {
       critical: input.critical,
     },
     config: input.config,
+    purpose: input.purpose,
   });
   const reconciled = reconcileLiveCritical(memory, snapshot.activeCriticalKeys);
   return {

@@ -45,6 +45,7 @@ import {
 } from "@/lib/services/feed-sync-rules";
 import {
   FEED_SYNC_KEY,
+  hostedFeedSyncEnabled,
   type FeedSyncLease,
 } from "@/lib/services/feed-sync-lease";
 import {
@@ -55,6 +56,7 @@ import {
 } from "@/lib/services/apifootball";
 import {
   hasRacingApiKey as realHasRacingApiKey,
+  raceCourseOffKey,
   resultsForRaceIds as realResultsForRaceIds,
   RESULTS_TTL_ACTIVE,
 } from "@/lib/services/theracingapi";
@@ -65,6 +67,7 @@ import {
 import { shouldFetchGoalTimeline, shouldFetchLineups } from "@/lib/live-poll-rules";
 import { formatEventTitle, formatRacingEventTitle, localCalendarDate } from "@/lib/events";
 import { parseRaceResults } from "@/lib/racing";
+import { alignTrackedFootballFixtures } from "@/lib/services/tracked-feed-align";
 import {
   isAccaDeskSettlement,
   settledResultAlert,
@@ -201,7 +204,11 @@ async function syncFootball(
   try {
     // One upstream lookup per external id, deduped inside fixturesByIds — the
     // number of users holding bets on the event is irrelevant.
-    const fixtures = await deps.fixturesByIds(candidates.map((e) => e.externalId!));
+    const fixtures = await alignTrackedFootballFixtures(
+      candidates,
+      await deps.fixturesByIds(candidates.map((e) => e.externalId!)),
+      now
+    );
     for (const event of candidates) {
       const fixture = fixtures.find((f) => f.externalId === event.externalId);
       if (!fixture) continue;
@@ -271,14 +278,19 @@ async function syncRacing(
   const touched: number[] = [];
   try {
     const dateByRaceId: Record<string, string> = {};
+    const aliasByRaceId: Record<string, string> = {};
     for (const event of candidates) {
       if (event.externalId) {
         dateByRaceId[event.externalId] = localCalendarDate(new Date(event.startTime));
+        aliasByRaceId[event.externalId] = raceCourseOffKey(
+          event.competition ?? event.homeTeam ?? "",
+          event.startTime
+        );
       }
     }
     const { results, tierBlocked } = await deps.resultsForRaceIds(
       candidates.map((e) => e.externalId!),
-      { maxStaleMs: RESULTS_TTL_ACTIVE, dateByRaceId }
+      { maxStaleMs: RESULTS_TTL_ACTIVE, dateByRaceId, aliasByRaceId }
     );
     if (tierBlocked) return [];
 
@@ -527,8 +539,9 @@ export async function runNeonFeedSync(
 
 /**
  * Try to take the lease and, if won, run the sync without blocking the
- * response. Called from every hosted dashboard poll: the lease check is one
- * cheap query, and 19 out of 20 seconds it does nothing.
+ * response. Vercel request paths do this; localhost sharing Neon does not
+ * (see hostedFeedSyncEnabled). The lease check is one cheap query, and 19
+ * out of 20 seconds it does nothing.
  */
 export async function maybeRunNeonFeedSync(options?: {
   lease?: FeedSyncLease;
@@ -537,6 +550,11 @@ export async function maybeRunNeonFeedSync(options?: {
 }): Promise<{ acquired: boolean }> {
   const key = options?.key ?? FEED_SYNC_KEY;
   let lease = options?.lease;
+  // Tests pass an in-memory lease. Live request paths must not let a Mac
+  // Next process take the fleet lease (stale live=all overwrites Neon FT).
+  if (!lease && !hostedFeedSyncEnabled()) {
+    return { acquired: false };
+  }
   if (!lease) {
     const { neonFeedSyncLease } = await import("@/lib/db/neon-feed-sync");
     lease = neonFeedSyncLease();

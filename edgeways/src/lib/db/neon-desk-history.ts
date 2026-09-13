@@ -200,3 +200,17 @@ export async function purgeNeonDeskSettlementHistoryForBet(
       )
     );
 }
+
+export async function purgeNeonDeskPromoHistoryForBet(betId: number): Promise<void> {
+  const clerkUserId = neonDeskClerkUserId();
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgHistory)
+    .where(
+      and(
+        eq(pgHistory.betId, betId),
+        eq(pgHistory.clerkUserId, clerkUserId),
+        eq(pgHistory.kind, "free_bet_promo")
+      )
+    );
+}

@@ -16,6 +16,9 @@ export interface Fixture {
   leagueCountry?: string | null;
   /** Country flag image URL from API-Football */
   leagueFlag?: string | null;
+  /** Last standing goal on a live tape that matches this score. Overlay only. */
+  lastGoalSide?: "home" | "away" | null;
+  lastGoalMinute?: number | null;
 }
 
 /** Current-season competition from the feed catalog (may have no fixtures today). */

@@ -54,6 +54,11 @@ import {
 } from "@/lib/db/neon-desk-state-map";
 import { apiUsageTodayAsync } from "@/lib/services/apifootball";
 import { maybeRunNeonFeedSync } from "@/lib/services/feed-sync-neon";
+import { alignEventRowsWithStoredFixtures } from "@/lib/services/tracked-feed-align";
+import {
+  resyncNeonStaleSettlements,
+  settleOpenNeonDeskBets,
+} from "@/lib/db/neon-desk-resync-settlement";
 import {
   getAllExchangeProviderStatuses,
   getExchangeProviderStatus,
@@ -175,24 +180,54 @@ export async function buildNeonDeskAppState(): Promise<AppState> {
     listNeonAccaRuns().catch(() => []),
     listNeonSystemRuns().catch(() => []),
     listNeonBetBuilderRuns().catch(() => []),
-    // Every hosted dashboard poll is a chance to advance the shared feed.
-    // Taking the lease is one cheap query alongside the snapshot reads; the
-    // sync itself is handed to `after()`, so the response is never blocked.
+    // Vercel polls take the lease and sync in after(). Localhost sharing Neon
+    // skips the lease so its live=all cache cannot overwrite Live.
     maybeRunNeonFeedSync().catch(() => ({ acquired: false })),
   ]);
   const eventIds = [...deskVisibleEventIds(followedIds, bets)];
   const feedEvents = await listNeonEventsByIds(eventIds).catch(() => []);
-  const events = filterEventsForDesk(feedEvents, followedIds, bets);
+  const events = await alignEventRowsWithStoredFixtures(
+    filterEventsForDesk(feedEvents, followedIds, bets)
+  ).catch(() => filterEventsForDesk(feedEvents, followedIds, bets));
+  let deskBets = bets;
+  let deskTransactions = transactions;
+  let deskHistory = history;
+  try {
+    const settledOpen = await settleOpenNeonDeskBets(deskBets, events);
+    const corrected = await resyncNeonStaleSettlements(deskBets, events);
+    if (settledOpen > 0 || corrected > 0) {
+      deskBets = await listNeonDeskBets();
+      deskTransactions = await listNeonDeskBalanceTransactions();
+      deskHistory = await listNeonDeskHistory(HOME_HISTORY_LIMIT);
+    }
+  } catch {
+    // Re-derive is best-effort; the snapshot still renders.
+  }
+  try {
+    // Same-request as SQLite processAiEffects so a risk-free loss after a
+    // runner edit credits the refund on this poll, not after() housekeeping.
+    const awarded = await awardNeonUnconditionalFreeBetsDue(
+      deskBets,
+      deskTransactions
+    );
+    if (awarded > 0) {
+      deskBets = await listNeonDeskBets();
+      deskTransactions = await listNeonDeskBalanceTransactions();
+      deskHistory = await listNeonDeskHistory(HOME_HISTORY_LIMIT);
+    }
+  } catch {
+    // Promo award is best-effort; the snapshot still renders.
+  }
   await scheduleHostedDeskHousekeeping(() =>
-    runHostedDeskHousekeeping({ events, bets, transactions })
+    runHostedDeskHousekeeping({ events, bets: deskBets, transactions: deskTransactions })
   );
   const snapshot = appStateFromNeonDesk({
-    bets,
+    bets: deskBets,
     events,
     offers,
     accounts,
-    transactions,
-    history,
+    transactions: deskTransactions,
+    history: deskHistory,
     casinoOffers,
     settings,
     apiUsage,

@@ -23,6 +23,7 @@ import {
   readDeskSnapshot,
   subscribeDeskSnapshot,
   writeDeskSnapshot,
+  openBetsPastResultWindow,
 } from "@/lib/desk-snapshot";
 import { canUseOfferEdge } from "@/lib/entitlements/offer-edge";
 import { localCalendarDate } from "@/lib/events";
@@ -87,6 +88,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const pollGen = useRef(0);
   /** Hide / saved keys stay until /api/state echoes them, so a poll cannot flash them back. */
   const settingsHoldRef = useRef<Partial<AppSettings> | null>(null);
+  const staleOpenRetry = useRef(false);
   const [prevDemo, setPrevDemo] = useState({
     active: publicDemo.active,
     view: publicDemo.view,
@@ -154,15 +156,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               ? { "If-None-Match": stateEtag.current }
               : undefined,
           });
+          let bodyRes = res;
           if (res.status === 304) {
+            if (pollGen.current !== gen) return;
+            if (
+              !staleOpenRetry.current &&
+              stateRef.current &&
+              openBetsPastResultWindow(stateRef.current)
+            ) {
+              staleOpenRetry.current = true;
+              stateEtag.current = null;
+              bodyRes = await fetch("/api/state", { cache: "no-store" });
+            } else {
+              staleOpenRetry.current = false;
+              setError(null);
+              return;
+            }
+          }
+          if (bodyRes.status === 304) {
             if (pollGen.current !== gen) return;
             setError(null);
             return;
           }
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const nextEtag = res.headers.get("etag");
+          if (!bodyRes.ok) throw new Error(`HTTP ${bodyRes.status}`);
+          const nextEtag = bodyRes.headers.get("etag");
           if (nextEtag) stateEtag.current = nextEtag;
-          const next = (await res.json()) as AppState;
+          staleOpenRetry.current = false;
+          const next = (await bodyRes.json()) as AppState;
           if (pollGen.current !== gen) return;
           if (
             mode === "poll" &&
@@ -183,7 +203,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           const applied = { ...next, settings };
           if (
             mode === "poll" &&
-            jsonSnapshotUnchanged(stateRef.current, applied)
+            jsonSnapshotUnchanged(stateRef.current, applied) &&
+            !(
+              stateRef.current &&
+              openBetsPastResultWindow(stateRef.current) &&
+              !openBetsPastResultWindow(applied)
+            )
           ) {
             setError(null);
             return;
@@ -254,6 +279,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     function pollIfVisible() {
       if (typeof document !== "undefined" && document.hidden) return;
+      if (stateRef.current && openBetsPastResultWindow(stateRef.current)) {
+        stateEtag.current = null;
+      }
       void fetchState("poll");
     }
 

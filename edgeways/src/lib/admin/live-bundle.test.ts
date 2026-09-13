@@ -48,7 +48,7 @@ describe("crossedDigestCount", () => {
 });
 
 describe("bundleNewEvents", () => {
-  it("ignores catch-up bets older than 15 minutes", () => {
+  it("ignores catch-up bets older than 15 minutes on the alert path", () => {
     const result = bundleNewEvents({
       events: [bet("old", NOW - 16 * 60 * 1000), bet("fresh", NOW - 1000)],
       now: NOW,
@@ -56,6 +56,19 @@ describe("bundleNewEvents", () => {
     });
     expect(result.bundles).toHaveLength(1);
     expect(result.bundles[0]?.id).toBe("fresh");
+  });
+
+  it("keeps this morning on the Live log path", () => {
+    const morning = NOW - 4 * 60 * 60 * 1000;
+    const result = bundleNewEvents({
+      events: [bet("morning", morning)],
+      now: NOW,
+      memory: emptyLiveBundleMemory(),
+      purpose: "log",
+    });
+    expect(result.bundles).toEqual([
+      expect.objectContaining({ id: "morning", at: morning, count: 1 }),
+    ]);
   });
 
   it("toasts each bet while the hour stays under 10", () => {

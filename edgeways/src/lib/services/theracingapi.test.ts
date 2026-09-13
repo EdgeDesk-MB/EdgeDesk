@@ -184,6 +184,42 @@ describe("theracingapi tier access", () => {
     expect(filtered.results.size).toBe(1);
   });
 
+  it("matches a result by course and off-time when race_id differs", async () => {
+    const today = localCalendarDate();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              race_id: "api-chester-1",
+              course: "Chester",
+              off_time: "14:05",
+              date: today,
+              field_size: 2,
+              runners: [
+                { horse_id: "h1", horse: "Holy See", position: 1 },
+                { horse_id: "h2", horse: "Stressfree", position: 2 },
+              ],
+            },
+          ],
+          total: 1,
+          limit: 100,
+          skip: 0,
+        }),
+      })
+    );
+
+    const { resultsForRaceIds, raceCourseOffKey } = await import("./theracingapi");
+    const alias = raceCourseOffKey("Chester", "14:05");
+    const filtered = await resultsForRaceIds(["card-chester-99"], {
+      aliasByRaceId: { "card-chester-99": alias },
+    });
+    expect(filtered.results.get("card-chester-99")?.winner).toBe("Holy See");
+  });
+
   it("pages results/today when total exceeds the API limit of 100", async () => {
     const page = (start: number, n: number) =>
       Array.from({ length: n }, (_, i) => ({

@@ -8,7 +8,7 @@ import type { FootballCompetitionCatalogEntry } from "@/lib/events/fixture-scope
 import type { FootballLineups } from "@/lib/events/lineups";
 import type { MatchTapeEvent } from "@/lib/events/match-tape";
 import { feedHorizonDates, localCalendarDate, wallClockKickoffMs } from "@/lib/events";
-import { LIVE_TTL_MS } from "@/lib/live-poll-rules";
+import { LIVE_TTL_MS, liveSnapshotUsable } from "@/lib/live-poll-rules";
 import {
   mapFixtureScores,
   mapLineupsPayload,
@@ -49,6 +49,9 @@ export interface Fixture {
   leagueCountry?: string | null;
   /** Country flag image URL from API-Football (`league.flag`) */
   leagueFlag?: string | null;
+  /** Last standing goal on a live tape that matches this score. Overlay only. */
+  lastGoalSide?: "home" | "away" | null;
+  lastGoalMinute?: number | null;
 }
 
 interface CacheEntry {
@@ -468,6 +471,13 @@ export function peekLiveFixtures(): Fixture[] | null {
   return hit.data;
 }
 
+/** Nested events from `live=all` / id fetch. No extra provider call. */
+export function peekFootballTape(externalId: string): MatchTapeEvent[] | null {
+  const hit = footballTapeMemo.get(`tape:${externalId}`);
+  if (!hit || hit.data.length === 0) return null;
+  return hit.data;
+}
+
 /** Warm the live list after the day card has already been served. */
 export function scheduleLiveFixturesRefresh(): void {
   if (peekLiveFixtures()) return;
@@ -620,7 +630,7 @@ export async function fixturesByIds(ids: string[]): Promise<Fixture[]> {
   const missing: string[] = [];
   for (const id of unique) {
     const live = liveById.get(id);
-    if (live) out.push(live);
+    if (live && liveSnapshotUsable(live)) out.push(live);
     else missing.push(id);
   }
   const fetched = await Promise.all(

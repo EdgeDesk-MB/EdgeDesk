@@ -5,7 +5,12 @@
  * local settlement paths fails here.
  */
 import { describe, expect, it } from "vitest";
-import { settlementForBetOnEvent } from "@/lib/services/event-settlement";
+import {
+  derivedSettlementForBetOnEvent,
+  settlementForBetOnEvent,
+  staleSettlementCorrection,
+  storedSettlementDisagrees,
+} from "@/lib/services/event-settlement";
 import {
   toMatchResult,
   toSettleable,
@@ -305,5 +310,69 @@ describe("settlementForBetOnEvent — horse racing", () => {
   it("stays open when the race has no result yet", () => {
     const b = bet({ market: "win", selection: "Kauto Star", sport: "horse_racing" });
     expect(settlementForBetOnEvent(b, race({ goals: null }))).toBeNull();
+  });
+
+  it("does not re-open an already-settled bet from the open-only poller path", () => {
+    const b = bet({
+      market: "win",
+      selection: "Denman",
+      sport: "horse_racing",
+      status: "won",
+      actualProfit: 9.6,
+      settledAt: NOW,
+    });
+    expect(settlementForBetOnEvent(b, race())).toBeNull();
+  });
+
+  it("re-derives a losing runner after the stored win was for a different horse", () => {
+    // Hand-worked: £10 @ 9.00 back, £8 @ 9.80 lay, 2% commission.
+    // Win: 10×8 − 8×8.8 = 80 − 70.4 = +9.60 (Al Jabbar / Kauto Star).
+    // Lose: −10 + 8×0.98 = −2.16 (Berkshire Regal / Denman, finished 2nd).
+    const storedWin = bet({
+      market: "win",
+      selection: "Denman",
+      label: "Winner Kauto Star",
+      betType: "risk_free",
+      sport: "horse_racing",
+      backStake: 10,
+      backOdds: 9,
+      layStake: 8,
+      layOdds: 9.8,
+      commission: 0.02,
+      status: "won",
+      actualProfit: 9.6,
+      settledAt: NOW,
+    });
+    const derived = derivedSettlementForBetOnEvent(storedWin, race())!;
+    const expected = settleRacingBet(toSettleable(storedWin), fullResult)!;
+    expect(derived.status).toBe("lost");
+    expect(derived.profit).toBe(expected.profit);
+    expect(derived.profit).toBeCloseTo(-2.16);
+    expect(storedSettlementDisagrees(storedWin, derived)).toBe(true);
+    expect(staleSettlementCorrection(storedWin, race())?.status).toBe("lost");
+  });
+
+  it("leaves a stored result alone when it already matches the current selection", () => {
+    const b = bet({
+      market: "win",
+      selection: "Kauto Star",
+      sport: "horse_racing",
+      status: "won",
+      actualProfit: settleRacingBet(
+        toSettleable(
+          bet({
+            market: "win",
+            selection: "Kauto Star",
+            backStake: 10,
+            backOdds: 2.1,
+            layStake: 9.9,
+            layOdds: 2.12,
+            commission: 0.02,
+          })
+        ),
+        fullResult
+      )!.profit,
+    });
+    expect(staleSettlementCorrection(b, race())).toBeNull();
   });
 });

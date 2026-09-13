@@ -16,6 +16,11 @@ import {
   liveBundleConfigFromSettings,
   type AdminLiveSettings,
 } from "@/lib/admin/live-settings-shared";
+import {
+  pickAdminLiveSound,
+  playAdminLiveSound,
+  unlockAdminLiveSound,
+} from "@/lib/admin/live-toast-sound";
 
 type LivePollResponse = {
   fingerprint: string;
@@ -92,6 +97,7 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
           now: body.now,
           memory: memoryRef.current,
           config,
+          purpose: "alert",
         });
         memoryRef.current = reconcileLiveCritical(
           memory,
@@ -102,6 +108,9 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
         const visible = !document.hidden;
         if (visible && settingsRef.current.toastsEnabled) {
           showLiveBundles(bundles, (href) => router.push(href));
+          if (bundles.length > 0) {
+            playAdminLiveSound(pickAdminLiveSound(bundles.map((bundle) => bundle.kind)));
+          }
         }
 
         if (fingerprintRef.current == null) {
@@ -128,12 +137,18 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
       if (!document.hidden) void tick(true);
     }
 
+    function unlock() {
+      unlockAdminLiveSound();
+    }
+
     void tick(false).then(schedule);
     document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("pointerdown", unlock, { once: true });
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("pointerdown", unlock);
     };
   }, [router]);
 

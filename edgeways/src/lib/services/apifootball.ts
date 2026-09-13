@@ -23,6 +23,7 @@ export {
   leagueStandings,
   liveFixtures,
   localCalendarDate,
+  peekFootballTape,
   peekLiveFixtures,
   pingApiFootball,
   scheduleLiveFixturesRefresh,

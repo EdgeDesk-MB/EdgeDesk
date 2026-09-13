@@ -1018,7 +1018,7 @@ harness drive: check a boost → verdict <10s → diary row → settle it; mobil
 **Follow-up.** Money path / Tracker / History → **J2b** (Phase 15). Do not extend J2 settle
 to paper-trade Logged-only rows (see §9 parking lot + J2b out of scope).
 
-## J2b. Boosts money path — diary ↔ Add bet ↔ Tracker / History `[strong]` (Phase 15)
+## J2b. Boosts money path — diary ↔ Add bet ↔ Tracker / History `[strong]` (Phase 15) — ✅ DONE 2026-08-03
 
 **Status.** Implemented 2026-08-03. Confirmed with Sam same day.
 
@@ -1987,7 +1987,7 @@ mass when the field thins out after 4th, and it captures field size for free —
 positions out of 8 runners is roughly double the hit rate of three out of 16. All three of Sam's
 stated instincts are therefore consequences of one model, not three hand-tuned bonuses.
 
-## M0. Capture the exchange back price `[local]` — prerequisite for M1
+## M0. Capture the exchange back price `[local]` — prerequisite for M1 — ✅ DONE 2026-08-02
 
 **Objective.** Stop throwing away half the Betfair order book.
 
@@ -2016,7 +2016,7 @@ additive context for the probability model only.
 **Acceptance.** Existing exchange tests unchanged and green; a runner with both sides present
 carries both on the desk payload; nothing that reads `exchangeDecimal` changes behaviour.
 
-## M1. Finishing-position model `[strong]` — pure calc, /calc-change
+## M1. Finishing-position model `[strong]` — pure calc, /calc-change — ✅ DONE 2026-08-02
 
 **Objective.** New `src/lib/calc/racing/finish-positions.ts`: given win probabilities, return each
 runner's probability of finishing 1st, 2nd, 3rd and 4th.
@@ -2082,7 +2082,7 @@ export function winProbsFromRunners(
 probability into pounds happens downstream in M2 and MUST use `src/lib/calc/money.ts`. Do not touch
 `src/lib/calc/ep/engine.ts`.
 
-## M2a. Target outcome + modelled trigger probability `[strong]` — /calc-change
+## M2a. Target outcome + modelled trigger probability `[strong]` — /calc-change — ✅ DONE 2026-08-02
 
 **Objective.** Give an offer a machine-readable statement of what result it pays on, and use the M1
 model to price it, without weakening a single existing test.
@@ -2114,7 +2114,7 @@ full book, so a graceful degradation path is required behaviour rather than a co
 cover `triggerProbFromModel` (positions `[2,3,4]` sums the right three columns), the
 `triggerProb`-supplied path, and `triggerBasis` on both branches.
 
-## M2b. The Offer Edge engine `[strong]`
+## M2b. The Offer Edge engine `[strong]` — ✅ DONE 2026-08-02
 
 **Objective.** NEW `src/lib/offers/offer-edge.ts` — for one offer and today's races, return the
 ranked plays.
@@ -2183,7 +2183,7 @@ ranking when the book justifies it; a race at exactly `minRunners` carries the n
 a race below `minRunners` is excluded entirely; plays are ordered by `totalEv`; `triggerBasis`
 degrades to `"heuristic"` when the book is too sparse for M1.
 
-## M3. Three surfaces `[strong]`
+## M3. Three surfaces `[strong]` — ✅ DONE 2026-08-02
 
 Built-then-screenshotted, not mock-first (standing convention, see L2). Read
 `docs/design-system.md` first. Design tokens only, no ad-hoc colours,
@@ -2251,7 +2251,12 @@ exists; legend present under Courses; `offer-tags` tests cover Edge sort prefere
 > Do **not** start N0 billing/auth work until D1 gate criteria in `product-roadmap.md` §7.1 are met.
 > The matrix + preview switch may ship earlier as personal product-design scaffolding if Sam asks.
 
-## N0. Entitlement scaffolding (Free / Core / Edge) `[strong]` ⏸ GATED
+## N0. Entitlement scaffolding (Free / Core / Edge) `[strong]` ✅ DONE (2026-08-25)
+
+> **Status corrected 2026-09-13.** This header read "⏸ GATED" long after the work
+> shipped. The matrix and flags landed as EDGE-17, real server-side enforcement
+> replaced the preview switch as EDGE-22, and feed guards are EDGE-83. The D1
+> gate it was gated on opened 2026-08-10.
 
 **Objective.** Make the §7.5 tier split *real in code* as a feature-entitlement matrix, with Edge
 chrome (`--edge`) reserved for Edge-tier capabilities, without building multi-tenant SaaS yet.
@@ -2509,7 +2514,7 @@ for real paywall; ships with unlocked default.
 
 ---
 
-## L7. Each-way & Extra-place on Racing Desk `[strong]`
+## L7. Each-way & Extra-place on Racing Desk `[strong]` ✅ DONE 2026-08-06 (Phase 17)
 
 **Status.** Phases 1–4 local 2026-08-06 (dialog handoff, UK place ladder + min-runners,
 Active bets strip + PlaceZoneBar, dual-lay settle tests). Betfair PLACE feed still stretch.
@@ -2646,7 +2651,7 @@ place lays (Phase 2 stretch).
 
 ---
 
-## O1. Offer completion playbook — Phase 1 `[strong]`
+## O1. Offer completion playbook — Phase 1 `[strong]` ✅ DONE 2026-08-10 (Phase 18)
 
 > **Verified against code 2026-08-10.** Sports offers store Important terms in `offers.rules`
 > JSON (`promo_terms` or racing `bet_get_free_place` + extras) via
@@ -2817,7 +2822,7 @@ P1 (football live card) ◄─ API-Football adapter, feed-sync, N0 entitlements
 
 # PHASE — FOOTBALL LIVE CARD (EDGE)
 
-## P1. Football live card `[strong]`
+## P1. Football live card `[strong]` ✅ Phase 1 DONE 2026-09-11 (Phase 19) — Phase 1b/2/3 outstanding
 
 > **Verified against code 2026-09-05.** Football feed is score + minute + period +
 > AET/pens 90-minute score. Goal tape is fetched only when an open “The bet wins IF”

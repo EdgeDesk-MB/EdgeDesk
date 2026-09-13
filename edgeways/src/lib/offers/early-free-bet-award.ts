@@ -47,6 +47,25 @@ export function freeBetEffectsForBet(
   return [];
 }
 
+/**
+ * Settlement-time awards: parsed trigger first, then risk-free bets that
+ * stored a refund face value but never got trigger text (Refund-If from Add bet).
+ */
+export function settlementFreeBetEffectsForBet(
+  bet: Pick<
+    BetRow,
+    "triggerRule" | "label" | "triggerText" | "betType" | "refundAmount" | "backStake"
+  >
+): AiEffect[] {
+  const existing = freeBetEffectsForBet(bet);
+  if (existing.length > 0) return existing;
+  if (bet.betType !== "risk_free") return [];
+  const amount =
+    bet.refundAmount != null && bet.refundAmount > 0 ? bet.refundAmount : bet.backStake;
+  if (!(amount > 0)) return [];
+  return [{ kind: "free_bet_award", amount, positions: [], awardOnLoss: true }];
+}
+
 /** Unconditional free-bet effect on a bet (empty positions = award on settle, or early). */
 export function unconditionalFreeBetEffect(
   bet: Pick<BetRow, "triggerRule" | "label" | "triggerText">,

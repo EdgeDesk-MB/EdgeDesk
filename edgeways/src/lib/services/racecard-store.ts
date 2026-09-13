@@ -266,8 +266,14 @@ export async function warmRacecardStore(): Promise<{ warmed: string[]; skipped: 
       skipped.push(date);
       continue;
     }
-    await refreshRacecardStore(date);
-    warmed.push(date);
+    // A rate-limited or upstream-down date must not stop the other date (or
+    // pruning below) from warming - each date's upstream call is independent.
+    try {
+      await refreshRacecardStore(date);
+      warmed.push(date);
+    } catch (error) {
+      console.error(`[racecard-store] warm failed for ${date}:`, error);
+    }
   }
   await pruneRacecardStore().catch(() => {});
   return { warmed, skipped };

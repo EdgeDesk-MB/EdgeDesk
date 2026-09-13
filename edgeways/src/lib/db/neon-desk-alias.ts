@@ -1,14 +1,14 @@
 /**
  * Clerk Development and Production issue different user ids for the same
- * email. Hosted desk rows are keyed by clerk_user_id, so localhost (test
- * keys) would otherwise open an empty copy of the Live desk. Resolve to the
- * Neon row that already holds the data.
+ * email. Hosted desk rows are keyed by clerk_user_id, so Live would otherwise
+ * open a second desk. Resolve to the canonical localhost owner row.
  */
 import "server-only";
 
 import { count, inArray, sql } from "drizzle-orm";
 import {
   deskOwnerUserId,
+  isDeskOwnerEmail,
   pickCanonicalNeonClerkUserId,
   type DeskActor,
 } from "@/lib/db/desk-scope";
@@ -31,6 +31,14 @@ export async function resolveCanonicalNeonClerkUserId(
 
   const cached = canonicalByEmail.get(email);
   if (cached) return cached;
+
+  if (isDeskOwnerEmail(email)) {
+    const owner = deskOwnerUserId();
+    if (owner) {
+      canonicalByEmail.set(email, owner);
+      return owner;
+    }
+  }
 
   try {
     const db = getNeonDb();

@@ -29,9 +29,18 @@ subscriptions (EDGE-82). Neon desk cutover done (EDGE-47, restore drill
 verified). Operator-held pooled feeds serve customer-tracked events (EDGE-81,
 D7); admin panel live at `/admin` (EDGE-80). Keyboard chords + `?` sheet
 (EDGE-78) and keyboard settle (EDGE-79) shipped; mobile polish round landed
-(EDGE-84/85/86). EDGE-45 resolved 25 Aug: D8 staged licensing. Remaining:
-EDGE-37 checklist pass, EDGE-33 stranger test, EDGE-67 referral codes.
+(EDGE-84/85/86). EDGE-37 checklist pass and EDGE-67 referral codes are both
+done; referral share links auto-apply the discount at Checkout (EDGE-137,
+4 Sep). EDGE-45 was **cancelled** 13 Sep, not resolved: it had become a
+standing comply-on-contact protocol with no completion condition, so it now
+lives in `docs/decisions/d8-staged-licensing.md` instead of Linear.
 Do **not** flip production back to waitlist.
+
+**Audit correction, 13 Sep 2026.** This file previously claimed EDGE-45 was
+"resolved 25 Aug" and listed EDGE-37 and EDGE-67 as remaining. None of those
+were accurate. Linear had also stopped tracking the product on 27 Aug while
+roughly 2.5 weeks of work shipped; that gap is now back-filled as EDGE-126
+to EDGE-146.
 The D1 gate was opened for launch-path work on
 10 Aug 2026 — evidence tracked as Linear EDGE-36. Work is in Linear: initiative
 **[Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c)**
@@ -60,7 +69,8 @@ history.
 ## 2. Automation setup
 
 Harness reference: `docs/cursor-daily-guide.md` §"Automations". Repo is on GitHub
-(`EdgeDesk-MB/EdgeDesk` — note D4/D7: org rename to Edgeways-MB pending), so
+(`EdgeDesk-MB/EdgeDesk`, note D4/D5b: org rename to Edgeways-MB still pending,
+tracked as EDGE-143), so
 cloud Cursor Automations are available once MCPs are authed.
 
 ### 2.1 Feedback → Linear (first automation to build)
@@ -181,8 +191,14 @@ alone. Decide before F4; it shapes the checkout and entitlement webhook design.
       operator aggregator (see `docs/legal/gambling-licence-assessment.md`).
       Sibling: EDGE-66 public `/contact` and `/refund`. Gibraltar
       incorporation is **not** required (assessment §9, 16 Aug 2026).
-- [ ] **ICO registration** — self-assessment 17 Aug: no fee until trading
-      starts. Retake then (~£40/yr). Production is already live.
+- [ ] **ICO registration (now due, EDGE-9 raised to Urgent 13 Sep 2026).**
+      The 17 Aug self-assessment concluded "no fee until trading starts", and
+      that condition has since been met without anyone revisiting this line.
+      Production went live 4 Sep, Stripe Checkout is open, and the in-app
+      roadmap ships "Paid plans are open." to customers. Edgeways is a live
+      controller of personal data (Clerk accounts, Neon desk rows, feedback
+      reports, PostHog EU, Resend audiences). Register and pay (~£40/yr),
+      then record the number on EDGE-9.
 - [x] **Company form** — sole trader: Sam Hayter trading as Edgeways
       (EDGE-15, 17 Aug). Ltd later if revenue or liability justifies.
 - [ ] **Trademark** — UK IPO search 19 Aug 2026 (EDGE-10, on hold). Hit:
@@ -339,6 +355,19 @@ EDGE-43, deliberately deferred until feedback volume exists):
 | Entitlements & Accounts | N0 matrix, D6, auth, sign-in, enforcement, hosted DB | EDGE-17…22, 47 |
 | Marketing Site & Waitlist | Domain/hosting, landing, waitlist, countdown, SEO, beta, Vercel | EDGE-23…29, 46 |
 | Launch QA & Polish | E3, G2, G4, onboarding, support, evidence, checklist, health, hygiene | EDGE-30…37, 48, 49 |
+| Feedback & Automations | Migration, triage loop, hooks, sweeps, errors → Linear | EDGE-38…43 |
+| Admin & Operator Console | Operator `/admin` pages: attention strip, payments, subscribers, inbox, health | EDGE-114…124 |
+| Post-Launch Desk & Live Sport | Football live card, desk features, Fixtures, performance, mobile (created 13 Sep 2026) | EDGE-128, 132…136, 141, 142 |
+
+> **Project status, 13 Sep 2026.** Payments & Billing, Entitlements & Accounts
+> and Admin & Operator Console are **Completed**. Compliance & Legal, Launch QA
+> & Polish, Feedback & Automations, Marketing & Growth and Post-Launch Desk &
+> Live Sport are **In Progress**. "Marketing Site & Waitlist" was renamed
+> **Marketing & Growth**; the waitlist scope closed on 2 Sep.
+>
+> **The M1/M2/M3 milestone ladder and the six cycles below are historical.**
+> Production launched 4 Sep, ahead of M3 (2 Nov), and no Linear cycle is
+> currently active. Do not plan against the cycle table.
 
 ## 7. Anticipated costs (11 Aug 2026)
 
@@ -394,11 +423,8 @@ wrappers happen.
 trigger fires), then ~£20–39/mo before
 per-sale fees. The first Core subscriber (£9.99/mo) covers a third to a half
 of the monthly run-rate; three subscribers cover it all.
-| Feedback & Automations | Migration, triage loop, hooks, sweeps, errors → Linear | EDGE-38…43 |
 
-Cycle 1 (17–23 Aug): EDGE-1, 2, 8, 9, 17, 18, 23, 24, 38, 39, 40.
-
-## 7. Decisions log (open, oldest first)
+## 8. Decisions log (open, oldest first)
 
 | # | Decision | Options | Due |
 |---|----------|---------|-----|

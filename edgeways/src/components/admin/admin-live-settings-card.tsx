@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AdminLiveSoundToggle } from "@/components/admin/admin-live-sound-toggle";
 import type { AdminLiveSettings } from "@/lib/admin/live-settings-shared";
 
 export function AdminLiveSettingsCard({
@@ -75,9 +76,11 @@ export function AdminLiveSettingsCard({
       <CardHeader>
         <CardTitle className="text-base">Live alerts</CardTitle>
         <CardDescription className="min-w-0 text-pretty break-words">
-          In-app toasts while Admin is open, and owner web push to this account
-          only. Volume bundles in the window below. Critical feed and health
-          alerts skip the wait.
+          In-app toasts while Admin is open, an optional sound on this browser,
+          and owner web push to this account only. Desk activity uses a soft
+          chime. Feed warnings and health drops use a harder alert. Volume
+          bundles in the window below. Critical feed and health alerts skip
+          the wait.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -90,6 +93,7 @@ export function AdminLiveSettingsCard({
               onCheckedChange={setToastsEnabled}
             />
           </div>
+          <AdminLiveSoundToggle />
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="live-push-enabled">Owner web push</Label>
             <Switch

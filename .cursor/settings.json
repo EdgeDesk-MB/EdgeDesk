@@ -8,6 +8,9 @@
     },
     "clerk": {
       "enabled": true
+    },
+    "figma": {
+      "enabled": true
     }
   }
 }

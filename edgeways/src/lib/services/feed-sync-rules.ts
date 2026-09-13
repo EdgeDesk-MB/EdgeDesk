@@ -122,6 +122,9 @@ export function footballEventPatch(
     | "ftHomeScore"
     | "ftAwayScore"
     | "resultPostedAt"
+    | "matchEnding"
+    | "period"
+    | "goals"
   >,
   fixture: Fixture,
   goals: string | null,
@@ -136,22 +139,32 @@ export function footballEventPatch(
     event.status === "finished" &&
     fixture.status === "live" &&
     isExtraTimePeriod(fixture.period);
+  const keepPostedResult =
+    event.status === "finished" &&
+    fixture.status !== "finished" &&
+    !reopenedForExtraTime;
+  const status = keepPostedResult ? event.status : fixture.status;
+  const homeScore = keepPostedResult ? event.homeScore : fixture.homeScore;
+  const awayScore = keepPostedResult ? event.awayScore : fixture.awayScore;
+  const minute = keepPostedResult ? event.minute : fixture.minute;
+  const period = keepPostedResult ? (event.period ?? null) : (fixture.period ?? null);
+  const storedGoals = keepPostedResult ? (event.goals ?? goals) : goals;
   const resultPostedAt = stampResultPostedAt({
     previousStatus: event.status,
     previousPostedAt: event.resultPostedAt,
     startTime: event.startTime,
-    goals,
-    minute: fixture.minute,
+    goals: storedGoals,
+    minute,
     now,
-    incomingStatus: fixture.status,
-    incomingPeriod: fixture.period,
+    incomingStatus: status,
+    incomingPeriod: period,
   });
   return {
-    status: fixture.status,
-    homeScore: fixture.homeScore,
-    awayScore: fixture.awayScore,
-    minute: fixture.minute,
-    period: fixture.period ?? null,
+    status,
+    homeScore,
+    awayScore,
+    minute,
+    period,
     homeLed2:
       event.homeLed2 ||
       (!reopenedForExtraTime &&
@@ -166,7 +179,7 @@ export function footballEventPatch(
       fixture.awayScore - fixture.homeScore >= 2
         ? 1
         : 0),
-    goals,
+    goals: storedGoals,
     resultPostedAt,
     ...(typeof fixture.htHomeScore === "number" || typeof fixture.htAwayScore === "number"
       ? {
@@ -182,6 +195,12 @@ export function footballEventPatch(
           ftHomeScore: event.ftHomeScore ?? event.homeScore,
           ftAwayScore: event.ftAwayScore ?? event.awayScore,
         }
+      : keepPostedResult
+        ? {
+            matchEnding: event.matchEnding ?? null,
+            ftHomeScore: event.ftHomeScore ?? null,
+            ftAwayScore: event.ftAwayScore ?? null,
+          }
       : fixture.matchEnding != null
         ? {
             matchEnding: fixture.matchEnding,

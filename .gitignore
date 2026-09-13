@@ -6,3 +6,12 @@ backups/
 **/.Ulysses*
 .vercel/
 node_modules/
+
+# MCP config holds live API keys/tokens in plaintext — never track this
+.cursor/mcp.json
+
+# Local QA scratch output (Playwright MCP console logs, screenshots, snapshots)
+.playwright-mcp/
+
+# Local screenshot dumps left at repo root by QA loops
+/release-notes-boxed*.png

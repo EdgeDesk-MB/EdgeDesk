@@ -597,6 +597,34 @@ describe("ledgerNeonBetSettlement", () => {
     );
     expect(mocks.txs).toEqual([]);
   });
+
+  it("credits a risk-free refund from refundAmount when trigger text is missing", async () => {
+    // Refund-If from Add bet stores betType + refundAmount, not parsed trigger text.
+    await expect(
+      awardNeonUnconditionalFreeBetIfDue(
+        bet({
+          status: "lost",
+          betType: "risk_free",
+          triggerText: null,
+          triggerRule: null,
+          refundAmount: 61.84,
+          backStake: 61.84,
+          bookmaker: "Bet365",
+          balanceLedgered: 1,
+        })
+      )
+    ).resolves.toBe(true);
+    expect(mocks.txs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountId: 30,
+          amount: 61.84,
+          category: "free_bet",
+          betId: 10,
+        }),
+      ])
+    );
+  });
 });
 
 describe("awardNeonUnconditionalFreeBetsDue", () => {

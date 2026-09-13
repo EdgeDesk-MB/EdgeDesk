@@ -48,7 +48,7 @@ describe("resolveCanonicalNeonClerkUserId", () => {
     ).resolves.toBe(local);
   });
 
-  it("follows the Live desk when the same email has two Clerk ids", async () => {
+  it("follows the localhost desk when the same email has two Clerk ids", async () => {
     mocks.users = [
       { clerkUserId: local, createdAt: 1 },
       { clerkUserId: live, createdAt: 2 },
@@ -57,6 +57,16 @@ describe("resolveCanonicalNeonClerkUserId", () => {
       { clerkUserId: local, n: 159 },
       { clerkUserId: live, n: 160 },
     ];
+    await expect(
+      resolveCanonicalNeonClerkUserId({
+        clerkUserId: local,
+        email: "samhayter.design@gmail.com",
+      })
+    ).resolves.toBe(live);
+  });
+
+  it("follows the owner desk even when app_users only has the older Clerk id", async () => {
+    mocks.users = [{ clerkUserId: local, createdAt: 1 }];
     await expect(
       resolveCanonicalNeonClerkUserId({
         clerkUserId: local,

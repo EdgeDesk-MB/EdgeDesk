@@ -9,7 +9,7 @@ export type AppUpdateSettings = {
 };
 
 export const DEFAULT_APP_UPDATE_MESSAGE =
-  "A new version of Edgeways is ready. Reload to pick up the update.";
+  "A new version of Edgeways is ready.";
 export const DEFAULT_APP_UPDATE_LINK_LABEL = "Reload";
 
 export const DEFAULT_APP_UPDATE: AppUpdateSettings = {
@@ -24,10 +24,40 @@ export const APP_UPDATE_MODE_LABEL: Record<AppUpdateMode, string> = {
 };
 
 export const APP_UPDATE_MODE_HINT: Record<AppUpdateMode, string> = {
-  auto: "Show after a new deploy, on desks that have not reloaded",
+  auto: "Apply on open desks after a new deploy. Waits while a dialog is open",
   off: "Never show on this environment",
   force: "Show now, for checking this environment only",
 };
+
+/** Open modal plates. A reload here would wipe Add bet / match view. */
+export const DESK_BLOCKING_OVERLAY_SELECTOR = [
+  "[data-slot='dialog-content'][data-state='open']",
+  "[data-slot='sheet-content'][data-state='open']",
+  "[data-slot='alert-dialog-content'][data-state='open']",
+  "[role='dialog'][aria-modal='true']",
+].join(", ");
+
+export function shouldAutoApplyAppUpdate(
+  settings: AppUpdateSettings | null | undefined
+): boolean {
+  return settings?.mode === "auto";
+}
+
+export function deskHasBlockingOverlay(root: ParentNode): boolean {
+  return Boolean(root.querySelector(DESK_BLOCKING_OVERLAY_SELECTOR));
+}
+
+/** Auto mode applies itself. Force stays a tap so operators can preview. */
+export function shouldApplyDeskUpdateNow(
+  settings: AppUpdateSettings | null | undefined,
+  bootStamp: string | null | undefined,
+  liveStamp: string | null | undefined,
+  root: ParentNode
+): boolean {
+  if (!appUpdateIsVisible(settings, bootStamp, liveStamp)) return false;
+  if (!shouldAutoApplyAppUpdate(settings)) return false;
+  return !deskHasBlockingOverlay(root);
+}
 
 export const APP_UPDATE_CHANGE_EVENT = "edgeways:app-update";
 

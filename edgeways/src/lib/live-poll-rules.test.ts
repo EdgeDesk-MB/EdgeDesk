@@ -6,6 +6,8 @@ import {
   needsTapeBackfill,
   matchViewShouldPollTape,
   footballBoardShouldPollDay,
+  liveFixtureClockIsStale,
+  liveSnapshotUsable,
   LIVE_POLL_WINDOW_MS,
   RESULT_BACKFILL_MAX_AGE_MS,
   TAPE_REFRESH_MS,
@@ -77,6 +79,26 @@ describe("shouldFetchGoalTimeline", () => {
       shouldFetchGoalTimeline(event, { status: "upcoming", homeScore: 0, awayScore: 0 })
     ).toBe(false);
   });
+
+  it("does not refetch tape when a frozen live=all row arrives after FT", () => {
+    expect(
+      shouldFetchGoalTimeline(
+        { ...event, status: "finished", homeScore: 1, awayScore: 0 },
+        { status: "live", homeScore: 0, awayScore: 0, period: "2H" },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("still fetches tape when a posted FT reopens for extra time", () => {
+    expect(
+      shouldFetchGoalTimeline(
+        { ...event, status: "finished", homeScore: 1, awayScore: 1 },
+        { status: "live", homeScore: 1, awayScore: 1, period: "ET" },
+        NOW
+      )
+    ).toBe(true);
+  });
 });
 
 describe("shouldFetchLineups", () => {
@@ -105,6 +127,62 @@ describe("shouldFetchLineups", () => {
       shouldFetchLineups(
         { lineups: null, startTime: NOW + 5 * 60 * 60 * 1000 },
         { status: "upcoming" },
+        NOW
+      )
+    ).toBe(false);
+  });
+});
+
+describe("liveFixtureClockIsStale", () => {
+  const kickoff = NOW - 121 * 60 * 1000;
+
+  it("flags a 57' snapshot more than two hours after kick-off (Bolton freeze)", () => {
+    expect(
+      liveFixtureClockIsStale(
+        { status: "live", startTime: kickoff, minute: 57, period: "2H" },
+        NOW
+      )
+    ).toBe(true);
+  });
+
+  it("keeps a first-half clock that still matches wall time", () => {
+    expect(
+      liveFixtureClockIsStale(
+        {
+          status: "live",
+          startTime: NOW - 20 * 60 * 1000,
+          minute: 19,
+          period: "1H",
+        },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("does not treat extra time as overdue 90", () => {
+    expect(
+      liveFixtureClockIsStale(
+        {
+          status: "live",
+          startTime: NOW - 130 * 60 * 1000,
+          minute: 105,
+          period: "ET",
+        },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("treats a finished snapshot as usable", () => {
+    expect(
+      liveSnapshotUsable(
+        { status: "finished", startTime: kickoff, minute: 90, period: "FT" },
+        NOW
+      )
+    ).toBe(true);
+    expect(
+      liveSnapshotUsable(
+        { status: "live", startTime: kickoff, minute: 57, period: "2H" },
         NOW
       )
     ).toBe(false);

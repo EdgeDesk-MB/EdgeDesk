@@ -28,6 +28,7 @@ import {
   settleFromOutcome,
   settleRacingBet,
 } from "@/lib/calc";
+import { roundPence } from "@/lib/calc/money";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import { footballFtResultReady } from "@/lib/events/football-full-time";
 import { parseRaceResults, selectionPosition } from "@/lib/racing";
@@ -101,16 +102,52 @@ function finalResultSettlement(bet: BetRow, event: EventRow): EventSettlement | 
   };
 }
 
-/** Null when the bet is not settleable from this event yet. */
-export function settlementForBetOnEvent(
+/**
+ * Decision only — ignores stored status so a corrected selection / market can
+ * re-derive from the recorded result (result-centric).
+ */
+export function derivedSettlementForBetOnEvent(
   bet: BetRow,
   event: EventRow
 ): EventSettlement | null {
-  if (bet.status !== "open") return null;
   if (bet.eventId !== event.id) return null;
   if (hasBetWinTrigger(bet)) {
     if (bet.betType === "dutch") return null;
     return triggerSettlement(bet, event);
   }
   return finalResultSettlement(bet, event);
+}
+
+/** Null when the bet is not settleable from this event yet. */
+export function settlementForBetOnEvent(
+  bet: BetRow,
+  event: EventRow
+): EventSettlement | null {
+  if (bet.status !== "open") return null;
+  return derivedSettlementForBetOnEvent(bet, event);
+}
+
+export function storedSettlementDisagrees(
+  bet: Pick<BetRow, "status" | "actualProfit">,
+  derived: Pick<EventSettlement, "status" | "profit">
+): boolean {
+  if (bet.status === "open") return false;
+  if (bet.status !== derived.status) return true;
+  if (bet.actualProfit == null) return true;
+  return roundPence(bet.actualProfit) !== roundPence(derived.profit);
+}
+
+/**
+ * Stored win/loss that no longer matches the current selection against the
+ * recorded result (e.g. the runner was edited after auto-settle).
+ */
+export function staleSettlementCorrection(
+  bet: BetRow,
+  event: EventRow
+): EventSettlement | null {
+  if (bet.status === "open") return null;
+  const derived = derivedSettlementForBetOnEvent(bet, event);
+  if (!derived) return null;
+  if (!storedSettlementDisagrees(bet, derived)) return null;
+  return derived;
 }

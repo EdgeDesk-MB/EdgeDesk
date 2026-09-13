@@ -14,6 +14,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
+import { AdminLiveSoundToggle } from "@/components/admin/admin-live-sound-toggle";
 import { AdminPage } from "@/components/admin/admin-page";
 import { AdminSection } from "@/components/admin/admin-section";
 import { Button } from "@/components/ui/button";
@@ -131,17 +132,20 @@ export function AdminLiveLog({
       description="Live alerts while Admin is open."
       icon={Bell}
       action={
-        unread > 0 ? (
-          <Button
-            variant="outline"
-            {...pageSecondaryButtonProps}
-            className="gap-1.5"
-            onClick={() => void readAll()}
-          >
-            <CheckCheck className="size-3.5" />
-            Mark all read
-          </Button>
-        ) : undefined
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <AdminLiveSoundToggle className="min-w-0" />
+          {unread > 0 ? (
+            <Button
+              variant="outline"
+              {...pageSecondaryButtonProps}
+              className="gap-1.5"
+              onClick={() => void readAll()}
+            >
+              <CheckCheck className="size-3.5" />
+              Mark all read
+            </Button>
+          ) : null}
+        </div>
       }
     >
       <StatStrip columns={2}>

@@ -39,7 +39,6 @@ import {
   ledgerFromSettledBet,
   getBalanceSummary,
   getPromoAwardsByBetId,
-  ledgerPromoAward,
 } from "@/lib/services/balances";
 import { computePnlBuckets } from "@/lib/pnl/pnl-buckets";
 import {
@@ -60,6 +59,7 @@ import {
   hasApiKey,
   apiUsageToday,
 } from "./apifootball";
+import { alignTrackedFootballFixtures } from "@/lib/services/tracked-feed-align";
 import {
   syncRacingResultsForOpenBets,
   syncRecentTrackedRacingResults,
@@ -85,12 +85,13 @@ import {
 } from "@/lib/pnl/open-bet-worst-case";
 import {
   freeBetAwardPhrase,
-  freeBetEffectsForBet,
+  settlementFreeBetEffectsForBet,
 } from "@/lib/offers/early-free-bet-award";
 import {
-  evaluateFreeBetAward,
-  evaluateUnconditionalFreeBet,
-  isPlaceFreeBetEffect,
+  applyFreeBetEffectsForBet,
+  resyncStaleSettlements,
+} from "@/lib/services/resync-settlement";
+import {
   evaluateTrigger,
   provisionalProfit,
   settleBet,
@@ -102,7 +103,6 @@ import {
 } from "@/lib/calc";
 import { commissionPaidOnSettledBet } from "@/lib/calc/commission-paid";
 import {
-  isRaceResultIncomplete,
   parseRaceResults,
   racingEventStatusDetail,
   selectionPosition,
@@ -252,7 +252,11 @@ async function refreshApiEvents(): Promise<void> {
   if (apiEvents.length === 0) return;
 
   try {
-    const fixtures = await fixturesByIds(apiEvents.map((e) => e.externalId!));
+    const fixtures = await alignTrackedFootballFixtures(
+      apiEvents,
+      await fixturesByIds(apiEvents.map((e) => e.externalId!)),
+      now
+    );
     const tapeLater = new Map<
       number,
       { event: (typeof apiEvents)[number]; fixture: (typeof fixtures)[number] }
@@ -496,7 +500,7 @@ function processAiEffects(): void {
     .from(bets)
     .all()
     .filter((b) => b.betType !== "free_snr" && b.betType !== "free_sr")
-    .filter((b) => freeBetEffectsForBet(b).length > 0);
+    .filter((b) => settlementFreeBetEffectsForBet(b).length > 0);
 
   if (candidates.length === 0) return;
 
@@ -511,24 +515,7 @@ function processAiEffects(): void {
   );
 
   for (const bet of candidates) {
-    for (const effect of freeBetEffectsForBet(bet)) {
-      if (effect.kind !== "free_bet_award") continue;
-
-      if (!isPlaceFreeBetEffect(effect)) {
-        const verdict = evaluateUnconditionalFreeBet(effect, bet.status);
-        if (verdict.met) ledgerPromoAward(bet, effect.amount, verdict.reason);
-        continue;
-      }
-
-      const event = bet.eventId ? byId.get(bet.eventId) : undefined;
-      if (!event || event.status !== "finished" || event.sport !== "horse_racing") continue;
-
-      const race = parseRaceResults(event.goals);
-      if (!race || isRaceResultIncomplete(race)) continue;
-
-      const verdict = evaluateFreeBetAward(effect, bet.selection, race);
-      if (verdict.met) ledgerPromoAward(bet, effect.amount, verdict.reason);
-    }
+    applyFreeBetEffectsForBet(bet, bet.eventId ? byId.get(bet.eventId) : undefined);
   }
 }
 
@@ -756,6 +743,9 @@ export async function getAppState(): Promise<AppState> {
 
   settleTriggers();
   autoSettle();
+  // Selection edits on already-settled bets do not reopen the row, so
+  // re-derive from the recorded result (wrong horse → lost, not still won).
+  resyncStaleSettlements();
   // Fix place-refund triggers stored as unconditional (Course · Horse · offer
   // labels) before settlement side-effects re-credit "Offer unlocked".
   repairMisparsedPlaceFreeBetTriggers();

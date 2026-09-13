@@ -62,6 +62,7 @@ import {
   Calculator,
   Check,
   ChevronDown,
+  ChevronUp,
   Gift,
   Layers2,
   NotebookPen,
@@ -519,7 +520,17 @@ function RunnerRow({
           >
             <div className="flex items-center justify-end gap-0.5">
               {isLiveExchange && (exchSteamer || exchDrifter) && (
-                <PriceMovementArrow movement={exchMove} />
+                exchSteamer ? (
+                  <ChevronDown
+                    className={cn("size-3 shrink-0 text-profit", "live-odds-chevron-down")}
+                    aria-hidden
+                  />
+                ) : (
+                  <ChevronUp
+                    className={cn("size-3 shrink-0 text-negative", "live-odds-chevron-up")}
+                    aria-hidden
+                  />
+                )
               )}
               <span className="font-semibold tabular-nums">
                 {formatDecimalOdds(runner.exchangeDecimal)}

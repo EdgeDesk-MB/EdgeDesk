@@ -5,9 +5,12 @@
 import { jsonSnapshotUnchanged } from "@/lib/services/app-state-snapshot";
 import { slimAppStateForWire } from "@/lib/services/app-state-wire";
 import type { AppState } from "@/lib/services/state.types";
+import { LIVE_FT_OVERDUE_MS } from "@/lib/live-poll-rules";
 
 export const DESK_SNAPSHOT_KEY = "edgeways.deskSnapshot";
-export const DESK_SNAPSHOT_VERSION = 1;
+export const DESK_SNAPSHOT_VERSION = 2;
+/** First paint only. An hour-old Open queue must not outlive a Neon settlement. */
+export const DESK_SNAPSHOT_MAX_AGE_MS = 30_000;
 
 type DeskSnapshot = {
   v: typeof DESK_SNAPSHOT_VERSION;
@@ -31,11 +34,17 @@ function isAppState(value: unknown): value is AppState {
   );
 }
 
-export function parseDeskSnapshot(raw: string | null): AppState | null {
+export function parseDeskSnapshot(
+  raw: string | null,
+  now = Date.now()
+): AppState | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<DeskSnapshot>;
     if (parsed.v !== DESK_SNAPSHOT_VERSION) return null;
+    if (typeof parsed.at !== "number" || now - parsed.at > DESK_SNAPSHOT_MAX_AGE_MS) {
+      return null;
+    }
     if (!isAppState(parsed.state)) return null;
     return parsed.state;
   } catch {
@@ -89,6 +98,24 @@ export function writeDeskSnapshot(state: AppState): void {
       state: next,
     } satisfies DeskSnapshot)
   );
+}
+
+/** Open bets whose event is past the result window: the snapshot is behind Neon. */
+export function openBetsPastResultWindow(
+  state: Pick<AppState, "bets" | "events">,
+  now = Date.now()
+): boolean {
+  const byId = new Map(state.events.map((event) => [event.id, event]));
+  return state.bets.some((bet) => {
+    if (bet.status !== "open" || bet.eventId == null) return false;
+    const event = byId.get(bet.eventId);
+    if (!event?.startTime) return false;
+    const age = now - event.startTime;
+    if ((event.sport ?? "football") === "horse_racing") {
+      return age > 90 * 60 * 1000;
+    }
+    return age > LIVE_FT_OVERDUE_MS;
+  });
 }
 
 export function subscribeDeskSnapshot(onStoreChange: () => void): () => void {

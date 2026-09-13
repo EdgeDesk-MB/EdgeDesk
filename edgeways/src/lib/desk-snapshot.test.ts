@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DESK_SNAPSHOT_VERSION,
+  openBetsPastResultWindow,
   parseDeskSnapshot,
   readDeskSnapshot,
   slimDeskSnapshot,
@@ -74,20 +75,32 @@ describe("parseDeskSnapshot", () => {
     const state = sample();
     expect(
       parseDeskSnapshot(
-        JSON.stringify({ v: DESK_SNAPSHOT_VERSION, at: 1, state })
+        JSON.stringify({ v: DESK_SNAPSHOT_VERSION, at: 1, state }),
+        1
       )
     ).toEqual(state);
+  });
+
+  it("rejects a snapshot older than the first-paint window", () => {
+    const state = sample();
+    expect(
+      parseDeskSnapshot(
+        JSON.stringify({ v: DESK_SNAPSHOT_VERSION, at: 1, state }),
+        1 + 31_000
+      )
+    ).toBeNull();
   });
 
   it("rejects a missing or foreign payload", () => {
     expect(parseDeskSnapshot(null)).toBeNull();
     expect(parseDeskSnapshot("{")).toBeNull();
     expect(
-      parseDeskSnapshot(JSON.stringify({ v: 0, at: 1, state: sample() }))
+      parseDeskSnapshot(JSON.stringify({ v: 0, at: 1, state: sample() }), 1)
     ).toBeNull();
     expect(
       parseDeskSnapshot(
-        JSON.stringify({ v: DESK_SNAPSHOT_VERSION, at: 1, state: { bets: [] } })
+        JSON.stringify({ v: DESK_SNAPSHOT_VERSION, at: 1, state: { bets: [] } }),
+        1
       )
     ).toBeNull();
   });
@@ -171,5 +184,62 @@ describe("writeDeskSnapshot", () => {
     const first = readDeskSnapshot();
     writeDeskSnapshot(state);
     expect(readDeskSnapshot()).toBe(first);
+  });
+});
+
+describe("openBetsPastResultWindow", () => {
+  it("flags a still-open football bet hours after kick-off", () => {
+    const kickoff = 1_800_000_000_000;
+    const state = sample({
+      bets: [
+        {
+          id: 740,
+          eventId: 126,
+          status: "open",
+          label: "Match odds home",
+        } as AppState["bets"][number],
+      ],
+      events: [
+        {
+          id: 126,
+          sport: "football",
+          startTime: kickoff,
+          status: "live",
+          homeTeam: "Bolton",
+          awayTeam: "Cardiff",
+        } as AppState["events"][number],
+      ],
+    });
+    expect(openBetsPastResultWindow(state, kickoff + 3 * 60 * 60 * 1000)).toBe(
+      true
+    );
+    expect(openBetsPastResultWindow(state, kickoff + 10 * 60 * 1000)).toBe(
+      false
+    );
+  });
+
+  it("flags a still-open race after the 90-minute live window", () => {
+    const off = 1_800_000_000_000;
+    const state = sample({
+      bets: [
+        {
+          id: 742,
+          eventId: 128,
+          status: "open",
+          label: "Winner Holy See",
+        } as AppState["bets"][number],
+      ],
+      events: [
+        {
+          id: 128,
+          sport: "horse_racing",
+          startTime: off,
+          status: "upcoming",
+          homeTeam: "Chester",
+          awayTeam: "14:05",
+        } as AppState["events"][number],
+      ],
+    });
+    expect(openBetsPastResultWindow(state, off + 91 * 60 * 1000)).toBe(true);
   });
 });

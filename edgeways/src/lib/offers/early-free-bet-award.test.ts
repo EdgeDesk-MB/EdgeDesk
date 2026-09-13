@@ -5,6 +5,7 @@ import {
   FREE_BET_EARNED_PHRASE,
   FREE_BET_WON_PHRASE,
   freeBetAwardPhrase,
+  settlementFreeBetEffectsForBet,
   showEarlyFreeBetAwardButton,
   titleHasFreeBetAwardPhrase,
   unconditionalFreeBetEffect,
@@ -65,6 +66,36 @@ describe("freeBetAwardPhrase", () => {
     expect(titleHasFreeBetAwardPhrase("Bet lost · Free bet won!")).toBe(true);
     expect(titleHasFreeBetAwardPhrase("Acca lost · Free bet earned!")).toBe(true);
     expect(titleHasFreeBetAwardPhrase("Bet lost")).toBe(false);
+  });
+});
+
+describe("settlementFreeBetEffectsForBet", () => {
+  it("uses refundAmount on a risk-free bet with no trigger text", () => {
+    expect(
+      settlementFreeBetEffectsForBet({
+        triggerRule: null,
+        label: "Winner Al Jabbar",
+        triggerText: null,
+        betType: "risk_free",
+        refundAmount: 61.84,
+        backStake: 61.84,
+      })
+    ).toEqual([
+      { kind: "free_bet_award", amount: 61.84, positions: [], awardOnLoss: true },
+    ]);
+  });
+
+  it("does not invent a refund on a qualifying bet", () => {
+    expect(
+      settlementFreeBetEffectsForBet({
+        triggerRule: null,
+        label: "Qualify",
+        triggerText: null,
+        betType: "qualifying",
+        refundAmount: null,
+        backStake: 10,
+      })
+    ).toEqual([]);
   });
 });
 

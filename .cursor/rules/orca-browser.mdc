@@ -1,0 +1,34 @@
+---
+description: Use Orca in-browser for Edgeways UI checks, not Playwright
+alwaysApply: true
+---
+
+# Browser: Orca in-browser first
+
+For localhost / desk UI (verify a page, click through a flow, screenshot),
+drive **Orca's embedded browser**. Do not open Playwright MCP or
+Chrome DevTools for that work.
+
+Load `orca-cli` then `references/browser.md` before the first tab command.
+
+## Do
+
+- Resolve the CLI: `ORCA_CLI_COMMAND` if set, else `orca`. If that fails
+  with a symlink error, use
+  `/Applications/Orca.app/Contents/Resources/bin/orca`.
+- Open a **new** tab: `orca tab create --url <url> --json`. Stay on that tab.
+- Loop: `goto` / `snapshot` / `click --element @eN` / `screenshot`. Re-snapshot
+  after navigation or a stale ref.
+- Prefer `orca wait --text|--url|--selector|--load` over bare sleeps.
+
+## Do not
+
+- Call Playwright or Chrome DevTools MCP (`browser_*` in those namespaces)
+  for Edgeways pages.
+- Attach to or navigate a tab Sam already has open.
+- Use Computer Use for in-app pages (that is for OS windows only).
+
+## Exceptions
+
+- Sam names Playwright / CDP / an external site.
+- `browser_host_unavailable` after retry: say so, then fall back.

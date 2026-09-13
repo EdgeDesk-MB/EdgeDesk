@@ -1,6 +1,6 @@
 ---
 name: visual-qa-loop
-description: Run a screenshot-driven verification loop after any UI change. Use when implementing or modifying frontend UI, before declaring visual work complete, or when the user asks to check/QA/verify the interface. Requires a running dev server and a browser tool (Playwright/browser MCP); falls back to static checks if unavailable.
+description: Run a screenshot-driven verification loop after any UI change. Use when implementing or modifying frontend UI, before declaring visual work complete, or when the user asks to check/QA/verify the interface. Requires a running dev server and Orca's embedded browser (orca-cli references/browser.md). Playwright / Chrome DevTools only if Sam asks or Orca cannot host the page. Falls back to static checks if no browser is available.
 ---
 
 # Visual QA Loop
@@ -9,7 +9,9 @@ UI work is not done when the code compiles — it is done when the rendered resu
 
 ## The loop
 
-1. **Render** — ensure the dev server is running; navigate to the changed screen.
+1. **Render** — ensure the dev server is running. Open a **new** Orca
+   tab (`orca tab create --url …`) and work only in that tab. Do not use
+   Playwright MCP for Edgeways pages.
 2. **Capture** — take screenshots at three viewports minimum:
    - Mobile: 375×812
    - Tablet: 768×1024

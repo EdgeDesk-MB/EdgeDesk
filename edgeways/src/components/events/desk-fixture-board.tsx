@@ -82,6 +82,7 @@ import {
 import { footballPhaseLabel, sortFixturesByKickoff, withEffectiveFeedStatus } from "@/lib/events";
 import {
   bumpTapeGoalPreviewHome,
+  resolveTapeLastGoal,
   tapeGoalPreviewRequested,
 } from "@/lib/events/fixture-tape-goal";
 import {
@@ -538,8 +539,12 @@ function fixtureTapeEvent(
     externalId: fixture.externalId,
     source: "api",
     sport: "football",
+    lastGoalSide: fixture.lastGoalSide,
+    lastGoalMinute: fixture.lastGoalMinute,
     goalSeed:
-      goalSeed && (goalSeed.home || goalSeed.away) ? goalSeed : undefined,
+      goalSeed && (goalSeed.home || goalSeed.away) && !(goalSeed.home && goalSeed.away)
+        ? goalSeed
+        : undefined,
   };
 }
 
@@ -561,6 +566,8 @@ function liveTapeDialogEvent(
     minute: row.minute,
     period: extra.period ?? tape.period,
     matchEnding: extra.matchEnding ?? tape.matchEnding,
+    lastGoalSide: extra.lastGoalSide ?? tape.lastGoalSide,
+    lastGoalMinute: extra.lastGoalMinute ?? tape.lastGoalMinute,
   };
 }
 
@@ -568,7 +575,10 @@ function fixtureTeamBack(
   fixture: Fixture,
   eventId: number | undefined,
   teamBackByEventId: Map<number, { home: SideBackMark | null; away: SideBackMark | null }>,
-  footballEventById: Map<number, { homeTeam: string; awayTeam: string }>
+  footballEventById: Map<
+    number,
+    { homeTeam: string; awayTeam: string; goals?: string | null }
+  >
 ) {
   if (eventId == null) return undefined;
   const marks = teamBackByEventId.get(eventId);
@@ -653,6 +663,7 @@ function FootballTapeRow({
   onTrack,
   onUntrack,
   goalPreview,
+  trackedGoals,
 }: {
   fixture: Fixture;
   eventId?: number;
@@ -668,16 +679,25 @@ function FootballTapeRow({
   onTrack?: () => void;
   onUntrack?: () => void;
   goalPreview?: boolean;
+  trackedGoals?: string | null;
 }) {
   const live = fixture.status === "live";
   const rowRef = useRef<HTMLLIElement>(null);
   const upcoming = fixture.status === "upcoming";
   const finished = fixture.status === "finished";
+  const lastGoal = resolveTapeLastGoal(
+    { home: fixture.homeScore ?? 0, away: fixture.awayScore ?? 0 },
+    trackedGoals,
+    fixture
+  );
   const goalFlash = useTapeGoalFlash(
     fixture.externalId ?? fixtureScoutKey(fixture),
     fixture.homeScore ?? 0,
     fixture.awayScore ?? 0,
-    live
+    live,
+    undefined,
+    lastGoal,
+    fixture.minute
   );
   useEffect(() => {
     if (!goalPreview) return;
@@ -793,6 +813,7 @@ function FootballTapeRow({
               awayOdds={scout?.markets.away}
               homeLabel={fixture.homeTeam}
               awayLabel={fixture.awayTeam}
+              chevronSide="left"
             />
           ) : null}
         </div>
@@ -1080,7 +1101,10 @@ function FootballCompetitionSection({
   onOpenTape: (event: FootballTapeDialogEvent) => void;
   eventIdByExternalId: Map<string, number>;
   teamBackByEventId: Map<number, { home: SideBackMark | null; away: SideBackMark | null }>;
-  footballEventById: Map<number, { homeTeam: string; awayTeam: string }>;
+  footballEventById: Map<
+    number,
+    { homeTeam: string; awayTeam: string; goals?: string | null }
+  >;
   displayTimezone: string;
   favourite: boolean;
   onToggleFavourite: () => void;
@@ -1183,6 +1207,7 @@ function FootballCompetitionSection({
                     tracked={trackedExternalIds.has(fixture.externalId)}
                     onTrack={() => onTrackFixture(fixture)}
                     onUntrack={() => onUntrackFixture(fixture)}
+                    trackedGoals={eventId != null ? footballEventById.get(eventId)?.goals : undefined}
                     goalPreview={
                       (fixture.externalId ?? fixtureScoutKey(fixture)) ===
                       goalPreviewKey
@@ -1330,7 +1355,10 @@ function FootballKickoffList({
   onOpenTape: (event: FootballTapeDialogEvent) => void;
   eventIdByExternalId: Map<string, number>;
   teamBackByEventId: Map<number, { home: SideBackMark | null; away: SideBackMark | null }>;
-  footballEventById: Map<number, { homeTeam: string; awayTeam: string }>;
+  footballEventById: Map<
+    number,
+    { homeTeam: string; awayTeam: string; goals?: string | null }
+  >;
   displayTimezone: string;
   showScope?: boolean;
   favouriteScopeIds?: Set<string>;
@@ -1384,6 +1412,7 @@ function FootballKickoffList({
               tracked={trackedExternalIds.has(fixture.externalId)}
               onTrack={() => onTrackFixture(fixture)}
               onUntrack={() => onUntrackFixture(fixture)}
+              trackedGoals={eventId != null ? footballEventById.get(eventId)?.goals : undefined}
             />
           );
         })}
@@ -1671,7 +1700,10 @@ export function DeskFixtureBoard({
     return map;
   }, [state?.events]);
   const footballEventById = useMemo(() => {
-    const map = new Map<number, { homeTeam: string; awayTeam: string }>();
+    const map = new Map<
+      number,
+      { homeTeam: string; awayTeam: string; goals?: string | null }
+    >();
     for (const event of state?.events ?? []) {
       if ((event.sport ?? "football") === "horse_racing") continue;
       map.set(event.id, event);

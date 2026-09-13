@@ -21,6 +21,23 @@ export const FEED_SYNC_MIN_INTERVAL_MS = 20_000;
 /** The single feed key. One poller covers football scores + racing results. */
 export const FEED_SYNC_KEY = "feed:live";
 
+/**
+ * Who may take the global Neon feed lease.
+ *
+ * Vercel (Live / preview) is the poller. A Mac Next process sharing Neon has
+ * its own in-memory `live=all` cache, which can freeze a finished match at a
+ * stale minute and write that over Neon. Localhost therefore reads Neon and
+ * does not poll unless EDGEWAYS_FEED_SYNC=1.
+ */
+export function hostedFeedSyncEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const flag = env.EDGEWAYS_FEED_SYNC?.trim();
+  if (flag === "0") return false;
+  if (flag === "1") return true;
+  return env.VERCEL === "1";
+}
+
 export type FeedSyncStateRow = {
   key: string;
   lastRunAt: number;

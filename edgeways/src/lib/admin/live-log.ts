@@ -16,6 +16,7 @@ import {
   type AdminLiveLogList,
   type AdminLiveLogRow,
 } from "@/lib/admin/live-log-shared";
+import { londonDayRangeMs, londonYmd } from "@/lib/admin/activity-day";
 import {
   liveBundleConfigFromSettings,
   readAdminLiveLogCursor,
@@ -179,7 +180,7 @@ export async function recordAdminLiveBundles(
         body,
         href: bundle.href,
         count: bundle.count,
-        createdAt: now,
+        createdAt: bundle.at ?? now,
         updatedAt: now,
         readAt,
       });
@@ -339,8 +340,14 @@ export async function ingestAdminLiveLog(input?: {
     readAdminLiveLogCursor(),
   ]);
   const config = liveBundleConfigFromSettings(settings);
+  const todayStart =
+    londonDayRangeMs(londonYmd(new Date(now)))?.start ?? now - 86_400_000;
   const since =
-    cursor.since > 0 ? cursor.since : Math.max(0, now - config.windowMs);
+    cursor.since > 0
+      ? input?.force
+        ? Math.min(cursor.since, todayStart)
+        : cursor.since
+      : todayStart;
 
   const assembled = await assembleLiveBundles({
     since,
@@ -348,6 +355,7 @@ export async function ingestAdminLiveLog(input?: {
     pingNeon: input?.pingNeon === true,
     critical: cursor.critical,
     config,
+    purpose: "log",
   });
   const recorded = await recordAdminLiveBundles(assembled.bundles, now);
   await writeAdminLiveLogCursor({

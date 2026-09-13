@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   TAPE_GOAL_FLASH_MS,
+  tapeGoalFromLastSideChange,
+  tapeGoalFromLatestEvent,
   tapeGoalFromScoreDelta,
   tapeGoalPreviewRequested,
   type TapeGoalFlash,
+  type TapeLastGoal,
 } from "@/lib/events/fixture-tape-goal";
 
 const QUIET: TapeGoalFlash = { home: false, away: false };
@@ -16,41 +19,92 @@ export function useTapeGoalFlash(
   home: number,
   away: number,
   active: boolean,
-  seed?: TapeGoalFlash | null
+  seed?: TapeGoalFlash | null,
+  lastGoal?: TapeLastGoal | null,
+  matchMinute?: number | null
 ): TapeGoalFlash {
   const prevRef = useRef<{ key: string; home: number; away: number } | null>(null);
   const seededKey = useRef<string | null>(null);
+  const lastSideRef = useRef<"home" | "away" | null>(null);
+  const timeoutRef = useRef<number | null>(null);
   const [flash, setFlash] = useState<TapeGoalFlash>(QUIET);
 
   useEffect(() => {
+    function clearHold() {
+      if (timeoutRef.current != null) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    }
+    function hold(hit: TapeGoalFlash) {
+      setFlash(hit);
+      clearHold();
+      timeoutRef.current = window.setTimeout(() => {
+        timeoutRef.current = null;
+        setFlash(QUIET);
+      }, TAPE_GOAL_FLASH_MS);
+    }
+
     const next = { key, home, away };
+    const prevLastSide = lastSideRef.current;
+    lastSideRef.current = lastGoal?.side ?? null;
     if (!active) {
       prevRef.current = next;
       seededKey.current = null;
+      lastSideRef.current = null;
+      clearHold();
       setFlash(QUIET);
       return;
     }
     const prev = prevRef.current;
     prevRef.current = next;
-    if (seed && (seed.home || seed.away) && seededKey.current !== key) {
+    const exclusiveSeed =
+      seed && seed.home && seed.away
+        ? null
+        : seed && (seed.home || seed.away)
+          ? seed
+          : null;
+    if (exclusiveSeed && seededKey.current !== key) {
       seededKey.current = key;
-      setFlash(seed);
-      const clear = window.setTimeout(() => setFlash(QUIET), TAPE_GOAL_FLASH_MS);
-      return () => window.clearTimeout(clear);
-    }
-    if (!prev || prev.key !== key) return;
-    const hit = tapeGoalFromScoreDelta(
-      { home: prev.home, away: prev.away },
-      { home, away }
-    );
-    if (!hit) {
-      if (home < prev.home || away < prev.away) setFlash(QUIET);
+      hold(exclusiveSeed);
       return;
     }
-    setFlash(hit);
-    const clear = window.setTimeout(() => setFlash(QUIET), TAPE_GOAL_FLASH_MS);
-    return () => window.clearTimeout(clear);
-  }, [key, home, away, active, seed?.home, seed?.away]);
+    const lastSide = lastGoal?.side ?? null;
+    if (!prev || prev.key !== key) {
+      const recent = tapeGoalFromLatestEvent(lastGoal ?? null, matchMinute);
+      if (recent) hold(recent);
+      return;
+    }
+    const hit = tapeGoalFromScoreDelta(
+      { home: prev.home, away: prev.away },
+      { home, away },
+      lastSide
+    );
+    if (hit) {
+      hold(hit);
+      return;
+    }
+    const catchUp = tapeGoalFromLastSideChange(
+      prevLastSide,
+      lastGoal ?? null,
+      matchMinute
+    );
+    if (catchUp) {
+      hold(catchUp);
+      return;
+    }
+    if (home < prev.home || away < prev.away) {
+      clearHold();
+      setFlash(QUIET);
+    }
+  }, [key, home, away, active, seed?.home, seed?.away, lastGoal?.side, lastGoal?.minute, matchMinute]);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current != null) window.clearTimeout(timeoutRef.current);
+    },
+    []
+  );
 
   return flash;
 }

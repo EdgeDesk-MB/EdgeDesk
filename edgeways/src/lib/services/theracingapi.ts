@@ -18,7 +18,14 @@ import {
 import type { RacingRunnerDetail } from "@/lib/racing-desk/types";
 import { spLabelMarksFavourite } from "@/lib/racing/odds";
 import { parseJockeyName } from "@/lib/racing/runner-display";
-import { localCalendarDate, londonWallToUtcMs, normaliseRacingApiOffTime } from "@/lib/events";
+import { DEFAULT_DISPLAY_TIMEZONE } from "@/lib/display-timezone";
+import {
+  localCalendarDate,
+  londonWallToUtcMs,
+  normaliseRacingApiOffTime,
+  racingVenueLabel,
+} from "@/lib/events";
+import { formatClockTime } from "@/lib/time-format";
 
 const BASE = "https://api.theracingapi.com";
 
@@ -83,6 +90,26 @@ const RACECARDS_TTL = 15 * 60 * 1000;
 const RESULTS_TTL_IDLE = 5 * 60 * 1000;
 /** Fresher window when settling open bets / incomplete tracked races. */
 export const RESULTS_TTL_ACTIVE = 90 * 1000;
+/** When a requested race is missing from cache, refetch after this. */
+export const RESULTS_TTL_MISSING_MS = 15 * 1000;
+
+/** Course + off-time key so a results row still matches when race_id differs. */
+export function raceCourseOffKey(
+  course: string,
+  offTimeOrStart: string | number
+): string {
+  const off =
+    typeof offTimeOrStart === "number"
+      ? formatClockTime(offTimeOrStart, {
+          timeZone: DEFAULT_DISPLAY_TIMEZONE,
+          format: "24h",
+        })
+      : normaliseRacingApiOffTime(offTimeOrStart);
+  const venue = racingVenueLabel(course)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return `${venue}|${off}`;
+}
 
 export type ResultsTodayOptions = {
   /**
@@ -304,7 +331,9 @@ function mapRacecard(item: any, now: number): RacingRacecard {
   };
 }
 
-function mapResult(item: any): { raceId: string; result: RaceResult } | null {
+function mapResult(
+  item: any
+): { raceId: string; result: RaceResult; courseOffKey?: string } | null {
   const raceId = String(item.race_id ?? "");
   if (!raceId) return null;
 
@@ -339,6 +368,8 @@ function mapResult(item: any): { raceId: string; result: RaceResult } | null {
 
   if (!winner) return null;
 
+  const course = String(item.course ?? "").trim();
+  const off = String(item.off_time ?? item.offTime ?? "").trim();
   return {
     raceId,
     result: {
@@ -347,6 +378,7 @@ function mapResult(item: any): { raceId: string; result: RaceResult } | null {
       runners,
       fieldSize: Number(item.field_size) || runners.length,
     },
+    ...(course && off ? { courseOffKey: raceCourseOffKey(course, off) } : {}),
   };
 }
 
@@ -432,6 +464,8 @@ export type RacingResultsTier = "basic" | "free" | "none";
 
 export interface ResultsTodayPayload {
   results: Map<string, RaceResult>;
+  byCourseOff: Map<string, RaceResult>;
+  fetchedAt: number;
   /** True when credentials exist but the plan cannot call results (Free tier). */
   tierBlocked: boolean;
   /** True when a previous day's `/v1/results` needs Standard. */
@@ -441,6 +475,7 @@ export interface ResultsTodayPayload {
 
 interface ResultsCacheData {
   results: Map<string, RaceResult>;
+  byCourseOff: Map<string, RaceResult>;
   tierBlocked: boolean;
   historicBlocked?: boolean;
   tier: RacingResultsTier;
@@ -472,9 +507,30 @@ export async function resolveRacingResultsTier(): Promise<RacingResultsTier> {
   return payload.tier;
 }
 
-async function fetchPagedResults(basePath: string): Promise<Map<string, RaceResult>> {
+type IndexedResults = {
+  results: Map<string, RaceResult>;
+  byCourseOff: Map<string, RaceResult>;
+};
+
+function payloadFromCache(
+  data: ResultsCacheData,
+  fetchedAt: number,
+  extra: Partial<Pick<ResultsTodayPayload, "historicBlocked">> = {}
+): ResultsTodayPayload {
+  return {
+    results: data.results,
+    byCourseOff: data.byCourseOff ?? new Map(),
+    fetchedAt,
+    tierBlocked: data.tierBlocked,
+    historicBlocked: extra.historicBlocked ?? data.historicBlocked,
+    tier: data.tier,
+  };
+}
+
+async function fetchPagedResults(basePath: string): Promise<IndexedResults> {
   const pageSize = 100;
-  const map = new Map<string, RaceResult>();
+  const results = new Map<string, RaceResult>();
+  const byCourseOff = new Map<string, RaceResult>();
   let skip = 0;
   let total = Number.POSITIVE_INFINITY;
   const joiner = basePath.includes("?") ? "&" : "?";
@@ -485,13 +541,29 @@ async function fetchPagedResults(basePath: string): Promise<Map<string, RaceResu
     if (!Number.isFinite(total) || total < 0) total = skip + page.length;
     for (const item of page) {
       const mapped = mapResult(item);
-      if (mapped) map.set(mapped.raceId, mapped.result);
+      if (!mapped) continue;
+      results.set(mapped.raceId, mapped.result);
+      if (mapped.courseOffKey) byCourseOff.set(mapped.courseOffKey, mapped.result);
     }
     if (page.length === 0) break;
     skip += page.length;
     if (page.length < pageSize) break;
   }
-  return map;
+  return { results, byCourseOff };
+}
+
+function emptyPayload(
+  tier: RacingResultsTier,
+  extra: Partial<Pick<ResultsTodayPayload, "tierBlocked" | "historicBlocked">> = {}
+): ResultsTodayPayload {
+  return {
+    results: new Map(),
+    byCourseOff: new Map(),
+    fetchedAt: Date.now(),
+    tierBlocked: extra.tierBlocked ?? false,
+    historicBlocked: extra.historicBlocked,
+    tier,
+  };
 }
 
 /** Basic tier - today's results with finishing positions. */
@@ -503,36 +575,40 @@ export async function resultsToday(
   const hit = cache.get(cacheKey) as CacheEntry<ResultsCacheData> | undefined;
   if (hit && Date.now() - hit.at < maxStaleMs) {
     rememberResultsTier(hit.data.tier);
-    return {
-      results: hit.data.results,
-      tierBlocked: hit.data.tierBlocked,
-      tier: hit.data.tier,
-    };
+    return payloadFromCache(hit.data, hit.at);
   }
 
   if (!hasRacingApiKey()) {
     rememberResultsTier("none");
-    return { results: new Map(), tierBlocked: false, tier: "none" };
+    return emptyPayload("none");
   }
 
   try {
-    const map = await singleFlight(cacheKey, () =>
+    const indexed = await singleFlight(cacheKey, () =>
       fetchPagedResults("/v1/results/today?region=gb&region=ire")
     );
-    const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
-    cache.set(cacheKey, { at: Date.now(), data });
+    const data: ResultsCacheData = {
+      results: indexed.results,
+      byCourseOff: indexed.byCourseOff,
+      tierBlocked: false,
+      tier: "basic",
+    };
+    const at = Date.now();
+    cache.set(cacheKey, { at, data });
     rememberResultsTier("basic");
-    return { results: map, tierBlocked: false, tier: "basic" };
+    return payloadFromCache(data, at);
   } catch (e) {
     if (isRacingTierAccessError(e)) {
       const data: ResultsCacheData = {
         results: new Map(),
+        byCourseOff: new Map(),
         tierBlocked: true,
         tier: "free",
       };
-      cache.set(cacheKey, { at: Date.now(), data });
+      const at = Date.now();
+      cache.set(cacheKey, { at, data });
       rememberResultsTier("free");
-      return { results: new Map(), tierBlocked: true, tier: "free" };
+      return payloadFromCache(data, at);
     }
     throw e;
   }
@@ -552,42 +628,42 @@ export async function resultsForDate(
   const cacheKey = `results:date:${date}`;
   const hit = cache.get(cacheKey) as CacheEntry<ResultsCacheData> | undefined;
   if (hit && Date.now() - hit.at < maxStaleMs) {
-    return {
-      results: hit.data.results,
-      tierBlocked: false,
+    return payloadFromCache(hit.data, hit.at, {
       historicBlocked: Boolean(hit.data.historicBlocked),
-      tier: hit.data.tier,
-    };
+    });
   }
 
   if (!hasRacingApiKey()) {
-    return { results: new Map(), tierBlocked: false, historicBlocked: false, tier: "none" };
+    return emptyPayload("none", { historicBlocked: false });
   }
 
   try {
-    const map = await singleFlight(cacheKey, () =>
+    const indexed = await singleFlight(cacheKey, () =>
       fetchPagedResults(
         `/v1/results?start_date=${encodeURIComponent(date)}&end_date=${encodeURIComponent(date)}&region=gb&region=ire`
       )
     );
-    const data: ResultsCacheData = { results: map, tierBlocked: false, tier: "basic" };
-    cache.set(cacheKey, { at: Date.now(), data });
-    return { results: map, tierBlocked: false, historicBlocked: false, tier: "basic" };
+    const data: ResultsCacheData = {
+      results: indexed.results,
+      byCourseOff: indexed.byCourseOff,
+      tierBlocked: false,
+      tier: "basic",
+    };
+    const at = Date.now();
+    cache.set(cacheKey, { at, data });
+    return payloadFromCache(data, at, { historicBlocked: false });
   } catch (e) {
     if (isRacingTierAccessError(e)) {
       const data: ResultsCacheData = {
         results: new Map(),
+        byCourseOff: new Map(),
         tierBlocked: false,
         historicBlocked: true,
         tier: getCachedRacingResultsTier(),
       };
-      cache.set(cacheKey, { at: Date.now(), data });
-      return {
-        results: new Map(),
-        tierBlocked: false,
-        historicBlocked: true,
-        tier: data.tier,
-      };
+      const at = Date.now();
+      cache.set(cacheKey, { at, data });
+      return payloadFromCache(data, at, { historicBlocked: true });
     }
     throw e;
   }
@@ -627,7 +703,10 @@ export async function racecardsByDate(
 
 export async function resultsForRaceIds(
   raceIds: string[],
-  options: ResultsTodayOptions & { dateByRaceId?: Record<string, string> } = {}
+  options: ResultsTodayOptions & {
+    dateByRaceId?: Record<string, string>;
+    aliasByRaceId?: Record<string, string>;
+  } = {}
 ): Promise<{
   results: Map<string, RaceResult>;
   tierBlocked: boolean;
@@ -657,13 +736,31 @@ export async function resultsForRaceIds(
   let historicBlocked = false;
   let tier: RacingResultsTier = getCachedRacingResultsTier();
 
+  const resolveHit = (
+    payload: ResultsTodayPayload,
+    id: string
+  ): RaceResult | undefined => {
+    const direct = payload.results.get(id);
+    if (direct) return direct;
+    const alias = options.aliasByRaceId?.[id];
+    return alias ? payload.byCourseOff.get(alias) : undefined;
+  };
+
   for (const [date, ids] of groups) {
-    const payload = await resultsForDate(date, options);
+    let payload = await resultsForDate(date, options);
+    const missing = ids.filter((id) => !resolveHit(payload, id));
+    if (
+      missing.length > 0 &&
+      !payload.tierBlocked &&
+      Date.now() - payload.fetchedAt >= RESULTS_TTL_MISSING_MS
+    ) {
+      payload = await resultsForDate(date, { ...options, maxStaleMs: 0 });
+    }
     if (payload.tierBlocked) tierBlocked = true;
     if (payload.historicBlocked) historicBlocked = true;
     if (date === today) tier = payload.tier;
     for (const id of ids) {
-      const hit = payload.results.get(id);
+      const hit = resolveHit(payload, id);
       if (hit) out.set(id, hit);
     }
   }

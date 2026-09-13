@@ -104,6 +104,14 @@ export function alignSideBackMarksToFixture(
   fixture: { homeTeam: string; awayTeam: string },
   marks: { home: SideBackMark | null; away: SideBackMark | null }
 ): { home: SideBackMark | null; away: SideBackMark | null } {
+  // A same-city derby (e.g. "Manchester United" vs "Manchester City") can
+  // pass the swapped check on a shared surname token even when the fixture
+  // already agrees with the event side for side. Trust a direct match first;
+  // only swap when the sides truly disagree.
+  const aligned =
+    footballTeamsMatch(fixture.homeTeam, event.homeTeam) &&
+    footballTeamsMatch(fixture.awayTeam, event.awayTeam);
+  if (aligned) return marks;
   const swapped =
     footballTeamsMatch(fixture.homeTeam, event.awayTeam) &&
     footballTeamsMatch(fixture.awayTeam, event.homeTeam);

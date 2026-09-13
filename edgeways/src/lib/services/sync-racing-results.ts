@@ -14,6 +14,7 @@ import {
   clearRacingResultsCache,
   getCachedRacingResultsTier,
   hasRacingApiKey,
+  raceCourseOffKey,
   resultsForRaceIds,
   RESULTS_TTL_ACTIVE,
   type RacingResultsTier,
@@ -107,15 +108,20 @@ export async function syncRacingResultsForEvents(
 
   try {
     const dateByRaceId: Record<string, string> = {};
+    const aliasByRaceId: Record<string, string> = {};
     for (const event of candidates) {
       if (event.externalId) {
         dateByRaceId[event.externalId] = localCalendarDate(new Date(event.startTime));
+        aliasByRaceId[event.externalId] = raceCourseOffKey(
+          event.competition ?? event.homeTeam ?? "",
+          event.startTime
+        );
       }
     }
     // Prefer a fresher cache when settling open / incomplete races (fast results).
     const { results, tierBlocked, tier, historicBlocked } = await resultsForRaceIds(
       candidates.map((e) => e.externalId!),
-      { maxStaleMs: RESULTS_TTL_ACTIVE, dateByRaceId }
+      { maxStaleMs: RESULTS_TTL_ACTIVE, dateByRaceId, aliasByRaceId }
     );
 
     if (tierBlocked) {

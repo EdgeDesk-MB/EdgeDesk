@@ -11,6 +11,7 @@ import {
   normalizeAppUpdate,
   readAppUpdateFromUnknown,
   readBuildStampFromUnknown,
+  shouldApplyDeskUpdateNow,
   type AppUpdateSettings,
 } from "@/lib/admin/app-update-shared";
 import {
@@ -129,6 +130,33 @@ export function MaintenanceBannerLive({
     }, ms);
     return () => window.clearTimeout(id);
   }, [updateVisible, heldUpdate, liveUpdate, liveStamp, motionReady]);
+
+  useEffect(() => {
+    if (!updateVisible) return;
+    let cancelled = false;
+    const apply = () => {
+      if (cancelled) return;
+      if (
+        !shouldApplyDeskUpdateNow(
+          liveUpdate,
+          bootStampRef.current,
+          liveStamp,
+          document
+        )
+      ) {
+        return;
+      }
+      cancelled = true;
+      void reloadDesk();
+    };
+    const kick = window.setTimeout(apply, 1_200);
+    const id = window.setInterval(apply, 2_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(kick);
+      window.clearInterval(id);
+    };
+  }, [liveStamp, liveUpdate, updateVisible]);
 
   useEffect(() => {
     let cancelled = false;

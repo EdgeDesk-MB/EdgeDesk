@@ -621,4 +621,22 @@ describe("maybeRunNeonFeedSync", () => {
     expect(outcome.acquired).toBe(false);
     expect(h.updates).toEqual([]);
   });
+
+  it("does not take the fleet lease from a localhost process", async () => {
+    const prevVercel = process.env.VERCEL;
+    const prevFlag = process.env.EDGEWAYS_FEED_SYNC;
+    delete process.env.VERCEL;
+    delete process.env.EDGEWAYS_FEED_SYNC;
+    try {
+      const h = harness({ events: [event()], openBets: [], fixtures: [fixture()] });
+      const outcome = await maybeRunNeonFeedSync({ deps: h.deps });
+      expect(outcome.acquired).toBe(false);
+      expect(h.fixturesByIds).not.toHaveBeenCalled();
+    } finally {
+      if (prevVercel === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = prevVercel;
+      if (prevFlag === undefined) delete process.env.EDGEWAYS_FEED_SYNC;
+      else process.env.EDGEWAYS_FEED_SYNC = prevFlag;
+    }
+  });
 });

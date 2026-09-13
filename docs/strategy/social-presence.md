@@ -285,7 +285,7 @@ Two lists. Mixing them is how this becomes a second job.
 
 ### Claim this week (even if you never post)
 
-Empty pages with the right name beat a squatter. This is the D7 / EDGE-70 job.
+Empty pages with the right name beat a squatter. This is the D5b / EDGE-70 job.
 
 | Network | Why claim it | Post on it now? |
 | --- | --- | --- |

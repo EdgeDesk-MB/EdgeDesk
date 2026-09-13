@@ -16,12 +16,13 @@ export async function resolveDeskActor(): Promise<DeskActor> {
   try {
     const { userId } = await auth();
     if (!userId) return { clerkUserId: null, email: null };
-    if (emailByUserId.has(userId)) {
-      return { clerkUserId: userId, email: emailByUserId.get(userId) ?? null };
+    const cachedEmail = emailByUserId.get(userId);
+    if (cachedEmail) {
+      return { clerkUserId: userId, email: cachedEmail };
     }
     const user = await currentUser();
     const email = primaryClerkEmail(user);
-    emailByUserId.set(userId, email);
+    if (email) emailByUserId.set(userId, email);
     // EDGE-105: we already hold the Clerk user here exactly once per user per
     // instance - the cheapest place to mirror legal consent server-side.
     // NULL-guarded, so the write happens at most once per user ever.

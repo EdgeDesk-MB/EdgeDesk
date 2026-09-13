@@ -38,6 +38,9 @@ import {
 import { syncBoostDiaryFromBet, unlinkBoostDiaryForBet } from "@/lib/services/boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import type { BetRow } from "@/lib/db/schema";
+import { getNeonEvent } from "@/lib/db/neon-events";
+import { resyncNeonSettledBetAgainstEvent } from "@/lib/db/neon-desk-resync-settlement";
+import { resyncSettledBetAgainstEvent, applyFreeBetEffectsForBet } from "@/lib/services/resync-settlement";
 
 export const dynamic = "force-dynamic";
 
@@ -177,7 +180,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
       if (p.status === "open" && existing.status !== "open") {
         await purgeNeonDeskSettlementTransactionsForBet(betId);
       }
-      const updated = await patchNeonDeskBet(betId, set);
+      let updated = await patchNeonDeskBet(betId, set);
       if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
       const placementTouched =
         p.betType !== undefined ||
@@ -190,6 +193,13 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
         await reledgerNeonOpenBetPlacement(updated).catch((error) => {
           logNeonLedgerFailure("reledger", updated.id, error);
         });
+      }
+      if (p.status === undefined && updated.eventId != null) {
+        const event = await getNeonEvent(updated.eventId);
+        if (event) {
+          const corrected = await resyncNeonSettledBetAgainstEvent(updated, event);
+          if (corrected) updated = corrected;
+        }
       }
       if (updated.status !== "open") {
         await ledgerNeonBetSettlement(updated).catch((error) => {
@@ -209,8 +219,9 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     }
   }
 
-  const updated = db.update(bets).set(set).where(eq(bets.id, betId)).returning().get();
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const patched = db.update(bets).set(set).where(eq(bets.id, betId)).returning().get();
+  if (!patched) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  let updated = patched;
 
   // Editing a bet into a mug stamps the cadence plan with the bet's
   // placement date - only ever moving the stamp FORWARD (J5).
@@ -248,6 +259,16 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
     reledgerDutchFreeLegs(updated);
   } else if (placementTouched && updated.status === "open") {
     reledgerOpenBetPlacement(existing, updated);
+  }
+  if (p.status === undefined && updated.eventId != null) {
+    const event = db.select().from(events).where(eq(events.id, updated.eventId)).get();
+    if (event) {
+      const corrected = resyncSettledBetAgainstEvent(updated, event);
+      if (corrected) {
+        applyFreeBetEffectsForBet(corrected, event);
+        updated = db.select().from(bets).where(eq(bets.id, corrected.id)).get() ?? corrected;
+      }
+    }
   }
   if (updated.status !== "open") ledgerFromSettledBet(updated);
   syncBoostDiaryFromBet(updated);

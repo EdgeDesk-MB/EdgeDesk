@@ -394,6 +394,18 @@ export async function purgeNeonDeskSettlementTransactionsForBet(
     );
 }
 
+export async function deleteNeonDeskBalanceTransaction(
+  id: number,
+  clerkUserId = neonDeskClerkUserId()
+): Promise<void> {
+  if (!clerkUserId) return;
+  await getNeonDb()
+    .delete(pgBalanceTransactions)
+    .where(
+      and(eq(pgBalanceTransactions.id, id), eq(pgBalanceTransactions.clerkUserId, clerkUserId))
+    );
+}
+
 export async function listNeonPendingTransactions(limit = 50) {
   const rows = await listNeonDeskBalanceTransactions();
   return rows

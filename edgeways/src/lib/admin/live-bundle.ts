@@ -43,7 +43,11 @@ export type LiveBundle = {
   href: string;
   count: number;
   coalesceKey?: string;
+  /** Real event time. Log rows use this so this morning stays this morning. */
+  at?: number;
 };
+
+export type LiveBundlePurpose = "alert" | "log";
 
 export type LiveBundleConfig = {
   bundleStart: number;
@@ -57,7 +61,7 @@ export const DEFAULT_LIVE_BUNDLE_CONFIG: LiveBundleConfig = {
   windowMs: 60 * 60 * 1000,
 };
 
-/** Skip catch-up rows older than this so Live does not look like activity just landed. */
+/** Toasts and push skip older rows so a catch-up ingest does not look live. */
 export const LIVE_EVENT_FRESH_MS = 15 * 60 * 1000;
 
 export type LiveBundleMemory = {
@@ -145,7 +149,10 @@ export function bundleNewEvents(input: {
   now: number;
   memory: LiveBundleMemory;
   config?: LiveBundleConfig;
+  /** Alert = toasts/push. Log = Live page records, including this morning. */
+  purpose?: LiveBundlePurpose;
 }): { memory: LiveBundleMemory; bundles: LiveBundle[] } {
+  const purpose = input.purpose ?? "alert";
   const config = input.config ?? DEFAULT_LIVE_BUNDLE_CONFIG;
   const start = Math.max(2, config.bundleStart);
   const high = Math.max(start, config.bundleHigh);
@@ -165,7 +172,22 @@ export function bundleNewEvents(input: {
 
   for (const event of sorted) {
     if (isPositiveLiveKind(event.kind)) {
-      if (input.now - event.at > LIVE_EVENT_FRESH_MS) continue;
+      if (purpose === "alert" && input.now - event.at > LIVE_EVENT_FRESH_MS) {
+        continue;
+      }
+      if (purpose === "log") {
+        bundles.push({
+          id: event.id,
+          kind: event.kind,
+          tone: "success",
+          title: event.title,
+          body: event.body,
+          href: event.href || KIND_HREF[event.kind],
+          count: 1,
+          at: event.at,
+        });
+        continue;
+      }
       window.push({ kind: event.kind, at: event.at });
       newcomers[event.kind].push(event);
       continue;
@@ -184,6 +206,10 @@ export function bundleNewEvents(input: {
       count: 1,
       coalesceKey: key,
     });
+  }
+
+  if (purpose === "log") {
+    return { memory: { window, critical }, bundles };
   }
 
   window = pruneLiveWindow(window, input.now, windowMs);

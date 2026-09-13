@@ -46,9 +46,17 @@ the app derives every market and auto-settles linked bets.
 ## Do NOT build (deferred by design)
 - No arbitrage or Kelly criterion features.
 - No web scraping of bookmakers/odds.
-- No auth, multi-tenant, or Tauri packaging yet.
+- No oddsmatching or offer discovery (D2). The Match Checker checks a match you
+  found; the moment it browses or ranks markets, it is an oddsmatcher.
+- No Tauri packaging yet.
+- No customer API-key fields, ever. Feeds are operator-held (D7), never BYOK.
 - No heavy OCR beyond the existing bet-slip import.
 - Do not add dependencies without flagging them first.
+
+**Auth and multi-tenant are shipped, not deferred.** This list previously said
+"No auth, multi-tenant, or Tauri packaging yet". Clerk auth and the hosted Neon
+per-user desk (Route 1, D6) went live in August 2026 and production has been
+charging customers since 4 Sep 2026. Corrected 13 Sep 2026.
 
 ## Commands
 - Install: `npm install`
@@ -60,8 +68,10 @@ the app derives every market and auto-settles linked bets.
 - Calc engine: `src/lib/calc`
 - Offers logic: `src/lib/offers` (advantage.ts, do-next.ts)
 - Roadmap data: `src/content/roadmap.ts`
-- Product vision: `../docs/PLAN.md`, `docs/roadmap/` (strategy research lives in
-  parent `../docs/strategy/` — see `../docs/repo-layout.md`)
+- Product plan: `docs/roadmap/product-roadmap.md` is **canonical**; it wins over
+  any older doc. Briefs: `docs/roadmap/implementation-briefs.md`. Origin context
+  only: `../docs/PLAN.md`. Strategy research lives in parent `../docs/strategy/`,
+  see `../docs/repo-layout.md`. Launch and ops: `../docs/live-readiness.md`.
 - Design system: `docs/design-system.md`
 - Lay odds / lay stake fields: `src/lib/calc/exchange-odds-step.ts` and
   `src/lib/calc/exchange-stake-step.ts`. Arrows, chevron steppers, and

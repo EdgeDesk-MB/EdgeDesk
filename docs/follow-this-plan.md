@@ -5,9 +5,15 @@
 > [Live Readiness](https://linear.app/samhayter/initiative/live-readiness-acfb04f89e8c).
 > Repo layout rules: `docs/repo-layout.md`.
 >
-> Last updated: **4 Sep 2026** (production is the **live app**, not a waitlist.
-> Verified against https://edgeways.app: launch homepage, `/desk` HTTP 200,
-> no waitlist form. `SITE_SURFACE=app`, `LANDING_VARIANT=launch`.)
+> Last updated: **13 Sep 2026** (organisation audit. Production is the **live
+> app**, not a waitlist. `SITE_SURFACE=app`, `LANDING_VARIANT=launch`.)
+>
+> **Read this first.** Between 27 Aug and 13 Sep, Linear was not tracking the
+> product: 49 commits and 8 customer release-note entries shipped with no
+> tickets. That gap is now back-filled as **EDGE-126 to EDGE-146**. The
+> "Do this week" and cycle sections below were written for the pre-launch
+> push and are kept for history. **Current open work lives in Linear, not
+> here.** When something finishes, tick it there first.
 
 ---
 
@@ -49,7 +55,8 @@ Neon desk cutover — offers, wallets, history and bets all read/write Neon on
 the preview, user-scoped by Clerk id; hosted JSON backup/restore drill works;
 Sam proved onboarding → offer → bet → refresh on the preview.
 
-**Done 23 Aug:** [EDGE-45](https://linear.app/samhayter/issue/EDGE-45)
+**Cancelled 13 Sep (not done, see the correction below):**
+[EDGE-45](https://linear.app/samhayter/issue/EDGE-45)
 reframed by [D8](decisions/d8-staged-licensing.md) — staged licensing:
 launch quietly on operator-held feeds, no permission emails sent; reply
 templates on file (`docs/legal/provider-permission-emails.md`) for
@@ -106,6 +113,25 @@ Settle-focused-bet leftover is [EDGE-79](https://linear.app/samhayter/issue/EDGE
 
 ---
 
+## What is actually open (13 Sep 2026)
+
+The single list worth working from. Everything else on this page is history.
+
+| Ticket | What | Why now |
+|--------|------|---------|
+| [EDGE-9](https://linear.app/samhayter/issue/EDGE-9) | ICO registration | **Urgent.** Trading has started; this is a live obligation, not a park |
+| [EDGE-146](https://linear.app/samhayter/issue/EDGE-146) | Land the WIP tree, settle the branch model | 68 uncommitted files, and git / GitHub / Vercel disagree on the trunk |
+| [EDGE-144](https://linear.app/samhayter/issue/EDGE-144) | og-image and lockup SVG | Blocks every social share and part of EDGE-28. Do before the first post |
+| [EDGE-145](https://linear.app/samhayter/issue/EDGE-145) | Growth playbook Phase 0 | Foundations before any outreach. Read §2 ground rules first |
+| [EDGE-140](https://linear.app/samhayter/issue/EDGE-140) | Take the offer inbox live | Built and verified, but not switched on. Resend + DNS + env |
+| [EDGE-28](https://linear.app/samhayter/issue/EDGE-28) · [EDGE-29](https://linear.app/samhayter/issue/EDGE-29) · [EDGE-125](https://linear.app/samhayter/issue/EDGE-125) | SEO, beta community, lifecycle email | The marketing phase proper |
+| [EDGE-33](https://linear.app/samhayter/issue/EDGE-33) · [EDGE-36](https://linear.app/samhayter/issue/EDGE-36) | Stranger test, marketing proof | Both feed the beta push |
+| [EDGE-87](https://linear.app/samhayter/issue/EDGE-87) · [EDGE-141](https://linear.app/samhayter/issue/EDGE-141) · [EDGE-142](https://linear.app/samhayter/issue/EDGE-142) · [EDGE-143](https://linear.app/samhayter/issue/EDGE-143) | Offer inbox Phase 2, football Phase 1b, dutch free-bet reporting, org rename | Backlog, in roughly that order |
+| [EDGE-41](https://linear.app/samhayter/issue/EDGE-41) · [EDGE-43](https://linear.app/samhayter/issue/EDGE-43) | Automations | EDGE-43 unblocked now the feedback prompt (EDGE-139) creates volume |
+| [EDGE-10](https://linear.app/samhayter/issue/EDGE-10) | Trademark | On hold by decision (L5). Revisit before paid scale |
+
+---
+
 ## Where we are right now
 
 | Thing | Status |
@@ -147,7 +173,7 @@ Full rules: `docs/repo-layout.md`.
 - [x] **[EDGE-8](https://linear.app/samhayter/issue/EDGE-8)** — Memo stands. GC email skipped 19 Aug. Solicitor only if a §7 trigger fires.
 - [x] **[EDGE-11](https://linear.app/samhayter/issue/EDGE-11)** — ToS draft read 16 Aug. Placeholders (entity, contact, VAT) fill at publish.
 - [x] **[EDGE-12](https://linear.app/samhayter/issue/EDGE-12)** — Privacy draft read 16 Aug. Published 17 Aug (EDGE-61).
-- [ ] **[EDGE-9](https://linear.app/samhayter/issue/EDGE-9)** — ICO fee: not due until trading. Parked in Cycle 6.
+- [ ] **[EDGE-9](https://linear.app/samhayter/issue/EDGE-9)** — **ICO fee is now due.** Raised to Urgent 13 Sep: trading started when production went live on 4 Sep, so the "not due until trading" park no longer holds. Register, pay ~£40/yr, record the number on the ticket.
 - [x] **[EDGE-10](https://linear.app/samhayter/issue/EDGE-10)** — UK IPO search 19 Aug. Filing on hold (Flutter EDGEWAYS hit).
 
 ### 2. Decisions (~20 min) — unblock agents

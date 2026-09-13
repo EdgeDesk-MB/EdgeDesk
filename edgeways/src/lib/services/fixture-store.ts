@@ -13,7 +13,7 @@
  *    missed FT is written through once.
  *
  * Past dates with a finished snapshot are immutable. A day frozen mid-match
- * (still `live` / not finished, kick-off more than three hours ago) gets
+ * (still `live` / not finished, kick-off more than ~2h 10m ago) gets
  * one background write-through. Stored rows re-derive upcoming/live from
  * kick-off (same 4h window as `effectiveEventStatus`) so LIVE still shows
  * between cron ticks. Live scores overlay from a warm in-process peek
@@ -35,19 +35,22 @@ import {
   mergeByExternalId,
 } from "@/lib/events";
 import { mergeLiveFixtureOverlay } from "@/lib/events/live-fixture-overlay";
+import { LIVE_FT_OVERDUE_MS, liveSnapshotUsable } from "@/lib/live-poll-rules";
 import {
   fixturesByDate,
   hasApiKey,
+  peekFootballTape,
   peekLiveFixtures,
   scheduleLiveFixturesRefresh,
   type Fixture,
 } from "@/lib/services/apifootball";
+import { lastStandingGoalMatchingScore } from "@/lib/events/fixture-tape-goal";
 
 /** Matches the in-memory TTL in apifootball - stale rows still serve. */
 export const FIXTURE_STORE_FRESH_MS = 10 * 60 * 1000;
 
 /** Kick-off this old, and not finished, means the day card is missing FT. */
-export const FOOTBALL_RESULT_CATCH_UP_MS = 3 * 60 * 60 * 1000;
+export const FOOTBALL_RESULT_CATCH_UP_MS = LIVE_FT_OVERDUE_MS;
 
 export function footballDayNeedsResultCatchUp(
   fixtures: readonly Fixture[],
@@ -97,13 +100,33 @@ function dateMayHaveLive(date: string, now: number): boolean {
   return date === today || date === yesterday;
 }
 
+function withLastGoal(fixtures: Fixture[]): Fixture[] {
+  return fixtures.map((fixture) => {
+    const tape = peekFootballTape(fixture.externalId);
+    const last = tape
+      ? lastStandingGoalMatchingScore(tape, {
+          home: fixture.homeScore,
+          away: fixture.awayScore,
+        })
+      : null;
+    if (!last) {
+      if (fixture.lastGoalSide == null && fixture.lastGoalMinute == null) return fixture;
+      return { ...fixture, lastGoalSide: null, lastGoalMinute: null };
+    }
+    if (fixture.lastGoalSide === last.side && fixture.lastGoalMinute === last.minute) {
+      return fixture;
+    }
+    return { ...fixture, lastGoalSide: last.side, lastGoalMinute: last.minute };
+  });
+}
+
 function withLiveScores(date: string, fixtures: Fixture[], now: number): Fixture[] {
   const current = withCurrentStatus(fixtures, now);
   if (!dateMayHaveLive(date, now)) return current;
-  const peek = peekLiveFixtures();
-  if (peek) return mergeLiveFixtureOverlay(current, peek);
+  const peek = peekLiveFixtures()?.filter((fixture) => liveSnapshotUsable(fixture, now));
+  if (peek) return withLastGoal(mergeLiveFixtureOverlay(current, peek));
   scheduleLiveFixturesRefresh();
-  return current;
+  return withLastGoal(current);
 }
 
 export async function readFixtureStore(date: string): Promise<StoredFixtures | null> {
@@ -152,6 +175,36 @@ export function refreshFixtureStore(date: string): Promise<void> {
   return work;
 }
 
+const LOOKBACK_CATCH_UP_SCAN_MS = 60 * 1000;
+let lookbackScanAt = 0;
+
+/** Today's desk poll also warms stuck lookback days, so FT does not wait on cron. */
+function scheduleLookbackCatchUp(now: number): void {
+  if (now - lookbackScanAt < LOOKBACK_CATCH_UP_SCAN_MS) return;
+  lookbackScanAt = now;
+  const work = async () => {
+    for (let daysAgo = 1; daysAgo <= FIXTURE_LIST_LOOKBACK_DAYS; daysAgo += 1) {
+      const date = localCalendarDate(new Date(now - daysAgo * 86400000));
+      const row = await readFixtureStore(date).catch(() => null);
+      if (row && footballDayNeedsResultCatchUp(row.fixtures, now)) {
+        try {
+          await refreshFixtureStore(date);
+        } catch (error) {
+          console.error("[fixture-store] lookback catch-up failed:", error);
+        }
+      }
+    }
+  };
+  void (async () => {
+    try {
+      const { after } = await import("next/server");
+      after(work);
+    } catch {
+      await work();
+    }
+  })();
+}
+
 function scheduleBackgroundRefresh(date: string): void {
   const work = async () => {
     try {
@@ -170,6 +223,8 @@ function scheduleBackgroundRefresh(date: string): void {
   })();
 }
 
+export { scheduleBackgroundRefresh as scheduleFixtureStoreRefresh };
+
 /**
  * Store-first fixtures for a UK calendar date. Throws only when there is no
  * stored payload AND the live fetch fails. A stale payload always serves.
@@ -177,6 +232,7 @@ function scheduleBackgroundRefresh(date: string): void {
 export async function getFixturesForDate(date: string): Promise<StoredFixtures> {
   const stored = await readFixtureStore(date).catch(() => null);
   const now = Date.now();
+  scheduleLookbackCatchUp(now);
 
   if (stored) {
     const fixtures = withLiveScores(date, stored.fixtures, now);

@@ -177,4 +177,19 @@ describe("alignSideBackMarksToFixture", () => {
       )
     ).toEqual({ home: homeMark, away: null });
   });
+
+  it("does not swap a same-city derby that already agrees", () => {
+    // "Manchester United" vs "Manchester City" clears the swapped check on
+    // the shared "manchester" token alone, even though the fixture and
+    // event already agree side-for-side - direct agreement must win.
+    const derby = { id: 134, homeTeam: "Manchester United", awayTeam: "Manchester City" };
+    const homeMark = { kind: "open" as const, betCount: 2 };
+    expect(
+      alignSideBackMarksToFixture(
+        derby,
+        { homeTeam: "Manchester United", awayTeam: "Manchester City" },
+        { home: homeMark, away: null }
+      )
+    ).toEqual({ home: homeMark, away: null });
+  });
 });

@@ -5,11 +5,26 @@
  * still get one result / tape backfill after the live window.
  */
 
+import { isExtraTimePeriod } from "@/lib/events/result-posted";
+
 /** In-process live-score / tape cache, and the fixtures-board live poll. */
 export const LIVE_TTL_MS = 15 * 1000;
 
 /** Live polling covers kickoff-imminent through 4h after kickoff. */
 export const LIVE_POLL_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * `live=all` can keep a match listed with a frozen minute (Bolton 57' 0-0
+ * after FT). Once wall-clock playing time is this far ahead of the reported
+ * minute, prefer `/fixtures?id=` and the day store.
+ */
+export const LIVE_CLOCK_STALE_SLACK_MS = 10 * 60 * 1000;
+
+/** 15 min HT plus a little stoppage before wall-clock is treated as 2H. */
+const HALF_TIME_ALLOWANCE_MS = 18 * 60 * 1000;
+
+/** League 90 + HT + added time. Past this without ET, FT is overdue. */
+export const LIVE_FT_OVERDUE_MS = 2 * 60 * 60 * 1000 + 10 * 60 * 1000;
 
 /** Backfill gives up after 3 days - beyond that, correct manually. */
 export const RESULT_BACKFILL_MAX_AGE_MS = 72 * 60 * 60 * 1000;
@@ -44,6 +59,7 @@ export function shouldFetchGoalTimeline(
     awayScore: number;
     period?: string | null;
     tapeFetchedAt?: number | null;
+    status?: string;
   },
   fixture: {
     status: string;
@@ -55,6 +71,13 @@ export function shouldFetchGoalTimeline(
   mode: "live" | "critical" = "live"
 ): boolean {
   if (fixture.status === "upcoming") return false;
+  if (
+    event.status === "finished" &&
+    fixture.status !== "finished" &&
+    !isExtraTimePeriod(fixture.period)
+  ) {
+    return false;
+  }
   const scoreChanged =
     fixture.homeScore !== event.homeScore || fixture.awayScore !== event.awayScore;
   const periodChanged =
@@ -79,6 +102,48 @@ export function shouldFetchLineups(
   }
   if (fixture.status === "live" || fixture.status === "finished") return true;
   return event.startTime <= now + LINEUPS_AHEAD_MS;
+}
+
+/** True when wall-clock says this live=all row is frozen behind the match. */
+export function liveFixtureClockIsStale(
+  fixture: {
+    status: string;
+    startTime: number;
+    minute?: number | null;
+    period?: string | null;
+  },
+  now = Date.now()
+): boolean {
+  if (fixture.status !== "live") return false;
+  if (isExtraTimePeriod(fixture.period)) return false;
+  const wall = now - fixture.startTime;
+  if (wall <= 0) return false;
+  if (wall >= LIVE_FT_OVERDUE_MS) return true;
+  const reportedMs = Math.max(0, fixture.minute ?? 0) * 60_000;
+  const inSecondHalf =
+    (fixture.minute ?? 0) >= 45 ||
+    fixture.period === "HT" ||
+    fixture.period === "2H";
+  const expectedPlayingMs = Math.max(
+    0,
+    wall - (inSecondHalf ? HALF_TIME_ALLOWANCE_MS : 0)
+  );
+  return expectedPlayingMs - reportedMs > LIVE_CLOCK_STALE_SLACK_MS;
+}
+
+/** False when a live=all row must not be used as the tracked-event score. */
+export function liveSnapshotUsable(
+  fixture: {
+    status: string;
+    startTime: number;
+    minute?: number | null;
+    period?: string | null;
+  },
+  now = Date.now()
+): boolean {
+  if (fixture.status === "finished") return true;
+  if (fixture.status !== "live") return true;
+  return !liveFixtureClockIsStale(fixture, now);
 }
 
 /**

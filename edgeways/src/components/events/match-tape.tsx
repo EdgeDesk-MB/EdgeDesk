@@ -42,7 +42,7 @@ import {
   type TwoupOpennessResult,
 } from "@/lib/calc/ep/twoup-openness";
 import { effectiveEventStatus, eventShowsScore, footballPhaseLabel } from "@/lib/events";
-import type { TapeGoalFlash } from "@/lib/events/fixture-tape-goal";
+import { resolveTapeLastGoal, type TapeGoalFlash } from "@/lib/events/fixture-tape-goal";
 import {
   footballFinishedNameWeight,
   matchTapeNameWeightClass,
@@ -120,6 +120,8 @@ export type FootballTapeDialogEvent = {
   sport?: string;
   /** List Goal window, if the row was already flashing when opened. */
   goalSeed?: TapeGoalFlash;
+  lastGoalSide?: "home" | "away" | null;
+  lastGoalMinute?: number | null;
 };
 
 function CardMark({
@@ -182,7 +184,7 @@ function TapeGlyph({ event }: { event: MatchTapeEvent }) {
 
   return (
     <span
-      className="inline-flex h-4 min-w-4 shrink-0 items-start justify-center pt-px"
+      className="inline-flex w-6 h-6 flex-shrink-0 items-center justify-center border border-muted rounded-sm p-1"
       aria-hidden
     >
       {mark}
@@ -260,16 +262,24 @@ function EventCopy({
     const incoming = event.assist;
     const outgoing = event.player;
     names = (
-      <span className="flex min-w-0 flex-col gap-0.5 text-pretty break-words">
+      <span className="text-pretty break-words">
         {incoming ? (
-          <span className="font-medium text-foreground">{incoming}</span>
-        ) : null}
-        {outgoing ? (
-          <span className="text-muted-foreground">{outgoing}</span>
-        ) : null}
-        {!incoming && !outgoing ? (
+          away ? (
+            <>
+              {outgoing && (<span className="text-muted-foreground">{" ("}{outgoing}{") "}</span>)}
+              <span className="font-medium text-foreground">{incoming}</span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-foreground">{incoming}</span>
+              {outgoing && (<span className="text-muted-foreground">{" ("}{outgoing}{") "}</span>)}
+            </>
+          )
+        ) : outgoing ? (
+          <span className="font-medium text-foreground">{outgoing}</span>
+        ) : (
           <span className="font-medium text-foreground">Substitution</span>
-        ) : null}
+        )}
       </span>
     );
   } else {
@@ -318,7 +328,7 @@ function EventCopy({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-start gap-1.5 text-xs leading-snug",
+        "flex min-w-0 items-center gap-2.5 text-xs leading-snug",
         away ? "justify-end text-right" : "justify-start text-left"
       )}
     >
@@ -641,12 +651,19 @@ function MatchScoreboard({
       startTime: event.startTime,
     }) || parseMatchTape(event.goals).some((row) => row.kind === "goal");
   const live = resultStatus === "live";
+  const lastGoal = resolveTapeLastGoal(
+    { home: event.homeScore ?? 0, away: event.awayScore ?? 0 },
+    event.goals,
+    event
+  );
   const goalFlash = useTapeGoalFlash(
     event.externalId ?? `${event.homeTeam}\0${event.awayTeam}\0${event.startTime ?? ""}`,
     event.homeScore ?? 0,
     event.awayScore ?? 0,
     live,
-    event.goalSeed
+    event.goalSeed,
+    lastGoal,
+    event.minute
   );
 
   const homeWeight = footballFinishedNameWeight("home", {
@@ -783,7 +800,6 @@ function MatchTimeline({ event }: { event: FootballTapeDialogEvent }) {
                     key={`${row.kind}-${row.minute}-${row.extra ?? 0}-${i}`}
                     aria-label={tapeRowLabel(row, event, disallowed)}
                     className={cn(
-                      listRow,
                       deskTableBodyCell,
                       "min-w-0",
                       tapeEdgeStart,

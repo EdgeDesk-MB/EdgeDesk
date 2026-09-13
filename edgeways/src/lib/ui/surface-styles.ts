@@ -146,7 +146,7 @@ export const sectionNestedTitle =
   "min-w-0 text-pretty break-words text-sm font-semibold leading-snug tracking-tight text-foreground";
 
 export const sectionDescription =
-  "min-w-0 text-pretty break-words text-xs text-muted-foreground";
+  "min-w-0 text-pretty break-words text-sm leading-snug tracking-tight text-muted-foreground";
 
 /** Vertical gap between stacked page sections / breakdown blocks after a main item */
 export const sectionStack = "flex flex-col gap-[var(--layout-stack-gap)]";

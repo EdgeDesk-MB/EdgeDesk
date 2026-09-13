@@ -33,7 +33,7 @@ export const ROADMAP_VERSION = {
 
 export const ROADMAP_STATUS_LABELS: Record<RoadmapStatus, string> = {
   done: "Done",
-  in_progress: "In Progress",
+  in_progress: "In progress",
   planned: "Planned",
   future: "Future",
 };
@@ -72,7 +72,7 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
       {
         id: "race-workflow",
         title: "Guided racing offer workflow",
-        description: "Pick a runner, place the back, lay it off, log it — step by step",
+        description: "Pick a runner, place the back, lay it off, log it, step by step",
         status: "done",
       },
       {

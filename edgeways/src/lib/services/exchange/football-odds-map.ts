@@ -217,12 +217,17 @@ export function extractFootballOdds(
           if (back) odds.drawBack = back;
           continue;
         }
-        if (footballTeamMatchScore(query.homeTeam, name) >= 60) {
+        // Score both sides and take the better match, not "home first": a
+        // same-city derby (e.g. "Manchester United" vs runner "Man City")
+        // can clear the home threshold on a shared surname token even
+        // though the away side is the true, stronger match.
+        const homeScore = footballTeamMatchScore(query.homeTeam, name);
+        const awayScore = footballTeamMatchScore(query.awayTeam, name);
+        if (homeScore < 60 && awayScore < 60) continue;
+        if (homeScore >= awayScore) {
           if (back) odds.homeBack = back;
           if (lay) odds.homeLay = lay;
-          continue;
-        }
-        if (footballTeamMatchScore(query.awayTeam, name) >= 60) {
+        } else {
           if (back) odds.awayBack = back;
           if (lay) odds.awayLay = lay;
         }

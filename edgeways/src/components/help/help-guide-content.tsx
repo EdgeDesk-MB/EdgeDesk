@@ -11,7 +11,7 @@ const HELP_SHORTCUT_BY_ID = new Map(
 
 export function HelpGuideContent({ guide }: { guide: HelpGuide }) {
   return (
-    <article className="prose-sm max-w-none space-y-6">
+    <article className="prose-sm max-w-[75ch] space-y-6">
       {guide.sections.map((section, i) => {
         const shortcuts = (section.shortcutIds ?? [])
           .map((id) => HELP_SHORTCUT_BY_ID.get(id))
@@ -19,7 +19,7 @@ export function HelpGuideContent({ guide }: { guide: HelpGuide }) {
         return (
           <section key={i} className="space-y-2">
             {section.heading && (
-              <h2 className="text-base font-semibold tracking-tight">{section.heading}</h2>
+              <h3 className="text-base font-semibold tracking-tight">{section.heading}</h3>
             )}
             {section.paragraphs?.map((p) => (
               <p key={p} className="text-sm leading-relaxed text-muted-foreground">

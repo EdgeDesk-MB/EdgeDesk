@@ -63,35 +63,50 @@ function LiveBackOdds({
   odds,
   paused,
   quoteSeq,
+  chevronSide = "right",
 }: {
   odds: number;
   paused: boolean;
   quoteSeq: number;
+  chevronSide?: "left" | "right";
 }) {
   const { flash, trend } = useOddsFlash(odds, paused, quoteSeq);
   const Icon = trend === "up" ? ChevronUp : trend === "down" ? ChevronDown : null;
+  const chevron = Icon ? (
+    <Icon
+      className={cn(
+        "size-3 shrink-0",
+        trend === "up" && "text-profit",
+        trend === "down" && "text-negative",
+        flash === "up" && "live-odds-chevron-up",
+        flash === "down" && "live-odds-chevron-down"
+      )}
+      aria-hidden
+    />
+  ) : null;
+  const price = (
+    <NumFlow
+      value={odds}
+      className={cn(
+        "font-semibold",
+        flash === "up" && "live-odds-flash-up",
+        flash === "down" && "live-odds-flash-down"
+      )}
+    />
+  );
   return (
     <span className="inline-flex items-center gap-0.5">
-      <NumFlow
-        value={odds}
-        className={cn(
-          "font-semibold",
-          flash === "up" && "live-odds-flash-up",
-          flash === "down" && "live-odds-flash-down"
-        )}
-      />
-      {Icon ? (
-        <Icon
-          className={cn(
-            "size-3 shrink-0",
-            trend === "up" && "text-profit",
-            trend === "down" && "text-negative",
-            flash === "up" && "live-odds-chevron-up",
-            flash === "down" && "live-odds-chevron-down"
-          )}
-          aria-hidden
-        />
-      ) : null}
+      {chevronSide === "left" ? (
+        <>
+          {chevron}
+          {price}
+        </>
+      ) : (
+        <>
+          {price}
+          {chevron}
+        </>
+      )}
     </span>
   );
 }
@@ -168,9 +183,11 @@ export function validTapeBack(odds: number | undefined): odds is number {
 export function ExchangeBackCell({
   odds,
   label,
+  chevronSide = "right",
 }: {
   odds: number | undefined;
   label: string;
+  chevronSide?: "left" | "right";
 }) {
   if (!validTapeBack(odds)) {
     return (
@@ -188,7 +205,12 @@ export function ExchangeBackCell({
           oddsCellClass
         )}
       >
-        <LiveBackOdds odds={odds} paused={false} quoteSeq={0} />
+        <LiveBackOdds
+          odds={odds}
+          paused={false}
+          quoteSeq={0}
+          chevronSide={chevronSide}
+        />
       </span>
     </span>
   );
@@ -201,12 +223,14 @@ export function ExchangeBackStack({
   homeLabel,
   awayLabel,
   className,
+  chevronSide = "right",
 }: {
   homeOdds?: number;
   awayOdds?: number;
   homeLabel: string;
   awayLabel: string;
   className?: string;
+  chevronSide?: "left" | "right";
 }) {
   return (
     <div
@@ -217,8 +241,16 @@ export function ExchangeBackStack({
         className
       )}
     >
-      <ExchangeBackCell odds={homeOdds} label={`${homeLabel} back`} />
-      <ExchangeBackCell odds={awayOdds} label={`${awayLabel} back`} />
+      <ExchangeBackCell
+        odds={homeOdds}
+        label={`${homeLabel} back`}
+        chevronSide={chevronSide}
+      />
+      <ExchangeBackCell
+        odds={awayOdds}
+        label={`${awayLabel} back`}
+        chevronSide={chevronSide}
+      />
     </div>
   );
 }

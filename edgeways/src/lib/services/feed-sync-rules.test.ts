@@ -236,6 +236,42 @@ describe("footballEventPatch", () => {
     expect(extra.homeLed2).toBe(0);
   });
 
+  it("does not regress a posted FT to a stale live snapshot", () => {
+    const tape = JSON.stringify([{ minute: 90, side: "home", player: "Gale" }]);
+    const patch = footballEventPatch(
+      event({
+        status: "finished",
+        homeScore: 1,
+        awayScore: 0,
+        minute: 90,
+        period: "FT",
+        matchEnding: "ft",
+        resultPostedAt: NOW,
+        goals: tape,
+      }),
+      fixture({
+        status: "live",
+        homeScore: 0,
+        awayScore: 0,
+        minute: 57,
+        period: "2H",
+        matchEnding: null,
+      }),
+      null,
+      { now: NOW + 60_000 }
+    );
+    expect(patch).toMatchObject({
+      status: "finished",
+      homeScore: 1,
+      awayScore: 0,
+      minute: 90,
+      period: "FT",
+      matchEnding: "ft",
+      goals: tape,
+    });
+    expect(patch.resultPostedAt).toBe(NOW);
+  });
+
   it("does not latch 2UP from an extra-time scoreline", () => {
     const patch = footballEventPatch(
       event({ homeLed2: 0, awayLed2: 0, ftHomeScore: 1, ftAwayScore: 1 }),

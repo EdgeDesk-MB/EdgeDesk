@@ -207,6 +207,51 @@ describe("extractFootballOdds", () => {
     expect(missingFootballOddsFields({ homeBack: 2.1 })).toContain("Over 2.5");
     expect(missingFootballOddsFields({ homeBack: 2.1 })).toContain("BTTS Yes");
   });
+
+  it("does not lose the away price in a same-city derby", () => {
+    // "Man City" alone clears the >=60 threshold against home team
+    // "Manchester United" too (shared "manchester" token once "united"
+    // and "city" are stripped as weak tokens) - the away side must win
+    // on the stronger score, not be skipped because home checked first.
+    const derbyMarkets: FootballCatalogueMarket[] = [
+      matchOddsMarket({
+        event: { id: "ev-derby", name: "Man Utd v Man City" },
+        runners: [
+          { selectionId: 1, runnerName: "Man Utd" },
+          { selectionId: 2, runnerName: "Man City" },
+          { selectionId: 3, runnerName: "The Draw" },
+        ],
+      }),
+    ];
+    const derbyBooks: FootballMarketBook[] = [
+      {
+        marketId: "1.100",
+        runners: [
+          {
+            selectionId: 1,
+            status: "ACTIVE",
+            ex: { availableToBack: [{ price: 2.26, size: 40 }] },
+          },
+          {
+            selectionId: 2,
+            status: "ACTIVE",
+            ex: { availableToBack: [{ price: 1.65, size: 80 }] },
+          },
+          {
+            selectionId: 3,
+            status: "ACTIVE",
+            ex: { availableToBack: [{ price: 3.9, size: 60 }] },
+          },
+        ],
+      },
+    ];
+    const odds = extractFootballOdds(derbyMarkets, derbyBooks, {
+      homeTeam: "Manchester United",
+      awayTeam: "Manchester City",
+    });
+    expect(odds.homeBack).toBe(2.26);
+    expect(odds.awayBack).toBe(1.65);
+  });
 });
 
 describe("footballOddsTimeWindow", () => {

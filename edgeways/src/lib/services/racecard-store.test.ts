@@ -189,6 +189,24 @@ describe("racecard-store", () => {
     expect(racecardsFree).not.toHaveBeenCalled();
   });
 
+  it("warmRacecardStore keeps going when one date's upstream call fails", async () => {
+    const { store, racecardsByDate } = await loadStore();
+    const today = localCalendarDate();
+    const tomorrow = localCalendarDate(new Date(Date.now() + 86_400_000));
+    racecardsByDate.mockImplementation(async (date: string) => {
+      if (date === today) throw new Error("Racing API 429");
+      return { cards: [card({ externalId: "tomorrow", raceName: "Tomorrow" })], oddsTier: "standard" };
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await store.warmRacecardStore();
+
+    consoleErrorSpy.mockRestore();
+    expect(result.warmed).toEqual([tomorrow]);
+    expect(await store.readRacecardStore(tomorrow)).not.toBeNull();
+    expect(await store.readRacecardStore(today)).toBeNull();
+  });
+
   it("prunes rows older than the retention window and keeps recent ones", async () => {
     const { store } = await loadStore();
     const old = localCalendarDate(new Date(Date.now() - 10 * 86400000));

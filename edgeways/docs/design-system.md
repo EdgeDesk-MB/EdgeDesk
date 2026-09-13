@@ -592,7 +592,11 @@ From `src/lib/ui/surface-styles.ts`:
   `--brand`) for `TAPE_GOAL_FLASH_MS` (20s). Live cells paint their own
   red; the shell is transparent so Goal cannot leak live red at the radius.
   NumberFlow `trend={1}` at 750ms rolls the new score. The tag blinks twice
-  at 1.44s then holds. First paint and score corrections do not flash.
+  at 1.44s then holds. Only the last goal is marked: both sides never show
+  Goal at once. A poll that jumped both scores uses the last standing event
+  on the tape; if the tape has not caught up, wait rather than flash both.
+  First paint can flash that last goal when it is on the current elapsed
+  minute. Score corrections do not flash.
   Reduced motion keeps the plate and tag, no blink.
   Localhost only: `/fixtures?previewGoal=1` bumps the first two live homes
   and leaves the score. Goal holds 20s then clears. It does not write the

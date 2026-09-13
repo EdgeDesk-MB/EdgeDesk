@@ -28,9 +28,17 @@ export type NeonDeskCandidate = {
 };
 
 /**
+ * Clerk Development id for the owner desk. Production Clerk issues a
+ * different id for the same email; alias always follows this row so
+ * localhost and edgeways.app share one Neon desk.
+ */
+export const DEFAULT_DESK_OWNER_USER_ID = "user_3IT7V2FQfFhC2ZNg9Q4FjAbDEgQ";
+
+/**
  * When the same email exists on more than one Clerk instance, pick the desk
- * that already has the data. Prefer an explicit owner id when it is one of
- * the candidates, otherwise the busiest desk, then the newest account row.
+ * that already has the data. The canonical local owner id wins when it is
+ * one of the candidates, then an explicit owner id, then the busiest desk,
+ * then the newest account row.
  */
 export function pickCanonicalNeonClerkUserId(input: {
   signedInUserId: string;
@@ -43,8 +51,13 @@ export function pickCanonicalNeonClerkUserId(input: {
   if (candidates.length === 0) return signedIn;
   if (candidates.length === 1) return candidates[0]!.clerkUserId.trim();
 
+  const ids = new Set(candidates.map((row) => row.clerkUserId.trim()));
+  if (ids.has(DEFAULT_DESK_OWNER_USER_ID)) {
+    return DEFAULT_DESK_OWNER_USER_ID;
+  }
+
   const preferred = input.preferredUserId?.trim();
-  if (preferred && candidates.some((row) => row.clerkUserId.trim() === preferred)) {
+  if (preferred && ids.has(preferred)) {
     return preferred;
   }
 
@@ -80,7 +93,7 @@ export function isDeskOwnerEmail(email: string | null | undefined): boolean {
 
 export function deskOwnerUserId(): string | null {
   const id = process.env.EDGEWAYS_DESK_OWNER_USER_ID?.trim();
-  return id || null;
+  return id || DEFAULT_DESK_OWNER_USER_ID;
 }
 
 export function isDeskOwner(actor: DeskActor): boolean {

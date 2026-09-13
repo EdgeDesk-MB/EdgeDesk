@@ -42,6 +42,7 @@ import {
   EARLY_FREE_BET_AWARD_REASON,
   freeBetAwardPhrase,
   freeBetEffectsForBet,
+  settlementFreeBetEffectsForBet,
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
 import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
@@ -447,7 +448,7 @@ export async function awardNeonUnconditionalFreeBetIfDue(
   if (bet.status === "open" || bet.status === "void") return false;
   if (bet.betType === "free_snr" || bet.betType === "free_sr") return false;
 
-  for (const effect of freeBetEffectsForBet(bet)) {
+  for (const effect of settlementFreeBetEffectsForBet(bet)) {
     if (effect.kind !== "free_bet_award") continue;
     if (isPlaceFreeBetEffect(effect)) continue;
     const verdict = evaluateUnconditionalFreeBet(effect, bet.status);

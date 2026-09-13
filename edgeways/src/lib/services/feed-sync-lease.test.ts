@@ -3,6 +3,7 @@ import {
   acquiredFeedSyncRow,
   canAcquireFeedSyncLease,
   createInMemoryFeedSyncLease,
+  hostedFeedSyncEnabled,
   FEED_SYNC_LEASE_MS,
   FEED_SYNC_MIN_INTERVAL_MS,
 } from "@/lib/services/feed-sync-lease";
@@ -32,6 +33,23 @@ describe("canAcquireFeedSyncLease", () => {
 
   it("uses the same throttle as the local external sync", () => {
     expect(FEED_SYNC_MIN_INTERVAL_MS).toBe(20_000);
+  });
+});
+
+describe("hostedFeedSyncEnabled", () => {
+  it("lets Vercel take the lease so Live stays the poller", () => {
+    expect(hostedFeedSyncEnabled({ VERCEL: "1" })).toBe(true);
+  });
+
+  it("keeps localhost off the lease so its live=all cache cannot overwrite Neon", () => {
+    expect(hostedFeedSyncEnabled({})).toBe(false);
+    expect(hostedFeedSyncEnabled({ VERCEL: "1", EDGEWAYS_FEED_SYNC: "0" })).toBe(
+      false
+    );
+  });
+
+  it("allows an explicit local poller", () => {
+    expect(hostedFeedSyncEnabled({ EDGEWAYS_FEED_SYNC: "1" })).toBe(true);
   });
 });
 

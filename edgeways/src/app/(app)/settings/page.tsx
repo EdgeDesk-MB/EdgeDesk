@@ -151,7 +151,7 @@ export default function SettingsPage() {
         <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button variant="outline" className="justify-start gap-2" asChild>
             <a href="/help">
-              <BookOpen className="size-4" /> Help hub
+              <BookOpen className="size-4" /> Guides
             </a>
           </Button>
           <Button variant="outline" className="justify-start gap-2" asChild>

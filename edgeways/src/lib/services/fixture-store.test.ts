@@ -10,6 +10,7 @@ vi.mock("@/lib/services/apifootball", async (importOriginal) => {
     fixturesByDate: vi.fn(),
     liveFixtures: vi.fn(async () => []),
     peekLiveFixtures: vi.fn(() => null),
+    peekFootballTape: vi.fn(() => null),
     scheduleLiveFixturesRefresh: vi.fn(),
   };
 });
@@ -51,6 +52,7 @@ async function loadStore() {
     fixturesByDate: vi.mocked(api.fixturesByDate),
     liveFixtures: vi.mocked(api.liveFixtures),
     peekLiveFixtures: vi.mocked(api.peekLiveFixtures),
+    peekFootballTape: vi.mocked(api.peekFootballTape),
     scheduleLiveFixturesRefresh: vi.mocked(api.scheduleLiveFixturesRefresh),
     hasApiKey: vi.mocked(api.hasApiKey),
   };
@@ -128,6 +130,39 @@ describe("fixture-store", () => {
     expect(stored?.fixtures[0]?.homeTeam).toBe("Old");
   });
 
+  it("refreshes a fresh today row when a live match is past the result window", async () => {
+    const { store, fixturesByDate } = await loadStore();
+    const today = localCalendarDate();
+    await store.writeFixtureStore(
+      today,
+      [
+        fixture({
+          status: "live",
+          startTime: Date.now() - store.FOOTBALL_RESULT_CATCH_UP_MS - 1000,
+          homeScore: 0,
+          awayScore: 0,
+          minute: 57,
+        }),
+      ],
+      Date.now()
+    );
+    fixturesByDate.mockResolvedValue([
+      fixture({ status: "finished", homeScore: 1, awayScore: 0, minute: 90 }),
+    ]);
+
+    const served = await store.getFixturesForDate(today);
+    expect(served.fixtures[0]?.minute).toBe(57);
+
+    await flushBackground(() => fixturesByDate.mock.calls.length > 0);
+    expect(fixturesByDate).toHaveBeenCalledWith(today);
+    const stored = await store.readFixtureStore(today);
+    expect(stored?.fixtures[0]).toMatchObject({
+      homeScore: 1,
+      awayScore: 0,
+      status: "finished",
+    });
+  });
+
   it("never refetches a finished past date", async () => {
     const { store, fixturesByDate } = await loadStore();
     const yesterday = localCalendarDate(new Date(Date.now() - 86400000));
@@ -181,6 +216,37 @@ describe("fixture-store", () => {
     await flushBackground(() => fixturesByDate.mock.calls.length > 0);
     expect(fixturesByDate).toHaveBeenCalledWith(yesterday);
     const stored = await store.readFixtureStore(yesterday);
+    expect(stored?.fixtures[0]).toMatchObject({
+      homeScore: 2,
+      awayScore: 0,
+      status: "finished",
+    });
+  });
+
+  it("a today read also writes through a stuck lookback day", async () => {
+    const { store, fixturesByDate } = await loadStore();
+    const today = localCalendarDate();
+    const threeDaysAgo = localCalendarDate(new Date(Date.now() - 3 * 86400000));
+    await store.writeFixtureStore(today, [fixture()]);
+    await store.writeFixtureStore(threeDaysAgo, [
+      fixture({
+        status: "live",
+        startTime: Date.now() - 3 * 24 * 60 * 60 * 1000,
+        homeScore: 0,
+        awayScore: 0,
+        minute: 26,
+      }),
+    ]);
+    fixturesByDate.mockImplementation(async (date: string) => {
+      if (date === threeDaysAgo) {
+        return [fixture({ status: "finished", homeScore: 2, awayScore: 0 })];
+      }
+      return [fixture()];
+    });
+
+    await store.getFixturesForDate(today);
+    await flushBackground(() => fixturesByDate.mock.calls.some(([date]) => date === threeDaysAgo));
+    const stored = await store.readFixtureStore(threeDaysAgo);
     expect(stored?.fixtures[0]).toMatchObject({
       homeScore: 2,
       awayScore: 0,
@@ -248,6 +314,82 @@ describe("fixture-store", () => {
     expect(liveFixtures).not.toHaveBeenCalled();
     const stored = await store.readFixtureStore(today);
     expect(stored?.fixtures[0]).toMatchObject({ homeScore: 0, awayScore: 0, minute: 7 });
+  });
+
+  it("names the last standing goal on a live overlay when the tape matches the score", async () => {
+    const { store, peekLiveFixtures, peekFootballTape } = await loadStore();
+    const today = localCalendarDate();
+    await store.writeFixtureStore(today, [
+      fixture({
+        externalId: "bournemouth-brentford",
+        status: "live",
+        startTime: Date.now() - 69 * 60 * 1000,
+        homeScore: 1,
+        awayScore: 1,
+        minute: 64,
+      }),
+    ]);
+    peekLiveFixtures.mockReturnValue([
+      fixture({
+        externalId: "bournemouth-brentford",
+        status: "live",
+        homeScore: 2,
+        awayScore: 2,
+        minute: 69,
+      }),
+    ]);
+    peekFootballTape.mockReturnValue([
+      { kind: "goal", side: "home", minute: 64 },
+      { kind: "goal", side: "away", minute: 66 },
+      { kind: "goal", side: "home", minute: 69 },
+      { kind: "goal", side: "away", minute: 69 },
+    ]);
+
+    const served = await store.getFixturesForDate(today);
+    expect(served.fixtures[0]).toMatchObject({
+      homeScore: 2,
+      awayScore: 2,
+      lastGoalSide: "away",
+      lastGoalMinute: 69,
+    });
+  });
+
+  it("does not overlay a clock-stale live peek onto a stored FT", async () => {
+    const { store, peekLiveFixtures, liveFixtures } = await loadStore();
+    const today = localCalendarDate();
+    const kickoff = Date.now() - 3 * 60 * 60 * 1000;
+    await store.writeFixtureStore(today, [
+      fixture({
+        externalId: "bolton-cardiff",
+        status: "finished",
+        startTime: kickoff,
+        homeScore: 1,
+        awayScore: 0,
+        minute: 90,
+        period: "FT",
+        matchEnding: "ft",
+      }),
+    ]);
+    peekLiveFixtures.mockReturnValue([
+      fixture({
+        externalId: "bolton-cardiff",
+        status: "live",
+        startTime: kickoff,
+        homeScore: 0,
+        awayScore: 0,
+        minute: 57,
+        period: "2H",
+      }),
+    ]);
+
+    const served = await store.getFixturesForDate(today);
+    expect(served.fixtures[0]).toMatchObject({
+      status: "finished",
+      homeScore: 1,
+      awayScore: 0,
+      minute: 90,
+    });
+    expect(liveFixtures).not.toHaveBeenCalled();
   });
 
   it("serves the day card when the live poll has not warmed yet", async () => {
