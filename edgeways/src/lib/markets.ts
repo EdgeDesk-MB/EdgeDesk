@@ -124,6 +124,38 @@ export function marketDef(sport: string, market: string): MarketDef | undefined 
   return (MARKETS[sport] ?? MARKETS.other).find((m) => m.value === market);
 }
 
+/**
+ * Winner market that can carry a bookie 2UP early-payout flag in Add bet.
+ * Football uses match odds; the US / ice sports use match winner.
+ */
+const TWO_UP_WINNER_MARKET: Partial<Record<SportValue, string>> = {
+  football: "match_odds",
+  american_football: "match_winner",
+  baseball: "match_winner",
+  ice_hockey: "match_winner",
+  basketball: "match_winner",
+};
+
+const TWO_UP_AHEAD_UNIT: Partial<Record<SportValue, string>> = {
+  football: "2 goals",
+  ice_hockey: "2 goals",
+  baseball: "2 runs",
+  american_football: "2 scores",
+  basketball: "2 points",
+};
+
+/** Whether Add bet should offer the 2UP early-payout toggle for this sport/market. */
+export function marketOffersTwoUpEarlyPayout(sport: string, market: string): boolean {
+  if (!isKnownSport(sport)) return false;
+  return TWO_UP_WINNER_MARKET[sport] === market;
+}
+
+/** Helper line under the 2UP toggle; unit follows the sport's scoring. */
+export function twoUpEarlyPayoutHint(sport: string): string {
+  const unit = (isKnownSport(sport) && TWO_UP_AHEAD_UNIT[sport]) || "2 goals";
+  return `Bookie pays out when the selection goes ${unit} ahead`;
+}
+
 /** Whether the result engine can settle this market from score / race result. */
 export function isAutoSettleMarket(sport: string, market: string): boolean {
   return !!marketDef(sport, market)?.auto;

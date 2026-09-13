@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   inferSportFromBet,
   linkableEventsForSport,
+  marketOffersTwoUpEarlyPayout,
   marketUsesLinkedEventSides,
+  twoUpEarlyPayoutHint,
 } from "./markets";
 
 describe("inferSportFromBet", () => {
@@ -50,6 +52,42 @@ describe("marketUsesLinkedEventSides", () => {
     expect(marketUsesLinkedEventSides("horse_racing", "win")).toBe(false);
     expect(marketUsesLinkedEventSides("golf", "outright")).toBe(false);
     expect(marketUsesLinkedEventSides("greyhounds", "win")).toBe(false);
+  });
+});
+
+describe("marketOffersTwoUpEarlyPayout", () => {
+  it("keeps football on match odds only", () => {
+    expect(marketOffersTwoUpEarlyPayout("football", "match_odds")).toBe(true);
+    expect(marketOffersTwoUpEarlyPayout("football", "btts")).toBe(false);
+    expect(marketOffersTwoUpEarlyPayout("football", "match_winner")).toBe(false);
+  });
+
+  it("offers 2UP on the winner market for US sports and ice hockey", () => {
+    for (const sport of [
+      "american_football",
+      "baseball",
+      "ice_hockey",
+      "basketball",
+    ] as const) {
+      expect(marketOffersTwoUpEarlyPayout(sport, "match_winner")).toBe(true);
+      expect(marketOffersTwoUpEarlyPayout(sport, "handicap")).toBe(false);
+    }
+  });
+
+  it("does not offer 2UP on other two-way sports", () => {
+    expect(marketOffersTwoUpEarlyPayout("tennis", "match_winner")).toBe(false);
+    expect(marketOffersTwoUpEarlyPayout("rugby_union", "match_winner")).toBe(false);
+    expect(marketOffersTwoUpEarlyPayout("cricket", "match_winner")).toBe(false);
+  });
+});
+
+describe("twoUpEarlyPayoutHint", () => {
+  it("names the scoring unit for each 2UP sport", () => {
+    expect(twoUpEarlyPayoutHint("football")).toContain("2 goals");
+    expect(twoUpEarlyPayoutHint("ice_hockey")).toContain("2 goals");
+    expect(twoUpEarlyPayoutHint("baseball")).toContain("2 runs");
+    expect(twoUpEarlyPayoutHint("american_football")).toContain("2 scores");
+    expect(twoUpEarlyPayoutHint("basketball")).toContain("2 points");
   });
 });
 

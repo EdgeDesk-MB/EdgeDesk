@@ -100,11 +100,13 @@ import {
   inferSportFromBet,
   isKnownSport,
   marketDef,
+  marketOffersTwoUpEarlyPayout,
   marketUsesLinkedEventSides,
   MARKETS,
   parseCorrectScore,
   SPORTS,
   teamSelectionLabel,
+  twoUpEarlyPayoutHint,
   type SportValue,
 } from "@/lib/markets";
 import type { BetRow, ExchangeRow } from "@/lib/db/schema";
@@ -1672,7 +1674,7 @@ export function AddBetDialog({
   function changeMarket(m: string) {
     setMarket(m);
     setSelection(defaultSelection(sport, m));
-    if (m !== "match_odds") setEarlyPayout(false);
+    if (!marketOffersTwoUpEarlyPayout(sport, m)) setEarlyPayout(false);
   }
 
   /** Dutch type: the builder computes (and may override) stakes, this maps
@@ -3113,12 +3115,12 @@ export function AddBetDialog({
               </div>
             )}
 
-            {market === "match_odds" && (
+            {marketOffersTwoUpEarlyPayout(sport, market) && (
               <div className="flex items-center justify-between rounded-md border px-3 py-2">
                 <div>
                   <div className="text-sm font-medium">2UP early payout</div>
                   <div className="text-xs text-muted-foreground">
-                    Bookie pays out when the selection goes 2 goals ahead
+                    {twoUpEarlyPayoutHint(sport)}
                   </div>
                 </div>
                 <Switch checked={earlyPayout} onCheckedChange={setEarlyPayout} />
