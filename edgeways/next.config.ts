@@ -1,8 +1,17 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 /** Edgeways Next config. A save here recycles `next dev` without killing the keep supervisor. */
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
+  // Pin the workspace root to this app. Without this, Turbopack walks up
+  // looking for lockfiles and can pick a stray one outside the repo (eg. a
+  // package.json accidentally created at $HOME), then resolves node_modules
+  // from there instead of edgeways/ - imports "disappear" even though the
+  // packages are correctly installed here.
+  turbopack: {
+    root: path.join(__dirname),
+  },
   // Fully hidden - the on-screen Rendering/Compiling badge is dev-only
   // chrome, not a performance signal. Errors still surface regardless.
   devIndicators: false,
