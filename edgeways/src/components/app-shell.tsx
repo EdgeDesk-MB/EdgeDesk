@@ -20,7 +20,7 @@ import { pagePanel } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const meta = isMetaPath(pathname);
 
   return (

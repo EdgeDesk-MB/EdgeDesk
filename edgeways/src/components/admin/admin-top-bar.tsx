@@ -16,7 +16,7 @@ import { adminModeTag } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export function AdminTopBar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   return (
     <header className="relative z-[45] shrink-0 overflow-visible bg-[#111111] text-topbar-foreground">

@@ -149,7 +149,7 @@ function readDeskExchangeOverride(): ExchangeProvider | null {
 export function RacingDeskView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const raceParam = searchParams.get("race");
+  const raceParam = searchParams?.get("race");
   const { openAddBet } = useAddBet();
   const { openEachWayCalculator } = useEachWayCalculator();
   const { openMatchedCalculator } = useMatchedCalculator();
@@ -173,7 +173,7 @@ export function RacingDeskView() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => searchParams.get("race")
+    () => searchParams?.get("race") ?? null
   );
   const hasPayloadRef = useRef(false);
   const [bookiePlaces, setBookiePlaces] = useState(4);
@@ -402,7 +402,7 @@ export function RacingDeskView() {
   const selectRace = useCallback(
     (externalId: string) => {
       setSelectedId(externalId);
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (params.get("race") === externalId) return;
       params.set("race", externalId);
       router.replace(`/racing?${params.toString()}`, { scroll: false });
@@ -412,7 +412,7 @@ export function RacingDeskView() {
 
   const clearRaceParam = useCallback(() => {
     setSelectedId(null);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
     if (!params.has("race")) return;
     params.delete("race");
     const qs = params.toString();

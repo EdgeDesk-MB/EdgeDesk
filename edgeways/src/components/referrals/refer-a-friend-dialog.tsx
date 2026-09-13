@@ -185,7 +185,7 @@ export function ReferAFriendDialog({
 }: {
   suppressed?: boolean;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { active: publicDemo } = usePublicDemo();
   const { state } = useAppState();
   const { isLoaded, isSignedIn, user } = useUser();

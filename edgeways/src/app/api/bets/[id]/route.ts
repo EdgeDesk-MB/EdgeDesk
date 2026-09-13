@@ -191,7 +191,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
         p.exchangeId !== undefined;
       if (placementTouched && updated.status === "open") {
         await reledgerNeonOpenBetPlacement(updated).catch((error) => {
-          logNeonLedgerFailure("reledger", updated.id, error);
+          logNeonLedgerFailure("reledger", betId, error);
         });
       }
       if (p.status === undefined && updated.eventId != null) {
@@ -203,7 +203,7 @@ export const PATCH = withDeskScope(async function PATCH(req: NextRequest, ctx: {
       }
       if (updated.status !== "open") {
         await ledgerNeonBetSettlement(updated).catch((error) => {
-          logNeonLedgerFailure("settlement", updated.id, error);
+          logNeonLedgerFailure("settlement", betId, error);
         });
       }
       if (p.purpose === "mug" && updated.bookmaker) {

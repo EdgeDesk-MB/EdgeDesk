@@ -114,7 +114,7 @@ const ADMIN_META_ITEM: MetaNavItem = {
 };
 
 export function AppTopBarMetaNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const { loaded, admin } = useAdminSession();
   const items = useMemo(

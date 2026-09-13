@@ -93,13 +93,13 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const settings = state?.settings;
-  const requestedTab = searchParams.get("tab");
+  const requestedTab = searchParams?.get("tab");
   const [tab, setTab] = useState<SettingsTab>(() =>
     requestedTab && isSettingsTab(requestedTab) ? requestedTab : "subscription"
   );
 
   useEffect(() => {
-    if (searchParams.get("tab") === "integrations") {
+    if (searchParams?.get("tab") === "integrations") {
       router.replace("/admin/feeds");
     }
   }, [router, searchParams]);

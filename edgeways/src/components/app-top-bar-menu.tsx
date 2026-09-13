@@ -79,7 +79,7 @@ function BurgerButton(props: React.ComponentProps<"button">) {
 /** Mobile: full-height drawer from the right with the sectioned navigation. */
 function MobileNavDrawer() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { state } = useAppState();
   const alertsUnread = state?.alertsUnread ?? 0;
   const openBetCount = (state?.bets ?? []).filter((b) => b.status === "open").length;

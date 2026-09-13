@@ -85,20 +85,20 @@ function TrackerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { openAddBet } = useAddBet();
-  const tabParam = searchParams.get("tab");
+  const tabParam = searchParams?.get("tab");
   const activeTab = tabParam === "pnl" ? "pnl" : "bets";
-  const urlDeskQueue = parseDeskQueue(searchParams.get("queue"));
+  const urlDeskQueue = parseDeskQueue(searchParams?.get("queue") ?? null);
   // Optimistic pill selection so the active queue paints before the heavy list.
   const [deskQueue, setDeskQueueState] = useState(urlDeskQueue);
   const [isQueuePending, startQueueTransition] = useTransition();
   const deferredDeskQueue = useDeferredValue(deskQueue);
   const listPending = isQueuePending || deferredDeskQueue !== deskQueue;
-  const offerFilterParam = searchParams.get("offer");
+  const offerFilterParam = searchParams?.get("offer");
   const offerFilterId = offerFilterParam != null ? Number(offerFilterParam) : null;
-  const eventFilterParam = searchParams.get("event");
+  const eventFilterParam = searchParams?.get("event");
   const eventFilterId = eventFilterParam != null ? Number(eventFilterParam) : null;
-  const highlightParam = searchParams.get("highlight");
-  const actionParam = searchParams.get("action");
+  const highlightParam = searchParams?.get("highlight");
+  const actionParam = searchParams?.get("action");
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [editingBet, setEditingBet] = useState<BetRow | null>(null);
   const [trackerAddOpen, setTrackerAddOpen] = useState(false);
@@ -317,7 +317,7 @@ function TrackerContent() {
     : 0;
 
   function setActiveTab(tab: "bets" | "pnl") {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
     if (tab === "pnl") {
       params.set("tab", "pnl");
       params.delete("queue");
@@ -332,7 +332,7 @@ function TrackerContent() {
     if (queue === deskQueue && !listPending) return;
     setDeskQueueState(queue);
     startQueueTransition(() => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.delete("tab");
       if (queue === "all") params.delete("queue");
       else params.set("queue", queue);
@@ -350,7 +350,7 @@ function TrackerContent() {
     let fadeTimer: number | undefined;
     queueMicrotask(() => {
       setHighlightId(id);
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.delete("highlight");
       const qs = params.toString();
       router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
@@ -362,7 +362,7 @@ function TrackerContent() {
   }, [highlightParam, router]);
 
   // J5: /tracker?mug=<bookie> → Add bet pre-set to a camouflage bet
-  const mugParam = searchParams.get("mug");
+  const mugParam = searchParams?.get("mug");
   const mugApplied = useRef(false);
   useEffect(() => {
     if (!mugParam || mugApplied.current) return;
@@ -393,7 +393,7 @@ function TrackerContent() {
           ? `Convert FB · ${offer?.bookmaker ?? offer?.title ?? "offer"}`
           : `Qualify · ${offer?.bookmaker ?? offer?.title ?? "offer"}`,
     });
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
     params.delete("action");
     const qs = params.toString();
     router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });
@@ -569,7 +569,7 @@ function TrackerContent() {
                     type="button"
                     className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
                     onClick={() => {
-                      const params = new URLSearchParams(searchParams.toString());
+                      const params = new URLSearchParams(searchParams?.toString() ?? "");
                       params.delete("offer");
                       params.delete("action");
                       const qs = params.toString();
@@ -584,7 +584,7 @@ function TrackerContent() {
                     type="button"
                     className="text-xs font-medium text-primary-text underline-offset-2 hover:underline"
                     onClick={() => {
-                      const params = new URLSearchParams(searchParams.toString());
+                      const params = new URLSearchParams(searchParams?.toString() ?? "");
                       params.delete("event");
                       const qs = params.toString();
                       router.replace(qs ? `/tracker?${qs}` : "/tracker", { scroll: false });

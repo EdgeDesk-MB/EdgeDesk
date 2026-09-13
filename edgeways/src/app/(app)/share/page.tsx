@@ -42,9 +42,9 @@ function ShareContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const shared = combineShareParams({
-    title: searchParams.get("title"),
-    text: searchParams.get("text"),
-    url: searchParams.get("url"),
+    title: searchParams?.get("title"),
+    text: searchParams?.get("text"),
+    url: searchParams?.get("url"),
   });
   const [text, setText] = useState(shared);
   const [saving, setSaving] = useState(false);

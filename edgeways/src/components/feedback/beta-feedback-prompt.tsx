@@ -59,7 +59,7 @@ function subscribeToStorage(callback: () => void): () => void {
  * localStorage via useSyncExternalStore so the server never renders it.
  */
 export function BetaFeedbackPrompt() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { isLoaded, userId } = useAuth();
   const { active: demoActive } = usePublicDemo();
   const [dismissedThisSession, setDismissedThisSession] = useState(false);

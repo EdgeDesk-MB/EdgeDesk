@@ -168,7 +168,7 @@ export default function AccaDeskPage() {
 function AccaDeskContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = searchParams.get("tab") === "history" ? "history" : "active";
+  const tab = searchParams?.get("tab") === "history" ? "history" : "active";
   const [runs, setRuns] = useState<RunView[] | null>(null);
   const load = useCallback(() => {
     api<{ runs: RunView[] }>("/api/acca")

@@ -61,7 +61,7 @@ export default function OffersPage() {
 function OffersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const highlightParam = searchParams.get("highlight");
+  const highlightParam = searchParams?.get("highlight");
   const { state, error, refresh } = useAppState(4000);
   const { openOffer, viewOffer } = useOfferDialog();
   const offers = useMemo(() => state?.offers ?? [], [state]);
@@ -152,7 +152,7 @@ function OffersContent() {
   // P1: push notifications deep-link to the campaign details modal via
   // /offers?view=<id>. The param survives until the polled offers contain
   // the id (first load can race the poll), then opens once and strips.
-  const viewParam = searchParams.get("view");
+  const viewParam = searchParams?.get("view");
   const handledViewRef = useRef<string | null>(null);
   useEffect(() => {
     if (!viewParam || handledViewRef.current === viewParam) return;
@@ -161,7 +161,7 @@ function OffersContent() {
     if (!offer) return;
     handledViewRef.current = viewParam;
     viewOffer(offer);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
     params.delete("view");
     const qs = params.toString();
     router.replace(qs ? `/offers?${qs}` : "/offers", { scroll: false });
@@ -175,7 +175,7 @@ function OffersContent() {
     let fadeTimer: number | undefined;
     queueMicrotask(() => {
       setHighlightId(id);
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.delete("highlight");
       const qs = params.toString();
       router.replace(qs ? `/offers?${qs}` : "/offers", { scroll: false });

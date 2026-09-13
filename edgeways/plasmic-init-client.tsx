@@ -11,7 +11,7 @@ PLASMIC.registerComponent(Button, {
     variant: { type: 'choice', options: ['default', 'destructive', 'outline', 'secondary', 'ghost', 'link'] },
     size: { type: 'choice', options: ['default', 'sm', 'lg', 'icon'] },
     children: 'slot',
-    onClick: 'eventHandler',
+    onClick: { type: 'eventHandler', argTypes: [{ name: 'event', type: 'object' }] },
     disabled: 'boolean'
   }
 });

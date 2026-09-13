@@ -79,7 +79,7 @@ export function FreeBetsProvider({ children }: { children: ReactNode }) {
 function FreeBetsQueryOpener({ onOpen }: { onOpen: () => void }) {
   const searchParams = useSearchParams();
   useEffect(() => {
-    if (searchParams.get("freeBets") === "1") onOpen();
+    if (searchParams?.get("freeBets") === "1") onOpen();
   }, [searchParams, onOpen]);
   return null;
 }

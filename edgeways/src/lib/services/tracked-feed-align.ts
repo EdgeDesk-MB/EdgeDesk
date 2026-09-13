@@ -9,7 +9,10 @@ import "server-only";
 
 import type { EventRow } from "@/lib/db/schema";
 import { localCalendarDate } from "@/lib/events";
-import { preferFresherLiveScore } from "@/lib/events/live-fixture-overlay";
+import {
+  preferFresherLiveScore,
+  type LiveScoreFields,
+} from "@/lib/events/live-fixture-overlay";
 import { liveFixtureClockIsStale } from "@/lib/live-poll-rules";
 import type { Fixture } from "@/lib/services/apifootball";
 import {
@@ -89,7 +92,7 @@ export async function alignTrackedFootballFixtures(
 }
 
 function applyStoredFixtureToEvent<T extends EventRow>(event: T, stored: Fixture): T {
-  const chosen = preferFresherLiveScore(event, stored);
+  const chosen = preferFresherLiveScore<LiveScoreFields>(event, stored);
   if (chosen === event) return event;
   const status =
     chosen.status === "finished" || chosen.status === "live" || chosen.status === "upcoming"

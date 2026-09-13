@@ -10,7 +10,7 @@ import { captionHeading, navLinkState } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 export function AdminNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   return (
     <aside

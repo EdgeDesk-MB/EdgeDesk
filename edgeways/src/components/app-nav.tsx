@@ -500,7 +500,7 @@ function NavDefaultExchange() {
 }
 
 export function AppNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { openAddBalance } = useAddBalance();
   const { openAddBet } = useAddBet();
   const { openMatchedCalculator } = useMatchedCalculator();

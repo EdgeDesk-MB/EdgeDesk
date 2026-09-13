@@ -24,7 +24,7 @@ import { PageShell } from "@/components/page-shell";
  * "Checking your plan" while /api/state is still in flight.
  */
 export function PlanRouteGate({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { state, error, refresh } = useAppState();
   const [cachedChrome, setCachedChrome] = useState<ChromeSnapshot | null>(null);
   useLayoutEffect(() => {

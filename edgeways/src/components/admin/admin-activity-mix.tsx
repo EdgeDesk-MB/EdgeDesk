@@ -90,7 +90,7 @@ export function AdminActivityMix({
   day?: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [pending, startTransition] = useTransition();
   const day = resolveActivityMixDay(dayParam);
 

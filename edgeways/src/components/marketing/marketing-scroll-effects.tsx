@@ -73,7 +73,7 @@ function bindReveals(root: Element | null): IntersectionObserver | null {
  * `[data-reveal]` nodes hidden under `html.marketing-reveal-armed`.
  */
 export function MarketingScrollEffects() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   useEffect(() => {
     const html = document.documentElement;

@@ -218,10 +218,10 @@ function EpDeskContent() {
   const [playbookOpen, setPlaybookOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("offers");
   const [tracking, setTracking] = useState(false);
-  const fixtureHome = searchParams.get("home")?.trim() ?? "";
-  const fixtureAway = searchParams.get("away")?.trim() ?? "";
-  const fixtureStart = searchParams.get("start")?.trim() ?? "";
-  const fixtureTab = searchParams.get("tab");
+  const fixtureHome = searchParams?.get("home")?.trim() ?? "";
+  const fixtureAway = searchParams?.get("away")?.trim() ?? "";
+  const fixtureStart = searchParams?.get("start")?.trim() ?? "";
+  const fixtureTab = searchParams?.get("tab");
 
   // Live tab state (not persisted)
   const [hg, setHg] = useState(0);

@@ -185,7 +185,7 @@ function HelpPageContent() {
   const router = useRouter();
   const { resetAndOpenWelcome } = useOnboarding();
 
-  const guideParam = searchParams.get("guide");
+  const guideParam = searchParams?.get("guide") ?? null;
   const activeSlug = isValidGuide(guideParam) ? guideParam : DEFAULT_HELP_GUIDE;
   const activeGuide = HELP_GUIDE_BY_SLUG[activeSlug];
 
