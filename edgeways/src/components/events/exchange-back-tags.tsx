@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const BETFAIR_BACK =
-  EXCHANGE_PRESETS.find((preset) => preset.name === "Betfair")?.backColor ?? "#a6d8ff";
+  EXCHANGE_PRESETS.find((preset) => preset.name === "Betfair")?.backColor ?? "#A7D8FF";
 
 const FLASH_MS = 3000;
 

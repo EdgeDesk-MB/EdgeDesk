@@ -41,6 +41,7 @@ function account(
     isActive: 1,
     accessStatus,
     notes: null,
+    notesSource: null,
     wrRemaining: 0,
     wrMinOdds: null,
     wrType: "stake",

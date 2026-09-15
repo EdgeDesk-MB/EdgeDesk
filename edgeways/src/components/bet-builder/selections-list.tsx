@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { BetBuilderSelectionRow } from "@/lib/db/schema";
+import { formatBetSelection } from "@/lib/markets";
 
 /**
  * Same-event BB selections: count bar + list (not a timeline - kick-off is shared).
@@ -52,7 +53,14 @@ export function BetBuilderSelectionsList({
               </p>
               {sel.market || sel.selection ? (
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {[sel.market, sel.selection].filter(Boolean).join(" · ")}
+                  {[
+                    sel.market,
+                    sel.selection
+                      ? formatBetSelection(sel.market ?? "", sel.selection)
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               ) : null}
             </div>

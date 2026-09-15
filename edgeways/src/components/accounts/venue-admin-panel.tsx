@@ -29,15 +29,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BookieNamePicker } from "@/components/bookie-name-picker";
 import { MoneyFlow } from "@/components/money-flow";
 import { api } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
-import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
+import {
+  EXCHANGE_PRESETS,
+  exchangeBackColor,
+  exchangeBrandColor,
+  exchangeLayColor,
+  exchangeSupportsBack,
+} from "@/lib/brands/exchanges";
 import { bookieBrandColor } from "@/lib/brands/bookies";
+import { cn } from "@/lib/utils";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import type { ExchangeRow } from "@/lib/db/schema";
-import { Landmark, Plus, Trash2, Wallet } from "lucide-react";
+import { Archive, ArchiveRestore, Landmark, Plus, StickyNote, Trash2, Wallet } from "lucide-react";
 import { EmptyState } from "@/components/help/empty-state";
 
 type BookieAccessStatus = "available" | "gubbed" | "closed";
@@ -111,6 +119,16 @@ export function ManageVenuesDialog({
       loadBookies();
     } catch (e) {
       toast.error("Delete failed", { description: String(e) });
+    }
+  }
+
+  async function unarchiveBookie(id: number, name: string) {
+    try {
+      await api(`/api/accounts/${id}`, { method: "PATCH", json: { isActive: true } });
+      toast.success(`${name} restored`);
+      loadBookies();
+    } catch (e) {
+      toast.error("Restore failed", { description: String(e) });
     }
   }
 
@@ -193,6 +211,7 @@ export function ManageVenuesDialog({
                       bookie={bookie}
                       onPatch={patchBookie}
                       onArchive={archiveBookie}
+                      onUnarchive={unarchiveBookie}
                     />
                   ))}
                 </TableBody>
@@ -235,7 +254,7 @@ function ExchangeEditRow({
         <span className="flex items-center gap-2 font-medium">
           <span
             className="inline-block size-3 rounded-full"
-            style={{ backgroundColor: exchange.brandColor }}
+            style={{ backgroundColor: exchangeBrandColor(exchange.name, exchange.brandColor) }}
           />
           {exchange.name}
         </span>
@@ -262,15 +281,22 @@ function ExchangeEditRow({
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
+          {exchangeSupportsBack(exchange.name) ? (
+            <span
+              className="rounded px-2 py-0.5 text-[11px] font-medium text-black/70"
+              style={{
+                backgroundColor:
+                  exchangeBackColor(exchange.name, exchange.backColor) ?? undefined,
+              }}
+            >
+              back
+            </span>
+          ) : null}
           <span
             className="rounded px-2 py-0.5 text-[11px] font-medium text-black/70"
-            style={{ backgroundColor: exchange.backColor }}
-          >
-            back
-          </span>
-          <span
-            className="rounded px-2 py-0.5 text-[11px] font-medium text-black/70"
-            style={{ backgroundColor: exchange.layColor }}
+            style={{
+              backgroundColor: exchangeLayColor(exchange.name, exchange.layColor),
+            }}
           >
             lay
           </span>
@@ -289,15 +315,30 @@ function BookieEditRow({
   bookie,
   onPatch,
   onArchive,
+  onUnarchive,
 }: {
   bookie: AccountBalance;
   onPatch: (id: number, json: Record<string, unknown>, message?: string) => void;
   onArchive: (id: number) => void;
+  onUnarchive: (id: number, name: string) => void;
 }) {
   const displayColor = bookieBrandColor(bookie.name, bookie.brandColor);
   const [color, setColor] = useState(displayColor);
   const [notes, setNotes] = useState(bookie.notes ?? "");
+  const [notesOpen, setNotesOpen] = useState(() => Boolean(bookie.notes?.trim()));
   const accessStatus = (bookie.accessStatus ?? "available") as BookieAccessStatus;
+  /** Hovering either row highlights both as one block, since the note row is really part of it. */
+  const [rowHovered, setRowHovered] = useState(false);
+  const groupHoverProps = {
+    onMouseEnter: () => setRowHovered(true),
+    onMouseLeave: () => setRowHovered(false),
+  };
+
+  function clearNotes() {
+    setNotes("");
+    setNotesOpen(false);
+    onPatch(bookie.id, { notes: null });
+  }
 
   // Adjust-during-render: external edits to the row refresh the form fields.
   const [prevBookie, setPrevBookie] = useState({
@@ -319,7 +360,14 @@ function BookieEditRow({
 
   return (
     <>
-      <TableRow className={bookie.isActive ? undefined : "opacity-60"}>
+      <TableRow
+        className={cn(
+          !bookie.isActive && "opacity-60",
+          notesOpen && "border-b-0",
+          rowHovered && "bg-selection-subtle"
+        )}
+        {...groupHoverProps}
+      >
         <TableCell>
           <span className="flex items-center gap-2 font-medium">
             <span
@@ -383,30 +431,92 @@ function BookieEditRow({
           <MoneyFlow value={bookie.balance} />
         </TableCell>
         <TableCell>
-          {bookie.isActive ? (
-            <Button variant="ghost" size="icon" onClick={() => onArchive(bookie.id)}>
-              <Trash2 className="size-4" />
-            </Button>
-          ) : null}
+          <div className="flex items-center justify-end gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-expanded={notesOpen}
+                    aria-label={notesOpen ? `Hide note for ${bookie.name}` : `Add note for ${bookie.name}`}
+                    onClick={() => setNotesOpen((v) => !v)}
+                  >
+                    <StickyNote className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Note</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {bookie.isActive ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Archive ${bookie.name}`}
+                      onClick={() => onArchive(bookie.id)}
+                    >
+                      <Archive className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Archive</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Unarchive ${bookie.name}`}
+                      onClick={() => onUnarchive(bookie.id, bookie.name)}
+                    >
+                      <ArchiveRestore className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Unarchive</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </TableCell>
       </TableRow>
-      <TableRow className={bookie.isActive ? "border-b" : "border-b opacity-60"}>
-        <TableCell colSpan={6} className="pt-0 pb-3">
-          <Input
-            value={notes}
-            placeholder="Notes - limits, gub details, login tips…"
-            className="h-8 text-xs"
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={() => {
-              const next = notes.trim() || null;
-              const prev = bookie.notes?.trim() || null;
-              if (next !== prev) {
-                onPatch(bookie.id, { notes: next });
-              }
-            }}
-          />
-        </TableCell>
-      </TableRow>
+      {notesOpen && (
+        <TableRow
+          className={cn(!bookie.isActive && "opacity-60", rowHovered && "bg-selection-subtle")}
+          {...groupHoverProps}
+        >
+          <TableCell colSpan={6} className="pt-0 pb-3">
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={notes}
+                placeholder={`Notes for ${bookie.name}`}
+                className="h-8 text-xs"
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={() => {
+                  const next = notes.trim() || null;
+                  const prev = bookie.notes?.trim() || null;
+                  if (next !== prev) {
+                    onPatch(bookie.id, { notes: next });
+                  }
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                aria-label={`Remove note for ${bookie.name}`}
+                onClick={clearNotes}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
     </>
   );
 }
@@ -500,8 +610,8 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
   const [name, setName] = useState("");
   const [commission, setCommission] = useState(0);
   const [brandColor, setBrandColor] = useState("#3f3f46");
-  const [backColor, setBackColor] = useState("#a6d8ff");
-  const [layColor, setLayColor] = useState("#fac9d1");
+  const [backColor, setBackColor] = useState("#A7D8FF");
+  const [layColor, setLayColor] = useState("#FBC9D2");
 
   function applyPreset(value: string) {
     setPreset(value);
@@ -589,9 +699,11 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
               {(
                 [
                   ["Colour", brandColor, setBrandColor],
-                  ["Back", backColor, setBackColor],
+                  ...(exchangeSupportsBack(name)
+                    ? [["Back", backColor, setBackColor] as [string, string, (v: string) => void]]
+                    : []),
                   ["Lay", layColor, setLayColor],
-                ] as const
+                ] as Array<[string, string, (v: string) => void]>
               ).map(([label, value, set]) => (
                 <div key={label} className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">{label}</Label>

@@ -56,6 +56,13 @@ export const ROADMAP_CATEGORIES: RoadmapCategory[] = [
         description: "Live in-play probability model with lock-in advice and dutch/lay ranking",
         status: "done",
       },
+      {
+        id: "calc-ep-multi-sport",
+        title: "Early-payout models for more sports",
+        description:
+          "Tennis, baseball and other early-payout sports modelled on the Early-payout Desk, the same way football 2UP is today",
+        status: "planned",
+      },
       { id: "calc-asian", title: "Asian handicap calculator", status: "future" },
     ],
   },

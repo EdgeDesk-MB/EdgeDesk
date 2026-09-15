@@ -60,6 +60,7 @@ import {
   unconditionalFreeBetEffect,
 } from "@/lib/offers/early-free-bet-award";
 import { stripStaleHorseFromRacingBetLabel } from "@/lib/bets/racing-bet-label";
+import { formatBetSelection } from "@/lib/markets";
 import { offerCampaignCardShell } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Gift, History } from "lucide-react";
@@ -911,7 +912,14 @@ export function HistoryEntryCard({
                 {bet.selection && (
                   <div>
                     <dt className="text-xs text-muted-foreground">Selection</dt>
-                    <dd>{bet.selection}</dd>
+                    <dd>
+                      {formatBetSelection(
+                        bet.market,
+                        bet.selection,
+                        event?.homeTeam,
+                        event?.awayTeam
+                      )}
+                    </dd>
                   </div>
                 )}
                 {bet.expectedProfit != null && entry.kind === "bet_placed" && (

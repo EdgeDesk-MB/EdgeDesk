@@ -205,6 +205,7 @@ describe("hosted desk cutover", () => {
     expect(settings).toMatch(/patchNeonDeskSettings/);
     expect(settings).toMatch(/hiddenFootballScopes/);
     expect(settings).toMatch(/hiddenRacingCourses/);
+    expect(settings).toMatch(/bookieScopes/);
     expect(settings).toMatch(/isFixtureScopeSettingsPatch/);
     const neonSettings = readFileSync(
       resolve(__dirname, "neon-desk-settings.ts"),

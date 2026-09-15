@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
  * --layout-page-x, --layout-card-x, --layout-stack-gap
  */
 
-/** Page shell outer inset - uniform on all sides (title, cards, grids align to this edge) */
+/** Page shell outer inset. Split so a later `pb-*` (calculator end air) does not drop the sides. */
 export const pageShell = cn(
-  "p-[var(--layout-page-x)]",
+  "px-[var(--layout-page-x)] pt-[var(--layout-page-x)] pb-[var(--layout-page-x)]",
   "gap-[var(--layout-stack-gap)]"
 );
 

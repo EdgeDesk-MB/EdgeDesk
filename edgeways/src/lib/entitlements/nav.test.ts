@@ -27,6 +27,8 @@ describe("featureForDeskPath", () => {
     expect(featureForDeskPath("/desk")).toBeNull();
     expect(featureForDeskPath("/calculators")).toBeNull();
     expect(featureForDeskPath("/calculators/ep-desk")).toBeNull();
+    expect(featureForDeskPath("/early-payout")).toBeNull();
+    expect(featureForDeskPath("/2up")).toBeNull();
     expect(featureForDeskPath("/racing")).toBeNull();
     expect(featureForDeskPath("/accounts")).toBeNull();
     expect(featureForDeskPath("/casino")).toBeNull();

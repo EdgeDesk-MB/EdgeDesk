@@ -1,36 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { DatePicker } from "@/components/date-picker";
-import { TimePicker } from "@/components/time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -39,23 +11,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TwoUpStakesHint } from "@/components/bets/two-up-stakes-hint";
 import { MoneyFlow, moneyPositiveClass } from "@/components/money-flow";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import type { BetRow, EventRow } from "@/lib/db/schema";
 import type { OfferSummary } from "@/lib/services/offers.types";
-import {
-  formatEventStatus,
-  formatEventTitle,
-  localCalendarDate,
-  londonWallToUtcMs,
-} from "@/lib/events";
-import {
-  bandLinkableEventsForPicker,
-  formatTrackedEventOption,
-} from "@/lib/add-bet-event-options";
-import { SportEventBlock, SportIcon } from "@/components/sport-icon";
-import { previewAiTriggers, type SettledBetStatus } from "@/lib/calc";
+import { formatEventStatus, formatEventTitle } from "@/lib/events";
+import { SportEventBlock } from "@/components/sport-icon";
+import { previewAiTriggers } from "@/lib/calc";
 import { betRaceOutcome, type PromoAwardsByBetId } from "@/lib/bet-outcomes";
+import { canManualSettleBet } from "@/lib/bets/manual-settle";
+import {
+  LinkEventSelect,
+  LinkOfferSelect,
+  linkableOffers as linkableOffersFrom,
+} from "@/components/tracker/bet-link-controls";
 import { LockInDialog, canLockIn } from "@/components/tracker/lock-in-dialog";
 import { ManualSettleDialog } from "@/components/tracker/manual-settle-dialog";
 import {
@@ -67,12 +37,13 @@ import { isRaceResultIncomplete, parseRaceResults } from "@/lib/racing";
 import {
   formatBetSelection,
   inferSportFromBet,
-  isAutoSettleMarket,
-  linkableEventsForSport,
+  isKnownSport,
   MARKET_LABELS,
 } from "@/lib/markets";
+import { useBookieScopes } from "@/hooks/use-bookie-scopes";
+import { earlyPayoutOfferLabel } from "@/lib/twoup/desk-view";
+import type { EpBookieSetup } from "@/lib/twoup/bookie-offers";
 import { formatEvGbp, formatGbp } from "@/lib/format-money";
-import { sportDisplayLabel } from "@/lib/sports";
 import {
   isBetCancelled,
   isOfferExpired,
@@ -86,15 +57,11 @@ import {
 } from "@/lib/ui/surface-styles";
 import { betStatusBadgeVariant, formatPillLabel } from "@/lib/ui/status-badges";
 import { cn } from "@/lib/utils";
-import { suppressRaceOffSoonForBetLink } from "@/lib/alerts/race-off-soon-suppress";
 import { formatAccaDeskBetDisplayTitle, isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { betLogTypeCaption } from "@/lib/bets/bet-log-title";
 import { repairCollapsedFootballFixtureLabel } from "@/lib/bets/football-bet-label";
 import { stripStaleHorseFromRacingBetLabel } from "@/lib/bets/racing-bet-label";
-import { twoUpBothWinProfit } from "@/lib/bets/two-up-windfall";
-import { api } from "@/hooks/use-app-state";
-import { preventDialogDismissOnPortaledContent } from "@/lib/dialog-portal";
-import { Link2, Pencil, RotateCcw, Zap } from "lucide-react";
+import { Pencil, RotateCcw, Zap } from "lucide-react";
 
 function betLogTitle(bet: BetRow, event?: EventRow | null): string {
   if (isAccaDeskBack(bet) || isAccaDeskLay(bet)) return formatAccaDeskBetDisplayTitle(bet);
@@ -106,19 +73,27 @@ function BetLogTypeLine({
   bet,
   title,
   offer,
+  bookieSetup,
   className,
 }: {
   bet: BetRow;
   title: string;
   offer?: OfferSummary;
+  bookieSetup?: EpBookieSetup | null;
   className?: string;
 }) {
   const typeLabel = betLogTypeCaption(title, bet.betType);
-  if (!typeLabel && !bet.earlyPayout && !offer) return null;
+  const sport =
+    (bet.sport && isKnownSport(bet.sport) ? bet.sport : null) ??
+    (offer?.sport && isKnownSport(offer.sport) ? offer.sport : null);
+  const epLabel = bet.earlyPayout
+    ? earlyPayoutOfferLabel(bet, sport, bookieSetup)
+    : null;
+  if (!typeLabel && !epLabel && !offer) return null;
   return (
     <div className={cn("mt-0.5 text-xs text-muted-foreground", className)}>
       {typeLabel}
-      {typeLabel && bet.earlyPayout ? " · 2UP" : bet.earlyPayout ? "2UP" : ""}
+      {typeLabel && epLabel ? ` · ${epLabel}` : epLabel ?? ""}
       {offer && (
         <>
           {typeLabel || bet.earlyPayout ? " · " : ""}
@@ -165,19 +140,8 @@ export function BetLogTable({
   /** Called after a lock-in trade is logged so the parent refreshes */
   onLogged: () => void;
 }) {
-  const linkableOffers = [...offerById.values()]
-    .filter(
-      (o) =>
-        o.status === "active" ||
-        o.status === "planned" ||
-        o.profit.freeBetStage === "awarded"
-    )
-    .sort((a, b) => {
-      const aAward = a.profit.freeBetStage === "awarded" ? 0 : 1;
-      const bAward = b.profit.freeBetStage === "awarded" ? 0 : 1;
-      if (aAward !== bAward) return aAward - bAward;
-      return b.createdAt - a.createdAt;
-    });
+  const { setup: bookieSetup } = useBookieScopes();
+  const linkableOffers = linkableOffersFrom([...offerById.values()]);
 
   return (
     <>
@@ -201,12 +165,7 @@ export function BetLogTable({
           );
           const canSetRaceResult =
             bet.status === "open" && event?.sport === "horse_racing";
-          // Free-bet trigger rules alone must not hide Set result — only hide when
-          // a result-centric path exists (race placings, or linked auto-settle market).
-          const canManualSettle =
-            bet.status === "open" &&
-            !canSetRaceResult &&
-            (!event || !isAutoSettleMarket(sport, bet.market));
+          const canManualSettle = canManualSettleBet(bet, event, offer?.sport);
           const raceResult = event ? parseRaceResults(event.goals) : null;
           const raceIncomplete =
             !!raceResult && isRaceResultIncomplete(raceResult);
@@ -236,7 +195,12 @@ export function BetLogTable({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-medium leading-snug">{title}</p>
-                  <BetLogTypeLine bet={bet} title={title} offer={offer} />
+                  <BetLogTypeLine
+                    bet={bet}
+                    title={title}
+                    offer={offer}
+                    bookieSetup={bookieSetup}
+                  />
                   {bet.offerId == null && linkableOffers.length > 0 && (
                     <div className="mt-1.5">
                       <LinkOfferSelect
@@ -410,12 +374,7 @@ export function BetLogTable({
           );
           const canSetRaceResult =
             bet.status === "open" && event?.sport === "horse_racing";
-          // Free-bet trigger rules alone must not hide Set result — only hide when
-          // a result-centric path exists (race placings, or linked auto-settle market).
-          const canManualSettle =
-            bet.status === "open" &&
-            !canSetRaceResult &&
-            (!event || !isAutoSettleMarket(sport, bet.market));
+          const canManualSettle = canManualSettleBet(bet, event, offer?.sport);
           const raceResult = event ? parseRaceResults(event.goals) : null;
           const raceIncomplete =
             !!raceResult && isRaceResultIncomplete(raceResult);
@@ -454,6 +413,7 @@ export function BetLogTable({
                   bet={bet}
                   title={title}
                   offer={offer}
+                  bookieSetup={bookieSetup}
                   className="line-clamp-1"
                 />
                 {bet.offerId == null && linkableOffers.length > 0 && (
@@ -662,285 +622,12 @@ export function BetLogTable({
   );
 }
 
-function LinkOfferSelect({
-  offers,
-  onLink,
-}: {
-  offers: OfferSummary[];
-  onLink: (offerId: number) => void;
-}) {
-  return (
-    <Select onValueChange={(v) => onLink(Number(v))}>
-      <SelectTrigger size="sm" className="h-7 w-full max-w-[11rem] text-xs">
-        <span className="flex items-center gap-1 text-primary-text">
-          <Link2 className="size-3 shrink-0" /> Link to offer
-        </span>
-      </SelectTrigger>
-      <SelectContent>
-        {offers.map((o) => (
-          <SelectItem key={o.id} value={String(o.id)}>
-            <span className="flex flex-col gap-0.5 text-left">
-              <span className="truncate font-medium">
-                {o.title.length > 36 ? `${o.title.slice(0, 33)}…` : o.title}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {o.bookmaker ?? "No bookie"}
-                {o.profit.freeBetStage === "awarded" && o.profit.freeBetAwardAmount != null
-                  ? ` · £${o.profit.freeBetAwardAmount.toFixed(0)} FB ready`
-                  : ` · ${o.status}`}
-              </span>
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function yesterdayCalendarDate(now = Date.now()): string {
-  const today = localCalendarDate(new Date(now));
-  const noon = londonWallToUtcMs(today, "12:00") ?? now;
-  return localCalendarDate(new Date(noon - 86_400_000));
-}
-
-function LinkEventSelect({
-  events,
-  bet,
-  sport,
-  onLink,
-}: {
-  events: EventRow[];
-  bet: BetRow;
-  /** Sport used when the bet was placed (offer sport, else market inference). */
-  sport: string;
-  onLink: (eventId: number, market: string, selection: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [addingRace, setAddingRace] = useState(false);
-  const [course, setCourse] = useState("");
-  const [raceDate, setRaceDate] = useState(() => yesterdayCalendarDate());
-  const [raceTime, setRaceTime] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const isRacing = sport === "horse_racing";
-  const dayBands = useMemo(() => {
-    const linkable = linkableEventsForSport(events, sport);
-    return bandLinkableEventsForPicker(linkable);
-  }, [events, sport]);
-  const eventCount = dayBands.reduce((n, b) => n + b.items.length, 0);
-  const sportLabel = sportDisplayLabel(sport).toLowerCase();
-
-  function linkToEvent(eventId: number) {
-    suppressRaceOffSoonForBetLink(eventId);
-    onLink(eventId, bet.market, bet.selection);
-  }
-
-  if (eventCount === 0 && !isRacing) {
-    return (
-      <span className="text-xs text-muted-foreground">No {sportLabel} events</span>
-    );
-  }
-
-  async function createAndLinkRace() {
-    const trimmed = course.trim();
-    const startTime = londonWallToUtcMs(raceDate, raceTime.trim());
-    if (!trimmed) {
-      toast.error("Enter the course");
-      return;
-    }
-    if (startTime == null) {
-      toast.error("Enter a valid date and off time");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await api<{ event: { id: number } }>("/api/events/track-racing", {
-        method: "POST",
-        json: { course: trimmed, startTime },
-      });
-      suppressRaceOffSoonForBetLink(res.event.id);
-      linkToEvent(res.event.id);
-      setOpen(false);
-      setAddingRace(false);
-      setCourse("");
-      setRaceTime("");
-      toast.success("Race linked", {
-        description: "Set result (1st–4th) if placings are still needed.",
-      });
-    } catch (e) {
-      toast.error("Could not add race", { description: String(e) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setAddingRace(false);
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 w-full max-w-[10rem] justify-start px-2 text-xs text-muted-foreground"
-        >
-          <Link2 className="size-3 shrink-0" /> Link event
-        </Button>
-      </DialogTrigger>
-      <DialogContent
-        className="max-w-sm gap-0 p-0"
-        onFocusOutside={preventDialogDismissOnPortaledContent}
-        onPointerDownOutside={preventDialogDismissOnPortaledContent}
-        onInteractOutside={preventDialogDismissOnPortaledContent}
-      >
-        <DialogHeader className="mx-0 mt-0">
-          <DialogTitle>Link event</DialogTitle>
-          <DialogDescription>
-            {isRacing
-              ? "Search tracked races, or add a past meeting."
-              : `Search tracked ${sportLabel} events.`}
-          </DialogDescription>
-        </DialogHeader>
-        {eventCount > 0 ? (
-          <Command
-            className={cn(
-              "border-t",
-              "[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5",
-              "[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold",
-              "[&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide",
-              "[&_[cmdk-group-heading]]:text-muted-foreground"
-            )}
-          >
-            <CommandInput placeholder={`Search ${sportLabel}…`} />
-            <CommandList className="max-h-64">
-              <CommandEmpty>No matching event.</CommandEmpty>
-              {dayBands.map((band) => (
-                <CommandGroup key={band.key} heading={band.label}>
-                  {band.items.map((e) => {
-                    const label = formatTrackedEventOption(e);
-                    return (
-                      <CommandItem
-                        key={e.id}
-                        value={`${label} ${band.label} ${e.homeTeam} ${e.awayTeam} ${e.competition ?? ""}`}
-                        onSelect={() => {
-                          linkToEvent(e.id);
-                          setOpen(false);
-                        }}
-                      >
-                        <SportIcon sport={e.sport} size={14} className="text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate">{label}</span>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              ))}
-            </CommandList>
-          </Command>
-        ) : null}
-        {isRacing ? (
-          <div className="border-t px-4 py-3">
-            {addingRace ? (
-              <div className="flex flex-col gap-2.5">
-                <p className="text-xs text-muted-foreground">
-                  Free racecards only cover today and tomorrow. Add yesterday&apos;s race by
-                  course and off time, then set placings.
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs text-muted-foreground">Course</Label>
-                  <Input
-                    value={course}
-                    onChange={(e) => setCourse(e.target.value)}
-                    placeholder="e.g. Thirsk"
-                    autoFocus
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">Date</Label>
-                    <DatePicker value={raceDate} onChange={setRaceDate} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">Off time</Label>
-                    <TimePicker value={raceTime} onChange={setRaceTime} placeholder="12:00" />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1"
-                    disabled={busy}
-                    onClick={() => setAddingRace(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="flex-1"
-                    disabled={busy}
-                    onClick={() => void createAndLinkRace()}
-                  >
-                    {busy ? "Linking…" : "Add & link"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setAddingRace(true)}
-              >
-                Race not listed? Add course &amp; time
-              </Button>
-            )}
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /** MoneyFlow-aligned colour for P&L digits (not the £ prefix). */
 function profitEntryClass(value: number): string {
   const rounded = Number((Number.isFinite(value) ? value : 0).toFixed(2));
   if (rounded === 0) return "text-muted-foreground";
   if (rounded > 0) return moneyPositiveClass;
   return "text-negative";
-}
-
-/** 2UP both-win P&L under Stakes: bookie pays early and the lay also wins. */
-function TwoUpStakesHint({
-  bet,
-  className,
-}: {
-  bet: BetRow;
-  className?: string;
-}) {
-  const profit = twoUpBothWinProfit(bet);
-  if (profit == null) return null;
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-0.5 text-xs tabular-nums",
-        className
-      )}
-      title="If the selection goes two up, then fails to win"
-    >
-      <Zap className="size-3 shrink-0 text-primary-text" aria-hidden />
-      <span className="text-muted-foreground">
-        2UP (<span className={cn("font-medium", profitEntryClass(profit))}>{formatGbp(profit, { signed: true })}</span>)
-      </span>
-    </div>
-  );
 }
 
 /** Expected P&L on the tracker row: whole amount coloured (incl. £). */

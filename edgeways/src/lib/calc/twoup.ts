@@ -50,8 +50,12 @@ export function twoUp(input: TwoUpInput): TwoUpResult {
 }
 
 /**
- * Expected value of the 2UP position given an estimated probability of the windfall
- * (team goes 2 up then fails to win) and the probability the team wins.
+ * Probability-weighted EV of a 2UP back/lay. UI was removed from
+ * `/calculators/two-up` (EDGE-154). Keep this for a later gated surface.
+ *
+ * pTeamWins = P(team wins, 2 up or not). pWindfall = P(2 up then fails).
+ * Residual mass is P(never 2 up and fails to win). Defaults on the old card
+ * were 32% / 6% (hint: windfall historically ~3–8%).
  */
 export function twoUpEV(result: TwoUpResult, pTeamWins: number, pWindfall: number): number {
   const pOther = Math.max(0, 1 - pTeamWins - pWindfall);

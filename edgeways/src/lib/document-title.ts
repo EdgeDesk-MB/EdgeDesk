@@ -9,7 +9,9 @@ export const APP_DOCUMENT_NAME = "Edgeways";
 
 /** Longest-prefix first. Labels match nav / desk naming. */
 const ROUTE_TITLES: readonly { prefix: string; title: string }[] = [
-  { prefix: "/calculators/ep-desk", title: "2UP Desk" },
+  { prefix: "/early-payout", title: "Early-payout Desk" },
+  { prefix: "/2up", title: "Early-payout Desk" },
+  { prefix: "/calculators/ep-desk", title: "Early-payout Desk" },
   { prefix: "/calculators/each-way", title: "Each way" },
   { prefix: "/calculators/sequential-lay", title: "Sequential lay" },
   { prefix: "/calculators/refund-if", title: "Refund-if" },
@@ -17,7 +19,7 @@ const ROUTE_TITLES: readonly { prefix: string; title: string }[] = [
   { prefix: "/calculators/accumulator", title: "Accumulator" },
   { prefix: "/calculators/dutching", title: "Dutching" },
   { prefix: "/calculators/matched", title: "Matched betting" },
-  { prefix: "/calculators/two-up", title: "2UP calculator" },
+  { prefix: "/calculators/two-up", title: "Early Payout" },
   { prefix: "/calculators/rule4", title: "Rule 4" },
   { prefix: "/calculators/ev", title: "EV calculator" },
   { prefix: "/calculators", title: "Calculators" },

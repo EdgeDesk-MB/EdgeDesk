@@ -3,16 +3,19 @@
 import { useId, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberStepperButtons } from "@/components/ui/number-stepper-buttons";
 import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { darken } from "@/lib/brands/exchanges";
 import {
   exchangeOddsStepHandlers,
   handleExchangeOddsInputEvent,
+  stepExchangeOdds,
 } from "@/lib/calc/exchange-odds-step";
 import {
   commitLayStake,
   formatLayStake,
   layStakeStepHandlers,
+  stepLayStake,
 } from "@/lib/calc/exchange-stake-step";
 import { formatMoneyAmount, roundMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
@@ -82,6 +85,20 @@ export function NumField({
     oddsStep?.onWheel ?? stakeStep?.onWheel
   );
 
+  function stepField(direction: 1 | -1) {
+    if (exchangeOddsStepping) {
+      onChange(stepExchangeOdds(value, direction > 0 ? "up" : "down"));
+      return;
+    }
+    if (layStakeStepping) {
+      onChange(stepLayStake(value, direction > 0 ? "up" : "down"));
+      return;
+    }
+    const base = Number.isFinite(value) ? value : (min ?? 0);
+    const next = roundMoney(base + direction * (step ?? 0.01));
+    onChange(min != null ? Math.max(min, next) : next);
+  }
+
   const moneyDisplay = focused
     ? text
     : Number.isFinite(value)
@@ -108,7 +125,7 @@ export function NumField({
     ? ({ "--nf": tint, "--nf-dark": darken(tint, 0.55) } as React.CSSProperties)
     : undefined;
   const fieldClass = cn(
-    "tabular-nums",
+    "tabular-nums pr-9 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
     prefix && "pl-7",
     tint && "border-0 bg-[var(--nf)] font-semibold dark:bg-[var(--nf-dark)]",
     inputClassName
@@ -198,6 +215,12 @@ export function NumField({
             style={tintStyle}
           />
         )}
+        <NumberStepperButtons
+          onStepUp={() => stepField(1)}
+          onStepDown={() => stepField(-1)}
+          disabled={disabled}
+          fieldRadius="var(--radius-button)"
+        />
       </div>
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </div>

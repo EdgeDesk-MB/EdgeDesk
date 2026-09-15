@@ -37,18 +37,18 @@ export function TrackFixtureProvider({ children }: { children: React.ReactNode }
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton
-          className="flex max-h-[min(90dvh,820px)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
+          className="flex max-w-[min(72rem,calc(100%-2rem))] flex-col gap-0 overflow-hidden p-0 sm:top-20 sm:bottom-20 sm:h-auto sm:max-h-none sm:max-w-[min(72rem,calc(100%-2rem))] sm:translate-y-0"
           onFocusOutside={preventDialogDismissOnPortaledContent}
           onPointerDownOutside={preventDialogDismissOnPortaledContent}
           onInteractOutside={preventDialogDismissOnPortaledContent}
         >
-          <DialogHeader className="mx-0 mt-0 shrink-0">
+          <DialogHeader className="mx-0 mt-0 shrink-0 border-b-0">
             <DialogTitle>Browse fixtures</DialogTitle>
             <DialogDescription>
               Pick a match or race to track.
             </DialogDescription>
           </DialogHeader>
-          {open ? <FixtureBrowserContent variant="dialog" className="min-h-[min(70dvh,640px)]" /> : null}
+          {open ? <FixtureBrowserContent variant="dialog" /> : null}
         </DialogContent>
       </Dialog>
     </TrackFixtureContext.Provider>

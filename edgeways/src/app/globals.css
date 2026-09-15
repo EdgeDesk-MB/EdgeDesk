@@ -11,35 +11,45 @@
  * Bet panel brand tints (Back / Lay). Registering these lets background-color
  * interpolate when --panel / --pi change (grey → bookie / exchange brand).
  */
+/*
+ * Empty plate initials must match --panel-empty / --panel-empty-dark
+ * (page mix). No var() here — @property initial-value is independent.
+ * Light empty ≈ page 96% + black. Dark empty ≈ page 94% + white.
+ */
 @property --panel {
   syntax: "<color>";
   inherits: true;
-  initial-value: #d4d4d8;
+  initial-value: oklch(0.929 0 0);
 }
 @property --panel-dark {
   syntax: "<color>";
   inherits: true;
-  initial-value: #3f3f46;
+  initial-value: oklch(0.229 0.004 250);
 }
 @property --pi {
   syntax: "<color>";
   inherits: true;
-  initial-value: #f4f4f5;
+  initial-value: oklch(0.973 0 0);
 }
 @property --pi-dark {
   syntax: "<color>";
   inherits: true;
-  initial-value: #52525b;
+  initial-value: oklch(0.368 0.003 250);
 }
 @property --chev {
   syntax: "<color>";
   inherits: true;
-  initial-value: #d4d4d8;
+  initial-value: oklch(0.929 0 0);
 }
 @property --chev-dark {
   syntax: "<color>";
   inherits: true;
-  initial-value: #3f3f46;
+  initial-value: oklch(0.229 0.004 250);
+}
+@property --bet-panel-shine {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
 }
 
 /*
@@ -182,6 +192,10 @@
   /* Near-white page plate; chroma 0 so it reads white-neutral, not cool grey.
    * --surface stays a step lighter so canvas → page → card still holds. */
   --page: oklch(0.968 0 0);
+  /* Empty Back/Lay plate before a bookie or exchange tint settles.
+   * A hair off --page — enough to read as a plate, not a grey slab. */
+  --panel-empty: color-mix(in oklch, var(--page) 96%, black);
+  --panel-empty-dark: color-mix(in oklch, var(--page) 94%, white);
   --surface: oklch(0.982 0 0);
   --surface-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
   --page-shadow: 0 0 8px rgb(0 0 0 / 0.06), 0 0 2px rgb(0 0 0 / 0.03);
@@ -262,10 +276,10 @@
   --brand-on-topbar: #111111;
   /* Inactive meta tabs on brand plate — #111 / white (same as --brand-on-topbar). */
   --topbar-muted-on-brand: #111111;
-  /* Light primary: ink plate #111 + brand type; hover lightens plate */
-  --primary: oklch(0.178 0 0);
-  --primary-foreground: var(--brand-text);
-  --primary-hover: oklch(0.28 0 0);
+  /* Light primary: Settings accent fill + contrast ink (same as dark) */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --primary-hover: color-mix(in oklch, var(--brand) 88%, black);
   /* Inline accent on light surfaces - ink (brand fails contrast on white) */
   --primary-text: oklch(0.178 0 0); /* #111111 */
   /* Highlight = capped brand (underlines / light strokes); chip = ink + type */
@@ -900,6 +914,64 @@ html[data-font="figtree"] {
 
   .surface-glass {
     box-shadow: var(--ew-surface-rim);
+  }
+
+  /**
+   * Add bet Early payout strip: 1px rim, no top stroke.
+   * Sides fade from 0 at the Back-plate join to the current bottom opacity.
+   */
+  .bet-panel-ep-edge::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    padding: 1px;
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0), rgb(0 0 0 / 0.1));
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .dark .bet-panel-ep-edge::after {
+    background: linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0),
+      rgb(255 255 255 / 0.06)
+    );
+  }
+
+  /* Back / Lay brand fill: tight leading lip, top → bottom (50ms). */
+  .bet-panel-shine-fill {
+    mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 max(0%, calc(var(--bet-panel-shine) - 6%)),
+      rgb(0 0 0 / 0.82) var(--bet-panel-shine),
+      transparent calc(var(--bet-panel-shine) + 8%)
+    );
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 max(0%, calc(var(--bet-panel-shine) - 6%)),
+      rgb(0 0 0 / 0.82) var(--bet-panel-shine),
+      transparent calc(var(--bet-panel-shine) + 8%)
+    );
+    animation: bet-panel-shine-fill 50ms ease-out forwards;
+  }
+
+  @keyframes bet-panel-shine-fill {
+    from {
+      --bet-panel-shine: 0%;
+    }
+    to {
+      --bet-panel-shine: 120%;
+    }
   }
 
   /* Cards keep a light ring; dark relies on the soft rim + face (no boxy stroke). */
@@ -1987,6 +2059,11 @@ html[data-font="figtree"] {
   .bet-panel-tint * {
     transition: none !important;
   }
+  .bet-panel-shine-fill {
+    animation: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+  }
   * {
     scroll-behavior: auto !important;
   }
@@ -2136,12 +2213,12 @@ html[data-font="figtree"] {
   --button-success-color-hover: color-mix(in oklch, var(--success), black 35%);
 }
 
-/* Primary (ink / brand) — stronger bottom lip like Polaris primary */
+/* Primary — brand fill in both themes. Light shares --ew-chip-shadow
+ * (soft dark rims ~0.05–0.08) so yellow plates do not read as ink bezels. */
 .aws-btn.edgeways-btn-3d.aws-btn--primary {
-  --ew-btn-shadow: inset 0 -1px 0 0 rgb(0 0 0 / 0.55),
-    inset 0 0 0 1px rgb(0 0 0 / 0.35),
-    inset 0 0.5px 0 1.5px rgb(255 255 255 / 0.22);
-  --ew-btn-shadow-pressed: inset 0 1px 0 0 rgb(0 0 0 / 0.45);
+  --ew-btn-shadow: var(--ew-chip-shadow);
+  --ew-btn-shadow-pressed: inset 0 1px 1px 0 rgb(0 0 0 / 0.12),
+    inset 0 -0.5px 0 0 rgb(255 255 255 / 0.08);
 }
 
 .dark .aws-btn.edgeways-btn-3d.aws-btn--primary {
@@ -2702,13 +2779,13 @@ html[data-font="figtree"] {
 }
 
 .aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__wrapper::before {
-  background: color-mix(in oklch, var(--primary) 38%, var(--muted)) !important;
+  background: color-mix(in oklch, var(--primary) 52%, var(--muted)) !important;
 }
 
 .aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__content,
 .aws-btn.edgeways-btn-3d.aws-btn--disabled .aws-btn__wrapper:hover .aws-btn__content {
-  background: color-mix(in oklch, var(--primary) 50%, var(--muted)) !important;
-  color: color-mix(in oklch, var(--primary-foreground) 82%, var(--primary)) !important;
+  background: color-mix(in oklch, var(--primary) 68%, var(--muted)) !important;
+  color: var(--primary-foreground) !important;
 }
 
 .aws-btn.edgeways-btn-3d.aws-btn--disabled[data-variant="edge"] .aws-btn__wrapper::before {

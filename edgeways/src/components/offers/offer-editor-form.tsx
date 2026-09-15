@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/date-picker";
 import { EventTimeInput } from "@/components/event-time-input";
@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { FormSection } from "@/components/ui/form-section";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -38,6 +39,14 @@ import { OfferCategoryIcon } from "@/components/offers/offer-category-icon";
 import { RegionFlag } from "@/components/region-flag";
 import { VenueSelect, inferVenueKind } from "@/components/venue-select";
 import { api, useAppState } from "@/hooks/use-app-state";
+import { useBookieScopes } from "@/hooks/use-bookie-scopes";
+import { SuggestBookieScopeDialog } from "@/components/bets/suggest-bookie-scope-dialog";
+import { upsertEpScope } from "@/lib/twoup/bookie-offers";
+import {
+  inferEpScopeFromOfferCopy,
+  shouldProposeBookieScope,
+  type SuggestedEpScope,
+} from "@/lib/twoup/scope-suggest";
 import { useNow } from "@/hooks/use-now";
 import { useVenueAccounts } from "@/hooks/use-venue-accounts";
 import type { OfferRecurrenceRule, OfferSummary } from "@/lib/services/offers.types";
@@ -92,7 +101,7 @@ import { formatApiError } from "@/lib/api-errors";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronDown, Plus, Save } from "lucide-react";
+import { Plus, Save } from "lucide-react";
 
 export type OfferEditorPrefill = {
   category?: OfferCategoryId;
@@ -186,75 +195,6 @@ function normalizeOffTime(raw: string): string {
   const m = raw.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return raw.trim();
   return `${m[1].padStart(2, "0")}:${m[2]}`;
-}
-
-function FormSection({
-  title,
-  summary,
-  open,
-  onOpenChange,
-  children,
-  accent,
-}: {
-  title: string;
-  summary?: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: React.ReactNode;
-  accent?: boolean;
-}) {
-  const headerClass = cn(
-    "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
-    accent
-      ? "rounded-t-lg bg-amber-500/15 hover:bg-amber-500/20 dark:bg-amber-500/15 dark:hover:bg-amber-500/25"
-      : "rounded-t-lg bg-muted/50 hover:bg-muted/70 dark:bg-input/30 dark:hover:bg-input/45",
-    !open && "rounded-b-lg"
-  );
-
-  return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-lg border",
-        accent
-          ? "border-amber-500/35 bg-amber-500/5"
-          : "border-border/70 bg-muted/20 dark:bg-input/20"
-      )}
-    >
-      <button type="button" onClick={() => onOpenChange(!open)} className={headerClass}>
-        <span
-          className={cn(
-            "flex-1 text-xs font-semibold tracking-wide",
-            accent ? "text-amber-800 dark:text-amber-300" : "text-foreground"
-          )}
-        >
-          {accent ? (
-            <span className="inline-flex items-center gap-1.5">
-              <AlertTriangle className="size-3.5" />
-              {title}
-            </span>
-          ) : (
-            title
-          )}
-        </span>
-        {!open && summary ? (
-          <span className="max-w-[55%] truncate text-xs text-muted-foreground">
-            {summary}
-          </span>
-        ) : null}
-        <ChevronDown
-          className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-180"
-          )}
-        />
-      </button>
-      {open ? (
-        <div className="flex flex-col gap-2 border-t border-border/50 px-3 py-2.5">
-          {children}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function initialFromPrefill(prefill?: OfferEditorPrefill) {
@@ -404,6 +344,10 @@ export function OfferEditorForm({
 }) {
   const boot = initialFromPrefill(prefill);
   const { state } = useAppState();
+  const { setup: bookieSetup, persistSetup } = useBookieScopes();
+  const [scopePrompt, setScopePrompt] = useState<SuggestedEpScope | null>(null);
+  const scopeDecisionRef = useRef<"done" | null>(null);
+  const pendingSeriesRef = useRef(false);
   const [title, setTitle] = useState(boot.title);
   const [bookmaker, setBookmaker] = useState(boot.bookmaker);
   const [offerUrl, setOfferUrl] = useState(boot.offerUrl);
@@ -461,9 +405,9 @@ export function OfferEditorForm({
   const [editingId, setEditingId] = useState<number | null>(boot.editingId);
 
   useEffect(() => {
-    onBlockingOverlayChange?.(seriesConfirmOpen);
+    onBlockingOverlayChange?.(seriesConfirmOpen || scopePrompt != null);
     return () => onBlockingOverlayChange?.(false);
-  }, [seriesConfirmOpen, onBlockingOverlayChange]);
+  }, [seriesConfirmOpen, scopePrompt, onBlockingOverlayChange]);
   const [racecards, setRacecards] = useState<RacingRacecard[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [sectionRacing, setSectionRacing] = useState(true);
@@ -1114,6 +1058,22 @@ export function OfferEditorForm({
       : 0;
 
   async function persistOffer(updateSeries: boolean) {
+    if (scopeDecisionRef.current !== "done") {
+      const cat = offerCategoryById(category);
+      if (!cat.isRacing && bookmakerTrimmed) {
+        const suggested = inferEpScopeFromOfferCopy({
+          bookie: bookmakerTrimmed,
+          title,
+          importantNotes,
+          sport: cat.sport,
+        });
+        if (suggested && shouldProposeBookieScope(bookieSetup, suggested)) {
+          pendingSeriesRef.current = updateSeries;
+          setScopePrompt(suggested);
+          return;
+        }
+      }
+    }
     setSaving(true);
     try {
       const payload = {
@@ -1150,6 +1110,7 @@ export function OfferEditorForm({
         }
       }
       setSeriesConfirmOpen(false);
+      scopeDecisionRef.current = null;
       onSaved();
     } catch (err) {
       toast.error(editingId != null ? "Could not update offer" : "Could not create offer", {
@@ -2343,6 +2304,32 @@ Expires 12 Aug 2026, 23:59`}
           </div>
         </DialogContent>
       </Dialog>
+      <SuggestBookieScopeDialog
+        open={scopePrompt != null}
+        bookie={scopePrompt?.bookie ?? ""}
+        sport={scopePrompt?.sport ?? "football"}
+        leadBy={scopePrompt?.leadBy ?? 2}
+        reason={scopePrompt?.reason}
+        onConfirm={(leadBy) => {
+          if (scopePrompt) {
+            persistSetup(
+              upsertEpScope(bookieSetup, {
+                bookie: scopePrompt.bookie,
+                sport: scopePrompt.sport,
+                leadBy,
+              })
+            );
+          }
+          scopeDecisionRef.current = "done";
+          setScopePrompt(null);
+          void persistOffer(pendingSeriesRef.current);
+        }}
+        onDecline={() => {
+          scopeDecisionRef.current = "done";
+          setScopePrompt(null);
+          void persistOffer(pendingSeriesRef.current);
+        }}
+      />
     </form>
   );
 }

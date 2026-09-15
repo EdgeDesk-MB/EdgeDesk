@@ -6,8 +6,9 @@ alwaysApply: true
 # Browser: Orca in-browser first
 
 For localhost / desk UI (verify a page, click through a flow, screenshot),
-drive **Orca's embedded browser**. Do not open Playwright MCP or
-Chrome DevTools for that work.
+drive **Orca's embedded browser**. Do not open Playwright MCP,
+Chrome DevTools, or system Chrome for that work. Those paths open extra
+windows and burn session credits.
 
 Load `orca-cli` then `references/browser.md` before the first tab command.
 
@@ -21,14 +22,36 @@ Load `orca-cli` then `references/browser.md` before the first tab command.
   after navigation or a stale ref.
 - Prefer `orca wait --text|--url|--selector|--load` over bare sleeps.
 
+## Browser shares (any page, any task)
+
+Sam may attach a URL, a selected-element dump, HTML, one or more screenshots,
+or a mix. The **user query is the task**. The share is evidence of where and
+what is on screen. Do not treat an example surface as the thing to build.
+
+**Use:** route; innermost named React component when present (else selector +
+visible text); on-screen / aria copy; screenshot(s) as visual truth (several
+images are states or viewports); dimensions for density or overflow.
+
+**Ignore unless asked:** full DOM paths, computed-style dumps, truncated SVG,
+CDN / asset URLs. Truncated HTML is normal; grep from the component name plus
+a stable class or `data-slot`. Do not ask Sam to paste the rest or to change
+the share format.
+
+Do not re-dump or re-open the same page before you have used what was shared.
+Open a verify tab after you change something, or if the share is not enough
+to act. Ask for another crop only when the image hides the thing the query
+is about.
+
 ## Do not
 
 - Call Playwright or Chrome DevTools MCP (`browser_*` in those namespaces)
   for Edgeways pages.
+- Open system Chrome, Chromium, or `open -a "Google Chrome"`.
 - Attach to or navigate a tab Sam already has open.
 - Use Computer Use for in-app pages (that is for OS windows only).
 
 ## Exceptions
 
 - Sam names Playwright / CDP / an external site.
-- `browser_host_unavailable` after retry: say so, then fall back.
+- `browser_host_unavailable` after retry: say so, then use Aside in a
+  **new** window (`.cursor/rules/aside-new-window.mdc`). Not Chrome.

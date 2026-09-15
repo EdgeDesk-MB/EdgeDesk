@@ -2,14 +2,17 @@
 
 import { useMemo } from "react";
 import { bookiePillStyle, type BookieChipStyle } from "@/lib/brands/bookies";
-import { contrastText, EXCHANGE_PRESETS, pillBorderColor } from "@/lib/brands/exchanges";
+import {
+  contrastText,
+  EXCHANGE_PRESETS,
+  exchangeBrandColor,
+  pillBorderColor,
+} from "@/lib/brands/exchanges";
 import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/lib/utils";
 
 function exchangePillStyle(name: string, override?: string | null): BookieChipStyle {
-  const key = name.trim().toLowerCase();
-  const preset = EXCHANGE_PRESETS.find((p) => p.name.toLowerCase() === key);
-  const bg = override?.trim() || preset?.brandColor || "#3f3f46";
+  const bg = exchangeBrandColor(name, override);
   return { bg, fg: contrastText(bg), border: pillBorderColor(bg) };
 }
 
@@ -22,6 +25,8 @@ const venueBadgeSizeClasses = {
   sm: "px-2 py-0.5 text-[11px] font-semibold leading-tight",
   /** Campaign cards — half-step above compact Badge (text-xs / h-6) */
   md: "h-6.5 px-2 text-[13px] font-medium leading-none",
+  /** Add bet Back / Lay triggers — same size as the former Lay header chip */
+  tag: "px-2 py-0.5 text-[11px] font-bold leading-tight uppercase",
 } as const;
 
 /**
@@ -36,6 +41,7 @@ export function VenueBadge({
   kind,
   size = "sm",
   className,
+  extra,
 }: {
   name: string;
   /** Explicit override when the parent already has Settings colour */
@@ -43,6 +49,8 @@ export function VenueBadge({
   kind?: "bookie" | "exchange";
   size?: keyof typeof venueBadgeSizeClasses;
   className?: string;
+  /** Shown after the name, e.g. `0%` on the Add bet exchange tag */
+  extra?: string;
 }) {
   const trimmed = name.trim();
   const { state } = useAppState(0);
@@ -71,21 +79,25 @@ export function VenueBadge({
     ? exchangePillStyle(trimmed, resolvedOverride)
     : bookiePillStyle(trimmed, resolvedOverride);
 
+  const tag = size === "tag";
+
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center truncate rounded-full border",
+        "inline-flex max-w-full items-center truncate",
+        tag ? "rounded" : "rounded-full border",
         venueBadgeSizeClasses[size],
         className
       )}
       style={{
         backgroundColor: style.bg,
         color: style.fg,
-        borderColor: style.border,
+        borderColor: tag ? undefined : style.border,
       }}
-      title={trimmed}
+      title={extra ? `${trimmed}  ${extra}` : trimmed}
     >
       {trimmed}
+      {extra ? `\u00a0\u00a0${extra}` : ""}
     </span>
   );
 }

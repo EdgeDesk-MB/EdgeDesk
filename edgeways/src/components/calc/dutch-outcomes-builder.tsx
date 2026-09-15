@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
 import { Button } from "@/components/ui/button";
+import { NumberStepperButtons } from "@/components/ui/number-stepper-buttons";
 import {
   Select,
   SelectContent,
@@ -22,12 +23,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PANEL_NEUTRAL, PanelInput, PanelSelect, PanelTextInput } from "@/components/calc/bet-panels";
+import {
+  PANEL_TINT_TRANSITION,
+  PanelInput,
+  PanelSelect,
+  PanelTextInput,
+  useSettledPanelTint,
+} from "@/components/calc/bet-panels";
 import { MoneyFlow, PercentFlow } from "@/components/money-flow";
 import { VenueSelect } from "@/components/venue-select";
 import { bookieFreeBetBalance } from "@/components/add-bet/back-bookie-balance-strip";
-import { bookiePanelTint } from "@/lib/brands/bookies";
-import { darken, lighten } from "@/lib/brands/exchanges";
+import { panelTintVars } from "@/lib/brands/exchanges";
+import { resolveBackPlateColors } from "@/lib/brands/panel-tints";
 import { useAppState } from "@/hooks/use-app-state";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
@@ -46,7 +53,12 @@ import {
 } from "@/lib/calc";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { roundPence, stepByIncrement } from "@/lib/calc/money";
-import { campaignHeaderBand, panelSurface, toolbarSelectTrigger } from "@/lib/ui/surface-styles";
+import {
+  campaignHeaderBand,
+  fieldControlShadow,
+  panelSurface,
+  toolbarSelectTrigger,
+} from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Gift, Plus, X } from "lucide-react";
 
@@ -93,6 +105,7 @@ export function DutchOutcomesBuilder({
   maxLegs?: number;
   className?: string;
 }) {
+  const tintReady = useSettledPanelTint();
   const [legs, setLegs] = useState<BuilderLeg[]>(() =>
     initialLegs && initialLegs.length >= minLegs
       ? initialLegs.map(({ stake: _stake, ...l }) => l)
@@ -450,20 +463,22 @@ export function DutchOutcomesBuilder({
           // Each outcome box tints from ITS OWN bookmaker when one is set,
           // else falls back to the account's default exchange - so a leg
           // stands apart from its siblings the moment it gets its own venue.
-          const legBase = leg.bookmaker?.trim()
-            ? bookiePanelTint(leg.bookmaker)
-            : (defaultExchange?.backColor ?? PANEL_NEUTRAL);
+          const plate = resolveBackPlateColors(
+            leg.bookmaker,
+            defaultExchange
+          );
           return (
             <div
               key={i}
-              className="bet-panel-tint relative flex flex-col gap-2 rounded-lg bg-[var(--panel)] p-2.5 transition-[background-color] duration-300 ease-out dark:bg-[var(--panel-dark)]"
+              className={cn(
+                "relative flex flex-col gap-2 rounded-lg bg-[var(--panel)] p-2.5 dark:bg-[var(--panel-dark)]",
+                PANEL_TINT_TRANSITION
+              )}
               style={
-                {
-                  "--panel": legBase,
-                  "--panel-dark": darken(legBase, 0.72),
-                  "--pi": lighten(legBase, 0.62),
-                  "--pi-dark": darken(legBase, 0.5),
-                } as React.CSSProperties
+                panelTintVars(
+                  tintReady ? plate.light : null,
+                  tintReady ? plate.dark : null
+                ) as React.CSSProperties
               }
             >
               <Button
@@ -648,7 +663,7 @@ function DutchWeightSlider({
           aria-hidden
         />
         <ChevronDown
-          className="pointer-events-none absolute top-0 z-10 size-3.5 -translate-x-1/2 text-primary"
+          className="pointer-events-none absolute top-0 z-10 size-3.5 -translate-x-1/2 text-primary-text"
           style={{ left: `${pct}%` }}
           aria-hidden
         />
@@ -752,8 +767,13 @@ function DutchStakeField({
           }
           setDraft(null);
         }}
-        className="bet-panel-tint h-10 w-full rounded-md border-0 bg-[var(--pi)] pl-8 pr-3 text-sm font-bold tabular-nums text-black/85 outline-none ring-primary/40 transition-[background-color] duration-300 ease-out [appearance:textfield] placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className={cn(
+          "h-10 w-full rounded-md border-0 bg-[var(--pi)] pl-8 pr-9 text-sm font-bold tabular-nums text-black/85 outline-none ring-primary/40 [appearance:textfield] placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+          fieldControlShadow,
+          PANEL_TINT_TRANSITION
+        )}
       />
+      <NumberStepperButtons onStepUp={() => step(1)} onStepDown={() => step(-1)} />
     </span>
   );
 }

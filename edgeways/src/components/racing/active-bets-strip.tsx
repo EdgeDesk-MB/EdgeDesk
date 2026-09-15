@@ -23,6 +23,7 @@ import {
 } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { formatGbp } from "@/lib/format-money";
+import { formatBetSelection } from "@/lib/markets";
 import { formatClockTime } from "@/lib/time-format";
 import { Eye, NotebookPen } from "lucide-react";
 
@@ -136,7 +137,9 @@ export function ActiveBetsStrip({
                         "mt-0 min-w-0 text-pretty break-words text-[15px]"
                       )}
                     >
-                      {b.selection || b.label}
+                      {b.selection
+                        ? formatBetSelection(b.market, b.selection)
+                        : b.label}
                     </p>
                     <p className="min-w-0 text-pretty break-words text-xs text-muted-foreground">
                       {[isDesk ? b.label : null, b.course, off, isDesk ? null : stakeOdds]

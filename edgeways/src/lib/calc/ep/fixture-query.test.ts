@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EP_DESK_PATH,
+  TWOUP_DESK_PATH,
   epDeskFixtureHref,
   epDeskFixtureSearch,
   parseEpDeskFixtureQuery,
@@ -67,7 +68,9 @@ describe("parseEpDeskFixtureQuery", () => {
 });
 
 describe("epDeskFixtureHref", () => {
-  it("builds a handoff URL and a clean desk path", () => {
+  it("builds a handoff URL onto /early-payout", () => {
+    expect(EP_DESK_PATH).toBe("/early-payout");
+    expect(TWOUP_DESK_PATH).toBe("/early-payout");
     expect(
       epDeskFixtureHref({
         home: "Everton",
@@ -75,7 +78,7 @@ describe("epDeskFixtureHref", () => {
         startTime: 1724328000000,
         tab: "dutch",
       })
-    ).toBe(`${EP_DESK_PATH}?home=Everton&away=Crystal+Palace&tab=dutch&start=1724328000000`);
+    ).toBe(`${TWOUP_DESK_PATH}?home=Everton&away=Crystal+Palace&tab=dutch&start=1724328000000`);
     expect(parseEpDeskTab("live")).toBe("live");
   });
 });

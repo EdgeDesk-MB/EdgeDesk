@@ -16,9 +16,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AdvancedLaySection } from "@/components/calc/advanced-lay";
+import { AddBetAdvancedLayField } from "@/components/add-bet/advanced-lay-field";
 import {
   BackPanel,
   LayPanel,
@@ -39,6 +38,7 @@ import {
   executableLayStake,
   layBounds,
   layPlanOutcome,
+  type LayBounds,
   type PartLay,
 } from "@/lib/calc";
 import {
@@ -46,7 +46,6 @@ import {
   betBuilderFairOdds,
   type BoostCall,
 } from "@/lib/calc/boost-check";
-import { contrastText } from "@/lib/brands/exchanges";
 import type { BoostDiaryRow, ExchangeRow } from "@/lib/db/schema";
 import { boostDiaryToAddBetPrefill } from "@/lib/services/boosts-client";
 import { panelSurface } from "@/lib/ui/surface-styles";
@@ -87,6 +86,7 @@ export function BoostCheckerForm({
   const [advanced, setAdvanced] = useState(false);
   const [partLays, setPartLays] = useState<PartLay[]>([]);
   const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
+  const [laySnap, setLaySnap] = useState<keyof LayBounds | null>(null);
   const [saving, setSaving] = useState(false);
 
   const { exchanges, defaultExchange } = useExchanges();
@@ -208,9 +208,11 @@ export function BoostCheckerForm({
 
       <BackPanel
         title="Back Bet"
+        exchange={exchange}
         venue={bookmaker}
         chip={
           <BookmakerSelect
+            tagTrigger
             value={bookmaker}
             onChange={setBookmaker}
             className="[--pi:var(--panel)] [--pi-dark:var(--panel-dark)]"
@@ -225,19 +227,19 @@ export function BoostCheckerForm({
         />
         <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelInput
+            label={mode === "boost" ? "Boosted odds" : "Offered builder odds"}
+            value={boostedOdds}
+            onChange={setBoostedOdds}
+            min={1}
+            placeholder="3.00"
+          />
+          <PanelInput
             label="Back stake"
             prefix="£"
             value={stake}
             onChange={setStake}
             min={0}
             placeholder="10.00"
-          />
-          <PanelInput
-            label={mode === "boost" ? "Boosted odds (decimal)" : "Offered builder odds"}
-            value={boostedOdds}
-            onChange={setBoostedOdds}
-            min={1}
-            placeholder="3.00"
           />
         </div>
       </BackPanel>
@@ -247,56 +249,61 @@ export function BoostCheckerForm({
           title="Lay Bet"
           exchange={exchange}
           chip={
-            <span className="flex items-center gap-2.5">
-              {exchange && (
-                <span
-                  className="rounded px-2 py-0.5 text-[11px] font-bold"
-                  style={{
-                    backgroundColor: exchange.brandColor,
-                    color: contrastText(exchange.brandColor),
-                  }}
-                >
-                  {exchange.name.toUpperCase()}
-                </span>
-              )}
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-black/70 dark:text-white/80">
-                Advanced
-                <Switch
-                  tone="onPanel"
-                  className="scale-90"
-                  checked={advanced}
-                  onCheckedChange={(on) => {
-                    setAdvanced(on);
-                    if (!on) {
-                      setPartLays([]);
-                      setLayStakeOverride(null);
-                    }
-                  }}
-                />
-              </label>
-            </span>
-          }
-        >
-          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <ExchangeSelect
-              onPanel
+              compact
+              tagTrigger
               exchanges={exchanges}
               value={exchange}
               onChange={setExchangeOverride}
-              showCommission
             />
+          }
+          footer={
+            <AddBetAdvancedLayField
+              enabled={advanced}
+              onEnabledChange={(on) => {
+                setAdvanced(on);
+                if (!on) {
+                  setPartLays([]);
+                  setLayStakeOverride(null);
+                  setLaySnap(null);
+                } else {
+                  setLaySnap("standard");
+                }
+              }}
+              bounds={bounds}
+              layStake={layStake}
+              onLayStake={(v) =>
+                setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+              }
+              lockedSnap={laySnap}
+              onLockedSnap={setLaySnap}
+              partLays={partLays}
+              onPartLays={setPartLays}
+              accent={exchange?.brandColor ?? "#1e293b"}
+            />
+          }
+        >
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <PanelInput
-              label="Lay odds (decimal)"
+              label="Lay odds"
               value={exchangeLay}
               onChange={setExchangeLay}
               min={1}
               placeholder="2.70"
               exchangeOddsStepping
             />
+            <LayStakeBanner
+              value={layStake}
+              liability={preview?.totalLiability}
+              pending={!bounds}
+              onChange={(v) =>
+                setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+              }
+            />
           </div>
           <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
             <PanelInput
-              label="Exchange back (decimal)"
+              label="Exchange back"
               value={exchangeBack}
               onChange={setExchangeBack}
               min={1}
@@ -312,31 +319,6 @@ export function BoostCheckerForm({
               </div>
             </div>
           </div>
-          {advanced &&
-            (bounds ? (
-              <AdvancedLaySection
-                bounds={bounds}
-                layStake={layStake}
-                onLayStake={setLayStakeOverride}
-                partLays={partLays}
-                onPartLays={setPartLays}
-                accent={exchange?.brandColor ?? "#1e293b"}
-              />
-            ) : (
-              <p className="text-xs text-black/60 dark:text-white/60">
-                Enter back stake, boosted odds and lay odds to unlock the
-                underlay/standard/overlay slider - Underlay is the boost play: £0 back if it
-                loses, the full edge if it wins.
-              </p>
-            ))}
-          {bounds ? (
-            <LayStakeBanner
-              value={layStake}
-              onChange={(v) =>
-                setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-              }
-            />
-          ) : null}
         </LayPanel>
       ) : (
         <div className={cn(panelSurface, "flex flex-col gap-2 p-4")}>

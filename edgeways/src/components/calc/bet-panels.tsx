@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, useMemo, useState } from "react";
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { NumberFlowGroup } from "@number-flow/react";
 import { MoneyFlow } from "@/components/money-flow";
@@ -14,21 +14,37 @@ import {
 } from "@/components/ui/select";
 import { useAppState } from "@/hooks/use-app-state";
 import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
-import { bookiePanelTint } from "@/lib/brands/bookies";
-import { contrastText, darken, lighten } from "@/lib/brands/exchanges";
+import {
+  contrastText,
+  muteForDark,
+  panelTintVars,
+} from "@/lib/brands/exchanges";
+import {
+  resolveBackPlateColors,
+  resolveLayPlateColors,
+} from "@/lib/brands/panel-tints";
 import type { ExchangeRow } from "@/lib/db/schema";
 import {
   exchangeOddsStepHandlers,
   handleExchangeOddsInputEvent,
+  stepExchangeOdds,
 } from "@/lib/calc/exchange-odds-step";
-import { stepByIncrement } from "@/lib/calc/money";
+import { roundPence, stepByIncrement } from "@/lib/calc/money";
+import { NumberStepperButtons } from "@/components/ui/number-stepper-buttons";
+import { fieldControlShadow } from "@/lib/ui/surface-styles";
 import {
   commitLayStake,
   formatLayStake,
   layStakeStepHandlers,
+  stepLayStake,
 } from "@/lib/calc/exchange-stake-step";
 import type { BookieBreakdownLine } from "@/lib/calc/matched";
 import { formatGbp } from "@/lib/format-money";
+import {
+  layFirstTintDelayMs,
+  noteBackFirstTint,
+  prefersReducedPanelMotion,
+} from "@/lib/ui/bet-panel-reveal";
 import { cn } from "@/lib/utils";
 import { Copy, ChevronDown } from "lucide-react";
 
@@ -48,60 +64,217 @@ function useVenueBrandOverride(venue?: string): string | null {
 }
 
 /**
- * Neutral panel until a bookie (back) or exchange (lay) brand is known.
- * Brand colours fade in via `@property` + `.bet-panel-tint` transitions.
- * Legacy MBB greens/blues are no longer used as load defaults.
+ * First paint is the empty page-mix plate. After two frames the brand
+ * tint can settle (shine wipe), never a stale grey or the previous bookie.
  */
-export const PANEL_NEUTRAL = "#d4d4d8";
-/** @deprecated Prefer PANEL_NEUTRAL; kept for any intentional green accent. */
-export const BACK_LIGHT = "#5fc478";
+export function useSettledPanelTint(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, []);
+  return ready;
+}
+
+type PanelTintRole = "back" | "lay";
+
+type AppliedTint = { light: string | null; dark: string | null };
+
+function tintKey(tint: AppliedTint | null): string {
+  if (!tint) return "";
+  return `${tint.light ?? ""}|${tint.dark ?? ""}`;
+}
+
+function usePanelShineTint(
+  role: PanelTintRole,
+  color?: string | null,
+  colorDark?: string | null
+): {
+  contentVars: React.CSSProperties;
+  baseVars: React.CSSProperties;
+  fillVars: React.CSSProperties;
+  wipeId: number;
+  finishWipe: () => void;
+} {
+  const ready = useSettledPanelTint();
+  const [applied, setApplied] = useState<AppliedTint | null>(null);
+  const [prev, setPrev] = useState<AppliedTint | null>(null);
+  const [wipeId, setWipeId] = useState(0);
+  const appliedRef = useRef<AppliedTint | null>(null);
+  const hadTint = useRef(false);
+  appliedRef.current = applied;
+
+  const target: AppliedTint = {
+    light: ready ? (color ?? null) : null,
+    dark: ready ? (colorDark ?? null) : null,
+  };
+  const targetId = tintKey(target);
+  const appliedId = tintKey(applied);
+  const isFirstTint = !hadTint.current && target.light != null;
+
+  useLayoutEffect(() => {
+    if (!ready || targetId === appliedId) return;
+    if (role === "back" && isFirstTint) noteBackFirstTint();
+  }, [ready, targetId, appliedId, role, isFirstTint]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (targetId === appliedId) return;
+
+    const reduced = prefersReducedPanelMotion();
+    let timer = 0;
+    let frame = 0;
+    let cancelled = false;
+
+    const apply = (delay: number) => {
+      timer = window.setTimeout(() => {
+        setPrev(appliedRef.current);
+        setApplied(target);
+        if (target.light != null) hadTint.current = true;
+        if (!reduced && (target.light != null || appliedRef.current?.light != null)) {
+          setWipeId((n) => n + 1);
+        }
+      }, delay);
+    };
+
+    if (!reduced && role === "lay" && isFirstTint) {
+      // Wait a frame so a sibling Back can note this load pair first.
+      frame = requestAnimationFrame(() => {
+        if (cancelled) return;
+        apply(layFirstTintDelayMs());
+      });
+    } else {
+      apply(0);
+    }
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+    // appliedId is read only to skip no-ops; applied is via ref inside the timeout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, targetId, role, target.light, target.dark, isFirstTint]);
+
+  const emptyVars = panelTintVars(null);
+  const prevVars = panelTintVars(prev?.light ?? null, prev?.dark ?? null);
+  const fillVars = panelTintVars(applied?.light ?? null, applied?.dark ?? null);
+  const shine = wipeId > 0;
+  const undercoat = shine
+    ? prev
+      ? prevVars
+      : emptyVars
+    : applied
+      ? fillVars
+      : emptyVars;
+  return {
+    contentVars: (applied ? fillVars : emptyVars) as React.CSSProperties,
+    baseVars: undercoat as React.CSSProperties,
+    fillVars: fillVars as React.CSSProperties,
+    wipeId,
+    finishWipe: () => {
+      setPrev(applied);
+      setWipeId(0);
+    },
+  };
+}
 
 /** Shared transition for panel / input / chevron brand tints. */
-const PANEL_TINT_TRANSITION =
-  "bet-panel-tint transition-[background-color] duration-300 ease-out";
+export const PANEL_TINT_TRANSITION =
+  "bet-panel-tint transition-[background-color] duration-500 ease-out";
 
 interface PanelProps {
   title: string;
   children: React.ReactNode;
   className?: string;
-  /** Base colour; defaults to neutral grey until a brand tint is supplied */
-  color?: string;
+  /** Light-mode plate. Null / omitted = empty page-mix until a brand settles. */
+  color?: string | null;
+  /** Dark-mode plate. Derived via muteForDark when omitted. */
+  colorDark?: string | null;
   chip?: React.ReactNode;
+  /** Strip flush under the plate (Add bet Early payout / Advanced lay). */
+  footer?: React.ReactNode;
+  /** Back paints first on load; Lay waits 25ms only on that first pair. */
+  tintRole: PanelTintRole;
 }
 
 /**
- * Coloured bet panel. Starts neutral, then fades to bookie / exchange brand.
- * Input tints are derived from the panel colour (lightened in light mode,
- * darkened in dark mode) so Betdaq / Betfair / bookie themes stay coherent.
+ * Coloured bet panel. First paint is the empty page-mix plate. Brand colour
+ * then shines in top-to-bottom (50ms). Inputs inherit `--pi` / `--pi-dark`.
  */
-function Panel({ title, children, className, color, chip }: PanelProps) {
-  const base = color ?? PANEL_NEUTRAL;
+function Panel({
+  title,
+  children,
+  className,
+  color,
+  colorDark,
+  chip,
+  footer,
+  tintRole,
+}: PanelProps) {
+  const { contentVars, baseVars, fillVars, wipeId, finishWipe } = usePanelShineTint(
+    tintRole,
+    color,
+    colorDark
+  );
+  const hasFooter = footer != null;
+  const shine = wipeId > 0;
+
   return (
     <div
-      className={cn("surface-glass overflow-hidden rounded-xl", className)}
-      style={
-        {
-          "--panel": base,
-          "--panel-dark": darken(base, 0.72),
-          "--pi": lighten(base, 0.62),
-          "--pi-dark": darken(base, 0.5),
-        } as React.CSSProperties
-      }
+      className={cn(
+        "relative rounded-xl",
+        hasFooter
+          ? "overflow-hidden bg-[color-mix(in_srgb,var(--panel)_68%,white)] dark:bg-[color-mix(in_srgb,var(--panel-dark)_72%,black)]"
+          : "overflow-visible",
+        className
+      )}
+      data-bet-panel={tintRole}
+      style={contentVars}
     >
-      <div
-        className={cn(
-          "bg-[var(--panel)] p-4 dark:bg-[var(--panel-dark)]",
-          PANEL_TINT_TRANSITION
-        )}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-extrabold tracking-tight text-black/80 dark:text-white/95">
-            {title}
-          </h3>
-          {chip}
+      <div className="surface-glass relative z-10 overflow-hidden rounded-xl bg-transparent">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-xl bg-[var(--panel)] dark:bg-[var(--panel-dark)]"
+          style={baseVars}
+        />
+        {shine ? (
+          <div
+            key={wipeId}
+            aria-hidden
+            className="bet-panel-shine-fill pointer-events-none absolute inset-0 rounded-xl bg-[var(--panel)] dark:bg-[var(--panel-dark)]"
+            style={fillVars}
+            onAnimationEnd={finishWipe}
+          />
+        ) : null}
+        <div
+          className={cn(
+            "relative px-4 pt-4",
+            hasFooter
+              ? "rounded-b-xl pb-[calc(1rem+var(--radius-xl))]"
+              : "pb-4"
+          )}
+        >
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="shrink-0 text-base font-extrabold tracking-tight text-black/80 dark:text-white/95">
+              {title}
+            </h3>
+            {chip ? <div className="min-w-0">{chip}</div> : null}
+          </div>
+          <div className="flex flex-col gap-3">{children}</div>
         </div>
-        <div className="flex flex-col gap-3">{children}</div>
       </div>
+      {hasFooter ? (
+        <div className="bet-panel-ep-edge relative z-0 rounded-b-xl px-4 py-4">
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -110,38 +283,38 @@ export function BackPanel({
   exchange,
   venue,
   color,
+  colorDark,
   ...props
-}: Omit<PanelProps, "color"> & {
+}: Omit<PanelProps, "color" | "colorDark" | "tintRole"> & {
   exchange?: ExchangeRow | null;
-  /** Selected bookmaker/venue - wins over exchange back colour. */
+  /** Selected bookmaker/venue - exchange names use back-cell colour, not the mark. */
   venue?: string;
   /** Explicit tint wins over venue / exchange. */
-  color?: string;
+  color?: string | null;
+  colorDark?: string | null;
 }) {
   const brandOverride = useVenueBrandOverride(venue);
-  const venueTint = venue?.trim()
-    ? bookiePanelTint(venue, brandOverride)
-    : null;
-  // No bookie: use the selected exchange's back colour (Calculators, matched, etc.).
-  // Still grey until an exchange is known - never the old MBB green default.
-  return (
-    <Panel
-      {...props}
-      color={color ?? venueTint ?? exchange?.backColor ?? PANEL_NEUTRAL}
-    />
-  );
+  const plate = color
+    ? { light: color, dark: colorDark ?? muteForDark(color) }
+    : resolveBackPlateColors(venue, exchange, brandOverride);
+  return <Panel {...props} tintRole="back" color={plate.light} colorDark={plate.dark} />;
 }
 
 export function LayPanel({
   exchange,
   color,
+  colorDark,
   ...props
-}: Omit<PanelProps, "color"> & {
+}: Omit<PanelProps, "color" | "colorDark" | "tintRole"> & {
   exchange?: ExchangeRow | null;
   /** Explicit tint wins over exchange lay colour. */
-  color?: string;
+  color?: string | null;
+  colorDark?: string | null;
 }) {
-  return <Panel {...props} color={color ?? exchange?.layColor ?? PANEL_NEUTRAL} />;
+  const plate = color
+    ? { light: color, dark: colorDark ?? muteForDark(color) }
+    : resolveLayPlateColors(exchange);
+  return <Panel {...props} tintRole="lay" color={plate.light} colorDark={plate.dark} />;
 }
 
 /**
@@ -158,6 +331,7 @@ export function PanelInput({
   min,
   placeholder,
   inputClassName,
+  density = "default",
   exchangeOddsStepping,
   incrementStepping,
   disabled,
@@ -173,6 +347,8 @@ export function PanelInput({
   min?: number;
   placeholder?: string;
   inputClassName?: string;
+  /** `compact` is h-9 + compact steppers (Advanced / strip fields). */
+  density?: "default" | "compact";
   /** Exchange lay-odds ladder for arrows / spinner. Typed prices stay. */
   exchangeOddsStepping?: boolean;
   /** Arrow / wheel steps on this increment grid (from zero). Never below £0. */
@@ -206,12 +382,31 @@ export function PanelInput({
     exchangeStep?.onWheel ?? incrementWheel
   );
 
+  function stepButton(direction: 1 | -1) {
+    if (exchangeOddsStepping) {
+      onChange(stepExchangeOdds(value, direction > 0 ? "up" : "down"));
+      return;
+    }
+    if (increment != null) {
+      stepIncrement(direction);
+      return;
+    }
+    const base = Number.isFinite(value) ? value : (min ?? 0);
+    const next = roundPence(base + direction * step);
+    onChange(min != null ? Math.max(min, next) : next);
+  }
+
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <span className="relative">
         {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-semibold text-black/45 dark:text-white/50">
+          <span
+            className={cn(
+              "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-black/45 dark:text-white/50",
+              density === "compact" ? "text-sm" : "text-base"
+            )}
+          >
             {prefix}
           </span>
         )}
@@ -246,19 +441,30 @@ export function PanelInput({
             }
           }}
           className={cn(
-            "h-11 w-full rounded-md border-0 bg-[var(--pi)] px-3 text-lg font-bold tabular-nums text-black/85 outline-none ring-primary/40 placeholder:text-base placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40",
+            "w-full rounded-md border-0 bg-[var(--pi)] px-3 font-bold tabular-nums text-black/85 outline-none ring-primary/40 [appearance:textfield] placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+            density === "compact"
+              ? "h-9 text-sm placeholder:text-sm"
+              : "h-11 text-lg placeholder:text-base",
+            fieldControlShadow,
             PANEL_TINT_TRANSITION,
-            prefix && "pl-8",
-            suffix && "pr-9",
+            prefix && (density === "compact" ? "pl-7" : "pl-8"),
+            suffix ? "pr-16" : "pr-9",
             disabled && "opacity-60",
             inputClassName
           )}
         />
         {suffix && (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-base font-bold text-black/60 dark:text-white/70">
+          <span className="pointer-events-none absolute right-10 top-1/2 -translate-y-1/2 text-base font-bold text-black/60 dark:text-white/70">
             {suffix}
           </span>
         )}
+        <NumberStepperButtons
+          onStepUp={() => stepButton(1)}
+          onStepDown={() => stepButton(-1)}
+          disabled={disabled}
+          density={density}
+          fieldRadius="var(--radius-md)"
+        />
       </span>
     </label>
   );
@@ -288,6 +494,7 @@ export function PanelTextInput({
         placeholder={placeholder}
         className={cn(
           "h-11 w-full rounded-md border-0 bg-[var(--pi)] px-3 text-lg font-bold text-black/85 outline-none ring-primary/40 placeholder:text-base placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40",
+          fieldControlShadow,
           PANEL_TINT_TRANSITION,
           inputClassName
         )}
@@ -320,6 +527,7 @@ export function PanelBookieInput({
         placeholder={placeholder}
         className={cn(
           "h-11 w-full rounded-md border-0 bg-[var(--pi)] px-3 text-base font-semibold text-black/85 outline-none ring-primary/40 placeholder:text-base placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40",
+          fieldControlShadow,
           PANEL_TINT_TRANSITION
         )}
       />
@@ -434,12 +642,14 @@ function LayStakeInput({
   value,
   onChange,
   pending,
+  density = "default",
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   /** Plan is not ready: show empty, and do not commit a £0 override on blur. */
   pending?: boolean;
+  density?: "default" | "compact";
 }) {
   const [focused, setFocused] = useState(false);
   const [text, setText] = useState("");
@@ -501,119 +711,115 @@ function LayStakeInput({
         const n = parseFloat(next.replace(/,/g, ""));
         if (Number.isFinite(n) && n >= 0) onChange(n);
       }}
-      className="h-10 w-full rounded-md border border-white/20 bg-white/10 pr-3 pl-8 text-lg font-extrabold tabular-nums text-white outline-none ring-primary/40 placeholder:text-white/30 focus:ring-2"
+      className={cn(
+        "w-full rounded-md border border-black/15 bg-[var(--pi)] pr-10 tabular-nums text-black/85 outline-none ring-primary/40 placeholder:text-black/30 focus:ring-2",
+        density === "compact"
+          ? "h-9 pl-7 text-sm font-bold"
+          : "h-11 pl-8 text-lg font-extrabold",
+        "dark:border-white/12 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/30",
+        PANEL_TINT_TRANSITION
+      )}
     />
   );
 }
 
-/** Dark lay-stake strip - read-only with optional liability, or editable with copy. */
+/** Lay stake field — Add bet well, optional liability under the input. */
 export function LayStakeBanner({
   label = "Lay stake",
   value,
   liability,
   onChange,
-  fillSelection,
   pending,
+  trailing = "copy",
+  density = "default",
 }: {
   label?: string;
   value: number;
-  /** Exchange liability - read-only banner only (omitted in Add bet) */
+  /** Exchange liability, shown under the field so Odds | Stake stay aligned */
   liability?: number;
-  /** When set, renders an editable input; typing updates the slider above */
+  /** When set, the field is overridable (Add bet / calculators) */
   onChange?: (v: number) => void;
-  /** J9: when set, a Fill slip action emits the extension intent */
-  fillSelection?: string;
   /** Hide a £0 auto value until back stake and both odds are in */
   pending?: boolean;
+  /** Main lay stake copies the slip; part-lay rows use inset steppers. */
+  trailing?: "copy" | "steppers";
+  /** `compact` is h-9 (Advanced strip). */
+  density?: "default" | "compact";
 }) {
-  const fillSlip = fillSelection?.trim()
-    ? () =>
-        void import("@/lib/betslip-intent").then(({ emitFillSlip }) =>
-          emitFillSlip({ side: "lay", selection: fillSelection, stake: value }).then((ok) => {
-            if (ok)
-              toast.success(`Stake £${value.toFixed(2)} copied`, {
-                description: "The extension fills the exchange slip if installed.",
-              });
-          })
-        )
-    : null;
-  if (onChange) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-white dark:bg-slate-700">
-        <label className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-sm text-white/75">{label}</span>
-          <span className="relative min-w-0 flex-1">
-            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base font-semibold text-white/45">
-              £
-            </span>
-            <LayStakeInput
-              label={label}
-              value={value}
-              onChange={onChange}
-              pending={pending}
-            />
-          </span>
-        </label>
-        {fillSlip ? (
-          <button
-            type="button"
-            aria-label="Fill exchange slip"
-            className="shrink-0 rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white/80 transition-colors hover:text-white"
-            onClick={fillSlip}
-          >
-            Fill slip
-          </button>
-        ) : null}
-        <button
-          type="button"
-          aria-label="Copy lay stake"
-          className="shrink-0 text-white/60 transition-colors hover:text-white"
-          onClick={() => {
-            navigator.clipboard.writeText(value.toFixed(2));
-            toast.success("Lay stake copied", { description: `£${value.toFixed(2)}` });
-          }}
-        >
-          <Copy className="size-[17.5px]" />
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/20 bg-slate-800 px-4 py-3 text-sm text-white dark:bg-slate-700">
-      <span className="flex items-center gap-2">
-        <span>
-          {label}: <MoneyFlow value={value} className="text-lg font-extrabold" />
-        </span>
-        <button
-          type="button"
-          aria-label="Copy lay stake"
-          className="text-white/60 transition-colors hover:text-white"
-          onClick={() => {
-            navigator.clipboard.writeText(value.toFixed(2));
-            toast.success("Lay stake copied", { description: `£${value.toFixed(2)}` });
-          }}
+    <label className="flex w-full min-w-0 flex-col gap-1">
+      <span className="text-xs font-semibold text-black/60 dark:text-white/70">
+        {label}
+      </span>
+      <span className="relative min-w-0">
+        <span
+          className={cn(
+            "pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 font-semibold text-black/45 dark:text-white/50",
+            density === "compact" ? "text-sm" : "text-base"
+          )}
         >
-          <Copy className="size-3.5" />
-        </button>
-        {fillSlip ? (
+          £
+        </span>
+        {onChange ? (
+          <LayStakeInput
+            label={label}
+            value={value}
+            onChange={onChange}
+            pending={pending}
+            density={density}
+          />
+        ) : (
+          <input
+            type="text"
+            inputMode="decimal"
+            aria-label={label}
+            readOnly
+            value={
+              pending || !Number.isFinite(value) ? "" : formatLayStake(value)
+            }
+            className={cn(
+              "w-full rounded-md border border-black/15 bg-[var(--pi)] pr-10 tabular-nums text-black/85 outline-none",
+              density === "compact"
+                ? "h-9 pl-7 text-sm font-bold"
+                : "h-11 pl-8 text-lg font-extrabold",
+              "dark:border-white/12 dark:bg-[var(--pi-dark)] dark:text-white/95",
+              PANEL_TINT_TRANSITION
+            )}
+          />
+        )}
+        {trailing === "steppers" && onChange ? (
+          <NumberStepperButtons
+            density={density}
+            onStepUp={() => onChange(stepLayStake(value, "up"))}
+            onStepDown={() => onChange(stepLayStake(value, "down"))}
+          />
+        ) : (
           <button
             type="button"
-            aria-label="Fill exchange slip"
-            className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-white/80 transition-colors hover:text-white"
-            onClick={fillSlip}
+            aria-label="Copy lay stake"
+            className="absolute top-1/2 right-2 mr-1 -translate-y-1/2 text-black/45 transition-colors hover:text-black/80 dark:text-white/50 dark:hover:text-white"
+            onClick={() => {
+              navigator.clipboard.writeText(
+                Number.isFinite(value) ? value.toFixed(2) : "0.00"
+              );
+              toast.success("Lay stake copied", {
+                description: `£${Number.isFinite(value) ? value.toFixed(2) : "0.00"}`,
+              });
+            }}
           >
-            Fill slip
+            <Copy className="size-4" />
           </button>
-        ) : null}
+        )}
       </span>
-      {liability != null && (
-        <span className="shrink-0 text-xs text-white/65">
-          Liability:{" "}
-          <span className="font-semibold tabular-nums text-white">£{liability.toFixed(2)}</span>
+      {liability != null && Number.isFinite(liability) ? (
+        <span className="text-xs font-medium text-black/55 dark:text-white/65">
+          Liability{" "}
+          <span className="tabular-nums font-semibold text-black/75 dark:text-white/85">
+            £{liability.toFixed(2)}
+          </span>
         </span>
-      )}
-    </div>
+      ) : null}
+    </label>
   );
 }
 
@@ -621,7 +827,7 @@ export interface OutcomeRow {
   label: string;
   bookie: number;
   exchange: number;
-  accent?: "back" | "lay";
+  accent?: "back" | "lay" | "edge";
   /**
    * Stake vs refund (or similar credit) that compose `bookie`.
    * Rendered above the net so risk-free retention is visible in the table.
@@ -690,11 +896,13 @@ export const ProfitTable = memo(function ProfitTable({
   venue?: string;
 }) {
   const brandOverride = useVenueBrandOverride(venue);
-  const hasVenueTint = !!venue?.trim();
-  const backBase = hasVenueTint
-    ? bookiePanelTint(venue!, brandOverride)
-    : (exchange?.backColor ?? PANEL_NEUTRAL);
-  const layBase = exchange?.layColor ?? PANEL_NEUTRAL;
+  const ready = useSettledPanelTint();
+  const backPlate = resolveBackPlateColors(venue, exchange, brandOverride);
+  const layPlate = resolveLayPlateColors(exchange);
+  const backBase = ready ? backPlate.light : null;
+  const layBase = ready ? layPlate.light : null;
+  const backDark = ready ? backPlate.dark : null;
+  const layDark = ready ? layPlate.dark : null;
   return (
     <NumberFlowGroup>
       <div className="flex min-w-0 flex-col gap-3">
@@ -710,12 +918,13 @@ export const ProfitTable = memo(function ProfitTable({
             </thead>
             <tbody>
               {rows.map((row) => {
-                const isBack = row.accent !== "lay";
+                const isEdge = row.accent === "edge";
+                const isBack = !isEdge && row.accent !== "lay";
                 const accent = isBack ? backBase : layBase;
-                // Bookie tints are always a pastel (lightened toward white), same
-                // assumption the rest of the panel family makes - contrastText
-                // can't parse that `color-mix(...)` string, so skip it here.
-                const chevText = isBack && hasVenueTint ? "#1a1a1a" : contrastText(accent);
+                const accentDark = isBack ? backDark : layDark;
+                const chevVars = panelTintVars(accent, accentDark);
+                const chevText =
+                  accent && /^#/.test(accent) ? contrastText(accent) : "#1a1a1a";
                 return (
                   <tr
                     key={row.label}
@@ -724,17 +933,24 @@ export const ProfitTable = memo(function ProfitTable({
                     <td className={cn("min-w-0 py-2 pr-3", row.bookieBreakdown?.length ? "h-full align-top" : "")}>
                       <span
                         className={cn(
-                          "flex min-h-9 min-w-0 items-center bg-[var(--chev)] py-1 pl-3 pr-6 text-[13px] font-bold leading-tight text-pretty break-words text-[var(--chev-text)] dark:bg-[var(--chev-dark)] dark:text-white/95",
+                          "flex min-h-9 min-w-0 items-center py-1 pl-3 pr-6 text-[13px] font-bold leading-tight text-pretty break-words",
+                          isEdge
+                            ? "bg-edge text-edge-foreground"
+                            : "bg-[var(--chev)] text-[var(--chev-text)] dark:bg-[var(--chev-dark)] dark:text-white/95",
                           row.bookieBreakdown?.length ? "h-full" : "",
                           PANEL_TINT_TRANSITION
                         )}
                         style={
                           {
-                            "--chev": accent,
-                            "--chev-dark": darken(accent, 0.45),
-                            "--chev-text": chevText,
                             clipPath:
                               "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)",
+                            ...(isEdge
+                              ? {}
+                              : {
+                                  "--chev": chevVars["--panel"],
+                                  "--chev-dark": chevVars["--panel-dark"],
+                                  "--chev-text": chevText,
+                                }),
                           } as React.CSSProperties
                         }
                       >

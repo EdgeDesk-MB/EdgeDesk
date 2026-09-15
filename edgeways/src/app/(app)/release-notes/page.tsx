@@ -130,7 +130,7 @@ export default function ReleaseNotesPage() {
                                       {kentry.href ? (
                                         <Link
                                           href={kentry.href}
-                                          className="inline-flex items-center gap-1.5 font-semibold text-primary hover:text-primary/80 transition-colors"
+                                          className="inline-flex items-center gap-1.5 font-semibold text-primary-text hover:text-primary-text/80 transition-colors"
                                           aria-label={`Open ${kentry.area}`}
                                         >
                                           {kentry.area}

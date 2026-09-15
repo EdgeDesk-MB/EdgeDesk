@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { Switch } from "@/components/ui/switch";
-import { AdvancedLaySection } from "@/components/calc/advanced-lay";
+import { AddBetAdvancedLayField } from "@/components/add-bet/advanced-lay-field";
 import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
 import {
   BackPanel,
   LayPanel,
   LayStakeBanner,
-  PanelBookieInput,
   PanelInput,
   ProfitTable,
 } from "@/components/calc/bet-panels";
-import { EdgePanel } from "@/components/calc/edge-panel";
+import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { PercentFlow } from "@/components/money-flow";
 import {
@@ -24,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
 import {
   layBounds,
@@ -36,6 +32,7 @@ import {
   SPECIAL_BONUS_HINTS,
   SPECIAL_BONUS_LABELS,
   type BetMode,
+  type LayBounds,
   type PartLay,
   type SpecialBonus,
   type SpecialBonusKind,
@@ -77,7 +74,6 @@ export function MatchedCalculator({
   const [backStake, setBackStake] = useState(10);
   const [backOdds, setBackOdds] = useState(3);
   const [layOdds, setLayOdds] = useState(3.1);
-  const [commission, setCommission] = useState(2);
   const [refundAmount, setRefundAmount] = useState(10);
   const [refundRetention, setRefundRetention] = useState(75);
   const [bonusKind, setBonusKind] = useState<SpecialBonusKind>("none");
@@ -88,15 +84,21 @@ export function MatchedCalculator({
   const [advanced, setAdvanced] = useState(false);
   const [partLays, setPartLays] = useState<PartLay[]>([]);
   const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
+  const [laySnap, setLaySnap] = useState<keyof LayBounds | null>(null);
 
   useEffect(() => {
     if (!exchange && defaultExchange) {
       queueMicrotask(() => {
         setExchange(defaultExchange);
-        setCommission(defaultExchange.commissionPct);
       });
     }
   }, [defaultExchange, exchange]);
+
+  const commissionPct = exchange?.commissionPct ?? 2;
+
+  useEffect(() => {
+    queueMicrotask(() => setLayStakeOverride(null));
+  }, [mode, backStake, backOdds, layOdds, commissionPct, refundAmount, refundRetention]);
 
   useEffect(() => {
     if (!open || !prefill) return;
@@ -114,12 +116,8 @@ export function MatchedCalculator({
 
     if (prefill.exchangeId !== undefined) {
       const ex = exchanges.find((e) => e.id === prefill.exchangeId);
-      if (ex) {
-        setExchange(ex);
-        if (prefill.commission === undefined) setCommission(ex.commissionPct);
-      }
+      if (ex) setExchange(ex);
     }
-    if (prefill.commission !== undefined) setCommission(prefill.commission);
     });
   }, [open, prefill, exchanges]);
 
@@ -156,7 +154,7 @@ export function MatchedCalculator({
       backStake,
       backOdds,
       layOdds,
-      commission: commission / 100,
+      commission: commissionPct / 100,
       partLays: advanced ? partLays.filter((p) => p.odds > 1 && p.stake > 0) : [],
       refundAmount,
       refundRetention: refundRetention / 100,
@@ -167,7 +165,7 @@ export function MatchedCalculator({
     backStake,
     backOdds,
     layOdds,
-    commission,
+    commissionPct,
     advanced,
     partLays,
     refundAmount,
@@ -345,15 +343,22 @@ export function MatchedCalculator({
         ) : null}
       </div>
 
-      <BackPanel title="Back Bet" exchange={exchange} venue={bookmaker}>
-        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-          <PanelBookieInput
+      <BackPanel
+        title="Back Bet"
+        exchange={exchange}
+        venue={bookmaker}
+        chip={
+          <BookmakerSelect
+            tagTrigger
             value={bookmaker}
             onChange={setBookmaker}
-            className="col-span-2 sm:col-span-1"
+            className="[--pi:var(--panel)] [--pi-dark:var(--panel-dark)]"
           />
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+          <PanelInput label="Back odds" value={backOdds} onChange={setBackOdds} min={1} />
           <PanelInput label="Back stake" prefix="£" value={backStake} onChange={setBackStake} min={0} />
-          <PanelInput label="Back odds (decimal)" value={backOdds} onChange={setBackOdds} min={1} />
           {mode === "risk_free" && (
             <>
               <PanelInput label="Refund amount" prefix="£" value={refundAmount} onChange={setRefundAmount} min={0} />
@@ -374,75 +379,55 @@ export function MatchedCalculator({
         title="Lay Bet"
         exchange={exchange}
         chip={
-          <span className="flex items-center gap-3">
-            {exchange && (
-              <span
-                className="rounded px-2 py-0.5 text-[11px] font-bold"
-                style={{
-                  backgroundColor: exchange.brandColor,
-                  color: contrastText(exchange.brandColor),
-                }}
-              >
-                {exchange.name.toUpperCase()}
-              </span>
-            )}
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-black/70 dark:text-white/80">
-              Advanced
-              <Switch
-                tone="onPanel"
-                checked={advanced}
-                onCheckedChange={(on) => {
-                  setAdvanced(on);
-                  if (!on) {
-                    setPartLays([]);
-                    setLayStakeOverride(null);
-                  }
-                }}
-              />
-            </label>
-          </span>
+          <ExchangeSelect
+            compact
+            tagTrigger
+            exchanges={exchanges}
+            value={exchange}
+            onChange={setExchange}
+          />
+        }
+        footer={
+          <AddBetAdvancedLayField
+            enabled={advanced}
+            onEnabledChange={(on) => {
+              setAdvanced(on);
+              if (!on) {
+                setPartLays([]);
+                setLayStakeOverride(null);
+                setLaySnap(null);
+              } else {
+                setLaySnap("standard");
+              }
+            }}
+            bounds={bounds}
+            layStake={layStake}
+            onLayStake={setLayStakeOverride}
+            lockedSnap={laySnap}
+            onLockedSnap={setLaySnap}
+            partLays={partLays}
+            onPartLays={setPartLays}
+            accent={exchange?.brandColor ?? "#1e293b"}
+          />
         }
       >
         <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-          <div className="col-span-2 sm:col-span-1">
-            <ExchangeSelect
-              onPanel
-              exchanges={exchanges}
-              value={exchange}
-              onChange={(ex) => {
-                setExchange(ex);
-                setCommission(ex.commissionPct);
-                toast.info(`${ex.name} selected`, { description: `Commission set to ${ex.commissionPct}%` });
-              }}
-            />
-          </div>
           <PanelInput
-            label="Lay odds (decimal)"
+            label="Lay odds"
             value={layOdds}
             onChange={setLayOdds}
             min={1}
             exchangeOddsStepping
           />
-          <PanelInput
-            label="Lay commission"
-            suffix="%"
-            value={commission}
-            onChange={setCommission}
-            min={0}
-            step={0.5}
+          <LayStakeBanner
+            value={layStake}
+            liability={result?.totalLiability}
+            pending={!planInput}
+            onChange={(v) =>
+              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+            }
           />
         </div>
-        {advanced && bounds && (
-          <AdvancedLaySection
-            bounds={bounds}
-            layStake={layStake}
-            onLayStake={setLayStakeOverride}
-            partLays={partLays}
-            onPartLays={setPartLays}
-            accent={exchange?.brandColor ?? "#1e293b"}
-          />
-        )}
-        <LayStakeBanner value={layStake} liability={result?.totalLiability} fillSelection={bookmaker ? `Lay vs ${bookmaker}` : "Matched lay"} />
       </LayPanel>
 
       <ProfitTable
@@ -495,8 +480,6 @@ export function MatchedCalculator({
             : {}),
         }}
       />
-
-      <EdgePanel backOdds={backOdds} layOdds={layOdds} stake={backStake} />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import NumberFlow from "@number-flow/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { statStripFiveColWidth } from "@/components/layout/stat-strip";
 import { TrackToggleButton } from "@/components/events/track-toggle-button";
 import { FavouriteStar } from "@/components/events/favourite-star";
 import { HideScopeButton } from "@/components/events/hide-scope-button";
@@ -353,6 +354,7 @@ function FixtureActions({
   onTrackAndBet,
   onEpDesk,
   showEpDesk,
+  twoUpActionLabel = "Early-payout Desk",
 }: {
   isTracked: boolean;
   onTrack: () => void;
@@ -360,6 +362,7 @@ function FixtureActions({
   onTrackAndBet: () => void;
   onEpDesk?: () => void;
   showEpDesk?: boolean;
+  twoUpActionLabel?: string;
 }) {
   return (
     <div className="flex items-center justify-end gap-0.5">
@@ -371,14 +374,14 @@ function FixtureActions({
               variant="ghost"
               size="icon"
               className="size-8"
-              aria-label="Analyse 2UP Dutch in 2UP Desk"
+              aria-label={twoUpActionLabel}
               onClick={onEpDesk}
             >
               <Flame className="size-4 text-warning" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top" align="center" sideOffset={6}>
-            2UP Desk, Dutch EV
+            {twoUpActionLabel}
           </TooltipContent>
         </Tooltip>
       ) : null}
@@ -1487,9 +1490,16 @@ export function DeskFixtureBoard({
   displayTimezone = DEFAULT_DISPLAY_TIMEZONE,
   emptyCompact = true,
   dayControl = null,
+  pinDayControl = false,
   listKey,
   sportControl = null,
   pageHeader = null,
+  persistView = true,
+  statusOverride,
+  trackedOnly = false,
+  hideStatusPills = false,
+  twoUpActionLabel = "Early-payout Desk",
+  onPicksCount,
   className,
 }: {
   sport: "football" | "horse_racing";
@@ -1512,12 +1522,22 @@ export function DeskFixtureBoard({
   loadFailed?: boolean;
   displayTimezone?: string;
   emptyCompact?: boolean;
-  dayControl?: ReactNode;
+  dayControl?: ReactNode | ((opts: { stretch?: boolean }) => ReactNode);
+  /** Early-payout Desk: day stepper and Filter sit at the top of the pin rail on lg.
+   *  Rail is one StatStrip column wide; gutter to the tape is `--layout-page-x`. */
+  pinDayControl?: boolean;
   /** Day identity for re-pinning the tape (UK date). */
   listKey?: string;
   sportControl?: ReactNode;
   /** Page title band. Sticks with the sport tabs and feed bar. */
   pageHeader?: ReactNode;
+  /** When false, status and rail stay local so 2UP Desk does not rewrite Fixtures prefs. */
+  persistView?: boolean;
+  statusOverride?: FixtureStatusFilter;
+  trackedOnly?: boolean;
+  hideStatusPills?: boolean;
+  twoUpActionLabel?: string;
+  onPicksCount?: (count: number) => void;
   className?: string;
 }) {
   const { state, applyLocalSettingsPatch } = useAppState();
@@ -1526,10 +1546,14 @@ export function DeskFixtureBoard({
     const tracked = (state?.events ?? []).filter(
       (event) => event.externalId && (event.sport ?? "football") !== "horse_racing"
     );
-    return mergeLiveFixtureOverlay(footballRaw, tracked).map((fixture) =>
+    const merged = mergeLiveFixtureOverlay(footballRaw, tracked).map((fixture) =>
       withEffectiveFeedStatus(fixture, now)
     );
-  }, [footballRaw, now, state?.events]);
+    if (!trackedOnly) return merged;
+    return merged.filter(
+      (fixture) => fixture.externalId != null && trackedExternalIds.has(fixture.externalId)
+    );
+  }, [footballRaw, now, state?.events, trackedOnly, trackedExternalIds]);
   const livePreviewKeys = useMemo(() => {
     const live = footballBase.filter((fixture) => fixture.status === "live");
     const first = live[0];
@@ -1598,15 +1622,20 @@ export function DeskFixtureBoard({
   const [favouriteIds, setFavouriteIds] = useState<string[]>(settingsFavouriteIds);
   const [hiddenIds, setHiddenIds] = useState<string[]>(settingsHiddenIds);
 
-  const sportViewKey = `${sport}\0${sportView.rail}\0${sportView.status}`;
+  const sportViewKey = `${sport}\0${sportView.rail}\0${sportView.status}\0${statusOverride ?? ""}\0${persistView}`;
   const [appliedViewKey, setAppliedViewKey] = useState(sportViewKey);
   if (appliedViewKey !== sportViewKey) {
     setAppliedViewKey(sportViewKey);
-    const nextRail = applyFixtureBoardRail(sportView.rail);
-    setFavouritesOnly(nextRail.favouritesOnly);
-    setBackedOnly(nextRail.backedOnly);
-    setScopeFilter(nextRail.scopeFilter);
-    setStatusFilter(sportView.status);
+    if (persistView) {
+      const nextRail = applyFixtureBoardRail(sportView.rail);
+      setFavouritesOnly(nextRail.favouritesOnly);
+      setBackedOnly(nextRail.backedOnly);
+      setScopeFilter(nextRail.scopeFilter);
+    }
+    setStatusFilter(statusOverride ?? (persistView ? sportView.status : "all"));
+  }
+  if (statusOverride && statusFilter !== statusOverride) {
+    setStatusFilter(statusOverride);
   }
 
   const settingsFavouriteKey = settingsFavouriteIds.join("\0");
@@ -1737,6 +1766,7 @@ export function DeskFixtureBoard({
   }) {
     const current = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
     const side = sport === "horse_racing" ? "racing" : "football";
+    if (!persistView) return;
     const fixtureBoardView = mergeFixtureBoardView(current, {
       sport,
       [side]: {
@@ -2037,6 +2067,9 @@ export function DeskFixtureBoard({
     sport === "football"
       ? scopedSourceFootball.filter((f) => fixtureHasTwoupEdgePick(f, scoutByKey)).length
       : 0;
+  useEffect(() => {
+    onPicksCount?.(picksCount);
+  }, [onPicksCount, picksCount]);
   const visibleCount = sport === "football" ? scopedFootball.length : scopedRacing.length;
   const selectedScope = scopeOptions.find((option) => option.id === scopeFilter);
   const scopeLabel =
@@ -2103,6 +2136,9 @@ export function DeskFixtureBoard({
   const settingsReady = state != null;
   const hasPins = favouriteSet.size > 0;
   const showPinRail = !settingsReady || hasPins || dayBackedCount > 0;
+  const pinDayOnRail = pinDayControl && showPinRail && dayControl != null;
+  const renderDayControl = (stretch = false) =>
+    typeof dayControl === "function" ? dayControl({ stretch }) : dayControl;
   const footballFilterIcon = sport === "football"
     ? (option: { name?: string; label: string; country?: string | null }) => (
         <CompetitionHeaderIcon
@@ -2113,7 +2149,7 @@ export function DeskFixtureBoard({
       )
     : undefined;
 
-  const listFilter = (
+  const renderListFilter = () => (
     <FixtureScopeFilter
       sport={sport}
       options={scopeOptions}
@@ -2185,6 +2221,9 @@ export function DeskFixtureBoard({
   const slice = (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        {hideStatusPills ? (
+          <div className={cn("min-w-0 flex-1", pinDayOnRail && "lg:hidden")} />
+        ) : (
         <div
           className={cn(
             filterPillGroup,
@@ -2225,10 +2264,17 @@ export function DeskFixtureBoard({
             </FilterPill>
           ) : null}
         </div>
+        )}
         <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-2">
-            {dayControl}
-            {listFilter}
+            {dayControl != null ? (
+              <div className={pinDayOnRail ? "lg:hidden" : undefined}>
+                {renderDayControl()}
+              </div>
+            ) : null}
+            <div className={pinDayOnRail ? "lg:hidden" : undefined}>
+              {renderListFilter()}
+            </div>
           </div>
           {showPinRail ? <div className="lg:hidden">{pinnedTrigger}</div> : null}
         </div>
@@ -2393,6 +2439,7 @@ export function DeskFixtureBoard({
             setTapeEvent(null);
             if (fixture) onAddBetFixture(fixture);
           }}
+          twoUpActionLabel={twoUpActionLabel}
           onEpDesk={() => {
             const fixture = football.find(
               (row) => row.externalId === tapeEvent.externalId
@@ -2438,7 +2485,14 @@ export function DeskFixtureBoard({
         <div className="relative z-10 shrink-0">
           {pageHeader}
           {sportControl ? <div className="w-full min-w-0">{sportControl}</div> : null}
-          <div className="w-full min-w-0 py-4">{slice}</div>
+          <div
+            className={cn(
+              "w-full min-w-0 py-4",
+              hideStatusPills && pinDayOnRail && "lg:hidden"
+            )}
+          >
+            {slice}
+          </div>
         </div>
         <div className="relative flex min-h-0 min-w-0 flex-1 gap-[var(--layout-page-x)]">
           <ScrollFadeEdges
@@ -2454,9 +2508,20 @@ export function DeskFixtureBoard({
             {body}
           </ScrollFadeEdges>
           {showPinRail ? (
-            <aside className="my-4 hidden min-h-0 w-56 shrink-0 lg:block">
+            <aside
+              className={cn(
+                "my-4 hidden min-h-0 shrink-0 lg:flex lg:flex-col",
+                pinDayControl ? statStripFiveColWidth : "w-56"
+              )}
+            >
+              {pinDayOnRail ? (
+                <div className="mb-4 flex w-full min-w-0 shrink-0 items-center gap-2">
+                  <div className="min-w-0 flex-1">{renderDayControl(true)}</div>
+                  {renderListFilter()}
+                </div>
+              ) : null}
               <ScrollFadeEdges
-                className="min-h-0 h-full"
+                className="min-h-0 min-w-0 flex-1"
                 fadeClassName="from-page"
                 fadeSize={FIXTURE_TAPE_GUTTER_PX}
                 fadeOnScroll

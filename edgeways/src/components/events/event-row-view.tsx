@@ -40,6 +40,7 @@ import {
   formatRacingEventTitle,
 } from "@/lib/events";
 import { formatClockTime } from "@/lib/time-format";
+import { formatBetSelection } from "@/lib/markets";
 import { FreeBetAwardBadge } from "@/components/free-bet-award-badge";
 import { SportEventBlock } from "@/components/sport-icon";
 import { formatPillLabel } from "@/lib/ui/status-badges";
@@ -172,7 +173,14 @@ export function EventRowView({
                   key={bet.id}
                   className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"
                 >
-                  <span className="font-medium text-foreground">{bet.selection}</span>
+                  <span className="font-medium text-foreground">
+                    {formatBetSelection(
+                      bet.market,
+                      bet.selection,
+                      event.homeTeam,
+                      event.awayTeam
+                    )}
+                  </span>
                   <span>·</span>
                   <span>{outcome.positionLabel}</span>
                   {outcome.promoAward && (

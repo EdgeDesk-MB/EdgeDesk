@@ -120,6 +120,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
       (id): id is string => typeof id === "string"
     );
   }
+  if (Array.isArray(body.bookieScopes)) {
+    patch.bookieScopes = body.bookieScopes;
+  }
   if (
     body.fixtureBoardView &&
     typeof body.fixtureBoardView === "object" &&

@@ -1,6 +1,11 @@
-/** Fixture-browser → 2UP Desk query. Applied once, then stripped from the URL. */
+/** Fixture board → 2UP Desk query. Kept on the URL like Racing `?race=`. */
 
-export const EP_DESK_PATH = "/calculators/ep-desk";
+export const TWOUP_DESK_PATH = "/early-payout";
+/** Previous live-desk path. `/2up` permanently redirects here. */
+export const TWOUP_DESK_LEGACY_PATH = "/2up";
+/** @deprecated Use TWOUP_DESK_PATH. Old bookmarks still redirect here. */
+export const EP_DESK_PATH = TWOUP_DESK_PATH;
+export const EP_DESK_LEGACY_PATH = "/calculators/ep-desk";
 
 export const EP_DESK_TABS = ["dutch", "offers", "lay", "live"] as const;
 export type EpDeskTab = (typeof EP_DESK_TABS)[number];

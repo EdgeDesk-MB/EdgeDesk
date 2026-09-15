@@ -10,12 +10,17 @@
 > existing test coverage). `[strong]` = use a stronger agent (schema, cross-cutting, or judgment-
 > heavy). `[design-first]` = wait for a mock/wireframe from Sam before building UI.
 
-Last updated: 2026-09-06 (B1 Daily Plan Home UI removed and parked to revisit.
-P1 Football live card Phase 1 in flight — HT persist, event tape, XI picker on Edge.)
+Last updated: 2026-09-14 (P2b Bookie scoping. Canonical home is Accounts.
+Early-payout Desk focuses the Early-payout surface. Prototype Books list
+is a spike, not the UX.)
 
 ---
 
-## 0. Repo conventions every agent must know
+## 0. Repo conventions (schema / DB / settings / AppState)
+
+Read this section when the task touches schema, DB bootstrap, settings, or
+`AppState` shapes. Do not load it on every change. Implementation loop:
+`docs/cursor-workflow.md` at the git root.
 
 - **Git root is the PARENT directory** `MB app build/`, not `edgeways/`. Git paths are prefixed
   `edgeways/`. Run all npm commands from `edgeways/`.
@@ -2960,6 +2965,196 @@ shots. Same shared-poll rule.
 
 **Sizing.** `[strong]` — schema, dual-path feed, entitlements, live UI.
 Phase 1b is a separate calc change.
+
+---
+
+## P2. Early-payout Desk as a live desk `[strong]` — EDGE-148 (2026-09-13)
+
+> **Verified against code 2026-09-13.** The live desk is still
+> `src/app/(app)/calculators/ep-desk/page.tsx` (~1,970 lines). Nav label is
+> already "2UP Desk" (`app-nav.tsx`). Path, titles, and storage keys still say
+> `ep-desk`. Racing Desk is `/racing` + `racing-desk-view.tsx`. Fixtures is
+> `fixture-browser.tsx` + `desk-fixture-board.tsx` (store-first, pin rail,
+> `status: "picks"` = 2UP Edge scout). Engine at `src/lib/calc/ep/engine.ts`
+> stays spec-locked.
+
+**Objective.** Make 2UP Desk a place a 2UP regular can live, the way Racing
+Desk is for racing. First paint is today's football, not a calculator form.
+The Dixon-Coles workbench stays, as the selected-match panel.
+
+**Why.** The page is named 2UP Desk in nav and buried as a calculator. The
+header is the typed match ("Mexico v England"). There is no day board, no
+bookie 2UP/1UP filter, and fixture deep links strip the query on apply.
+
+**Product locks (Sam 2026-09-13, renamed 13 Sep evening).**
+- Customer name is Early-payout Desk (nav, header, titles). Canonical path is
+  `/early-payout`. Permanent redirect `/2up` and `/calculators/ep-desk` →
+  `/early-payout`.
+- Football 2UP is one early-payout form (picks, books, Dixon-Coles model).
+  Active lists every `earlyPayout` / 2UP / 1UP bet. Do not stamp baseball as 2UP.
+- Other sports: sport badge + "Early payout", Tracker only, no football model.
+- Copy Racing Desk chrome: `PageHeader`, StatStrip tiles, board first.
+- Reuse Fixtures football board. Do not fork a third tape. Lock sport to
+  football until a baseball (or other) day-card store exists. Hide racing tabs.
+- 2UP picks = existing `twoup_scout` / `status: "picks"`. Edge-gated.
+- Bookie tool: superseded by P2b Bookie scoping. Do not ship the prototype
+  all-wallets switch list as the product. Seed football 2UP/1UP from the
+  curated catalog only. Not oddsmatching. Not a live offer scrape.
+- Track upcoming matches with the existing Fixtures track actions.
+- Keep `?home=&away=&start=` on the URL (Racing keeps `?race=`).
+- Do not change `src/lib/calc/ep/engine.ts`.
+- Do not expand the fixture store past today/tomorrow in this slice.
+- D8: customer copy never names the feed provider.
+- No new hosted table. Bookie marks persist in localStorage for v1.
+
+### Files
+
+- NEW `src/app/(app)/early-payout/page.tsx` + `src/components/twoup/two-up-desk-view.tsx`.
+  `/2up` is a permanent redirect onto that path.
+- NEW `src/components/twoup/two-up-workbench.tsx` (move today's ep-desk page).
+- NEW `src/lib/twoup/bookie-offers.ts` + `.test.ts`.
+- `src/app/(app)/calculators/ep-desk/page.tsx` becomes a redirect.
+- `src/lib/calc/ep/fixture-query.ts`: `EP_DESK_PATH` / `TWOUP_DESK_PATH` = `/early-payout`.
+- `fixture-browser.tsx` + `desk-fixture-board.tsx`: `sportLock="football"`,
+  `persistView` (2UP desk must not clobber Fixtures prefs), `statusOverride`,
+  `trackedOnly`, in-page `onOpenTwoUp`.
+- Nav, document title, help (`page-help` + Guides), calculator catalog
+  (drop 2UP Desk card; leave `/calculators/two-up`).
+
+### Acceptance
+
+1. Live desks → Early-payout opens `/early-payout` titled Early-payout Desk.
+2. `/calculators/ep-desk?home=Everton&away=Palace` redirects to `/early-payout` with
+   the same query and opens Model.
+3. First paint with no query is today's football board.
+4. Tiles: Fixtures, 2UP picks, Tracked, Active, Model.
+5. Selecting a fixture loads the workbench and keeps the query.
+6. Bookie scoping is P2b. Football model still prefers football 2UP/1UP
+   scopes. The prototype Books list is not acceptance.
+7. Core/Free still see the Edge 2UP promo. Scout stays Edge-gated.
+8. `npx vitest run` green. No calc/engine edits.
+
+**Sizing.** `[strong]` — cross-cutting UI, routing, help, fixture embed.
+
+---
+
+## P2b. Bookie scoping `[strong]` — EDGE-148 children (2026-09-14)
+
+> **Verified against code 2026-09-14.** Full P2b is on this branch for
+> local review. `settings.bookieScopes` + `useBookieScopes`. Accounts
+> bookie dialog has Details / Ledger / Scope (Early payout + Racing
+> stub). Deep link `/accounts?venue=<id>&scope=early_payout`. Desk header
+> is **Scope**: pick one bookie, edit that book's early-payout rules,
+> link to Accounts. Add bet asks on Save. Offers suggest from title /
+> important notes. Engine stays spec-locked.
+
+**Objective.** Scoping is the user's map of where they place, and which
+conditional offer pays on that bookie. Early payout is one surface.
+Racing will be another. The user picks the bookie, then the surface, then
+the sport and the lead that pays (baseball five runs ahead, football 2UP).
+Offers and Add bet can propose a scope. The user confirms.
+
+**Why the prototype fails.** Dumping every wallet into one scroll with
+identical controls is not selection. The user cannot find a bookie, cannot
+see a summary, and cannot tell that this is house rules rather than a live
+offer list. Early-payout Desk should focus Early-payout rules, not become
+the only place those rules exist.
+
+**Product locks (Sam 2026-09-14, confirmed same day).**
+- Word is **Scope**. Scope holds every surface. Early payout is a section
+  inside it (tab vs other layout is still open). Not "2UP books". Not
+  "Often 2UP".
+- **Canonical home is Accounts.** Open a bookie → Scope sits with Details
+  and Ledger. Early payout is the first section. Racing later (stub only
+  in this slice).
+- **Early-payout Desk** is a focused shortcut into the Early-payout
+  section. Pick bookies, select one, edit sports and leads. A control
+  opens that bookie on Accounts at Scope.
+- **Suggestions, never silent writes.** Add bet and Offers may propose a
+  scope change. The user confirms. Decline does not block the bet or the
+  offer. Catalog may seed football 2UP/1UP as a starting guess only.
+- **Add bet timing (Sam 2026-09-14):** ask once **on Save**, not when
+  they toggle Early payout. The confirm must include the **lead
+  integer** for the current sport / market. Pre-fill the sport default
+  (football 2, baseball 5, else 1). They change it. Basketball on the
+  main market will not be 5. See "What on save means" below.
+- **Offers:** if an offer's bookie plus its conditions / core promo lines
+  imply an Early-payout (or later Racing) rule that is missing or
+  different from current Scope, suggest the update. Same confirm. Do not
+  scrape bookie sites. Only use what the user already put on the offer.
+- Football 2UP = sport `football` + lead 2. Football 1UP = lead 1. Other
+  sports: one lead per bookie + sport. Defaults: football 2, baseball 5,
+  else 1. Units from `epLeadUnit`.
+- Persist via existing settings (no new table). Dual-path Neon. Migrate
+  `edgeways.twoup-bookies.v1`. Hosted must not write SQLite-only.
+- Not oddsmatching. D8: never name the feed provider. Do not change
+  `src/lib/calc/ep/engine.ts`. Do not expand the fixture store.
+
+**What on save means.** In Add bet, Early payout is a switch. Asking
+the moment they flip it nags them while they are still filling stakes.
+Asking when they press Save is one question: write this rule to
+10Bet's Scope? The prompt shows the sport and a lead field they can
+edit (runs, points, goals, and so on). Yes writes Scope with that
+lead. No still saves the bet.
+
+**Design point of view (taste, not a mock).**
+- Subject: this bookie's house rules for a named surface.
+- Audience: mid-session, knows their wallets, wants the rule written once.
+- Single job: pick a bookie, then set which sports pay and by how much.
+- Signature: one selected bookie + a short rule list. Everything else quiet.
+- Work-tool density. No card-in-card. No numbered 01/02. No wall of
+  switches. Sentence case, British English, commas not em dashes.
+- Wait for Sam to tweak this plan before painting a new modal. UI phases
+  are `[design-first]` until that pass.
+
+### Phases (do in order)
+
+1. **Model** `[strong]`. Shared `BookieScope` in `src/lib/twoup/bookie-offers.ts`
+   (or a new `src/lib/accounts/bookie-scopes.ts` if the file outgrows EP).
+   Shape: `{ bookie, surface: "early_payout" | "racing", sport, leadBy }`.
+   Racing rows may exist with empty payload later; do not write racing
+   leads now. Settings key e.g. `bookieScopes`. Parse + migrate v1
+   localStorage. Hook used by desk, Accounts, Add bet, Tracker labels.
+   Tests: migrate, upsert, one lead per non-football sport, football 2UP
+   and 1UP together, `hosted-desk-cutover` still contains `isNeonDesk` on
+   the settings route.
+2. **Accounts Scope** `[design-first]`. Scope is a container on the bookie
+   (third tab or equivalent). Inside it, Early payout is a section: sport,
+   lead, unit, add/remove, summary. Racing section stub. Deep link
+   `/accounts?venue=<id>&scope=early_payout` so the desk lands on that
+   section. Layout (tabs vs stacked sections) waits on Sam.
+3. **Desk focused editor** `[design-first]`. Replace
+   `two-up-bookie-dialog.tsx`. Flow: add/select EP bookies → summary →
+   select one → edit Early-payout rules. Link to Accounts → Scope (all
+   surfaces). Header control: **Scope**.
+4. **Add bet confirm** `[strong]`. On Save only, if Early payout is on
+   and `scopeForBookieSport` is missing or the lead differs, ask once.
+   The dialog shows sport plus an editable lead (pre-filled from
+   `defaultEpLeadBy`, not assumed). Yes writes
+   `{ bookie, surface: early_payout, sport, leadBy }`. No saves the bet
+   only.
+5. **Offer confirm** `[strong]`. When saving or editing an offer whose
+   bookie and recognised conditions / core promo lines imply an
+   Early-payout rule that is missing or different, suggest the Scope
+   update. Confirm only. Conservative detector: title, important terms,
+   and any structured EP fields the offer already has. No site scrape.
+
+### Acceptance
+
+1. A user can add baseball · 5 runs ahead on one bookie without seeing
+   every other wallet's form at the same time.
+2. The same scope appears on Accounts, on the EP desk editor, and as the
+   Active / Tracker label.
+3. Add bet on Save, and an offer with recognised EP conditions, can
+   each suggest a Scope write. Confirm only. Decline still saves.
+4. Football model still prefers football lead-2 / lead-1 bookies.
+5. Refresh on hosted (Neon) keeps the scopes. localStorage v1 migrates
+   once.
+6. No engine edits. No new sports day board. No "Often 2UP".
+
+**Sizing.** `[strong]` overall. Accounts / desk UI wait for Sam on
+section layout. Model can start. Add bet confirm is on Save, with an
+editable lead.
 
 ---
 

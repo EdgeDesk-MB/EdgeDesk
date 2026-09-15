@@ -1,16 +1,15 @@
 import type { CSSProperties } from "react";
-import { darken, lighten } from "@/lib/brands/exchanges";
+import { muteForDark } from "@/lib/brands/exchanges";
 
 /**
- * Exchange-branded odds cell — same lighten/darken pattern as calculator
- * Back/Lay panels. Light mode: pastel tint. Dark mode: deep panel tint (0.72)
- * so cells match the calc, not washed mid-tones.
+ * Exchange-branded odds cell — light hex as-is, dark via the same
+ * `muteForDark` mix as Back/Lay plates (hue held, pastel in dark).
  */
 export function oddsCellStyle(hex?: string): CSSProperties | undefined {
   if (!hex) return undefined;
   return {
-    "--odds-cell": lighten(hex, 0.72),
-    "--odds-cell-dark": darken(hex, 0.72),
+    "--odds-cell": hex,
+    "--odds-cell-dark": muteForDark(hex),
   } as CSSProperties;
 }
 

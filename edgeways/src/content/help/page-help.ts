@@ -3,6 +3,7 @@ import { ACCA_DESK_HELP_BULLETS } from "@/content/help/acca-methods";
 export type PageHelpId =
   | "dashboard"
   | "fixtures"
+  | "twoup"
   | "racing"
   | "tracker"
   | "offers"
@@ -47,6 +48,18 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
     ],
     guideSlug: "getting-started",
   },
+  twoup: {
+    title: "Early-payout Desk",
+    summary: "Early-payout positions on one desk. Football 2UP is the modelled form; settle Active bets here and Profit Tracker stays in sync.",
+    bullets: [
+      "Fixtures is today's football tape. Pin competitions, track upcoming matches, then open Model on a football row.",
+      "2UP picks ranks pinned football competitions for Edge. Core and Free still get the board and the football model.",
+      "Scope is the house rules for one bookie. On this desk, pick a bookie and set the early-payout sports and lead. The same Scope sits on Accounts with Details and Ledger. Football is 2UP or 1UP. Baseball might be five runs ahead. It is not a live offer list.",
+      "Active lists open early-payout bets from any sport. Set result, Edit and offer or event links write the same bet as Profit Tracker.",
+      "Today and tomorrow only for football cards. Baseball and other sports do not have a day board here yet.",
+    ],
+    guideSlug: "twoup-desk",
+  },
   racing: {
     title: "Racing Desk",
     summary: "Racecards and one-click lays for place-refund offers.",
@@ -69,7 +82,7 @@ export const PAGE_HELP: Record<PageHelpId, PageHelpContent> = {
       "Link an event once - score changes settle match odds, BTTS, O/U 2.5 and 2UP together.",
       "Use “The bet wins IF …” for goalscorer and combo triggers - settles at the decisive moment.",
       "Advanced lay mode supports part lays, underlay and overlay for boosted-odds plays.",
-      "Lock in on any open single: enter today's exchange prices and close the position for a guaranteed P&L - slide to lock part and let the rest ride. 2UP bets lock on the 2UP Desk instead.",
+      "Lock in on any open single: enter today's exchange prices and close the position for a guaranteed P&L - slide to lock part and let the rest ride. Football 2UP bets lock on the Early-payout Desk instead.",
     ],
     guideSlug: "calculators",
   },

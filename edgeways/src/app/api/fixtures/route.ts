@@ -66,7 +66,7 @@ export const GET = withDeskScope(async function GET(req: NextRequest) {
     );
   } catch (error) {
     // Free tier often returns HTTP 200 + errors.requests when capped -
-    // fall back to demo so Fixtures / EP Desk handoff still works.
+    // fall back to demo so Fixtures / 2UP Desk handoff still works.
     // D8: warnings are client-facing, so never name the data provider.
     if (isRateLimitError(error)) {
       return NextResponse.json({

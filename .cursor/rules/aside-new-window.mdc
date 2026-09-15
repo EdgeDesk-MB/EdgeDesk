@@ -6,8 +6,8 @@ alwaysApply: true
 # Aside: new window only
 
 Edgeways localhost UI uses Orca's embedded browser first
-(`.cursor/rules/orca-browser.mdc`). This rule is for Aside when you
-must use it.
+(`.cursor/rules/orca-browser.mdc`). Aside is the fallback when Orca
+cannot host the page, or when Sam names Aside. Never system Chrome.
 
 When using Aside or the browser, never take over Sam's active session,
 focused window, or existing tabs. Always open a new window for agent work.

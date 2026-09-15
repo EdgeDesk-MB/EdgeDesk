@@ -11,7 +11,7 @@ You review Edgeways UI diffs against `edgeways/docs/design-system.md`. Read that
 ## When invoked
 
 1. Read `edgeways/docs/design-system.md`, then the changed files.
-2. If a browser/screenshot tool is available, capture the changed screens at 375px, 768px and 1440px and critique the render as well as the code. If not available, say so.
+2. If you can open Orca, capture the changed screens at 375px, 768px and 1440px and critique the render as well as the code. Aside (new window) only if Orca cannot host. Never Playwright or system Chrome. If no browser, say so.
 
 ## Edgeways conformance checks (hard rules — from the design system)
 

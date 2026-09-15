@@ -8,42 +8,38 @@ belongs in the app vs parent `docs/`.
 **Sam daily plan:** `docs/follow-this-plan.md`.
 
 Before doing any work:
-1. Read `edgeways/AGENTS.md`. It holds the product context, hard rules and the
-   mandatory pre-flight checklist. Hosted (Vercel) desk data is Neon, not
-   SQLite. Do not ship a customer mutation that only writes the empty
-   `:memory:` file.
-2. For repo conventions (git paths, tests, DB bootstrap, data shapes), read
-   section 0 of `edgeways/docs/roadmap/implementation-briefs.md`.
+1. If `edgeways/AGENTS.md` is already in context, do not re-read it. Hard
+   rules, do-not-build list, and Neon live there. Hosted desk data is Neon,
+   not SQLite. Do not ship a customer mutation that only writes `:memory:`.
+2. Implementation loop: if `.cursor/rules/iterative-dev.mdc` is already in
+   context, follow it. Do not also read `docs/cursor-workflow.md`. Hosts
+   that do not inject that rule (Claude Code, Zed, Aider) should read
+   `docs/cursor-workflow.md` and use the same loop and gates.
+3. Linear: if Sam named `EDGE-n`, that is scope. Otherwise see the cheap
+   protocol on the iterative-dev rule. Local models skip Linear.
 
 The browser extension (J9 betslip fill) lives in `extension/` — plain Chrome
 MV3, no build step; see `extension/README.md` for the install and the manual
 test protocol.
 
 Other pointers:
-- Model routing strategy (local Ollama backbone vs Cursor Ultra / Claude Code):
- `docs/Local-vs-Cloud-Model-Strategy.md`. Day-to-day habits: `docs/ai-playbook.md`.
- Enable-list: `docs/cursor-setup.md`. Always-on rule: `.cursor/rules/model-routing.mdc`.
-- Bet-type taxonomy (structure × market × modifier, full-cover families, MB utility):
- `docs/betting-methods-guide.md` (parent docs, outside the app).
-- Cursor skills, subagents and slash commands: `.cursor/skills/`, `.cursor/agents/`,
-  `.cursor/commands/`. Claude Code mirror: `.claude/skills/`, `.claude/agents/`.
-  Full harness map: `docs/cursor-kit.md`. Daily go-to guide (incl. automation
-  recipes): `docs/cursor-daily-guide.md`. Launch path (payments, legal,
-  go-live gates): `docs/live-readiness.md` and `docs/follow-this-plan.md`.
+- Implementation loop: `docs/cursor-workflow.md` (hosts without the
+  iterative-dev rule only). Harness map: `docs/cursor-kit.md`. Daily
+  human reference: `docs/cursor-daily-guide.md`. Linear for humans:
+  `docs/linear.md`. Do not load those mid-task.
+- Model routing: `docs/Local-vs-Cloud-Model-Strategy.md`. Habits:
+  `docs/ai-playbook.md`. Enable-list: `docs/cursor-setup.md`. Always-on rule:
+  `.cursor/rules/model-routing.mdc` and `iterative-dev.mdc`.
+- Cursor: `.cursor/skills/`, `.cursor/agents/`, `.cursor/commands/`. Claude
+  Code mirror: `.claude/skills/`, `.claude/agents/`. MCP hub (what to auth,
+  what to skip): `docs/cursor-setup.md` § 9.
+- Bet-type taxonomy: `docs/betting-methods-guide.md`. Launch path:
+  `docs/live-readiness.md` and `docs/follow-this-plan.md`.
 - Run all npm commands from `edgeways/`, not from this directory.
+- UI verify: Orca embedded browser. Aside (new window) if Orca cannot
+  host or Sam names Aside. Never Playwright, Chrome, or Computer Use
+  for Edgeways pages. Claude Code: see root `CLAUDE.md`.
 
-## Model routing (agents)
-
-You cannot switch the user's model picker. For non-trivial work, if the current
-model is a poor fit, say so briefly once and recommend a lane:
-
-| Lane | Models | Use for |
-| --- | --- | --- |
-| Local | `qwen3-coder-ctx` | Bounded edits, privacy, unlimited grind |
-| Cursor Models | Composer 2.5, Grok 4.5 | Default daily cloud agents (protect Other Models $) |
-| Volume frontier | Kimi K3 | Serious multi-file Cursor agent runs |
-| Peak | Claude Opus 5 / Fable 5 | Architecture, hard bugs, calc review, prose |
-| Specialist harness | Claude Code + Opus | Long autonomous explore → edit → test loops |
-
-Hard rules: calc/settlement changes need frontier + `/calc-change` + audit, never
-local-unreviewed. Prefer Composer/Grok over K3/Opus when the task is routine.
+Schema, DB bootstrap, settings, and `AppState` shapes: read section 0 of
+`edgeways/docs/roadmap/implementation-briefs.md` only when the task touches
+those. Do not load it on every change.

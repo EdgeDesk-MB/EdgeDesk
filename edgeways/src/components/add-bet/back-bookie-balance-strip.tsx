@@ -5,8 +5,12 @@ import { Gift } from "lucide-react";
 import { MoneyFlow } from "@/components/money-flow";
 import type { BetMode } from "@/lib/calc";
 import { findVenueBalanceAccount } from "@/lib/accounts/resolve-venue";
+import { formatGbp } from "@/lib/format-money";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import { cn } from "@/lib/utils";
+
+export const ADD_BET_BALANCE_WELL =
+  "flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-md px-2.5 py-1.5 text-xs font-semibold bg-black/5 text-black/70 dark:bg-white/10 dark:text-white/80";
 
 export type FreeBetKind = "snr" | "sr";
 
@@ -171,6 +175,7 @@ export function BackBookieBalanceStrip({
   onAddBalanceChange,
   onUseFreeBet,
   onUseCash,
+  parts = "all",
   className,
 }: {
   bookmaker: string;
@@ -187,6 +192,8 @@ export function BackBookieBalanceStrip({
   onUseFreeBet?: (amount: number) => void;
   /** Leave free-bet funding and stake cash instead (no_lay overlay). */
   onUseCash?: () => void;
+  /** `well` = wallet row(s). `issue` = Exceeds row. Default both. */
+  parts?: "well" | "issue" | "all";
   className?: string;
 }) {
   if (betType !== "qualifying" && betType !== "risk_free" && !isFreeBetBetType(betType)) {
@@ -202,10 +209,18 @@ export function BackBookieBalanceStrip({
   const needsFunding =
     !usesFreeBet && bookieNeedsCashFunding(accounts, bookmaker, backStake, credit);
   const showAddBalance = needsFunding && onAddBalanceChange != null;
-  const topUp = bookieCashTopUpBreakdown(accounts, bookmaker, backStake, credit);
-  const topUpNeeded = topUp.total;
+  const topUpNeeded = bookieCashTopUpNeeded(
+    accounts,
+    bookmaker,
+    backStake,
+    credit
+  );
+
+  const showWell = parts !== "issue";
+  const showIssue = parts !== "well";
 
   if (!bookmaker.trim()) {
+    if (!showWell) return null;
     return (
       <p className={cn("text-xs font-medium text-black/45 dark:text-white/45", className)}>
         Select a bookie to see available balance.
@@ -214,6 +229,7 @@ export function BackBookieBalanceStrip({
   }
 
   if (!account && !showAddBalance) {
+    if (!showWell) return null;
     return (
       <p className={cn("text-xs leading-snug text-black/55 dark:text-white/55", className)}>
         No balance tracked for {bookmaker}. Saving a bet will create the account.{" "}
@@ -224,130 +240,109 @@ export function BackBookieBalanceStrip({
     );
   }
 
+  const cashWell = ADD_BET_BALANCE_WELL;
+
   const stake = Number.isFinite(backStake) && backStake > 0 ? backStake : 0;
   const walletPrimary = usesFreeBet ? (account?.freeBets ?? 0) : cash;
   const primaryAvailable = usesFreeBet ? freeBets : cashAvailable;
-  const over =
+  const showCashIssue = !usesFreeBet && needsFunding;
+  const showFreeBetIssue =
+    usesFreeBet &&
     (account != null || credit > 0) &&
-    stake > primaryAvailable + 0.001 &&
-    !(!usesFreeBet && addBalance);
+    stake > primaryAvailable + 0.001;
+
+  const issueVisible = showIssue && (showCashIssue || showFreeBetIssue);
+  if (!showWell && !issueVisible) return null;
 
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      {/* Primary strip - cash or free bet depending on mode */}
-      {account ? (
-        <div
-          className={cn(
-            "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold",
-            usesFreeBet
-              ? "bg-violet-600/15 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100"
-              : "bg-black/10 text-black/75 dark:bg-white/10 dark:text-white/80"
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-1.5">
-            {usesFreeBet && (
-              <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
-            )}
-            {usesFreeBet ? "Free bet balance" : "Cash balance"}
-          </span>
-          <MoneyFlow
-            value={walletPrimary}
-            className={cn(
-              "shrink-0 tabular-nums",
-              usesFreeBet && "text-violet-700 dark:text-violet-300"
-            )}
-          />
-        </div>
-      ) : (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-black/10 px-2.5 py-1.5 text-xs font-semibold text-black/75 dark:bg-white/10 dark:text-white/80">
-          <span>Cash balance</span>
-          <span className="tabular-nums text-muted-foreground">No wallet</span>
-        </div>
-      )}
-
-      {/* Always surface free bets when in cash mode (and vice versa if useful) */}
-      {account && !usesFreeBet && freeBets > 0.001 ? (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-violet-600/12 px-2.5 py-1.5 text-xs font-semibold text-violet-950 dark:bg-violet-500/15 dark:text-violet-100">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
-            Free bet balance
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
-            <MoneyFlow value={freeBets} className="tabular-nums text-violet-700 dark:text-violet-300" />
-            {onUseFreeBet ? (
-              <button
-                type="button"
-                onClick={() => onUseFreeBet(freeBets)}
-                className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-violet-800 underline-offset-2 hover:underline dark:text-violet-200"
-              >
-                Use
-              </button>
-            ) : null}
-          </span>
-        </div>
-      ) : null}
-
-      {account && usesFreeBet && (cash !== 0 || onUseCash) ? (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-black/8 px-2.5 py-1 text-[11px] font-medium text-black/60 dark:bg-white/8 dark:text-white/60">
-          <span>Cash balance</span>
-          <span className="flex shrink-0 items-center gap-2">
-            <MoneyFlow value={cash} className="tabular-nums" />
-            {onUseCash ? (
-              <button
-                type="button"
-                onClick={onUseCash}
-                className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-black/70 underline-offset-2 hover:underline dark:text-white/70"
-              >
-                Use cash
-              </button>
-            ) : null}
-          </span>
-        </div>
-      ) : null}
-
-      {stake > 0 && (account || credit > 0) && (
-        <p
-          className={cn(
-            "px-0.5 text-[11px] font-medium tabular-nums",
-            over
-              ? "text-amber-800 dark:text-amber-300"
-              : usesFreeBet
-                ? "text-violet-800/90 dark:text-violet-300/90"
-                : "text-black/55 dark:text-white/55"
-          )}
-        >
-          {usesFreeBet ? "Using" : "Stake"} £{stake.toFixed(2)}
-          {primaryAvailable > 0 && (
-            <>
-              {" "}
-              of £{primaryAvailable.toFixed(2)} available
-              {credit > 0.001 ? " (includes this bet)" : ""}
-            </>
-          )}
-          {over && " - exceeds available"}
-        </p>
-      )}
-      {showAddBalance ? (
-        <div className="flex flex-col gap-0.5">
-          <label className="flex cursor-pointer items-center gap-2 px-0.5 pt-0.5 text-xs font-semibold text-black/75 dark:text-white/80">
-            <input
-              type="checkbox"
-              className="size-3.5 rounded border-border accent-primary"
-              checked={addBalance === true}
-              onChange={(e) => onAddBalanceChange?.(e.target.checked)}
-            />
-            Add balance
-            {topUpNeeded > 0.001 ? (
-              <span className="font-medium text-black/50 dark:text-white/50">
-                (£{topUpNeeded.toFixed(2)})
+      {showWell ? (
+        <>
+          {account ? (
+            <div
+              className={cn(
+                cashWell,
+                usesFreeBet &&
+                  "bg-violet-600/15 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100"
+              )}
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-pretty break-words">
+                {usesFreeBet && (
+                  <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
+                )}
+                {usesFreeBet ? "Free bet balance" : "Balance"}
               </span>
-            ) : null}
-          </label>
-          {topUp.deficitPart > 0.001 ? (
-            <p className="px-0.5 text-[11px] font-medium leading-snug text-black/50 dark:text-white/50">
-              £{topUp.stakePart.toFixed(2)} for this stake, plus £
-              {topUp.deficitPart.toFixed(2)} to clear the cash shortfall
-            </p>
+              <MoneyFlow
+                value={walletPrimary}
+                className={cn(
+                  "shrink-0 tabular-nums",
+                  usesFreeBet && "text-violet-700 dark:text-violet-300"
+                )}
+              />
+            </div>
+          ) : (
+            <div className={cashWell}>
+              <span>Balance</span>
+              <span className="tabular-nums text-muted-foreground">No wallet</span>
+            </div>
+          )}
+
+          {account && !usesFreeBet && freeBets > 0.001 ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-md bg-violet-600/12 px-2.5 py-1.5 text-xs font-semibold text-violet-950 dark:bg-violet-500/15 dark:text-violet-100">
+              <span className="flex min-w-0 items-center gap-1.5 text-pretty break-words">
+                <Gift className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
+                Free bet balance
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <MoneyFlow value={freeBets} className="tabular-nums text-violet-700 dark:text-violet-300" />
+                {onUseFreeBet ? (
+                  <button
+                    type="button"
+                    onClick={() => onUseFreeBet(freeBets)}
+                    className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-violet-800 underline-offset-2 hover:underline dark:text-violet-200"
+                  >
+                    Use
+                  </button>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+
+          {account && usesFreeBet && (cash !== 0 || onUseCash) ? (
+            <div className={cashWell}>
+              <span>Balance</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <MoneyFlow value={cash} className="tabular-nums" />
+                {onUseCash ? (
+                  <button
+                    type="button"
+                    onClick={onUseCash}
+                    className="rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-black/70 underline-offset-2 hover:underline dark:text-white/70"
+                  >
+                    Use cash
+                  </button>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {issueVisible ? (
+        <div className="flex items-center justify-between gap-2 px-0.5 pt-0.5">
+          <p className="min-w-0 text-xs font-medium text-warning">
+            {usesFreeBet ? "Exceeds free bet balance" : "Exceeds balance"}
+          </p>
+          {showAddBalance ? (
+            <label className="flex shrink-0 cursor-pointer items-center justify-end gap-1.5 text-right text-xs font-semibold tabular-nums text-black/75 dark:text-white/80">
+              Add{topUpNeeded > 0.001 ? ` ${formatGbp(topUpNeeded)} to cover` : ""}
+              <input
+                type="checkbox"
+                className="size-3.5 rounded border-border accent-primary"
+                checked={addBalance === true}
+                onChange={(e) => onAddBalanceChange?.(e.target.checked)}
+              />
+            </label>
           ) : null}
         </div>
       ) : null}

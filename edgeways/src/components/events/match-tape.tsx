@@ -982,6 +982,7 @@ export function FootballLiveTapeDialog({
   onUntrack,
   onAddBet,
   onEpDesk,
+  twoUpActionLabel = "Early-payout Desk",
   showTwoupScout = false,
   scout: scoutProp = null,
   scoutLoading: scoutLoadingProp = false,
@@ -995,6 +996,7 @@ export function FootballLiveTapeDialog({
   onUntrack?: () => void;
   onAddBet?: () => void;
   onEpDesk?: () => void;
+  twoUpActionLabel?: string;
   showTwoupScout?: boolean;
   scout?: TwoupOpennessResult | null;
   scoutLoading?: boolean;
@@ -1437,7 +1439,7 @@ export function FootballLiveTapeDialog({
                 onClick={onEpDesk}
               >
                 <Flame className="size-4 text-warning" aria-hidden />
-                2UP Desk
+                {twoUpActionLabel}
               </Button>
             ) : null}
             {canTrack && (onTrack || onUntrack) ? (

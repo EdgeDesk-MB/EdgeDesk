@@ -1,5 +1,7 @@
 # Cursor Kit — Edgeways edition
 
+> Implementation loop (classify → increment → verify):
+> `docs/cursor-workflow.md`.
 > Daily usage guide (loops, cheat sheets, automation recipes):
 > `docs/cursor-daily-guide.md`.
 
@@ -12,6 +14,8 @@ Claude Code reads `.claude/`; Cursor reads `.cursor/`. Both stay in sync.
 MB app build/
 ├── .cursor/
 │   ├── skills/
+│   │   ├── iterative-dev/SKILL.md
+│   │   ├── ticket-hygiene/SKILL.md
 │   │   ├── brief/SKILL.md
 │   │   ├── calc-change/SKILL.md
 │   │   ├── delegate-local/SKILL.md
@@ -25,8 +29,8 @@ MB app build/
 │   │   ├── ux-qa-auditor.md
 │   │   └── consistency-checker.md
 │   └── commands/
-│       ├── brief.md · calc-audit.md · calc-change.md
-│       ├── delegate-local.md · design-review.md
+│       ├── iterative-dev.md · ticket-hygiene.md · brief.md · calc-audit.md
+│       ├── calc-change.md · delegate-local.md · design-review.md
 ├── .claude/                    ← same skills + agents, Claude Code frontmatter
 ├── edgeways/docs/design-system.md   ← source of truth for UI
 └── docs/templates/DESIGN.md    ← generic kit template; redundant for Edgeways
@@ -37,15 +41,23 @@ MB app build/
 - **Frontmatter translated.** Claude Code's `tools: Read, Grep, Glob, Bash` became Cursor's `readonly: true` (both auditors). `model: inherit` encodes your "switch to a frontier model first" command notes; `consistency-checker` pins `model: fast` and runs `is_background: true`.
 - **design-reviewer merged.** Your five Edgeways conformance checks (tokens only, documented patterns, shadcn primitives, British English/commas, `formatClockTime`) are now the hard rules, ranked above the kit's general checks (states, a11y, generic-AI tells, screenshot review at three viewports). One reviewer, no overlap with the old kit version.
 - **Commands re-pointed** from `.claude/…` paths to `.cursor/…` equivalents. The audit/review commands now say "delegate to the subagent" since Cursor handles model choice via agent frontmatter rather than the picker.
-- **Cross-references updated**: `calc-change` ends by delegating to `calc-auditor`; `design-system-consistency` ends by delegating to `consistency-checker` + `design-reviewer`; `brief`'s `[local]` tag points at the `delegate-local` skill.
+- **Cross-references updated**: `iterative-dev` points at `docs/cursor-workflow.md`; `calc-change` ends by delegating to `calc-auditor`; `design-system-consistency` ends by delegating to `consistency-checker` + `design-reviewer`; `brief`'s `[local]` tag points at the `delegate-local` skill.
 
 ## Workflow (Edgeways)
+
+Canonical loop: `docs/cursor-workflow.md` (or `/iterative-dev`). Classify first,
+load one skill, smallest verifiable increment. Orca / CLI / cloud agents must
+`Read` the matching `SKILL.md`; slash commands will not fire.
 
 **Money-maths change:** `calc-change` skill fires (or `/calc-change`) → test-first with hand-worked numbers → smallest diff via `money.ts` → vitest green → delegate diff to `calc-auditor` → fix FAILs → commit.
 
 **UI change:** `design-system-consistency` + `design-taste` + `ux-heuristics` shape the build → `visual-qa-loop` self-verify (screenshots at 375/768/1440) → `consistency-checker` (background, cheap) + `design-reviewer` → fix Blockers/Majors → commit.
 
 **Roadmap item:** `/brief` → sized `[local]` / `[strong]` / `[design-first]` → `[local]` briefs go through `delegate-local`; `[strong]` in-session on a frontier model; `[design-first]` waits for your mock.
+
+**Ticket-worthy work:** `/ticket-hygiene` (or the skill). Sam named `EDGE-n`
+→ that is scope. Else one search. Small bugs comment on EDGE-171. Local
+models skip Linear. Human one-pager: `docs/linear.md`.
 
 ## Caveats to verify (see "Complete after install")
 
@@ -56,5 +68,5 @@ MB app build/
 ## Extending
 
 - `design-system.md` remains the highest-leverage file — every skill and agent defers to it.
-- Always-on conventions (framework patterns, import styles) belong in `.cursor/rules/`, not skills.
+- Always-on conventions (framework patterns, import styles) belong in `.cursor/rules/`, not skills. The increment loop is `docs/cursor-workflow.md` plus the short `iterative-dev` always-on rule.
 - The generic kit (previous zip) stays useful for non-Edgeways projects; this edition is repo-specific.

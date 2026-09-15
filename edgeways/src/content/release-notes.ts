@@ -135,8 +135,8 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       },
       {
         kind: "improvement",
-        area: "2UP Desk",
-        href: "/calculators/ep-desk",
+        area: "Early-payout Desk",
+        href: "/early-payout",
         text: "1UP is optional. The desk starts on 2UP only; turn on Include 1UP to add those prices and mixed dutch.",
       },
       {
@@ -956,7 +956,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Alerts",
-        href: "/calculators/ep-desk",
+        href: "/early-payout",
         text: "Live 2UP sentinel: when your team goes two up, the alert includes an exact lock-in suggestion - the equalising in-play back, stake and guaranteed profit, priced from the live model.",
       },
       {

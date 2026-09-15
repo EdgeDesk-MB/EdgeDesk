@@ -5,23 +5,21 @@ import {
   BackPanel,
   LayPanel,
   LayStakeBanner,
-  PanelBookieInput,
   PanelInput,
   PanelSelect,
+  PanelTextInput,
   ProfitTable,
 } from "@/components/calc/bet-panels";
+import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import type { EachWayCalculatorPrefill } from "@/components/each-way-calculator-provider";
 import { PlaceZoneBar } from "@/components/racing/place-zone-bar";
 import { MoneyFlow, NumFlow } from "@/components/money-flow";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { serializeEwMeta, type EachWayBetMeta } from "@/lib/bets/ew-meta";
-import { contrastText } from "@/lib/brands/exchanges";
 import { eachWay, extraPlace } from "@/lib/calc";
 import { estimateLayPlaceOdds } from "@/lib/calc/estimate-lay-place-odds";
 import { placePositions } from "@/lib/racing";
@@ -62,7 +60,8 @@ export function EachWayCalculatorForm({
   const [placeFraction, setPlaceFraction] = useState("0.2");
   const [layWinOdds, setLayWinOdds] = useState(9.6);
   const [layPlaceOdds, setLayPlaceOdds] = useState(2.8);
-  const [commission, setCommission] = useState(2);
+  const [layWinStakeOverride, setLayWinStakeOverride] = useState<number | null>(null);
+  const [layPlaceStakeOverride, setLayPlaceStakeOverride] = useState<number | null>(null);
   const [fieldSize, setFieldSize] = useState(12);
   const [exchangePlaces, setExchangePlaces] = useState(3);
   const [bookiePlaces, setBookiePlaces] = useState(4);
@@ -80,10 +79,11 @@ export function EachWayCalculatorForm({
     if (!exchange && defaultExchange) {
       queueMicrotask(() => {
         setExchange(defaultExchange);
-        setCommission(defaultExchange.commissionPct);
       });
     }
   }, [defaultExchange, exchange]);
+
+  const commissionPct = exchange?.commissionPct ?? 2;
 
   useEffect(() => {
     if (!open) return;
@@ -118,7 +118,6 @@ export function EachWayCalculatorForm({
       } else if (nextWin != null) {
         setLayPlaceOdds(estimateLayPlaceOdds(nextWin, frac));
       }
-      if (prefill?.commission != null) setCommission(prefill.commission);
       if (nextField != null) setFieldSize(nextField);
 
       const terms = ukPlaceTerms(nextField ?? fieldSize);
@@ -154,10 +153,7 @@ export function EachWayCalculatorForm({
 
       if (prefill?.exchangeId !== undefined) {
         const ex = exchanges.find((e) => e.id === prefill.exchangeId);
-        if (ex) {
-          setExchange(ex);
-          if (prefill.commission === undefined) setCommission(ex.commissionPct);
-        }
+        if (ex) setExchange(ex);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,7 +179,14 @@ export function EachWayCalculatorForm({
       : null;
 
   const fraction = parseFloat(placeFraction);
-  const c = commission / 100;
+  const c = commissionPct / 100;
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setLayWinStakeOverride(null);
+      setLayPlaceStakeOverride(null);
+    });
+  }, [stake, winOdds, fraction, layWinOdds, layPlaceOdds, c]);
 
   const standardResult = useMemo(() => {
     if (!(stake > 0 && winOdds > 1 && layWinOdds > 1 && layPlaceOdds > 1)) return null;
@@ -194,8 +197,10 @@ export function EachWayCalculatorForm({
       layWinOdds,
       layPlaceOdds,
       commission: c,
+      layWinStakeOverride: layWinStakeOverride ?? undefined,
+      layPlaceStakeOverride: layPlaceStakeOverride ?? undefined,
     });
-  }, [stake, winOdds, fraction, layWinOdds, layPlaceOdds, c]);
+  }, [stake, winOdds, fraction, layWinOdds, layPlaceOdds, c, layWinStakeOverride, layPlaceStakeOverride]);
 
   const extraResult = useMemo(() => {
     if (!(stake > 0 && winOdds > 1 && layWinOdds > 1 && layPlaceOdds > 1)) return null;
@@ -209,8 +214,21 @@ export function EachWayCalculatorForm({
       commission: c,
       bookiePlaces,
       exchangePlaces,
+      layWinStakeOverride: layWinStakeOverride ?? undefined,
+      layPlaceStakeOverride: layPlaceStakeOverride ?? undefined,
     });
-  }, [stake, winOdds, fraction, layWinOdds, layPlaceOdds, c, bookiePlaces, exchangePlaces]);
+  }, [
+    stake,
+    winOdds,
+    fraction,
+    layWinOdds,
+    layPlaceOdds,
+    c,
+    bookiePlaces,
+    exchangePlaces,
+    layWinStakeOverride,
+    layPlaceStakeOverride,
+  ]);
 
   const active = mode === "extra_place" ? extraResult : standardResult;
   const layWinStake = active?.layWinStake ?? 0;
@@ -295,26 +313,30 @@ export function EachWayCalculatorForm({
         </p>
       )}
 
-      <BackPanel title="Back Bet (Bookie)" exchange={exchange} venue={bookmaker}>
-        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-          <PanelBookieInput
+      <BackPanel
+        title="Back Bet"
+        exchange={exchange}
+        venue={bookmaker}
+        chip={
+          <BookmakerSelect
+            tagTrigger
             value={bookmaker}
             onChange={setBookmaker}
-            placeholder="e.g. William Hill"
-            className="col-span-2 sm:col-span-1"
+            className="[--pi:var(--panel)] [--pi-dark:var(--panel-dark)]"
           />
-          {embedded && (
-            <div className="col-span-2 space-y-1.5 sm:col-span-1">
-              <Label className="text-xs text-muted-foreground">Selection</Label>
-              <Input
-                value={selection}
-                onChange={(e) => setSelection(e.target.value)}
-                placeholder="Horse name"
-              />
-            </div>
-          )}
+        }
+      >
+        {embedded && (
+          <PanelTextInput
+            label="Selection"
+            value={selection}
+            onChange={setSelection}
+            placeholder="Horse name"
+          />
+        )}
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+          <PanelInput label="Win odds" value={winOdds} onChange={setWinOdds} min={1} />
           <PanelInput label="EW stake (per part)" prefix="£" value={stake} onChange={setStake} min={0} />
-          <PanelInput label="Win odds (decimal)" value={winOdds} onChange={setWinOdds} min={1} />
           <PanelSelect label="Place terms" value={placeFraction} onChange={setPlaceFraction}>
             {placeTerms.map((t) => (
               <option key={t.value} value={t.value}>
@@ -405,73 +427,56 @@ export function EachWayCalculatorForm({
       </BackPanel>
 
       <LayPanel
-        title="Lay Bets (Exchange)"
+        title="Lay Bet"
         exchange={exchange}
         chip={
-          exchange ? (
-            <span
-              className="rounded px-2 py-0.5 text-[11px] font-bold"
-              style={{
-                backgroundColor: exchange.brandColor,
-                color: contrastText(exchange.brandColor),
-              }}
-            >
-              {exchange.name.toUpperCase()}
-            </span>
-          ) : null
+          <ExchangeSelect
+            compact
+            tagTrigger
+            exchanges={exchanges}
+            value={exchange}
+            onChange={setExchange}
+          />
         }
       >
         <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-          <div className="col-span-2 sm:col-span-1">
-            <ExchangeSelect
-              onPanel
-              exchanges={exchanges}
-              value={exchange}
-              onChange={(ex) => {
-                setExchange(ex);
-                setCommission(ex.commissionPct);
-              }}
-            />
-          </div>
           <PanelInput
-            label="Lay commission"
-            suffix="%"
-            value={commission}
-            onChange={setCommission}
-            min={0}
-            step={0.5}
-          />
-          <PanelInput
-            label="Lay odds - WIN market"
+            label="Lay WIN odds"
             value={layWinOdds}
             onChange={setLayWinOdds}
             min={1}
             exchangeOddsStepping
           />
+          <LayStakeBanner
+            label="Lay WIN stake"
+            value={layWinStake}
+            liability={active?.layWinLiability}
+            pending={!active}
+            onChange={(v) =>
+              setLayWinStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+            }
+          />
           <PanelInput
-            label="Lay odds - PLACE market"
+            label="Lay PLACE odds"
             value={layPlaceOdds}
             onChange={setLayPlaceOdds}
             min={1}
             exchangeOddsStepping
+          />
+          <LayStakeBanner
+            label="Lay PLACE stake"
+            value={layPlaceStake}
+            liability={active?.layPlaceLiability}
+            pending={!active}
+            onChange={(v) =>
+              setLayPlaceStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+            }
           />
         </div>
         <p className="text-xs text-muted-foreground">
           Place lay is manual until the desk has live PLACE prices. Confirm against the exchange
           before filling the slip.
         </p>
-        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-          <LayStakeBanner
-            label="Lay WIN stake"
-            value={layWinStake}
-            liability={active?.layWinLiability ?? 0}
-          />
-          <LayStakeBanner
-            label="Lay PLACE stake"
-            value={layPlaceStake}
-            liability={active?.layPlaceLiability ?? 0}
-          />
-        </div>
       </LayPanel>
 
       <ProfitTable

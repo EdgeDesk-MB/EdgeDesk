@@ -70,6 +70,8 @@ describe("public demo helpers", () => {
     expect(isPublicDemoDeskPath("/desk")).toBe(true);
     expect(isPublicDemoDeskPath("/accounts")).toBe(true);
     expect(isPublicDemoDeskPath("/racing")).toBe(true);
+    expect(isPublicDemoDeskPath("/early-payout")).toBe(true);
+    expect(isPublicDemoDeskPath("/2up")).toBe(true);
     expect(isPublicDemoDeskPath("/login")).toBe(false);
   });
 

@@ -29,6 +29,8 @@ const patchSchema = z.object({
   accessStatus: z.enum(["available", "gubbed", "closed"]).optional(),
   owner: z.string().min(1).max(60).optional(),
   notes: z.string().nullable().optional(),
+  /** "scope" only from the bookie-scope auto-fill; any other notes write is user-authored. */
+  notesSource: z.enum(["user", "scope"]).optional(),
   fundedByAccountId: z.number().nullable().optional(),
   wrRemaining: z.number().min(0).optional(),
   wrMinOdds: z.number().nullable().optional(),
@@ -43,7 +45,9 @@ function patchFields(p: z.infer<typeof patchSchema>) {
     ...(p.brandColor !== undefined ? { brandColor: p.brandColor } : {}),
     ...(p.accessStatus !== undefined ? { accessStatus: p.accessStatus } : {}),
     ...(p.owner !== undefined ? { owner: p.owner.trim() || "me" } : {}),
-    ...(p.notes !== undefined ? { notes: p.notes } : {}),
+    ...(p.notes !== undefined
+      ? { notes: p.notes, notesSource: p.notesSource ?? "user" }
+      : {}),
     ...(p.fundedByAccountId !== undefined
       ? { fundedByAccountId: p.fundedByAccountId }
       : {}),

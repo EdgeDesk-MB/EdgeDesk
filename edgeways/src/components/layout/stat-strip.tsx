@@ -8,6 +8,9 @@ const columnClasses = {
   5: "sm:grid-cols-2 lg:grid-cols-5",
 } as const;
 
+/** One column of a 5-col `StatStrip` (`gap-2` × 4 = 2rem). */
+export const statStripFiveColWidth = "w-[calc((100%-2rem)/5)]";
+
 export function StatStrip({
   children,
   columns = 5,
@@ -32,6 +35,7 @@ export function StatTile({
   valueClassName,
   active,
   onClick,
+  reserveSub = true,
 }: {
   label: string;
   value: React.ReactNode;
@@ -42,6 +46,11 @@ export function StatTile({
   /** When set with onClick, tile renders as a selectable summary tab. */
   active?: boolean;
   onClick?: () => void;
+  /**
+   * Keep the empty sub row so a strip of mixed tiles shares height.
+   * Set false for lone label+value cards (Accounts Cash / Free bets).
+   */
+  reserveSub?: boolean;
 }) {
   const interactive = onClick != null;
   const classNames = cn(
@@ -63,6 +72,7 @@ export function StatTile({
   // Races / P&L match Tracked / Active bets, and MoneyFlow cannot collapse
   // the gaps. Label→value 2px; value→supporting text 10px.
   const hasSub = sub != null && sub !== "";
+  const showSub = hasSub || reserveSub;
   const body = (
     <div className="flex w-full flex-col">
       <p className="h-3.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-muted-foreground">
@@ -76,15 +86,18 @@ export function StatTile({
       >
         {value}
       </div>
-      <p
-        className={cn(
-          "mt-2.5 h-3.5 text-[11px] leading-none",
-          hasSub ? "text-muted-foreground" : "invisible select-none"
-        )}
-        aria-hidden={!hasSub}
-      >
-        {hasSub ? sub : "\u00a0"}
-      </p>
+      {showSub ? (
+        <p
+          className={cn(
+            "mt-2.5 h-3.5 min-w-0 truncate text-[11px] leading-none",
+            hasSub ? "text-muted-foreground" : "invisible select-none"
+          )}
+          aria-hidden={!hasSub}
+          title={typeof sub === "string" ? sub : undefined}
+        >
+          {hasSub ? sub : "\u00a0"}
+        </p>
+      ) : null}
     </div>
   );
 

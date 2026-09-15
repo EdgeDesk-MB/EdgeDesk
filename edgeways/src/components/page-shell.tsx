@@ -167,7 +167,7 @@ export function CalculatorShell({
   wide?: boolean;
 }) {
   return (
-    <PageShell className={className}>
+    <PageShell className={cn("pb-16", className)}>
       <div
         className={cn(
           "mx-auto flex w-full flex-col gap-[var(--layout-stack-gap)]",

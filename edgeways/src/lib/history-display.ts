@@ -13,7 +13,7 @@ import {
 } from "@/lib/offers/early-free-bet-award";
 import { formatOfferListGroupLabel, startOfLocalDay } from "@/lib/offers/offer-list-groups";
 import { formatClockTime } from "@/lib/time-format";
-import { MARKET_LABELS } from "@/lib/markets";
+import { formatBetSelection, MARKET_LABELS } from "@/lib/markets";
 import {
   formatGoalScorelineSegments,
   formatGoalScorelineText,
@@ -889,7 +889,7 @@ export function formatBetMeta(bet: BetRow): string[] {
   if (bet.bookmaker) lines.push(bet.bookmaker);
   if (bet.selection) {
     const market = MARKET_LABELS[bet.market] ?? bet.market;
-    lines.push(`${market} · ${bet.selection}`);
+    lines.push(`${market} · ${formatBetSelection(bet.market, bet.selection)}`);
   }
   if (bet.backStake > 0) {
     lines.push(`Back ${formatGbp(bet.backStake)} @ ${bet.backOdds.toFixed(2)}`);

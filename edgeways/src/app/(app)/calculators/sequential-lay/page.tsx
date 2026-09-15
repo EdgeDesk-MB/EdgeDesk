@@ -1,21 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { AdvancedLaySection } from "@/components/calc/advanced-lay";
 import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
 import {
   BackPanel,
   LayPanel,
   LayStakeBanner,
-  PanelBookieInput,
   PanelInput,
   ProfitTable,
 } from "@/components/calc/bet-panels";
+import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
-import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { type BetMode } from "@/lib/calc/matched";
 import { layBounds, layPlanOutcome, type PartLay } from "@/lib/calc/layplan";
@@ -38,7 +36,6 @@ export default function SequentialLayCalculatorPage() {
   const [backStake, setBackStake] = useState(10);
   const [backOdds, setBackOdds] = useState(6);
   const [layOdds, setLayOdds] = useState(5.2);
-  const [commission, setCommission] = useState(2);
   const [partLays, setPartLays] = useState<PartLay[]>([{ odds: 5.8, stake: 5 }]);
   const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
 
@@ -46,10 +43,11 @@ export default function SequentialLayCalculatorPage() {
     if (!exchange && defaultExchange) {
       queueMicrotask(() => {
         setExchange(defaultExchange);
-        setCommission(defaultExchange.commissionPct);
       });
     }
   }, [defaultExchange, exchange]);
+
+  const commissionPct = exchange?.commissionPct ?? 2;
 
   const planInput = useMemo(() => {
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
@@ -59,10 +57,10 @@ export default function SequentialLayCalculatorPage() {
       backStake,
       backOdds,
       layOdds,
-      commission: commission / 100,
+      commission: commissionPct / 100,
       partLays: validParts,
     };
-  }, [mode, backStake, backOdds, layOdds, commission, partLays]);
+  }, [mode, backStake, backOdds, layOdds, commissionPct, partLays]);
 
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
   const layStake = layStakeOverride ?? bounds?.standard ?? 0;
@@ -120,15 +118,22 @@ export default function SequentialLayCalculatorPage() {
         </div>
       </div>
 
-      <BackPanel title="Back bet" exchange={exchange} venue={bookmaker}>
-        <div className="grid grid-cols-2 gap-3">
-          <PanelBookieInput
+      <BackPanel
+        title="Back Bet"
+        exchange={exchange}
+        venue={bookmaker}
+        chip={
+          <BookmakerSelect
+            tagTrigger
             value={bookmaker}
             onChange={setBookmaker}
-            className="col-span-2 sm:col-span-1"
+            className="[--pi:var(--panel)] [--pi-dark:var(--panel-dark)]"
           />
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+          <PanelInput label="Back odds" value={backOdds} onChange={setBackOdds} min={1} />
           <PanelInput label="Back stake" prefix="£" value={backStake} onChange={setBackStake} min={0} />
-          <PanelInput label="Back odds (decimal)" value={backOdds} onChange={setBackOdds} min={1} />
         </div>
       </BackPanel>
 
@@ -136,48 +141,31 @@ export default function SequentialLayCalculatorPage() {
         title="Part lays + final lay"
         exchange={exchange}
         chip={
-          exchange && (
-            <span
-              className="rounded px-2 py-0.5 text-[11px] font-bold"
-              style={{
-                backgroundColor: exchange.brandColor,
-                color: contrastText(exchange.brandColor),
-              }}
-            >
-              {exchange.name.toUpperCase()}
-            </span>
-          )
+          <ExchangeSelect
+            compact
+            tagTrigger
+            exchanges={exchanges}
+            value={exchange}
+            onChange={setExchange}
+          />
         }
       >
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 sm:col-span-1">
-            <ExchangeSelect
-              onPanel
-              exchanges={exchanges}
-              value={exchange}
-              onChange={(ex) => {
-                setExchange(ex);
-                setCommission(ex.commissionPct);
-                toast.info(`${ex.name} selected`, {
-                  description: `Commission set to ${ex.commissionPct}%`,
-                });
-              }}
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelInput
-            label="Current lay odds (final lay)"
+            label="Lay odds"
             value={layOdds}
             onChange={setLayOdds}
             min={1}
             exchangeOddsStepping
           />
-          <PanelInput
-            label="Lay commission"
-            suffix="%"
-            value={commission}
-            onChange={setCommission}
-            min={0}
-            step={0.5}
+          <LayStakeBanner
+            value={layStake}
+            liability={result?.totalLiability}
+            pending={!planInput}
+            label={`Final lay stake${partTotal > 0 ? ` (${partTotal.toFixed(2)} already laid)` : ""}`}
+            onChange={(v) =>
+              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+            }
           />
         </div>
 
@@ -191,12 +179,6 @@ export default function SequentialLayCalculatorPage() {
             accent={exchange?.brandColor ?? "#1e293b"}
           />
         )}
-
-        <LayStakeBanner
-          value={layStake}
-          liability={result?.totalLiability}
-          label={`Final lay stake${partTotal > 0 ? ` (${partTotal.toFixed(2)} already laid)` : ""}`}
-        />
         {result && result.totalLayStake > layStake && (
           <p className="text-center text-xs text-muted-foreground">
             Total lay stake across all steps:{" "}

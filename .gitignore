@@ -9,6 +9,9 @@ node_modules/
 
 # MCP config holds live API keys/tokens in plaintext — never track this
 .cursor/mcp.json
+.mcp.json
+.claude/mcp.json
+.claude.json
 
 # Local QA scratch output (Playwright MCP console logs, screenshots, snapshots)
 .playwright-mcp/

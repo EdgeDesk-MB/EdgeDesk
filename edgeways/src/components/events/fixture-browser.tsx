@@ -149,10 +149,31 @@ export function FixtureBrowserContent({
   variant = "page",
   header = null,
   className,
+  sportLock,
+  hideSportControl = false,
+  persistView = true,
+  statusOverride,
+  trackedOnly = false,
+  hideStatusPills = false,
+  pinDayControl = false,
+  twoUpActionLabel,
+  onPicksCount,
+  onOpenTwoUp,
 }: {
   variant?: "page" | "dialog";
   header?: ReactNode;
   className?: string;
+  sportLock?: "football";
+  hideSportControl?: boolean;
+  persistView?: boolean;
+  statusOverride?: "all" | "live" | "scheduled" | "picks";
+  trackedOnly?: boolean;
+  hideStatusPills?: boolean;
+  /** Early-payout Desk: day stepper and Filter sit at the top of the pin rail on lg. */
+  pinDayControl?: boolean;
+  twoUpActionLabel?: string;
+  onPicksCount?: (count: number) => void;
+  onOpenTwoUp?: (fixture: Fixture) => void;
 }) {
   const router = useRouter();
   const { openAddBet } = useAddBet();
@@ -165,9 +186,15 @@ export function FixtureBrowserContent({
   const [racingError, setRacingError] = useState<string | null>(null);
   const [loadingCompetitions, setLoadingCompetitions] = useState(false);
   const savedSport = normalizeFixtureBoardView(state?.settings.fixtureBoardView).sport;
-  const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">(savedSport);
-  const [appliedSport, setAppliedSport] = useState(savedSport);
-  if (state != null && appliedSport !== savedSport) {
+  const [fixtureSport, setFixtureSport] = useState<"football" | "horse_racing">(
+    sportLock ?? savedSport
+  );
+  const [appliedSport, setAppliedSport] = useState(sportLock ?? savedSport);
+  if (sportLock && fixtureSport !== sportLock) {
+    setFixtureSport(sportLock);
+    setAppliedSport(sportLock);
+  }
+  if (!sportLock && state != null && appliedSport !== savedSport) {
     setAppliedSport(savedSport);
     setFixtureSport(savedSport);
   }
@@ -194,6 +221,7 @@ export function FixtureBrowserContent({
   const goTracked = useCallback(() => router.push("/tracked-events"), [router]);
 
   function persistFixtureSport(next: "football" | "horse_racing") {
+    if (sportLock) return;
     setFixtureSport(next);
     const current = normalizeFixtureBoardView(state?.settings.fixtureBoardView);
     const fixtureBoardView = mergeFixtureBoardView(current, { sport: next });
@@ -630,6 +658,10 @@ export function FixtureBrowserContent({
   );
 
   function openEpDesk(fixture: Fixture) {
+    if (onOpenTwoUp) {
+      onOpenTwoUp(fixture);
+      return;
+    }
     if (variant === "dialog") closeTrackFixture();
     router.push(
       epDeskFixtureHref({
@@ -665,39 +697,42 @@ export function FixtureBrowserContent({
     (fixtureSport === "horse_racing" ? dayReady.racing : dayReady.football);
   const showLoadingEmpty = !sportReady && !sportError;
 
-  const dayStepper = racingLocked ? null : (
-    <CalendarDayStepper
-      day={listDay}
-      onChange={(ymd) => {
-        const next = clampCalendarYmd(ymd, dayBounds.min, dayBounds.max);
-        if (next === listDay) return;
-        setListDay(next);
-        const hit = peekFixtureDay(next);
-        const sportReadyNow =
-          hit &&
-          (fixtureSport === "horse_racing" ? hit.racingReady : hit.footballReady);
-        if (hit && sportReadyNow) {
-          applyDay(next, hit);
-          return;
-        }
-        setFixtures([]);
-        setRacingFixtures([]);
-        setFootballError(null);
-        setRacingError(null);
-        setDayReady({ day: next, football: false, racing: false });
-      }}
-      min={dayBounds.min}
-      max={dayBounds.max}
-      busy={showLoadingEmpty}
-      selectedLabel={formatFixtureStepperLabel(listDay, Date.now(), displayTimezone)}
-      ariaLabel="Fixture day"
-      pickAriaLabel="Pick fixture day"
-      fromYear={Number(dayBounds.min.slice(0, 4))}
-      toYear={Number(dayBounds.max.slice(0, 4))}
-    />
-  );
+  const dayStepper = racingLocked
+    ? null
+    : ({ stretch = false }: { stretch?: boolean } = {}) => (
+        <CalendarDayStepper
+          day={listDay}
+          onChange={(ymd) => {
+            const next = clampCalendarYmd(ymd, dayBounds.min, dayBounds.max);
+            if (next === listDay) return;
+            setListDay(next);
+            const hit = peekFixtureDay(next);
+            const sportReadyNow =
+              hit &&
+              (fixtureSport === "horse_racing" ? hit.racingReady : hit.footballReady);
+            if (hit && sportReadyNow) {
+              applyDay(next, hit);
+              return;
+            }
+            setFixtures([]);
+            setRacingFixtures([]);
+            setFootballError(null);
+            setRacingError(null);
+            setDayReady({ day: next, football: false, racing: false });
+          }}
+          min={dayBounds.min}
+          max={dayBounds.max}
+          busy={showLoadingEmpty}
+          selectedLabel={formatFixtureStepperLabel(listDay, Date.now(), displayTimezone)}
+          ariaLabel="Fixture day"
+          pickAriaLabel="Pick fixture day"
+          fromYear={Number(dayBounds.min.slice(0, 4))}
+          toYear={Number(dayBounds.max.slice(0, 4))}
+          stretch={stretch}
+        />
+      );
 
-  const tabs = (
+  const tabs = hideSportControl || sportLock ? null : (
     <TabsLineBar
       bleed={tabBleed}
       className={cn(
@@ -749,6 +784,13 @@ export function FixtureBrowserContent({
       onTrackAndBetFixture={trackAndBetFixture}
       onAddBetFixture={addBetFromLiveFixture}
       onEpDesk={openEpDesk}
+      persistView={persistView}
+      statusOverride={statusOverride}
+      trackedOnly={trackedOnly}
+      hideStatusPills={hideStatusPills}
+      pinDayControl={pinDayControl}
+      twoUpActionLabel={twoUpActionLabel}
+      onPicksCount={onPicksCount}
       onTrackRace={trackRace}
       onUntrackRace={untrackRace}
       onTrackAndBetRace={trackAndBetRace}

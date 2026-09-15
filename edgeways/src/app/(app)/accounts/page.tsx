@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { AccountTypeBadge } from "@/components/accounts/account-type-badge";
@@ -36,6 +37,7 @@ import { Tabs, TabsContent, TabsLineBar, TabsList, TabsTrigger } from "@/compone
 import { useAddBalance } from "@/components/add-balance-provider";
 import { TransferFundsDialog } from "@/components/accounts/transfer-funds-dialog";
 import { ManageVenuesDialog } from "@/components/accounts/venue-admin-panel";
+import { BookieScopePanel } from "@/components/accounts/bookie-scope-panel";
 import { FreeBetExpiryControl } from "@/components/accounts/free-bet-expiry-control";
 import { freeBetLotNoteLabel } from "@/lib/accounts/free-bet-expiry";
 import { MoneyFlow } from "@/components/money-flow";
@@ -58,6 +60,7 @@ import {
   pagePrimaryButtonProps,
   pageSecondaryButtonProps,
 } from "@/components/layout/page-header-actions";
+import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import type { AccountBalance } from "@/lib/services/balances.types";
 import {
   computeBookmakerStats,
@@ -68,7 +71,23 @@ import {
 } from "@/lib/accounts/bookmaker-stats";
 import { dialogTitleIcon, listRow, listRowGroup } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, Building2, Check, Pencil, Plus, Trash2, Wallet } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Building2,
+  Check,
+  Pencil,
+  Plus,
+  StickyNote,
+  Trash2,
+  Wallet,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { scopeNoteTooltip } from "@/lib/accounts/notes-source";
 
 type TxRow = {
   id: number;
@@ -81,6 +100,14 @@ type TxRow = {
 
 type PendingTx = TxRow & { accountName: string };
 
+function cashTileSub(pendingIn: number | null | undefined, wrRemaining: number): string | undefined {
+  const pending = pendingIn ?? 0;
+  const parts: string[] = [];
+  if (pending > 0) parts.push(`£${pending.toFixed(2)} pending`);
+  if (wrRemaining > 0) parts.push(`WR £${wrRemaining.toFixed(2)} left`);
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 export default function AccountsPage() {
   return (
     <Suspense fallback={<PageLoading label="Loading accounts" />}>
@@ -90,6 +117,10 @@ export default function AccountsPage() {
 }
 
 function AccountsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const venueParam = searchParams?.get("venue");
+  const scopeParam = searchParams?.get("scope");
   const { openAddBalance } = useAddBalance();
   const { state, refresh } = useAppState(3000);
 
@@ -138,6 +169,18 @@ function AccountsContent() {
   }
 
   const selected = accounts.find((a) => a.id === selectedId) ?? null;
+  const scopeDeepLink =
+    selectedId != null &&
+    venueParam === String(selectedId) &&
+    (scopeParam === "early_payout" || scopeParam === "racing");
+
+  useEffect(() => {
+    if (!venueParam) return;
+    const id = Number(venueParam);
+    if (!Number.isFinite(id)) return;
+    if (accounts.length > 0 && !accounts.some((account) => account.id === id)) return;
+    setSelectedId(id);
+  }, [accounts, venueParam]);
   const bankNameById = useMemo(
     () => new Map(banks.map((b) => [b.id, b.name] as const)),
     [banks]
@@ -334,8 +377,15 @@ function AccountsContent() {
         account={selected}
         banks={banks}
         open={selectedId != null}
+        initialTab={scopeDeepLink ? "scope" : "details"}
+        scopeSurface={scopeParam === "racing" ? "racing" : "early_payout"}
         onOpenChange={(open) => {
-          if (!open) setSelectedId(null);
+          if (!open) {
+            setSelectedId(null);
+            if (venueParam || scopeParam) {
+              router.replace("/accounts", { scroll: false });
+            }
+          }
         }}
         onSaved={() => {
           refresh();
@@ -743,6 +793,39 @@ function MugPlanForm({
   );
 }
 
+/** Desktop-only: note icon before the text, hover reveals provenance for a scope auto-fill. */
+function AccountNoteLine({ account }: { account: AccountBalance }) {
+  const note = account.notes?.trim();
+  if (!note) return null;
+  const icon = <StickyNote className="mt-0.5 size-3 shrink-0 text-muted-foreground/70" />;
+  const text = (
+    <p className="line-clamp-2 max-w-md whitespace-normal break-words text-xs font-normal text-muted-foreground">
+      {note}
+    </p>
+  );
+  if (account.notesSource !== "scope") {
+    return (
+      <span className="mt-0.5 flex items-start gap-1">
+        {icon}
+        {text}
+      </span>
+    );
+  }
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="mt-0.5 flex items-start gap-1">
+            {icon}
+            {text}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{scopeNoteTooltip(account.type)}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function AccountTable({
   rows,
   bankNameById,
@@ -910,11 +993,9 @@ function AccountTable({
                 <p className="mt-0.5 text-xs font-normal text-muted-foreground">
                   Funded by {bankNameById.get(a.fundedByAccountId)}
                 </p>
-              ) : a.notes?.trim() ? (
-                <p className="mt-0.5 line-clamp-1 text-xs font-normal text-muted-foreground">
-                  {a.notes}
-                </p>
-              ) : null}
+              ) : (
+                <AccountNoteLine account={a} />
+              )}
               {(a.pendingIn ?? 0) > 0 ? (
                 <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
                   +£{a.pendingIn.toFixed(2)} pending
@@ -1104,12 +1185,16 @@ function AccountDetailDialog({
   account,
   banks,
   open,
+  initialTab = "details",
+  scopeSurface = "early_payout",
   onOpenChange,
   onSaved,
 }: {
   account: AccountBalance | null;
   banks: AccountBalance[];
   open: boolean;
+  initialTab?: "details" | "ledger" | "scope";
+  scopeSurface?: "early_payout" | "racing";
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
@@ -1120,9 +1205,11 @@ function AccountDetailDialog({
           from the 3s poll cannot reset the form (only the id matters). */}
       {open && account ? (
         <AccountDetailBody
-          key={account.id}
+          key={`${account.id}:${initialTab}`}
           account={account}
           banks={banks}
+          initialTab={initialTab}
+          scopeSurface={scopeSurface}
           onOpenChange={onOpenChange}
           onSaved={onSaved}
         />
@@ -1134,11 +1221,15 @@ function AccountDetailDialog({
 function AccountDetailBody({
   account,
   banks,
+  initialTab,
+  scopeSurface,
   onOpenChange,
   onSaved,
 }: {
   account: AccountBalance;
   banks: AccountBalance[];
+  initialTab: "details" | "ledger" | "scope";
+  scopeSurface: "early_payout" | "racing";
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
@@ -1152,6 +1243,7 @@ function AccountDetailBody({
     account.fundedByAccountId != null ? String(account.fundedByAccountId) : "none"
   );
   const [notes, setNotes] = useState(account.notes ?? "");
+  const [notesSource, setNotesSource] = useState(account.notesSource ?? null);
   const [wrRemaining, setWrRemaining] = useState(account.wrRemaining ?? 0);
   const [wrMinOdds, setWrMinOdds] = useState(
     account.wrMinOdds != null && account.wrMinOdds > 1 ? String(account.wrMinOdds) : ""
@@ -1172,7 +1264,9 @@ function AccountDetailBody({
   const [saving, setSaving] = useState(false);
   const [loadingTx, setLoadingTx] = useState(true);
   const [removingLotId, setRemovingLotId] = useState<number | null>(null);
-  const [tab, setTab] = useState<"details" | "ledger">("details");
+  const [tab, setTab] = useState<"details" | "ledger" | "scope">(
+    account.type === "bookie" ? initialTab : "details"
+  );
 
   useEffect(() => {
     void loadLedger(account.id, { silent: true });
@@ -1281,7 +1375,10 @@ function AccountDetailBody({
       : 0;
 
   return (
-    <DialogContent className="flex h-[min(36rem,90vh)] max-w-lg flex-col gap-0 overflow-hidden p-0 max-sm:h-[min(36rem,92dvh)] max-sm:overflow-hidden max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <DialogContent
+      data-dialog-tone="page"
+      className="flex h-[min(36rem,90vh)] max-w-lg flex-col gap-0 overflow-hidden p-0 max-sm:h-[min(36rem,92dvh)] max-sm:overflow-hidden max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] dark:bg-page"
+    >
         <DialogHeader className="mx-0 mt-0 shrink-0 border-b-0 pb-0">
           <DialogTitle className="flex min-w-0 items-center gap-2.5">
             {account.type === "bookie" ? (
@@ -1304,7 +1401,7 @@ function AccountDetailBody({
         </DialogHeader>
         <Tabs
           value={tab}
-          onValueChange={(value) => setTab(value as "details" | "ledger")}
+          onValueChange={(value) => setTab(value as "details" | "ledger" | "scope")}
           activationMode="manual"
           className="flex min-h-0 flex-1 flex-col gap-0"
         >
@@ -1312,10 +1409,13 @@ function AccountDetailBody({
           <TabsList
             variant="line"
             className="justify-start"
-            fadeClassName="from-page dark:from-card"
+            fadeClassName="from-page"
           >
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="ledger">Ledger</TabsTrigger>
+            {account.type === "bookie" ? (
+              <TabsTrigger value="scope">Scope</TabsTrigger>
+            ) : null}
           </TabsList>
         </TabsLineBar>
 
@@ -1325,34 +1425,43 @@ function AccountDetailBody({
         >
           <ScrollFadeEdges
             className="min-h-0 flex-1"
-            fadeClassName="from-page dark:from-card"
+            fadeClassName="from-page"
             scrollClassName="app-scroll-nested space-y-4 px-6 py-4"
           >
-          <p className="text-sm text-muted-foreground">
-            Cash <MoneyFlow value={account.balance} className="inline font-semibold" />
-            {account.type === "bookie" ? (
-              <>
-                {" · "}
-                Free bets{" "}
-                <MoneyFlow
-                  value={freeBetsShown}
-                  className="inline font-semibold text-edge"
-                />
-                {(account.wrRemaining ?? 0) > 0 ? (
-                  <>
-                    {" · "}
-                    WR £{account.wrRemaining.toFixed(2)} left
-                  </>
-                ) : null}
-              </>
-            ) : null}
-            {(account.pendingIn ?? 0) > 0 ? (
-              <>
-                {" · "}
-                £{account.pendingIn.toFixed(2)} pending
-              </>
-            ) : null}
-          </p>
+          {account.type === "bookie" ? (
+            <StatStrip columns={2} className="grid-cols-2">
+              <StatTile
+                label="Cash"
+                reserveSub={false}
+                value={<MoneyFlow value={account.balance} />}
+                valueClassName={
+                  isNegativeGbp(account.balance) ? "text-negative" : undefined
+                }
+                sub={cashTileSub(account.pendingIn, wrRemaining)}
+              />
+              <StatTile
+                label="Free bets"
+                reserveSub={false}
+                value={<MoneyFlow value={freeBetsShown} className="text-edge" />}
+                valueClassName="text-edge"
+                sub={
+                  !loadingTx && freeBetLots.length > 0
+                    ? `${freeBetLots.length} ${freeBetLots.length === 1 ? "lot" : "lots"}`
+                    : undefined
+                }
+              />
+            </StatStrip>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Cash <MoneyFlow value={account.balance} className="inline font-semibold" />
+              {(account.pendingIn ?? 0) > 0 ? (
+                <>
+                  {" · "}
+                  £{account.pendingIn.toFixed(2)} pending
+                </>
+              ) : null}
+            </p>
+          )}
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -1510,7 +1619,10 @@ function AccountDetailBody({
             <Label className="text-xs text-muted-foreground">Notes</Label>
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setNotesSource("user");
+              }}
               rows={2}
               placeholder="Optional"
               className="min-h-[4rem] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
@@ -1525,7 +1637,7 @@ function AccountDetailBody({
         >
           <ScrollFadeEdges
             className="min-h-0 flex-1"
-            fadeClassName="from-page dark:from-card"
+            fadeClassName="from-page"
             scrollClassName="app-scroll-nested px-6 py-4"
           >
           {loadingTx ? (
@@ -1575,6 +1687,31 @@ function AccountDetailBody({
           )}
           </ScrollFadeEdges>
         </TabsContent>
+
+        {account.type === "bookie" ? (
+          <TabsContent
+            value="scope"
+            className="flex min-h-0 flex-1 flex-col outline-none"
+          >
+            <ScrollFadeEdges
+              className="min-h-0 flex-1"
+              fadeClassName="from-page"
+              scrollClassName="app-scroll-nested px-6 py-5"
+            >
+              <BookieScopePanel
+                bookie={account.name}
+                accountId={account.id}
+                notes={notes}
+                notesSource={notesSource}
+                onNotesAutoFilled={(next) => {
+                  setNotes(next);
+                  setNotesSource("scope");
+                }}
+                surface={scopeSurface}
+              />
+            </ScrollFadeEdges>
+          </TabsContent>
+        ) : null}
         </Tabs>
 
         <div className="flex shrink-0 justify-end gap-2 border-t px-6 py-3">
