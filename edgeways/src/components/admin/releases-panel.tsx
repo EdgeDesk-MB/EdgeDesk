@@ -190,7 +190,7 @@ export function ReleasesPanel({
           ? "App update is off on this environment."
           : updateMode === "force"
             ? "App update is forced on this environment."
-            : "App update is automatic on this environment."
+            : "App update will prompt on this environment."
       );
     } catch (error) {
       toast.error(
@@ -355,10 +355,10 @@ export function ReleasesPanel({
         <CardHeader>
           <CardTitle className="text-base">App update</CardTitle>
           <CardDescription>
-            Prompts desks that are still on an older build to reload. Auto
-            compares the boot stamp of this tab with the current deploy. Force
-            is for checking {envLabel.toLowerCase()} only. Localhost /admin
-            never writes the live banner.
+            Prompts desks that are still on an older build. They stay put until
+            they tap Reload. Auto compares the boot stamp of this tab with the
+            current deploy. Force is for checking {envLabel.toLowerCase()} only.
+            Localhost /admin never writes the live banner.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
