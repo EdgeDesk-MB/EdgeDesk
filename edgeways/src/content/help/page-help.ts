@@ -1,3 +1,5 @@
+/** Voice: `.cursor/rules/customer-copy.mdc`. Benefit first, one idea per line. */
+
 import { ACCA_DESK_HELP_BULLETS } from "@/content/help/acca-methods";
 
 export type PageHelpId =

@@ -1,0 +1,43 @@
+---
+description: Benefit-led voice for release notes and Help. Short unique points, not a changelog.
+globs: edgeways/src/content/release-notes.ts,edgeways/src/content/help/**/*.ts,edgeways/src/content/customer-copy.test.ts
+alwaysApply: false
+---
+
+# Customer copy (release notes and Help)
+
+Write for the person using the desk, not the diff. Same voice on
+`/release-notes` and Help / page help / FAQ.
+
+## Do
+
+- Lead with the benefit, then one concrete what. One idea per bullet.
+- Keep it short. Easy to scan. Each point unique.
+- Vary the opener in a group. Mix *It's now easier / quicker / clearer*,
+  *We've simplified / tidied / shortened / dropped / opened*, *You can now*,
+  *Finding X is faster*, *X no longer*. Do not start every line the same way.
+- Name the surface the customer sees (Add bet, Home, Fixtures). Link `href`
+  to that page when one exists.
+- British English, sentence case, commas. Run `customer-copy.test.ts`.
+
+## Do not
+
+- List layout, tokens, component names, or ticket IDs.
+- Explain how it was built, or rename things unless the customer will
+  notice the new name.
+- Repeat the same benefit verb in one group, or stack three Add bet
+  bullets that are really one change.
+- Leak providers or internals (D8). The LEAK regex in
+  `customer-copy.test.ts` is the floor, not the voice.
+
+## Examples
+
+```
+Bad:  Early payout is a tinted strip under the Back plate, switch left.
+Good: We've tidied Early payout onto a strip under Back, so the extra
+      fields only appear when you need them.
+
+Bad:  Cash balance is now Balance. Light wash, not a grey plate.
+Good: It's now easier to see if you can fund the bet. Balance sits
+      under Back and Lay.
+```

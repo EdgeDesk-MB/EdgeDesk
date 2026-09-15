@@ -20,6 +20,7 @@ load **only** the matching skill plus one source of truth.
 | feed/store | Feed-store-first (already on) |
 | schema/state | Briefs section 0 |
 | docs/roadmap | `brief` skill. Stop if product scope |
+| customer copy | `.cursor/rules/customer-copy.mdc` + `customer-copy.test.ts` |
 | mechanical | `delegate-local` if bounded |
 
 If skills did not auto-fire, `Read` the matching `SKILL.md` before that

@@ -13,7 +13,7 @@ second pre-flight.
 In short:
 
 1. Classify (calc / UI / hosted write / feed/store / schema/state /
-   docs/roadmap / mechanical).
+   docs/roadmap / customer copy / mechanical).
 2. Announce files, approach, and `Ticket: EDGE-n|none`.
 3. `Read` the matching skill plus one source of truth from the classify
    table. On Orca / CLI / cloud agents, skills do not auto-fire. From

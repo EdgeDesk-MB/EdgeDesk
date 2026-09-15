@@ -1,8 +1,8 @@
 /**
  * Curated release notes - customer-facing highlights, newest first.
- * Write for the person using the desk, not the diff. Skip rebrands,
- * internals, and anything a customer does not need to see.
- * Add a group per release day (or milestone) as work ships.
+ * Voice: `.cursor/rules/customer-copy.mdc`. Benefit first, one idea per
+ * bullet, vary the opener. Skip internals and anything a customer does
+ * not need to see. Add a group per release day (or milestone) as work ships.
  */
 
 export type ReleaseNoteKind = "feature" | "improvement" | "fix";
@@ -32,22 +32,72 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
-    date: "2026-09-10",
-    title: "Fixture page improvements and other fixes",
+    date: "2026-09-15",
+    title: "Early-payout Desk, and a simpler Add bet",
     summary:
-      "Fixtures can show only matches you have already backed, and it remembers how you last left the page. Home Prov no longer double-counts a lock-in. History times and a few Add bet bugs are cleaned up.",
+      "We've given early-payout its own desk, shortened a few names in the nav, and made Add bet easier to fund and easier to read.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Early-payout Desk",
+        href: "/early-payout",
+        text: "It's now easier to run early-payout from one place. The board, Active bets and scouting sit together. Football 2UP is modelled here. Other sports follow each bookie's lead rule.",
+      },
+      {
+        kind: "improvement",
+        area: "Early-payout Desk",
+        href: "/early-payout",
+        text: "We've shortened the Live desks names. 2UP Desk is now Early-payout, Racing Desk is Racing, and Combo Desk is Combo. Old 2UP Desk links still land here.",
+      },
+      {
+        kind: "improvement",
+        area: "Accounts",
+        href: "/accounts",
+        text: "We've simplified bookie rules. Scope on each account is the sports you place and the lead that pays. Saving an Add bet can confirm a new rule without a second screen.",
+      },
+      {
+        kind: "improvement",
+        area: "Add bet",
+        href: "/tracker",
+        text: "It's now easier to see if you can fund the bet. Balance sits under Back and Lay. If the stake is short, we say so and offer to add the difference on the bookie, or remind you to top up the exchange.",
+      },
+      {
+        kind: "improvement",
+        area: "Add bet",
+        href: "/tracker",
+        text: "We've tidied Early payout and Advanced onto strips under Back and Lay, so the extra fields only appear when you need them. The profit table now shows the early-payout outcome when both sides are on.",
+      },
+      {
+        kind: "improvement",
+        area: "Add bet",
+        href: "/tracker",
+        text: "We've tidied the Back and Lay plates so Add bet and the calculators read the same. Dark mode is easier to tell apart, and Save bet uses your Settings colour in light as well.",
+      },
+      {
+        kind: "improvement",
+        area: "Calculators",
+        href: "/calculators/two-up",
+        text: "We've dropped the 2UP Desk tile. The Early Payout calculator is still here for a one-off price.",
+      },
+    ],
+  },
+  {
+    date: "2026-09-10",
+    title: "Fixtures remembers you, and a more honest Home Prov",
+    summary:
+      "You can now filter Fixtures to matches you've already backed, and the page keeps your last sport and filters. Home Prov no longer double-counts a lock-in.",
     entries: [
       {
         kind: "feature",
         area: "Fixtures",
         href: "/fixtures",
-        text: "Backed only shows matches you already have a back on. The page also keeps the sport and filters you last used.",
+        text: "You can now show only matches you've already backed. The page also keeps the sport and filters you last used.",
       },
       {
         kind: "improvement",
         area: "Home",
         href: "/",
-        text: "If you lock in a bet, Prov now treats the lock-in and the original as one position, not two.",
+        text: "We've made Prov treat a lock-in and the original as one position, so it no longer double-counts.",
       },
       {
         kind: "improvement",
@@ -65,7 +115,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Tracked Events",
         href: "/tracked-events",
-        text: "Substitutions are easier to see on the match tape. You can still tap a finished football match for a short while after full time.",
+        text: "Substitutions are clearer on the match tape. You can still tap a finished football match for a short while after full time.",
       },
       {
         kind: "fix",
@@ -79,30 +129,30 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-09-07",
     title: "Pin any league, race result tapes, and dates that work on the phone",
     summary:
-      "Search every competition, keep a pin rail of shortcuts, tap a finished race for the result, and pick dates with the phone's own controls. Live clocks say HT and extra time properly.",
+      "Finding a league is quicker, a finished race now opens its result, and dates on the phone use the phone's own picker.",
     entries: [
       {
         kind: "feature",
         area: "Fixtures",
         href: "/fixtures",
-        text: "Filter finds any competition, even when it has no match today. Pin it for a shortcut rail. Drag pins to reorder.",
+        text: "Finding a competition is quicker, even when it has no match today. You can pin it for a shortcut rail and drag pins to reorder.",
       },
       {
         kind: "improvement",
         area: "Fixtures",
         href: "/fixtures",
-        text: "Step through Today and Tomorrow, or pick a day. All / Live / Scheduled sit with the day switcher. Leagues follow first kick-off, with common UK and European leagues first.",
+        text: "It's now easier to move through the week: Today, Tomorrow, or pick a day. All / Live / Scheduled sit with the day switcher. Common UK and European leagues come first.",
       },
       {
         kind: "feature",
         area: "Racing Desk",
         href: "/racing",
-        text: "Tap a finished race to open the result tape: finishing order, starting prices and distances.",
+        text: "You can now tap a finished race for the result: finishing order, starting prices and distances.",
       },
       {
         kind: "improvement",
         area: "Mobile",
-        text: "Date and time fields use the phone's own picker, so they no longer fight the keyboard or lock the page.",
+        text: "Date and time fields on the phone now use the phone's own picker, so they no longer fight the keyboard or lock the page.",
       },
       {
         kind: "improvement",
@@ -113,7 +163,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "fix",
         area: "Navigation",
-        text: "Paid desks open from your last visit instead of sitting on Checking your plan. If the page cannot load, you get Try again.",
+        text: "Paid desks now open from your last visit, instead of sitting on Checking your plan. If the page cannot load, you get Try again.",
       },
       {
         kind: "fix",
@@ -143,51 +193,51 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Fixtures",
         href: "/fixtures",
-        text: "Add bet from a live match or race without tracking it first. Add bet hides once the fixture has finished.",
+        text: "You can add a bet from a live match or race without tracking it first. Add bet hides once the fixture has finished.",
       },
     ],
   },
   {
     date: "2026-09-06",
-    title: "A cleaner Home, Dutching stake controls, and both clubs in the feed",
+    title: "A cleaner Home, Dutching you can steer, and both clubs in the feed",
     summary:
-      "Home is Summary, chart, feed and Do next. Dutching can round stakes, let you change one stake, or weight the split toward one outcome. Football rows show both crests, and a tap opens the match tape. Star or hide competitions and courses.",
+      "We've simplified Home to Summary, chart, feed and Do next. You can now steer a Dutch split, and football rows show both crests.",
     entries: [
       {
         kind: "improvement",
         area: "Home",
         href: "/",
-        text: "Today's plan is off Home, the phone deck, and Settings. The phone deck is Summary, Feed and Do next. A saved start card of Today's plan now opens Summary. Quick actions stay Paste slip and Add bet.",
+        text: "We've simplified Home. Today's plan is off the page, the phone deck and Settings. The phone deck is Summary, Feed and Do next. Quick actions stay Paste slip and Add bet.",
       },
       {
         kind: "feature",
         area: "Dutching",
         href: "/calculators/dutching",
-        text: "Round the suggested stakes, change one stake yourself, or weight the split toward the first or last outcome. The same controls are in Add bet for a Dutch bet.",
+        text: "You can now round the suggested stakes, change one stake yourself, or weight the split toward the first or last outcome. The same controls are in Add bet for a Dutch bet.",
       },
       {
         kind: "feature",
         area: "History",
         href: "/history",
-        text: "Football rows show both club crests. On Edge, tap a match to open the tape: goals, cards, VAR, substitutions and formations. Switch Expanded or Compact and the page remembers.",
+        text: "Football rows now show both club crests. On Edge, tap a match for the tape: goals, cards, VAR, substitutions and formations. Expanded or Compact is remembered.",
       },
       {
         kind: "improvement",
         area: "Home",
         href: "/",
-        text: "The live feed uses the same crests and day stamps (Today, Yesterday). A new day starts a new Today, instead of leaving yesterday's header stuck.",
+        text: "The live feed now uses the same crests and day stamps. A new day starts a new Today, instead of leaving yesterday's header stuck.",
       },
       {
         kind: "feature",
         area: "Fixtures",
         href: "/fixtures",
-        text: "Star a competition or course to pin it. Hide ones you do not want. Saved shows only what you pinned, on Fixtures and Racing Desk.",
+        text: "You can star a competition or course to pin it, and hide ones you do not want. Saved shows only what you pinned, on Fixtures and Racing Desk.",
       },
       {
         kind: "improvement",
         area: "Profit Tracker",
         href: "/tracker",
-        text: "The bet log groups by day, same Today / Yesterday split as Tracked Events. Future work sits above Today.",
+        text: "The bet log now groups by day, same Today / Yesterday split as Tracked Events. Future work sits above Today.",
       },
       {
         kind: "improvement",
@@ -201,43 +251,43 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-09-05",
     title: "Goals in History, richer live football, and fixtures that open at once",
     summary:
-      "History now shows kick-off and each goal as they happen. On Edge, a tracked match lists who scored and the formations. Today's fixtures open straight away, and finding an event when you log a bet is quicker.",
+      "It's now clearer how a match unfolded. Today's fixtures open straight away, and finding an event when you log a bet is quicker.",
     entries: [
       {
         kind: "feature",
         area: "Tracked Events",
         href: "/tracked-events",
-        text: "On Edge, a tracked football match now lists who scored, bookings and VAR, plus each side's formation once the teams are named.",
+        text: "It's now clearer what happened on Edge: who scored, bookings and VAR, plus each side's formation once the teams are named.",
       },
       {
         kind: "feature",
         area: "Add bet",
         href: "/tracker",
-        text: "First or anytime goalscorer on Edge lets you pick from the named players, instead of typing the name.",
+        text: "You can now pick a first or anytime goalscorer from the named players, instead of typing the name.",
       },
       {
         kind: "fix",
         area: "History",
         href: "/history",
-        text: "Kick-off and each goal now show in History as the match unfolds, including the 2UP trigger, not only the final whistle and the settlement.",
+        text: "Kick-off and each goal now show as the match unfolds, including the 2UP trigger, not only the final whistle.",
       },
       {
         kind: "improvement",
         area: "Fixtures",
         href: "/fixtures",
-        text: "Today's and tomorrow's matches open straight away and stay up to date in the background, the same way race cards already do.",
+        text: "Today's and tomorrow's matches now open straight away and stay up to date in the background, the same way race cards already do.",
       },
       {
         kind: "improvement",
         area: "Add bet",
         href: "/tracker",
-        text: "Find a match or race faster: search Events, grouped by Today, Tomorrow and kick-off hour.",
+        text: "Finding a match or race is faster: search Events, grouped by Today, Tomorrow and kick-off hour.",
       },
       {
         kind: "improvement",
         area: "Racing Desk",
         href: "/racing",
-        text: "Race cards appear immediately, then live exchange prices fill in. Picks still come from your Edge recommendations.",
+        text: "Race cards now appear immediately, then live exchange prices fill in. Picks still come from your Edge recommendations.",
       },
       {
         kind: "improvement",
@@ -249,7 +299,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Accounts",
         href: "/accounts",
-        text: "Adjust balance now has Top up, Withdrawal and Adjustment, so paying in and correcting a figure are separate.",
+        text: "We've separated paying in from correcting a figure. Adjust balance now has Top up, Withdrawal and Adjustment.",
       },
       {
         kind: "fix",
@@ -263,43 +313,43 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-09-03",
     title: "Acca verdicts, offer terms in the bet form, faster race cards",
     summary:
-      "One alert sums up a finished acca, bet forms warn you before you break the offer terms, and Racing Desk opens faster with multi-race tickets counted properly in the day P&L.",
+      "It's now clearer how an acca finished. The bet form warns you before you break the offer terms, and race cards open faster.",
     entries: [
       {
         kind: "feature",
         area: "Acca Desk",
         href: "/acca",
-        text: "When the last deciding leg lands, one alert sums up the whole run: You just made £X (or the settled loss), won, locked or busted, with a nudge to claim the refund on acca insurance. The per-leg ledger toasts step aside, so the campaign gets one clear verdict.",
+        text: "When the last deciding leg lands, one alert now sums up the whole run: You just made £X (or the settled loss), won, locked or busted, with a nudge to claim the refund on acca insurance.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Offer terms inside the bet form. Placing a qualifier or convert from an offer shows the terms that matter (min odds, min and max stake, min selections) and warns you as you type if the draft breaks one, across Add bet, Acca and Bet Builder.",
+        text: "It's now clearer if a draft breaks the offer. Placing a qualifier or convert shows the terms that matter and warns you as you type, across Add bet, Acca and Bet Builder.",
       },
       {
         kind: "improvement",
         area: "Acca Desk",
         href: "/acca",
-        text: "Mid-run, the acca card headline reads If this leg loses with the cover amount, the next leg to lay or lock, and an all-win estimate, instead of a bare Worst outcome.",
+        text: "We've made the live acca card easier to read. It now says If this leg loses with the cover, the next leg to lay or lock, and an all-win estimate.",
       },
       {
         kind: "improvement",
         area: "Racing Desk",
         href: "/racing",
-        text: "Today's racing P&L counts accas, bet builders and systems once, on their own line when they span more than one race, and plots them on the day chart at the last racing leg.",
+        text: "Today's racing P&L now counts accas, bet builders and systems once when they span more than one race, and plots them on the day chart at the last racing leg.",
       },
       {
         kind: "improvement",
         area: "Racing Desk",
         href: "/racing",
-        text: "Race cards open faster and stay available all day: the desk keeps its own copy of today's and tomorrow's cards and refreshes them in the background.",
+        text: "Race cards open faster and stay available all day. The desk keeps today's and tomorrow's cards and refreshes them in the background.",
       },
       {
         kind: "improvement",
         area: "Tracked Events",
         href: "/tracked-events",
-        text: "The race-awaiting-result prompt on Tracked Events opens Set result in place, instead of linking you to the page you are already on.",
+        text: "The race-awaiting-result prompt now opens Set result in place, instead of sending you to the page you are already on.",
       },
     ],
   },
@@ -307,12 +357,12 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-09-02",
     title: "Phone quick actions open the real bet form",
     summary:
-      "Add bet on the phone is the same form as the desktop, with the bookie list, event and stake. The old three-field shortcut is gone.",
+      "Add bet on the phone is the same form as the desktop. We've dropped the old three-field shortcut.",
     entries: [
       {
         kind: "fix",
         area: "Mobile",
-        text: "Quick actions → Add bet opens the full bet form (bookie dropdown included). The old Log manually shortcut, which saved a half-empty bet and could error, is removed.",
+        text: "Add bet on the phone now opens the full form, bookie list included. We've dropped the old Log manually shortcut, which saved a half-empty bet and could error.",
       },
       {
         kind: "improvement",
@@ -325,18 +375,18 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-30",
     title: "Plans you can open, and a live desk that stays",
     summary:
-      "Locked desks explain the upgrade in place, Settings shows Core and Edge side by side, and what you save on the live desk is still there after a refresh.",
+      "It's now clearer what each plan includes. A locked desk no longer blocks the click, and what you save on the live desk stays after a refresh.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings?tab=subscription&live=1",
-        text: "Settings → Subscription shows Core and Edge as choice cards: what each includes, the monthly price, and a 14-day Edge trial. Paid accounts open Manage subscription for the card, invoices and cancel.",
+        text: "You can now compare Core and Edge side by side: what each includes, the monthly price, and a 14-day Edge trial. Paid accounts open Manage subscription for the card, invoices and cancel.",
       },
       {
         kind: "improvement",
         area: "Navigation",
-        text: "A locked desk no longer blocks the click. You open the page and get an Available on Core/Edge subscription plate, with what the plan includes and View plans. 2UP Desk and Settings → Alerts do the same for lock-in alerts.",
+        text: "A locked desk no longer blocks the click. You open the page and see what the plan includes, with View plans. Early-payout Desk and Settings → Alerts do the same for lock-in alerts.",
       },
       {
         kind: "improvement",
@@ -354,13 +404,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Accounts",
         href: "/accounts",
-        text: "Opening a wallet splits Details and Ledger. The ledger lists the full history, not the last 25 rows.",
+        text: "Opening a wallet now splits Details and Ledger. The ledger lists the full history, not the last 25 rows.",
       },
       {
         kind: "fix",
         area: "Home",
         href: "/desk",
-        text: "The live desk keeps offers, bets, wallets, free-bet lots, recurring series, playbook steps and mistake tags after a refresh.",
+        text: "The live desk now keeps offers, bets, wallets, free-bet lots, recurring series, playbook steps and mistake tags after a refresh.",
       },
     ],
   },
@@ -368,25 +418,25 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-29",
     title: "Free bet log and wallets",
     summary:
-      "Free includes Profit Tracker, Set result, and bookie wallets that move with the result.",
+      "You can now log and settle on Free, with bookie wallets that move with the result.",
     entries: [
       {
         kind: "feature",
         area: "Profit Tracker",
         href: "/tracker",
-        text: "On Free, Profit Tracker is open. Log a bet from a calculator, Set result, and see basic P&L.",
+        text: "On Free, you can now log a bet from a calculator, Set result, and see basic P&L.",
       },
       {
         kind: "feature",
         area: "Accounts",
         href: "/accounts",
-        text: "Placing a bet reserves the back stake and lay liability. Set result pays the bookie and exchange wallets.",
+        text: "Placing a bet now reserves the back stake and lay liability. Set result pays the bookie and exchange wallets.",
       },
       {
         kind: "improvement",
         area: "Free",
         href: "/settings?tab=subscription&live=1",
-        text: "The public plan table now says Free includes the settleable log and wallets. Offers, lots, and Do Next stay on Core.",
+        text: "The public plan table now says Free includes the settleable log and wallets. Offers, lots and Do Next stay on Core.",
       },
     ],
   },
@@ -394,43 +444,43 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-29",
     title: "Refund-If offers and calculator polish",
     summary:
-      "Money-back-if-you-lose campaigns get the right underlay path, and the calculators and menus are easier to read.",
+      "We've opened a proper path for money-back-if-you-lose campaigns, and the calculators are easier to scan.",
     entries: [
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Money back as a free bet if it loses is now its own campaign type (Refund-If), not a tight-match qualifier. Step 1 is Place refund-if bet: underlay on the exchange using the free-bet value, then convert only if the bet loses. A win already locked the profit, so convert is skipped.",
+        text: "Money back as a free bet if it loses is now its own campaign type (Refund-If). Step 1 is the underlay. Convert only if the bet loses. A win already locked the profit, so convert is skipped.",
       },
       {
         kind: "fix",
         area: "Offers",
         href: "/offers",
-        text: "A lost risk-free bet records the cash from the back and lay only. The free bet is awarded and converted as usual, instead of counting an anticipated refund as cash on the day.",
+        text: "A lost risk-free bet now records the cash from the back and lay only. The free bet is awarded and converted as usual, instead of counting an anticipated refund as cash on the day.",
       },
       {
         kind: "feature",
         area: "Calculators",
         href: "/calculators/refund-if",
-        text: "Refund-If joins the calculators index. On Refund-If and Risk-free, the lose-row bookie cell unpacks stake lost, refund at your retention (or cash refund), then the net.",
+        text: "Refund-If now sits on the calculators index. On Refund-If and Risk-free, the lose row unpacks stake lost, the refund, then the net.",
       },
       {
         kind: "improvement",
         area: "Calculators",
         href: "/calculators",
-        text: "Every calculator card has an icon, so Core vs Tools is easier to scan.",
+        text: "Finding Core vs Tools is faster: every calculator card has an icon.",
       },
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Long race names in the offer Race menu stay inside the field: the title truncates, runner counts stay right-aligned.",
+        text: "Long race names in the offer Race menu now stay inside the field. The title shortens, runner counts stay on the right.",
       },
       {
         kind: "fix",
         area: "Mobile",
         href: "/desk",
-        text: "Tab strips on small screens pan when labels overflow, instead of clipping the last tab, and they hug the label width.",
+        text: "Tab strips on small screens now pan when labels overflow, instead of clipping the last tab.",
       },
     ],
   },
@@ -438,13 +488,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-26",
     title: "Refer a friend, payment recovery, and Racing Desk",
     summary:
-      "Share Edgeways from Settings, get a clear prompt if a card payment fails, and Racing Desk shows your offers on the signed-in account.",
+      "You can now share Edgeways from Settings, get a clear prompt if a card payment fails, and Racing Desk shows your offers on the signed-in account.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Refer a friend: your share code lives in Settings, and a prompt can appear on Home. They get 50% off their first paid month; you get £10 when they first pay.",
+        text: "You can now refer a friend from Settings. They get 50% off their first paid month; you get £10 when they first pay. A prompt can also appear on Home.",
       },
       {
         kind: "feature",
@@ -456,7 +506,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "fix",
         area: "Alerts",
         href: "/alerts",
-        text: "Push and the alerts inbox follow your Edgeways account, so they work on every device you sign in on, the same way as bets and offers.",
+        text: "Push and the alerts inbox now follow your Edgeways account, so they work on every device you sign in on, the same way as bets and offers.",
       },
       {
         kind: "fix",
@@ -468,7 +518,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "improvement",
         area: "Guides",
         href: "/help",
-        text: "FAQ sits on the mobile Guides tab row, instead of buried under the guide cards.",
+        text: "Finding FAQ is faster: it now sits on the mobile Guides tab row, instead of buried under the guide cards.",
       },
     ],
   },
@@ -476,30 +526,30 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-25",
     title: "Mobile fit and finish",
     summary:
-      "A phone pass over the everyday surfaces: the Home deck, quick actions, dialogs, and the top bar.",
+      "We've made the phone easier to live on: the Home deck, quick actions, dialogs and the top bar.",
     entries: [
       {
         kind: "fix",
         area: "Mobile",
         href: "/desk",
-        text: "Swiping the Home deck no longer fights the P&L chart - drag the chart to scrub it, swipe anywhere else to change cards.",
+        text: "Swiping the Home deck no longer fights the P&L chart. Drag the chart to scrub it, swipe anywhere else to change cards.",
       },
       {
         kind: "improvement",
         area: "Mobile",
         href: "/desk",
-        text: "Quick actions is rebuilt for the phone: big brand-coloured tiles for Paste slip and Log manually, with room to tap.",
+        text: "We've rebuilt Quick actions for the phone: big tiles for Paste slip and Log manually, with room to tap.",
       },
       {
         kind: "improvement",
         area: "Mobile",
         href: "/settings",
-        text: "Dialogs and forms across the app fit small screens properly - no more squashed fields or side-by-side inputs - and buttons are taller everywhere, matching the Support page sizing.",
+        text: "Dialogs and forms now fit small screens properly. No more squashed fields, and buttons are taller everywhere.",
       },
       {
         kind: "improvement",
         area: "Mobile",
-        text: "The top bar stays tidy on narrow screens: balances shorten (FB, Exch.) and the wordmark steps aside for the bolt when space runs out.",
+        text: "The top bar stays tidy on narrow screens. Balances shorten (FB, Exch.) and the wordmark steps aside for the bolt when space runs out.",
       },
       {
         kind: "improvement",
@@ -513,25 +563,25 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-22",
     title: "Your desk, on every device",
     summary:
-      "Sign in anywhere and your desk is there - and plans now shape what each account can do.",
+      "Sign in anywhere and your desk is there, and plans now shape what each account can do.",
     entries: [
       {
         kind: "feature",
         area: "Accounts",
         href: "/settings",
-        text: "Your desk lives in your Edgeways account: bets, offers, balances and history are the same on phone and desktop, and backup/restore works wherever you sign in.",
+        text: "Your desk now lives in your Edgeways account. Bets, offers, balances and history are the same on phone and desktop, and backup works wherever you sign in.",
       },
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Plans are real: Free, Core and Edge each unlock their own features, and Settings shows exactly what your plan includes.",
+        text: "It's now clearer what your plan includes. Free, Core and Edge each unlock their own features.",
       },
       {
         kind: "improvement",
         area: "Accessibility",
         href: "/help?guide=keyboard",
-        text: "A measured contrast pass across both themes, and you can settle the focused open bet from the keyboard.",
+        text: "Contrast is clearer across both themes, and you can settle the focused open bet from the keyboard.",
       },
     ],
   },
@@ -550,7 +600,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Keyboard",
         href: "/help?guide=keyboard",
-        text: "Keyboard shortcuts for the daily actions - log a bet, settle, switch desks - with a ? cheat-sheet available anywhere.",
+        text: "You can now run the daily actions from the keyboard: log a bet, settle, switch desks. Press ? anywhere for the cheat-sheet.",
       },
     ],
   },
@@ -558,19 +608,19 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-16",
     title: "Billing, onboarding and bringing your history",
     summary:
-      "Manage your subscription in Settings, a kinder first run for new accounts, and a proper import for spreadsheet history.",
+      "You can now manage your subscription in Settings, new accounts get a kinder first run, and spreadsheet history has a proper import.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Manage billing from Settings: update your card, download invoices, change or cancel your plan - the receipt shows your first charge date up front.",
+        text: "You can now manage billing from Settings: update your card, download invoices, change or cancel your plan. The receipt shows your first charge date up front.",
       },
       {
         kind: "feature",
         area: "Onboarding",
         href: "/setup",
-        text: "New accounts get a full-page setup: your experience level, why you're here, and a monthly target to pace against - then a guided first run to a working desk.",
+        text: "New accounts now get a kinder first run: experience level, why you're here, and a monthly target, then a guided path to a working desk.",
       },
       {
         kind: "improvement",
@@ -582,7 +632,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Import your profit history from an Oddsmonkey CSV: map the columns, preview, import. Imported rows join your P&L but never touch balances or EV capture.",
+        text: "We've opened a proper import for Oddsmonkey CSV history: map the columns, preview, import. Imported rows join your P&L but never touch balances or EV capture.",
       },
       {
         kind: "feature",
@@ -596,19 +646,19 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-12",
     title: "Racing Desk polish",
     summary:
-      "The race card reads better, and offers know whether they can be used once or many times.",
+      "The race card is easier to read, and offers now know whether they can be used once or many times.",
     entries: [
       {
         kind: "improvement",
         area: "Racing Desk",
         href: "/racing",
-        text: "The price chart sits beside the race card on wide screens, and the desk header stays tidy at any width.",
+        text: "The race card is easier to read on wide screens: the price chart sits beside it, and the header stays tidy at any width.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "One-shot vs multi-use offers: the offer form and the terms parser both understand promotions you can use repeatedly.",
+        text: "Offers now know if they are one-shot or multi-use, so promotions you can use repeatedly are handled properly.",
       },
       {
         kind: "fix",
@@ -628,49 +678,49 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-10",
     title: "Offer completion playbook: deposit codes to clear wagering",
     summary:
-      "Paste or drop a sports promo and Edgeways walks the campaign step by step, with the code on Step 1, Mark done for soft gates, and auto-advance from bets, deposits and wagering when the ledger can prove it.",
+      "Pasting a promo now walks the campaign step by step, with the code on Step 1 and a clear next action.",
     entries: [
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Paste offer expands a drop zone on the New offer form. Fields fill as you paste; green ticks mark paste-filled values until you edit them. Same pattern on Log a casino offer. Sticky Add offer / Continue stays reachable.",
+        text: "Pasting an offer now fills the New offer form as you go. Green ticks mark what came from the paste until you edit them. Same pattern on Log a casino offer.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Completion playbook on campaign cards: Step N of M with deposit → qualify → await award → convert → clear wagering (when the T&Cs need it). Soft gates use Mark done; qualify and convert keep Place / Convert.",
+        text: "It's now clearer what to do next. Campaign cards show a playbook: deposit, qualify, await award, convert, then clear wagering when the T&Cs need it.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Paste or drop a promo email to capture promo codes, min deposit, reward event, winnings wagering, max conversion and payment exclusions. Bet & Get emails land with the right stakes and Step 1 = deposit + code.",
+        text: "You can paste or drop a promo email to capture the code, min deposit, reward event and wagering. Bet & Get emails land with the right stakes and Step 1 as deposit plus code.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Deposit step shows the promo code for one-tap copy. After Mark done (or a matching Accounts transfer/top-up), Do next and Track move on to the qualifying bet, so you are not offered Place while a deposit is still due.",
+        text: "The deposit step now shows the promo code for one-tap copy. Do next waits until the deposit is done before offering Place.",
       },
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Convert prefills lock the reward event when the offer names one (e.g. PSG vs Villa). Clear-wagering watches bookie WR after convert: shows pounds left, links to Accounts, and auto-completes only once outstanding WR has burned to £0.",
+        text: "Convert now locks the reward event when the offer names one. Clear wagering shows pounds left and completes only once outstanding WR is £0.",
       },
       {
         kind: "improvement",
         area: "Home",
         href: "/desk",
-        text: "Do next surfaces playbook steps first (deposit / opt-in / clear wagering) so deposit-gated campaigns do not look like ready-to-qualify Track cards.",
+        text: "Do next now puts playbook steps first, so a deposit-gated campaign does not look ready to qualify.",
       },
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Paste preview calls out deposit + code before you save. Classic bet&get without a deposit gate still starts at qualify.",
+        text: "Paste preview now calls out deposit plus code before you save. A classic bet and get without a deposit gate still starts at qualify.",
       },
     ],
   },
@@ -678,49 +728,49 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-06",
     title: "Combo desks: Bet Builder, Systems, and place tools",
     summary:
-      "Full-cover systems and bet builders sit beside Acca, and Racing Desk gains place-aware tools.",
+      "Full-cover systems and bet builders now sit beside Acca, and Racing Desk has place-aware tools next to the runners.",
     entries: [
       {
         kind: "feature",
         area: "Bet Builder",
         href: "/bet-builder",
-        text: "Bet Builder Desk joins the Combo group: create a run, track selections, settle the whole ticket, and open it from offers, Do next or free-bet convert when the campaign is bet-builder shaped.",
+        text: "You can now run a bet builder on its own desk: create a run, track selections, settle the whole ticket, and open it from offers or Do next when the campaign is bet-builder shaped.",
       },
       {
         kind: "feature",
         area: "Systems",
         href: "/systems",
-        text: "Systems Desk for Lucky / Patent / Trixie / Yankee / Canadian (Goliath): paste a slip, organise legs, settle per leg with combination returns (void refunds dead lines), and classify as an EV play or mug bet. Not a finder - it tracks the system you already built.",
+        text: "We've opened Systems Desk for Lucky, Patent, Trixie, Yankee and Canadian (Goliath). Paste a slip, organise legs, settle per leg. It tracks the system you already built, it is not a finder.",
       },
       {
         kind: "improvement",
         area: "Acca Desk",
         href: "/acca",
-        text: "Acca runs share paste-slip create with Bet Builder, support combined and no-lay methods, and show a clearer leg timeline while a run is live.",
+        text: "Acca runs now share paste-slip create with Bet Builder, and the live timeline is clearer.",
       },
       {
         kind: "feature",
         area: "Racing Desk",
         href: "/racing",
-        text: "Active bets strip and place-zone bar on the card so each-way and place-refund work stays next to the runners, plus a clearer today P&L view for the desk.",
+        text: "Each-way and place-refund work now stays next to the runners, with an Active bets strip, a place-zone bar, and a clearer today P&L.",
       },
       {
         kind: "feature",
         area: "Each Way",
         href: "/calculators/each-way",
-        text: "Each Way / Extra Place calculator on the desk: place ladder and dual-lay settle paths.",
+        text: "The Each Way / Extra Place calculator is now on the desk, with a place ladder and dual-lay settle paths.",
       },
       {
         kind: "feature",
         area: "Feedback",
         href: "/feedback",
-        text: "Feedback in the top menu: pick Bug, Idea or Other, add a summary and details, then send or copy a report.",
+        text: "You can now send Feedback from the top menu: Bug, Idea or Other, then send or copy a report.",
       },
       {
         kind: "improvement",
         area: "Alerts",
         href: "/alerts",
-        text: "Quieter toasts for actions you just took, and clearer settle-related copy.",
+        text: "Toasts are quieter for actions you just took, and settle-related copy is clearer.",
       },
     ],
   },
@@ -728,31 +778,31 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-08-05",
     title: "Make it yours: appearance, reminders, and Acca from offers",
     summary:
-      "Personalise the desk, set casino and offer reminders, and route multi-leg campaigns into the right combo desk.",
+      "You can now personalise the desk, set casino and offer reminders, and send multi-leg campaigns to the right combo desk.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Appearance: choose a brand accent, header pattern and UI font. The desk keeps your choices across visits.",
+        text: "You can now choose a brand accent, header pattern and UI font. The desk keeps your choices across visits.",
       },
       {
         kind: "feature",
         area: "Casino",
         href: "/casino",
-        text: "Set a reminder on a campaign for free spins or bonuses that land later. It fires into the alerts inbox and as a push when due.",
+        text: "We've opened reminders on a campaign for free spins or bonuses that land later. They fire into the alerts inbox and as a push when due.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Qualifier and reward scope (Single / Acca / Bet builder): Place and Convert open the matching combo desk when entitled, with a chooser if more than one path applies. Free-bet Acca convert lands as SNR on the Acca run.",
+        text: "Place and Convert now open the matching combo desk when the offer is an acca or bet builder, with a chooser if more than one path applies.",
       },
       {
         kind: "improvement",
         area: "Tracker",
         href: "/tracker",
-        text: "Campaign sections, settle flows and P&L breakdown polish so multi-leg and offer-linked positions are easier to scan.",
+        text: "Multi-leg and offer-linked positions are easier to scan: campaign sections, settle flows and the P&L breakdown.",
       },
     ],
   },
@@ -760,19 +810,19 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-14",
     title: "Monthly targets and demo mode",
     summary:
-      "A target to pace the month against, and a safe parallel desk for showing Edgeways off.",
+      "You can now set a monthly target, and a separate demo desk for walkthroughs.",
     entries: [
       {
         kind: "feature",
         area: "Home",
         href: "/desk",
-        text: "Monthly target: set one in Settings and the Monthly P&L chip shows factual pace - \"£162 of £250 · on pace\" or the £/day needed over the days left. No streaks, no confetti; a bad-variance week is not behind plan if the edge was captured.",
+        text: "You can now set a monthly target in Settings. The Monthly P&L chip shows factual pace, not streaks or confetti.",
       },
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Demo mode: a separate, seeded, clearly watermarked desk for screenshots and walkthroughs - six accounts, a month of settled campaigns, an open qualifier and a tagged leak, so every page looks lived-in. Your real data never mixes with it.",
+        text: "We've opened Demo mode: a separate, watermarked desk for screenshots. Your real data never mixes with it.",
       },
       {
         kind: "improvement",
@@ -784,13 +834,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Edge Report",
         href: "/report",
-        text: "Season summary: a Year tab on the Edge Report - profit, expected vs realised and capture month by month, commission drag, retention, and your best and worst bookmakers of the year. Months before your first EV lock show settled profit only, with the coverage window stated plainly rather than implying a capture rate that was never measured.",
+        text: "The Edge Report now has a Year tab: profit, expected vs realised, and your best and worst bookmakers. Months before your first EV lock show settled profit only.",
       },
       {
         kind: "improvement",
         area: "Accessibility",
         href: "/help?guide=keyboard",
-        text: "Screen readers name every switch and icon button, Reduce motion stills pulsing indicators and dialog animations, and a Keyboard & accessibility guide in Help documents the palette and everyday keys.",
+        text: "Screen readers now name every switch and icon button, and Reduce motion stills pulsing indicators. Help has a Keyboard & accessibility guide.",
       },
       {
         kind: "fix",
@@ -802,7 +852,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Set up your desk: a four-step wizard for bank and bankroll, your bookies with balances, bet defaults, and notifications. A fresh install reaches a working desk in under a minute; re-run it any time from Settings → Help & about.",
+        text: "We've shortened first-run setup to four steps: bank, bookies, defaults and notifications. Re-run it any time from Settings → Help & about.",
       },
       {
         kind: "fix",
@@ -812,13 +862,13 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "improvement",
         area: "Navigation",
-        text: "The sidebar groups into Betting, Live desks and Insight. On the phone the burger is a full-height drawer with the whole sectioned navigation, and appearance is a Light / Dark / System control.",
+        text: "The sidebar now groups into Betting, Live desks and Insight. On the phone the burger is a full-height drawer.",
       },
       {
         kind: "feature",
         area: "Help",
         href: "/help?guide=site-map",
-        text: "Site map: every page and where it lives, including sub-navigation, quick actions and the pages that sit outside the main nav.",
+        text: "Finding a page is faster: Help now has a site map of every route, including quick actions and pages outside the main nav.",
       },
     ],
   },
@@ -826,25 +876,25 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-14",
     title: "Match Checker, alerts inbox, push and the palette",
     summary:
-      "Found a price? Get a verdict in seconds. Missed a notification? It is waiting for you, or on your phone. And everything is two keystrokes away.",
+      "It's now quicker to check a price you found, and missed alerts wait in an inbox or on your phone.",
     entries: [
       {
         kind: "feature",
         area: "Match Checker",
         href: "/match-checker",
-        text: "New Match Checker page: enter the back and lay odds and get a good/ok/poor verdict with the qualifying cost or locked-in free-bet profit, the lay stake and liability, and both outcomes side by side. Commission prefills from your default exchange, and one tap opens the full calculator with everything carried over. It checks the match you found - it never lists markets.",
+        text: "You can now check a price in seconds: back and lay odds, a good/ok/poor verdict, and one tap into the full calculator. It never lists markets.",
       },
       {
         kind: "improvement",
         area: "Match Checker",
         href: "/match-checker",
-        text: "Risk-free offers stay in the full calculator. Their verdict depends on refund amount and retention, and a silent assumption here would mislead.",
+        text: "Risk-free offers stay in the full calculator, so a silent assumption here cannot mislead.",
       },
       {
         kind: "feature",
         area: "Alerts",
         href: "/alerts",
-        text: "Alerts inbox: every alert Edgeways raises is kept, with an unread badge in the navigation. Notifications and toasts deliver in the moment; the inbox is the record. Tap an alert to mark it read and jump to the right desk, or clear the lot with one tap.",
+        text: "We've opened an Alerts inbox. Every alert is kept, with an unread badge. Tap to jump to the right desk.",
       },
       {
         kind: "improvement",
@@ -856,7 +906,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Background push: flip Push to this device in Settings → Alerts and sentinel alerts reach your phone with every Edgeways tab closed.",
+        text: "Push can now reach your phone from Settings → Alerts, even with every tab closed.",
       },
       {
         kind: "improvement",
@@ -867,7 +917,7 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
       {
         kind: "feature",
         area: "Navigation",
-        text: "Command palette: Cmd/Ctrl+K anywhere jumps to any page, open offer or bookie wallet, and runs the quick actions - add a bet, start an offer, open the calculator, adjust a balance.",
+        text: "Finding any page is faster: Cmd/Ctrl+K jumps to a page, offer or wallet, and runs the daily actions.",
       },
     ],
   },
@@ -875,37 +925,37 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-14",
     title: "Your rules: tuning, Home layout and data custody",
     summary:
-      "Edgeways bends to how you operate. Every behaviour-defining threshold is yours to set, Home shows the widgets you choose, and your data has a proper backup, restore and import story.",
+      "You can now tune how the desk behaves, choose the Home widgets you want, and back up or restore your data.",
     entries: [
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "New Tuning card: unhedged-back grace windows, the offer-drought nudge, the retention prior and its weight, the mistake-tag prompt threshold, the Edge Report minimum, and per-action effort minutes behind the £/hr sort. Defaults match how Edgeways has always behaved; each row shows its default and resets in one tap.",
+        text: "We've opened a Tuning card for grace windows, drought nudges, retention weight and the £/hr sort. Each row shows its default and resets in one tap.",
       },
       {
         kind: "feature",
         area: "Home",
         href: "/desk",
-        text: "Home layout is yours: show or hide any widget per mode and reorder the mobile deck. Desktop keeps its two-column design and adapts - hide the chart and the plan takes the full width. Hidden widgets stay reachable from their own pages.",
+        text: "Home layout is yours: show or hide any widget and reorder the phone deck. Hidden widgets stay reachable from their own pages.",
       },
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "Data custody: one-tap backup of your entire desk, and a validated restore flow. The upload is checked, you confirm what it contains, and a safety copy of your current data is always saved first. A failed restore leaves everything untouched.",
+        text: "You can now back up the whole desk in one tap, and restore only after you confirm what the file contains. A failed restore leaves everything untouched.",
       },
       {
         kind: "feature",
         area: "Settings",
         href: "/settings",
-        text: "CSV import wizard: bring bet history in from a spreadsheet - map your columns, preview, import. UK dates, £ signs and quoted fields all handled; unreadable rows are reported, never silently dropped.",
+        text: "You can import spreadsheet history: map columns, preview, import. Unreadable rows are reported, never silently dropped.",
       },
       {
         kind: "improvement",
         area: "Settings",
         href: "/settings",
-        text: "Imported history shows in your P&L and bookmaker stats, but it never changes balances, never links itself to campaigns, and never counts towards EV capture. The Edge Report stays honest.",
+        text: "Imported history shows in your P&L, but it never changes balances or counts towards EV capture.",
       },
     ],
   },
@@ -913,31 +963,31 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-14",
     title: "Edge Report, mistake tags, and the bookmaker league",
     summary:
-      "Edgeways now tells you whether you actually captured your edge, and where the leaks are: a monthly Edge Report, one-tap mistake tags and a bookmaker league table with manual health.",
+      "It's now clearer whether you captured your edge, and where the leaks are.",
     entries: [
       {
         kind: "feature",
         area: "Edge Report",
         href: "/report",
-        text: "New Edge Report page: cumulative expected edge (stepped at lock time) vs realised P&L (stepped at settle time), with capture rate, commission drag and free-bet retention for the month. Months with fewer than five settled campaigns show a not-enough-data state instead of noisy lines.",
+        text: "We've opened the Edge Report: expected edge vs realised P&L, with capture rate, commission drag and free-bet retention. Thin months show not-enough-data instead of noisy lines.",
       },
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Mistake ledger: when a settled campaign captures under 90% of its locked EV, the post-mortem line offers one-tap tags (laid late, wrong market, odds moved, bookie voided, other). The Edge Report totals the £ lost per tag - \"Where the leak is\".",
+        text: "When a campaign captures under 90% of its locked EV, you can now tag why in one tap. The report totals the £ lost per tag.",
       },
       {
         kind: "feature",
         area: "Accounts",
         href: "/accounts",
-        text: "Bookmaker league table: realised profit, ROI, free-bet retention, offer count and days since the last offer per bookie. Health is yours to set - mark a bookie as cooling, and a 40-day offer drought earns a gentle \"mark as cooling?\" nudge.",
+        text: "The bookmaker league now shows profit, ROI, retention and days since the last offer. Health is yours to set.",
       },
       {
         kind: "improvement",
         area: "Home",
         href: "/desk",
-        text: "Gubbed bookies' offers sink to the bottom of Do next (and wear a Gubbed chip) but are never hidden. Closed accounts drop out entirely.",
+        text: "Gubbed bookies' offers sink to the bottom of Do next, but are never hidden. Closed accounts drop out.",
       },
     ],
   },
@@ -945,25 +995,25 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-14",
     title: "Unhedged backs and 2UP lock-in alerts",
     summary:
-      "Edgeways now watches your positions: unhedged backs and triggered 2UP payouts raise alerts the moment they matter.",
+      "It's now clearer when a back is still naked, and when a 2UP payout is ready to lock in.",
     entries: [
       {
         kind: "feature",
         area: "Alerts",
         href: "/desk",
-        text: "Naked-exposure sentinel: an open qualifying or risk-free back with no lay raises an amber Home banner and an alert after 10 minutes (3 minutes near the off). One tap marks it intentional.",
+        text: "An open qualifying or risk-free back with no lay now raises an amber Home banner after 10 minutes, or 3 minutes near the off. One tap marks it intentional.",
       },
       {
         kind: "feature",
         area: "Alerts",
         href: "/early-payout",
-        text: "Live 2UP sentinel: when your team goes two up, the alert includes an exact lock-in suggestion - the equalising in-play back, stake and guaranteed profit, priced from the live model.",
+        text: "When your team goes two up, the alert now includes a lock-in suggestion: the equalising in-play back, stake and guaranteed profit.",
       },
       {
         kind: "improvement",
         area: "Settings",
         href: "/settings",
-        text: "Each sentinel has its own toggle in Settings → Alerts.",
+        text: "Each of these alerts has its own toggle in Settings → Alerts.",
       },
     ],
   },
@@ -971,35 +1021,35 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-13",
     title: "The mobile experience",
     summary:
-      "A dedicated phone experience: swipeable Home, full-page layouts, bottom sheets, three-tap bet capture and an installable app.",
+      "We've opened a dedicated phone experience: swipeable Home, full-page layouts, and an installable app.",
     entries: [
       {
         kind: "feature",
         area: "Mobile",
         href: "/desk",
-        text: "Home is a swipeable deck on the phone - Overview, Today's plan, Chart, Feed and Do next as full-screen cards with pagination dots, remembered position and a context-aware start card (pin it in Settings).",
+        text: "Home is now a swipeable deck on the phone, with a start card you can pin in Settings.",
       },
       {
         kind: "feature",
         area: "Mobile",
         href: "/tracker",
-        text: "Quick-log: a floating + on every mobile screen captures a bet in three taps - paste a slip, tap a plan slot, or log bookie/stake/odds. Captured bets are flagged for desktop review in the tracker.",
+        text: "You can now capture a bet in three taps from a floating + on every screen.",
       },
       {
         kind: "feature",
         area: "Mobile",
         href: "/settings",
-        text: "Edgeways installs to your Home Screen as an app, with notifications for expiring offers, race off-times and settled results (toggleable per type).",
+        text: "Edgeways now installs to your Home Screen, with notifications you can toggle per type.",
       },
       {
         kind: "improvement",
         area: "Mobile",
-        text: "Full-page layouts on the phone; dialogs open as bottom sheets (small confirms stay centred); tracker and accounts tables become card lists; the Racing Desk leads with the offer workflow and tucks the runner grid behind a tap.",
+        text: "We've tidied the phone layouts: dialogs open as bottom sheets, and tables become card lists.",
       },
       {
         kind: "improvement",
         area: "Navigation",
-        text: "The full main navigation lives in the burger menu on mobile.",
+        text: "The full main navigation now lives in the burger menu on mobile.",
       },
     ],
   },
@@ -1007,25 +1057,25 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-13",
     title: "The Daily Plan and honest P&L",
     summary:
-      "One time-ordered run-sheet for the day, and a chart that can show exactly what commission costs.",
+      "You can now see the day as one timeline, and a chart that can show exactly what commission costs.",
     entries: [
       {
         kind: "feature",
         area: "Home",
         href: "/desk",
-        text: "Today's plan: offer deadlines, race off-times and kick-offs in one timeline, each slot with its expected £. Completed slots collapse but never reorder.",
+        text: "You can now see offer deadlines, race off-times and kick-offs in one timeline, each with its expected £. Completed slots collapse but never reorder.",
       },
       {
         kind: "feature",
         area: "Chart",
         href: "/desk",
-        text: "Retained | Gross toggle - gross adds back exchange commission so the cost of commission is visible rather than silently netted.",
+        text: "We've opened a Retained | Gross toggle, so the cost of commission is visible rather than silently netted.",
       },
       {
         kind: "improvement",
         area: "Chart",
         href: "/desk",
-        text: "Markers are directional triangles (green up = profit in, red down = loss out), sit exactly on the plotted line, and balance corrections get their own markers at the foot of their step.",
+        text: "Markers now sit on the plotted line, with their own marks for balance corrections.",
       },
       {
         kind: "fix",
@@ -1039,19 +1089,19 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-13",
     title: "Honest expected vs realised",
     summary:
-      "Every expected-value figure is locked at the moment it becomes real, so expected vs realised is an honest comparison.",
+      "Expected profit now locks when it becomes real, so expected vs realised is an honest comparison.",
     entries: [
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "EV lock + capture rate: expected profit snapshots when a campaign starts and is never silently changed. Edits create visible re-locks. Settled campaigns show \"Expected → Realised · % captured\".",
+        text: "Expected profit now locks when a campaign starts, and is never silently changed. Settled campaigns show Expected → Realised and % captured.",
       },
       {
         kind: "improvement",
         area: "Offers",
         href: "/offers",
-        text: "Expired campaigns record their realised-to-date honestly. Lost EV is real signal.",
+        text: "Expired campaigns now record their realised-to-date honestly.",
       },
     ],
   },
@@ -1059,31 +1109,31 @@ export const RELEASE_NOTES: ReleaseNoteGroup[] = [
     date: "2026-07-12",
     title: "Measured retention and smarter ranking",
     summary:
-      "Retention from your own conversions, provenance on every £-EV, smarter Do next ranking, and paste-to-log.",
+      "Retention now comes from your own conversions, every £-EV says how sure it is, and Do next ranks by £/hr.",
     entries: [
       {
         kind: "feature",
         area: "Offers",
         href: "/offers",
-        text: "Free-bet retention is measured from your own conversions, blended with a cautious default until you have enough of them, instead of a flat 80% guess.",
+        text: "Free-bet retention is now measured from your own conversions, blended with a cautious default until you have enough of them.",
       },
       {
         kind: "feature",
         area: "Home",
         href: "/desk",
-        text: "Every £-EV on screen carries a provenance badge - live, estimated or heuristic - and Home leads with the edge on the table.",
+        text: "Every £-EV on screen now carries a live, estimated or heuristic badge, and Home leads with the edge on the table.",
       },
       {
         kind: "feature",
         area: "Do next",
         href: "/desk",
-        text: "£/hr rate sort, bankroll-aware ranking with funding shortfall chips, and paste-to-log that turns bookie confirmation text into a prefilled bet.",
+        text: "Do next now sorts by £/hr, flags a funding shortfall, and can paste a bookie confirmation into a prefilled bet.",
       },
       {
         kind: "feature",
         area: "Racing Desk",
         href: "/racing",
-        text: "No-vig fair odds per runner.",
+        text: "Racing Desk now shows no-vig fair odds per runner.",
       },
     ],
   },

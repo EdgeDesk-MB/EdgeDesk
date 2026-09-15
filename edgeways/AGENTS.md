@@ -72,6 +72,8 @@ charging customers since 4 Sep 2026. Corrected 13 Sep 2026.
 - Calc engine: `src/lib/calc`
 - Offers logic: `src/lib/offers` (advantage.ts, do-next.ts)
 - Roadmap data: `src/content/roadmap.ts`
+- Release notes and Help: `src/content/release-notes.ts`,
+  `src/content/help/`. Voice: `../.cursor/rules/customer-copy.mdc`.
 - Product plan: `docs/roadmap/product-roadmap.md` is **canonical**; it wins over
   any older doc. Briefs: `docs/roadmap/implementation-briefs.md`. Origin context
   only: `../docs/PLAN.md`. Strategy research lives in parent `../docs/strategy/`,

@@ -1,3 +1,5 @@
+/** Voice: `.cursor/rules/customer-copy.mdc`. Benefit first, one idea per line. */
+
 export type HelpGuideSlug =
   | "getting-started"
   | "how-it-works"
