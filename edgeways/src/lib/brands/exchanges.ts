@@ -27,7 +27,7 @@ const retiredExchangeMarks: Record<string, readonly string[]> = {
 const retiredExchangeCells: Record<string, readonly string[]> = {
   betfair: ["#a6d8ff", "#fac9d1"],
   betdaq: ["#fce38f", "#b5e5c4", "#a6d8ff", "#fac9d1", "#a7d8ff", "#fbc9d2"],
-  smarkets: ["#bfe8d4", "#c7dcf5"],
+  smarkets: ["#bfe8d4", "#c7dcf5", "#C5E6D4"],
   matchbook: ["#b8dff5", "#f7bac2"],
   betconnect: ["#9ad8ff", "#9af0b8"],
 };
@@ -118,12 +118,22 @@ export const EMPTY_PANEL_LIGHT = "var(--panel-empty)";
 export const EMPTY_PANEL_DARK = "var(--panel-empty-dark)";
 
 /**
- * Same hue as light, prepped for the dark desk. Lock L and scale C so
- * plates stay pastel. `from` keeps yellow yellow (a mix toward grey
- * made low-chroma pastels wander into brown).
+ * Light-mode plate from the Accounts / cell source. Keep hue, lift L
+ * so the wash sits on the page, and cap chroma so it stays a surface
+ * not a blaze. Do not drop L: that turns Betfair yellow into bronze.
+ * Do not mix toward white in sRGB: that turns red into pink.
+ */
+export function muteForLight(color: string): string {
+  return `oklch(from ${color} 0.86 min(c, 0.09) h)`;
+}
+
+/**
+ * Dark-mode plate from the same source (not from the light wash).
+ * Lower L, keep more chroma than a grey, still muted vs light.
+ * `from` keeps yellow yellow.
  */
 export function muteForDark(color: string): string {
-  return `oklch(from ${color} 0.36 calc(c * 0.3) h)`;
+  return `oklch(from ${color} 0.4 min(c * 0.45, 0.07) h)`;
 }
 
 export const EXCHANGE_PRESETS: ExchangePreset[] = [
@@ -181,20 +191,19 @@ export function contrastText(hex: string): string {
 }
 
 /**
- * Darken a colour toward black by a factor (0..1) - used to derive dark-mode
- * panel tints. `color-mix` accepts any valid CSS colour (hex, `hsl(...)`,
- * named, etc.), not just hex - needed because unmapped bookies fall back to
- * a deterministic `hsl(...)` string (see `hashStyle` in `brands/bookies.ts`).
+ * Darken a colour toward black by a factor (0..1). Used for NumField
+ * `--nf-dark`. Dark plates use `muteForDark`, not this. Accepts any CSS
+ * colour (hex, `hsl(...)`) so unmapped bookies can pass a hash hue.
  */
 export function darken(color: string, factor: number): string {
   const pct = Math.round((1 - factor) * 100);
-  return `color-mix(in srgb, ${color} ${pct}%, black)`;
+  return `color-mix(in oklch, ${color} ${pct}%, black)`;
 }
 
 /** Lighten a colour toward white by a factor (0..1) - derives input tints from panel colours. */
 export function lighten(color: string, factor: number): string {
   const pct = Math.round((1 - factor) * 100);
-  return `color-mix(in srgb, ${color} ${pct}%, white)`;
+  return `color-mix(in oklch, ${color} ${pct}%, white)`;
 }
 
 /** Pill border ~20% darker than background — works with hex, hsl, and Settings overrides. */

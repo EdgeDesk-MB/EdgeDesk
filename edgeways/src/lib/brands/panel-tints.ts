@@ -1,11 +1,10 @@
-import { bookieBrandColor, bookiePanelTint } from "@/lib/brands/bookies";
+import { bookieBrandColor } from "@/lib/brands/bookies";
 import {
   exchangeBackColor,
-  exchangeBackColorDark,
   exchangeLayColor,
-  exchangeLayColorDark,
   findExchangePreset,
   muteForDark,
+  muteForLight,
 } from "@/lib/brands/exchanges";
 
 export type PlateTint = {
@@ -23,7 +22,12 @@ function isExchangeVenue(
   return !!exchange?.name && exchange.name.trim().toLowerCase() === name.toLowerCase();
 }
 
-/** Back plate: exchange back cell, bookie pastel, or empty. */
+function plateFromSource(source: string | null): PlateTint {
+  if (!source) return EMPTY_PLATE;
+  return { light: muteForLight(source), dark: muteForDark(source) };
+}
+
+/** Back plate: exchange back cell, bookie brand, or empty. Both go through mute. */
 export function resolveBackPlateColors(
   venue: string | undefined,
   exchange?: { name: string; backColor?: string | null } | null,
@@ -36,21 +40,12 @@ export function resolveBackPlateColors(
         exchange?.name.trim().toLowerCase() === venueName.toLowerCase()
           ? exchange.backColor
           : undefined;
-      return {
-        light: exchangeBackColor(venueName, override),
-        dark: exchangeBackColorDark(venueName, override),
-      };
+      return plateFromSource(exchangeBackColor(venueName, override));
     }
-    const light = bookiePanelTint(venueName, venueBrandOverride);
-    // Dark uses the Settings brand, not the already-washed light pastel,
-    // so Betfair yellow stays yellow instead of a greyed-out cream.
-    return { light, dark: muteForDark(bookieBrandColor(venueName, venueBrandOverride)) };
+    return plateFromSource(bookieBrandColor(venueName, venueBrandOverride));
   }
   if (exchange?.name.trim()) {
-    return {
-      light: exchangeBackColor(exchange.name, exchange.backColor),
-      dark: exchangeBackColorDark(exchange.name, exchange.backColor),
-    };
+    return plateFromSource(exchangeBackColor(exchange.name, exchange.backColor));
   }
   return EMPTY_PLATE;
 }
@@ -60,8 +55,5 @@ export function resolveLayPlateColors(
   exchange?: { name: string; layColor?: string | null } | null
 ): PlateTint {
   if (!exchange?.name.trim()) return EMPTY_PLATE;
-  return {
-    light: exchangeLayColor(exchange.name, exchange.layColor),
-    dark: exchangeLayColorDark(exchange.name, exchange.layColor),
-  };
+  return plateFromSource(exchangeLayColor(exchange.name, exchange.layColor));
 }

@@ -8,6 +8,7 @@ import {
   exchangeLayColorDark,
   exchangeSupportsBack,
   muteForDark,
+  muteForLight,
 } from "@/lib/brands/exchanges";
 import {
   resolveBackPlateColors,
@@ -67,6 +68,7 @@ describe("exchange cell colours", () => {
     expect(exchangeBackColor("Betdaq", "#A7D8FF")).toBe("#FFEFB1");
     expect(exchangeLayColor("Betdaq", "#FBC9D2")).toBe("#BBE7D3");
     expect(exchangeBackColor("Smarkets", "#bfe8d4")).toBe("#D6E2FE");
+    expect(exchangeLayColor("Smarkets", "#C5E6D4")).toBe("#D4F9E9");
     expect(exchangeLayColor("BetConnect", "#9af0b8")).toBe("#81AED3");
   });
 
@@ -75,8 +77,15 @@ describe("exchange cell colours", () => {
     expect(exchangeBackColorDark("Betdaq")).toBe(muteForDark("#FFEFB1"));
     expect(exchangeLayColorDark("Betdaq")).toBe(muteForDark("#BBE7D3"));
     expect(exchangeLayColorDark("Matchbook")).toBe(muteForDark("#FFAEB4"));
-    expect(muteForDark("#ffb80c")).toBe("oklch(from #ffb80c 0.36 calc(c * 0.3) h)");
+    expect(muteForDark("#ffb80c")).toBe("oklch(from #ffb80c 0.4 min(c * 0.45, 0.07) h)");
     expect(muteForDark("#ffb80c")).not.toContain("250");
+  });
+
+  it("mutes light plates by hue, not by mixing toward white", () => {
+    expect(muteForLight("#d70f37")).toBe("oklch(from #d70f37 0.86 min(c, 0.09) h)");
+    expect(muteForLight("#ffb80c")).toBe("oklch(from #ffb80c 0.86 min(c, 0.09) h)");
+    expect(muteForLight("#d70f37")).not.toContain("white");
+    expect(bookiePanelTint("Ladbrokes")).toBe(muteForLight("#d70f37"));
   });
 
   it("mutes a real custom cell for dark", () => {
@@ -87,7 +96,9 @@ describe("exchange cell colours", () => {
 
 describe("resolveBackPlateColors", () => {
   it("uses the exchange back cell when the venue is an exchange", () => {
-    expect(resolveBackPlateColors("Betfair", { name: "Smarkets" }).light).toBe("#A7D8FF");
+    expect(resolveBackPlateColors("Betfair", { name: "Smarkets" }).light).toBe(
+      muteForLight("#A7D8FF")
+    );
     expect(resolveBackPlateColors("BetConnect").light).toBeNull();
   });
 
@@ -98,14 +109,23 @@ describe("resolveBackPlateColors", () => {
     expect(plate.dark).toContain("#ffb80c");
   });
 
+  it("keeps Ladbrokes red, not a mix toward pink", () => {
+    const plate = resolveBackPlateColors("Ladbrokes");
+    expect(plate.light).toBe(muteForLight("#d70f37"));
+    expect(plate.light).not.toContain("white");
+    expect(plate.dark).toBe(muteForDark("#d70f37"));
+  });
+
   it("uses Betdaq exchange cells, not the sportsbook navy", () => {
     const plate = resolveBackPlateColors("Betdaq");
-    expect(plate.light).toBe("#FFEFB1");
+    expect(plate.light).toBe(muteForLight("#FFEFB1"));
     expect(plate.dark).toBe(muteForDark("#FFEFB1"));
   });
 
   it("falls back to the selected exchange back cell when no venue is set", () => {
-    expect(resolveBackPlateColors(undefined, { name: "Matchbook" }).light).toBe("#8DD2F1");
+    expect(resolveBackPlateColors(undefined, { name: "Matchbook" }).light).toBe(
+      muteForLight("#8DD2F1")
+    );
     expect(resolveBackPlateColors(undefined).light).toBeNull();
   });
 });
@@ -113,6 +133,11 @@ describe("resolveBackPlateColors", () => {
 describe("resolveLayPlateColors", () => {
   it("is empty until an exchange is selected", () => {
     expect(resolveLayPlateColors(null).light).toBeNull();
-    expect(resolveLayPlateColors({ name: "BetConnect" }).light).toBe("#81AED3");
+    expect(resolveLayPlateColors({ name: "BetConnect" }).light).toBe(
+      muteForLight("#81AED3")
+    );
+    expect(resolveLayPlateColors({ name: "Smarkets" }).light).toBe(
+      muteForLight("#D4F9E9")
+    );
   });
 });

@@ -19,7 +19,7 @@ export function AddBetStripFlagToggle({
     <label className="flex shrink-0 items-center gap-3">
       <span className="flex items-center gap-2">
         {icon}
-        <span className="text-xs font-medium text-black/80 dark:text-white/95">
+        <span className="text-xs font-medium text-black/55 dark:text-white/55">
           {label}
         </span>
       </span>
