@@ -29,7 +29,7 @@ import { type TrackedEventLike } from "@/lib/events";
 import { api } from "@/hooks/use-app-state";
 import { useKnownFixtures } from "@/hooks/use-known-fixtures";
 import { useNow } from "@/hooks/use-now";
-import { MARKETS, marketDef } from "@/lib/markets";
+import { formatBetSelection, MARKETS, marketDef } from "@/lib/markets";
 import {
   formatOfferScopeLabel,
   isRegionalScope,
@@ -78,7 +78,15 @@ function selectionChoices(
       return { value: opt, label: opt };
     });
   }
-  return opts.map((opt) => ({ value: opt, label: opt }));
+  return opts.map((opt) => ({
+    value: opt,
+    label: formatBetSelection(
+      market,
+      opt,
+      teams?.homeTeam ?? "",
+      teams?.awayTeam ?? ""
+    ),
+  }));
 }
 
 function toHourBands<T extends { startTime?: number }>(

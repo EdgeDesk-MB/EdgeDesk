@@ -64,6 +64,8 @@ export function isPublicDemoDeskPath(pathname: string): boolean {
     "/casino",
     "/feedback",
     "/racing",
+    "/early-payout",
+    "/2up",
     "/alerts",
   ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }

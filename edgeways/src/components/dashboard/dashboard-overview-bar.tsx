@@ -11,10 +11,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyFlow } from "@/components/money-flow";
 import { DashboardPnlSummaries } from "@/components/dashboard/dashboard-pnl-summaries";
 import { DashboardSectionHeader } from "@/components/dashboard/dashboard-section-header";
+import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import type { OfferSummary } from "@/lib/services/offers.types";
 import type { BetRow } from "@/lib/db/schema";
 import {
@@ -24,6 +24,7 @@ import {
   type PaceIncomePoint,
 } from "@/lib/pnl/pace-stats";
 import { homeDeckChartMinH } from "@/lib/ui/layout-spacing";
+import { captionHeading, quietPanel } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { CalendarRange, Radio } from "lucide-react";
 
@@ -262,7 +263,10 @@ export function DashboardOverviewBar({
 
       {pace.dayCount > 0 ? (
         <Dialog open={paceOpen} onOpenChange={setPaceOpen}>
-          <DialogContent className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogContent
+            data-dialog-tone="page"
+            className="flex max-h-[min(36rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md dark:bg-page"
+          >
               <DialogHeader className="mx-0 mt-0 shrink-0">
                 <DialogTitle>Pace</DialogTitle>
                 <DialogDescription>
@@ -272,71 +276,57 @@ export function DashboardOverviewBar({
 
             <ScrollFadeEdges
               className="min-h-0 flex-1"
-              fadeClassName="from-page dark:from-card"
+              fadeClassName="from-page"
               scrollClassName="px-[var(--layout-card-x)] py-[var(--layout-card-x)]"
             >
-              <Tabs
-                value={paceTab}
-                onValueChange={(v) => setPaceTab(v as "daily" | "yearly")}
-                activationMode="manual"
-                className="gap-3"
-              >
-                <TabsList variant="segmented" className="w-full">
-                  <TabsTrigger value="daily">
-                    Daily avg.
-                    <MoneyFlow
-                      value={pace.dailyAvg}
-                      signColor
-                      className="ml-1 inline text-xs font-semibold"
-                    />
-                  </TabsTrigger>
-                  <TabsTrigger value="yearly">
-                    Yearly est.
-                    <MoneyFlow
-                      value={pace.yearlyEst}
-                      signColor
-                      className="ml-1 inline text-xs font-semibold"
-                    />
-                  </TabsTrigger>
-                </TabsList>
+              <div className="space-y-3">
+                <StatStrip columns={2} className="grid-cols-2">
+                  <StatTile
+                    label="Daily avg."
+                    value={<MoneyFlow value={pace.dailyAvg} signColor />}
+                    sub={formatPaceDayCount(pace.dayCount)}
+                    active={paceTab === "daily"}
+                    onClick={() => setPaceTab("daily")}
+                  />
+                  <StatTile
+                    label="Yearly est."
+                    value={<MoneyFlow value={pace.yearlyEst} signColor />}
+                    sub="Daily avg. × 365"
+                    active={paceTab === "yearly"}
+                    onClick={() => setPaceTab("yearly")}
+                  />
+                </StatStrip>
 
                 {/* Stack both panels so height stays at the taller view (no dialog jump). */}
                 <div className="grid">
                   <div
-                    role="tabpanel"
+                    role="region"
+                    aria-label="Daily average"
                     aria-hidden={paceTab !== "daily"}
                     className={cn(
                       "col-start-1 row-start-1 space-y-3 outline-none",
                       paceTab !== "daily" && "invisible pointer-events-none"
                     )}
                   >
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Daily average
-                      </p>
-                      <div className="mt-1 text-3xl font-bold tabular-nums leading-none tracking-tight">
-                        <MoneyFlow value={pace.dailyAvg} signColor className="inline" />
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        Total settled ÷ {formatPaceDayCount(pace.dayCount)} since{" "}
-                        {formatActivitySince(pace.activityStartMs)}
-                      </p>
-                    </div>
-                    <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-xs dark:bg-input/20">
+                    <p className="text-xs text-muted-foreground">
+                      Total settled ÷ {formatPaceDayCount(pace.dayCount)} since{" "}
+                      {formatActivitySince(pace.activityStartMs)}
+                    </p>
+                    <dl className={cn(quietPanel, "grid grid-cols-2 gap-2 px-4 py-4 pb-5 text-xs")}>
                       <div>
-                        <dt className="text-muted-foreground">Settled P&L</dt>
+                        <dt className={captionHeading}>Settled P&L</dt>
                         <dd className="mt-0.5 font-semibold tabular-nums">
                           <MoneyFlow value={pace.totalProfit} signColor className="inline" />
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-muted-foreground">Settlements</dt>
+                        <dt className={captionHeading}>Settlements</dt>
                         <dd className="mt-0.5 font-semibold tabular-nums">
                           {pace.settlementCount.toLocaleString("en-GB")}
                         </dd>
                       </div>
-                      <div className="col-span-2">
-                        <dt className="text-muted-foreground">Activity window</dt>
+                      <div className="col-span-2 mt-2">
+                        <dt className={captionHeading}>Activity window</dt>
                         <dd className="mt-0.5 font-medium">
                           {formatActivitySince(pace.activityStartMs)} → today ·{" "}
                           {formatPaceDayCount(pace.dayCount)}
@@ -346,46 +336,39 @@ export function DashboardOverviewBar({
                   </div>
 
                   <div
-                    role="tabpanel"
+                    role="region"
+                    aria-label="Yearly estimate"
                     aria-hidden={paceTab !== "yearly"}
                     className={cn(
                       "col-start-1 row-start-1 space-y-3 outline-none",
                       paceTab !== "yearly" && "invisible pointer-events-none"
                     )}
                   >
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Yearly estimate
-                      </p>
-                      <div className="mt-1 text-3xl font-bold tabular-nums leading-none tracking-tight">
-                        <MoneyFlow value={pace.yearlyEst} signColor className="inline" />
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        Daily avg. × 365 - projects current pace over a full year
-                      </p>
-                    </div>
-                    <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5 text-xs dark:bg-input/20">
+                    <p className="text-xs text-muted-foreground">
+                      Daily avg. × 365, current pace over a full year
+                    </p>
+                    <dl className={cn(quietPanel, "grid grid-cols-2 gap-2 px-4 py-4 pb-5 text-xs")}>
                       <div>
-                        <dt className="text-muted-foreground">Daily avg.</dt>
+                        <dt className={captionHeading}>Daily avg.</dt>
                         <dd className="mt-0.5 font-semibold tabular-nums">
                           <MoneyFlow value={pace.dailyAvg} signColor className="inline" />
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-muted-foreground">Multiplier</dt>
+                        <dt className={captionHeading}>Multiplier</dt>
                         <dd className="mt-0.5 font-semibold tabular-nums">× 365</dd>
                       </div>
-                      <div className="col-span-2 flex items-start gap-2 text-xs text-muted-foreground">
-                        <CalendarRange className="mt-0.5 size-3.5 shrink-0" />
-                        <span>
-                          Based on {formatPaceDayCount(pace.dayCount)} of settled activity. Short
-                          windows can swing this estimate a lot.
-                        </span>
-                      </div>
                     </dl>
+                    <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <CalendarRange className="mt-0.5 size-3 shrink-0" />
+                      <span>
+                        Based on {formatPaceDayCount(pace.dayCount)} of settled activity. Short
+                        windows can swing this estimate a lot.
+                      </span>
+                    </p>
                   </div>
                 </div>
-              </Tabs>
+              </div>
             </ScrollFadeEdges>
 
             <div className="shrink-0 border-t bg-selection-subtle/50 px-[var(--layout-card-x)] py-[var(--layout-card-x)]">

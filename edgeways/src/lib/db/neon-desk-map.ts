@@ -181,6 +181,7 @@ export function toSqliteAccountRow(row: PgAccountRow): AccountRow {
     isActive: row.isActive,
     accessStatus: row.accessStatus,
     notes: row.notes,
+    notesSource: row.notesSource,
     wrRemaining: row.wrRemaining,
     wrMinOdds: row.wrMinOdds,
     wrType: row.wrType,

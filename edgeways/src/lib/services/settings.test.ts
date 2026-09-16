@@ -69,6 +69,24 @@ describe("fixture board view", () => {
   });
 });
 
+describe("bookie scopes", () => {
+  it("round-trips early-payout rows and migrates a v1 payload", () => {
+    expect(getAppSettings().bookieScopes).toEqual([]);
+    patchAppSettings({
+      bookieScopes: [
+        { bookie: "Coral", surface: "early_payout", sport: "football", leadBy: 2 },
+        { bookie: "bet365", surface: "early_payout", sport: "baseball", leadBy: 5 },
+      ],
+    });
+    expect(getAppSettings().bookieScopes).toEqual([
+      { bookie: "Coral", surface: "early_payout", sport: "football", leadBy: 2 },
+      { bookie: "bet365", surface: "early_payout", sport: "baseball", leadBy: 5 },
+    ]);
+    patchAppSettings({ bookieScopes: [] });
+    expect(getAppSettings().bookieScopes).toEqual([]);
+  });
+});
+
 describe("normalizeDefaultSport", () => {
   it("accepts known sports and falls back to football", () => {
     expect(normalizeDefaultSport("horse_racing")).toBe("horse_racing");

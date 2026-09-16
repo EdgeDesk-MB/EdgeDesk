@@ -16,4 +16,10 @@ describe("isLinkActive", () => {
     expect(isLinkActive("/casino", "/casino")).toBe(true);
     expect(isLinkActive("/casino/calendar", "/casino/calendar")).toBe(true);
   });
+
+  it("treats Early-payout Desk as its own live desk, not a calculator", () => {
+    expect(isLinkActive("/early-payout", "/early-payout")).toBe(true);
+    expect(isLinkActive("/early-payout", "/calculators")).toBe(false);
+    expect(isLinkActive("/calculators/two-up", "/calculators")).toBe(true);
+  });
 });

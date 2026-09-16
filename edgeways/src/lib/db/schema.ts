@@ -49,8 +49,8 @@ export const exchanges = sqliteTable("exchanges", {
   name: text("name").notNull(),
   commissionPct: real("commission_pct").notNull().default(0),
   brandColor: text("brand_color").notNull().default("#3f3f46"),
-  backColor: text("back_color").notNull().default("#a6d8ff"),
-  layColor: text("lay_color").notNull().default("#fac9d1"),
+  backColor: text("back_color").notNull().default("#A7D8FF"),
+  layColor: text("lay_color").notNull().default("#FBC9D2"),
   isDefault: integer("is_default").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
@@ -548,6 +548,8 @@ export const accounts = sqliteTable("accounts", {
     .notNull()
     .default("available"),
   notes: text("notes"),
+  /** Who last wrote `notes`: "scope" when the bookie-scope auto-fill set it, else user-authored (null = legacy/manual). */
+  notesSource: text("notes_source", { enum: ["user", "scope"] }),
   /** Outstanding wagering requirement (£ remaining) */
   wrRemaining: real("wr_remaining").notNull().default(0),
   /** Min decimal odds for a bet to count toward WR */

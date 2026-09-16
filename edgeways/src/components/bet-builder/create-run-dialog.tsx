@@ -583,7 +583,6 @@ export function BetBuilderCreateRunForm({
               <LayStakeBanner
                 label="Lay stake (optional)"
                 value={Number.isFinite(layStake) ? layStake : 0}
-                fillSelection={label.trim() || "Bet builder"}
                 onChange={(v) => {
                   setLayStakeTouched(true);
                   setLayStake(v);

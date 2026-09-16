@@ -2,6 +2,12 @@
   "permissions": {
     "allow": [
       "mcp__claude_ai_Linear__list_issues"
+    ],
+    "deny": [
+      "mcp__playwright",
+      "mcp__playwright__*",
+      "mcp__chrome-devtools",
+      "mcp__chrome-devtools__*"
     ]
   }
 }

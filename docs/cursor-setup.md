@@ -1,14 +1,15 @@
 # Cursor setup checklist (Edgeways)
 
-**Updated:** 2 August 2026  
+**Updated:** 15 September 2026  
 
 One-off in-app configuration so Cursor picks up the repo rules, the Ultra
 model set, and the local backbone. Repo-side files already in place: `AGENTS.md`
 (root and `edgeways/`), `edgeways/.cursor/rules/*.mdc`,
-`.cursor/rules/model-routing.mdc`, `.cursorignore`.
+`.cursor/rules/model-routing.mdc`, `.cursor/rules/iterative-dev.mdc`,
+`.cursorignore`.
 
-Routing why/when: `docs/Local-vs-Cloud-Model-Strategy.md`. Day-to-day habits:
-`docs/ai-playbook.md`.
+Routing why/when: `docs/Local-vs-Cloud-Model-Strategy.md`. Implementation
+loop: `docs/cursor-workflow.md`. Day-to-day habits: `docs/ai-playbook.md`.
 
 ## 1. Workspace
 Open `MB app build/` (the git root) as the workspace, not `edgeways/`.
@@ -85,6 +86,32 @@ Settings → Indexing: confirm the codebase index completed after
 ## 8. On-demand buffer
 Plan & Usage: optionally set a modest on-demand monthly limit so Other Models
 does not hard-stop mid-session if you spike on K3/Opus.
+
+## 9. MCP hub
+
+Orca Project Settings → Edgeways → **MCP Configs** reads `.mcp.json` and
+`.claude/mcp.json` (same 11 servers, so Claude and other models both see
+them). Those files are local and gitignored. Shape without keys:
+`.mcp.json.example`. After an edit, Refresh MCP configs. Expect the same 11 servers in
+`.mcp.json`, `.cursor/mcp.json`, `.claude.json`, and `.claude/mcp.json`
+so Cursor, Claude, and other models all resolve. Start a **new** Orca
+or Claude session after an MCP edit.
+
+Servers: linear, github, context7, posthog, neon, stripe, vercel, figma,
+tana-local, supercut, pencil. Neon and Stripe are HTTP (login on first use).
+Tana only works while local Tana is running.
+
+Linear also stays native in Orca (`orca linear`). In Cursor, Linear MCP
+must be authed in the desktop IDE (this agent session cannot complete that
+login). Clerk and shadcn stay Cursor plugins. Agent ticket protocol:
+`.cursor/skills/ticket-hygiene/SKILL.md`. Human one-pager: `docs/linear.md`.
+
+### Do not add
+
+- **Supabase** — desk is Neon.
+- **Playwright** or **chrome-devtools** — Edgeways UI is Orca's browser.
+  Aside (new window) is the fallback. Those two MCP servers open system
+  Chrome and burn Claude session credits. Do not put them back.
 
 ## Verification
 1. Open `edgeways/src/lib/calc/matched.ts`, ask chat a question about it, and

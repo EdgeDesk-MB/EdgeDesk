@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import { PageHelp } from "@/components/help/page-help";
 import type { PageHelpId } from "@/content/help/page-help";
@@ -23,7 +23,7 @@ export function DeskPageHeader({
   title: string;
   description?: React.ReactNode;
   helpId?: PageHelpId;
-  icon?: LucideIcon;
+  icon?: ComponentType<{ className?: string }>;
   action?: React.ReactNode;
   toolbar?: React.ReactNode;
   className?: string;

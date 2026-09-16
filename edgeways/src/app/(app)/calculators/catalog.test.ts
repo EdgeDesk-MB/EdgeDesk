@@ -16,6 +16,9 @@ describe("calculator catalog", () => {
     const hrefs = calculatorCardHrefs();
     expect(hrefs.length).toBeGreaterThan(0);
     expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(hrefs).not.toContain("/calculators/ep-desk");
+    expect(hrefs).not.toContain("/2up");
+    expect(hrefs).not.toContain("/early-payout");
   });
 
   it("every card href has a page.tsx", () => {
@@ -29,6 +32,14 @@ describe("calculator catalog", () => {
       expect(section.title.length).toBeGreaterThan(0);
       expect(section.calculators.length).toBeGreaterThan(0);
     }
+  });
+
+  it("names the early-payout calculator without a 2UP suffix", () => {
+    const card = CALCULATOR_SECTIONS.flatMap((section) => section.calculators).find(
+      (calc) => calc.href === "/calculators/two-up"
+    );
+    expect(card?.title).toBe("Early Payout");
+    expect(card?.description).not.toMatch(/2UP/i);
   });
 
   it("gives each calculator a unique icon", () => {

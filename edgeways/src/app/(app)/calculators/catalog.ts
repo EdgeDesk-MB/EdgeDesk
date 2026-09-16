@@ -14,9 +14,8 @@ import {
   Timer,
   Undo2,
 } from "lucide-react";
-import { FootballIcon } from "@/components/sport-icon";
 
-/** Lucide or a stroke-matched custom mark (FootballIcon for 2UP Desk). Same API as nav icons. */
+/** Lucide or a stroke-matched custom mark. Same API as nav icons. */
 export type CalculatorIcon = ComponentType<{
   className?: string;
   strokeWidth?: number;
@@ -59,15 +58,9 @@ export const CALCULATOR_SECTIONS: CalculatorSection[] = [
       },
       {
         href: "/calculators/two-up",
-        title: "Early Payout (2UP)",
-        description: "Back a 2UP bookie and lay the exchange.",
+        title: "Early Payout",
+        description: "Back an early-payout bookie and lay the exchange.",
         icon: Timer,
-      },
-      {
-        href: "/calculators/ep-desk",
-        title: "2UP Desk",
-        description: "Dixon-Coles 2UP desk with dutch versus lay ranking.",
-        icon: FootballIcon,
       },
       {
         href: "/calculators/accumulator",

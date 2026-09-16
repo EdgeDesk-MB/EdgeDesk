@@ -164,8 +164,8 @@ CREATE TABLE IF NOT EXISTS exchanges (
   name TEXT NOT NULL,
   commission_pct REAL NOT NULL DEFAULT 0,
   brand_color TEXT NOT NULL DEFAULT '#3f3f46',
-  back_color TEXT NOT NULL DEFAULT '#a6d8ff',
-  lay_color TEXT NOT NULL DEFAULT '#fac9d1',
+  back_color TEXT NOT NULL DEFAULT '#A7D8FF',
+  lay_color TEXT NOT NULL DEFAULT '#FBC9D2',
   is_default INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
@@ -694,6 +694,7 @@ CREATE TABLE IF NOT EXISTS offer_series (
   addColumn("casino_offer_series", "offer_url TEXT");
   addColumn("accounts", "access_status TEXT NOT NULL DEFAULT 'available'");
   addColumn("accounts", "notes TEXT");
+  addColumn("accounts", "notes_source TEXT");
   addColumn("accounts", "funded_by_account_id INTEGER");
   addColumn("accounts", "wr_remaining REAL NOT NULL DEFAULT 0");
   addColumn("accounts", "wr_min_odds REAL");

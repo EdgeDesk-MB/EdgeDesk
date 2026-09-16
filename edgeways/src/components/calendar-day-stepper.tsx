@@ -23,6 +23,7 @@ export function CalendarDayStepper({
   pickAriaLabel = "Pick a day",
   fromYear,
   toYear,
+  stretch = false,
 }: {
   day: string;
   onChange: (ymd: string) => void;
@@ -36,6 +37,8 @@ export function CalendarDayStepper({
   pickAriaLabel?: string;
   fromYear?: number;
   toYear?: number;
+  /** Fill the parent (pin rail). Chevrons stay 32px; the date field grows. */
+  stretch?: boolean;
 }) {
   const atMin = min != null && day <= min;
   const atMax = max != null && day >= max;
@@ -49,7 +52,7 @@ export function CalendarDayStepper({
 
   return (
     <div
-      className="flex items-center gap-1"
+      className={cn("flex items-center gap-1", stretch && "w-full")}
       role="group"
       aria-label={ariaLabel}
       aria-busy={disabled || busy}
@@ -84,7 +87,7 @@ export function CalendarDayStepper({
           return false;
         }}
         className={cn(
-          calendarDayStepperTriggerWidth,
+          stretch ? "min-w-0 flex-1" : calendarDayStepperTriggerWidth,
           toolbarControlH,
           "justify-center px-2 max-sm:px-2"
         )}

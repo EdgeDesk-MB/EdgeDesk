@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  capitaliseSelectionLabel,
+  formatBetSelection,
   inferSportFromBet,
+  isEarlyPayoutMarket,
   linkableEventsForSport,
+  marketDef,
   marketUsesLinkedEventSides,
 } from "./markets";
 
@@ -24,6 +28,32 @@ describe("inferSportFromBet", () => {
     expect(inferSportFromBet("win")).toBe("horse_racing");
     expect(inferSportFromBet("match_winner")).toBe("tennis");
     expect(inferSportFromBet("btts")).toBe("football");
+  });
+});
+
+describe("isEarlyPayoutMarket", () => {
+  it("allows only the sport's match-winner market", () => {
+    expect(isEarlyPayoutMarket("football", "match_odds")).toBe(true);
+    expect(isEarlyPayoutMarket("football", "btts")).toBe(false);
+    expect(isEarlyPayoutMarket("tennis", "match_winner")).toBe(true);
+    expect(isEarlyPayoutMarket("darts", "match_winner")).toBe(true);
+    expect(isEarlyPayoutMarket("darts", "correct_score")).toBe(false);
+    expect(isEarlyPayoutMarket("tennis", "set_betting")).toBe(false);
+    expect(isEarlyPayoutMarket("basketball", "match_winner")).toBe(true);
+    expect(isEarlyPayoutMarket("basketball", "handicap")).toBe(false);
+    expect(isEarlyPayoutMarket("horse_racing", "win")).toBe(false);
+    expect(isEarlyPayoutMarket("horse_racing", "match_winner")).toBe(false);
+    expect(isEarlyPayoutMarket("golf", "match_winner")).toBe(false);
+    expect(isEarlyPayoutMarket("other", "match_winner")).toBe(false);
+  });
+
+  it("labels US-book winners as Moneyline", () => {
+    expect(marketDef("basketball", "match_winner")?.label).toBe("Moneyline");
+    expect(marketDef("baseball", "match_winner")?.label).toBe("Moneyline");
+    expect(marketDef("american_football", "match_winner")?.label).toBe("Moneyline");
+    expect(marketDef("ice_hockey", "match_winner")?.label).toBe("Moneyline");
+    expect(marketDef("tennis", "match_winner")?.label).toBe("Match winner");
+    expect(marketDef("football", "match_odds")?.label).toBe("Match odds");
   });
 });
 
@@ -50,6 +80,31 @@ describe("marketUsesLinkedEventSides", () => {
     expect(marketUsesLinkedEventSides("horse_racing", "win")).toBe(false);
     expect(marketUsesLinkedEventSides("golf", "outright")).toBe(false);
     expect(marketUsesLinkedEventSides("greyhounds", "win")).toBe(false);
+  });
+});
+
+describe("formatBetSelection", () => {
+  it("shows Home / Draw / Away, not lowercase tokens", () => {
+    expect(formatBetSelection("match_winner", "away")).toBe("Away");
+    expect(formatBetSelection("match_odds", "home")).toBe("Home");
+    expect(formatBetSelection("match_odds", "draw")).toBe("Draw");
+    expect(formatBetSelection("btts", "yes")).toBe("Yes");
+    expect(formatBetSelection("over_under_2_5", "over")).toBe("Over");
+    expect(formatBetSelection("double_chance", "home/draw")).toBe("Home/Draw");
+  });
+
+  it("uses team names when the fixture is linked", () => {
+    expect(formatBetSelection("match_odds", "home", "Everton", "Palace")).toBe(
+      "Everton"
+    );
+    expect(formatBetSelection("match_winner", "away", "Yankees", "Red Sox")).toBe(
+      "Red Sox"
+    );
+  });
+
+  it("leaves horse names and free text alone", () => {
+    expect(formatBetSelection("win", "Constitution Hill")).toBe("Constitution Hill");
+    expect(capitaliseSelectionLabel("away")).toBe("Away");
   });
 });
 

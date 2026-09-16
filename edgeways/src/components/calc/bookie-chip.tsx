@@ -3,9 +3,14 @@
 import { useMemo } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { bookiePillStyle } from "@/lib/brands/bookies";
+import {
+  exchangeBrandColor,
+  findExchangePreset,
+  pillBorderColor,
+} from "@/lib/brands/exchanges";
 import { cn } from "@/lib/utils";
 
-/** 8px compact / 12px menu bookie mark. Hairline from `pillBorderColor`. */
+/** 8px compact / 12px menu bookie / exchange mark. Hairline from `pillBorderColor`. */
 export function BookieColourDot({
   name,
   brandColor,
@@ -16,14 +21,17 @@ export function BookieColourDot({
   size?: "sm" | "md";
 }) {
   if (!name.trim()) return null;
-  const style = bookiePillStyle(name, brandColor);
+  const exchange = findExchangePreset(name);
+  const bookie = exchange ? null : bookiePillStyle(name, brandColor);
+  const bg = exchange ? exchangeBrandColor(name, brandColor) : bookie!.bg;
+  const border = exchange ? pillBorderColor(bg) : bookie!.border;
   return (
     <span
       className={cn(
         "inline-block shrink-0 rounded-full border",
         size === "sm" ? "size-2" : "size-3"
       )}
-      style={{ backgroundColor: style.bg, borderColor: style.border }}
+        style={{ backgroundColor: bg, borderColor: border }}
       aria-hidden
     />
   );

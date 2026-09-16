@@ -33,6 +33,6 @@ The main agent acts as foreman: writes a self-contained prompt, ships it to the 
    ```
 
    Use a generous Bash timeout (300000ms or more); the 70B model is slow.
-3. Review before applying anything: run `npx vitest run` from `edgeways/`, and never apply calc or settlement changes without the `calc-change` workflow.
+3. Review before applying anything: run `npx vitest run` from `edgeways/`, and never apply calc or settlement changes without the `calc-change` workflow. The local model must not call Linear or other MCPs. Put `Ticket: EDGE-n|none` in the prompt so you can update Linear after review.
 4. Two bad results on the same task means stop delegating, do it in-session, and tell Sam which task type failed so the routing matrix can be updated.
 5. If the node is unreachable (connection refused, timeout), say so plainly and continue in-session. Do not retry more than once.

@@ -1,21 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { CalculatorAddBetButton } from "@/components/calc/calculator-add-bet";
 import {
   BackPanel,
   LayPanel,
   LayStakeBanner,
-  PanelBookieInput,
   PanelInput,
   ProfitTable,
 } from "@/components/calc/bet-panels";
+import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { PercentFlow } from "@/components/money-flow";
 import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
-import { contrastText } from "@/lib/brands/exchanges";
 import { useExchanges } from "@/hooks/use-exchanges";
 import { matchedBet, riskFreeBookieBreakdown, riskFreeRefundCash } from "@/lib/calc/matched";
 import type { ExchangeRow } from "@/lib/db/schema";
@@ -34,22 +32,27 @@ export default function RefundIfCalculatorPage() {
   const [backStake, setBackStake] = useState(10);
   const [backOdds, setBackOdds] = useState(3);
   const [layOdds, setLayOdds] = useState(3.1);
-  const [commission, setCommission] = useState(2);
   const [refundAmount, setRefundAmount] = useState(10);
   const [refundRetention, setRefundRetention] = useState(75);
+  const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
 
   useEffect(() => {
     if (!exchange && defaultExchange) {
       queueMicrotask(() => {
         setExchange(defaultExchange);
-        setCommission(defaultExchange.commissionPct);
       });
     }
   }, [defaultExchange, exchange]);
 
+  const commissionPct = exchange?.commissionPct ?? 2;
+
   useEffect(() => {
     queueMicrotask(() => setRefundAmount(backStake));
   }, [backStake]);
+
+  useEffect(() => {
+    queueMicrotask(() => setLayStakeOverride(null));
+  }, [backStake, backOdds, layOdds, commissionPct, refundAmount, refundRetention]);
 
   const result = useMemo(() => {
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
@@ -58,11 +61,12 @@ export default function RefundIfCalculatorPage() {
       backStake,
       backOdds,
       layOdds,
-      commission: commission / 100,
+      commission: commissionPct / 100,
       refundAmount,
       refundRetention: refundRetention / 100,
+      layStakeOverride: layStakeOverride ?? undefined,
     });
-  }, [backStake, backOdds, layOdds, commission, refundAmount, refundRetention]);
+  }, [backStake, backOdds, layOdds, commissionPct, refundAmount, refundRetention, layStakeOverride]);
 
   const refundCash = riskFreeRefundCash({
     backStake,
@@ -72,7 +76,7 @@ export default function RefundIfCalculatorPage() {
 
   const displayRows = useMemo(() => {
     if (!result) return [];
-    const layWinnings = result.layStake * (1 - commission / 100);
+    const layWinnings = result.layStake * (1 - commissionPct / 100);
     return [
       {
         label: "If back bet wins",
@@ -92,7 +96,7 @@ export default function RefundIfCalculatorPage() {
         })?.lines,
       },
     ];
-  }, [result, backStake, backOdds, refundCash, refundAmount, refundRetention, commission]);
+  }, [result, backStake, backOdds, refundCash, refundAmount, refundRetention, commissionPct]);
 
   return (
     <CalculatorShell>
@@ -101,15 +105,22 @@ export default function RefundIfCalculatorPage() {
         description="Money-back-if-you-lose: cash or free-bet refund."
       />
 
-      <BackPanel title="Back bet (refund offer)" exchange={exchange} venue={bookmaker}>
-        <div className="grid grid-cols-2 gap-3">
-          <PanelBookieInput
+      <BackPanel
+        title="Back Bet"
+        exchange={exchange}
+        venue={bookmaker}
+        chip={
+          <BookmakerSelect
+            tagTrigger
             value={bookmaker}
             onChange={setBookmaker}
-            className="col-span-2 sm:col-span-1"
+            className="[--pi:var(--panel)] [--pi-dark:var(--panel-dark)]"
           />
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+          <PanelInput label="Back odds" value={backOdds} onChange={setBackOdds} min={1} />
           <PanelInput label="Back stake" prefix="£" value={backStake} onChange={setBackStake} min={0} />
-          <PanelInput label="Back odds (decimal)" value={backOdds} onChange={setBackOdds} min={1} />
           <PanelInput
             label="Refund amount"
             prefix="£"
@@ -117,7 +128,7 @@ export default function RefundIfCalculatorPage() {
             onChange={setRefundAmount}
             min={0}
           />
-          <div className="col-span-2 flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <PanelInput
               label="Refund retention"
               suffix="%"
@@ -148,48 +159,35 @@ export default function RefundIfCalculatorPage() {
       </BackPanel>
 
       <LayPanel
-        title="Lay bet"
+        title="Lay Bet"
         exchange={exchange}
         chip={
-          exchange && (
-            <span
-              className="rounded px-2 py-0.5 text-[11px] font-bold"
-              style={{
-                backgroundColor: exchange.brandColor,
-                color: contrastText(exchange.brandColor),
-              }}
-            >
-              {exchange.name.toUpperCase()}
-            </span>
-          )
+          <ExchangeSelect
+            compact
+            tagTrigger
+            exchanges={exchanges}
+            value={exchange}
+            onChange={setExchange}
+          />
         }
       >
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 sm:col-span-1">
-            <ExchangeSelect
-              onPanel
-              exchanges={exchanges}
-              value={exchange}
-              onChange={(ex) => {
-                setExchange(ex);
-                setCommission(ex.commissionPct);
-                toast.info(`${ex.name} selected`, {
-                  description: `Commission set to ${ex.commissionPct}%`,
-                });
-              }}
-            />
-          </div>
-          <PanelInput label="Lay odds (decimal)" value={layOdds} onChange={setLayOdds} min={1} exchangeOddsStepping />
+        <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <PanelInput
-            label="Lay commission"
-            suffix="%"
-            value={commission}
-            onChange={setCommission}
-            min={0}
-            step={0.5}
+            label="Lay odds"
+            value={layOdds}
+            onChange={setLayOdds}
+            min={1}
+            exchangeOddsStepping
+          />
+          <LayStakeBanner
+            value={result?.layStake ?? 0}
+            liability={result?.liability}
+            pending={!result}
+            onChange={(v) =>
+              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
+            }
           />
         </div>
-        <LayStakeBanner value={result?.layStake ?? 0} liability={result?.liability} />
       </LayPanel>
 
       <ProfitTable

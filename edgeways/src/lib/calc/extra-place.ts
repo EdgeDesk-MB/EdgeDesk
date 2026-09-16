@@ -20,6 +20,8 @@ export interface ExtraPlaceInput {
   bookiePlaces: number;
   /** Places paid by the exchange place market (e.g. 3) */
   exchangePlaces: number;
+  layWinStakeOverride?: number;
+  layPlaceStakeOverride?: number;
 }
 
 export interface ExtraPlaceOutcomeRow {
@@ -57,14 +59,23 @@ const OUTCOME_LABELS: Record<EachWayRaceOutcome, string> = {
 };
 
 export function extraPlace(input: ExtraPlaceInput): ExtraPlaceResult {
-  const lays = eachWayLayStakes(input);
+  const computed = eachWayLayStakes(input);
+  const layWinStake = input.layWinStakeOverride ?? computed.layWinStake;
+  const layPlaceStake = input.layPlaceStakeOverride ?? computed.layPlaceStake;
+  const lays = {
+    placeOdds: computed.placeOdds,
+    layWinStake,
+    layWinLiability: layWinStake * (input.layWinOdds - 1),
+    layPlaceStake,
+    layPlaceLiability: layPlaceStake * (input.layPlaceOdds - 1),
+  };
   const layInput = {
     stakePerPart: input.stakePerPart,
     winOdds: input.winOdds,
     placeFraction: input.placeFraction,
-    layWinStake: lays.layWinStake,
+    layWinStake,
     layWinOdds: input.layWinOdds,
-    layPlaceStake: lays.layPlaceStake,
+    layPlaceStake,
     layPlaceOdds: input.layPlaceOdds,
     commission: input.commission,
   };

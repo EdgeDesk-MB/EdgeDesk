@@ -30,3 +30,4 @@ right lane. Do not nag on every turn. Full matrix: `docs/Local-vs-Cloud-Model-St
 - Calc/offers money paths: never treat local-only as sufficient for landing changes.
 - UI work: Composer/Grok or local coder is fine; finish with design-review on frontier if non-trivial.
 - Prefer recommending **Grok/Composer** over K3/Opus when the task is routine, so Other Models budget lasts.
+- Local / Cmd+K / qwen: skip Linear and hub MCPs. Write `Ticket: EDGE-n|none` in the announce block. The parent updates Linear.

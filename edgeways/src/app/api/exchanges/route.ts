@@ -14,8 +14,8 @@ const createSchema = z.object({
   name: z.string().min(1),
   commissionPct: z.number().min(0).max(20).default(0),
   brandColor: z.string().default("#3f3f46"),
-  backColor: z.string().default("#a6d8ff"),
-  layColor: z.string().default("#fac9d1"),
+  backColor: z.string().default("#A7D8FF"),
+  layColor: z.string().default("#FBC9D2"),
   isDefault: z.boolean().default(false),
 });
 

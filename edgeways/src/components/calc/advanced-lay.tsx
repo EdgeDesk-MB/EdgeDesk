@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNonPassiveWheel } from "@/hooks/use-non-passive-wheel";
-import {
-  exchangeOddsStepHandlers,
-  handleExchangeOddsInputEvent,
-} from "@/lib/calc/exchange-odds-step";
-import { layStakeStepHandlers } from "@/lib/calc/exchange-stake-step";
+import { Button } from "@/components/ui/button";
+import { LayStakeBanner, PanelInput } from "@/components/calc/bet-panels";
 import { cn } from "@/lib/utils";
 import { highlightedLaySnap } from "@/lib/add-bet-lay-stake";
+import { formatGbp } from "@/lib/format-money";
+import { fieldControlShadow } from "@/lib/ui/surface-styles";
 import type { LayBounds, PartLay } from "@/lib/calc";
 import { Plus, X } from "lucide-react";
+
+const RANGE_FIELD = cn(
+  "h-7 w-20 rounded-md border-0 bg-[var(--pi)] px-2 text-xs font-semibold tabular-nums text-black/85 outline-none ring-primary/40 [appearance:textfield] focus:ring-2",
+  "dark:bg-[var(--pi-dark)] dark:text-white/90",
+  "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+  fieldControlShadow
+);
 
 /**
  * MBB-style advanced lay controls: part lays + an underlay/standard/overlay
@@ -114,52 +119,60 @@ export function AdvancedLaySection({
   }
 
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    <div
+      className={cn(
+        "[--adv-pi:color-mix(in_srgb,var(--pi)_82%,black)]",
+        "[--adv-pi-dark:color-mix(in_srgb,var(--pi-dark)_72%,black)]",
+        className
+      )}
+    >
+      <div className="flex flex-col gap-3 [--pi:var(--adv-pi)] [--pi-dark:var(--adv-pi-dark)]">
       {/* Part lays already placed */}
       {partLays.map((part, i) => (
-        <div key={i} className="flex items-end gap-2 max-sm:flex-col max-sm:items-stretch">
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs font-medium text-black/60 dark:text-white/60">
-              Part lay {i + 1} odds
-            </span>
-            <PartLayOddsInput
-              value={part.odds}
-              onChange={(odds) =>
-                onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
-              }
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs font-medium text-black/60 dark:text-white/60">Stake</span>
-            <span className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-black/50 dark:text-white/50">
-                £
-              </span>
-              <PartLayStakeInput
-                value={part.stake}
-                onChange={(stake) =>
-                  onPartLays(partLays.map((p, j) => (j === i ? { ...p, stake } : p)))
-                }
-              />
-            </span>
-          </label>
-          <button
+        <div
+          key={i}
+          className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 max-sm:grid-cols-1"
+        >
+          <PanelInput
+            label={`Part lay ${i + 1} odds`}
+            value={part.odds}
+            min={1.01}
+            density="compact"
+            exchangeOddsStepping
+            onChange={(odds) =>
+              onPartLays(partLays.map((p, j) => (j === i ? { ...p, odds } : p)))
+            }
+          />
+          <LayStakeBanner
+            label="Stake"
+            value={part.stake}
+            density="compact"
+            trailing="steppers"
+            onChange={(stake) =>
+              onPartLays(partLays.map((p, j) => (j === i ? { ...p, stake } : p)))
+            }
+          />
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             aria-label={`Remove part lay ${i + 1}`}
             onClick={() => onPartLays(partLays.filter((_, j) => j !== i))}
-            className="mb-1.5 rounded-md p-1.5 text-black/50 transition-colors hover:bg-black/10 hover:text-black/80 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white/80"
+            className="mb-1.5 text-black/50 hover:bg-black/10 hover:text-black/80 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white/80 max-sm:mb-0 max-sm:justify-self-end"
           >
-            <X className="size-4" />
-          </button>
+            <X />
+          </Button>
         </div>
       ))}
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-full gap-1.5"
         onClick={() => onPartLays([...partLays, { odds: NaN, stake: NaN }])}
-        className="flex h-8 w-full items-center justify-center gap-1 rounded-full bg-black/15 text-xs font-semibold text-black/70 transition-colors hover:bg-black/25 dark:bg-white/15 dark:text-white/80 dark:hover:bg-white/25"
       >
         <Plus className="size-3.5" /> Add part lay
-      </button>
+      </Button>
 
       {/* Underlay / Standard / Overlay snaps */}
       <div className="flex items-center justify-between">
@@ -217,11 +230,11 @@ export function AdvancedLaySection({
             step={0.01}
             value={Number(min.toFixed(2))}
             onChange={(e) => setMinOverride(parseFloat(e.target.value))}
-            className="h-7 w-20 rounded-md border-0 bg-black/10 px-2 text-xs font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
+            className={RANGE_FIELD}
           />
         </label>
         <span className="font-semibold tabular-nums text-black/70 dark:text-white/80">
-          £ {Number.isFinite(displayStake) ? displayStake.toFixed(2) : "-"}
+          {formatGbp(displayStake)}
         </span>
         <label className="flex items-center gap-1.5">
           <span className="font-medium text-black/60 dark:text-white/60">Max £</span>
@@ -231,58 +244,11 @@ export function AdvancedLaySection({
             step={0.01}
             value={Number(max.toFixed(2))}
             onChange={(e) => setMaxOverride(parseFloat(e.target.value))}
-            className="h-7 w-20 rounded-md border-0 bg-black/10 px-2 text-xs font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
+            className={RANGE_FIELD}
           />
         </label>
       </div>
+      </div>
     </div>
-  );
-}
-
-function PartLayOddsInput({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (odds: number) => void;
-}) {
-  const oddsStep = exchangeOddsStepHandlers(value, onChange);
-  const wheelRef = useNonPassiveWheel<HTMLInputElement>(oddsStep.onWheel);
-  return (
-    <input
-      ref={wheelRef}
-      type="number"
-      inputMode="decimal"
-      min={1.01}
-      step="any"
-      value={Number.isFinite(value) ? value : ""}
-      onChange={(e) => handleExchangeOddsInputEvent(value, e, onChange)}
-      onKeyDown={oddsStep.onKeyDown}
-      className="h-9 w-full rounded-md border-0 bg-black/10 px-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
-    />
-  );
-}
-
-function PartLayStakeInput({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (stake: number) => void;
-}) {
-  const stakeStep = layStakeStepHandlers(value, onChange);
-  const wheelRef = useNonPassiveWheel<HTMLInputElement>(stakeStep.onWheel);
-  return (
-    <input
-      ref={wheelRef}
-      type="number"
-      inputMode="decimal"
-      min={0}
-      step={0.01}
-      value={Number.isFinite(value) ? value : ""}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      onKeyDown={stakeStep.onKeyDown}
-      className="h-9 w-full rounded-md border-0 bg-black/10 pl-7 pr-3 text-sm font-semibold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/90"
-    />
   );
 }

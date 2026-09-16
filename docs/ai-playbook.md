@@ -1,11 +1,13 @@
 # AI stack playbook
 
-**Updated:** 6 August 2026  
+**Updated:** 15 September 2026  
 **Scope:** how to actually drive the stack day to day. Routing analysis and
-subscription strategy live in `docs/Local-vs-Cloud-Model-Strategy.md`. Cursor
-enable-list and one-off setup live in `docs/cursor-setup.md`. Bet-type
-taxonomy (Lucky / Yankee / systems modelling) lives in
-`docs/betting-methods-guide.md`.
+subscription strategy live in `docs/Local-vs-Cloud-Model-Strategy.md`.
+Implementation loop: `docs/cursor-workflow.md` (hosts without the
+iterative-dev rule). Cursor enable-list: `docs/cursor-setup.md`. Linear
+for humans: `docs/linear.md`. Bet-type taxonomy:
+`docs/betting-methods-guide.md`. Agents must not load this playbook
+mid-task.
 
 Note: app UI details (menu names, shortcuts) drift between versions. Where a
 shortcut below is wrong, the in-app command palette or help is the truth.
@@ -58,6 +60,12 @@ Models pool by using Grok 4.5 / Composer 2.5 for routine cloud sessions.
 6. **Wrong model for the job?** Agents should say so at the start of a turn
    (see `.cursor/rules/model-routing.mdc` and root `AGENTS.md`). Cursor does
    not auto-switch the picker; you change it.
+7. **Load one skill, not the library.** If the iterative-dev rule is already
+   in context, do not also read `docs/cursor-workflow.md`, this playbook,
+   the kit, or live-readiness. Local models skip Linear and MCP.
+8. **Linear is cheap, not constant.** Named `EDGE-n` is scope. Ticket-worthy
+   work gets one search. Small bugs comment on EDGE-171. History is a
+   Linear comment, not a new markdown file.
 
 ---
 
@@ -88,16 +96,21 @@ Local parallel ladder: `qwen3-coder-ctx` → `bb-deepseek-70b` → escalate clou
 
 ### Rules
 `edgeways/.cursor/rules/*.mdc` auto-attach on matching files. Root
-`.cursor/rules/model-routing.mdc` always applies. `AGENTS.md` is read at
-workspace root.
+`.cursor/rules/model-routing.mdc` and `iterative-dev.mdc` always apply.
+`AGENTS.md` is read at workspace root. Implementation loop:
+`docs/cursor-workflow.md`.
 
 ### Commands (project slash commands)
 `.cursor/commands/*.md` points at `.cursor/skills/` and `.cursor/agents/`; type `/` in chat:
+- `/iterative-dev` — classify + increment loop (`docs/cursor-workflow.md`)
+- `/ticket-hygiene` — Linear only when a ticket applies
 - `/calc-change`, `/brief`, `/delegate-local`
 - `/calc-audit`, `/design-review` (switch to a frontier model first)
 
 ### Skills (auto-triggered workflows)
 `.cursor/skills/*/SKILL.md` — also mirrored under `.claude/skills/` for Claude Code:
+- **Loop:** `iterative-dev` (points at the always-on rule, not a re-read)
+- **Tickets:** `ticket-hygiene` (not always-on)
 - **Calc:** `calc-change`, `delegate-local`
 - **Roadmap:** `brief`
 - **UI build:** `design-system-consistency`, `design-taste`, `ux-heuristics`, `visual-qa-loop`

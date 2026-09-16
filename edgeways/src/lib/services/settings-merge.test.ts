@@ -88,6 +88,25 @@ describe("mergeAppSettings", () => {
     expect(isFixtureScopeSettingsPatch({ defaultBackStake: 10 })).toBe(false);
   });
 
+  it("round-trips bookie scopes on the hosted blob", () => {
+    const patched = mergeAppSettings(DEFAULT_SETTINGS, {
+      bookieScopes: [
+        { bookie: "Coral", sport: "football", leadBy: 2 },
+        { bookie: "Coral", surface: "racing", sport: "football", leadBy: 1 },
+      ] as (typeof DEFAULT_SETTINGS)["bookieScopes"],
+    });
+    expect(patched.bookieScopes).toEqual([
+      { bookie: "Coral", surface: "early_payout", sport: "football", leadBy: 2 },
+      { bookie: "Coral", surface: "racing", sport: "football", leadBy: 1 },
+    ]);
+    expect(
+      parseStoredSettings({
+        ...DEFAULT_SETTINGS,
+        bookieScopes: { twoUp: ["Coral"], oneUp: [] },
+      } as unknown).bookieScopes
+    ).toEqual([{ bookie: "Coral", surface: "early_payout", sport: "football", leadBy: 2 }]);
+  });
+
   it("merges fixture board view without dropping the other sport", () => {
     const pinned = mergeAppSettings(DEFAULT_SETTINGS, {
       fixtureBoardView: { football: { rail: "pins", status: "live" } },

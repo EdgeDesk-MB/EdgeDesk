@@ -5,13 +5,10 @@ import {
   appUpdateExitHold,
   appUpdateIsVisible,
   appUpdatesEqual,
-  deskHasBlockingOverlay,
   normalizeAppUpdate,
   parseAppUpdate,
   readAppUpdateFromUnknown,
   readBuildStampFromUnknown,
-  shouldApplyDeskUpdateNow,
-  shouldAutoApplyAppUpdate,
 } from "./app-update-shared";
 
 describe("normalizeAppUpdate", () => {
@@ -64,6 +61,11 @@ describe("appUpdateIsVisible", () => {
     expect(appUpdateIsVisible(settings, null, "def")).toBe(false);
     expect(appUpdateIsVisible(settings, "abc", null)).toBe(false);
   });
+
+  it("keeps auto as a prompt, not a self-apply", () => {
+    expect(DEFAULT_APP_UPDATE.mode).toBe("auto");
+    expect(appUpdateIsVisible(DEFAULT_APP_UPDATE, "old", "new")).toBe(true);
+  });
 });
 
 describe("payload extras", () => {
@@ -111,25 +113,3 @@ describe("appUpdatesEqual", () => {
   });
 });
 
-describe("shouldApplyDeskUpdateNow", () => {
-  const auto = { mode: "auto" as const, message: DEFAULT_APP_UPDATE_MESSAGE };
-
-  function root(hit: Element | null): ParentNode {
-    return { querySelector: () => hit } as unknown as ParentNode;
-  }
-
-  it("auto-applies only in auto mode when the stamp moved and no dialog is open", () => {
-    expect(shouldAutoApplyAppUpdate(auto)).toBe(true);
-    expect(shouldAutoApplyAppUpdate({ ...auto, mode: "force" })).toBe(false);
-    expect(shouldApplyDeskUpdateNow(auto, "old", "new", root(null))).toBe(true);
-    expect(
-      shouldApplyDeskUpdateNow({ ...auto, mode: "force" }, "old", "new", root(null))
-    ).toBe(false);
-  });
-
-  it("waits while a dialog is open", () => {
-    const doc = root({} as Element);
-    expect(deskHasBlockingOverlay(doc)).toBe(true);
-    expect(shouldApplyDeskUpdateNow(auto, "old", "new", doc)).toBe(false);
-  });
-});

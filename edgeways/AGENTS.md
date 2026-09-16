@@ -14,16 +14,17 @@ src/lib/calc (Vitest-tested). Result-centric: record the real-world outcome,
 the app derives every market and auto-settles linked bets.
 
 ## Pre-flight (MANDATORY before any code change)
-1. List the files you intend to touch and the approach, in one short block.
-2. Read section 0 ("Repo conventions") of `docs/roadmap/implementation-briefs.md`
-   before your first change in a session.
-3. If the task touches calculations or settlement, read `docs/offer-command-centre.md`
-   and the relevant `src/lib/calc/*.test.ts` FIRST. Never change calc output
-   without adding/adjusting a test.
-4. If the task touches UI, read `docs/design-system.md` first.
-5. If the task is product scope or roadmap, STOP and defer to the planning flow.
-   Do not write code.
-6. Implement the smallest diff that satisfies the task.
+1. If the iterative-dev rule is already in context, follow its classify
+   table. Do not re-read this pre-flight as a second loop. Hosts without
+   that rule: read `../docs/cursor-workflow.md`.
+2. Announce files, approach, and `Ticket: EDGE-n|none` in one short block.
+3. Load only the matching skill plus one source of truth from that table.
+   Do not open design-system, briefs section 0, or offer-command-centre
+   unless the table says so.
+4. If the task is product scope or roadmap, STOP and defer to the planning
+   flow. Do not write code.
+5. Smallest verifiable increment, then the next. Do not batch an
+   unverified feature.
 
 ## Hard rules
 - British English. Commas, never em dashes.
@@ -42,6 +43,9 @@ the app derives every market and auto-settles linked bets.
   Adding consumers is fine; changing combinatorics or normalisation is not.
 - Git root is the PARENT directory (`MB app build/`). Run all npm commands from
   `edgeways/`.
+- UI verify is Orca's embedded browser (`orca tab create`). Aside (new
+  window) only if Orca cannot host or Sam names Aside. Never Playwright,
+  Chrome DevTools, system Chrome, or Computer Use for desk pages.
 
 ## Do NOT build (deferred by design)
 - No arbitrage or Kelly criterion features.
@@ -68,6 +72,8 @@ charging customers since 4 Sep 2026. Corrected 13 Sep 2026.
 - Calc engine: `src/lib/calc`
 - Offers logic: `src/lib/offers` (advantage.ts, do-next.ts)
 - Roadmap data: `src/content/roadmap.ts`
+- Release notes and Help: `src/content/release-notes.ts`,
+  `src/content/help/`. Voice: `../.cursor/rules/customer-copy.mdc`.
 - Product plan: `docs/roadmap/product-roadmap.md` is **canonical**; it wins over
   any older doc. Briefs: `docs/roadmap/implementation-briefs.md`. Origin context
   only: `../docs/PLAN.md`. Strategy research lives in parent `../docs/strategy/`,
@@ -84,28 +90,23 @@ charging customers since 4 Sep 2026. Corrected 13 Sep 2026.
   the mutation API.
 
 ## Skills, subagents and delegation
+Implementation loop: already-on `../.cursor/rules/iterative-dev.mdc`, or
+`../docs/cursor-workflow.md` if that rule is not in context. If skills did
+not auto-fire (Orca, CLI, cloud agents), `Read` the matching `SKILL.md`.
+Local / Cmd+K / qwen: no Linear, no MCP, no auditor subagents.
+
 Harness at the git root: Cursor reads `../.cursor/` (skills, agents, commands);
 Claude Code reads `../.claude/` (same content, mirrored). Map: `../docs/cursor-kit.md`.
+- `/iterative-dev`: classify → load one skill → increment → verify.
+- `/ticket-hygiene`: Linear only when a ticket applies (not always-on).
 - `/calc-change`: guarded workflow for any change to calc/settlement maths.
 - `/brief`: turn a roadmap item into an implementation brief in the
   `docs/roadmap/implementation-briefs.md` format, sized [local]/[strong]/[design-first].
 - `/delegate-local`: hand bounded, mechanical tasks to the local Ollama backbone.
 - Subagents: `calc-auditor`, `design-reviewer`, `consistency-checker`, `ux-qa-auditor`.
-- UI skills (auto-triggered): `design-system-consistency`, `design-taste`,
-  `ux-heuristics`, `visual-qa-loop`.
-- Model routing: `../docs/Local-vs-Cloud-Model-Strategy.md`, playbook
-  `../docs/ai-playbook.md`, always-on rule `../.cursor/rules/model-routing.mdc`.
-
-## Model routing (agents)
-
-You cannot switch the user's model picker. For non-trivial Edgeways work, if
-the current model is a poor fit, say so briefly once and recommend:
-
-- **Composer 2.5 / Grok 4.5** — routine cloud agent (Cursor Models pool).
-- **Kimi K3** — serious multi-file agent runs.
-- **Claude Opus 5 / Fable 5** — architecture, hard bugs, calc review, prose.
-- **Claude Code + Opus** — long autonomous harness loops.
-- **Local `qwen3-coder-ctx`** — bounded edits when the Ollama bridge is up.
-
-Calc/settlement: frontier + `/calc-change` + audit only. Prefer Composer/Grok
-over K3/Opus when the task is routine so Other Models budget lasts.
+- UI skills: `design-system-consistency`, `design-taste`, `ux-heuristics`,
+  `visual-qa-loop`.
+- Model routing: `../docs/Local-vs-Cloud-Model-Strategy.md`. Playbook:
+  `../docs/ai-playbook.md`. Always-on: `../.cursor/rules/model-routing.mdc`.
+  Prefer Composer/Grok for routine work. Calc/settlement: frontier +
+  `/calc-change` + audit only.

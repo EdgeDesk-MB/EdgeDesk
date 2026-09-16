@@ -5,6 +5,7 @@
  */
 
 import { SPORTS, isKnownSport, type SportValue } from "@/lib/sports";
+import { isEpDeskSport } from "@/lib/twoup/bookie-offers";
 
 export { SPORTS, isKnownSport };
 export type { SportValue };
@@ -20,6 +21,14 @@ export interface MarketDef {
 
 const TWO_WAY_MATCH: MarketDef[] = [
   { value: "match_winner", label: "Match winner", options: ["home", "away"] },
+  { value: "handicap", label: "Handicap" },
+  { value: "over_under", label: "Over/Under" },
+  { value: "other", label: "Other" },
+];
+
+/** NBA / NFL / MLB / NHL books list the two-way winner as Moneyline. */
+const MONEYLINE_MATCH: MarketDef[] = [
+  { value: "match_winner", label: "Moneyline", options: ["home", "away"] },
   { value: "handicap", label: "Handicap" },
   { value: "over_under", label: "Over/Under" },
   { value: "other", label: "Other" },
@@ -92,14 +101,14 @@ const SPORT_MARKET_OVERRIDES: Partial<Record<SportValue, MarketDef[]>> = {
   cycling: OUTRIGHT,
   rugby_union: TWO_WAY_MATCH,
   rugby_league: TWO_WAY_MATCH,
-  basketball: TWO_WAY_MATCH,
-  american_football: TWO_WAY_MATCH,
+  basketball: MONEYLINE_MATCH,
+  american_football: MONEYLINE_MATCH,
   boxing: TWO_WAY_MATCH,
   mma: TWO_WAY_MATCH,
   snooker: TWO_WAY_MATCH,
-  ice_hockey: TWO_WAY_MATCH,
+  ice_hockey: MONEYLINE_MATCH,
   volleyball: TWO_WAY_MATCH,
-  baseball: TWO_WAY_MATCH,
+  baseball: MONEYLINE_MATCH,
   esports: TWO_WAY_MATCH,
   other: [{ value: "other", label: "Other" }],
 };
@@ -122,6 +131,16 @@ MARKET_LABELS.two_up = "2UP";
 
 export function marketDef(sport: string, market: string): MarketDef | undefined {
   return (MARKETS[sport] ?? MARKETS.other).find((m) => m.value === market);
+}
+
+/**
+ * Early payout only applies to the sport's match-winner market:
+ * football Match odds, US-book Moneyline, otherwise Match winner.
+ */
+export function isEarlyPayoutMarket(sport: string, market: string): boolean {
+  if (!isEpDeskSport(sport) || sport === "other") return false;
+  if (sport === "football") return market === "match_odds";
+  return market === "match_winner";
 }
 
 /** Whether the result engine can settle this market from score / race result. */
@@ -201,10 +220,26 @@ export function formatCorrectScore(home: number, away: number): string {
   return `${Math.max(0, Math.floor(home))}-${Math.max(0, Math.floor(away))}`;
 }
 
+/** Canonical market-result tokens. Stored lowercase; shown sentence case. */
+const MARKET_SELECTION_LABELS: Record<string, string> = {
+  home: "Home",
+  away: "Away",
+  draw: "Draw",
+  yes: "Yes",
+  no: "No",
+  over: "Over",
+  under: "Under",
+  "home/draw": "Home/Draw",
+  "home/away": "Home/Away",
+  "draw/away": "Draw/Away",
+};
+
 /** Ensure the first letter of a selection label is capitalised for display. */
 export function capitaliseSelectionLabel(label: string): string {
   const t = label.trim();
   if (!t) return t;
+  const token = MARKET_SELECTION_LABELS[t.toLowerCase()];
+  if (token) return token;
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
@@ -214,9 +249,10 @@ export function teamSelectionLabel(
   homeTeam: string,
   awayTeam: string
 ): string {
-  if (value === "home") return capitaliseSelectionLabel(homeTeam.trim() || "Home");
-  if (value === "away") return capitaliseSelectionLabel(awayTeam.trim() || "Away");
-  if (value === "draw") return "Draw";
+  const key = value.trim().toLowerCase();
+  if (key === "home") return capitaliseSelectionLabel(homeTeam.trim() || "Home");
+  if (key === "away") return capitaliseSelectionLabel(awayTeam.trim() || "Away");
+  if (key === "draw") return "Draw";
   return capitaliseSelectionLabel(value);
 }
 
@@ -233,7 +269,15 @@ export function formatCorrectScoreLabel(
   return `${home} ${cs.home}–${cs.away} ${away}`;
 }
 
-/** Format a bet's selection for display in the tracker. */
+const TEAM_SELECTION_MARKETS = new Set([
+  "match_odds",
+  "match_winner",
+  "draw_no_bet",
+  "two_up",
+  "double_chance",
+]);
+
+/** Format a bet's selection for display. Tokens stay lowercase in storage. */
 export function formatBetSelection(
   market: string,
   selection: string,
@@ -244,11 +288,12 @@ export function formatBetSelection(
   const home = homeTeam ?? "";
   const away = awayTeam ?? "";
   if (market === "correct_score") return formatCorrectScoreLabel(selection, home, away);
+  const key = selection.trim().toLowerCase();
   if (
-    (market === "match_odds" || market === "draw_no_bet" || market === "two_up") &&
-    (selection === "home" || selection === "away" || selection === "draw")
+    TEAM_SELECTION_MARKETS.has(market) &&
+    (key === "home" || key === "away" || key === "draw")
   ) {
-    return teamSelectionLabel(selection, home, away);
+    return teamSelectionLabel(key, home, away);
   }
-  return selection;
+  return MARKET_SELECTION_LABELS[key] ?? selection;
 }

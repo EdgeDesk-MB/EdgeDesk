@@ -16,8 +16,11 @@ describe("pageLabelFromPathname", () => {
     expect(pageLabelFromPathname("/")).toBe("Home");
     expect(pageLabelFromPathname("/racing")).toBe("Racing Desk");
     expect(pageLabelFromPathname("/offers/calendar")).toBe("Offer calendar");
-    expect(pageLabelFromPathname("/calculators/ep-desk")).toBe("2UP Desk");
+    expect(pageLabelFromPathname("/early-payout")).toBe("Early-payout Desk");
+    expect(pageLabelFromPathname("/2up")).toBe("Early-payout Desk");
+    expect(pageLabelFromPathname("/calculators/ep-desk")).toBe("Early-payout Desk");
     expect(pageLabelFromPathname("/calculators/matched")).toBe("Matched betting");
+    expect(pageLabelFromPathname("/calculators/two-up")).toBe("Early Payout");
     expect(pageLabelFromPathname("/terms")).toBe("Terms of Service");
     expect(pageLabelFromPathname("/privacy")).toBe("Privacy Policy");
   });

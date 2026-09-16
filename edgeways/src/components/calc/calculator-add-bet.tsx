@@ -25,7 +25,12 @@ export function CalculatorAddBetButton({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} disabled={disabled} className={className}>
+      <Button
+        size="lg"
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        className={className}
+      >
         {children}
       </Button>
       {open ? (

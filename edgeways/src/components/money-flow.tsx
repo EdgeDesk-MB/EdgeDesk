@@ -115,7 +115,11 @@ function SplitFlow({
             />
           </>
         ) : (
-          `.${fracText}`
+          // Reserve NumberFlow's own vertical padding (mask fade allowance) up front,
+          // so mounting it doesn't grow the row height a beat after first paint.
+          <span className={animateFraction ? "inline-block py-[0.25em]" : undefined}>
+            .{fracText}
+          </span>
         ))}
       {suffix}
     </span>

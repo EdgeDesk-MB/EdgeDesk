@@ -32,6 +32,7 @@ import {
   normalizeFixtureBoardView,
 } from "@/lib/events/fixture-board-view";
 import { normalizeFavouriteScopeIds } from "@/lib/events/fixture-scope";
+import { normalizeBookieScopes } from "@/lib/twoup/bookie-offers";
 
 export type AppSettingsPatch = Partial<
   Omit<
@@ -88,6 +89,7 @@ function cloneSettings(settings: AppSettings): AppSettings {
     favouriteRacingCourses: [...(settings.favouriteRacingCourses ?? [])],
     hiddenFootballScopes: [...(settings.hiddenFootballScopes ?? [])],
     hiddenRacingCourses: [...(settings.hiddenRacingCourses ?? [])],
+    bookieScopes: [...(settings.bookieScopes ?? [])],
     fixtureBoardView: normalizeFixtureBoardView(settings.fixtureBoardView),
   };
 }
@@ -229,6 +231,7 @@ export function parseStoredSettings(raw: unknown): AppSettings {
     favouriteRacingCourses: normalizeFavouriteScopeIds(o.favouriteRacingCourses),
     hiddenFootballScopes: normalizeFavouriteScopeIds(o.hiddenFootballScopes),
     hiddenRacingCourses: normalizeFavouriteScopeIds(o.hiddenRacingCourses),
+    bookieScopes: normalizeBookieScopes(o.bookieScopes),
     fixtureBoardView: normalizeFixtureBoardView(o.fixtureBoardView),
     ...brand,
     uiFont: normalizeUiFont(typeof o.uiFont === "string" ? o.uiFont : undefined),
@@ -323,6 +326,9 @@ export function mergeAppSettings(
   }
   if (patch.hiddenRacingCourses != null) {
     next.hiddenRacingCourses = normalizeFavouriteScopeIds(patch.hiddenRacingCourses);
+  }
+  if (patch.bookieScopes != null) {
+    next.bookieScopes = normalizeBookieScopes(patch.bookieScopes);
   }
   if (patch.fixtureBoardView != null) {
     next.fixtureBoardView = mergeFixtureBoardView(next.fixtureBoardView, patch.fixtureBoardView);

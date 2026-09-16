@@ -11,11 +11,14 @@ export function BookmakerSelect({
   onChange,
   className,
   preferAvailable = true,
+  tagTrigger = false,
 }: {
   value: string;
   onChange: (name: string) => void;
   className?: string;
   preferAvailable?: boolean;
+  /** Add bet Back header: brand tag instead of colour dot + name */
+  tagTrigger?: boolean;
 }) {
   return (
     <VenueSelect
@@ -24,6 +27,7 @@ export function BookmakerSelect({
       className={className}
       preferAvailable={preferAvailable}
       compact
+      tagTrigger={tagTrigger}
       placeholder="Bookie"
     />
   );

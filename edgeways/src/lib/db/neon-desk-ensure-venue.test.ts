@@ -17,6 +17,7 @@ function account(partial: Partial<AccountRow> & Pick<AccountRow, "id" | "name" |
     isActive: 1,
     accessStatus: "available",
     notes: null,
+    notesSource: null,
     wrRemaining: 0,
     wrMinOdds: null,
     wrType: "stake",

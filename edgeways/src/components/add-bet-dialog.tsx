@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { AdvancedLaySection } from "@/components/calc/advanced-lay";
+import { AddBetAdvancedLayField } from "@/components/add-bet/advanced-lay-field";
 import {
   BackBookieBalanceStrip,
   bookieCashTopUpNeeded,
@@ -41,6 +41,12 @@ import {
   noLaySaveBetType,
   type FreeBetKind,
 } from "@/components/add-bet/back-bookie-balance-strip";
+import {
+  ExchangeBalanceIssue,
+  ExchangeBalanceWell,
+  editBetReservedLiability,
+  exchangeNeedsFunding,
+} from "@/components/add-bet/exchange-balance";
 import { backVenueKind } from "@/lib/accounts/resolve-venue";
 import { BookmakerSelect } from "@/components/calc/bookmaker-select";
 import { MoneyFlow } from "@/components/money-flow";
@@ -53,6 +59,7 @@ import {
   PanelInput,
   PanelTextInput,
   ProfitTable,
+  type OutcomeRow,
 } from "@/components/calc/bet-panels";
 import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { api } from "@/hooks/use-app-state";
@@ -92,13 +99,13 @@ import {
 } from "@/lib/calc";
 import { applyAccaBoost } from "@/lib/calc/acca-workflow";
 import { DutchOutcomesBuilder, inferMatchOddsSelection } from "@/components/calc/dutch-outcomes-builder";
-import { contrastText } from "@/lib/brands/exchanges";
 import {
   capitaliseSelectionLabel,
   defaultSelection,
   formatCorrectScore,
   inferSportFromBet,
   isKnownSport,
+  isEarlyPayoutMarket,
   marketDef,
   marketUsesLinkedEventSides,
   MARKETS,
@@ -157,6 +164,19 @@ import {
   parseOfferRules,
 } from "@/lib/offers/racing-offer-rules";
 import { sportDisplayLabel } from "@/lib/sports";
+import { AddBetEarlyPayoutField } from "@/components/add-bet/early-payout-field";
+import { useBookieScopes } from "@/hooks/use-bookie-scopes";
+import { earlyPayoutBothWinSides } from "@/lib/bets/two-up-windfall";
+import { isExplicitOneUp } from "@/lib/twoup/desk-view";
+import {
+  clampEpLeadBy,
+  defaultEpLeadBy,
+  formatEpRule,
+  scopeForBookieSport,
+  toEpDeskSport,
+  upsertEpScope,
+  withExplicitFootballEpLabel,
+} from "@/lib/twoup/bookie-offers";
 import { qualifyingOfferTriggerText } from "@/lib/offers/offer-track-bet";
 import {
   OfferRequirementHint,
@@ -168,7 +188,11 @@ import {
   placementBreachMessages,
   placementRequirementsFromImportant,
 } from "@/lib/offers/offer-placement-requirements";
-import { placementFieldWarningClass, sectionDescription } from "@/lib/ui/surface-styles";
+import {
+  fieldControlShadow,
+  placementFieldWarningClass,
+  sectionDescription,
+} from "@/lib/ui/surface-styles";
 import { readImportantTerms } from "@/lib/offers/offer-terms";
 import {
   bookmakerFromOfferPrefs,
@@ -267,7 +291,7 @@ export interface AddBetPrefill {
   refundRetention?: number;
   /** Mobile quick-log capture - the bet is flagged for later desktop review */
   quickLogged?: boolean;
-  /** J5: pre-set the Mug bet toggle (camouflage, excluded from edge analytics) */
+  /** J5: open as Mug bet (qualifying maths, purpose mug) */
   mug?: boolean;
   /** Open the Paste slip import as soon as the dialog mounts */
   autoOpenImport?: boolean;
@@ -280,17 +304,18 @@ export interface AddBetPrefill {
   omitEventDefaults?: boolean;
 }
 
-/** UI bet types: the four calc modes plus "no lay" (saved as qualifying
- * with zeroed lay - a deliberate back-only bet, e.g. mug bets), "dutch"
- * (saved as betType dutch with a legs array), and "boost" (J2b — qualifying
- * maths, stored as betType boost for Tracker/History categorisation). */
-type UiBetType = BetMode | "no_lay" | "dutch" | "boost";
+/** UI bet types: the four calc modes plus "mug" (qualifying maths, purpose
+ * mug), "no lay" (saved as qualifying with zeroed lay), "dutch" (saved as
+ * betType dutch with a legs array), and "boost" (J2b — qualifying maths,
+ * stored as betType boost for Tracker/History categorisation). */
+type UiBetType = BetMode | "mug" | "no_lay" | "dutch" | "boost";
 
 const betTypeLabels: Record<UiBetType, string> = {
   qualifying: "Qualifying",
   free_snr: "Free bet (SNR)",
   free_sr: "Free bet (SR)",
   risk_free: "Risk-free",
+  mug: "Mug bet",
   no_lay: "No lay",
   dutch: "Dutch",
   boost: "Boost",
@@ -355,6 +380,7 @@ export function AddBetDialog({
 }) {
   const { exchanges } = useExchanges();
   const { state: appState, refresh: refreshAppState } = useAppState(10_000);
+  const { setup: bookieSetup, persist } = useBookieScopes();
   const appSettings = appState?.settings;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
@@ -416,17 +442,20 @@ export function AddBetDialog({
   const [betType, setBetType] = useState<UiBetType>(appSettings?.defaultBetType ?? "qualifying");
   /** The calc/settlement mode behind the UI type */
   const calcBetType: BetMode =
-    betType === "no_lay" || betType === "dutch" || betType === "boost"
+    betType === "no_lay" ||
+    betType === "dutch" ||
+    betType === "boost" ||
+    betType === "mug"
       ? "qualifying"
       : betType;
   const noLay = betType === "no_lay";
   const isDutch = betType === "dutch";
   const isBoost = betType === "boost";
+  const isMug = betType === "mug";
   /** No-lay overlay: stake from free-bet balance without leaving No lay mode. */
   const [noLayFreeBet, setNoLayFreeBet] = useState<FreeBetKind | null>(null);
   const stakingFreeBet =
     isFreeBetBetType(calcBetType) || (noLay && noLayFreeBet != null);
-  const [mugBet, setMugBet] = useState(false);
   const [backStake, setBackStake] = useState(appSettings?.defaultBackStake ?? NaN);
   const [backOdds, setBackOdds] = useState(NaN);
   const [refundAmount, setRefundAmount] = useState(NaN);
@@ -436,7 +465,10 @@ export function AddBetDialog({
   const [boostPct, setBoostPct] = useState(NaN);
   const [layOdds, setLayOdds] = useState(NaN);
   const [exchange, setExchange] = useState<ExchangeRow | null>(null);
+  const [commissionPct, setCommissionPct] = useState(2);
   const [earlyPayout, setEarlyPayout] = useState(false);
+  const [epLeadBy, setEpLeadBy] = useState(2);
+  const epSport = toEpDeskSport(sport);
   const [advanced, setAdvanced] = useState(false);
   const [partLays, setPartLays] = useState<PartLay[]>([]);
   const [layStakeOverride, setLayStakeOverride] = useState<KeyedLayOverride | null>(null);
@@ -478,7 +510,9 @@ export function AddBetDialog({
     setBoostPct(NaN);
     setLayOdds(NaN);
     setExchange(null);
+    setCommissionPct(2);
     setEarlyPayout(false);
+    setEpLeadBy(2);
     setAdvanced(false);
     setPartLays([]);
     setLayStakeOverride(null);
@@ -495,6 +529,11 @@ export function AddBetDialog({
     if (!opts?.preserveFixtures) setKnownFixtures([]);
     setFetchedRunners([]);
     setRunnersFetchDone(false);
+  }
+
+  function applyExchange(ex: ExchangeRow | null, comm?: number) {
+    setExchange(ex);
+    if (ex) setCommissionPct(comm ?? ex.commissionPct);
   }
 
   const loadTrackedEvents = useCallback(() => {
@@ -637,7 +676,9 @@ export function AddBetDialog({
         editBet.layOdds
       );
       setBetType(
-        editBet.betType === "dutch"
+        editBet.purpose === "mug" && !unhedgedFree
+          ? "mug"
+          : editBet.betType === "dutch"
           ? "dutch"
           : editBet.betType === "boost"
             ? "boost"
@@ -655,7 +696,6 @@ export function AddBetDialog({
           ? (JSON.parse(editBet.legs) as AddBetPrefill["dutchLegs"])
           : undefined
       );
-      setMugBet(editBet.purpose === "mug" && !unhedgedFree);
       setBackStake(editBet.backStake);
       setBackOdds(editBet.backOdds);
       setRefundAmount(editBet.refundAmount ?? editBet.backStake);
@@ -667,7 +707,14 @@ export function AddBetDialog({
       setLayOdds(editBet.layOdds);
       setMarket(editBet.market);
       setSelection(editBet.selection);
-      setEarlyPayout(!!editBet.earlyPayout);
+      setEarlyPayout(
+        !!editBet.earlyPayout && isEarlyPayoutMarket(resolvedSport, editBet.market)
+      );
+      setEpLeadBy(
+        editBet.earlyPayout && isExplicitOneUp(editBet)
+          ? 1
+          : leadFromScope(editBet.bookmaker ?? "", resolvedSport)
+      );
       const editStakingFreeBet =
         isFreeBetBetType(editBet.betType) || unhedgedFree != null;
       setTriggerText(editStakingFreeBet ? "" : (editBet.triggerText ?? ""));
@@ -713,7 +760,7 @@ export function AddBetDialog({
         (editBet.exchangeId != null
           ? exchanges.find((e) => e.id === editBet.exchangeId)
           : undefined) ?? exchangeFromNotes(editBet.notes, exchanges);
-      if (ex) setExchange(ex);
+      if (ex) applyExchange(ex, editBet.commission * 100);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editBet?.id, events, exchanges]);
@@ -747,8 +794,7 @@ export function AddBetDialog({
       if (prefill.label !== undefined) setLabel(prefill.label);
       if (prefill.betType) setBetType(prefill.betType as UiBetType);
       if (prefill.mug) {
-        setMugBet(true);
-        setBetType("no_lay");
+        setBetType("mug");
       }
       if (prefill.backStake !== undefined) setBackStake(prefill.backStake);
       if (prefill.backOdds !== undefined) setBackOdds(prefill.backOdds);
@@ -792,7 +838,19 @@ export function AddBetDialog({
       } else if (prefill.selection) {
         setSelection(prefill.selection);
       }
-      if (prefill.earlyPayout !== undefined) setEarlyPayout(prefill.earlyPayout);
+      if (prefill.earlyPayout !== undefined) {
+        const prefillSport =
+          prefill.sport && isKnownSport(prefill.sport) ? prefill.sport : sport;
+        const prefillMarket = prefill.market ?? market;
+        setEarlyPayout(
+          !!prefill.earlyPayout && isEarlyPayoutMarket(prefillSport, prefillMarket)
+        );
+      }
+      if (prefill.earlyPayout) {
+        setEpLeadBy(
+          leadFromScope(prefill.bookmaker ?? bookmaker, prefill.sport ?? sport)
+        );
+      }
       if (prefill.dutchLegs) {
         setDutchLegs(prefill.dutchLegs);
         if (!prefill.betType) setBetType("dutch");
@@ -852,7 +910,7 @@ export function AddBetDialog({
       }
       if (prefill.exchangeId !== undefined) {
         const ex = exchanges.find((e) => e.id === prefill.exchangeId);
-        if (ex) setExchange(ex);
+        if (ex) applyExchange(ex);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -872,7 +930,7 @@ export function AddBetDialog({
         : undefined) ?? exchangeFromNotes(editBet.notes, exchanges);
     if (ex) {
       exchangeHydratedRef.current = true;
-      queueMicrotask(() => setExchange(ex));
+      queueMicrotask(() => applyExchange(ex, editBet.commission * 100));
     }
   }, [open, editBet, exchanges, exchange]);
 
@@ -885,11 +943,10 @@ export function AddBetDialog({
         : undefined) ??
       exchanges.find((e) => e.isDefault) ??
       exchanges[0];
-    queueMicrotask(() => setExchange(preferred));
+    queueMicrotask(() => applyExchange(preferred));
   }, [exchanges, exchange, prefill]);
 
-  const commission =
-    exchange?.commissionPct ?? (editBet ? editBet.commission * 100 : 2);
+  const commission = Number.isFinite(commissionPct) ? commissionPct : 2;
   const markets = MARKETS[sport] ?? MARKETS.other;
   const effectiveMarket = isDutch && sport === "football" ? "match_odds" : market;
   const currentMarket = marketDef(sport, effectiveMarket);
@@ -945,8 +1002,8 @@ export function AddBetDialog({
     [planInput, layStake]
   );
 
-  const outcomeRows = useMemo(
-    () => [
+  const outcomeRows = useMemo(() => {
+    const rows: OutcomeRow[] = [
       {
         label:
           calcBetType === "risk_free"
@@ -973,9 +1030,29 @@ export function AddBetDialog({
               })?.lines
             : undefined,
       },
-    ],
-    [preview, calcBetType, backStake, refundFace, refundRetention]
-  );
+    ];
+    if (earlyPayout && preview) {
+      const sides = earlyPayoutBothWinSides(preview);
+      rows.push({
+        label: epSport
+          ? `If ${formatEpRule(epSport, epLeadBy)}, and lay wins`
+          : "If early payout, and lay wins",
+        bookie: sides.bookie,
+        exchange: sides.exchange,
+        accent: "edge" as const,
+      });
+    }
+    return rows;
+  }, [
+    preview,
+    calcBetType,
+    backStake,
+    refundFace,
+    refundRetention,
+    earlyPayout,
+    epSport,
+    epLeadBy,
+  ]);
 
   /** Course/race-scoped campaign CTA: stay on that meeting, no freehand escape. */
   const courseScopeLocked =
@@ -1486,9 +1563,14 @@ export function AddBetDialog({
     if (pendingFixture) return;
     if (manualEntry || eventId !== "none" || !homeTeam.trim() || !awayTeam.trim()) return;
     const match = findTrackedEvent(events, homeTeam, awayTeam, sport);
-    if (match) applyTrackedEvent(match as EventLite);
+    if (match) {
+      applyTrackedEvent(match as EventLite);
+      return;
+    }
+    const fixture = findRewardEventMatch(knownFixtures, homeTeam, awayTeam, sport);
+    if (fixture) applyPendingFixture(fixture);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [homeTeam, awayTeam, sport, events, manualEntry, pendingFixture]);
+  }, [homeTeam, awayTeam, sport, events, knownFixtures, manualEntry, pendingFixture]);
 
   // When dialog opens with a pre-selected event id, apply its details once events load
   useEffect(() => {
@@ -1667,12 +1749,20 @@ export function AddBetDialog({
     setAwayTeam("");
     setManualEntry(false);
     setEarlyPayout(false);
+    setEpLeadBy(leadFromScope(bookmaker, next));
   }
 
   function changeMarket(m: string) {
     setMarket(m);
     setSelection(defaultSelection(sport, m));
-    if (m !== "match_odds") setEarlyPayout(false);
+    if (!isEarlyPayoutMarket(sport, m)) setEarlyPayout(false);
+  }
+
+  function leadFromScope(bookie: string, nextSport: string) {
+    const nextEp = toEpDeskSport(nextSport);
+    if (!nextEp) return 2;
+    const scoped = scopeForBookieSport(bookieSetup, bookie, nextEp);
+    return scoped ? clampEpLeadBy(scoped.leadBy) : defaultEpLeadBy(nextEp);
   }
 
   /** Dutch type: the builder computes (and may override) stakes, this maps
@@ -1743,7 +1833,7 @@ export function AddBetDialog({
       if (fields.exchangeName?.trim() && source === "exchange") {
         const name = fields.exchangeName.trim().toLowerCase();
         const ex = exchanges.find((e) => e.name.toLowerCase().includes(name) || name.includes(e.name.toLowerCase()));
-        if (ex) setExchange(ex);
+        if (ex) applyExchange(ex);
       }
       if (fields.marketHint === "win" || fields.marketHint === "place") {
         setMarket(fields.marketHint);
@@ -2131,8 +2221,23 @@ export function AddBetDialog({
       toast.error("Enter a valid correct score");
       return;
     }
+    const scopeBookie = bookmaker || prefill?.bookmaker || "";
+    const scopeSport = toEpDeskSport(sport);
     setSaving(true);
     try {
+      if (earlyPayout && scopeBookie && scopeSport) {
+        try {
+          await persist(
+            upsertEpScope(bookieSetup, {
+              bookie: scopeBookie,
+              sport: scopeSport,
+              leadBy: clampEpLeadBy(epLeadBy),
+            }).scopes
+          );
+        } catch {
+          /* persist already toasts */
+        }
+      }
       const resolvedEventId = await resolveEventIdForSave();
 
       const resolvedBookmaker = bookmaker || prefill?.bookmaker || "";
@@ -2141,15 +2246,20 @@ export function AddBetDialog({
 
       await creditBackStakeIfNeeded(resolvedBookmaker, backStake);
 
-      const payload = {
-        label: stripStaleHorseFromRacingBetLabel(
-          withFootballSelectionLabel(
-            label ||
-              prefill?.labelSuggestion ||
-              `${currentMarket?.label ?? market} ${selection}`.trim()
-          ),
-          selection
+      const rawLabel = stripStaleHorseFromRacingBetLabel(
+        withFootballSelectionLabel(
+          label ||
+            prefill?.labelSuggestion ||
+            `${currentMarket?.label ?? market} ${selection}`.trim()
         ),
+        selection
+      );
+
+      const payload = {
+        label:
+          earlyPayout && scopeSport === "football"
+            ? withExplicitFootballEpLabel(rawLabel, epLeadBy)
+            : rawLabel,
         eventId: resolvedEventId ?? null,
         // Boost Place bet may leave market unset until the user picks a sport.
         market: market || "other",
@@ -2176,7 +2286,7 @@ export function AddBetDialog({
             ? ""
             : undefined
           : triggerText.trim() || prefill?.triggerText || undefined,
-        purpose: mugBet ? "mug" : editBet?.purpose === "mug" ? null : undefined,
+        purpose: isMug ? "mug" : editBet?.purpose === "mug" ? null : undefined,
         expectedProfit: noLay ? undefined : Number(preview!.guaranteed.toFixed(2)),
         notes: prefill?.notes ?? (!noLay && exchange ? `Exchange: ${exchange.name}` : undefined),
         offerId: resolvedOfferId,
@@ -2247,6 +2357,51 @@ export function AddBetDialog({
     }
   }
 
+  const showEpToggle = !!(epSport && isEarlyPayoutMarket(sport, effectiveMarket));
+  const reservedLayLiability = editBetReservedLiability(editBet, exchange?.id);
+  const layExceedsBalance =
+    !noLay &&
+    exchangeNeedsFunding(
+      appState?.balances?.accounts,
+      exchange?.id,
+      exchange?.name ?? "",
+      preview?.totalLiability ?? 0,
+      reservedLayLiability
+    );
+
+  const bookieBalanceStrip = (
+    <BackBookieBalanceStrip
+      bookmaker={bookmaker}
+      betType={calcBetType}
+      backStake={backStake}
+      accounts={appState?.balances?.accounts}
+      reservedCredit={
+        stakingFreeBet ? reservedFreeBetCredit : reservedCashCredit
+      }
+      usingFreeBet={noLay && noLayFreeBet != null}
+      addBalance={effectiveAddBalance}
+      onAddBalanceChange={needsAddBalance ? setAddBalance : undefined}
+      onUseFreeBet={(amount) => {
+        if (noLay) {
+          // Stay in No lay; stake from free-bet balance (SNR default).
+          setNoLayFreeBet((prev) => prev ?? "snr");
+        } else if (!isFreeBetBetType(calcBetType)) {
+          // Qualifying / risk-free cannot stake FB - switch into SNR mode.
+          setBetType("free_snr");
+        }
+        setBackStake(amount);
+        setAddBalance(false);
+      }}
+      onUseCash={
+        noLay && noLayFreeBet != null
+          ? () => {
+              setNoLayFreeBet(null);
+            }
+          : undefined
+      }
+    />
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -2294,10 +2449,10 @@ export function AddBetDialog({
                     className={cn(
                       "absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 transition-colors",
                       triggerLinkedFromLabel && triggerText === labelOfferTrigger
-                        ? "text-violet-600 dark:text-violet-400"
-                        : "text-violet-500/70 hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400"
+                        ? "text-edge"
+                        : "text-edge/70 hover:bg-edge/10 hover:text-edge"
                     )}
-                    title="Offer detected in label — click to apply to Offer trigger"
+                    title="Offer detected in label, click to apply to Offer trigger"
                     aria-label="Apply offer trigger from label"
                   >
                     <Zap className="size-4" />
@@ -2313,8 +2468,8 @@ export function AddBetDialog({
                 )}
               </div>
               {labelHasOfferTrigger && !stakingFreeBet && !triggerText.trim() ? (
-                <p className="text-[11px] text-violet-700 dark:text-violet-300">
-                  Offer phrase detected — applying to Offer trigger.
+                <p className="text-[11px] text-edge">
+                  Offer phrase detected, applying to Offer trigger.
                 </p>
               ) : null}
             </div>
@@ -2711,9 +2866,27 @@ export function AddBetDialog({
                   </div>
                 )}
             </div>
+            {!isBoost && !stakingFreeBet ? (
+              <BetOfferTriggerField
+                value={triggerText}
+                onChange={handleTriggerTextChange}
+                preview={aiTriggerPreview}
+                needsEventLink={
+                  aiTriggerPreview.recognised &&
+                  aiTriggerPreview.lines.some((l) => l.includes("if selection finishes")) &&
+                  eventId === "none" &&
+                  !selection.trim()
+                }
+                needsTeamNames={
+                  aiTriggerPreview.lines.some((l) => l.includes("settles the bet")) &&
+                  eventId === "none" &&
+                  !effectiveHome
+                }
+              />
+            ) : null}
           </div>
 
-          {/* Right - back/lay & triggers */}
+          {/* Right - back, early payout, lay */}
           <div className="flex flex-col gap-3 p-6">
             {isDutch ? (
               <DutchOutcomesBuilder
@@ -2736,10 +2909,25 @@ export function AddBetDialog({
               venue={bookmaker}
               chip={
                 <BookmakerSelect
+                  tagTrigger
                   value={bookmaker}
-                  onChange={setBookmaker}
+                  onChange={(next) => {
+                    setBookmaker(next);
+                    setEpLeadBy(leadFromScope(next, sport));
+                  }}
                   className="[--pi:var(--panel)] [--pi-dark:var(--panel-dark)]"
                 />
+              }
+              footer={
+                showEpToggle && epSport ? (
+                  <AddBetEarlyPayoutField
+                    enabled={earlyPayout}
+                    onEnabledChange={setEarlyPayout}
+                    sport={epSport}
+                    leadBy={epLeadBy}
+                    onLeadByChange={(next) => setEpLeadBy(clampEpLeadBy(next))}
+                  />
+                ) : null
               }
             >
               {market === "correct_score" && sport === "football" ? (
@@ -2766,6 +2954,7 @@ export function AddBetDialog({
                       }
                       className={cn(
                         "h-8 w-12 shrink-0 rounded border-0 bg-black/10 px-1 text-center text-base font-bold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/95",
+                        fieldControlShadow,
                         ring(!csParsed)
                       )}
                     />
@@ -2782,6 +2971,7 @@ export function AddBetDialog({
                       }
                       className={cn(
                         "h-8 w-12 shrink-0 rounded border-0 bg-black/10 px-1 text-center text-base font-bold tabular-nums text-black/85 outline-none focus:ring-2 focus:ring-primary/40 dark:bg-white/10 dark:text-white/95",
+                        fieldControlShadow,
                         ring(!csParsed)
                       )}
                     />
@@ -2844,37 +3034,6 @@ export function AddBetDialog({
                   inputClassName={ring(!selection.trim())}
                 />
               )}
-              <BackBookieBalanceStrip
-                bookmaker={bookmaker}
-                betType={calcBetType}
-                backStake={backStake}
-                accounts={appState?.balances?.accounts}
-                reservedCredit={
-                  stakingFreeBet ? reservedFreeBetCredit : reservedCashCredit
-                }
-                usingFreeBet={noLay && noLayFreeBet != null}
-                addBalance={effectiveAddBalance}
-                onAddBalanceChange={needsAddBalance ? setAddBalance : undefined}
-                onUseFreeBet={(amount) => {
-                  if (noLay) {
-                    // Stay in No lay; stake from free-bet balance (SNR default).
-                    setNoLayFreeBet((prev) => prev ?? "snr");
-                    setMugBet(false);
-                  } else if (!isFreeBetBetType(calcBetType)) {
-                    // Qualifying / risk-free cannot stake FB - switch into SNR mode.
-                    setBetType("free_snr");
-                  }
-                  setBackStake(amount);
-                  setAddBalance(false);
-                }}
-                onUseCash={
-                  noLay && noLayFreeBet != null
-                    ? () => {
-                        setNoLayFreeBet(null);
-                      }
-                    : undefined
-                }
-              />
               {stakingFreeBet && bookieFbAvailable > 0.001 ? (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
@@ -2907,6 +3066,19 @@ export function AddBetDialog({
               ) : null}
               <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                 <PanelInput
+                  label="Back odds"
+                  value={backOdds}
+                  onChange={setBackOdds}
+                  min={1}
+                  placeholder="3.00"
+                  invalid={requirementBreaches.oddsLow}
+                  describedBy="add-bet-offer-req"
+                  inputClassName={cn(
+                    ring(!(backOdds > 1)),
+                    requirementBreaches.oddsLow && placementFieldWarningClass
+                  )}
+                />
+                <PanelInput
                   label={stakingFreeBet ? "Free bet stake" : "Back stake"}
                   prefix="£"
                   value={backStake}
@@ -2925,20 +3097,8 @@ export function AddBetDialog({
                       "bg-violet-500/10 ring-violet-500/30 focus:ring-violet-500/45 dark:bg-violet-500/15"
                   )}
                 />
-                <PanelInput
-                  label="Back odds (decimal)"
-                  value={backOdds}
-                  onChange={setBackOdds}
-                  min={1}
-                  placeholder="3.00"
-                  invalid={requirementBreaches.oddsLow}
-                  describedBy="add-bet-offer-req"
-                  inputClassName={cn(
-                    ring(!(backOdds > 1)),
-                    requirementBreaches.oddsLow && placementFieldWarningClass
-                  )}
-                />
               </div>
+              {bookieBalanceStrip}
               <OfferRequirementHint
                 id="add-bet-offer-req"
                 messages={placementBreachMessages(offerRequirements, requirementBreaches)}
@@ -2984,7 +3144,10 @@ export function AddBetDialog({
                           placeholder="30"
                           value={Number.isFinite(boostPct) ? boostPct : ""}
                           onChange={(e) => setBoostPct(parseFloat(e.target.value))}
-                          className="h-8 w-full rounded-md border-0 bg-[var(--pi)] pr-7 pl-2 text-sm font-semibold tabular-nums text-black/85 outline-none ring-primary/40 placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40"
+                          className={cn(
+                            "h-8 w-full rounded-md border-0 bg-[var(--pi)] pr-7 pl-2 text-sm font-semibold tabular-nums text-black/85 outline-none ring-primary/40 placeholder:font-medium placeholder:text-black/40 focus:ring-2 dark:bg-[var(--pi-dark)] dark:text-white/95 dark:placeholder:text-white/40",
+                            fieldControlShadow
+                          )}
                         />
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-black/55 dark:text-white/65">
                           %
@@ -3017,49 +3180,43 @@ export function AddBetDialog({
               title="Lay Bet"
               exchange={exchange}
               chip={
-                <span className="flex items-center gap-2.5">
-                  {exchange && (
-                    <span
-                      className="rounded px-2 py-0.5 text-[11px] font-bold"
-                      style={{
-                        backgroundColor: exchange.brandColor,
-                        color: contrastText(exchange.brandColor),
-                      }}
-                    >
-                      {exchange.name.toUpperCase()}
-                    </span>
-                  )}
-                  <label className="flex items-center gap-1.5 text-xs font-semibold text-black/70 dark:text-white/80">
-                    Advanced
-                    <Switch
-                      tone="onPanel"
-                      className="scale-90"
-                      checked={advanced}
-                      onCheckedChange={(on) => {
-                        setAdvanced(on);
-                        if (!on) {
-                          setPartLays([]);
-                          setLayStakeOverride(null);
-                          setLaySnap(null);
-                        } else {
-                          setLaySnap("standard");
-                        }
-                      }}
-                    />
-                  </label>
-                </span>
+                <ExchangeSelect
+                  compact
+                  tagTrigger
+                  exchanges={exchanges}
+                  value={exchange}
+                  onChange={applyExchange}
+                />
+              }
+              footer={
+                <AddBetAdvancedLayField
+                  enabled={advanced}
+                  onEnabledChange={(on) => {
+                    setAdvanced(on);
+                    if (!on) {
+                      setPartLays([]);
+                      setLayStakeOverride(null);
+                      setLaySnap(null);
+                    } else {
+                      setLaySnap("standard");
+                    }
+                  }}
+                  bounds={bounds}
+                  layStake={layStake}
+                  onLayStake={(v) =>
+                    setLayStakeOverride(commitLayStakeOverride(v, layCalcKey))
+                  }
+                  lockedSnap={laySnap}
+                  onLockedSnap={setLaySnap}
+                  partLays={partLays}
+                  onPartLays={setPartLays}
+                  accent={exchange?.brandColor ?? "#1e293b"}
+                />
               }
             >
               <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-                <ExchangeSelect
-                  onPanel
-                  exchanges={exchanges}
-                  value={exchange}
-                  onChange={setExchange}
-                  showCommission
-                />
                 <PanelInput
-                  label="Lay odds (decimal)"
+                  label="Lay odds"
                   value={layOdds}
                   onChange={setLayOdds}
                   min={1}
@@ -3067,82 +3224,26 @@ export function AddBetDialog({
                   inputClassName={ring(!(layOdds > 1))}
                   exchangeOddsStepping
                 />
+                <LayStakeBanner
+                  value={layStake}
+                  pending={!planInput}
+                  onChange={(v) => {
+                    setLaySnap(null);
+                    setLayStakeOverride(commitLayStakeOverride(v, layCalcKey));
+                  }}
+                />
               </div>
-              {advanced &&
-                (bounds ? (
-                  <AdvancedLaySection
-                    bounds={bounds}
-                    layStake={layStake}
-                    onLayStake={(v) =>
-                      setLayStakeOverride(commitLayStakeOverride(v, layCalcKey))
-                    }
-                    lockedSnap={laySnap}
-                    onLockedSnap={setLaySnap}
-                    partLays={partLays}
-                    onPartLays={setPartLays}
-                    accent={exchange?.brandColor ?? "#1e293b"}
-                  />
-                ) : (
-                  <p className="text-xs text-black/60 dark:text-white/60">
-                    Enter back stake, back odds and lay odds to unlock part lays and the
-                    underlay/overlay slider.
-                  </p>
-                ))}
-              <LayStakeBanner
-                value={layStake}
-                fillSelection={selection || label}
-                pending={!planInput}
-                onChange={(v) => {
-                  setLaySnap(null);
-                  setLayStakeOverride(commitLayStakeOverride(v, layCalcKey));
-                }}
-              />
+              <div className="flex flex-col gap-1">
+                <ExchangeBalanceWell
+                  exchangeName={exchange?.name ?? ""}
+                  exchangeId={exchange?.id}
+                  accounts={appState?.balances?.accounts}
+                />
+                {layExceedsBalance ? <ExchangeBalanceIssue /> : null}
+              </div>
             </LayPanel>
             )}
 
-            {(betType === "qualifying" || (betType === "no_lay" && !noLayFreeBet)) && (
-              <div className="flex items-center justify-between rounded-md border px-3 py-2">
-                <div>
-                  <div className="text-sm font-medium">Mug bet (camouflage)</div>
-                  <div className="text-xs text-muted-foreground">
-                    Real money, but excluded from every edge metric - keeps the account
-                    looking human
-                  </div>
-                </div>
-                <Switch checked={mugBet} onCheckedChange={setMugBet} />
-              </div>
-            )}
-
-            {market === "match_odds" && (
-              <div className="flex items-center justify-between rounded-md border px-3 py-2">
-                <div>
-                  <div className="text-sm font-medium">2UP early payout</div>
-                  <div className="text-xs text-muted-foreground">
-                    Bookie pays out when the selection goes 2 goals ahead
-                  </div>
-                </div>
-                <Switch checked={earlyPayout} onCheckedChange={setEarlyPayout} />
-              </div>
-            )}
-
-            {!isBoost && !stakingFreeBet ? (
-              <BetOfferTriggerField
-                value={triggerText}
-                onChange={handleTriggerTextChange}
-                preview={aiTriggerPreview}
-                needsEventLink={
-                  aiTriggerPreview.recognised &&
-                  aiTriggerPreview.lines.some((l) => l.includes("if selection finishes")) &&
-                  eventId === "none" &&
-                  !selection.trim()
-                }
-                needsTeamNames={
-                  aiTriggerPreview.lines.some((l) => l.includes("settles the bet")) &&
-                  eventId === "none" &&
-                  !effectiveHome
-                }
-              />
-            ) : null}
               </>
             )}
           </div>
@@ -3193,7 +3294,8 @@ export function AddBetDialog({
             )}
           </div>
           )}
-          <div className="flex justify-end gap-2 px-6 pb-4 pt-2">
+          <div className="flex items-center justify-end gap-3 px-6 pb-4 pt-2">
+          <div className="flex shrink-0 justify-end gap-2">
           {editBet && (
             <Button
               type="button"
@@ -3227,6 +3329,7 @@ export function AddBetDialog({
           >
             {editBet ? "Save changes" : "Save bet"}
           </DialogSaveButton>
+          </div>
           </div>
         </div>
         <div

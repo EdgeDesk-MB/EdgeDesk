@@ -58,8 +58,8 @@ function ensureExchangeRow(name: string): ExchangeRow {
       name: name.trim(),
       commissionPct: preset?.commissionPct ?? 2,
       brandColor: preset?.brandColor ?? "#3f3f46",
-      backColor: preset?.backColor ?? "#a6d8ff",
-      layColor: preset?.layColor ?? "#fac9d1",
+      backColor: preset?.backColor ?? "#A7D8FF",
+      layColor: preset?.layColor ?? "#FBC9D2",
       isDefault: 0,
       createdAt: Date.now(),
     })

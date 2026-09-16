@@ -1,8 +1,11 @@
+/** Voice: `.cursor/rules/customer-copy.mdc`. Benefit first, one idea per line. */
+
 export type HelpGuideSlug =
   | "getting-started"
   | "how-it-works"
   | "desk-how-tos"
   | "racing-desk"
+  | "twoup-desk"
   | "offers"
   | "calculators"
   | "mobile"
@@ -161,7 +164,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         bullets: [
           "Do next ranks offers using: measured retention + EV basis + bookie health (gubbed sinks, never hides) + funding checks + measured £/hr.",
           "Do next ranks today's offer work; timed races, kickoffs and acca lay-due legs also raise alerts.",
-          "The 2UP Desk consumes tracked-event live scores; the Acca Desk consumes event results; the Racing Desk consumes racecards plus your racing offers.",
+          "The Early-payout Desk consumes tracked-event live scores; the Acca Desk consumes event results; the Racing Desk consumes racecards plus your racing offers.",
           "Alerts feed from: naked exposure (deliberately-unlaid mug bets exempt), 2UP locks, offer expiry, the morning daily tasks digest, acca lay-due, and the weekly digest.",
         ],
       },
@@ -215,10 +218,10 @@ export const HELP_GUIDES: HelpGuide[] = [
         ],
       },
       {
-        heading: "Racing Desk and the 2UP Desk",
+        heading: "Racing Desk and the Early-payout Desk",
         bullets: [
           "Racing: add a place-refund offer first - Intelligence then scores today's races by offer fit, field size and EV. Lay opens the calculator with real odds; Basic-tier results auto-settle.",
-          "2UP: track the match, the desk watches for 2-goals-ahead, alerts the early-payout trigger, and computes the equalising lock trades live.",
+          "Early payout: football 2UP is modelled here (track the match, watch 2-goals-ahead, lock). Other sports with an early-payout flag sit on Active. Set result there writes the same bet as Profit Tracker.",
         ],
       },
       {
@@ -246,6 +249,44 @@ export const HELP_GUIDES: HelpGuide[] = [
           "Alerts inbox (+ badge) holds everything; push mirrors to your phone once enabled from a secure origin (see On your phone).",
           "The weekly digest (Settings → opt-in) lands Monday morning: the week's edge, leaks, drought nudges.",
           "The command palette (⌘K) reaches every page and quick action; the mobile Quick actions sheet mirrors it.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "twoup-desk",
+    title: "Early-payout Desk guide",
+    description: "How to live on the early-payout desk: fixtures, picks, books, and the football model.",
+    sections: [
+      {
+        heading: "What the Early-payout Desk does",
+        paragraphs: [
+          "One desk for early-payout positions. Football 2UP is the modelled form: browse today's football, mark the books you use and the lead that pays, track matches, and open the Dixon-Coles model when you have prices. Baseball and other sports with an early-payout flag appear on Active.",
+        ],
+      },
+      {
+        heading: "The board",
+        bullets: [
+          "Fixtures is the same football tape as the Fixtures page. There is no baseball day board yet.",
+          "2UP picks uses Edge scout on the football competitions you pin. Pin a league first.",
+          "Tracked is the football matches you already follow. Active is open early-payout bets from any sport. Set result, Edit and links update Profit Tracker.",
+          "Open model on a football row to load that match. The URL keeps the teams so refresh stays on it.",
+        ],
+      },
+      {
+        heading: "Scope",
+        bullets: [
+          "Pick one bookie, then set the sports and the lead that pays. Football is 2UP or 1UP. Other sports use a lead, such as baseball five runs ahead.",
+          "The same rules live on Accounts → Scope. Add bet and Offers can suggest a write. You confirm. Decline still saves.",
+          "This is a wallet filter, not a finder. We do not scrape bookie sites.",
+        ],
+      },
+      {
+        heading: "The model",
+        bullets: [
+          "Paste exchange backs, lays, Over 2.5 and BTTS, plus the early-payout prices.",
+          "Offers, Dutch, Lay and Live compare structures on the same stake. 1UP is optional.",
+          "The simple Early Payout calculator stays under Calculators for a single back and lay.",
         ],
       },
     ],
@@ -375,7 +416,7 @@ export const HELP_GUIDES: HelpGuide[] = [
         bullets: [
           "Matched Betting - qualifiers, free bets (SNR/SR), risk-free. The workhorse.",
           "Dutching - equal-profit across outcomes, with stake rounding and per-leg overrides. Use 2UP dutch mode for early-payout windfalls.",
-          "Early Payout (2UP) - back a 2UP bookie, lay the exchange, see windfall scenarios.",
+          "Early Payout - back an early-payout bookie, lay the exchange, see windfall when the lead pays.",
           "Each Way & Extra Place - standard EW arbs and extra-place offers.",
           "Sequential Lay - part lays at earlier odds, finish at current market.",
           "Refund-If - money-back-if-you-lose with free-bet or cash retention.",
@@ -385,7 +426,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Pro",
         bullets: [
-          "2UP Desk - Dixon-Coles 2UP modelling with dutch vs lay ranking and live settlement. Turn on 1UP to add those prices and mixed thresholds. Use when you want model-driven EV, not just snapshot maths.",
+          "Early-payout Desk lives under Live desks, not here. Use it for today's football fixtures, Edge 2UP picks, and the Dixon-Coles model.",
         ],
       },
       {
@@ -399,7 +440,7 @@ export const HELP_GUIDES: HelpGuide[] = [
       {
         heading: "Add to tracker",
         paragraphs: [
-          "Every calculator has an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, save, then settle from Profit Tracker. Bookie and exchange wallets move when you place and when you settle. When football fixtures are connected, 2UP Desk and 2UP can find-or-create the real fixture automatically.",
+          "Every calculator has an “Add to tracker” button. Numbers pre-fill the Add bet dialog - review, link an event, save, then settle from Profit Tracker. Bookie and exchange wallets move when you place and when you settle. When football fixtures are connected, Early-payout Desk and the Early Payout calculator can find-or-create the real fixture automatically.",
         ],
       },
       {

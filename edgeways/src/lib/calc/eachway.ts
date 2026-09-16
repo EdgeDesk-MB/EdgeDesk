@@ -18,6 +18,8 @@ export interface EachWayInput {
   layWinOdds: number;
   layPlaceOdds: number;
   commission: number;
+  layWinStakeOverride?: number;
+  layPlaceStakeOverride?: number;
 }
 
 export interface EachWayResult {
@@ -34,7 +36,7 @@ export interface EachWayResult {
 }
 
 export function eachWay(input: EachWayInput): EachWayResult {
-  const lays = eachWayLayStakes({
+  const computed = eachWayLayStakes({
     stakePerPart: input.stake,
     winOdds: input.winOdds,
     placeFraction: input.placeFraction,
@@ -42,14 +44,23 @@ export function eachWay(input: EachWayInput): EachWayResult {
     layPlaceOdds: input.layPlaceOdds,
     commission: input.commission,
   });
+  const layWinStake = input.layWinStakeOverride ?? computed.layWinStake;
+  const layPlaceStake = input.layPlaceStakeOverride ?? computed.layPlaceStake;
+  const lays = {
+    placeOdds: computed.placeOdds,
+    layWinStake,
+    layWinLiability: layWinStake * (input.layWinOdds - 1),
+    layPlaceStake,
+    layPlaceLiability: layPlaceStake * (input.layPlaceOdds - 1),
+  };
 
   const layInput = {
     stakePerPart: input.stake,
     winOdds: input.winOdds,
     placeFraction: input.placeFraction,
-    layWinStake: lays.layWinStake,
+    layWinStake,
     layWinOdds: input.layWinOdds,
-    layPlaceStake: lays.layPlaceStake,
+    layPlaceStake,
     layPlaceOdds: input.layPlaceOdds,
     commission: input.commission,
   };

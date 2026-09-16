@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { ExchangeNamePicker } from "@/components/bookie-name-picker";
 import { ThemeSelect } from "@/components/theme-select";
 import {
-  brandChipCountInverse,
+  brandChipCount,
   captionHeading,
   coreNavTag,
   edgeMarkerPill,
@@ -47,6 +47,7 @@ import {
   Puzzle,
   Radio,
   Scale,
+  Timer,
   Zap,
   Wallet,
 } from "lucide-react";
@@ -54,7 +55,7 @@ import { requiredPlan } from "@/lib/entitlements/plans";
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import type { FeatureFlag } from "@/lib/entitlements/features";
 import { planLockCopy } from "@/lib/entitlements/nav";
-import { FootballIcon, HorseRacingIcon } from "@/components/sport-icon";
+import { HorseRacingIcon } from "@/components/sport-icon";
 import { useAddBalance } from "@/components/add-balance-provider";
 import { useAddBet } from "@/components/add-bet-provider";
 import { useMatchedCalculator } from "@/components/matched-calculator-provider";
@@ -215,19 +216,19 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         kind: "link",
         href: "/racing",
-        label: "Racing Desk",
+        label: "Racing",
         icon: HorseRacingIcon,
         livePulse: "racing",
       },
       {
         kind: "link",
-        href: "/calculators/ep-desk",
-        label: "2UP Desk",
-        icon: FootballIcon,
+        href: "/early-payout",
+        label: "Early-payout",
+        icon: Timer,
       },
       {
         kind: "group",
-        label: "Combo Desk",
+        label: "Combo",
         icon: Layers,
         href: "/acca",
         baseHref: "/acca",
@@ -315,7 +316,7 @@ export function isLinkActive(pathname: string, href: string): boolean {
   }
   if (href === "/calculators") {
     return (
-      pathname.startsWith("/calculators") && !pathname.startsWith("/calculators/ep-desk")
+      pathname.startsWith("/calculators")
     );
   }
   return pathname.startsWith(href);
@@ -324,7 +325,7 @@ export function isLinkActive(pathname: string, href: string): boolean {
 export function ActionBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className={brandChipCountInverse}>
+    <span className={brandChipCount}>
       {count > 9 ? "9+" : count}
     </span>
   );

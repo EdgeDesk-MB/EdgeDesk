@@ -34,6 +34,7 @@ import { normalizeTimeFormat, setDisplayTimeFormat } from "@/lib/time-format";
 import { normalizeUiFont } from "@/lib/ui-font";
 import { normalizeHeaderPattern } from "@/lib/header-pattern";
 import type { AppSettingsPatch } from "./settings-merge";
+import { normalizeBookieScopes } from "@/lib/twoup/bookie-offers";
 
 export type { AppSettings, OfferBetPref };
 export type { AppSettingsPatch } from "./settings-merge";
@@ -118,6 +119,15 @@ function parseFavouriteScopeIds(raw: string | undefined): string[] {
   }
 }
 
+function parseBookieScopes(raw: string | undefined) {
+  if (!raw) return [];
+  try {
+    return normalizeBookieScopes(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 export function getAppSettings(): AppSettings {
   const stake = parseFloat(readRaw("defaultBackStake") ?? "");
   const poll = parseInt(readRaw("dashboardPollMs") ?? "", 10);
@@ -170,6 +180,7 @@ export function getAppSettings(): AppSettings {
     favouriteRacingCourses: parseFavouriteScopeIds(readRaw("favouriteRacingCourses")),
     hiddenFootballScopes: parseFavouriteScopeIds(readRaw("hiddenFootballScopes")),
     hiddenRacingCourses: parseFavouriteScopeIds(readRaw("hiddenRacingCourses")),
+    bookieScopes: parseBookieScopes(readRaw("bookieScopes")),
     fixtureBoardView: parseFixtureBoardView(readRaw("fixtureBoardView")),
     ...(() => {
       const rawPreset = readRaw("brandAccentPreset");
@@ -330,6 +341,9 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
       "hiddenRacingCourses",
       JSON.stringify(normalizeFavouriteScopeIds(patch.hiddenRacingCourses))
     );
+  }
+  if (patch.bookieScopes != null) {
+    writeRaw("bookieScopes", JSON.stringify(normalizeBookieScopes(patch.bookieScopes)));
   }
   if (patch.fixtureBoardView != null) {
     const merged = mergeFixtureBoardView(

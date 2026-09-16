@@ -4,7 +4,7 @@
  * fuzzy startsWith → deterministic hash-hue fallback.
  */
 
-import { lighten, pillBorderColor } from "@/lib/brands/exchanges";
+import { muteForLight, pillBorderColor } from "@/lib/brands/exchanges";
 
 export interface BookieChipStyle {
   bg: string;
@@ -117,12 +117,11 @@ export function bookieBrandColor(name: string, override?: string | null): string
 }
 
 /**
- * Pastel tint of a bookie's brand colour for Back Bet panel backgrounds -
- * lightened to sit alongside the hand-tuned exchange `backColor` pastels
- * (see `EXCHANGE_PRESETS` in `exchanges.ts`) that panels use by default.
+ * Light-mode Back plate from the bookie brand. Hue-preserving mute, not
+ * a mix toward white (that turns Ladbrokes red into pink).
  */
 export function bookiePanelTint(name: string, override?: string | null): string {
-  return lighten(bookieBrandColor(name, override), 0.7);
+  return muteForLight(bookieBrandColor(name, override));
 }
 
 /**

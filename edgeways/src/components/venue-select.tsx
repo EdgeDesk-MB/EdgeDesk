@@ -13,11 +13,17 @@ import {
 import { inferBackVenueKind } from "@/lib/accounts/resolve-venue";
 import { filterBookmakers } from "@/lib/bookmakers";
 import { BookieColourDot } from "@/components/calc/bookie-chip";
+import { VenueBadge } from "@/components/venue-badge";
 import { bookieBrandColor } from "@/lib/brands/bookies";
+import { exchangeBrandColor, exchangeSupportsBack } from "@/lib/brands/exchanges";
 import { fieldControl } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+
+/** Add bet panel chip: ghost on the tint, quiet hover, brand ring on keyboard focus. */
+export const compactGhostTriggerClass =
+  "flex h-[33px] items-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-xs font-bold text-black/85 outline-none transition-colors hover:bg-black/8 dark:text-white/95 dark:hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40";
 
 type PickerRow = {
   name: string;
@@ -54,6 +60,8 @@ export function VenueSelect({
   preferAvailable = true,
   /** Compact chip style (2UP / Add bet panels) */
   compact = false,
+  /** Compact Add bet Back: brand tag instead of colour dot + name */
+  tagTrigger = false,
   /** Settings-style bordered trigger; `sm` matches ThemeSelect height (~32px) */
   size = "default",
   placeholder = "Select…",
@@ -67,6 +75,8 @@ export function VenueSelect({
   brandColor: brandColorOverride = null,
   /** Hide wallets already on the account - directory + custom only (Add bookie / Add exchange). */
   omitExistingWallets = false,
+  /** Compact tag: extra text inside the badge, e.g. `0%` */
+  tagExtra,
   ariaLabel,
   id,
 }: {
@@ -76,6 +86,7 @@ export function VenueSelect({
   className?: string;
   preferAvailable?: boolean;
   compact?: boolean;
+  tagTrigger?: boolean;
   size?: "default" | "sm";
   placeholder?: string;
   kinds?: Array<"bookie" | "exchange">;
@@ -85,6 +96,7 @@ export function VenueSelect({
   ariaLabel?: string;
   id?: string;
   omitExistingWallets?: boolean;
+  tagExtra?: string;
 }) {
   const {
     bookieWallets,
@@ -109,6 +121,8 @@ export function VenueSelect({
 
   const showBookies = kinds.includes("bookie");
   const showExchanges = kinds.includes("exchange");
+  /** BetConnect is lay-only. Hide it from any picker that can choose a back. */
+  const hideLayOnly = (name: string) => showBookies && !exchangeSupportsBack(name);
 
   const existingWalletKeys = useMemo(() => {
     const set = new Set<string>();
@@ -124,6 +138,7 @@ export function VenueSelect({
       if (!omitExistingWallets) {
         for (const w of bookieWallets) {
           if (preferAvailable && w.accessStatus === "closed") continue;
+          if (hideLayOnly(w.name)) continue;
           seenBookies.add(w.name.toLowerCase());
           count++;
         }
@@ -132,6 +147,7 @@ export function VenueSelect({
       }
       for (const name of filterBookmakers("")) {
         if (seenBookies.has(name.toLowerCase())) continue;
+        if (hideLayOnly(name)) continue;
         count++;
       }
     }
@@ -140,6 +156,7 @@ export function VenueSelect({
       if (!omitExistingWallets) {
         for (const w of exchangeWallets) {
           if (preferAvailable && w.accessStatus === "closed") continue;
+          if (hideLayOnly(w.name)) continue;
           seenEx.add(w.name.toLowerCase());
           count++;
         }
@@ -148,6 +165,7 @@ export function VenueSelect({
       }
       for (const e of exchangeDirectory) {
         if (seenEx.has(e.name.toLowerCase())) continue;
+        if (hideLayOnly(e.name)) continue;
         count++;
       }
     }
@@ -175,6 +193,7 @@ export function VenueSelect({
       if (!omitExistingWallets) {
         for (const w of bookieWallets) {
           if (preferAvailable && w.accessStatus === "closed") continue;
+          if (hideLayOnly(w.name)) continue;
           if (q && !w.name.toLowerCase().includes(q)) continue;
           seenBookies.add(w.name.toLowerCase());
           bookies.push({
@@ -191,6 +210,7 @@ export function VenueSelect({
 
       for (const name of filterBookmakers(search)) {
         if (seenBookies.has(name.toLowerCase())) continue;
+        if (hideLayOnly(name)) continue;
         bookies.push({
           name,
           kind: "bookie",
@@ -208,6 +228,7 @@ export function VenueSelect({
       if (!omitExistingWallets) {
         for (const w of exchangeWallets) {
           if (preferAvailable && w.accessStatus === "closed") continue;
+          if (hideLayOnly(w.name)) continue;
           if (q && !w.name.toLowerCase().includes(q)) continue;
           seenEx.add(w.name.toLowerCase());
           exchanges.push({
@@ -224,6 +245,7 @@ export function VenueSelect({
 
       for (const e of exchangeDirectory) {
         if (seenEx.has(e.name.toLowerCase())) continue;
+        if (hideLayOnly(e.name)) continue;
         if (q && !e.name.toLowerCase().includes(q)) continue;
         exchanges.push({
           name: e.name,
@@ -264,7 +286,8 @@ export function VenueSelect({
     showSearch &&
     allowCustom &&
     search.trim().length > 0 &&
-    !allNames.has(search.trim().toLowerCase());
+    !allNames.has(search.trim().toLowerCase()) &&
+    !hideLayOnly(search.trim());
 
   const valueStatus = value
     ? statusByName.get(value.trim().toLowerCase()) ?? null
@@ -275,9 +298,13 @@ export function VenueSelect({
     if (brandColorOverride?.trim()) return brandColorOverride.trim();
     const key = value.trim().toLowerCase();
     const exWallet = exchangeWallets.find((e) => e.name.toLowerCase() === key);
-    if (exWallet?.brandColor) return exWallet.brandColor;
     const exDir = exchangeDirectory.find((e) => e.name.toLowerCase() === key);
-    if (exDir?.brandColor) return exDir.brandColor;
+    if (exWallet || exDir) {
+      return exchangeBrandColor(
+        value,
+        exWallet?.brandColor ?? exDir?.brandColor
+      );
+    }
     const bookieWallet = bookieWallets.find((b) => b.name.toLowerCase() === key);
     return bookieBrandColor(value, bookieWallet?.brandColor);
   }, [value, brandColorOverride, bookieWallets, exchangeWallets, exchangeDirectory]);
@@ -356,6 +383,7 @@ export function VenueSelect({
   }, [open]);
 
   async function pick(name: string, kind: "bookie" | "exchange", persist: boolean) {
+    if (hideLayOnly(name)) return;
     onChange(name);
     setOpen(false);
     setSearch("");
@@ -392,7 +420,10 @@ export function VenueSelect({
   function rowButton(row: PickerRow) {
     const status = row.accessStatus;
     const gubbed = status === "gubbed";
-    const color = row.brandColor ?? bookieBrandColor(row.name);
+    const color =
+      row.kind === "exchange"
+        ? exchangeBrandColor(row.name, row.brandColor)
+        : (row.brandColor ?? bookieBrandColor(row.name));
     return (
       <li key={`${row.section}-${row.name}`}>
         <button
@@ -524,10 +555,8 @@ export function VenueSelect({
       aria-haspopup="listbox"
       onClick={() => setOpen((o) => !o)}
       className={cn(
-        // Ghost on the panel tint: quiet hover only; brand ring on keyboard focus, not click
-        "flex h-[33px] max-w-[148px] items-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-xs font-bold text-black/85 outline-none transition-colors",
-        "hover:bg-black/8 dark:text-white/95 dark:hover:bg-white/10",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        compactGhostTriggerClass,
+        tagTrigger ? "max-w-[220px]" : "max-w-[148px]",
         open && "bg-black/8 dark:bg-white/10",
         !value && "text-black/45 dark:text-white/45"
       )}
@@ -540,9 +569,21 @@ export function VenueSelect({
       }
     >
       {value ? (
-        <BookieColourDot name={value} brandColor={valueBrandColor} />
+        tagTrigger ? (
+          <VenueBadge
+            name={value}
+            brandColor={valueBrandColor}
+            size="tag"
+            extra={tagExtra}
+            className="min-w-0"
+          />
+        ) : (
+          <BookieColourDot name={value} brandColor={valueBrandColor} />
+        )
       ) : null}
-      <span className="min-w-0 flex-1 truncate text-left">{value || "Bookie"}</span>
+      {value && tagTrigger ? null : (
+        <span className="min-w-0 flex-1 truncate text-left">{value || "Bookie"}</span>
+      )}
       {valueStatus === "gubbed" && (
         <span className="shrink-0 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
           G

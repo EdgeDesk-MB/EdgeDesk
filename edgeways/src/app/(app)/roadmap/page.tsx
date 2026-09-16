@@ -131,10 +131,11 @@ function RoadmapCategoryPlate({ category }: { category: RoadmapCategory }) {
             {category.items.map((item) => (
               <li
                 key={item.id}
+                id={`roadmap-${item.id}`}
                   className={cn(
                     listRow,
                     deskInsetX,
-                    "flex items-start justify-between gap-3 py-4"
+                    "scroll-mt-24 flex items-start justify-between gap-3 py-4"
                   )}
               >
                 <div className="min-w-0">

@@ -16,6 +16,14 @@ export const fieldControl = cn(
   "skeuo-solid field-control rounded-[var(--radius-button)] border-transparent bg-[#eeeeee] dark:bg-input/30"
 );
 
+/**
+ * Just the recessed "well to type in" inset shadow from {@link fieldControl},
+ * with none of its radius / background / transition. For typed fields that
+ * keep their own colour and radius (panel-tinted calc inputs, compact
+ * numeric cells) but should still read as a field, not a flat fill.
+ */
+export const fieldControlShadow = "shadow-[var(--ew-btn-shadow-pressed)]";
+
 /** White card lifted above the page surface */
 export const surfaceLift = cn(
   "surface-lift bg-card text-card-foreground ring-1 ring-border/40 dark:ring-0"
@@ -286,12 +294,12 @@ export const brandChipActive =
 
 /**
  * Counters / nav badges — flat.
- * Light: ink plate + off-white type.
+ * Light: mid-grey plate + off-white type.
  * Dark: same mute as unselected Racing Desk filter-pill counts
  * (`bg-foreground/10 text-foreground/70`).
  */
 export const brandChipCount =
-  "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#111111] px-1.5 text-[11px] font-bold tabular-nums text-[#fafafa] dark:bg-foreground/10 dark:text-foreground/70";
+  "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#666666] px-1.5 text-[11px] font-bold tabular-nums text-[#fafafa] dark:bg-foreground/10 dark:text-foreground/70";
 
 /**
  * Shared box for Core / Edge / Backed marks. Floor 11px.

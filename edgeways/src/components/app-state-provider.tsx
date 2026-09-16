@@ -59,7 +59,7 @@ function settingsHoldCovered(
   for (const [key, value] of Object.entries(hold)) {
     const current = incoming[key as keyof AppSettings];
     if (Array.isArray(value) && Array.isArray(current)) {
-      if (value.join("\0") !== current.join("\0")) return false;
+      if (JSON.stringify(value) !== JSON.stringify(current)) return false;
       continue;
     }
     if (current !== value) return false;

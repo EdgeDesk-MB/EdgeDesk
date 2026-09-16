@@ -1,7 +1,8 @@
 # Cursor daily guide, Edgeways harness
 
 The one-page reference for working on Edgeways in Cursor: what fires on its own,
-what to invoke, and how the quality gates fit together. For setup see
+what to invoke, and how the quality gates fit together. Agents follow
+`docs/cursor-workflow.md` (classify → increment → verify). For setup see
 `docs/cursor-setup.md`; for the full harness map see `docs/cursor-kit.md`; for
 cross-editor habits see `docs/ai-playbook.md`.
 
@@ -12,13 +13,17 @@ cross-editor habits see `docs/ai-playbook.md`.
 - `AGENTS.md` (root + `edgeways/`) — read at session start.
 - Rules in `edgeways/.cursor/rules/*.mdc` — attach when you touch matching files
   (`design-system.mdc` and `micro-typography.mdc` on UI, `calc-guardrails.mdc` on calc).
-- Root rules in `.cursor/rules/` — always on (`model-routing`, `dev-server`).
+- Root rules in `.cursor/rules/` — always on (`iterative-dev`, `model-routing`,
+  `dev-server`, Neon, feed store-first, Orca browser).
 - Skills in `.cursor/skills/` — trigger from their descriptions when your request
-  matches (e.g. UI work pulls in the design skills).
+  matches (e.g. UI work pulls in the design skills). In Orca / CLI they do not
+  auto-run; the agent must `Read` the matching `SKILL.md`. Local / Cmd+K
+  models skip Linear, MCP, and auditor subagents.
 
 **You invoke:**
 
-- Slash commands (type `/` in chat): `/calc-change`, `/calc-audit`, `/brief`,
+- Slash commands (type `/` in chat, Cursor IDE only): `/iterative-dev`,
+  `/ticket-hygiene`, `/calc-change`, `/calc-audit`, `/brief`,
   `/delegate-local`, `/design-review`.
 - Subagents: ask in chat, e.g. "delegate this diff to the calc-auditor".
 
@@ -33,7 +38,9 @@ cross-editor habits see `docs/ai-playbook.md`.
 | -------------------- | --------------------------------------------- | ------------------------------------------------ |
 | Source of truth (UI) | `edgeways/docs/design-system.md`              | Tokens, patterns, voice. Law.                    |
 | Auto-attach rules    | `edgeways/.cursor/rules/`                     | design-system, micro-typography, calc-guardrails |
-| Always-on rules      | `.cursor/rules/`                              | model-routing, dev-server                        |
+| Always-on rules      | `.cursor/rules/`                              | iterative-dev, model-routing, dev-server, Neon   |
+| Implementation loop  | `docs/cursor-workflow.md`                     | Classify → load one skill → increment → verify   |
+| Linear (humans)      | `docs/linear.md`                              | Cheap ticket protocol. Agents load the skill     |
 | Skills               | `.cursor/skills/` (mirror: `.claude/skills/`) | Workflows that shape the build                   |
 | Subagents            | `.cursor/agents/` (mirror: `.claude/agents/`) | Read-only quality gates                          |
 | Slash commands       | `.cursor/commands/`                           | Manual triggers for the above                    |
@@ -41,6 +48,9 @@ cross-editor habits see `docs/ai-playbook.md`.
 | Model strategy       | `docs/Local-vs-Cloud-Model-Strategy.md`       | Why/when of model routing                        |
 
 ## The three daily loops
+
+These are the typed paths inside `docs/cursor-workflow.md`. Classify first,
+then run the matching loop. Do not load all three.
 
 ### 1. Money-maths change (calc, settlement, offers)
 
@@ -75,6 +85,8 @@ cross-editor habits see `docs/ai-playbook.md`.
 
 | Command           | Use when                                                |
 | ----------------- | ------------------------------------------------------- |
+| `/iterative-dev`  | Start of implementation work (classify + increment loop) |
+| `/ticket-hygiene` | Sam named EDGE-*, or finishing ticket-worthy work        |
 | `/calc-change`    | Touching anything in `src/lib/calc` or `src/lib/offers` |
 | `/calc-audit`     | Before committing a calc diff (frontier model)          |
 | `/design-review`  | Before committing a UI diff (frontier model)            |
@@ -94,6 +106,8 @@ cross-editor habits see `docs/ai-playbook.md`.
 
 | Skill                       | Shapes                                                  |
 | --------------------------- | ------------------------------------------------------- |
+| `iterative-dev`             | Classify → increment → verify (read `cursor-workflow.md`) |
+| `ticket-hygiene`            | Linear only when a ticket applies (not always-on)       |
 | `calc-change`               | Guarded calc workflow                                   |
 | `brief`                     | Implementation briefs                                   |
 | `delegate-local`            | Local-backbone delegation                               |
@@ -124,7 +138,21 @@ The harness is already automation-shaped. The mapping:
 | Slash commands               | Manual triggers                                                                |
 | Hooks (`.cursor/hooks.json`) | Local enforcement on agent events                                              |
 | Cursor Automations           | Cloud agents on schedules / events (repo is on GitHub: `EdgeDesk-MB/EdgeDesk`) |
-| Connected MCPs               | Linear (ticketing), PostHog (product analytics), Supabase, Stripe              |
+| Connected MCPs               | Live list and auth steps: `docs/cursor-setup.md` § MCP hub. Do not assume PostHog / Neon / Vercel / Stripe are authed in Orca. Never Supabase. Never Playwright or Chrome DevTools. UI verify is Orca, then Aside. |
+
+### Recipe 0: Ticket hygiene (every agent, cheap)
+
+Do not file a ticket per edit. The always-on iterative-dev rule already
+has the short protocol. Load `ticket-hygiene` only when Linear applies.
+
+- Sam named `EDGE-n` → that is scope. Fetch, then one finish comment.
+- Ticket-worthy, no id → one search. Attach if obvious.
+- Small bugs → comment on [EDGE-171](https://linear.app/samhayter/issue/EDGE-171).
+- Local / Cmd+K → write `Ticket:` only. Parent updates Linear.
+- History = Linear comment, not a new markdown file. Durable D-class
+  still goes in `docs/decisions/`.
+
+Human one-pager: `docs/linear.md`.
 
 ### Recipe 1: Feedback → Linear triage
 
@@ -167,7 +195,8 @@ Ask for these in chat ("create a project hook that…") and they get written to
 
 ### Recipe 4: Errors → tickets
 
-PostHog MCP is connected. A scheduled run groups new errors, pairs each with a
+When PostHog MCP is ready (auth in Cursor desktop if dark), a scheduled run
+groups new errors, pairs each with a
 suspect commit, and drafts a Linear issue with repro context. Same idempotency
 rule: one Linear issue per error group, linked both ways.
 
@@ -200,15 +229,19 @@ comment. The agents' prompts already exist; the automation just runs them.
 - **Adding a piece:** new workflow → `.cursor/skills/<name>/SKILL.md` (+ mirror);
   new gate → `.cursor/agents/<name>.md` (+ mirror); new manual trigger →
   `.cursor/commands/<name>.md`. Then add a row to `docs/cursor-kit.md` and this
-  guide.
+  guide. If you change the increment loop itself, edit `docs/cursor-workflow.md`.
 - **Rules vs skills:** always-on conventions belong in `.cursor/rules/`; task
-  workflows belong in skills. Do not blur them.
+  workflows belong in skills. The implementation loop lives in
+  `docs/cursor-workflow.md` so Claude Code and other AGENTS.md readers can
+  follow it without Cursor. Do not copy that loop into a fourth file.
 
 ## Doc map
 
 | Doc                                     | Read when                                                   |
 | --------------------------------------- | ----------------------------------------------------------- |
 | This file                               | Daily reference                                             |
+| `docs/linear.md`                        | Linear convention (humans). Agents use the skill            |
+| `docs/cursor-workflow.md`               | Agent implementation loop (classify → increment → verify)   |
 | `docs/live-readiness.md`                | Launch path: automations, payments, legal, pre-launch gates |
 | `docs/cursor-kit.md`                    | Harness structure and port notes                            |
 | `docs/cursor-setup.md`                  | One-off Cursor configuration                                |

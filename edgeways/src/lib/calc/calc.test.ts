@@ -28,6 +28,7 @@ import {
   settleFromOutcome,
   settlePartialOutcome,
   twoUp,
+  twoUpEV,
   twoUpDutchScenarios,
   deriveOutcomes,
 } from "./index";
@@ -589,6 +590,32 @@ describe("2up early payout", () => {
     expect(r.qualifyingLoss).toBeGreaterThan(-5);
     expect(r.windfallProfit).toBeGreaterThan(140); // 50*2 + lay winnings
   });
+
+  it("lay stake override uses that stake for liability and windfall", () => {
+    const auto = twoUp({ backStake: 50, backOdds: 3, layOdds: 3.1, commission: 0.02 });
+    // Equalising lay is ~48.39; overlay £10 more → liability = 58.39 × 2.1
+    const over = twoUp({
+      backStake: 50,
+      backOdds: 3,
+      layOdds: 3.1,
+      commission: 0.02,
+      layStakeOverride: auto.layStake + 10,
+    });
+    expect(over.layStake).toBe(auto.layStake + 10);
+    expect(over.liability).toBeCloseTo((auto.layStake + 10) * 2.1, 10);
+    expect(over.windfallProfit).toBeCloseTo(
+      50 * 2 + (auto.layStake + 10) * (1 - 0.02),
+      10
+    );
+  });
+
+  it("weights the three 2UP scenarios by the old calculator probability fields", () => {
+    // £50 @ 3.0, lay 3.1 @ 2%. Former UI defaults: P(win) 32%, P(windfall) 6%.
+    // Lay = 150/3.08. Team-wins = never-2up = −7/3.08. Windfall = 455/3.08.
+    // EV = 0.32×(−7/3.08) + 0.62×(−7/3.08) + 0.06×(455/3.08) = 20.72/3.08
+    const r = twoUp({ backStake: 50, backOdds: 3, layOdds: 3.1, commission: 0.02 });
+    expect(twoUpEV(r, 0.32, 0.06)).toBeCloseTo(20.72 / 3.08, 10);
+  });
 });
 
 describe("each way", () => {
@@ -605,6 +632,42 @@ describe("each way", () => {
     expect(r.totalOutlay).toBe(20);
     const spread = Math.max(r.profitIfWins, r.profitIfPlacesOnly, r.profitIfUnplaced) - r.worstCase;
     expect(spread).toBeLessThan(5);
+  });
+
+  it("lay stake overrides replace the equalising win and place lays", () => {
+    // £10 EW @ 9.0 (1/5), lay 9.6 / 2.8 @ 2%. Override lays £5 / £8.
+    // Place odds 1+(9−1)×0.2 = 2.6. Win liab 5×8.6 = 43. Place liab 8×1.8 = 14.4.
+    // Win lay net 5×0.98 = 4.9. Place lay net 8×0.98 = 7.84.
+    // Wins: 10×8 + 10×1.6 − 43 − 14.4 = 38.6
+    // Place only: −10 + 16 + 4.9 − 14.4 = −3.5
+    // Unplaced: −20 + 4.9 + 7.84 = −7.26
+    const auto = eachWay({
+      stake: 10,
+      winOdds: 9,
+      placeFraction: 0.2,
+      layWinOdds: 9.6,
+      layPlaceOdds: 2.8,
+      commission: 0.02,
+    });
+    const r = eachWay({
+      stake: 10,
+      winOdds: 9,
+      placeFraction: 0.2,
+      layWinOdds: 9.6,
+      layPlaceOdds: 2.8,
+      commission: 0.02,
+      layWinStakeOverride: 5,
+      layPlaceStakeOverride: 8,
+    });
+    expect(r.layWinStake).toBe(5);
+    expect(r.layPlaceStake).toBe(8);
+    expect(r.layWinLiability).toBeCloseTo(43, 10);
+    expect(r.layPlaceLiability).toBeCloseTo(14.4, 10);
+    expect(r.profitIfWins).toBeCloseTo(38.6, 10);
+    expect(r.profitIfPlacesOnly).toBeCloseTo(-3.5, 10);
+    expect(r.profitIfUnplaced).toBeCloseTo(-7.26, 10);
+    expect(r.worstCase).toBeCloseTo(-7.26, 10);
+    expect(r.profitIfWins).not.toBeCloseTo(auto.profitIfWins, 6);
   });
 });
 
@@ -624,6 +687,39 @@ describe("extra place", () => {
     expect(r.profitIfExtraPlace).toBeGreaterThan(0);
     expect(r.qualifyingLoss).toBeLessThan(0);
     expect(r.impliedExtraPlaceOdds).toBeGreaterThan(1);
+  });
+
+  it("lay stake overrides replace the equalising win and place lays", () => {
+    // £10/part @ 12.0 (1/5), lay 12.5 / 3.2 @ 2%. Override lays £6 / £4.
+    // Place odds 1+(12−1)×0.2 = 3.2. Win liab 6×11.5 = 69. Place liab 4×2.2 = 8.8.
+    // Win lay net 6×0.98 = 5.88. Place lay net 4×0.98 = 3.92.
+    // Wins: 10×11 + 10×2.2 − 69 − 8.8 = 54.2
+    // Standard place: −10 + 22 + 5.88 − 8.8 = 9.08
+    // Extra place: −10 + 22 + 5.88 + 3.92 = 21.8
+    // Unplaced: −20 + 5.88 + 3.92 = −10.2
+    const r = extraPlace({
+      stakePerPart: 10,
+      winOdds: 12,
+      placeFraction: 0.2,
+      layWinOdds: 12.5,
+      layPlaceOdds: 3.2,
+      commission: 0.02,
+      bookiePlaces: 4,
+      exchangePlaces: 3,
+      layWinStakeOverride: 6,
+      layPlaceStakeOverride: 4,
+    });
+    expect(r.layWinStake).toBe(6);
+    expect(r.layPlaceStake).toBe(4);
+    expect(r.layWinLiability).toBeCloseTo(69, 10);
+    expect(r.layPlaceLiability).toBeCloseTo(8.8, 10);
+    expect(r.outcomes.find((o) => o.key === "win")?.total).toBeCloseTo(54.2, 10);
+    expect(r.outcomes.find((o) => o.key === "standard_place")?.total).toBeCloseTo(9.08, 10);
+    expect(r.outcomes.find((o) => o.key === "extra_place")?.total).toBeCloseTo(21.8, 10);
+    expect(r.outcomes.find((o) => o.key === "unplaced")?.total).toBeCloseTo(-10.2, 10);
+    expect(r.profitIfExtraPlace).toBeCloseTo(21.8, 10);
+    expect(r.qualifyingLoss).toBeCloseTo(-10.2, 10);
+    expect(r.worstCase).toBeCloseTo(-10.2, 10);
   });
 });
 

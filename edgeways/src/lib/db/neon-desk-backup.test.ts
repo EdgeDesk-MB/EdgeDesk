@@ -18,6 +18,7 @@ vi.mock("@/lib/db/neon-desk", () => ({
 }));
 
 vi.mock("@/lib/db/neon", () => ({
+  getNeonSql: () => () => Promise.resolve([]),
   getNeonDb: () => ({
     select: () => ({
       from: (table: unknown) => ({

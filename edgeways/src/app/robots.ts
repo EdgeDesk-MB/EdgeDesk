@@ -22,6 +22,8 @@ export default function robots(): MetadataRoute.Robots {
         "/calculators",
         "/casino",
         "/desk",
+        "/early-payout",
+        "/2up",
         "/events",
         "/feedback",
         "/fixtures",

@@ -1,6 +1,7 @@
 /**
  * Unified exchange lay-odds feed - respects Settings default exchange.
  */
+import { exchangeBackColor, exchangeLayColor } from "@/lib/brands/exchanges";
 import { db, exchanges } from "@/lib/db";
 import {
   betfairConfigured,
@@ -133,8 +134,11 @@ export function getExchangeColors(provider?: ExchangeProvider | null): {
     : undefined;
   const def = match ?? rows.find((e) => e.isDefault) ?? rows[0];
   return {
-    backColor: def?.backColor ?? "#a6d8ff",
-    layColor: def?.layColor ?? "#fac9d1",
+    backColor:
+      (def ? exchangeBackColor(def.name, def.backColor) : null) ?? "#A7D8FF",
+    layColor: def
+      ? exchangeLayColor(def.name, def.layColor)
+      : "#FBC9D2",
     brandColor: def?.brandColor ?? "#ffb80c",
   };
 }

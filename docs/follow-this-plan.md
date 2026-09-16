@@ -13,7 +13,8 @@
 > tickets. That gap is now back-filled as **EDGE-126 to EDGE-146**. The
 > "Do this week" and cycle sections below were written for the pre-launch
 > push and are kept for history. **Current open work lives in Linear, not
-> here.** When something finishes, tick it there first.
+> here.** When something finishes, tick it there first. Agent convention:
+> `docs/linear.md`. Standing desk bugs: EDGE-171.
 
 ---
 

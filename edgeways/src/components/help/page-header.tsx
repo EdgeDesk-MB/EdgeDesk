@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import { DeskPageHeader } from "@/components/layout/desk-page-header";
 import { ToolbarRow } from "@/components/layout/toolbar-row";
@@ -18,7 +18,7 @@ export function PageHeader({
   title: string;
   description?: React.ReactNode;
   helpId?: PageHelpId;
-  icon?: LucideIcon;
+  icon?: ComponentType<{ className?: string }>;
   action?: React.ReactNode;
   /** Filter pills / secondary controls below the title band */
   toolbar?: React.ReactNode;

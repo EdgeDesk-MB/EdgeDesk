@@ -8,7 +8,7 @@ import "server-only";
 import { and, desc, eq, lt, or } from "drizzle-orm";
 import { EXCHANGE_PRESETS } from "@/lib/brands/exchanges";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
-import { getNeonDb } from "@/lib/db/neon";
+import { getNeonDb, getNeonSql } from "@/lib/db/neon";
 import { insertNeonDeskHistory } from "@/lib/db/neon-desk-history";
 import {
   toSqliteAccountRow,
@@ -26,6 +26,15 @@ import {
 import type { AccountRow, BalanceTransactionRow, ExchangeRow } from "@/lib/db/schema";
 
 let neonExchangesSeeded = false;
+let notesSourceColumnReady = false;
+
+/** Additive column for the bookie-scope note auto-fill; accounts predate it. */
+export async function ensureNotesSourceColumn(): Promise<void> {
+  if (notesSourceColumnReady) return;
+  const sql = getNeonSql();
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS notes_source text`;
+  notesSourceColumnReady = true;
+}
 
 /** Shared catalog of exchange brands. Commission is overlaid per desk. */
 export async function ensureNeonExchanges(): Promise<void> {
@@ -115,6 +124,7 @@ export async function listNeonDeskAccounts(
   clerkUserId = neonDeskClerkUserId()
 ): Promise<AccountRow[]> {
   if (!clerkUserId) return [];
+  await ensureNotesSourceColumn();
   const rows = await getNeonDb()
     .select()
     .from(pgAccounts)
@@ -130,6 +140,7 @@ export async function insertNeonDeskAccount(
   if (!clerkUserId) {
     throw new Error("Sign in to save an account.");
   }
+  await ensureNotesSourceColumn();
   const rows = await getNeonDb()
     .insert(pgAccounts)
     .values({ ...values, clerkUserId })
@@ -148,6 +159,7 @@ export type NeonDeskAccountPatch = Partial<{
   accessStatus: "available" | "gubbed" | "closed";
   owner: string;
   notes: string | null;
+  notesSource: "user" | "scope" | null;
   fundedByAccountId: number | null;
   wrRemaining: number;
   wrMinOdds: number | null;
@@ -165,6 +177,7 @@ export async function patchNeonDeskAccount(
   if (!clerkUserId) {
     throw new Error("Sign in to save an account.");
   }
+  await ensureNotesSourceColumn();
   const rows = await getNeonDb()
     .update(pgAccounts)
     .set(patch)
@@ -199,6 +212,7 @@ export async function renameNeonDeskAccount(
   }
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Name is required.");
+  await ensureNotesSourceColumn();
 
   const db = getNeonDb();
   const existing = await db

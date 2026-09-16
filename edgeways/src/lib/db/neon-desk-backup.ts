@@ -12,6 +12,7 @@ import "server-only";
 import { and, eq, notInArray } from "drizzle-orm";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
+import { ensureNotesSourceColumn } from "@/lib/db/neon-desk-accounts";
 import {
   accounts as pgAccounts,
   balanceTransactions as pgBalanceTransactions,
@@ -78,7 +79,8 @@ const ACCOUNT_KEYS: Array<[string, string]> = [
   ["id", "id"], ["name", "name"], ["type", "type"], ["exchangeId", "exchange_id"],
   ["fundedByAccountId", "funded_by_account_id"], ["brandColor", "brand_color"],
   ["owner", "owner"], ["isActive", "is_active"], ["accessStatus", "access_status"],
-  ["notes", "notes"], ["wrRemaining", "wr_remaining"], ["wrMinOdds", "wr_min_odds"],
+  ["notes", "notes"], ["notesSource", "notes_source"],
+  ["wrRemaining", "wr_remaining"], ["wrMinOdds", "wr_min_odds"],
   ["wrType", "wr_type"], ["health", "health"],
   ["healthUpdatedAt", "health_updated_at"], ["createdAt", "created_at"],
 ];
@@ -198,6 +200,7 @@ export async function neonDeskBackupBundle(): Promise<{
   if (!clerkUserId) {
     throw new Error("Sign in to download a backup.");
   }
+  await ensureNotesSourceColumn();
   const db = getNeonDb();
   const [
     series,
@@ -279,6 +282,7 @@ export async function restoreNeonDeskBackup(
   if (!clerkUserId) {
     throw new Error("Sign in to restore a backup.");
   }
+  await ensureNotesSourceColumn();
   const db = getNeonDb();
 
   const seriesRows = tables.offer_series ?? [];
@@ -414,6 +418,7 @@ export async function restoreNeonDeskBackup(
         accessStatus:
           (str(r.access_status) as "available" | "gubbed" | "closed") ?? "available",
         notes: str(r.notes),
+        notesSource: (str(r.notes_source) as "user" | "scope" | null) ?? null,
         wrRemaining: num(r.wr_remaining) ?? 0,
         wrMinOdds: num(r.wr_min_odds),
         wrType: (str(r.wr_type) as "stake" | "risk_win") ?? "stake",

@@ -9,7 +9,8 @@
 ```text
 MB app build/                          ← git root (private GitHub)
 ├── docs/                              ← ops, legal, launch, AI harness, strategy
-│   ├── follow-this-plan.md            ← START HERE each day
+│   ├── follow-this-plan.md            ← START HERE each day (launch history)
+│   ├── linear.md                      ← Linear convention (humans)
 │   ├── live-readiness.md
 │   ├── stripe-test-rehearsal.md       ← localhost Checkout cards + listen
 │   ├── hosting-and-environments.md
@@ -50,14 +51,14 @@ So: moving strategy out of `edgeways/` does **not** hide it from GitHub. It keep
 
 ### `edgeways/docs/` — agents coding the product
 
-Keep only what pre-flight and calc/UI work need:
+Keep only what the classify table in `docs/cursor-workflow.md` needs:
 
 | Keep | Why |
 |------|-----|
 | `design-system.md` | UI work gate |
 | `offer-command-centre.md` | Offers / settlement context |
 | `offer-paste-learning.md` | Paste pipeline |
-| `roadmap/implementation-briefs.md` | Repo conventions §0 |
+| `roadmap/implementation-briefs.md` | Schema / DB / settings / AppState (§0). Not every change. |
 | `roadmap/product-roadmap.md` | Product scope agents must respect |
 | `roadmap/polish-backlog.md` | Engineering polish queue |
 
@@ -91,7 +92,8 @@ Short stubs remain at the old paths so historical links still resolve.
 
 ## Checklist when adding a new doc
 
-1. Will an agent need it mid-edit to follow AGENTS.md pre-flight? → `edgeways/docs/`
+1. Will an agent need it mid-edit after classifying the task in
+   `docs/cursor-workflow.md` (calc, UI, schema/state)? → `edgeways/docs/`
 2. Is it legal, payments, launch ops, or competitive strategy? → root `docs/`
 3. Will a **customer** see it in the UI? → `src/content/` or marketing routes only, and write for them
 4. Does it contain secrets or account URLs? → **do not commit**; use env / password manager

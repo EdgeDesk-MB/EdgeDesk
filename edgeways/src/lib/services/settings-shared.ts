@@ -13,6 +13,7 @@ import {
   type FixtureBoardViewSettings,
 } from "@/lib/events/fixture-board-view";
 import { isKnownSport, type SportValue } from "@/lib/sports";
+import type { BookieScope } from "@/lib/twoup/bookie-offers";
 
 export { normalizeHomeLayout, type HomeLayoutSettings } from "@/lib/ui/home-layout";
 export {
@@ -94,6 +95,11 @@ export interface AppSettings {
   hiddenFootballScopes: string[];
   /** Racing course names hidden from the fixture board. */
   hiddenRacingCourses: string[];
+  /**
+   * Bookie Scope rows (Early payout now, Racing later). Not a Settings page
+   * control. Dual-path via /api/settings. P2b / EDGE-149.
+   */
+  bookieScopes: BookieScope[];
   /** Last Fixtures tape sport, rail (All / Pinned only / Backed only / one scope), and status pills. */
   fixtureBoardView: FixtureBoardViewSettings;
   /** Brand accent preset id (amber, viridian, …, custom). */
@@ -235,6 +241,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   favouriteRacingCourses: [],
   hiddenFootballScopes: [],
   hiddenRacingCourses: [],
+  bookieScopes: [],
   fixtureBoardView: DEFAULT_FIXTURE_BOARD_VIEW,
   brandAccentPreset: "amber",
   brandAccentHex: "#FFC71E",
