@@ -1,7 +1,7 @@
 # Strategy digest (for automated ticket triage)
 
 last_reviewed: 2026-09-21
-status: DRAFT, awaiting Sam's review
+status: reviewed by Sam, 2026-09-21
 
 This is a compact, citable index of Edgeways strategy, built for the n8n alignment gate. It is not a source of truth. When it disagrees with a source file, the source wins and this file is stale. Cite entry IDs (V1, NG3, D7 and so on). Status entries (BT and RK) go stale fastest: check their review_by date and verify against `edgeways/docs/roadmap/product-roadmap.md` section 6 and Linear (team EDGE).
 
