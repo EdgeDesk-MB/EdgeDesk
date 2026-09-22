@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { counterPlateLight } from "@/lib/ui/surface-styles";
 
 const OPTIONS: Array<{ value: "light" | "dark"; label: string; icon: LucideIcon }> = [
   { value: "light", label: "Light", icon: Sun },
@@ -81,7 +82,7 @@ export function ThemeSelect({
               selected
                 ? topbar
                   ? "bg-[#111111] text-white"
-                  : "bg-stat-tile-selected text-foreground dark:bg-background dark:text-foreground"
+                  : `${counterPlateLight} dark:bg-background dark:text-foreground`
                 : topbar
                   ? "text-[#111111]/70 hover:bg-[#111111]/10 hover:text-[#111111]"
                   : "text-muted-foreground hover:text-foreground"
