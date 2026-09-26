@@ -16,6 +16,7 @@ import {
   suppressAlertKeys,
 } from "@/lib/alerts/seen";
 import type { OfferNextActionKind } from "@/lib/offers/next-actions";
+import { offerDeepLinkHref } from "@/lib/offers/offer-deep-link";
 import type { EdgeAlert } from "@/lib/alerts/types";
 
 export function completedKindFromBetType(
@@ -105,7 +106,7 @@ export function notifyOfferStepDone(args: {
     body,
     bookmaker: args.bookmaker?.trim() || null,
     tone: "positive",
-    href: `/offers?view=${args.offerId}`,
+    href: offerDeepLinkHref(args.offerId),
     delivery: "ephemeral",
   };
   createLocalAlertChannel().notify(alert);

@@ -78,6 +78,7 @@ import {
   useRacingOfferEdgeKey,
 } from "@/hooks/use-offer-edge-race-count";
 import { prefetchDeskPageApis } from "@/lib/prefetch-desk-pages";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
 
 type NavIcon = ComponentType<{ className?: string }>;
 
@@ -509,6 +510,7 @@ export function AppNav() {
   const { openCasinoLog } = useCasinoLog();
   const { openBoostCheck } = useBoostCheck();
   const { openOffer } = useOfferDialog();
+  const { demoHref } = usePublicDemo();
   const { state } = useAppState(5000);
   const [cachedChrome, setCachedChrome] = useState<ChromeSnapshot | null>(null);
   useLayoutEffect(() => {
@@ -643,7 +645,7 @@ export function AppNav() {
     return (
       <div key={item.href} className="relative w-full min-w-0">
         <Link
-          href={href}
+          href={demoHref(href)}
           prefetch
           onPointerEnter={() => prefetchNavHref(item.href)}
           onFocus={() => prefetchNavHref(item.href)}
@@ -729,7 +731,7 @@ export function AppNav() {
       <div key={entry.baseHref} className="flex flex-col gap-0.5">
         <div className="relative w-full min-w-0">
           <Link
-            href={firstChildHref}
+            href={demoHref(firstChildHref)}
             prefetch
             onPointerEnter={() => prefetchNavHref(firstChildHref)}
             onFocus={() => prefetchNavHref(firstChildHref)}
@@ -779,7 +781,7 @@ export function AppNav() {
               return (
                 <Link
                   key={child.href}
-                  href={child.href}
+                  href={demoHref(child.href)}
                   prefetch
                   onPointerEnter={() => prefetchNavHref(child.href)}
                   onFocus={() => prefetchNavHref(child.href)}

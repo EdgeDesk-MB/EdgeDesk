@@ -29,6 +29,11 @@ import { filterPillCountState, toolbarSelectTrigger } from "@/lib/ui/surface-sty
 import { formatPillLabel } from "@/lib/ui/status-badges";
 import { listOfferNextActions, offerNextActionLabel } from "@/lib/offers/next-actions";
 import {
+  OFFER_DEEP_LINK_LEGACY_PARAM,
+  OFFER_DEEP_LINK_PARAM,
+  parseOfferDeepLinkId,
+} from "@/lib/offers/offer-deep-link";
+import {
   availableBookieNames,
   offerMatchesAvailableBookies,
 } from "@/lib/accounts/available-bookies";
@@ -150,22 +155,29 @@ function OffersContent() {
   }, [categoryScoped]);
 
   // P1: push notifications deep-link to the campaign details modal via
-  // /offers?view=<id>. The param survives until the polled offers contain
+  // /offers?offer=<id>. The param survives until the polled offers contain
   // the id (first load can race the poll), then opens once and strips.
-  const viewParam = searchParams?.get("view");
-  const handledViewRef = useRef<string | null>(null);
+  // Legacy `?view=<id>` still reads, for notifications sent before EDGE-159.
+  const offerParamKey =
+    searchParams?.get(OFFER_DEEP_LINK_PARAM) != null
+      ? OFFER_DEEP_LINK_PARAM
+      : OFFER_DEEP_LINK_LEGACY_PARAM;
+  const offerParam = searchParams?.get(offerParamKey);
+  const handledOfferRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!viewParam || handledViewRef.current === viewParam) return;
-    const id = Number(viewParam);
-    const offer = Number.isFinite(id) ? offers.find((o) => o.id === id) : undefined;
+    if (!offerParam || handledOfferRef.current === offerParam) return;
+    const id = parseOfferDeepLinkId(offerParam);
+    const offer = id != null ? offers.find((o) => o.id === id) : undefined;
     if (!offer) return;
-    handledViewRef.current = viewParam;
+    handledOfferRef.current = offerParam;
     viewOffer(offer);
+    // Only the param that matched is stripped, so a demo `?view=free`
+    // sitting alongside survives.
     const params = new URLSearchParams(searchParams?.toString() ?? "");
-    params.delete("view");
+    params.delete(offerParamKey);
     const qs = params.toString();
     router.replace(qs ? `/offers?${qs}` : "/offers", { scroll: false });
-  }, [viewParam, offers, viewOffer, router, searchParams]);
+  }, [offerParam, offerParamKey, offers, viewOffer, router, searchParams]);
 
   useEffect(() => {
     if (!highlightParam) return;
