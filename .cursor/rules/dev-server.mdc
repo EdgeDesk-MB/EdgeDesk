@@ -7,6 +7,12 @@ alwaysApply: true
 
 Sam needs continual localhost uptime. Treat the running Next server as sacred.
 
+This rule covers interactive sessions. Unattended agent runs (Cyrus
+worktrees) follow "UI verification in agent runs" in the root `AGENTS.md`
+instead: start their own server from their worktree's `edgeways/`, use the
+next free port (3001, 3002…) if 3000 is taken, and stop only the servers
+they started. The "Do not" list below still applies to anyone else's server.
+
 ## Do
 
 - If nothing listens on `:3000`, start with `npm run dev:detached` from `edgeways/`
