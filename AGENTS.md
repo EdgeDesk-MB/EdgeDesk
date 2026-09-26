@@ -42,6 +42,10 @@ Other pointers:
 
 **UI verification in agent runs.** For any change a user can see:
 
+Cyrus worktrees are prepared by the repo-root `cyrus-setup.sh`, which
+copies `$CYRUS_DEV_ENV_FILE` to `edgeways/.env.local` and runs `npm ci`
+when `node_modules` is missing.
+
 1. Start the dev server from `edgeways/` with the repo's dev script, on
    port 3000.
 2. Open pages in Orca with `orca tab create --url
