@@ -40,6 +40,33 @@ Other pointers:
   host or Sam names Aside. Never Playwright, Chrome, or Computer Use
   for Edgeways pages. Claude Code: see root `CLAUDE.md`.
 
+**UI verification in agent runs.** For any change a user can see:
+
+Cyrus worktrees are prepared by the repo-root `cyrus-setup.sh`, which
+copies `$CYRUS_DEV_ENV_FILE` to `edgeways/.env.local` and runs `npm ci`
+when `node_modules` is missing.
+
+1. Start your own dev server from this worktree's `edgeways/` with the
+   repo's dev script. Never reuse a server started from another
+   worktree, because it serves different code. If port 3000 is in use,
+   use the next free port (3001, 3002 and so on), and use that port in
+   every Orca URL below.
+2. Open pages in Orca with `orca tab create --url
+   http://localhost:<port>/<path> --worktree "$ORCA_BROWSER_WORKTREE"`
+   (leave out `--worktree` if that variable is unset). Keep the returned
+   page id and pass it as `--page` on later commands.
+3. Replay every **User journey** in the ticket's agent brief, step by
+   step: `orca snapshot` to find elements, `orca click --element <ref>`,
+   `orca reload`, then `orca snapshot` again to check the Expect line.
+   Re-snapshot after every navigation, because element refs change.
+4. In the PR description and the Linear summary, list each journey as
+   **Pass** or **Fail** with one line of evidence. If Orca or the dev
+   server can't run, say so plainly. Never claim a browser check that did
+   not happen.
+5. At the end of the run, always stop any dev server you started, and
+   close the tabs you opened (`orca tab close --page <id>`). Never stop
+   a server you did not start.
+
 Schema, DB bootstrap, settings, and `AppState` shapes: read section 0 of
 `edgeways/docs/roadmap/implementation-briefs.md` only when the task touches
 those. Do not load it on every change.
