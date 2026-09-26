@@ -40,6 +40,25 @@ Other pointers:
   host or Sam names Aside. Never Playwright, Chrome, or Computer Use
   for Edgeways pages. Claude Code: see root `CLAUDE.md`.
 
+**UI verification in agent runs.** For any change a user can see:
+
+1. Start the dev server from `edgeways/` with the repo's dev script, on
+   port 3000.
+2. Open pages in Orca with `orca tab create --url
+   http://localhost:3000/<path> --worktree "$ORCA_BROWSER_WORKTREE"`
+   (leave out `--worktree` if that variable is unset). Keep the returned
+   page id and pass it as `--page` on later commands.
+3. Replay every **User journey** in the ticket's agent brief, step by
+   step: `orca snapshot` to find elements, `orca click --element <ref>`,
+   `orca reload`, then `orca snapshot` again to check the Expect line.
+   Re-snapshot after every navigation, because element refs change.
+4. In the PR description and the Linear summary, list each journey as
+   **Pass** or **Fail** with one line of evidence. If Orca or the dev
+   server can't run, say so plainly. Never claim a browser check that did
+   not happen.
+5. Stop the dev server and close the tabs you opened
+   (`orca tab close --page <id>`).
+
 Schema, DB bootstrap, settings, and `AppState` shapes: read section 0 of
 `edgeways/docs/roadmap/implementation-briefs.md` only when the task touches
 those. Do not load it on every change.
