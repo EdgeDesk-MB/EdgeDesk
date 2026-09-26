@@ -23,6 +23,7 @@ import { canDesk } from "@/lib/entitlements/effective-plan";
 import { ThemeSelect } from "@/components/theme-select";
 import { MobileDrawerSessionButton } from "@/components/top-bar-login-button";
 import { useAppState } from "@/hooks/use-app-state";
+import { usePublicDemo } from "@/components/demo/public-demo-provider";
 import {
   useOfferEdgeRaceCount,
   useRacingOfferEdgeKey,
@@ -80,6 +81,7 @@ function BurgerButton(props: React.ComponentProps<"button">) {
 function MobileNavDrawer() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() ?? "";
+  const { demoHref } = usePublicDemo();
   const { state } = useAppState();
   const alertsUnread = state?.alertsUnread ?? 0;
   const openBetCount = (state?.bets ?? []).filter((b) => b.status === "open").length;
@@ -140,7 +142,7 @@ function MobileNavDrawer() {
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={demoHref(item.href)}
                       onClick={() => {
                         close();
                       }}

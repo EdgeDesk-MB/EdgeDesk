@@ -21,6 +21,44 @@ export function parsePublicDemoView(
   return "edge";
 }
 
+/** Plan preview query param. Desks must not reuse it (EDGE-159). */
+export const PUBLIC_DEMO_VIEW_PARAM = "view";
+
+/** Only an explicit plan counts. A missing or foreign `?view=` is not "edge". */
+export function readPublicDemoViewParam(
+  value: string | null | undefined
+): PublicDemoView | null {
+  return value === "free" || value === "core" || value === "edge" ? value : null;
+}
+
+/**
+ * Query string carrying `view`, or null when `search` already has it. Plain
+ * nav links drop the query, so the demo writes the plan back after each
+ * navigation, otherwise a reload falls through to Edge.
+ */
+export function publicDemoSearchWithView(
+  search: string,
+  view: PublicDemoView
+): string | null {
+  const params = new URLSearchParams(search);
+  if (params.get(PUBLIC_DEMO_VIEW_PARAM) === view) return null;
+  params.set(PUBLIC_DEMO_VIEW_PARAM, view);
+  return `?${params.toString()}`;
+}
+
+/** Internal desk href with the demo plan attached, so new tabs keep it too. */
+export function withPublicDemoView(href: string, view: PublicDemoView): string {
+  if (!href.startsWith("/") || href.startsWith("//")) return href;
+  const hashAt = href.indexOf("#");
+  const hash = hashAt === -1 ? "" : href.slice(hashAt);
+  const beforeHash = hashAt === -1 ? href : href.slice(0, hashAt);
+  const queryAt = beforeHash.indexOf("?");
+  const path = queryAt === -1 ? beforeHash : beforeHash.slice(0, queryAt);
+  const search = queryAt === -1 ? "" : beforeHash.slice(queryAt);
+  const next = publicDemoSearchWithView(search, view);
+  return `${path}${next ?? search}${hash}`;
+}
+
 /**
  * Presence-only check for client UI (banners, write-blocking, FOUC skips).
  * The value is HMAC-signed (EDGE-91) and the secret never reaches the browser,
