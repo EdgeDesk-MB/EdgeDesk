@@ -10,6 +10,7 @@
 import { accaCampaignCompleteAlert, type AccaCompleteAlertRun } from "./acca-complete";
 import { isAccaDeskBack, isAccaDeskLay } from "@/lib/bets/acca-desk-bets";
 import { nakedExposureAlertKey } from "@/lib/bets/naked-exposure";
+import { offerDeepLinkHref } from "@/lib/offers/offer-deep-link";
 import { effectiveOfferExpiryMs } from "@/lib/offers/offer-expiry";
 import type { DoNextItem } from "@/lib/offers/do-next";
 import type { DailyPlanRaceInput } from "@/lib/plan/daily-plan";
@@ -440,7 +441,10 @@ export function evaluateAlertRules(input: AlertRuleInput): EdgeAlert[] {
         body: copy.body,
         bookmaker: item.bookmaker?.trim() || null,
         // P1: land on the campaign details modal, not the add-bet flow
-        href: item.offerId != null ? `/offers?view=${item.offerId}` : (item.href ?? "/offers"),
+        href:
+          item.offerId != null
+            ? offerDeepLinkHref(item.offerId)
+            : (item.href ?? "/offers"),
       });
     }
   }

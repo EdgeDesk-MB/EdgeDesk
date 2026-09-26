@@ -87,7 +87,7 @@ describe("offer_expiring rule", () => {
     expect(alerts[0]).toMatchObject({
       kind: "offer_expiring",
       key: "offer_expiring:offer-5-place_qualifying:2026-07-13",
-      href: "/offers?view=5",
+      href: "/offers?offer=5",
     });
     expect(alerts[0]!.title).toMatch(/⚡ £12 edge ends in/i);
     expect(alerts[0]!.body).toMatch(/place the £10 qualifying bet before/i);

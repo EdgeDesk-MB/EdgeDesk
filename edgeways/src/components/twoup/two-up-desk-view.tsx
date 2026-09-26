@@ -19,7 +19,6 @@ import { TwoUpPlaybookDialog, TwoUpWorkbench } from "@/components/twoup/two-up-w
 import { canDesk } from "@/lib/entitlements/effective-plan";
 import { canUseTwoupScout } from "@/lib/entitlements/twoup-scout";
 import {
-  epDeskFixtureSearch,
   parseEpDeskFixtureQuery,
   TWOUP_DESK_PATH,
 } from "@/lib/calc/ep/fixture-query";
@@ -33,6 +32,8 @@ import {
   canOpenFootballEpModel,
   isTwoUpBet,
   parseTwoUpDeskView,
+  TWOUP_DESK_VIEW_PARAM,
+  twoUpDeskSearch,
   type TwoUpDeskViewId,
 } from "@/lib/twoup/desk-view";
 import { FootballIcon } from "@/components/sport-icon";
@@ -54,7 +55,7 @@ export function TwoUpDeskView() {
     start: searchParams?.get("start"),
     tab: searchParams?.get("tab"),
   });
-  const viewFromUrl = searchParams?.get("view");
+  const viewFromUrl = searchParams?.get(TWOUP_DESK_VIEW_PARAM);
   const [deskTab, setDeskTab] = useState<TwoUpDeskViewId>(() =>
     fixtureQuery ? "model" : parseTwoUpDeskView(viewFromUrl)
   );
@@ -96,30 +97,10 @@ export function TwoUpDeskView() {
     fixture?: { home: string; away: string; startTime?: number; tab?: string };
     clearFixture?: boolean;
   }) {
-    const params = new URLSearchParams(searchParams?.toString() ?? "");
-    const view = next.view ?? deskTab;
-    if (view === "fixtures") params.delete("view");
-    else params.set("view", view);
-    if (next.clearFixture) {
-      params.delete("home");
-      params.delete("away");
-      params.delete("start");
-      params.delete("tab");
-    } else if (next.fixture) {
-      const search = new URLSearchParams(
-        epDeskFixtureSearch({
-          home: next.fixture.home,
-          away: next.fixture.away,
-          startTime: next.fixture.startTime,
-          tab: next.fixture.tab,
-        })
-      );
-      params.set("home", search.get("home") ?? next.fixture.home);
-      params.set("away", search.get("away") ?? next.fixture.away);
-      if (search.get("start")) params.set("start", search.get("start")!);
-      if (search.get("tab")) params.set("tab", search.get("tab")!);
-    }
-    const qs = params.toString();
+    const qs = twoUpDeskSearch(searchParams?.toString() ?? "", {
+      ...next,
+      view: next.view ?? deskTab,
+    });
     router.replace(qs ? `${TWOUP_DESK_PATH}?${qs}` : TWOUP_DESK_PATH, {
       scroll: false,
     });
