@@ -293,13 +293,22 @@ export const brandChipActive =
   "skeuo-solid skeuo-sm bg-[#111111] font-semibold text-brand-text";
 
 /**
+ * Light-mode counter plate, mid-grey face + off-white type. Shared by the nav
+ * counters and the side-nav appearance toggle so the two read as one family.
+ */
+export const counterPlateLight = "bg-[#666666] text-[#fafafa]";
+
+/**
  * Counters / nav badges — flat.
- * Light: mid-grey plate + off-white type.
+ * Light: mid-grey plate + off-white type (`counterPlateLight`).
  * Dark: same mute as unselected Racing Desk filter-pill counts
  * (`bg-foreground/10 text-foreground/70`).
  */
-export const brandChipCount =
-  "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#666666] px-1.5 text-[11px] font-bold tabular-nums text-[#fafafa] dark:bg-foreground/10 dark:text-foreground/70";
+export const brandChipCount = cn(
+  "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+  counterPlateLight,
+  "dark:bg-foreground/10 dark:text-foreground/70"
+);
 
 /**
  * Shared box for Core / Edge / Backed marks. Floor 11px.
