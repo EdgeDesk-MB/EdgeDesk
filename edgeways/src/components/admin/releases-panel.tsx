@@ -355,9 +355,11 @@ export function ReleasesPanel({
         <CardHeader>
           <CardTitle className="text-base">App update</CardTitle>
           <CardDescription>
-            Prompts desks that are still on an older build. They stay put until
-            they tap Reload. Auto compares the boot stamp of this tab with the
-            current deploy. Force is for checking {envLabel.toLowerCase()} only.
+            Desks still on an older build reload quietly on their next page
+            change or when the tab is hidden, never mid-edit or with a dialog
+            open. Auto compares the boot stamp of this tab with the current
+            deploy. Force shows the Reload prompt for checking{" "}
+            {envLabel.toLowerCase()} only.
             Localhost /admin never writes the live banner.
           </CardDescription>
         </CardHeader>

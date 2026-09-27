@@ -15,6 +15,7 @@ import { ScrollIdleBars } from "@/components/scroll-idle-bars";
 import { BrandStorageMigration } from "@/components/brand-storage-migration";
 import { PostHogIdentify } from "@/components/analytics/posthog-identify";
 import { SyncAppUser } from "@/components/sync-app-user";
+import { ChunkLoadRecovery } from "@/components/chunk-load-recovery";
 import { BRAND_ACCENT_FOUC_SCRIPT } from "@/lib/brand-accent-fouc";
 import {
   BRAND_ACCENT_COOKIE_KEY,
@@ -151,6 +152,7 @@ export default async function RootLayout({
           appearance={EDGEWAYS_CLERK_APPEARANCE}
           localization={EDGEWAYS_CLERK_LOCALIZATION}
         >
+          <ChunkLoadRecovery />
           <BrandStorageMigration />
           <ScrollIdleBars />
           <SyncAppUser />

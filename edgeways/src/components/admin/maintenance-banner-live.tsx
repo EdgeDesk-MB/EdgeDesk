@@ -6,13 +6,16 @@ import {
   DEFAULT_APP_UPDATE,
   DEFAULT_APP_UPDATE_LINK_LABEL,
   appUpdateExitHold,
+  appUpdateIsPending,
   appUpdateIsVisible,
   appUpdatesEqual,
   normalizeAppUpdate,
   readAppUpdateFromUnknown,
+  readBuildCriticalFromUnknown,
   readBuildStampFromUnknown,
   type AppUpdateSettings,
 } from "@/lib/admin/app-update-shared";
+import { reloadForUpdate } from "@/lib/app-update/quiet-reload";
 import {
   SITE_BANNER_CHANGE_EVENT,
   SITE_BANNER_POLL_MS,
@@ -25,6 +28,7 @@ import {
 import { SPRING_DURATION_MS } from "@/lib/ui/motion";
 import { MaintenanceBannerView } from "./maintenance-banner";
 import { SiteBannerSlot } from "./site-banner-slot";
+import { useQuietUpdateReload } from "./use-quiet-update-reload";
 
 const LAYOUT_TOKEN = "--layout-site-banner-h";
 
@@ -39,24 +43,12 @@ function readBannerFromUnknown(raw: unknown): MaintenanceBanner {
   );
 }
 
-/** Only from the Reload tap. A timer here yanks the desk mid-work. */
-async function reloadDesk(): Promise<void> {
-  try {
-    if ("serviceWorker" in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
-    }
-  } catch {
-    // Reload still picks up the new documents.
-  }
-  window.location.reload();
-}
-
 /**
  * Live site chrome: operator banner plus an optional update prompt.
  * SSR first paint when already on, then poll so open tabs animate in
  * or out without a reload. Fail-soft. A same-tab publish beats an
- * in-flight poll.
+ * in-flight poll. A new build is applied quietly at a safe moment; the
+ * prompt only shows for Force or a build flagged critical.
  */
 export function MaintenanceBannerLive({
   initial,
@@ -69,15 +61,16 @@ export function MaintenanceBannerLive({
 }) {
   const start = normalizeMaintenanceBanner(initial);
   const startUpdate = normalizeAppUpdate(initialUpdate);
-  const bootStampRef = useRef(buildStamp);
+  const [bootStamp] = useState(buildStamp);
   const [live, setLive] = useState(start);
   const [liveUpdate, setLiveUpdate] = useState(startUpdate);
   const [liveStamp, setLiveStamp] = useState(buildStamp);
+  const [liveCritical, setLiveCritical] = useState(false);
   const [held, setHeld] = useState<MaintenanceBanner | null>(
     siteBannerIsVisible(start) ? start : null
   );
   const [heldUpdate, setHeldUpdate] = useState<AppUpdateSettings | null>(
-    appUpdateIsVisible(startUpdate, bootStampRef.current, buildStamp)
+    appUpdateIsVisible(startUpdate, bootStamp, buildStamp)
       ? startUpdate
       : null
   );
@@ -86,11 +79,16 @@ export function MaintenanceBannerLive({
   const bannerVisible = siteBannerIsVisible(live);
   const updateVisible = appUpdateIsVisible(
     liveUpdate,
-    bootStampRef.current,
-    liveStamp
+    bootStamp,
+    liveStamp,
+    liveCritical
   );
   const shownBanner = bannerVisible ? live : held;
   const shownUpdate = updateVisible ? liveUpdate : heldUpdate;
+
+  useQuietUpdateReload(
+    appUpdateIsPending(liveUpdate, bootStamp, liveStamp)
+  );
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMotionReady(true));
@@ -103,9 +101,15 @@ export function MaintenanceBannerLive({
 
   useEffect(() => {
     setHeldUpdate((prev) =>
-      appUpdateExitHold(prev, liveUpdate, bootStampRef.current, liveStamp)
+      appUpdateExitHold(
+        prev,
+        liveUpdate,
+        bootStamp,
+        liveStamp,
+        liveCritical
+      )
     );
-  }, [liveUpdate, liveStamp]);
+  }, [liveUpdate, bootStamp, liveStamp, liveCritical]);
 
   useEffect(() => {
     if (bannerVisible || !held) return;
@@ -123,13 +127,26 @@ export function MaintenanceBannerLive({
     const ms = reduce || !motionReady ? 0 : SPRING_DURATION_MS;
     const id = window.setTimeout(() => {
       setHeldUpdate((prev) =>
-        appUpdateIsVisible(liveUpdate, bootStampRef.current, liveStamp)
+        appUpdateIsVisible(
+          liveUpdate,
+          bootStamp,
+          liveStamp,
+          liveCritical
+        )
           ? prev
           : null
       );
     }, ms);
     return () => window.clearTimeout(id);
-  }, [updateVisible, heldUpdate, liveUpdate, liveStamp, motionReady]);
+  }, [
+    updateVisible,
+    heldUpdate,
+    liveUpdate,
+    bootStamp,
+    liveStamp,
+    liveCritical,
+    motionReady,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +175,7 @@ export function MaintenanceBannerLive({
         applyBanner(readBannerFromUnknown(raw));
         applyUpdate(readAppUpdateFromUnknown(raw));
         applyStamp(readBuildStampFromUnknown(raw));
+        setLiveCritical(readBuildCriticalFromUnknown(raw));
       } catch {
         // Best-effort. The next tick retries.
       }
@@ -273,7 +291,7 @@ export function MaintenanceBannerLive({
               action={{
                 label: DEFAULT_APP_UPDATE_LINK_LABEL,
                 onClick: () => {
-                  void reloadDesk();
+                  void reloadForUpdate();
                 },
               }}
               announce={false}
