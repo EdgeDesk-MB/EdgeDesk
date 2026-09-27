@@ -1,5 +1,6 @@
 import posthog from "posthog-js";
 import { shouldDropPosthogException } from "@/lib/analytics/exception-noise";
+import { shouldCapturePosthogOnHost } from "@/lib/analytics/posthog-gate";
 
 /**
  * Product analytics + error tracking (EDGE-35 / EDGE-49). Privacy posture:
@@ -7,10 +8,18 @@ import { shouldDropPosthogException } from "@/lib/analytics/exception-noise";
  * capture. Pageviews, unhandled exceptions and explicit capture() only.
  * Events proxy through /ingest (see next.config.ts) so the browser talks to
  * our origin, not posthog.com. No token (fresh clone, CI) = silently off.
+ * Non-production hosts skip init entirely, so no PostHog requests at all
+ * (EDGE-204). opt_out_capturing() would still fetch remote config.
  */
 const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 
-if (token) {
+if (
+  token &&
+  shouldCapturePosthogOnHost(
+    window.location.hostname,
+    process.env.NEXT_PUBLIC_POSTHOG_FORCE_ENABLE
+  )
+) {
   posthog.init(token, {
     api_host: "/ingest",
     ui_host:
