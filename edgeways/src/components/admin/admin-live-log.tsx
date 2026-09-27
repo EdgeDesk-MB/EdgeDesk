@@ -22,7 +22,8 @@ import { EmptyState } from "@/components/help/empty-state";
 import { StatStrip, StatTile } from "@/components/layout/stat-strip";
 import { pageSecondaryButtonProps } from "@/components/layout/page-header-actions";
 import { api } from "@/hooks/use-app-state";
-import { formatAdminDateTime } from "@/lib/admin/format";
+import { londonYmd } from "@/lib/admin/activity-day";
+import { ADMIN_TIME_ZONE, formatAdminDateTime } from "@/lib/admin/format";
 import {
   ADMIN_LIVE_LOG_CAP,
   type AdminLiveLogList,
@@ -46,8 +47,9 @@ type LogResponse = AdminLiveLogList & { pollMs?: number };
 
 function dayLabel(ms: number): string {
   const date = new Date(ms);
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) return formatClockTime(date);
+  if (londonYmd(date) === londonYmd()) {
+    return formatClockTime(date, { timeZone: ADMIN_TIME_ZONE });
+  }
   return formatAdminDateTime(ms);
 }
 

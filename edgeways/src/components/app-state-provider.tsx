@@ -52,6 +52,8 @@ const AppStateContext = createContext<AppStateContextValue | null>(null);
 /** Abandon a coalesced poll that has been stuck this long (dev compile / API hang). */
 const STALE_INFLIGHT_MS = 15_000;
 
+const subscribeNoop = () => () => {};
+
 function settingsHoldCovered(
   incoming: AppSettings,
   hold: Partial<AppSettings>
@@ -75,9 +77,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     readDeskSnapshot,
     () => null
   );
-  const [live, setLive] = useState<AppState | null>(() =>
-    publicDemo.active ? buildPublicDemoState(publicDemo.view) : null
-  );
+  // The demo fixture reads the clock and the local timezone, which differ
+  // between the server and the browser. Build it only after hydration, like
+  // the signed-in desk, or the SSR text will not match (React #418).
+  const hydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  const demoReady = publicDemo.active && hydrated;
+  const [live, setLive] = useState<AppState | null>(null);
   const state = publicDemo.active ? live : live ?? cached;
   const [error, setError] = useState<string | null>(null);
   const [pauseCount, setPauseCount] = useState(0);
@@ -90,16 +95,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const settingsHoldRef = useRef<Partial<AppSettings> | null>(null);
   const staleOpenRetry = useRef(false);
   const [prevDemo, setPrevDemo] = useState({
-    active: publicDemo.active,
+    active: false,
     view: publicDemo.view,
   });
 
   if (
-    prevDemo.active !== publicDemo.active ||
+    prevDemo.active !== demoReady ||
     prevDemo.view !== publicDemo.view
   ) {
-    setPrevDemo({ active: publicDemo.active, view: publicDemo.view });
-    if (publicDemo.active) {
+    setPrevDemo({ active: demoReady, view: publicDemo.view });
+    if (demoReady) {
       setLive(buildPublicDemoState(publicDemo.view));
       setError(null);
     }
