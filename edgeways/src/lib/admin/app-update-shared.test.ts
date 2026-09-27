@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_APP_UPDATE,
   DEFAULT_APP_UPDATE_MESSAGE,
+  APP_UPDATE_PREVIEW_CAPTION,
   appUpdateExitHold,
   appUpdateIsPending,
   appUpdateIsVisible,
@@ -141,3 +142,13 @@ describe("appUpdatesEqual", () => {
   });
 });
 
+
+describe("APP_UPDATE_PREVIEW_CAPTION", () => {
+  it("describes what live desks see in each mode", () => {
+    expect(APP_UPDATE_PREVIEW_CAPTION).toEqual({
+      auto: "Live desks only see this banner for critical updates. Otherwise they reload quietly.",
+      force: "Live desks see this after the next deploy, until they reload.",
+      off: "Hidden. Desks don't reload for updates.",
+    });
+  });
+});

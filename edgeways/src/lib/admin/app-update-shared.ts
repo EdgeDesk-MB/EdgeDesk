@@ -29,6 +29,12 @@ export const APP_UPDATE_MODE_HINT: Record<AppUpdateMode, string> = {
   force: "Show now, for checking this environment only",
 };
 
+export const APP_UPDATE_PREVIEW_CAPTION: Record<AppUpdateMode, string> = {
+  auto: "Live desks only see this banner for critical updates. Otherwise they reload quietly.",
+  off: "Hidden. Desks don't reload for updates.",
+  force: "Live desks see this after the next deploy, until they reload.",
+};
+
 export const APP_UPDATE_CHANGE_EVENT = "edgeways:app-update";
 
 export function isAppUpdateMode(value: unknown): value is AppUpdateMode {

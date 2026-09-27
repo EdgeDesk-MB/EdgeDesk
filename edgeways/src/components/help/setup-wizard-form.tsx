@@ -861,6 +861,7 @@ export function SetupWizardForm({
             </div>
             {attribution === "other" ? (
               <Input
+                name="setup-attribution-other"
                 aria-label="Where you heard about us"
                 placeholder="Optional note"
                 value={attributionOther}
@@ -951,6 +952,7 @@ export function SetupWizardForm({
                     persistCustom={false}
                   />
                   <SetupMoneyInput
+                    name={`setup-bookie-balance-${i}`}
                     aria-label={`Balance for bookie ${i + 1}`}
                     value={row.balance}
                     onChange={(balance) => setBookie(i, { balance })}
