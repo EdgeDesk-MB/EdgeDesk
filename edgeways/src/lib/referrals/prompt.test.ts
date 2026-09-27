@@ -1,35 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  hasReferralSuccessMoment,
+  REFERRAL_SETTLE_WINDOW_MS,
+  crossedIntoProfit,
+  hasRecentReferralSettleAction,
   isReferralPromptDismissed,
-  isReferralPromptHidden,
-  isReferralPromptSnoozed,
+  isReferralSettleRoute,
   isReferralSubscriber,
   markReferralPromptDismissed,
+  noteReferralSettleAction,
   referralPromptStorageKey,
-  shouldOpenReferralPrompt,
-  snoozeReferralPrompt,
+  resetReferralSettleActionForTests,
+  shouldArmReferralAsk,
 } from "@/lib/referrals/prompt";
 
-describe("referral prompt", () => {
+describe("referral prompt dismiss latch", () => {
   const local = new Map<string, string>();
-  const session = new Map<string, string>();
 
   beforeEach(() => {
     local.clear();
-    session.clear();
     vi.stubGlobal("window", {});
     vi.stubGlobal("localStorage", {
       getItem: (key: string) => local.get(key) ?? null,
       setItem: (key: string, value: string) => local.set(key, value),
       removeItem: (key: string) => local.delete(key),
       clear: () => local.clear(),
-    });
-    vi.stubGlobal("sessionStorage", {
-      getItem: (key: string) => session.get(key) ?? null,
-      setItem: (key: string, value: string) => session.set(key, value),
-      removeItem: (key: string) => session.delete(key),
-      clear: () => session.clear(),
     });
   });
 
@@ -44,15 +38,6 @@ describe("referral prompt", () => {
 
   it("starts undismissed", () => {
     expect(isReferralPromptDismissed()).toBe(false);
-    expect(isReferralPromptHidden()).toBe(false);
-  });
-
-  it("snoozes for the session without a lasting dismiss", () => {
-    snoozeReferralPrompt("user_owner");
-    expect(isReferralPromptSnoozed("user_owner")).toBe(true);
-    expect(isReferralPromptDismissed("user_owner")).toBe(false);
-    expect(isReferralPromptHidden("user_owner")).toBe(true);
-    expect(local.size).toBe(0);
   });
 });
 
@@ -83,100 +68,92 @@ describe("isReferralSubscriber", () => {
   });
 });
 
-describe("hasReferralSuccessMoment", () => {
-  it("qualifies on a settled bet with profit", () => {
-    expect(
-      hasReferralSuccessMoment({
-        bets: [{ status: "won", actualProfit: 4.2 }],
-        casinoSettlements: [],
-      })
-    ).toBe(true);
+describe("isReferralSettleRoute", () => {
+  it("counts settle and completion mutations", () => {
+    expect(isReferralSettleRoute("PATCH", "/api/bets/12")).toBe(true);
+    expect(isReferralSettleRoute("POST", "/api/bets")).toBe(true);
+    expect(isReferralSettleRoute("POST", "/api/events/4/result")).toBe(true);
+    expect(isReferralSettleRoute("PATCH", "/api/acca/legs/9")).toBe(true);
+    expect(isReferralSettleRoute("PATCH", "/api/bet-builder/3")).toBe(true);
+    expect(isReferralSettleRoute("PATCH", "/api/boosts/2")).toBe(true);
+    expect(isReferralSettleRoute("PATCH", "/api/casino/7?x=1")).toBe(true);
+    expect(isReferralSettleRoute("POST", "/api/racing/sync-results")).toBe(true);
   });
 
-  it("qualifies on a completed casino offer with profit", () => {
-    expect(
-      hasReferralSuccessMoment({
-        bets: [{ status: "lost", actualProfit: -8 }],
-        casinoSettlements: [{ amount: 11.31 }],
-      })
-    ).toBe(true);
-  });
-
-  it("qualifies on early payout or half-win with profit", () => {
-    expect(
-      hasReferralSuccessMoment({
-        bets: [{ status: "early_payout", actualProfit: 1.2 }],
-        casinoSettlements: [],
-      })
-    ).toBe(true);
-    expect(
-      hasReferralSuccessMoment({
-        bets: [{ status: "half_win", actualProfit: 0.4 }],
-        casinoSettlements: [],
-      })
-    ).toBe(true);
-  });
-
-  it("ignores open, void, break-even, and losing completions", () => {
-    expect(
-      hasReferralSuccessMoment({
-        bets: [
-          { status: "open", actualProfit: 12 },
-          { status: "void", actualProfit: 3 },
-          { status: "won", actualProfit: 0 },
-          { status: "lost", actualProfit: -2.5 },
-          { status: "push", actualProfit: 0 },
-        ],
-        casinoSettlements: [{ amount: 0 }, { amount: -4 }],
-      })
-    ).toBe(false);
+  it("ignores reads, imports, restores, demo data and settings", () => {
+    expect(isReferralSettleRoute("GET", "/api/bets")).toBe(false);
+    expect(isReferralSettleRoute("POST", "/api/import/bets")).toBe(false);
+    expect(isReferralSettleRoute("POST", "/api/import/platform")).toBe(false);
+    expect(isReferralSettleRoute("POST", "/api/data/restore")).toBe(false);
+    expect(isReferralSettleRoute("POST", "/api/data/demo")).toBe(false);
+    expect(isReferralSettleRoute("PATCH", "/api/settings")).toBe(false);
+    expect(isReferralSettleRoute("POST", "/api/betsy")).toBe(false);
   });
 });
 
-describe("shouldOpenReferralPrompt", () => {
-  const ready = {
-    pathname: "/desk",
-    signedIn: true,
-    publicDemo: false,
-    suppressed: false,
-    hidden: false,
-    subscribed: true,
-    hasSuccessMoment: true,
-  };
+describe("recent settle action", () => {
+  beforeEach(() => resetReferralSettleActionForTests());
 
-  it("opens on the homepage after a subscribed success moment", () => {
-    expect(shouldOpenReferralPrompt(ready)).toBe(true);
-    expect(shouldOpenReferralPrompt({ ...ready, pathname: "/desk/" })).toBe(
+  it("holds for the settle window only", () => {
+    expect(hasRecentReferralSettleAction(1_000)).toBe(false);
+    noteReferralSettleAction("PATCH", "/api/bets/1", 1_000);
+    expect(hasRecentReferralSettleAction(1_000 + REFERRAL_SETTLE_WINDOW_MS)).toBe(
       true
     );
-  });
-
-  it("stays closed on other routes", () => {
-    expect(shouldOpenReferralPrompt({ ...ready, pathname: "/settings" })).toBe(
-      false
-    );
-    expect(shouldOpenReferralPrompt({ ...ready, pathname: "/offers" })).toBe(
-      false
-    );
-  });
-
-  it("stays closed without a subscription or a profitable completion", () => {
-    expect(shouldOpenReferralPrompt({ ...ready, subscribed: false })).toBe(
-      false
-    );
     expect(
-      shouldOpenReferralPrompt({ ...ready, hasSuccessMoment: false })
+      hasRecentReferralSettleAction(1_001 + REFERRAL_SETTLE_WINDOW_MS)
     ).toBe(false);
   });
 
-  it("stays closed in public demo, while other dialogs are up, or when hidden", () => {
-    expect(shouldOpenReferralPrompt({ ...ready, publicDemo: true })).toBe(
-      false
-    );
-    expect(shouldOpenReferralPrompt({ ...ready, signedIn: false })).toBe(false);
-    expect(shouldOpenReferralPrompt({ ...ready, suppressed: true })).toBe(
-      false
-    );
-    expect(shouldOpenReferralPrompt({ ...ready, hidden: true })).toBe(false);
+  it("is not set by an import", () => {
+    noteReferralSettleAction("POST", "/api/import/bets", 1_000);
+    expect(hasRecentReferralSettleAction(1_000)).toBe(false);
+  });
+});
+
+describe("crossedIntoProfit", () => {
+  it("fires when realised P&L goes from £0 or less to above £0", () => {
+    expect(crossedIntoProfit(0, 4.2)).toBe(true);
+    expect(crossedIntoProfit(-0.62, 11.31)).toBe(true);
+  });
+
+  it("does not fire on first load, staying positive, or a pence-dust move", () => {
+    expect(crossedIntoProfit(null, 4.2)).toBe(false);
+    expect(crossedIntoProfit(12, 18)).toBe(false);
+    expect(crossedIntoProfit(-3, -1)).toBe(false);
+    expect(crossedIntoProfit(-0.5, 0.004)).toBe(false);
+    expect(crossedIntoProfit(0.004, 5)).toBe(true);
+  });
+});
+
+describe("shouldArmReferralAsk", () => {
+  const ready = {
+    before: -0.5,
+    after: 7.25,
+    recentSettle: true,
+    signedIn: true,
+    publicDemo: false,
+    subscribed: true,
+    alreadyAsked: false,
+  };
+
+  it("arms on the first in-app settle that crosses into profit", () => {
+    expect(shouldArmReferralAsk(ready)).toBe(true);
+  });
+
+  it("stays closed for profit already on the desk at load (seed or import)", () => {
+    expect(shouldArmReferralAsk({ ...ready, before: null })).toBe(false);
+    expect(shouldArmReferralAsk({ ...ready, before: 2_400 })).toBe(false);
+  });
+
+  it("stays closed when no settle was made in this tab", () => {
+    expect(shouldArmReferralAsk({ ...ready, recentSettle: false })).toBe(false);
+  });
+
+  it("stays closed once asked, without a subscription, signed out or in the demo", () => {
+    expect(shouldArmReferralAsk({ ...ready, alreadyAsked: true })).toBe(false);
+    expect(shouldArmReferralAsk({ ...ready, subscribed: false })).toBe(false);
+    expect(shouldArmReferralAsk({ ...ready, signedIn: false })).toBe(false);
+    expect(shouldArmReferralAsk({ ...ready, publicDemo: true })).toBe(false);
   });
 });

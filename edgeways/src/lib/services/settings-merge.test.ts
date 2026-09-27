@@ -56,6 +56,17 @@ describe("mergeAppSettings", () => {
     expect(mergeAppSettings(confirmed, { ageConfirmedAt: null }).ageConfirmedAt).toBeNull();
   });
 
+  it("keeps the hosted referral ask latch across merge and parse", () => {
+    expect(parseStoredSettings(null).referralAskShownAt).toBeNull();
+    const shown = mergeAppSettings(DEFAULT_SETTINGS, {
+      referralAskShownAt: 1_790_544_000_000,
+    });
+    expect(shown.referralAskShownAt).toBe(1_790_544_000_000);
+    expect(
+      parseStoredSettings(JSON.parse(JSON.stringify(shown))).referralAskShownAt
+    ).toBe(1_790_544_000_000);
+  });
+
   it("round-trips favourite fixture scopes", () => {
     const patched = mergeAppSettings(DEFAULT_SETTINGS, {
       favouriteFootballScopes: ["England::Premier League", "all", "England::Premier League"],

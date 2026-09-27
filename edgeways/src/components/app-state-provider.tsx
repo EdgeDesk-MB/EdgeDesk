@@ -45,6 +45,8 @@ type AppStateContextValue = {
    * Returns a resume function; safe to call from useEffect cleanups.
    */
   pausePolling: () => () => void;
+  /** True while any dialog (or Add bet) holds the poll paused. */
+  pollingPaused: boolean;
 };
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -353,8 +355,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       applyLocalOfferPatch,
       applyLocalSettingsPatch,
       pausePolling,
+      pollingPaused,
     }),
-    [state, error, refresh, applyLocalOfferPatch, applyLocalSettingsPatch, pausePolling]
+    [
+      state,
+      error,
+      refresh,
+      applyLocalOfferPatch,
+      applyLocalSettingsPatch,
+      pausePolling,
+      pollingPaused,
+    ]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
@@ -364,11 +375,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
  * Safe outside `AppStateProvider` (marketing dialogs no-op).
  * `DialogContent` pauses for every open modal. */
 export function usePauseAppStatePolling(paused: boolean) {
-  const ctx = useContext(AppStateContext);
+  const pausePolling = useContext(AppStateContext)?.pausePolling;
   useEffect(() => {
-    if (!paused || !ctx) return;
-    return ctx.pausePolling();
-  }, [paused, ctx]);
+    if (!paused || !pausePolling) return;
+    return pausePolling();
+  }, [paused, pausePolling]);
 }
 
 /** @param _intervalMs Ignored. Shared poll is a product default (3s), not a user setting. */

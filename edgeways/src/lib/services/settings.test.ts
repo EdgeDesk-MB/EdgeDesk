@@ -19,6 +19,16 @@ describe("age confirmation persistence (EDGE-13)", () => {
   });
 });
 
+describe("referral ask latch (EDGE-219)", () => {
+  it("round-trips referralAskShownAt", () => {
+    expect(getAppSettings().referralAskShownAt).toBeNull();
+    patchAppSettings({ referralAskShownAt: 1_790_544_000_000 });
+    expect(getAppSettings().referralAskShownAt).toBe(1_790_544_000_000);
+    patchAppSettings({ referralAskShownAt: null });
+    expect(getAppSettings().referralAskShownAt).toBeNull();
+  });
+});
+
 describe("stakeFromOfferPrefs / bookmakerFromOfferPrefs", () => {
   it("prefers remembered stake over rules and fallback", () => {
     const prefs = { "5": { stake: 12.5, bookmaker: "Coral" } };

@@ -1,11 +1,28 @@
 import { BOLT_PATH } from "@/lib/brand/bolt-mark";
 
+/** The slip stub left of the dashed tear fits about 112 units of type. */
+const SLIP_TEXT_MAX = 112;
+
+function slipFontSize(label: string): number {
+  if (label.length <= 3) return 32;
+  if (label.length <= 5) return 28;
+  if (label.length <= 6) return 24;
+  return 20;
+}
+
 /**
  * Referral interrupt art: a betting slip stamped with the Edgeways bolt.
  * Header is `--edge`. Slip uses currentColor (`--edge-foreground`);
- * £10 and bolt use `--edge` so they read on that slip.
+ * the amount and bolt use `--edge` so they read on that slip.
  */
-export function ReferAFriendArt({ className }: { className?: string }) {
+export function ReferAFriendArt({
+  className,
+  amount = "£10",
+}: {
+  className?: string;
+  amount?: string;
+}) {
+  const fontSize = slipFontSize(amount);
   return (
     <svg
       viewBox="0 0 240 112"
@@ -40,14 +57,17 @@ export function ReferAFriendArt({ className }: { className?: string }) {
         />
         <text
           x="68"
-          y="44"
+          y={32 + fontSize * 0.375}
           textAnchor="middle"
           fill="var(--edge)"
-          fontSize="32"
+          fontSize={fontSize}
           fontWeight="800"
           fontFamily="var(--font-heading), ui-sans-serif, system-ui, sans-serif"
+          {...(amount.length > 8
+            ? { textLength: SLIP_TEXT_MAX, lengthAdjust: "spacingAndGlyphs" }
+            : {})}
         >
-          £10
+          {amount}
         </text>
         <g transform="translate(144 12) scale(1.67)">
           <path d={BOLT_PATH} fill="var(--edge)" />
