@@ -55,6 +55,12 @@ when `node_modules` is missing.
    http://localhost:<port>/<path> --worktree "$ORCA_BROWSER_WORKTREE"`
    (leave out `--worktree` if that variable is unset). Keep the returned
    page id and pass it as `--page` on later commands.
+
+   **Every time you open a browser tab in Orca, bring it to the front so
+   Sam can watch.** Create the tab with `--json`, read
+   `result.browserPageId` from the output, then run:
+   `orca tab switch --page <browserPageId> --worktree "$ORCA_BROWSER_WORKTREE" --focus`
+   Do this for every tab you open, including repeat visits in new tabs.
 3. Replay every **User journey** in the ticket's agent brief, step by
    step: `orca snapshot` to find elements, `orca click --element <ref>`,
    `orca reload`, then `orca snapshot` again to check the Expect line.
