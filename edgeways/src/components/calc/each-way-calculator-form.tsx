@@ -19,6 +19,7 @@ import { MoneyFlow, NumFlow } from "@/components/money-flow";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { useManualLayStake } from "@/hooks/use-manual-lay-stake";
 import { serializeEwMeta, type EachWayBetMeta } from "@/lib/bets/ew-meta";
 import { eachWay, extraPlace } from "@/lib/calc";
 import { estimateLayPlaceOdds } from "@/lib/calc/estimate-lay-place-odds";
@@ -60,8 +61,6 @@ export function EachWayCalculatorForm({
   const [placeFraction, setPlaceFraction] = useState("0.2");
   const [layWinOdds, setLayWinOdds] = useState(9.6);
   const [layPlaceOdds, setLayPlaceOdds] = useState(2.8);
-  const [layWinStakeOverride, setLayWinStakeOverride] = useState<number | null>(null);
-  const [layPlaceStakeOverride, setLayPlaceStakeOverride] = useState<number | null>(null);
   const [fieldSize, setFieldSize] = useState(12);
   const [exchangePlaces, setExchangePlaces] = useState(3);
   const [bookiePlaces, setBookiePlaces] = useState(4);
@@ -181,12 +180,16 @@ export function EachWayCalculatorForm({
   const fraction = parseFloat(placeFraction);
   const c = commissionPct / 100;
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setLayWinStakeOverride(null);
-      setLayPlaceStakeOverride(null);
-    });
-  }, [stake, winOdds, fraction, layWinOdds, layPlaceOdds, c]);
+  const layPlanReady =
+    stake > 0 &&
+    winOdds > 1 &&
+    layWinOdds > 1 &&
+    layPlaceOdds > 1 &&
+    (mode !== "extra_place" || bookiePlaces > exchangePlaces);
+  const layWin = useManualLayStake(layPlanReady);
+  const layPlace = useManualLayStake(layPlanReady);
+  const layWinStakeOverride = layWin.manual;
+  const layPlaceStakeOverride = layPlace.manual;
 
   const standardResult = useMemo(() => {
     if (!(stake > 0 && winOdds > 1 && layWinOdds > 1 && layPlaceOdds > 1)) return null;
@@ -452,9 +455,9 @@ export function EachWayCalculatorForm({
             value={layWinStake}
             liability={active?.layWinLiability}
             pending={!active}
-            onChange={(v) =>
-              setLayWinStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-            }
+            manual={layWin.isManual}
+            onResetToAuto={layWin.reset}
+            onChange={layWin.commit}
           />
           <PanelInput
             label="Lay PLACE odds"
@@ -468,9 +471,9 @@ export function EachWayCalculatorForm({
             value={layPlaceStake}
             liability={active?.layPlaceLiability}
             pending={!active}
-            onChange={(v) =>
-              setLayPlaceStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-            }
+            manual={layPlace.isManual}
+            onResetToAuto={layPlace.reset}
+            onChange={layPlace.commit}
           />
         </div>
         <p className="text-xs text-muted-foreground">

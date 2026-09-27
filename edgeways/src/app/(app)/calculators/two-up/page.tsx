@@ -18,6 +18,7 @@ import { MoneyFlow } from "@/components/money-flow";
 import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { useManualLayStake } from "@/hooks/use-manual-lay-stake";
 import { twoUp } from "@/lib/calc/twoup";
 import type { ExchangeRow } from "@/lib/db/schema";
 import { panelSurface, sectionNestedTitle } from "@/lib/ui/surface-styles";
@@ -34,7 +35,6 @@ export default function TwoUpCalculatorPage() {
   const [backStake, setBackStake] = useState(50);
   const [backOdds, setBackOdds] = useState(3);
   const [layOdds, setLayOdds] = useState(3.1);
-  const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
 
   useEffect(() => {
     if (!exchange && defaultExchange) {
@@ -45,10 +45,12 @@ export default function TwoUpCalculatorPage() {
   }, [defaultExchange, exchange]);
 
   const commissionPct = exchange?.commissionPct ?? 2;
-
-  useEffect(() => {
-    queueMicrotask(() => setLayStakeOverride(null));
-  }, [backStake, backOdds, layOdds, commissionPct]);
+  const {
+    manual: layStakeOverride,
+    isManual: layStakeManual,
+    commit: commitLayStake,
+    reset: resetLayStake,
+  } = useManualLayStake(backStake > 0 && backOdds > 1 && layOdds > 1);
 
   const result = useMemo(() => {
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
@@ -174,9 +176,9 @@ export default function TwoUpCalculatorPage() {
             value={result?.layStake ?? 0}
             liability={result?.liability}
             pending={!result}
-            onChange={(v) =>
-              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-            }
+            manual={layStakeManual}
+            onResetToAuto={resetLayStake}
+            onChange={commitLayStake}
           />
         </div>
       </LayPanel>
