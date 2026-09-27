@@ -90,28 +90,38 @@ when `node_modules` is missing.
      (modals, banners, empty states, error states)
    - **before and after** when changing existing UI (before from `main`,
      after from your branch)
-   - **desktop** (about 1440 wide) and **mobile** (Pixel 9 emulation,
-     **412 px wide at 1×**; avoid 3× devices, which Orca captures tiled)
+   - **desktop** (1440 × 900) and **mobile** (Pixel 9, 412 × 915), both
+     at **2×** pixel density; add **tablet** (820 × 1180) when the change
+     touches responsive layout
 
-   How, with no new tools: `orca screenshot --format png --json --page
-   <id>` returns base64 in `result.data`; decode it to a PNG file.
-   Desktop is a tab with no device emulation, resampled with `sips
-   --resampleWidth 1440`. Before emulating, note the pane height in
-   device pixels (`innerHeight * devicePixelRatio`). Mobile is a
-   **separate** tab (emulation cannot be undone) after `orca set device
-   --name "Pixel 9"`, which is 412 px at 2.625×. If the capture is taller
-   than the pane it repeats, so crop to the pane height with `sips -c
-   <paneHeight> <width> --cropOffset 1 1` (`0 0` crops from the centre),
-   then `sips --resampleWidth 412`. Check each image before you upload
-   it. `agent-new` lands on `/setup` after sign-in because setup
-   completion is stored in the browser; go straight to `/desk` unless
-   the journey is the setup wizard.
+   How, with no new tools: before each capture, set the layout size and
+   density with `orca viewport --page <id> --width <w> --height <h>
+   --scale 2 --mobile --json`. The page then lays out at exactly `<w>` ×
+   `<h>` CSS px and renders at `<scale>`×. Keep `--mobile` for desktop
+   too: without it Orca ignores `--scale` and the layout widens instead.
+   It does not switch on touch, so hover styles still apply. Reload and
+   `goto` clear the override, so re-apply it right before every
+   screenshot. Then `orca screenshot --format png --json --page <id>`
+   returns base64 in `result.data`; decode it to a PNG file (for
+   example 2880 × 1800 for desktop). Mobile uses a **separate** tab
+   with `orca set device --name "Pixel 9"` first, for the mobile user
+   agent (it cannot be undone), then the same `viewport` call.
+
+   Orca can only capture as tall as its pane, and a taller image repeats
+   (tiles). Before the first override, note the pane height in device
+   pixels (`innerHeight * devicePixelRatio`, about 1,900 on Sam's
+   display). If `<h>` × 2 is bigger, use `--scale 1.5` (tablet portrait
+   usually needs this), and say so in the caption. Do not use 3×: a full
+   phone height at 3× is taller than the pane. Check each image before
+   you upload it. `agent-new` lands on `/setup` after sign-in because
+   setup completion is stored in the browser; go straight to `/desk`
+   unless the journey is the setup wizard.
 
    Upload each PNG with `linear_upload_file` (cyrus-tools), then post
    them in **one** Linear comment titled **"Screenshots"** (`save_comment`
    on the issue), each embedded as `![caption](assetUrl)` with a caption:
-   journey, account, viewport and resolution (for example "Journey 2,
-   agent-new, mobile Pixel 9, 412 × 728"). Edit that same comment on later
+   journey, account, viewport and density (for example "Journey 2,
+   agent-new, mobile Pixel 9, 412 × 915 at 2×"). Edit that same comment on later
    pushes (`save_comment` with its `id`) instead of posting new ones. If
    an upload fails, say so in your summary.
 
