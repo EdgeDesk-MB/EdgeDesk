@@ -25,3 +25,13 @@ else
   (cd "$app_dir" && npm ci --no-audit --no-fund --loglevel=error >/dev/null)
   echo "deps: installed"
 fi
+
+# Agent test accounts (EDGE-214): dev Clerk users plus seeded local desks.
+# The seed refuses anything but a sk_test_ key and a local SQLite desk.
+if [ ! -f "$env_target" ]; then
+  echo "agent seed: skipped ($env_target missing)"
+elif (cd "$app_dir" && npm run --silent seed:agent); then
+  echo "agent seed: ready"
+else
+  echo "agent seed: failed, signed-in journeys need a manual npm run seed:agent"
+fi
