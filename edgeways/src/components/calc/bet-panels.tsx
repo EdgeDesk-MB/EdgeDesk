@@ -46,7 +46,7 @@ import {
   prefersReducedPanelMotion,
 } from "@/lib/ui/bet-panel-reveal";
 import { cn } from "@/lib/utils";
-import { Copy, ChevronDown } from "lucide-react";
+import { Copy, ChevronDown, RotateCcw } from "lucide-react";
 
 /** Settings `brandColor` for a venue name, matching VenueBadge / VenueSelect. */
 function useVenueBrandOverride(venue?: string): string | null {
@@ -737,6 +737,8 @@ export function LayStakeBanner({
   pending,
   trailing = "copy",
   density = "default",
+  manual = false,
+  onResetToAuto,
 }: {
   label?: string;
   value: number;
@@ -744,6 +746,9 @@ export function LayStakeBanner({
   liability?: number;
   /** When set, the field is overridable (Add bet / calculators) */
   onChange?: (v: number) => void;
+  /** The user typed this stake: show the Manual tag and Reset to auto */
+  manual?: boolean;
+  onResetToAuto?: () => void;
   /** Hide a £0 auto value until back stake and both odds are in */
   pending?: boolean;
   /** Main lay stake copies the slip; part-lay rows use inset steppers. */
@@ -751,10 +756,35 @@ export function LayStakeBanner({
   /** `compact` is h-9 (Advanced strip). */
   density?: "default" | "compact";
 }) {
+  const showManual = manual && onChange != null;
   return (
     <label className="flex w-full min-w-0 flex-col gap-1">
-      <span className="text-xs font-semibold text-black/60 dark:text-white/70">
-        {label}
+      <span className="flex min-w-0 items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-xs font-semibold text-black/60 dark:text-white/70">
+            {label}
+          </span>
+          {showManual ? (
+            <span className="shrink-0 rounded-full bg-black/10 px-1.5 text-[11px] leading-4 font-semibold text-black/70 dark:bg-white/15 dark:text-white/80">
+              Manual
+            </span>
+          ) : null}
+        </span>
+        {showManual && onResetToAuto ? (
+          <button
+            type="button"
+            title="Reset to auto"
+            aria-label={`Reset ${label.toLowerCase()} to auto`}
+            className="flex shrink-0 items-center gap-1 text-xs font-medium text-black/55 transition-colors hover:text-black/85 dark:text-white/65 dark:hover:text-white"
+            onClick={(e) => {
+              e.preventDefault();
+              onResetToAuto();
+            }}
+          >
+            <RotateCcw className="size-3" />
+            <span className="max-sm:sr-only">Reset to auto</span>
+          </button>
+        ) : null}
       </span>
       <span className="relative min-w-0">
         <span

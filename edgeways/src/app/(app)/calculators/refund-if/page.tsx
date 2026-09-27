@@ -15,6 +15,7 @@ import { PercentFlow } from "@/components/money-flow";
 import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { useManualLayStake } from "@/hooks/use-manual-lay-stake";
 import { matchedBet, riskFreeBookieBreakdown, riskFreeRefundCash } from "@/lib/calc/matched";
 import type { ExchangeRow } from "@/lib/db/schema";
 
@@ -34,7 +35,6 @@ export default function RefundIfCalculatorPage() {
   const [layOdds, setLayOdds] = useState(3.1);
   const [refundAmount, setRefundAmount] = useState(10);
   const [refundRetention, setRefundRetention] = useState(75);
-  const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
 
   useEffect(() => {
     if (!exchange && defaultExchange) {
@@ -45,14 +45,16 @@ export default function RefundIfCalculatorPage() {
   }, [defaultExchange, exchange]);
 
   const commissionPct = exchange?.commissionPct ?? 2;
+  const {
+    manual: layStakeOverride,
+    isManual: layStakeManual,
+    commit: commitLayStake,
+    reset: resetLayStake,
+  } = useManualLayStake(backStake > 0 && backOdds > 1 && layOdds > 1);
 
   useEffect(() => {
     queueMicrotask(() => setRefundAmount(backStake));
   }, [backStake]);
-
-  useEffect(() => {
-    queueMicrotask(() => setLayStakeOverride(null));
-  }, [backStake, backOdds, layOdds, commissionPct, refundAmount, refundRetention]);
 
   const result = useMemo(() => {
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
@@ -183,9 +185,9 @@ export default function RefundIfCalculatorPage() {
             value={result?.layStake ?? 0}
             liability={result?.liability}
             pending={!result}
-            onChange={(v) =>
-              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-            }
+            manual={layStakeManual}
+            onResetToAuto={resetLayStake}
+            onChange={commitLayStake}
           />
         </div>
       </LayPanel>

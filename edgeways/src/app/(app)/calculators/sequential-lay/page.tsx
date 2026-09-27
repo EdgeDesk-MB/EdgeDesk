@@ -15,6 +15,7 @@ import { ExchangeSelect } from "@/components/calc/exchange-select";
 import { CalculatorPageHeader } from "@/components/layout/calculator-page-header";
 import { CalculatorShell } from "@/components/page-shell";
 import { useExchanges } from "@/hooks/use-exchanges";
+import { useManualLayStake } from "@/hooks/use-manual-lay-stake";
 import { type BetMode } from "@/lib/calc/matched";
 import { layBounds, layPlanOutcome, type PartLay } from "@/lib/calc/layplan";
 import type { ExchangeRow } from "@/lib/db/schema";
@@ -37,7 +38,6 @@ export default function SequentialLayCalculatorPage() {
   const [backOdds, setBackOdds] = useState(6);
   const [layOdds, setLayOdds] = useState(5.2);
   const [partLays, setPartLays] = useState<PartLay[]>([{ odds: 5.8, stake: 5 }]);
-  const [layStakeOverride, setLayStakeOverride] = useState<number | null>(null);
 
   useEffect(() => {
     if (!exchange && defaultExchange) {
@@ -48,6 +48,13 @@ export default function SequentialLayCalculatorPage() {
   }, [defaultExchange, exchange]);
 
   const commissionPct = exchange?.commissionPct ?? 2;
+  const {
+    manual: layStakeOverride,
+    isManual: layStakeManual,
+    commit: commitLayStake,
+    reset: resetLayStake,
+    setManual: setLayStakeOverride,
+  } = useManualLayStake(backStake > 0 && backOdds > 1 && layOdds > 1);
 
   const planInput = useMemo(() => {
     if (!(backStake > 0 && backOdds > 1 && layOdds > 1)) return null;
@@ -163,9 +170,9 @@ export default function SequentialLayCalculatorPage() {
             liability={result?.totalLiability}
             pending={!planInput}
             label={`Final lay stake${partTotal > 0 ? ` (${partTotal.toFixed(2)} already laid)` : ""}`}
-            onChange={(v) =>
-              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-            }
+            manual={layStakeManual}
+            onResetToAuto={resetLayStake}
+            onChange={commitLayStake}
           />
         </div>
 

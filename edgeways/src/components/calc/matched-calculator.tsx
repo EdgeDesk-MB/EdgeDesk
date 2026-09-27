@@ -25,7 +25,6 @@ import { useExchanges } from "@/hooks/use-exchanges";
 import {
   layBounds,
   layPlanOutcome,
-  executableLayStake,
   bonusLoseBookieBreakdown,
   riskFreeBookieBreakdown,
   specialBonusExtras,
@@ -37,6 +36,10 @@ import {
   type SpecialBonus,
   type SpecialBonusKind,
 } from "@/lib/calc";
+import {
+  nextManualLayStake,
+  resolveCalculatorLayStake,
+} from "@/lib/calculator-lay-stake";
 import type { ExchangeRow } from "@/lib/db/schema";
 import { panelSurface } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
@@ -95,10 +98,6 @@ export function MatchedCalculator({
   }, [defaultExchange, exchange]);
 
   const commissionPct = exchange?.commissionPct ?? 2;
-
-  useEffect(() => {
-    queueMicrotask(() => setLayStakeOverride(null));
-  }, [mode, backStake, backOdds, layOdds, commissionPct, refundAmount, refundRetention]);
 
   useEffect(() => {
     if (!open || !prefill) return;
@@ -175,11 +174,11 @@ export function MatchedCalculator({
 
   const bounds = useMemo(() => (planInput ? layBounds(planInput) : null), [planInput]);
 
-  const layStake = useMemo(() => {
-    if (!planInput) return 0;
-    const override = advanced && layStakeOverride != null ? layStakeOverride : null;
-    return executableLayStake(planInput, override);
-  }, [planInput, advanced, layStakeOverride]);
+  const layStake = useMemo(
+    () => resolveCalculatorLayStake(planInput, layStakeOverride, laySnap),
+    [planInput, layStakeOverride, laySnap]
+  );
+  const layStakeManual = layStakeOverride != null && laySnap == null;
 
   const result = useMemo(
     () => (planInput ? layPlanOutcome({ ...planInput, layStake }) : null),
@@ -423,9 +422,15 @@ export function MatchedCalculator({
             value={layStake}
             liability={result?.totalLiability}
             pending={!planInput}
-            onChange={(v) =>
-              setLayStakeOverride(Number.isFinite(v) && v >= 0 ? v : null)
-            }
+            manual={layStakeManual}
+            onResetToAuto={() => {
+              setLayStakeOverride(null);
+              setLaySnap(null);
+            }}
+            onChange={(v) => {
+              setLaySnap(null);
+              setLayStakeOverride((cur) => nextManualLayStake(cur, v, planInput != null));
+            }}
           />
         </div>
       </LayPanel>
@@ -469,7 +474,7 @@ export function MatchedCalculator({
           exchangeId: exchange?.id,
           advanced,
           partLays,
-          layStakeOverride,
+          layStakeOverride: layStakeManual ? layStakeOverride : null,
           bookmaker: bookmaker || undefined,
           expectedProfit: result ? Number(result.guaranteed.toFixed(2)) : undefined,
           ...(mode === "risk_free"
