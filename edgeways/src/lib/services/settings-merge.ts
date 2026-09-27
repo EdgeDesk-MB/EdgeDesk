@@ -242,6 +242,7 @@ export function parseStoredSettings(raw: unknown): AppSettings {
       typeof o.planPreview === "string" ? o.planPreview : undefined
     ),
     ageConfirmedAt: parseAgeConfirmedAt(o.ageConfirmedAt),
+    referralAskShownAt: parseAgeConfirmedAt(o.referralAskShownAt),
   };
 }
 
@@ -350,6 +351,9 @@ export function mergeAppSettings(
   if (patch.planPreview != null) next.planPreview = normalizePlanPreview(patch.planPreview);
   if (patch.ageConfirmedAt !== undefined) {
     next.ageConfirmedAt = parseAgeConfirmedAt(patch.ageConfirmedAt);
+  }
+  if (patch.referralAskShownAt !== undefined) {
+    next.referralAskShownAt = parseAgeConfirmedAt(patch.referralAskShownAt);
   }
 
   return next;

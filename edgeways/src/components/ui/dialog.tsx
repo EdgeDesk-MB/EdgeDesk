@@ -68,6 +68,16 @@ function DialogOverlay({
  * `mobile="center"` opts back into the desktop-style centred modal - reserve
  * that for small confirm prompts ("Are you sure?" deletes).
  */
+/**
+ * Every open modal freezes the desk poll so NumberFlow / live feed cannot
+ * repaint through the overlay. Lives inside `DialogPrimitive.Content`, which
+ * only mounts while open: the `DialogContent` wrapper renders even when closed.
+ */
+function PauseAppStatePollingWhileMounted() {
+  usePauseAppStatePolling(true)
+  return null
+}
+
 function DialogContent({
   className,
   children,
@@ -82,9 +92,6 @@ function DialogContent({
   showCloseButton?: boolean
   mobile?: "sheet" | "center"
 }) {
-  // Every open modal freezes the desk poll so NumberFlow / live feed cannot
-  // repaint through the overlay.
-  usePauseAppStatePolling(true)
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -120,6 +127,7 @@ function DialogContent({
           onInteractOutside?.(e)
         }}
       >
+        <PauseAppStatePollingWhileMounted />
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close

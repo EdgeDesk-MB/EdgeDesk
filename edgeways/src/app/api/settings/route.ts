@@ -148,6 +148,9 @@ export const PATCH = withDeskScope(async function PATCH(req: Request) {
   if (typeof body.ageConfirmedAt === "number" || body.ageConfirmedAt === null) {
     patch.ageConfirmedAt = body.ageConfirmedAt;
   }
+  if (typeof body.referralAskShownAt === "number") {
+    patch.referralAskShownAt = body.referralAskShownAt;
+  }
 
   if (body.offerBetPref && typeof body.offerBetPref === "object") {
     const pref = body.offerBetPref as Record<string, unknown>;

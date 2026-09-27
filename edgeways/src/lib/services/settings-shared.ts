@@ -119,6 +119,11 @@ export interface AppSettings {
   /** ms epoch when the user confirmed they are 18+ (EDGE-13); null = not yet. */
   ageConfirmedAt: number | null;
   /**
+   * ms epoch when the Refer a friend ask opened after the first profitable
+   * in-app settle (EDGE-219). Set once, so the ask never repeats; null = not yet.
+   */
+  referralAskShownAt: number | null;
+  /**
    * EDGE-22: server-resolved billing row, injected per API response — never
    * stored (parseStoredSettings whitelists keys, so it cannot round-trip).
    * Present for signed-in sessions; absent/null in the public demo.
@@ -249,6 +254,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   headerPattern: "diagonal-lines",
   planPreview: "unlocked",
   ageConfirmedAt: null,
+  referralAskShownAt: null,
 };
 
 /** Pure resolve - safe on client with settings from app state. */

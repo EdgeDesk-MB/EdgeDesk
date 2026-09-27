@@ -200,6 +200,7 @@ export function getAppSettings(): AppSettings {
     headerPattern: normalizeHeaderPattern(readRaw("headerPattern")),
     planPreview: normalizePlanPreview(readRaw("planPreview")),
     ageConfirmedAt: normalizeAgeConfirmedAt(readRaw("ageConfirmedAt")),
+    referralAskShownAt: normalizeAgeConfirmedAt(readRaw("referralAskShownAt")),
   };
   // Server-side display helpers (history labels, sync toasts) read the
   // process-wide format; keep it in step with the persisted preference.
@@ -375,6 +376,12 @@ export function patchAppSettings(patch: AppSettingsPatch): AppSettings {
     writeRaw(
       "ageConfirmedAt",
       patch.ageConfirmedAt == null ? "" : String(Math.trunc(patch.ageConfirmedAt))
+    );
+  }
+  if (patch.referralAskShownAt !== undefined) {
+    writeRaw(
+      "referralAskShownAt",
+      patch.referralAskShownAt == null ? "" : String(Math.trunc(patch.referralAskShownAt))
     );
   }
   return getAppSettings();
