@@ -72,6 +72,9 @@ export function EdgewaysLogo({
     // eslint-disable-next-line @next/next/no-img-element -- brand lockup; aspect preserved via h-* + w-auto
     <img
       src={onDark ? "/brand/logo-yellow.png" : "/brand/logo.png"}
+      // React hoists a preload for this src; the topbar mask fetches the same
+      // file in CORS mode, so the preload must be CORS too or it goes unused.
+      crossOrigin="anonymous"
       alt=""
       aria-hidden
       className={imgClass}

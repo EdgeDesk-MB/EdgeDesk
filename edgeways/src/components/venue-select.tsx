@@ -488,6 +488,7 @@ export function VenueSelect({
               <input
                 ref={searchRef}
                 type="text"
+                name="venue-search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {

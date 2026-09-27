@@ -21,6 +21,7 @@ import { FilterPill } from "@/components/ui/filter-pill";
 import type { FlagsOverview } from "@/lib/admin/flags";
 import {
   APP_UPDATE_MODE_HINT,
+  APP_UPDATE_PREVIEW_CAPTION,
   APP_UPDATE_MODE_LABEL,
   APP_UPDATE_MODES,
   DEFAULT_APP_UPDATE_LINK_LABEL,
@@ -423,13 +424,10 @@ export function ReleasesPanel({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              {updateMode === "off"
-                ? "Off. Save to hide the prompt on this environment."
-                : updateDirty
-                  ? "Unsaved. Save to publish on this environment."
-                  : updateMode === "force"
-                    ? `Forced on ${envLabel.toLowerCase()} desks.`
-                    : "Live desks see this after the next deploy, until they reload."}
+              {APP_UPDATE_PREVIEW_CAPTION[updateMode]}
+              {updateDirty
+                ? " Unsaved. Save to publish on this environment."
+                : null}
             </p>
           </div>
         </CardContent>
