@@ -333,6 +333,7 @@ export function RacingPlacingsDialog({
               Choose image
             </Button>
             <input
+              name="placings-screenshot"
               ref={fileInputRef}
               type="file"
               accept="image/*"
@@ -415,6 +416,7 @@ export function RacingPlacingsDialog({
                 </button>
                 <div className="relative flex min-w-0 items-center gap-0.5">
                   <input
+                    name="placing-horse"
                     value={row.horse}
                     onChange={(e) => updateRow(index, { horse: e.target.value })}
                     placeholder={place === 1 ? "Winner" : "-"}
@@ -427,6 +429,7 @@ export function RacingPlacingsDialog({
                     <label className="relative inline-flex size-5 shrink-0 cursor-pointer items-center justify-center text-muted-foreground/70 hover:text-foreground">
                       <ChevronDown className="size-3.5" aria-hidden />
                       <select
+                        name="placing-horse-pick"
                         aria-label={`Pick horse for ${place}`}
                         title="Pick from runners"
                         className="absolute inset-0 z-10 cursor-pointer opacity-0"
@@ -452,6 +455,7 @@ export function RacingPlacingsDialog({
                 </div>
                 <div className="flex min-w-0 items-baseline justify-end gap-1">
                   <input
+                    name="placing-sp"
                     value={row.spText}
                     onChange={(e) => updateRow(index, { spText: e.target.value })}
                     placeholder="-"

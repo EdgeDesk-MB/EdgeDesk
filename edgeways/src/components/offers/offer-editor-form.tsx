@@ -1293,6 +1293,7 @@ Expires 12 Aug 2026, 23:59`}
           {/* When it pays — one toggle, then places / favourite nest underneath. */}
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
             <input
+              name="result-conditional"
               type="checkbox"
               className="mt-0.5"
               checked={resultConditional}
@@ -1388,6 +1389,7 @@ Expires 12 Aug 2026, 23:59`}
               <div className="flex flex-col gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2.5">
                 <label className="flex cursor-pointer items-start gap-2.5 text-xs">
                   <input
+                    name="winner-must-be-sp-favourite"
                     type="checkbox"
                     className="mt-0.5"
                     checked={winnerMustBeSpFavourite}
@@ -1729,6 +1731,7 @@ Expires 12 Aug 2026, 23:59`}
         {showAutoAddAccount ? (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
             <input
+              name="auto-add-account"
               type="checkbox"
               className="mt-0.5"
               checked={autoAddAccount}
@@ -1832,6 +1835,7 @@ Expires 12 Aug 2026, 23:59`}
         {editingId == null ? (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
             <input
+              name="repeats-enabled"
               type="checkbox"
               className="mt-0.5"
               checked={repeatsEnabled}
@@ -1943,6 +1947,7 @@ Expires 12 Aug 2026, 23:59`}
             </p>
             <label className="mt-2 flex cursor-pointer items-center gap-2 text-muted-foreground">
               <input
+                name="stop-recurrence"
                 type="checkbox"
                 checked={stopRecurrence}
                 onChange={(e) => setStopRecurrence(e.target.checked)}

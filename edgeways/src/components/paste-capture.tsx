@@ -305,6 +305,7 @@ export function PasteCapture({
             {shots.length > 0 ? "Add images" : "Choose images"}
           </Button>
           <input
+            name="capture-image"
             ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif,.eml,message/rfc822"

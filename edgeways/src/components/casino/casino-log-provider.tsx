@@ -371,6 +371,7 @@ Stake £10 get a £20 casino bonus
                 </div>
                 <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
                   <input
+                    name="repeats-enabled"
                     type="checkbox"
                     className="mt-0.5"
                     checked={repeatsEnabled}

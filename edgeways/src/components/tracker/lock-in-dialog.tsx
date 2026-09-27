@@ -259,6 +259,7 @@ function LockInDialogContent({ bet, onDone }: { bet: BetRow; onDone: () => void 
               </span>
             </div>
             <input
+              name="lock-amount"
               type="range"
               aria-label="Lock amount"
               min={0}

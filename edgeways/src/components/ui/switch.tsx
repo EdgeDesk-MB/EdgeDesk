@@ -9,6 +9,8 @@ function Switch({
   className,
   size = "default",
   tone = "default",
+  id,
+  name,
   ...props
 }: React.ComponentProps<typeof SwitchPrimitive.Root> & {
   size?: "sm" | "default"
@@ -24,9 +26,14 @@ function Switch({
 }) {
   const onPanel = tone === "onPanel"
   const pnl = tone === "pnl"
+  const autoId = React.useId()
+  const controlId = id ?? autoId
 
   return (
     <SwitchPrimitive.Root
+      id={controlId}
+      // Radix server-renders a hidden checkbox that only receives `name`.
+      name={name ?? controlId}
       data-slot="switch"
       data-size={size}
       data-tone={tone}

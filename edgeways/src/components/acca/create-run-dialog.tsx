@@ -439,6 +439,7 @@ export function CreateRunForm({
         {method === "combined" && !isEdit ? (
           <label className="flex items-center gap-2 text-[12px] font-medium text-black/70 dark:text-white/80">
             <input
+              name="no-lay"
               type="checkbox"
               checked={noLay}
               onChange={(e) => setNoLay(e.target.checked)}
@@ -499,6 +500,7 @@ export function CreateRunForm({
         ) : null}
         <label className="flex items-center gap-2 text-xs font-semibold text-black/60 dark:text-white/70">
           <input
+            name="boosted"
             type="checkbox"
             checked={boosted}
             onChange={(e) => setBoosted(e.target.checked)}

@@ -67,6 +67,7 @@ export function BetTextImport({ onApply, className }: BetTextImportProps) {
       </div>
 
       <textarea
+        name="bet-confirmation-text"
         value={text}
         onChange={(e) => {
           setText(e.target.value);

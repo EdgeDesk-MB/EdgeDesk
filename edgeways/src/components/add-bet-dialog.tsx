@@ -2943,6 +2943,7 @@ export function AddBetDialog({
                       {effectiveHome || "Home"}
                     </span>
                     <input
+                      name="correct-score-home"
                       type="number"
                       inputMode="numeric"
                       min={0}
@@ -2960,6 +2961,7 @@ export function AddBetDialog({
                     />
                     <span className="shrink-0 font-bold text-black/50 dark:text-white/50">–</span>
                     <input
+                      name="correct-score-away"
                       type="number"
                       inputMode="numeric"
                       min={0}
@@ -3137,6 +3139,7 @@ export function AddBetDialog({
                     {useBoostPct ? (
                       <span className="relative inline-flex w-20 shrink-0">
                         <input
+                          name="boost-percent"
                           type="number"
                           inputMode="decimal"
                           min={0}

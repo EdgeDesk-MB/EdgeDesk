@@ -129,6 +129,7 @@ function ShareContent() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <textarea
+              name="shared-offer-text"
               aria-label="Shared offer text"
               rows={8}
               value={text}

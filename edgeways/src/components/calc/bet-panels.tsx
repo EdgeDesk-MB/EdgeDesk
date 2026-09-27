@@ -411,6 +411,7 @@ export function PanelInput({
           </span>
         )}
         <input
+          name="panel-value"
           ref={wheelRef}
           type="number"
           inputMode="decimal"
@@ -488,6 +489,7 @@ export function PanelTextInput({
     <label className="flex flex-col gap-1">
       <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <input
+        name="panel-text"
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -521,6 +523,7 @@ export function PanelBookieInput({
     <label className={cn("flex flex-col gap-1", className)}>
       <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <input
+        name="bookie"
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -556,6 +559,7 @@ export function PanelSelect({
       <span className="text-xs font-semibold text-black/60 dark:text-white/70">{label}</span>
       <span className="relative">
         <select
+          name="bet-choice"
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
@@ -683,6 +687,7 @@ function LayStakeInput({
 
   return (
     <input
+      name="amount"
       ref={wheelRef}
       type="text"
       inputMode="decimal"
@@ -770,6 +775,7 @@ export function LayStakeBanner({
           />
         ) : (
           <input
+            name="amount"
             type="text"
             inputMode="decimal"
             aria-label={label}
