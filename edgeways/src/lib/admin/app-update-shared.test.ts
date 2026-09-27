@@ -3,11 +3,13 @@ import {
   DEFAULT_APP_UPDATE,
   DEFAULT_APP_UPDATE_MESSAGE,
   appUpdateExitHold,
+  appUpdateIsPending,
   appUpdateIsVisible,
   appUpdatesEqual,
   normalizeAppUpdate,
   parseAppUpdate,
   readAppUpdateFromUnknown,
+  readBuildCriticalFromUnknown,
   readBuildStampFromUnknown,
 } from "./app-update-shared";
 
@@ -54,17 +56,43 @@ describe("appUpdateIsVisible", () => {
     ).toBe(true);
   });
 
-  it("shows auto only when the boot stamp is stale", () => {
+  it("shows auto only for a stale boot stamp on a critical build", () => {
     const settings = { mode: "auto" as const, message: DEFAULT_APP_UPDATE_MESSAGE };
-    expect(appUpdateIsVisible(settings, "abc", "abc")).toBe(false);
-    expect(appUpdateIsVisible(settings, "abc", "def")).toBe(true);
-    expect(appUpdateIsVisible(settings, null, "def")).toBe(false);
-    expect(appUpdateIsVisible(settings, "abc", null)).toBe(false);
+    expect(appUpdateIsVisible(settings, "abc", "abc", true)).toBe(false);
+    expect(appUpdateIsVisible(settings, "abc", "def", true)).toBe(true);
+    expect(appUpdateIsVisible(settings, null, "def", true)).toBe(false);
+    expect(appUpdateIsVisible(settings, "abc", null, true)).toBe(false);
   });
 
-  it("keeps auto as a prompt, not a self-apply", () => {
+  it("keeps an unflagged auto build quiet", () => {
     expect(DEFAULT_APP_UPDATE.mode).toBe("auto");
-    expect(appUpdateIsVisible(DEFAULT_APP_UPDATE, "old", "new")).toBe(true);
+    expect(appUpdateIsVisible(DEFAULT_APP_UPDATE, "old", "new")).toBe(false);
+    expect(appUpdateIsVisible(DEFAULT_APP_UPDATE, "old", "new", false)).toBe(false);
+  });
+});
+
+describe("appUpdateIsPending", () => {
+  it("is pending on auto when the boot stamp is stale", () => {
+    expect(appUpdateIsPending(DEFAULT_APP_UPDATE, "old", "new")).toBe(true);
+    expect(appUpdateIsPending(DEFAULT_APP_UPDATE, "same", "same")).toBe(false);
+    expect(appUpdateIsPending(DEFAULT_APP_UPDATE, null, "new")).toBe(false);
+    expect(appUpdateIsPending(DEFAULT_APP_UPDATE, "old", null)).toBe(false);
+  });
+
+  it("never self-applies on off or force", () => {
+    const off = { mode: "off" as const, message: DEFAULT_APP_UPDATE_MESSAGE };
+    const force = { mode: "force" as const, message: DEFAULT_APP_UPDATE_MESSAGE };
+    expect(appUpdateIsPending(off, "old", "new")).toBe(false);
+    expect(appUpdateIsPending(force, "old", "new")).toBe(false);
+  });
+});
+
+describe("readBuildCriticalFromUnknown", () => {
+  it("only accepts an explicit true", () => {
+    expect(readBuildCriticalFromUnknown({ critical: true })).toBe(true);
+    expect(readBuildCriticalFromUnknown({ critical: "true" })).toBe(false);
+    expect(readBuildCriticalFromUnknown({ enabled: true })).toBe(false);
+    expect(readBuildCriticalFromUnknown(null)).toBe(false);
   });
 });
 

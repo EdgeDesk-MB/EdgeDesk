@@ -1,6 +1,7 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, type CSSProperties } from "react";
+import { recoverFromChunkLoadError } from "@/lib/app-update/quiet-reload";
 
 /**
  * Last-resort error page: replaces the root layout, so no CSS or fonts are
@@ -22,7 +23,17 @@ const linkStyle: CSSProperties = {
   alignItems: "center",
 };
 
-export default function GlobalError({ reset }: { error: Error; reset: () => void }) {
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  useEffect(() => {
+    recoverFromChunkLoadError(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <head>

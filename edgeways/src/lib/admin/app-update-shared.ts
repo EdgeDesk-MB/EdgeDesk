@@ -24,8 +24,8 @@ export const APP_UPDATE_MODE_LABEL: Record<AppUpdateMode, string> = {
 };
 
 export const APP_UPDATE_MODE_HINT: Record<AppUpdateMode, string> = {
-  auto: "Show on open desks after a new deploy. They reload when they tap",
-  off: "Never show on this environment",
+  auto: "Open desks reload quietly at a safe moment after a new deploy",
+  off: "Never reload or prompt on this environment",
   force: "Show now, for checking this environment only",
 };
 
@@ -73,26 +73,45 @@ export function appUpdateExitHold(
   previous: AppUpdateSettings | null,
   next: AppUpdateSettings,
   bootStamp: string | null | undefined,
-  liveStamp: string | null | undefined
+  liveStamp: string | null | undefined,
+  critical = false
 ): AppUpdateSettings | null {
-  if (appUpdateIsVisible(next, bootStamp, liveStamp)) return next;
+  if (appUpdateIsVisible(next, bootStamp, liveStamp, critical)) return next;
   if (previous) return previous;
   return null;
 }
 
-export function appUpdateIsVisible(
+/** This tab booted on an older build. Applied by a quiet reload at a safe moment. */
+export function appUpdateIsPending(
   settings: AppUpdateSettings | null | undefined,
   bootStamp: string | null | undefined,
   liveStamp: string | null | undefined
+): boolean {
+  return Boolean(
+    settings?.mode === "auto" &&
+      bootStamp &&
+      liveStamp &&
+      bootStamp !== liveStamp
+  );
+}
+
+/**
+ * The Reload banner. Auto only shows it for a build the endpoint flags as
+ * critical. Anything unflagged waits for a quiet reload instead.
+ */
+export function appUpdateIsVisible(
+  settings: AppUpdateSettings | null | undefined,
+  bootStamp: string | null | undefined,
+  liveStamp: string | null | undefined,
+  critical = false
 ): boolean {
   if (!settings) return false;
   if (settings.mode === "off") return false;
   if (settings.mode === "force") return Boolean(settings.message.trim());
   return Boolean(
-    settings.message.trim() &&
-      bootStamp &&
-      liveStamp &&
-      bootStamp !== liveStamp
+    critical &&
+      settings.message.trim() &&
+      appUpdateIsPending(settings, bootStamp, liveStamp)
   );
 }
 
@@ -119,6 +138,12 @@ export function readBuildStampFromUnknown(raw: unknown): string | null {
   if (!raw || typeof raw !== "object") return null;
   const stamp = (raw as { buildStamp?: unknown }).buildStamp;
   return typeof stamp === "string" && stamp.trim() ? stamp.trim() : null;
+}
+
+/** Only an explicit `critical: true` counts. Unflagged builds are not critical. */
+export function readBuildCriticalFromUnknown(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  return (raw as { critical?: unknown }).critical === true;
 }
 
 export function readAppUpdateFromUnknown(raw: unknown): AppUpdateSettings {

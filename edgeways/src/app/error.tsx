@@ -1,13 +1,25 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import {
   MarketingDocPage,
   marketingDocPrimaryActionClass,
   marketingDocSecondaryActionClass,
 } from "@/components/marketing/marketing-doc-page";
+import { recoverFromChunkLoadError } from "@/lib/app-update/quiet-reload";
 
-export default function RootError({ reset }: { error: Error; reset: () => void }) {
+export default function RootError({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  useEffect(() => {
+    recoverFromChunkLoadError(error);
+  }, [error]);
+
   return (
     <MarketingDocPage
       title="Something went wrong"
