@@ -1,9 +1,12 @@
+import { shouldCapturePosthogOnServer } from "@/lib/analytics/posthog-gate";
+
 /**
  * Server-side PostHog capture via the ingestion HTTP API — no posthog-node
  * dependency. Used by webhooks (e.g. referral_credited) where no browser
  * session exists. Analytics are best-effort and never block the caller.
  * Targets the EU ingestion host directly (the browser uses the /ingest
  * proxy; NEXT_PUBLIC_POSTHOG_HOST is the app UI host, not ingestion).
+ * Production deploy only (EDGE-204), unless NEXT_PUBLIC_POSTHOG_FORCE_ENABLE.
  */
 export function captureServerEvent(
   distinctId: string,
@@ -12,6 +15,7 @@ export function captureServerEvent(
 ): void {
   const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN?.trim();
   if (!token || !distinctId) return;
+  if (!shouldCapturePosthogOnServer()) return;
   const host = (
     process.env.POSTHOG_INGEST_HOST ?? "https://eu.i.posthog.com"
   ).replace(/\/$/, "");
