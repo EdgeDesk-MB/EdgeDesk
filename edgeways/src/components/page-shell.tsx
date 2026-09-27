@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
+import { UpdateHoldOnEdit } from "@/components/update-hold-on-edit";
 import { pageShell, pageShellCompact, sectionBar, sectionMeta } from "@/lib/ui/layout-spacing";
 import {
   FIXTURE_TAPE_GUTTER_PX,
@@ -174,7 +175,7 @@ export function CalculatorShell({
           contentClassName ?? (wide ? "max-w-4xl" : "max-w-3xl")
         )}
       >
-        {children}
+        <UpdateHoldOnEdit>{children}</UpdateHoldOnEdit>
       </div>
     </PageShell>
   );
