@@ -651,12 +651,14 @@ From `src/lib/ui/surface-styles.ts`:
 - **`listRowSelected(active)`** - grey selection for sidebar lists
 - **`sectionBar` / `sectionMeta`** - panel section headers
 - **Day-split lists** (`ListDaySection`) - Campaigns, Casino Campaigns, Tracked
-  Events, Profit Tracker, and History. Fixtures is one picked day, not a
+  Events, Profit Tracker, History, and Alerts. Fixtures is one picked day, not a
   day-split list inside each competition. Label
   (`Today` / `Yesterday` / `Monday 6th July`) plus a hairline, then that day's
   cards, table, or fixture rows. Tokens: `listDaySectionLabel` /
   `listDaySectionContent`. History cards use `listDaySectionContentCompact`
-  (`gap-3`; collapsed `gap-2`). Inside a competition/course plate with hairline
+  (`gap-3`; collapsed `gap-2`). Alerts uses that compact token at `gap-2`,
+  and the row clock is time only (`formatClockTime`); the day heading
+  carries the date. Inside a competition/course plate with hairline
   rows, use `listDaySectionContentNested` (`mt-1.5 gap-0`) instead of the
   campaign-card stack. Light-mode fixture accordions are one `--card`
   plate: header and rows share the lift, split by a hairline. Dark

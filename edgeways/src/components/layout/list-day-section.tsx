@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * Campaigns-style day split: label + hairline, then the day's cards or table.
  * Used on Campaigns, Casino Campaigns, Tracked Events, Profit Tracker,
- * History, and Browse fixtures.
+ * History, Alerts, and Browse fixtures.
  * Hairline fixture rows inside a plate pass `listDaySectionContentNested`.
  * `upcoming` is Profit Tracker only: clock mark for days after today.
  */
