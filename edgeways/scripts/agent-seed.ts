@@ -1,8 +1,9 @@
 /**
- * EDGE-214: pure pieces of `npm run seed:agent`. Two dev-only Clerk accounts
- * (agent-customer, agent-admin) so unattended agent runs can replay
- * signed-in and /admin journeys. Clerk test-mode emails (`+clerk_test`) sign
- * in with the fixed code 424242 on the development instance.
+ * EDGE-214: pure pieces of `npm run seed:agent`. Dev-only Clerk accounts
+ * (agent-customer, agent-admin, and agent-new from EDGE-220) so unattended
+ * agent runs can replay signed-in, /admin and first-time journeys. Clerk
+ * test-mode emails (`+clerk_test`) sign in with the fixed code 424242 on the
+ * development instance.
  *
  * Kept free of Clerk and env loading so Vitest can drive it against a temp
  * SQLite file. The runner is `scripts/seed-agent.ts`.
@@ -15,24 +16,30 @@ import { settleFromOutcome } from "@/lib/calc/settlement";
 export const CLERK_TEST_EMAIL_MARKER = "+clerk_test@";
 export const CLERK_TEST_VERIFICATION_CODE = "424242";
 
-export type AgentKey = "customer" | "admin";
+export type AgentKey = "customer" | "admin" | "new";
 
 export type AgentAccount = {
   key: AgentKey;
   /** Handle used in AGENTS.md and journey write-ups. */
-  handle: "agent-customer" | "agent-admin";
+  handle: "agent-customer" | "agent-admin" | "agent-new";
   email: string;
   firstName: string;
   lastName: string;
   role: "user" | "admin";
   plan: "edge";
   billingStatus: "active";
+  /**
+   * `history`: completed campaigns plus a live pipeline. `empty`: set-up
+   * accounts only, no offers or bets, so first-time journeys start clean.
+   */
+  desk: "history" | "empty";
   /** Completed offer campaigns to seed (each is a qualifier plus a free bet). */
   campaigns: number;
 };
 
 export const DEFAULT_AGENT_CUSTOMER_EMAIL = "agent-customer+clerk_test@example.com";
 export const DEFAULT_AGENT_ADMIN_EMAIL = "agent-admin+clerk_test@example.com";
+export const DEFAULT_AGENT_NEW_EMAIL = "agent-new+clerk_test@example.com";
 
 /** Heavy history for /history performance work (EDGE-209). */
 export const CUSTOMER_CAMPAIGNS = 1200;
@@ -51,6 +58,7 @@ export function agentAccounts(
       role: "user",
       plan: "edge",
       billingStatus: "active",
+      desk: "history",
       campaigns: CUSTOMER_CAMPAIGNS,
     },
     {
@@ -62,7 +70,20 @@ export function agentAccounts(
       role: "admin",
       plan: "edge",
       billingStatus: "active",
+      desk: "history",
       campaigns: ADMIN_CAMPAIGNS,
+    },
+    {
+      key: "new",
+      handle: "agent-new",
+      email: normaliseEmail(env.AGENT_NEW_EMAIL) ?? DEFAULT_AGENT_NEW_EMAIL,
+      firstName: "Agent",
+      lastName: "New",
+      role: "user",
+      plan: "edge",
+      billingStatus: "active",
+      desk: "empty",
+      campaigns: 0,
     },
   ];
 }
@@ -105,8 +126,12 @@ export function seedRefusals(
       reasons.push(`${account.handle} email must be a Clerk test address (name+clerk_test@domain).`);
     }
   }
-  if (accounts[0] && accounts[1] && accounts[0].email === accounts[1].email) {
-    reasons.push("agent-customer and agent-admin need different emails.");
+  for (let i = 0; i < accounts.length; i += 1) {
+    for (let j = i + 1; j < accounts.length; j += 1) {
+      if (accounts[i]!.email === accounts[j]!.email) {
+        reasons.push(`${accounts[i]!.handle} and ${accounts[j]!.handle} need different emails.`);
+      }
+    }
   }
   return reasons;
 }
@@ -247,6 +272,41 @@ type SeedBet = {
   layOdds: number;
 };
 
+/** Bank, exchange and bookie accounts with deposits, which is what setup leaves behind. */
+function seedDeskAccounts(sqlite: Database.Database, openedAt: number): number {
+  const insertAccount = sqlite.prepare(
+    `INSERT INTO accounts (name, type, is_active, access_status, wr_remaining, wr_type, created_at)
+     VALUES (?, ?, 1, 'available', 0, 'stake', ?)`
+  );
+  const insertTx = sqlite.prepare(
+    `INSERT INTO balance_transactions (account_id, amount, category, note, created_at)
+     VALUES (?, ?, 'top_up', ?, ?)`
+  );
+  const bankId = insertAccount.run("Agent Bank", "bank", openedAt).lastInsertRowid;
+  insertTx.run(bankId, 2000, "Starting bankroll", openedAt);
+  const exchangeAccountId = insertAccount.run("Betfair", "exchange", openedAt).lastInsertRowid;
+  insertTx.run(exchangeAccountId, 750, "Exchange float", openedAt);
+  for (const bookie of BOOKIES) {
+    const id = insertAccount.run(bookie, "bookie", openedAt).lastInsertRowid;
+    insertTx.run(id, 50, "Deposit", openedAt);
+  }
+  return BOOKIES.length + 2;
+}
+
+/**
+ * Seed the agent-new desk: past setup (bank, exchange, bookies funded) with
+ * no offers, bets or events, so realised profit is £0 and Home shows the
+ * first-time welcome. Assumes an empty, bootstrapped desk file.
+ */
+export function seedEmptyAgentDesk(
+  sqlite: Database.Database,
+  input: { now?: number } = {}
+): DeskSeedSummary {
+  const now = input.now ?? Date.now();
+  const accounts = seedDeskAccounts(sqlite, now - DAY);
+  return { accounts, offers: 0, settledBets: 0, openBets: 0 };
+}
+
 /**
  * Seed one agent desk: bank, bookies, exchange, completed campaigns spread
  * over the last 18 months, and a live pipeline for today. Assumes an empty,
@@ -268,24 +328,7 @@ export function seedAgentDesk(
   const exchangeId = exchange?.id ?? null;
 
   const historyDays = 540;
-  const openedAt = now - (historyDays + 7) * DAY;
-
-  const insertAccount = sqlite.prepare(
-    `INSERT INTO accounts (name, type, is_active, access_status, wr_remaining, wr_type, created_at)
-     VALUES (?, ?, 1, 'available', 0, 'stake', ?)`
-  );
-  const insertTx = sqlite.prepare(
-    `INSERT INTO balance_transactions (account_id, amount, category, note, created_at)
-     VALUES (?, ?, 'top_up', ?, ?)`
-  );
-  const bankId = insertAccount.run("Agent Bank", "bank", openedAt).lastInsertRowid;
-  insertTx.run(bankId, 2000, "Starting bankroll", openedAt);
-  const exchangeAccountId = insertAccount.run("Betfair", "exchange", openedAt).lastInsertRowid;
-  insertTx.run(exchangeAccountId, 750, "Exchange float", openedAt);
-  for (const bookie of BOOKIES) {
-    const id = insertAccount.run(bookie, "bookie", openedAt).lastInsertRowid;
-    insertTx.run(id, 50, "Deposit", openedAt);
-  }
+  const accounts = seedDeskAccounts(sqlite, now - (historyDays + 7) * DAY);
 
   const insertOffer = sqlite.prepare(
     `INSERT INTO offers (title, bookmaker, status, expected_profit, expires_at, created_at, completed_at, sport)
@@ -441,7 +484,7 @@ export function seedAgentDesk(
   insertOffer.run("Midweek reload: bet £10 get £5", "William Hill", "planned", 3.75, now + 5 * DAY, today, null);
 
   return {
-    accounts: BOOKIES.length + 2,
+    accounts,
     offers: campaigns + 3,
     settledBets,
     openBets,
