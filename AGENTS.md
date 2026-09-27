@@ -61,6 +61,19 @@ when `node_modules` is missing.
    `result.browserPageId` from the output, then run:
    `orca tab switch --page <browserPageId> --worktree "$ORCA_BROWSER_WORKTREE" --focus`
    Do this for every tab you open, including repeat visits in new tabs.
+   **Signed-in journeys.** For signed-in journeys, sign in as
+   `agent-customer`; for `/admin`, sign in as `agent-admin`. Never mark a
+   signed-in journey "not run" for lack of an account. On `/login`, enter
+   `agent-customer+clerk_test@example.com` or
+   `agent-admin+clerk_test@example.com` (or `AGENT_CUSTOMER_EMAIL` /
+   `AGENT_ADMIN_EMAIL` if set), then the Clerk test code `424242`. No
+   password. `cyrus-setup.sh` seeds both through `npm run seed:agent`
+   (from `edgeways/`); re-run it for a fresh desk. `agent-customer` is on
+   Edge with a heavy history (about 2,400 settled bets); `agent-admin`
+   has the admin role and a small desk. Both are dev Clerk and local
+   SQLite only. Close the "Refer a friend" dialog with "Not now" if it
+   opens. To switch account, sign out first
+   (`orca eval --expression "window.Clerk.signOut()"`).
 3. Replay every **User journey** in the ticket's agent brief, step by
    step: `orca snapshot` to find elements, `orca click --element <ref>`,
    `orca reload`, then `orca snapshot` again to check the Expect line.

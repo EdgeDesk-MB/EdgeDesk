@@ -18,6 +18,7 @@
     "billing:rehearsal": "npx tsx --tsconfig scripts/tsconfig.json scripts/billing-rehearsal.ts",
     "db:resend-smoke": "npx tsx scripts/resend-smoke.ts",
     "resend:audience-sync": "npx tsx --tsconfig scripts/tsconfig.json scripts/resend-audience-backfill.ts",
+    "seed:agent": "npx tsx --tsconfig scripts/tsconfig.json scripts/seed-agent.ts",
     "postinstall": "node scripts/relink-node-modules-nosync.mjs"
   },
   "dependencies": {
