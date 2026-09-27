@@ -37,6 +37,7 @@ export function AuthAgeConfirm({
         <ResponsibleGamblingNote className="text-[color-mix(in_srgb,var(--marketing-fg)_55%,transparent)] [&_a]:text-[var(--marketing-brand)]" />
         <label className="flex cursor-pointer items-start gap-2 text-left text-sm text-[color-mix(in_srgb,var(--marketing-fg)_65%,transparent)]">
           <input
+            name="legal-accepted"
             type="checkbox"
             className="mt-0.5 size-4 shrink-0 rounded accent-[var(--marketing-brand)]"
             checked={legalAccepted}

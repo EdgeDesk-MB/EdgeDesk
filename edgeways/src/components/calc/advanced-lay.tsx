@@ -202,6 +202,7 @@ export function AdvancedLaySection({
       </div>
 
       <input
+        name="lay-stake"
         type="range"
         aria-label="Lay stake"
         min={min}
@@ -225,6 +226,7 @@ export function AdvancedLaySection({
         <label className="flex items-center gap-1.5">
           <span className="font-medium text-black/60 dark:text-white/60">Min £</span>
           <input
+            name="lay-stake-min"
             type="number"
             inputMode="decimal"
             step={0.01}
@@ -239,6 +241,7 @@ export function AdvancedLaySection({
         <label className="flex items-center gap-1.5">
           <span className="font-medium text-black/60 dark:text-white/60">Max £</span>
           <input
+            name="lay-stake-max"
             type="number"
             inputMode="decimal"
             step={0.01}

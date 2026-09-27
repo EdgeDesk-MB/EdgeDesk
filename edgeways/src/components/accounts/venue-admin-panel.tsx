@@ -416,6 +416,7 @@ function BookieEditRow({
         </TableCell>
         <TableCell>
           <input
+            name="venue-colour"
             type="color"
             value={color}
             onChange={(e) => setColor(e.target.value)}
@@ -590,6 +591,7 @@ function AddBookieDialog({ onSaved }: { onSaved: () => void }) {
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Colour</Label>
               <input
+                name="brand-colour"
                 type="color"
                 value={brandColor}
                 onChange={(e) => setBrandColor(e.target.value)}
@@ -708,6 +710,7 @@ function AddExchangeDialog({ onSaved }: { onSaved: () => void }) {
                 <div key={label} className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">{label}</Label>
                   <input
+                    name="brand-colour"
                     type="color"
                     value={value}
                     onChange={(e) => set(e.target.value)}

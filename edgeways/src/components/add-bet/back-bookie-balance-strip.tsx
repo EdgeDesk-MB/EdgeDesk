@@ -337,6 +337,7 @@ export function BackBookieBalanceStrip({
             <label className="flex shrink-0 cursor-pointer items-center justify-end gap-1.5 text-right text-xs font-semibold tabular-nums text-black/75 dark:text-white/80">
               Add{topUpNeeded > 0.001 ? ` ${formatGbp(topUpNeeded)} to cover` : ""}
               <input
+                name="add-balance"
                 type="checkbox"
                 className="size-3.5 rounded border-border accent-primary"
                 checked={addBalance === true}

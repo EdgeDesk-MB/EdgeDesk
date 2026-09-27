@@ -3,10 +3,12 @@ import * as React from "react"
 import { fieldControl } from "@/lib/ui/surface-styles"
 import { cn } from "@/lib/utils"
 
-function Input({ className, type, ref, ...props }: React.ComponentProps<"input">) {
+function Input({ className, type, ref, id, ...props }: React.ComponentProps<"input">) {
+  const autoId = React.useId()
   return (
     <input
       ref={ref}
+      id={id ?? autoId}
       type={type}
       data-slot="input"
       className={cn(

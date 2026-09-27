@@ -9,9 +9,12 @@ import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon } from "lucide-react"
 
 function Select({
+  name,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  const autoName = React.useId()
+  // Radix server-renders a hidden native select that only receives `name`.
+  return <SelectPrimitive.Root data-slot="select" name={name ?? autoName} {...props} />
 }
 
 function SelectGroup({

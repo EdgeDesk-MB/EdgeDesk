@@ -265,6 +265,7 @@ export function DataCustodyCard({
         </p>
 
         <input
+          name="restore-file"
           ref={restoreInputRef}
           type="file"
           accept={hosted ? ".json,application/json" : ".db,application/octet-stream"}
@@ -276,6 +277,7 @@ export function DataCustodyCard({
           }}
         />
         <input
+          name="import-file"
           ref={importInputRef}
           type="file"
           accept=".csv,text/csv"

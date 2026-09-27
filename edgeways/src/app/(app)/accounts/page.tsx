@@ -1618,6 +1618,7 @@ function AccountDetailBody({
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Notes</Label>
             <textarea
+              name="account-notes"
               value={notes}
               onChange={(e) => {
                 setNotes(e.target.value);

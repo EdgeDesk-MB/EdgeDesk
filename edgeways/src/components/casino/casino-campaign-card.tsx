@@ -621,6 +621,7 @@ export function CasinoCampaignCard({
             </p>
             <label className="mt-2 flex cursor-pointer items-center gap-2 text-muted-foreground">
               <input
+                name="stop-recurrence"
                 type="checkbox"
                 onChange={(e) => {
                   if (!e.target.checked) return;

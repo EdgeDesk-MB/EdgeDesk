@@ -135,6 +135,7 @@ export function PlatformImportDialog({
   return (
     <>
       <input
+        name="import-file"
         ref={inputRef}
         type="file"
         accept=".csv,text/csv"

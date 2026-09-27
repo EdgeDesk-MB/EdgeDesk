@@ -668,6 +668,7 @@ function DutchWeightSlider({
           aria-hidden
         />
         <input
+          name="dutch-favour"
           type="range"
           min={0}
           max={1}
@@ -735,6 +736,7 @@ function DutchStakeField({
         £
       </span>
       <input
+        name="dutch-stake"
         ref={wheelRef}
         type="number"
         inputMode="decimal"
