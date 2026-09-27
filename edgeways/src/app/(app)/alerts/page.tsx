@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ListDaySection } from "@/components/layout/list-day-section";
 import {
   AlarmClock,
   Ban,
@@ -29,9 +30,12 @@ import { PageLoading } from "@/components/page-loading";
 import { PageHeader } from "@/components/help/page-header";
 import { PageFillScroll, PageFillShell } from "@/components/page-shell";
 import { api, apiGet, useAppState } from "@/hooks/use-app-state";
+import { useNow } from "@/hooks/use-now";
+import { groupAlertsInboxByDay } from "@/lib/alerts/inbox-day-groups";
 import { ALERT_INBOX_READ_EVENT } from "@/lib/alerts/inbox-read-event";
 import type { AlertsInboxRow } from "@/lib/db/schema";
 import { formatClockTime } from "@/lib/time-format";
+import { listDaySectionContentCompact } from "@/lib/ui/surface-styles";
 import { cn } from "@/lib/utils";
 
 const KIND_ICONS: Record<string, LucideIcon> = {
@@ -49,18 +53,11 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   weekly_digest: Bell,
 };
 
-function dayLabel(ms: number): string {
-  const d = new Date(ms);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  if (sameDay) return formatClockTime(d);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
 export default function AlertsPage() {
   const router = useRouter();
   // Shared polled context - refresh() keeps the nav unread badge in step.
   const { refresh } = useAppState();
+  const now = useNow(60_000);
   const [alerts, setAlerts] = useState<AlertsInboxRow[] | null>(null);
 
   const load = useCallback(() => {
@@ -129,7 +126,7 @@ export default function AlertsPage() {
       />
 
       <PageFillScroll>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-8">
         {alerts.length === 0 ? (
           <EmptyState
             icon={BellRing}
@@ -137,7 +134,14 @@ export default function AlertsPage() {
             description="When a sentinel fires or an offer needs you, it lands here as well as on your screen, so a missed notification is never a lost one."
           />
         ) : (
-          alerts.map((alert) => {
+          groupAlertsInboxByDay(alerts, now).map((group) => (
+            <ListDaySection
+              key={group.key}
+              label={group.label}
+              headingId={`alerts-day-${group.key}`}
+              contentClassName={cn(listDaySectionContentCompact, "gap-2")}
+            >
+            {group.alerts.map((alert) => {
             const voided =
               (alert.kind === "result_settled" &&
                 (alert.title.startsWith("Void ·") || alert.title.startsWith("Push ·"))) ||
@@ -188,7 +192,7 @@ export default function AlertsPage() {
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {dayLabel(alert.updatedAt)}
+                    {formatClockTime(alert.updatedAt)}
                   </span>
                   {isUnread ? (
                     <button
@@ -208,7 +212,9 @@ export default function AlertsPage() {
                 </span>
               </div>
             );
-          })
+            })}
+            </ListDaySection>
+          ))
         )}
       </div>
       </PageFillScroll>

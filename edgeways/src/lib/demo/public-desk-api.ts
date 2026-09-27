@@ -696,9 +696,14 @@ function pathAndDate(path: string): { pathname: string; date: string } {
   return { pathname: pathname ?? path, date };
 }
 
-/** Canned Alerts page for the public demo. Never written to a live desk. */
+/**
+ * Canned Alerts page for the public demo. Never written to a live desk.
+ * Three calendar days so the list shows Today, Yesterday, and a full date.
+ */
 export function publicDemoAlertsInbox(now = Date.now()): AlertsInboxRow[] {
-  const raisedAt = t(0, 9, now);
+  const today = t(0, 9, now);
+  const yesterday = t(1, 18, now);
+  const older = t(11, 14, now);
   return [
     {
       id: 1,
@@ -707,8 +712,8 @@ export function publicDemoAlertsInbox(now = Date.now()): AlertsInboxRow[] {
       title: "⚠️ Lay missing · full stake exposed",
       body: "Qualifying · Acca insurance, 3-fold (Paddy Power)",
       href: "/tracker?highlight=40",
-      createdAt: raisedAt,
-      updatedAt: raisedAt,
+      createdAt: today,
+      updatedAt: today,
       readAt: null,
     },
     {
@@ -718,8 +723,8 @@ export function publicDemoAlertsInbox(now = Date.now()): AlertsInboxRow[] {
       title: "⚠️ Lay missing · full stake exposed",
       body: "Qualifying · Yankee on the card (Coral)",
       href: "/tracker?highlight=80",
-      createdAt: raisedAt,
-      updatedAt: raisedAt,
+      createdAt: yesterday,
+      updatedAt: yesterday,
       readAt: null,
     },
     {
@@ -729,8 +734,8 @@ export function publicDemoAlertsInbox(now = Date.now()): AlertsInboxRow[] {
       title: "🔒 2UP · hedge the lay",
       body: "Arsenal vs Chelsea · early payout is in",
       href: "/tracker?highlight=1",
-      createdAt: raisedAt,
-      updatedAt: raisedAt,
+      createdAt: older,
+      updatedAt: older,
       readAt: null,
     },
   ];
