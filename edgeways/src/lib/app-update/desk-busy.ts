@@ -32,8 +32,21 @@ function fieldSnapshot(el: Field): string {
   return el.value;
 }
 
-export function deskHasOpenHold(doc: Document): boolean {
-  return doc.querySelector(DESK_HOLD_SELECTOR) != null;
+/**
+ * `data-update-hold="page"` guards work that lives in the current page only.
+ * Leaving the page drops it anyway, so it does not stop a link to another page.
+ */
+export const PAGE_HOLD_VALUE = "page";
+
+const LEAVING_PAGE_HOLD_SELECTOR = DESK_HOLD_SELECTOR.replace(
+  "[data-update-hold]",
+  `[data-update-hold]:not([data-update-hold="${PAGE_HOLD_VALUE}"])`
+);
+
+export function deskHasOpenHold(doc: Document, leavingPage = false): boolean {
+  return (
+    doc.querySelector(leavingPage ? LEAVING_PAGE_HOLD_SELECTOR : DESK_HOLD_SELECTOR) != null
+  );
 }
 
 export type EditedFieldTracker = {
