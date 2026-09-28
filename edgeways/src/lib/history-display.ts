@@ -230,19 +230,26 @@ function isExtraTimeMatchEnding(event: EventRow | undefined): boolean {
   return event?.matchEnding === "aet" || event?.matchEnding === "pen";
 }
 
+/**
+ * Final match minute for a football full-time row: 120 after extra time or
+ * pens, otherwise the stored minute (never below 90). Null when unknown.
+ */
+export function historyFullTimeMinute(entry: HistoryRow, ctx: HistoryContext): number | null {
+  if (entry.kind !== "full_time") return null;
+  const event = resolveHistoryEvent(entry, ctx);
+  if (event?.sport === "horse_racing") return null;
+  if (isExtraTimeMatchEnding(event)) return 120;
+  if (entry.minute != null && entry.minute > 0) return Math.max(entry.minute, 90);
+  return event != null ? 90 : null;
+}
+
 /** True when the badge should show a live minute (e.g. 23') instead of a clock time. */
 export function historyUsesMinuteBadge(entry: HistoryRow, ctx: HistoryContext): boolean {
   const event = resolveHistoryEvent(entry, ctx);
   if (historyBetPlacedMatchMinute(entry, ctx) != null) return true;
-  // AET/extra-time full_time entries show the match minute ("120'") not the wall clock
-  // so they read consistently alongside AET goals at the same minute.
-  // Missing fixtures must not throw: `event?.sport !== "horse_racing"` is true when event is undefined.
-  if (
-    entry.kind === "full_time" &&
-    event != null &&
-    event.sport !== "horse_racing" &&
-    isExtraTimeMatchEnding(event)
-  ) {
+  // Football full time reads as a match minute like goals ("90'", "120'"), never
+  // the result-posted wall clock. Blank when the minute is unknown.
+  if (entry.kind === "full_time" && event?.sport !== "horse_racing") {
     return true;
   }
   return (
@@ -272,11 +279,10 @@ export function formatHistoryTimeBadgeParts(
 
   if (historyUsesMinuteBadge(entry, ctx)) {
     const minute =
-      historyBetPlacedMatchMinute(entry, ctx) ??
-      (entry.kind === "full_time" && isExtraTimeMatchEnding(resolveHistoryEvent(entry, ctx))
-        ? 120
-        : entry.minute);
-    return { primary: `${minute}'` };
+      entry.kind === "full_time"
+        ? historyFullTimeMinute(entry, ctx)
+        : (historyBetPlacedMatchMinute(entry, ctx) ?? entry.minute);
+    return { primary: minute != null ? `${minute}'` : "" };
   }
 
   const time = formatHistoryClock(when);

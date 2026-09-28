@@ -766,10 +766,15 @@ describe("formatHistoryTimeBadge", () => {
     vi.useRealTimers();
   });
 
-  it("shows full-time clock time instead of 90'", () => {
+  it("shows 90' for a normal full time, never the result-posted clock", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-08T21:00:00"));
+    vi.setSystemTime(new Date("2026-07-09T09:00:00"));
 
+    const postedCtx = buildHistoryContext(
+      [{ ...event, resultPostedAt: new Date("2026-07-09T08:11:00").getTime() }],
+      [],
+      {}
+    );
     const entry = row({
       kind: "full_time",
       title: "Full time",
@@ -778,9 +783,64 @@ describe("formatHistoryTimeBadge", () => {
       betId: undefined,
     });
 
-    expect(historyUsesMinuteBadge(entry, ctx)).toBe(false);
-    expect(formatHistoryTimeBadge(entry, ctx)).toBe("Today, 21:00");
+    expect(historyUsesMinuteBadge(entry, postedCtx)).toBe(true);
+    expect(formatHistoryTimeBadgeParts(entry, postedCtx)).toEqual({ primary: "90'" });
+    expect(formatHistoryTimeBadge(entry, postedCtx, { omitDay: true })).toBe("90'");
     expect(historyOccurredAt(entry, ctx)).toBe(kickoffAt.getTime() + 90 * 60 * 1000);
+
+    vi.useRealTimers();
+  });
+
+  it("shows 90' for a finished fixture whose full-time row has no stored minute", () => {
+    const entry = row({
+      kind: "full_time",
+      title: "Full time",
+      eventId: 1,
+      minute: null,
+      betId: undefined,
+    });
+    expect(formatHistoryTimeBadge(entry, ctx)).toBe("90'");
+  });
+
+  it("shows 120' for a full time decided on pens", () => {
+    const penCtx = buildHistoryContext([{ ...event, matchEnding: "pen" }], [], {});
+    const entry = row({
+      kind: "full_time",
+      title: "Full time (Pens)",
+      eventId: 1,
+      minute: 120,
+      betId: undefined,
+    });
+    expect(formatHistoryTimeBadge(entry, penCtx, { omitDay: true })).toBe("120'");
+  });
+
+  it("shows nothing when no full-time minute is available", () => {
+    const emptyCtx = buildHistoryContext([], [], {});
+    const entry = row({
+      kind: "full_time",
+      title: "Full time",
+      eventId: 99,
+      minute: null,
+      betId: undefined,
+      createdAt: new Date("2026-07-09T08:11:00").getTime(),
+    });
+    expect(formatHistoryTimeBadgeParts(entry, emptyCtx)).toEqual({ primary: "" });
+    expect(formatHistoryTimeBadge(entry, emptyCtx, { omitDay: true })).toBe("");
+  });
+
+  it("keeps racing results on the race clock", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-08T21:00:00"));
+
+    const raceCtx = buildHistoryContext([{ ...event, sport: "horse_racing" }], [], {});
+    const entry = row({
+      kind: "full_time",
+      title: "Result",
+      eventId: 1,
+      betId: undefined,
+    });
+    expect(historyUsesMinuteBadge(entry, raceCtx)).toBe(false);
+    expect(formatHistoryTimeBadge(entry, raceCtx, { omitDay: true })).toBe("19:30");
 
     vi.useRealTimers();
   });
@@ -850,8 +910,8 @@ describe("formatHistoryTimeBadge", () => {
       betId: undefined,
       createdAt: new Date("2026-07-08T21:00:00").getTime(),
     });
-    expect(historyUsesMinuteBadge(orphanFt, emptyCtx)).toBe(false);
-    expect(formatHistoryTimeBadge(orphanFt, emptyCtx)).toBe("Today, 21:00");
+    expect(historyUsesMinuteBadge(orphanFt, emptyCtx)).toBe(true);
+    expect(formatHistoryTimeBadge(orphanFt, emptyCtx)).toBe("90'");
 
     vi.useRealTimers();
   });
