@@ -1,8 +1,9 @@
 /**
- * EDGE-214: `npm run seed:agent`. Creates (or refreshes) the agent-customer
- * and agent-admin users on the Clerk DEVELOPMENT instance, then resets and
- * reseeds their local SQLite desks. Idempotent: every run leaves the same
- * accounts and a fresh desk dated relative to now.
+ * EDGE-214: `npm run seed:agent`. Creates (or refreshes) the agent-customer,
+ * agent-admin and agent-new users on the Clerk DEVELOPMENT instance, then
+ * resets and reseeds their local SQLite desks. agent-new is reset to an empty
+ * set-up desk. Idempotent: every run leaves the same accounts and a fresh
+ * desk dated relative to now.
  *
  * Sign in on /login with the account email, then the Clerk test code 424242.
  * Refuses to run unless CLERK_SECRET_KEY is sk_test_ and the desk is local
@@ -19,6 +20,7 @@ import {
   CLERK_TEST_VERIFICATION_CODE,
   resetDeskFile,
   seedAgentDesk,
+  seedEmptyAgentDesk,
   seedRefusals,
   upsertAgentAppUser,
   type AgentAccount,
@@ -110,7 +112,9 @@ async function main(): Promise<void> {
           now,
         });
         summary = sqlite.transaction(() =>
-          seedAgentDesk(sqlite, { campaigns: account.campaigns, now })
+          account.desk === "empty"
+            ? seedEmptyAgentDesk(sqlite, { now })
+            : seedAgentDesk(sqlite, { campaigns: account.campaigns, now })
         )();
         sqlite.pragma("wal_checkpoint(TRUNCATE)");
       } finally {

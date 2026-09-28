@@ -8,8 +8,10 @@ import {
   agentClerkMetadata,
   DEFAULT_AGENT_ADMIN_EMAIL,
   DEFAULT_AGENT_CUSTOMER_EMAIL,
+  DEFAULT_AGENT_NEW_EMAIL,
   resetDeskFile,
   seedAgentDesk,
+  seedEmptyAgentDesk,
   seedRefusals,
   upsertAgentAppUser,
 } from "./agent-seed";
@@ -21,30 +23,42 @@ const DEV_ENV = {
 
 describe("agent accounts", () => {
   it("defaults to Clerk test-mode emails with the right roles", () => {
-    const [customer, admin] = agentAccounts({});
+    const [customer, admin, fresh] = agentAccounts({});
     expect(customer).toMatchObject({
       handle: "agent-customer",
       email: DEFAULT_AGENT_CUSTOMER_EMAIL,
       role: "user",
       plan: "edge",
       billingStatus: "active",
+      desk: "history",
     });
     expect(admin).toMatchObject({
       handle: "agent-admin",
       email: DEFAULT_AGENT_ADMIN_EMAIL,
       role: "admin",
+      desk: "history",
     });
-    expect(customer!.email).toContain("+clerk_test@");
-    expect(admin!.email).toContain("+clerk_test@");
+    expect(fresh).toMatchObject({
+      handle: "agent-new",
+      email: DEFAULT_AGENT_NEW_EMAIL,
+      role: "user",
+      desk: "empty",
+      campaigns: 0,
+    });
+    for (const account of [customer, admin, fresh]) {
+      expect(account!.email).toContain("+clerk_test@");
+    }
   });
 
   it("honours AGENT_*_EMAIL overrides", () => {
-    const [customer, admin] = agentAccounts({
+    const [customer, admin, fresh] = agentAccounts({
       AGENT_CUSTOMER_EMAIL: " Cust+clerk_test@Edgeways.test ",
       AGENT_ADMIN_EMAIL: "ops+clerk_test@edgeways.test",
+      AGENT_NEW_EMAIL: "first+clerk_test@edgeways.test",
     });
     expect(customer!.email).toBe("cust+clerk_test@edgeways.test");
     expect(admin!.email).toBe("ops+clerk_test@edgeways.test");
+    expect(fresh!.email).toBe("first+clerk_test@edgeways.test");
   });
 
   it("pre-confirms the age gate and legal consent in Clerk metadata", () => {
@@ -84,12 +98,18 @@ describe("seed guard", () => {
       seedRefusals({ ...DEV_ENV, AGENT_CUSTOMER_EMAIL: "someone@example.com" })[0]
     ).toMatch(/agent-customer/);
     expect(
+      seedRefusals({ ...DEV_ENV, AGENT_NEW_EMAIL: "someone@example.com" })[0]
+    ).toMatch(/agent-new/);
+    expect(
       seedRefusals({
         ...DEV_ENV,
         AGENT_CUSTOMER_EMAIL: "same+clerk_test@example.com",
         AGENT_ADMIN_EMAIL: "same+clerk_test@example.com",
       })
     ).toEqual(["agent-customer and agent-admin need different emails."]);
+    expect(
+      seedRefusals({ ...DEV_ENV, AGENT_NEW_EMAIL: DEFAULT_AGENT_CUSTOMER_EMAIL })
+    ).toEqual(["agent-customer and agent-new need different emails."]);
   });
 });
 
@@ -172,6 +192,54 @@ describe("agent desk seed", () => {
       email: DEFAULT_AGENT_ADMIN_EMAIL,
       legalVersion: "v1",
     });
+  });
+});
+
+describe("agent-new empty desk seed", () => {
+  const now = Date.UTC(2026, 8, 27, 12);
+  let sqlite: Database.Database;
+
+  const reseedEmpty = () => {
+    resetDeskFile(sqlite);
+    sqlite
+      .prepare(
+        `INSERT INTO exchanges (name, commission_pct, is_default, created_at) VALUES ('Betfair', 2, 1, ?)`
+      )
+      .run(now);
+    return seedEmptyAgentDesk(sqlite, { now });
+  };
+
+  beforeAll(() => {
+    db.select().from(appUsers).all();
+    sqlite = new Database(process.env.EDGEWAYS_DB_PATH!);
+    seedAgentDesk(sqlite, { campaigns: 5, now });
+  });
+
+  it("resets a busy desk to accounts only, with no offers or bets", () => {
+    expect(reseedEmpty()).toEqual({ accounts: 10, offers: 0, settledBets: 0, openBets: 0 });
+    expect(db.select().from(bets).all()).toHaveLength(0);
+    expect(db.select().from(offers).all()).toHaveLength(0);
+  });
+
+  it("is idempotent across re-seeds", () => {
+    reseedEmpty();
+    expect(reseedEmpty()).toEqual({ accounts: 10, offers: 0, settledBets: 0, openBets: 0 });
+    const count = sqlite.prepare(`SELECT COUNT(*) AS n FROM accounts`).get() as { n: number };
+    expect(count.n).toBe(10);
+  });
+
+  it("loads as past setup with an empty desk and £0 realised profit", async () => {
+    reseedEmpty();
+    const { getAppState } = await import("@/lib/services/state");
+    const { needsSetup, hasDeskActivity, shouldShowEmptyDeskWelcome } = await import(
+      "@/lib/dashboard-empty"
+    );
+    const state = await getAppState();
+    expect(needsSetup(state)).toBe(false);
+    expect(hasDeskActivity(state)).toBe(false);
+    expect(shouldShowEmptyDeskWelcome(state)).toBe(true);
+    expect(state.settledProfit).toBe(0);
+    expect(state.history).toHaveLength(0);
   });
 });
 
