@@ -114,12 +114,17 @@ export function twoUpSplitLegs(
   };
 }
 
-function alreadySplitForBet(entries: HistoryRow[], betId: number): boolean {
-  return entries.some(
-    (row) =>
-      row.betId === betId &&
+function alreadySplitBetIds(entries: HistoryRow[]): Set<number> {
+  const out = new Set<number>();
+  for (const row of entries) {
+    if (
+      row.betId != null &&
       (isTwoUpBookieHistoryDedupe(row.dedupe) || isTwoUpLayHistoryDedupe(row.dedupe))
-  );
+    ) {
+      out.add(row.betId);
+    }
+  }
+  return out;
 }
 
 /** Replace a combined 2UP settlement with bookie + lay rows when allowed. */
@@ -129,6 +134,7 @@ export function expandTwoUpHistoryEntries(
   eventsById: Map<number, EventRow>
 ): HistoryRow[] {
   const out: HistoryRow[] = [];
+  const splitBetIds = alreadySplitBetIds(entries);
   for (const entry of entries) {
     if (entry.kind !== "settlement" || entry.betId == null) {
       out.push(entry);
@@ -149,7 +155,7 @@ export function expandTwoUpHistoryEntries(
       out.push(entry);
       continue;
     }
-    if (alreadySplitForBet(entries, bet.id)) {
+    if (splitBetIds.has(bet.id)) {
       out.push(entry);
       continue;
     }

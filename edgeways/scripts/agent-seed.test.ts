@@ -9,6 +9,7 @@ import {
   DEFAULT_AGENT_ADMIN_EMAIL,
   DEFAULT_AGENT_CUSTOMER_EMAIL,
   DEFAULT_AGENT_NEW_EMAIL,
+  HEAVY_CUSTOMER_CAMPAIGNS,
   resetDeskFile,
   seedAgentDesk,
   seedEmptyAgentDesk,
@@ -48,6 +49,14 @@ describe("agent accounts", () => {
     for (const account of [customer, admin, fresh]) {
       expect(account!.email).toContain("+clerk_test@");
     }
+  });
+
+  it("gives only agent-customer the heavy history when asked", () => {
+    const [customer, admin, fresh] = agentAccounts({}, { heavy: true });
+    expect(customer!.campaigns).toBe(HEAVY_CUSTOMER_CAMPAIGNS);
+    expect(customer!.campaigns).toBeGreaterThan(agentAccounts({})[0]!.campaigns);
+    expect(admin!.campaigns).toBe(agentAccounts({})[1]!.campaigns);
+    expect(fresh!.campaigns).toBe(0);
   });
 
   it("honours AGENT_*_EMAIL overrides", () => {

@@ -18,7 +18,11 @@ import { ScrollFadeEdges } from "@/components/ui/scroll-fade-edges";
 import { apiGet, useAppState } from "@/hooks/use-app-state";
 import type { AppState } from "@/lib/services/state.types";
 import { buildHistoryContext } from "@/lib/history-display";
-import type { BetRow, EventRow, HistoryRow } from "@/lib/db/schema";
+import {
+  historyContextFromPage,
+  historyPageApiPath,
+  type HistoryPagePayload,
+} from "@/lib/history-page";
 import { dashboardPanelBody, dashboardSection } from "@/lib/ui/dashboard-layout";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { cn } from "@/lib/utils";
@@ -31,14 +35,6 @@ const FEED_FILTERS: { id: FeedFilter; label: string }[] = [
   { id: "all", label: "All" },
 ];
 
-interface CasinoHistoryPayload {
-  entries: HistoryRow[];
-  events: EventRow[];
-  bets: BetRow[];
-  promoAwards: Record<number, { amount: number; reason: string }>;
-  offerTitles?: Array<{ id: number; title: string }>;
-}
-
 export function DashboardFeedPanel({
   state,
   className,
@@ -50,7 +46,7 @@ export function DashboardFeedPanel({
   showLiveDock?: boolean;
 }) {
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
-  const [casinoFeed, setCasinoFeed] = useState<CasinoHistoryPayload | null>(null);
+  const [casinoFeed, setCasinoFeed] = useState<HistoryPagePayload | null>(null);
   const { refresh } = useAppState(10_000);
 
   const [prevFeedFilter, setPrevFeedFilter] = useState(feedFilter);
@@ -67,7 +63,7 @@ export function DashboardFeedPanel({
     // Dedicated fetch: state.history is capped at ~40 across ALL kinds, so an
     // older casino row can fall out of the Home All window while History still
     // shows it under the Casino filter.
-    apiGet<CasinoHistoryPayload>("/api/history?filter=casino&limit=40")
+    apiGet<HistoryPagePayload>(historyPageApiPath("casino", { limit: 40 }))
       .then((res) => {
         if (live) setCasinoFeed(res);
       })
@@ -81,13 +77,7 @@ export function DashboardFeedPanel({
 
   const historyContext = useMemo(() => {
     if (feedFilter === "casino" && casinoFeed) {
-      return buildHistoryContext(
-        casinoFeed.events,
-        casinoFeed.bets,
-        casinoFeed.promoAwards,
-        casinoFeed.offerTitles ?? [],
-        casinoFeed.entries
-      );
+      return historyContextFromPage(casinoFeed);
     }
     return state
       ? buildHistoryContext(

@@ -4,12 +4,8 @@
  */
 import { buildPublicDemoState } from "@/lib/demo/public-fixture";
 import { publicDemoOfferEdge, publicDemoRacingDesk } from "@/lib/demo/public-racing-desk";
-import {
-  buildHistoryContext,
-  isHiddenHistoryFeedEntry,
-  matchesHistoryFilter,
-  type HistoryFilter,
-} from "@/lib/history-display";
+import { isHiddenHistoryFeedEntry, type HistoryFilter } from "@/lib/history-display";
+import { buildHistoryPage, parseHistoryPageLimit } from "@/lib/history-page";
 import type { AccaRunView } from "@/lib/services/acca-desk";
 import type { BoostDiaryEntry } from "@/lib/services/boosts-client";
 import type { CasinoOfferSummary } from "@/lib/services/casino-offers.types";
@@ -665,28 +661,18 @@ function publicDemoHistoryPayload(path: string, now: number) {
   const filter = HISTORY_FILTERS.includes(filterParam as HistoryFilter)
     ? (filterParam as HistoryFilter)
     : "all";
-  const limit = Math.min(Number(params.get("limit") ?? 200) || 200, 500);
   const state = buildPublicDemoState("edge", now);
-  const offerTitles = state.offers.map((o) => ({ id: o.id, title: o.title }));
-  const context = buildHistoryContext(
-    state.events,
-    state.bets,
-    state.promoAwards,
-    offerTitles,
-    state.history
-  );
-  let entries = state.history.filter((e) => !isHiddenHistoryFeedEntry(e, context));
-  if (filter !== "all") {
-    entries = entries.filter((e) => matchesHistoryFilter(e, filter, context));
-  }
-  return {
-    entries: entries.slice(0, limit),
+  return buildHistoryPage({
+    rows: state.history,
     events: state.events,
     bets: state.bets,
     promoAwards: state.promoAwards,
-    offerTitles,
+    offerTitles: state.offers.map((o) => ({ id: o.id, title: o.title })),
     filter,
-  };
+    cursor: params.get("cursor"),
+    limit: parseHistoryPageLimit(params.get("limit")),
+    isHidden: isHiddenHistoryFeedEntry,
+  });
 }
 
 function pathAndDate(path: string): { pathname: string; date: string } {

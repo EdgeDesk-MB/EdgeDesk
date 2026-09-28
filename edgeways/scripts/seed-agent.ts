@@ -5,6 +5,9 @@
  * set-up desk. Idempotent: every run leaves the same accounts and a fresh
  * desk dated relative to now.
  *
+ * `npm run seed:agent -- --heavy` gives agent-customer about 10,000 settled
+ * bets instead of 2,400, for /history performance work (EDGE-223).
+ *
  * Sign in on /login with the account email, then the Clerk test code 424242.
  * Refuses to run unless CLERK_SECRET_KEY is sk_test_ and the desk is local
  * SQLite. Prints status only, never keys.
@@ -57,7 +60,7 @@ async function ensureClerkUser(
 }
 
 async function main(): Promise<void> {
-  const accounts = agentAccounts();
+  const accounts = agentAccounts(process.env, { heavy: process.argv.includes("--heavy") });
   const refusals = seedRefusals(process.env, accounts);
   if (fs.existsSync(path.join(process.cwd(), "data", "demo-mode"))) {
     refusals.push("data/demo-mode is present, so the app would serve the demo desk. Turn demo mode off first.");

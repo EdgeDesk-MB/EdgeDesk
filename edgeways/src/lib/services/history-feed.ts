@@ -20,6 +20,7 @@ import {
 } from "@/lib/history-display";
 import { isChartAnnotationEntry } from "@/lib/pnl/chart-bet-markers";
 import { dedupeHistoryForDisplay } from "@/lib/history-feed-display";
+import { buildHistoryPage, type HistoryPagePayload } from "@/lib/history-page";
 
 export { dedupeHistoryForDisplay } from "@/lib/history-feed-display";
 
@@ -42,8 +43,13 @@ export function purgeHistoryForBet(betId: number): number {
 /** Remove history rows whose bet was deleted before purge-on-delete existed. */
 export function purgeOrphanedBetHistory(): number {
   const betIds = db.select({ id: bets.id }).from(bets).all().map((b) => b.id);
-  const linked = db.select().from(history).where(isNotNull(history.betId)).all();
-  const orphaned = linked.filter((row) => row.betId != null && !betIds.includes(row.betId));
+  const known = new Set(betIds);
+  const linked = db
+    .select({ betId: history.betId })
+    .from(history)
+    .where(isNotNull(history.betId))
+    .all();
+  const orphaned = linked.filter((row) => row.betId != null && !known.has(row.betId));
   if (orphaned.length === 0) return 0;
 
   if (betIds.length === 0) {
@@ -98,6 +104,30 @@ export function getHistoryFeed(options?: {
   entries = entries.slice(0, limit);
 
   return { entries, events: allEvents, bets: allBets, context, promoAwards, offerTitles };
+}
+
+/** One cursor page of the History feed, sorted and filtered over all rows (EDGE-223). */
+export function getHistoryPage(options: {
+  filter: HistoryFilter;
+  cursor?: string | null;
+  limit?: number;
+}): HistoryPagePayload {
+  if (!options.cursor) purgeOrphanedBetHistory();
+  const allEvents = db.select().from(events).all();
+  return buildHistoryPage({
+    rows: dedupeHistoryForDisplay(
+      db.select().from(history).orderBy(desc(history.createdAt), desc(history.id)).all(),
+      allEvents
+    ),
+    events: allEvents,
+    bets: db.select().from(bets).all(),
+    promoAwards: getPromoAwardsByBetId(),
+    offerTitles: loadOfferTitles(),
+    filter: options.filter,
+    cursor: options.cursor,
+    limit: options.limit,
+    isHidden: isHiddenHistoryFeedEntry,
+  });
 }
 
 /** All feed rows that qualify as chart money-position annotations (not limited to feed page size). */
