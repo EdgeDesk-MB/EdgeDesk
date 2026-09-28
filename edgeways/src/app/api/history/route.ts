@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
-import {
-  buildHistoryContext,
-  isDeskCampaignLayHistoryEntry,
-  matchesHistoryFilter,
-  sortHistoryEntries,
-  type HistoryFilter,
-} from "@/lib/history-display";
-import { dedupeHistoryForDisplay, getHistoryFeed } from "@/lib/services/history-feed";
+import { isDeskCampaignLayHistoryEntry, type HistoryFilter } from "@/lib/history-display";
+import { buildHistoryPage, parseHistoryPageLimit } from "@/lib/history-page";
+import { dedupeHistoryForDisplay, getHistoryPage } from "@/lib/services/history-feed";
 import { isNeonDesk } from "@/lib/db/desk-backend";
 import { listNeonDeskBets } from "@/lib/db/neon-desk";
-import { listNeonDeskOffers } from "@/lib/db/neon-desk-offers";
+import { listNeonDeskOfferTitles } from "@/lib/db/neon-desk-offers";
 import { listNeonDeskHistory, syncNeonDeskEventHistory } from "@/lib/db/neon-desk-history";
-import { listNeonEvents } from "@/lib/db/neon-events";
+import { listNeonEventsByIds } from "@/lib/db/neon-events";
 import { listNeonDeskTrackedEventIds } from "@/lib/db/neon-desk-tracked-events";
-import { filterEventsForDesk } from "@/lib/events/desk-tracked-events";
+import { deskVisibleEventIds } from "@/lib/events/desk-tracked-events";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 const FILTERS: HistoryFilter[] = [
@@ -34,49 +29,47 @@ export const GET = withDeskScope(async function GET(req: Request) {
   const filter = FILTERS.includes(filterParam as HistoryFilter)
     ? (filterParam as HistoryFilter)
     : "all";
-  const limit = Math.min(Number(searchParams.get("limit") ?? 200), 500);
+  const limit = parseHistoryPageLimit(searchParams.get("limit"));
+  const cursor = searchParams.get("cursor");
 
   if (isNeonDesk()) {
-    const hosted = await getHostedHistoryFeed(limit, filter);
-    return NextResponse.json({ ...hosted, filter });
+    return NextResponse.json(await getHostedHistoryPage({ filter, cursor, limit }));
   }
-
-  const feed = getHistoryFeed({ limit, filter });
-
-  return NextResponse.json({
-    entries: feed.entries,
-    events: feed.events,
-    bets: feed.bets,
-    promoAwards: feed.promoAwards,
-    offerTitles: feed.offerTitles,
-    filter,
-  });
+  return NextResponse.json(getHistoryPage({ filter, cursor, limit }));
 });
 
-/** Hosted feed: same display pipeline over Neon rows and desk events. */
-async function getHostedHistoryFeed(limit: number, filter: HistoryFilter) {
-  const [initialRows, betRows, offerRows, feedEvents, followedIds] = await Promise.all([
-    listNeonDeskHistory(limit * 2),
+/**
+ * Hosted page: same pipeline over Neon rows. A fixed handful of queries per
+ * request, whatever the desk size. Event commentary syncs on the first page only.
+ */
+async function getHostedHistoryPage(input: {
+  filter: HistoryFilter;
+  cursor: string | null;
+  limit: number;
+}) {
+  const [initialRows, betRows, offerTitles, followedIds] = await Promise.all([
+    listNeonDeskHistory(null),
     listNeonDeskBets(),
-    listNeonDeskOffers(),
-    listNeonEvents().catch(() => []),
+    listNeonDeskOfferTitles(),
     listNeonDeskTrackedEventIds().catch(() => []),
   ]);
-  const events = filterEventsForDesk(feedEvents, followedIds, betRows);
-  await syncNeonDeskEventHistory(events, initialRows).catch(() => {});
-  const rows = await listNeonDeskHistory(limit * 2);
-  const promoAwards: Record<number, { amount: number; reason: string }> = {};
-  const offerTitles = offerRows.map((o) => ({ id: o.id, title: o.title }));
-
-  const raw = dedupeHistoryForDisplay(rows, events);
-  const context = buildHistoryContext(events, betRows, promoAwards, offerTitles, raw);
-  let entries = sortHistoryEntries(raw, context).filter(
-    (e) => !isDeskCampaignLayHistoryEntry(e, context)
+  const events = await listNeonEventsByIds([...deskVisibleEventIds(followedIds, betRows)]).catch(
+    () => []
   );
-  if (filter !== "all") {
-    entries = entries.filter((e) => matchesHistoryFilter(e, filter, context));
+  let rows = initialRows;
+  if (!input.cursor) {
+    const written = await syncNeonDeskEventHistory(events, initialRows).catch(() => 0);
+    if (written > 0) rows = await listNeonDeskHistory(null);
   }
-  entries = entries.slice(0, limit);
-
-  return { entries, events, bets: betRows, promoAwards, offerTitles };
+  return buildHistoryPage({
+    rows: dedupeHistoryForDisplay(rows, events),
+    events,
+    bets: betRows,
+    promoAwards: {},
+    offerTitles,
+    filter: input.filter,
+    cursor: input.cursor,
+    limit: input.limit,
+    isHidden: isDeskCampaignLayHistoryEntry,
+  });
 }

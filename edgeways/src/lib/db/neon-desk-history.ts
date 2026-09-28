@@ -4,7 +4,7 @@
  */
 import "server-only";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { neonDeskClerkUserId } from "@/lib/db/neon-desk";
 import { getNeonDb } from "@/lib/db/neon";
 import { toSqliteHistoryRow } from "@/lib/db/neon-desk-map";
@@ -28,15 +28,16 @@ export async function listNeonDeskHistoryKeysForEvents(
     );
 }
 
-export async function listNeonDeskHistory(limit = 500): Promise<HistoryRow[]> {
+/** Newest first. `limit: null` reads the whole feed (History pages over all rows). */
+export async function listNeonDeskHistory(limit: number | null = 500): Promise<HistoryRow[]> {
   const clerkUserId = neonDeskClerkUserId();
   if (!clerkUserId) return [];
-  const rows = await getNeonDb()
+  const query = getNeonDb()
     .select()
     .from(pgHistory)
     .where(eq(pgHistory.clerkUserId, clerkUserId))
-    .orderBy(desc(pgHistory.createdAt), desc(pgHistory.id))
-    .limit(limit);
+    .orderBy(desc(pgHistory.createdAt), desc(pgHistory.id));
+  const rows = limit == null ? await query : await query.limit(limit);
   return rows.map(toSqliteHistoryRow);
 }
 
@@ -90,14 +91,47 @@ export async function upsertNeonDeskHistory(
     });
 }
 
-/** Write kick-off / goal / 2UP / full-time rows for this login's desk events. */
+const SYNC_WRITE_CHUNK = 500;
+
+type ExistingHistoryRow = Pick<HistoryRow, "eventId" | "dedupe"> &
+  Partial<Pick<HistoryRow, "title" | "detail" | "amount" | "betId" | "minute" | "createdAt">>;
+
+/** True when a full stored row already holds what an upsert would write. */
+function upsertIsNoop(row: ExistingHistoryRow | undefined, values: NeonDeskHistoryValues): boolean {
+  if (!row || row.title === undefined) return false;
+  return (
+    row.title === values.title &&
+    (row.detail ?? null) === (values.detail ?? null) &&
+    (row.amount ?? null) === (values.amount ?? null) &&
+    (row.eventId ?? null) === (values.eventId ?? null) &&
+    (row.betId ?? null) === (values.betId ?? null) &&
+    (row.minute ?? null) === (values.minute ?? null) &&
+    row.createdAt === values.createdAt
+  );
+}
+
+function chunks<T>(list: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += SYNC_WRITE_CHUNK) {
+    out.push(list.slice(i, i + SYNC_WRITE_CHUNK));
+  }
+  return out;
+}
+
+/**
+ * Write kick-off / goal / 2UP / full-time rows for this login's desk events.
+ * Batched: at most one insert, one upsert and one delete per 500 rows, however
+ * many events. Pass full stored rows as `existing` to skip unchanged upserts
+ * and stale-tick deletes that would be no-ops. Returns rows written or removed.
+ */
 export async function syncNeonDeskEventHistory(
   events: EventRow[],
-  existing: Array<Pick<HistoryRow, "eventId" | "dedupe">> = [],
+  existing: ExistingHistoryRow[] = [],
   clerkUserId = neonDeskClerkUserId()
-): Promise<void> {
-  if (!clerkUserId) return;
+): Promise<number> {
+  if (!clerkUserId) return 0;
   const now = Date.now();
+  const byDedupe = new Map(existing.map((row) => [row.dedupe, row]));
   const dedupesByEvent = new Map<number, string[]>();
   for (const row of existing) {
     if (row.eventId == null) continue;
@@ -105,6 +139,10 @@ export async function syncNeonDeskEventHistory(
     list.push(row.dedupe);
     dedupesByEvent.set(row.eventId, list);
   }
+
+  const inserts = new Map<string, NeonDeskHistoryValues>();
+  const upserts = new Map<string, NeonDeskHistoryValues>();
+  const purges = new Set<string>();
   for (const event of events) {
     const existingDedupes = dedupesByEvent.get(event.id) ?? [];
     const seen = new Set(existingDedupes);
@@ -123,19 +161,55 @@ export async function syncNeonDeskEventHistory(
         createdAt: fact.createdAt,
       };
       if (fact.write === "upsert") {
-        await upsertNeonDeskHistory(values, clerkUserId);
+        inserts.delete(fact.dedupe);
+        if (!upsertIsNoop(byDedupe.get(fact.dedupe), values)) {
+          upserts.set(fact.dedupe, values);
+        }
         seen.add(fact.dedupe);
         continue;
       }
       if (seen.has(fact.dedupe)) continue;
-      await insertNeonDeskHistory(values, clerkUserId);
+      inserts.set(fact.dedupe, values);
       seen.add(fact.dedupe);
     }
-    const staleScoreTicks = obsoleteScoreHistoryDedupes(event);
-    if (staleScoreTicks.length > 0) {
-      await purgeNeonDeskHistoryDedupes(staleScoreTicks, clerkUserId);
+    for (const dedupe of obsoleteScoreHistoryDedupes(event)) {
+      // A stale tick is removed after this event's writes, so it must not land.
+      inserts.delete(dedupe);
+      upserts.delete(dedupe);
+      if (existing.length === 0 || byDedupe.has(dedupe)) purges.add(dedupe);
     }
   }
+
+  const db = getNeonDb();
+  for (const batch of chunks([...inserts.values()])) {
+    await db
+      .insert(pgHistory)
+      .values(batch.map((values) => ({ ...values, clerkUserId })))
+      .onConflictDoNothing({
+        target: [pgHistory.clerkUserId, pgHistory.dedupe],
+      });
+  }
+  for (const batch of chunks([...upserts.values()])) {
+    await db
+      .insert(pgHistory)
+      .values(batch.map((values) => ({ ...values, clerkUserId })))
+      .onConflictDoUpdate({
+        target: [pgHistory.clerkUserId, pgHistory.dedupe],
+        set: {
+          title: sql`excluded.title`,
+          detail: sql`excluded.detail`,
+          amount: sql`excluded.amount`,
+          eventId: sql`excluded.event_id`,
+          betId: sql`excluded.bet_id`,
+          minute: sql`excluded.minute`,
+          createdAt: sql`excluded.created_at`,
+        },
+      });
+  }
+  for (const batch of chunks([...purges])) {
+    await purgeNeonDeskHistoryDedupes(batch, clerkUserId);
+  }
+  return inserts.size + upserts.size + purges.size;
 }
 
 /** Drop leftover nameless score ticks once the tape names that scoreline. */

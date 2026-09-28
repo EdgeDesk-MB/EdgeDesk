@@ -4,6 +4,7 @@
  */
 import { apiGet } from "@/hooks/use-app-state";
 import { feedHorizonDates } from "@/lib/events";
+import { historyPageApiPath } from "@/lib/history-page";
 
 const DEFAULT_TTL_MS = 2 * 60_000;
 
@@ -27,7 +28,7 @@ export function deskPagePrefetchPaths(href: string, now = Date.now()): string[] 
     ];
   }
   if (path === "/history") {
-    return ["/api/history?filter=all&limit=200"];
+    return [historyPageApiPath("all")];
   }
   if (path === "/alerts") {
     return ["/api/alerts"];

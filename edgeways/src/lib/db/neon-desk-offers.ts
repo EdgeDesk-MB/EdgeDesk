@@ -35,6 +35,16 @@ export type NeonDeskOfferValues = {
   createdAt: number;
 };
 
+/** Id and title only, for History's early free-bet award copy. */
+export async function listNeonDeskOfferTitles(): Promise<Array<{ id: number; title: string }>> {
+  const id = neonDeskClerkUserId();
+  if (!id) return [];
+  return getNeonDb()
+    .select({ id: pgOffers.id, title: pgOffers.title })
+    .from(pgOffers)
+    .where(eq(pgOffers.clerkUserId, id));
+}
+
 export async function listNeonDeskOffers(
   clerkUserId?: string | null
 ): Promise<OfferRow[]> {

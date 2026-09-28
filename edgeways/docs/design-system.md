@@ -839,8 +839,12 @@ surface. The plate switches via `in-data-[slot=card]` and
   (the label, or a description when one is passed). Gated Core/Edge routes
   use the same spinner from `PlanRouteGate` until `/api/state` lands. Do
   not flash £0.00, “No bets logged yet”, or any other empty copy. Home,
-  Profit Tracker, Offers, History, and the other list desks use this until
+  Profit Tracker, Offers, and the other list desks use this until
   the first payload lands.
+- **Paged feed (History)** - the header and filters paint at once (route
+  `loading.tsx` too) and `<HistoryListSkeleton>` holds the list in the
+  card rhythm until the first page lands. Later pages append below on
+  scroll, with an outline **Load more** fallback and a muted end line.
 - **Summary then list (Profit Tracker)** - once headline figures are on
   `/api/state`, paint the Summary strip immediately. Keep `<PlateLoading>`
   on the Bet log plate until the rows (and desk-run enrichment) are ready.

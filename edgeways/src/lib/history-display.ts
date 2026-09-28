@@ -820,20 +820,29 @@ function historySortAt(entry: HistoryRow, ctx: HistoryContext): number {
   return historyOccurredAt(entry, ctx);
 }
 
+/** Feed position: moment, then same-moment story rank, then id. All newest-first. */
+export type HistorySortKey = readonly [at: number, rank: number, id: number];
+
+export function historySortKey(entry: HistoryRow, ctx: HistoryContext): HistorySortKey {
+  return [historySortAt(entry, ctx), historyKindTieRank(entry.kind), entry.id];
+}
+
+/** Negative when `a` sits above `b` in the newest-first feed. */
+export function compareHistorySortKeys(a: HistorySortKey, b: HistorySortKey): number {
+  if (b[0] !== a[0]) return b[0] - a[0];
+  if (b[1] !== a[1]) return b[1] - a[1];
+  return b[2] - a[2];
+}
+
 export function sortHistoryEntries(
   rows: HistoryRow[],
   ctx: HistoryContext
 ): HistoryRow[] {
   const expanded = expandTwoUpHistoryEntries(rows, ctx.betsById, ctx.eventsById);
-  return [...expanded].sort((a, b) => {
-    const ta = historySortAt(a, ctx);
-    const tb = historySortAt(b, ctx);
-    if (tb !== ta) return tb - ta;
-    const ra = historyKindTieRank(a.kind);
-    const rb = historyKindTieRank(b.kind);
-    if (ra !== rb) return rb - ra;
-    return b.id - a.id;
-  });
+  return expanded
+    .map((entry) => ({ entry, key: historySortKey(entry, ctx) }))
+    .sort((a, b) => compareHistorySortKeys(a.key, b.key))
+    .map(({ entry }) => entry);
 }
 
 /**

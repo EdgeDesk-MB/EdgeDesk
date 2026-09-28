@@ -23,7 +23,7 @@ describe("deskPagePrefetchPaths", () => {
 
   it("warms History and Alerts lists", () => {
     expect(deskPagePrefetchPaths("/history")).toEqual([
-      "/api/history?filter=all&limit=200",
+      "/api/history?filter=all&limit=50",
     ]);
     expect(deskPagePrefetchPaths("/alerts")).toEqual(["/api/alerts"]);
   });

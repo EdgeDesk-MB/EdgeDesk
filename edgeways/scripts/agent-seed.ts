@@ -43,10 +43,13 @@ export const DEFAULT_AGENT_NEW_EMAIL = "agent-new+clerk_test@example.com";
 
 /** Heavy history for /history performance work (EDGE-209). */
 export const CUSTOMER_CAMPAIGNS = 1200;
+/** `seed:agent -- --heavy`: about 10,000 settled bets to amplify /history cost (EDGE-223). */
+export const HEAVY_CUSTOMER_CAMPAIGNS = 5000;
 export const ADMIN_CAMPAIGNS = 12;
 
 export function agentAccounts(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  options: { heavy?: boolean } = {}
 ): AgentAccount[] {
   return [
     {
@@ -59,7 +62,7 @@ export function agentAccounts(
       plan: "edge",
       billingStatus: "active",
       desk: "history",
-      campaigns: CUSTOMER_CAMPAIGNS,
+      campaigns: options.heavy ? HEAVY_CUSTOMER_CAMPAIGNS : CUSTOMER_CAMPAIGNS,
     },
     {
       key: "admin",
