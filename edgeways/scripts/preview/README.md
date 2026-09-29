@@ -2,7 +2,7 @@
 
 Headless Chromium journeys against every Vercel **Preview** deployment, run
 in GitHub Actions by `.github/workflows/preview-checks.yml`. Production
-deployments are ignored.
+deployments only take the visual baseline (see Visual regression).
 
 ## What runs
 
@@ -59,14 +59,58 @@ journey takes a "failed here" screenshot.
 No secret is printed. Response URLs in errors have their query strings
 removed, because Clerk handshake tokens travel there.
 
+## Visual regression (EDGE-228)
+
+Every screenshot is compared with a baseline of the same page on `main`.
+A difference is listed for Sam to judge, it never fails the status.
+
+- **Baseline.** Each successful Production deployment runs the signed-out
+  journeys (home and sign-in) against `https://edgeways.app` (override
+  with the `PREVIEW_BASELINE_URL` repository variable) and replaces
+  `baseline/` on `preview-checks-assets` with the PNGs and
+  `baseline.json`. The production domain, not the deployment URL, because
+  live Clerk only loads on its configured domains. Only journeys that
+  passed are baselined. To seed one by hand, run the workflow with
+  `baseline` ticked and `preview_url` set to `https://edgeways.app`.
+- **Signed-in pages are not compared.** Production uses the live Clerk
+  instance, where the agent test accounts do not exist, so main has no
+  signed-in baseline. The comment says how many were skipped. A baseline
+  never contains an account.
+- **Comparison.** `visual.ts compare` pairs screenshots by journey,
+  viewport and label, and diffs pixels in Node (`png.ts`, zlib only, no
+  image dependency). A pixel differs above pixelmatch's YIQ threshold of
+  0.1; a screenshot is flagged when over 0.1% of its pixels differ. Also
+  flagged: a new screenshot in a baselined journey, and a baseline
+  screenshot the branch no longer reaches.
+- **Masking.** Every screenshot freezes animations, hides the caret, and
+  paints magenta over `time`, `canvas`, NumberFlow, toasts and anything
+  marked `data-visual-mask`. Add that attribute to a clock, live score or
+  odds element that shows up on a journey page. Clerk's "Development
+  mode" strip, previews only, is hidden while the screenshot is taken.
+- **Outputs.** `visual.json` in the artefact; for each flagged screenshot,
+  `diff-<key>.png` (main, this branch, difference in red, left to right),
+  embedded in the PR comment under **Visual changes** and on the Linear
+  Screenshots comment after "Check these". The status description adds
+  "N visual changes to check".
+
+Local run, from `edgeways/`:
+
+```bash
+npm run -s preview:journeys -- --base-url https://edgeways.app --out /tmp/base --baseline
+RESULTS_DIR=/tmp/base npm run -s preview:visual -- manifest
+npm run -s preview:journeys -- --base-url https://<preview>.vercel.app --out /tmp/pr
+RESULTS_DIR=/tmp/pr npm run -s preview:visual -- compare --baseline-dir /tmp/base/baseline
+```
+
 ## Token scope
 
 The repo is public and `main` is unprotected, so the workflow is split:
 
 - **Mark pending**: `statuses: write` only, sets the pending status.
 - **Run journeys**: read-only, and no step gets a GitHub token (the
-  checkout does not keep credentials). It runs the preview's code and
-  uploads the artefact.
+  checkout does not keep credentials). It fetches the baseline
+  anonymously, runs the preview's code, compares, and uploads the
+  artefact.
 - **Publish results**: the only job with `contents: write`,
   `pull-requests: write`, `issues: write` and `statuses: write`. It
   downloads the artefact, pushes the screenshots, posts the comments and

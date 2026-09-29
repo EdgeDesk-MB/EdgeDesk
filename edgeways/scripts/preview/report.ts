@@ -1,6 +1,7 @@
 /**
  * Posts preview check results (EDGE-226). Run by the Preview checks workflow
- * after journeys.ts and publish-assets.sh.
+ * after journeys.ts, visual.ts and publish-assets.sh. Visual changes from
+ * visual.json (EDGE-228) are listed on both comments with their side by side.
  *
  * - One PR comment, found by COMMENT_MARKER and edited in place.
  * - When LINEAR_API_KEY is set and the branch names a ticket (edge-123),
@@ -11,7 +12,7 @@
  * Env: GITHUB_TOKEN, GITHUB_REPOSITORY, SHA, RUN_URL, ASSET_BASE_URL,
  * BRANCH (fallback when there is no PR), RESULTS_DIR, LINEAR_API_KEY.
  */
-import { appendFileSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import {
   COMMENT_MARKER,
@@ -22,6 +23,7 @@ import {
   pickPullRequest,
   ticketFromBranch,
   type RunResult,
+  type VisualReport,
 } from "./lib";
 
 type Pull = {
@@ -123,7 +125,13 @@ async function upsertLinearComment(
   key: string,
   ticket: string,
   result: RunResult,
-  ctx: { resultsDir: string; sha: string; runUrl: string; prUrl: string | null },
+  ctx: {
+    resultsDir: string;
+    sha: string;
+    runUrl: string;
+    prUrl: string | null;
+    visual: VisualReport | null;
+  },
 ) {
   const found = await linear<{
     viewer: { id: string };
@@ -142,10 +150,12 @@ async function upsertLinearComment(
   }
 
   const assets = new Map<string, string>();
-  for (const j of result.journeys) {
-    for (const s of j.shots) {
-      assets.set(s.file, await uploadToLinear(key, path.join(ctx.resultsDir, s.file)));
-    }
+  const files = [
+    ...result.journeys.flatMap((j) => j.shots.map((s) => s.file)),
+    ...(ctx.visual?.items.flatMap((i) => (i.diffFile ? [i.diffFile] : [])) ?? []),
+  ];
+  for (const file of files) {
+    assets.set(file, await uploadToLinear(key, path.join(ctx.resultsDir, file)));
   }
   const body = buildLinearComment(result, {
     imageUrl: (f) => assets.get(f) ?? null,
@@ -153,6 +163,7 @@ async function upsertLinearComment(
     runUrl: ctx.runUrl,
     baseUrl: result.baseUrl,
     prUrl: ctx.prUrl,
+    visual: ctx.visual,
   });
 
   const mine = found.issue.comments.nodes.find(
@@ -181,12 +192,17 @@ async function main() {
   const resultsDir = process.env.RESULTS_DIR || DEFAULT_OUT_DIR;
   const assetBase = process.env.ASSET_BASE_URL?.replace(/\/+$/, "") || null;
   const result = JSON.parse(readFileSync(path.join(resultsDir, "results.json"), "utf8")) as RunResult;
+  const visualFile = path.join(resultsDir, "visual.json");
+  const visual = existsSync(visualFile)
+    ? (JSON.parse(readFileSync(visualFile, "utf8")) as VisualReport)
+    : null;
 
   const prBody = buildPrComment(result, {
     imageUrl: (f) => (assetBase ? `${assetBase}/${f}` : null),
     sha,
     runUrl,
     baseUrl: result.baseUrl,
+    visual,
   });
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${prBody}\n`);
 
@@ -211,6 +227,7 @@ async function main() {
         sha,
         runUrl,
         prUrl: pr?.html_url ?? null,
+        visual,
       });
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);

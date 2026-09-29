@@ -2,6 +2,7 @@
  * Preview checks (EDGE-226). Playwright journeys against a Vercel preview.
  * Usage: npm run -s preview:journeys -- --base-url https://<preview>.vercel.app
  *          [--out artifacts/preview-checks] [--timeout 30000] [--extra-path /x]
+ *          [--baseline]
  *
  * Writes results.json and PNG screenshots to --out, prints the same JSON to
  * stdout, and exits 1 if any journey fails. See scripts/preview/README.md.
@@ -15,6 +16,9 @@ import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { isAppPageError, isAppResponseFailure, isAppConsoleError } from "../smoke/noise";
 import {
+  MASK_COLOUR,
+  MASK_SELECTORS,
+  SCREENSHOT_STYLE,
   VIEWPORTS,
   parseArgs,
   shotFileName,
@@ -49,7 +53,14 @@ type SignedInJourney = {
 
 type Journey = PublicJourney | SignedInJourney;
 
+/** A baseline run is against production, which uses the live Clerk instance
+ * where the agent test accounts do not exist, so it stays signed out. */
 function journeys(args: Args, env: NodeJS.ProcessEnv): Journey[] {
+  const all = allJourneys(args, env);
+  return args.baseline ? all.filter((j) => j.kind === "public") : all;
+}
+
+function allJourneys(args: Args, env: NodeJS.ProcessEnv): Journey[] {
   return [
     { kind: "public", id: "home", title: "Home", path: "/", ready: MAIN_SELECTOR },
     {
@@ -144,7 +155,15 @@ class Recorder {
       this.result.shots.length + 1,
       label,
     );
-    await page.screenshot({ path: path.join(this.outDir, file), fullPage: false });
+    await page.screenshot({
+      path: path.join(this.outDir, file),
+      fullPage: false,
+      animations: "disabled",
+      caret: "hide",
+      mask: [page.locator(MASK_SELECTORS.join(", "))],
+      maskColor: MASK_COLOUR,
+      style: SCREENSHOT_STYLE,
+    });
     this.result.shots.push({ file, label });
   }
 
