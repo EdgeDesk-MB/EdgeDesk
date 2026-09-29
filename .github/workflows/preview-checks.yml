@@ -3,6 +3,12 @@
 # status, and posts screenshots on the PR (and on the Linear ticket when
 # LINEAR_API_KEY is set). Details: edgeways/scripts/preview/README.md.
 #
+# Visual regression (EDGE-228): every successful Production deployment of
+# main takes a baseline of the signed-out pages on BASELINE_URL, stored in
+# baseline/ on the preview-checks-assets branch. Preview runs compare their
+# screenshots with it and list the differences. A difference never fails
+# the status.
+#
 # The repo is public and main is unprotected, so the token is scoped per job.
 # The journeys job runs preview code with a read-only token that is never
 # exposed to a step. Only the publish job can write.
@@ -19,6 +25,10 @@ on:
         description: Optional extra page, for example /definitely-missing to prove a failing journey fails the status
         required: false
         default: ""
+      baseline:
+        description: Take a new visual baseline from preview_url instead (use https://edgeways.app, from main)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,13 +37,18 @@ env:
   SHA: ${{ github.event.deployment.sha || github.sha }}
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
   RESULTS_DIR: artifacts/preview-checks
+  BASELINE_DIR: artifacts/baseline
   ARTEFACT: preview-checks-${{ github.run_id }}-${{ github.run_attempt }}
+  MODE: ${{ (inputs.baseline || github.event.deployment.environment == 'Production') && 'baseline' || 'preview' }}
+  # Production's own domain, not the deployment URL: live Clerk only loads
+  # on the domains it is configured for, so /login is blank elsewhere.
+  BASELINE_URL: ${{ vars.PREVIEW_BASELINE_URL || 'https://edgeways.app' }}
 
 jobs:
   pending:
     name: Mark pending
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && !inputs.baseline) ||
       (github.event.deployment_status.state == 'success' &&
        github.event.deployment.environment == 'Preview')
     runs-on: ubuntu-latest
@@ -54,11 +69,15 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.deployment_status.state == 'success' &&
-       github.event.deployment.environment == 'Preview')
-    # On the job, not the workflow, so skipped events (pending statuses,
-    # production) never cancel a run in progress.
+       (github.event.deployment.environment == 'Preview' ||
+        github.event.deployment.environment == 'Production'))
+    # On the job, not the workflow, so skipped events (pending statuses)
+    # never cancel a run in progress. Baselines share one group, newest wins.
     concurrency:
-      group: preview-checks-${{ github.event.deployment.sha || github.sha }}
+      group: >-
+        ${{ (inputs.baseline || github.event.deployment.environment == 'Production')
+        && 'preview-checks-baseline'
+        || format('preview-checks-{0}', github.event.deployment.sha || github.sha) }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -90,6 +109,20 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      # Anonymous fetch, the repo is public and the checkout kept no token.
+      - name: Fetch visual baseline
+        if: env.MODE == 'preview'
+        continue-on-error: true
+        run: |
+          mkdir -p "$BASELINE_DIR"
+          if git fetch --quiet --depth=1 origin refs/heads/preview-checks-assets 2>/dev/null &&
+             git cat-file -e FETCH_HEAD:baseline/baseline.json 2>/dev/null; then
+            git archive FETCH_HEAD baseline | tar -x -C "$BASELINE_DIR" --strip-components=1
+            echo "Baseline from main $(jq -r '.sha[0:7]' "$BASELINE_DIR/baseline.json"), taken $(jq -r .takenAt "$BASELINE_DIR/baseline.json")"
+          else
+            echo "No visual baseline yet"
+          fi
+
       - name: Run journeys
         id: journeys
         continue-on-error: true
@@ -97,9 +130,30 @@ jobs:
           PREVIEW_URL: ${{ github.event.deployment_status.environment_url || inputs.preview_url }}
           EXTRA_PATH: ${{ inputs.extra_path }}
         run: |
-          args=(--base-url "$PREVIEW_URL" --out "$RESULTS_DIR")
+          if [ "$MODE" = "baseline" ]; then
+            url="${PREVIEW_URL:-$BASELINE_URL}"
+            if [ "$GITHUB_EVENT_NAME" = "deployment_status" ]; then url="$BASELINE_URL"; fi
+            args=(--base-url "$url" --out "$RESULTS_DIR" --baseline)
+          else
+            args=(--base-url "$PREVIEW_URL" --out "$RESULTS_DIR")
+          fi
           if [ -n "$EXTRA_PATH" ]; then args+=(--extra-path "$EXTRA_PATH"); fi
           npm run -s preview:journeys -- "${args[@]}" > /dev/null
+
+      - name: Compare with baseline
+        if: env.MODE == 'preview' && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        continue-on-error: true
+        run: npm run -s preview:visual -- compare --baseline-dir "$BASELINE_DIR"
+
+      # A dispatched baseline can run from any branch, so it records main's head.
+      - name: Write baseline
+        if: env.MODE == 'baseline' && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
+            export SHA
+          fi
+          npm run -s preview:visual -- manifest
 
       - name: Upload artefact
         if: always()
@@ -140,25 +194,29 @@ jobs:
           name: ${{ env.ARTEFACT }}
           path: edgeways/artifacts/preview-checks
 
+      - name: Publish baseline
+        if: env.MODE == 'baseline' && hashFiles('edgeways/artifacts/preview-checks/baseline/baseline.json') != ''
+        run: bash scripts/preview/publish-assets.sh
+
       - uses: actions/setup-node@v4
-        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        if: env.MODE == 'preview' && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: edgeways/package-lock.json
 
       - name: Install dependencies
-        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        if: env.MODE == 'preview' && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
         run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Publish screenshots
         id: assets
-        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        if: env.MODE == 'preview' && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
         continue-on-error: true
         run: bash scripts/preview/publish-assets.sh
 
       - name: Post comments
-        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        if: env.MODE == 'preview' && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
@@ -167,12 +225,13 @@ jobs:
         run: npm run -s preview:report
 
       - name: Set final status
-        if: always()
+        if: always() && env.MODE == 'preview'
         env:
           GH_TOKEN: ${{ github.token }}
           OUTCOME: ${{ needs.journeys.outputs.outcome }}
         run: |
           results="$RESULTS_DIR/results.json"
+          visual="$RESULTS_DIR/visual.json"
           if [ "$OUTCOME" = "success" ]; then state=success
           elif [ -f "$results" ]; then state=failure
           else state=error
@@ -181,6 +240,10 @@ jobs:
             description="$(jq -r 'if (.journeys | length) == 0 then "Could not run: \(.error // "no journeys")"[0:140] else "\([.journeys[] | select(.ok)] | length) of \(.journeys | length) journeys passed" end' "$results")"
           else
             description="Journeys did not run"
+          fi
+          if [ -f "$visual" ]; then
+            flagged="$(jq '[.items[] | select(.status == "changed" or .status == "new" or .status == "missing")] | length' "$visual")"
+            if [ "$flagged" -gt 0 ]; then description="$description, $flagged visual changes to check"; fi
           fi
           gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" --silent \
             -f state="$state" -f context="Preview checks" \

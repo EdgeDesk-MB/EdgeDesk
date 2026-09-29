@@ -54,6 +54,8 @@ export type Args = {
   outDir: string;
   timeoutMs: number;
   extraPaths: string[];
+  /** Baseline run against main's production deploy: signed-out journeys only. */
+  baseline: boolean;
 };
 
 export const DEFAULT_OUT_DIR = "artifacts/preview-checks";
@@ -64,6 +66,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   let outDir = DEFAULT_OUT_DIR;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
   const extraPaths: string[] = [];
+  let baseline = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => {
@@ -75,6 +78,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     else if (arg === "--out") outDir = next();
     else if (arg === "--timeout") timeoutMs = Number(next());
     else if (arg === "--extra-path") extraPaths.push(next());
+    else if (arg === "--baseline") baseline = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   if (!baseUrl) throw new Error("--base-url (or PREVIEW_URL) is required");
@@ -85,7 +89,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     if (!p.startsWith("/")) throw new Error(`--extra-path must start with /: ${p}`);
   }
   new URL(baseUrl);
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), outDir, timeoutMs, extraPaths };
+  return { baseUrl: baseUrl.replace(/\/+$/, ""), outDir, timeoutMs, extraPaths, baseline };
 }
 
 /** `cyrus/edge-226-preview-checks` → `EDGE-226`. */
@@ -128,11 +132,265 @@ export function summarise(result: Pick<RunResult, "journeys" | "error">): string
   return `${passed} of ${result.journeys.length} journeys passed`;
 }
 
+// ---------------------------------------------------------------------------
+// Visual regression (EDGE-228). Screenshots are compared with a baseline
+// taken from main's production deploy. A difference never fails the check.
+
+/** YIQ colour distance per pixel, 0 to 1 (pixelmatch's scale and default). */
+export const PIXEL_THRESHOLD = 0.1;
+/** A screenshot is flagged when more than this share of its pixels differ. */
+export const CHANGED_RATIO = 0.001;
+
+/** Playwright paints these over before every screenshot. Opt a time-based
+ * element in with `data-visual-mask`. */
+export const MASK_SELECTORS = [
+  "[data-visual-mask]",
+  "time",
+  "canvas",
+  "number-flow-react",
+  "[data-sonner-toaster]",
+];
+export const MASK_COLOUR = "#FF00FF";
+
+/** Applied only while a screenshot is taken. Previews use the development
+ * Clerk instance, whose card footer adds a striped "Development mode" strip
+ * that production (live Clerk) never shows; it makes the card taller, so it
+ * cannot be masked. Structural selectors, Clerk's other class names are hashed. */
+export const SCREENSHOT_STYLE =
+  ".cl-footerItem > div > p, .cl-footerItem > div:has(+ div) { display: none !important; }";
+
+export type BaselineShot = {
+  key: string;
+  file: string;
+  journeyId: string;
+  viewport: ViewportName;
+  label: string;
+};
+
+/** baseline/baseline.json on the preview-checks-assets branch. */
+export type BaselineManifest = {
+  sha: string;
+  baseUrl: string;
+  takenAt: string;
+  runUrl: string;
+  /** Journey and viewport pairs (`home-desktop`) that passed, so were baselined. */
+  journeys: string[];
+  shots: BaselineShot[];
+};
+
+export type VisualStatus = "same" | "changed" | "new" | "missing" | "unbaselined";
+
+export type VisualItem = {
+  key: string;
+  journeyId: string;
+  title: string;
+  account: string | null;
+  viewport: ViewportName;
+  label: string;
+  status: VisualStatus;
+  /** Share of pixels that differ, 0 to 1. Set for same and changed. */
+  ratio?: number;
+  /** This run's screenshot. */
+  file?: string;
+  baselineFile?: string;
+  /** Side by side: main, this branch, difference. Set for changed. */
+  diffFile?: string;
+};
+
+/** visual.json next to results.json. */
+export type VisualReport = {
+  baseline: Pick<BaselineManifest, "sha" | "baseUrl" | "takenAt"> | null;
+  error?: string;
+  pixelThreshold: number;
+  changedRatio: number;
+  items: VisualItem[];
+};
+
+function journeyKey(journeyId: string, viewport: ViewportName): string {
+  return `${journeyId}-${viewport}`;
+}
+
+type KeyedShot = { key: string; journey: JourneyResult; shot: Shot };
+
+/** Stable identity for a screenshot across runs: journey, viewport and label,
+ * not the index, so an extra 18+ gate shot does not shift every later one. */
+export function keyedShots(journeys: JourneyResult[]): KeyedShot[] {
+  const out: KeyedShot[] = [];
+  for (const journey of journeys) {
+    const seen = new Map<string, number>();
+    for (const shot of journey.shots) {
+      const base = `${journeyKey(journey.id, journey.viewport)}-${slug(shot.label) || "shot"}`;
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      out.push({ key: n === 1 ? base : `${base}-${n}`, journey, shot });
+    }
+  }
+  return out;
+}
+
+/** Baseline from a run: only journeys that passed, so a "failed here" shot
+ * never becomes the thing previews are held to. */
+export function buildBaselineManifest(
+  result: RunResult,
+  meta: { sha: string; runUrl: string; takenAt: string },
+): BaselineManifest {
+  const passed = result.journeys.filter((j) => j.ok);
+  return {
+    sha: meta.sha,
+    baseUrl: result.baseUrl,
+    takenAt: meta.takenAt,
+    runUrl: meta.runUrl,
+    journeys: passed.map((j) => journeyKey(j.id, j.viewport)),
+    shots: keyedShots(passed).map(({ key, journey, shot }) => ({
+      key,
+      file: shot.file,
+      journeyId: journey.id,
+      viewport: journey.viewport,
+      label: shot.label,
+    })),
+  };
+}
+
+export type PlannedComparison = Omit<VisualItem, "ratio" | "diffFile">;
+
+/** Pairs this run's screenshots with the baseline's. Pixels are compared
+ * later, for the `same` items; the rest are already decided. */
+export function planComparisons(result: RunResult, baseline: BaselineManifest): PlannedComparison[] {
+  const byKey = new Map(baseline.shots.map((s) => [s.key, s]));
+  const baselined = new Set(baseline.journeys);
+  const plan: PlannedComparison[] = [];
+  const matched = new Set<string>();
+  for (const { key, journey, shot } of keyedShots(result.journeys)) {
+    const base = byKey.get(key);
+    const item = {
+      key,
+      journeyId: journey.id,
+      title: journey.title,
+      account: journey.account,
+      viewport: journey.viewport,
+      label: shot.label,
+      file: shot.file,
+    };
+    if (base) {
+      matched.add(key);
+      plan.push({ ...item, status: "same", baselineFile: base.file });
+    } else {
+      const known = baselined.has(journeyKey(journey.id, journey.viewport));
+      plan.push({ ...item, status: known ? "new" : "unbaselined" });
+    }
+  }
+  const ran = new Set(result.journeys.map((j) => journeyKey(j.id, j.viewport)));
+  for (const s of baseline.shots) {
+    if (matched.has(s.key) || !ran.has(journeyKey(s.journeyId, s.viewport))) continue;
+    const journey = result.journeys.find((j) => j.id === s.journeyId && j.viewport === s.viewport);
+    plan.push({
+      key: s.key,
+      journeyId: s.journeyId,
+      title: journey?.title ?? s.journeyId,
+      account: journey?.account ?? null,
+      viewport: s.viewport,
+      label: s.label,
+      status: "missing",
+      baselineFile: s.file,
+    });
+  }
+  return plan;
+}
+
+export function isFlagged(item: VisualItem): boolean {
+  return item.status === "changed" || item.status === "new" || item.status === "missing";
+}
+
+export function formatRatio(ratio: number): string {
+  const pct = ratio * 100;
+  if (pct > 0 && pct < 0.01) return "under 0.01%";
+  return `${pct.toFixed(pct < 1 ? 2 : 1)}%`;
+}
+
+export function summariseVisual(report: VisualReport | null | undefined): string | null {
+  if (!report) return null;
+  if (report.error) return "visual comparison did not run";
+  if (!report.baseline) return "no visual baseline yet";
+  const flagged = report.items.filter(isFlagged).length;
+  if (flagged === 0) return "no visual changes";
+  return `${flagged} visual ${flagged === 1 ? "change" : "changes"} to check`;
+}
+
+function visualLine(item: VisualItem): string {
+  const who = item.account ? ` (${item.account})` : "";
+  const what =
+    item.status === "changed"
+      ? `${formatRatio(item.ratio ?? 0)} of pixels differ`
+      : item.status === "new"
+        ? "new screenshot, main has none"
+        : "on main, not reached on this branch";
+  return `- ${item.title}${who}, ${item.label}, ${item.viewport}: ${what}`;
+}
+
+function visualSection(
+  report: VisualReport | null | undefined,
+  imageUrl: CommentContext["imageUrl"],
+  opts: { heading: string; details: boolean },
+): string[] {
+  if (!report) return [];
+  const lines = ["", opts.heading, ""];
+  if (report.error) {
+    lines.push(`Visual comparison did not run: ${oneLine(report.error)}`);
+    return lines;
+  }
+  if (!report.baseline) {
+    lines.push("No baseline from main yet. One is taken on main's next production deploy.");
+    return lines;
+  }
+  const base = `main (\`${report.baseline.sha.slice(0, 7)}\`, production)`;
+  const flagged = report.items.filter(isFlagged);
+  const compared = report.items.filter((i) => i.status === "same" || i.status === "changed").length;
+  if (flagged.length === 0) {
+    lines.push(`No visual changes against ${base}, ${compared} screenshots compared.`);
+  } else {
+    const noun = flagged.length === 1 ? "screenshot differs" : "screenshots differ";
+    lines.push(
+      `Check these: ${flagged.length} ${noun} from ${base}, ${compared} compared. A difference does not fail the check.`,
+      "",
+      ...flagged.map(visualLine),
+    );
+    const images = flagged.flatMap((item) => {
+      const url = item.diffFile ? imageUrl(item.diffFile) : null;
+      if (!url) return [];
+      const caption = `${item.title}, ${item.label}, ${item.viewport}: main, this branch, difference`;
+      return [`![${caption.replace(/[[\]]/g, "")}](${url})`];
+    });
+    if (images.length > 0) {
+      const body = images.flatMap((l) => [l, ""]);
+      if (opts.details) {
+        lines.push(
+          "",
+          "<details open><summary>Side by side: main, this branch, difference in red</summary>",
+          "",
+          ...body,
+          "</details>",
+        );
+      } else {
+        lines.push("", "Side by side: main, this branch, difference in red.", "", ...body);
+      }
+    }
+  }
+  const unbaselined = report.items.filter((i) => i.status === "unbaselined").length;
+  if (unbaselined > 0) {
+    lines.push(
+      "",
+      `Not compared: ${unbaselined} signed-in screenshots. Production uses the live sign-in, where the agent test accounts do not exist, so main has no baseline for them.`,
+    );
+  }
+  return lines;
+}
+
 type CommentContext = {
   imageUrl: (file: string) => string | null;
   sha: string;
   runUrl: string;
   baseUrl: string;
+  visual?: VisualReport | null;
 };
 
 function journeyLine(j: JourneyResult): string {
@@ -185,6 +443,7 @@ export function buildPrComment(result: RunResult, ctx: CommentContext): string {
   if (problems.length > 0) {
     lines.push("", "<details><summary>Errors and warnings</summary>", "", ...problems, "", "</details>");
   }
+  lines.push(...visualSection(ctx.visual, ctx.imageUrl, { heading: "#### Visual changes", details: true }));
   const images = imageLines(result, ctx.imageUrl);
   if (images.length > 0) {
     lines.push("", "<details open><summary>Screenshots</summary>", "", ...images.flatMap((l) => [l, ""]), "</details>");
@@ -206,6 +465,7 @@ export function buildLinearComment(
     `${LINEAR_SIGNATURE}: ${summarise(result)} on ${ctx.baseUrl} for \`${ctx.sha.slice(0, 7)}\` (${where}[run](${ctx.runUrl})).`,
     "",
     ...result.journeys.map(journeyLine),
+    ...visualSection(ctx.visual, ctx.imageUrl, { heading: "**Visual changes**", details: false }),
     "",
     ...imageLines(result, ctx.imageUrl).flatMap((l) => [l, ""]),
   ];

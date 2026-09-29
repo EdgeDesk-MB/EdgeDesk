@@ -2,16 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   COMMENT_MARKER,
   LINEAR_HEADING,
+  buildBaselineManifest,
   buildLinearComment,
   buildPrComment,
+  formatRatio,
   isOwnLinearComment,
+  keyedShots,
   parseArgs,
   pickPullRequest,
+  planComparisons,
   shotFileName,
   summarise,
+  summariseVisual,
   ticketFromBranch,
   type JourneyResult,
   type RunResult,
+  type VisualReport,
 } from "./lib";
 
 function journey(over: Partial<JourneyResult> = {}): JourneyResult {
@@ -157,6 +163,148 @@ describe("Linear comment", () => {
 
   it("does not claim someone else's Screenshots comment", () => {
     expect(isOwnLinearComment("**Screenshots**\n\n![Journey 1](x)")).toBe(false);
+  });
+});
+
+describe("visual baseline", () => {
+  const home = journey({ shots: [{ file: "home-desktop-01-signed-out.png", label: "signed out" }] });
+  const signIn = journey({
+    id: "sign-in",
+    title: "Sign-in page",
+    ok: false,
+    errors: ["boom"],
+    shots: [{ file: "sign-in-desktop-01-signed-out.png", label: "signed out" }],
+  });
+  const manifest = buildBaselineManifest(run([home, signIn]), {
+    sha: "b3a3f98849edf3ae9f3c56dab5b9a5225539f2a0",
+    runUrl: "https://github.com/o/r/actions/runs/2",
+    takenAt: "2026-09-29T09:00:00.000Z",
+  });
+
+  it("keys shots by journey, viewport and label, not index", () => {
+    const keys = keyedShots([
+      journey({
+        id: "first-time",
+        shots: [
+          { file: "first-time-desktop-01-18-gate.png", label: "18+ gate" },
+          { file: "first-time-desktop-02-desk.png", label: "desk" },
+          { file: "first-time-desktop-03-desk.png", label: "desk" },
+        ],
+      }),
+    ]).map((k) => k.key);
+    expect(keys).toEqual(["first-time-desktop-18-gate", "first-time-desktop-desk", "first-time-desktop-desk-2"]);
+  });
+
+  it("only baselines journeys that passed", () => {
+    expect(manifest.journeys).toEqual(["home-desktop"]);
+    expect(manifest.shots.map((s) => s.key)).toEqual(["home-desktop-signed-out"]);
+    expect(parseArgs(["--base-url", "https://x.dev", "--baseline"]).baseline).toBe(true);
+    expect(parseArgs(["--base-url", "https://x.dev"]).baseline).toBe(false);
+  });
+
+  it("plans same, new, missing and unbaselined", () => {
+    const plan = planComparisons(
+      run([
+        journey({
+          shots: [
+            { file: "home-desktop-01-signed-out.png", label: "signed out" },
+            { file: "home-desktop-02-menu.png", label: "menu" },
+          ],
+        }),
+        journey({ id: "customer", title: "Signed-in desk", account: "agent-customer", shots: [{ file: "c.png", label: "setup wizard" }] }),
+      ]),
+      { ...manifest, journeys: ["home-desktop"], shots: [...manifest.shots, { ...manifest.shots[0], key: "home-desktop-gone", label: "gone" }] },
+    );
+    expect(plan.map((p) => [p.key, p.status])).toEqual([
+      ["home-desktop-signed-out", "same"],
+      ["home-desktop-menu", "new"],
+      ["customer-desktop-setup-wizard", "unbaselined"],
+      ["home-desktop-gone", "missing"],
+    ]);
+    expect(plan[0].baselineFile).toBe("home-desktop-01-signed-out.png");
+  });
+
+  it("does not call a baseline shot missing when its journey did not run", () => {
+    expect(planComparisons(run([]), manifest)).toEqual([]);
+  });
+});
+
+describe("visual section in the comments", () => {
+  const baseline = { sha: "b3a3f98849edf3ae9f3c56dab5b9a5225539f2a0", baseUrl: "https://edgeways.app", takenAt: "t" };
+  const item = {
+    key: "home-desktop-signed-out",
+    journeyId: "home",
+    title: "Home",
+    account: null,
+    viewport: "desktop" as const,
+    label: "signed out",
+    file: "home-desktop-01-signed-out.png",
+    baselineFile: "home-desktop-01-signed-out.png",
+  };
+  const report = (items: VisualReport["items"], over: Partial<VisualReport> = {}): VisualReport => ({
+    baseline,
+    pixelThreshold: 0.1,
+    changedRatio: 0.001,
+    items,
+    ...over,
+  });
+
+  it("says so when nothing changed", () => {
+    const body = buildPrComment(run([journey()]), {
+      ...CTX,
+      visual: report([
+        { ...item, status: "same", ratio: 0 },
+        { ...item, key: "c", title: "Signed-in desk", status: "unbaselined" },
+      ]),
+    });
+    expect(body).toContain("#### Visual changes");
+    expect(body).toContain("No visual changes against main (`b3a3f98`, production), 1 screenshots compared.");
+    expect(body).toContain("Not compared: 1 signed-in screenshots");
+  });
+
+  it("lists changes with their side by side, on GitHub and Linear", () => {
+    const visual = report([
+      { ...item, status: "changed", ratio: 0.0423, diffFile: "diff-home-desktop-signed-out.png" },
+      { ...item, key: "x", label: "menu", status: "new" },
+    ]);
+    const pr = buildPrComment(run([journey()]), { ...CTX, visual });
+    expect(pr).toContain("Check these: 2 screenshots differ from main (`b3a3f98`, production), 1 compared.");
+    expect(pr).toContain("- Home, signed out, desktop: 4.2% of pixels differ");
+    expect(pr).toContain("- Home, menu, desktop: new screenshot, main has none");
+    expect(pr).toContain(
+      "![Home, signed out, desktop: main, this branch, difference](https://raw.example/runs/1-1/diff-home-desktop-signed-out.png)",
+    );
+    expect(pr).toContain("does not fail the check");
+    expect(pr).not.toContain("—");
+
+    const linear = buildLinearComment(run([journey()]), {
+      ...CTX,
+      imageUrl: (f) => `https://uploads.linear.app/${f}`,
+      prUrl: null,
+      visual,
+    });
+    expect(linear.startsWith(LINEAR_HEADING)).toBe(true);
+    expect(linear).toContain("**Visual changes**");
+    expect(linear).toContain("Check these: 2 screenshots differ");
+    expect(linear).toContain("(https://uploads.linear.app/diff-home-desktop-signed-out.png)");
+    expect(isOwnLinearComment(linear)).toBe(true);
+  });
+
+  it("explains a missing baseline or a failed comparison, and is quiet without a report", () => {
+    expect(buildPrComment(run([journey()]), { ...CTX, visual: report([], { baseline: null }) })).toContain(
+      "No baseline from main yet",
+    );
+    expect(buildPrComment(run([journey()]), { ...CTX, visual: report([], { error: "Bad PNG" }) })).toContain(
+      "Visual comparison did not run: Bad PNG",
+    );
+    expect(buildPrComment(run([journey()]), CTX)).not.toContain("Visual changes");
+    expect(summariseVisual(report([{ ...item, status: "missing" }]))).toBe("1 visual change to check");
+  });
+
+  it("formats small ratios readably", () => {
+    expect(formatRatio(0.00005)).toBe("under 0.01%");
+    expect(formatRatio(0.0012)).toBe("0.12%");
+    expect(formatRatio(0.2)).toBe("20.0%");
   });
 });
 
