@@ -19,6 +19,8 @@
     "db:resend-smoke": "npx tsx scripts/resend-smoke.ts",
     "resend:audience-sync": "npx tsx --tsconfig scripts/tsconfig.json scripts/resend-audience-backfill.ts",
     "smoke:prod": "npx tsx --tsconfig scripts/tsconfig.json scripts/smoke/prod.ts",
+    "preview:journeys": "npx tsx --tsconfig scripts/tsconfig.json scripts/preview/journeys.ts",
+    "preview:report": "npx tsx --tsconfig scripts/tsconfig.json scripts/preview/report.ts",
     "seed:agent": "npx tsx --tsconfig scripts/tsconfig.json scripts/seed-agent.ts",
     "postinstall": "node scripts/relink-node-modules-nosync.mjs"
   },
