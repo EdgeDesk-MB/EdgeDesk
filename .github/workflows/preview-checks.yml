@@ -95,7 +95,7 @@ jobs:
         continue-on-error: true
         env:
           PREVIEW_URL: ${{ github.event.deployment_status.environment_url || inputs.preview_url }}
-          EXTRA_PATH: ${{ inputs.extra_path || '/definitely-missing' }}
+          EXTRA_PATH: ${{ inputs.extra_path }}
         run: |
           args=(--base-url "$PREVIEW_URL" --out "$RESULTS_DIR")
           if [ -n "$EXTRA_PATH" ]; then args+=(--extra-path "$EXTRA_PATH"); fi
