@@ -2,6 +2,10 @@
 # successful Vercel Preview deployment, sets the "Preview checks" commit
 # status, and posts screenshots on the PR (and on the Linear ticket when
 # LINEAR_API_KEY is set). Details: edgeways/scripts/preview/README.md.
+#
+# The repo is public and main is unprotected, so the token is scoped per job.
+# The journeys job runs preview code with a read-only token that is never
+# exposed to a step. Only the publish job can write.
 name: Preview checks
 
 on:
@@ -17,14 +21,36 @@ on:
         default: ""
 
 permissions:
-  contents: write
-  statuses: write
-  pull-requests: write
-  issues: write
+  contents: read
+
+env:
+  SHA: ${{ github.event.deployment.sha || github.sha }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  RESULTS_DIR: artifacts/preview-checks
+  ARTEFACT: preview-checks-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
+  pending:
+    name: Mark pending
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Preview')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Mark status pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" --silent
+          -f state=pending -f context="Preview checks"
+          -f description="Running journeys" -f target_url="$RUN_URL"
+
   journeys:
-    name: Preview checks
+    name: Run journeys
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.deployment_status.state == 'success' &&
@@ -36,14 +62,10 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      SHA: ${{ github.event.deployment.sha || github.sha }}
-      PREVIEW_URL: ${{ github.event.deployment_status.environment_url || inputs.preview_url }}
-      EXTRA_PATH: ${{ inputs.extra_path }}
-      BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      RESULTS_DIR: artifacts/preview-checks
-      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: read
+    outputs:
+      outcome: ${{ steps.journeys.outcome }}
     defaults:
       run:
         working-directory: edgeways
@@ -51,12 +73,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.SHA }}
-
-      - name: Mark status pending
-        run: >-
-          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" --silent
-          -f state=pending -f context="Preview checks"
-          -f description="Running journeys" -f target_url="$RUN_URL"
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -76,6 +93,9 @@ jobs:
       - name: Run journeys
         id: journeys
         continue-on-error: true
+        env:
+          PREVIEW_URL: ${{ github.event.deployment_status.environment_url || inputs.preview_url }}
+          EXTRA_PATH: ${{ inputs.extra_path }}
         run: |
           args=(--base-url "$PREVIEW_URL" --out "$RESULTS_DIR")
           if [ -n "$EXTRA_PATH" ]; then args+=(--extra-path "$EXTRA_PATH"); fi
@@ -85,21 +105,63 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: preview-checks-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ env.ARTEFACT }}
           path: edgeways/artifacts/preview-checks
           retention-days: 14
           if-no-files-found: warn
 
+  publish:
+    name: Publish results
+    needs: [pending, journeys]
+    if: >-
+      always() &&
+      needs.journeys.result != 'skipped' &&
+      needs.journeys.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      statuses: write
+    defaults:
+      run:
+        working-directory: edgeways
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Download artefact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTEFACT }}
+          path: edgeways/artifacts/preview-checks
+
+      - uses: actions/setup-node@v4
+        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: edgeways/package-lock.json
+
+      - name: Install dependencies
+        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        run: npm install --ignore-scripts --no-audit --no-fund
+
       - name: Publish screenshots
         id: assets
-        if: always() && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
         continue-on-error: true
         run: bash scripts/preview/publish-assets.sh
 
       - name: Post comments
-        if: always() && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        if: hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
           ASSET_BASE_URL: ${{ steps.assets.outputs.asset_base_url }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: npm run -s preview:report
@@ -107,7 +169,8 @@ jobs:
       - name: Set final status
         if: always()
         env:
-          OUTCOME: ${{ steps.journeys.outcome }}
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ needs.journeys.outputs.outcome }}
         run: |
           results="$RESULTS_DIR/results.json"
           if [ "$OUTCOME" = "success" ]; then state=success

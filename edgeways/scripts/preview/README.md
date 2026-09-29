@@ -17,6 +17,12 @@ Sign-in uses the dev Clerk test accounts from the root `AGENTS.md` with the
 test code `424242`. Previews use the development Clerk instance and are not
 behind Vercel protection, so no secret is needed.
 
+**Screenshots are public.** The repo is public, so anyone can read the
+`preview-checks-assets` branch, the PR comment images and the workflow
+artefact. Journeys must only ever sign in as the agent test accounts
+(`agent-customer`, `agent-new`, `agent-admin`), never a real customer or
+Sam's own login, and must not open pages that show secrets or keys.
+
 On a preview the desk is the hosted (Neon) one, so it may be brand new. The
 journeys never assert on seeded data. If the 18+ gate opens it is
 screenshotted and confirmed. If a page lands on the setup wizard it is
@@ -52,6 +58,25 @@ journey takes a "failed here" screenshot.
 
 No secret is printed. Response URLs in errors have their query strings
 removed, because Clerk handshake tokens travel there.
+
+## Token scope
+
+The repo is public and `main` is unprotected, so the workflow is split:
+
+- **Mark pending**: `statuses: write` only, sets the pending status.
+- **Run journeys**: read-only, and no step gets a GitHub token (the
+  checkout does not keep credentials). It runs the preview's code and
+  uploads the artefact.
+- **Publish results**: the only job with `contents: write`,
+  `pull-requests: write`, `issues: write` and `statuses: write`. It
+  downloads the artefact, pushes the screenshots, posts the comments and
+  sets the final status. It fails when a journey fails.
+
+## Redirects
+
+A signed-in page that redirects while loading (for example `/desk` to the
+setup wizard) aborts the first navigation. That is a normal landing: the
+journey waits for the page the app sent it to and notes where it landed.
 
 ## Run locally
 
