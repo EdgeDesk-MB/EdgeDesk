@@ -5,6 +5,7 @@ import { FEEDBACK_KINDS } from "@/lib/feedback/types";
 import { getDeskActor, isDeskOwner } from "@/lib/db/desk-scope";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { rateLimitResponse } from "@/lib/api-rate-limit";
+import { requestOrigin } from "@/lib/billing/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export const POST = withDeskScope(async function POST(req: Request) {
       replyEmail,
       diagnostics: parsed.data.diagnostics,
       signedInEmail: getDeskActor().email,
+      adminOrigin: requestOrigin(req),
     });
     return NextResponse.json(result);
   } catch (e) {

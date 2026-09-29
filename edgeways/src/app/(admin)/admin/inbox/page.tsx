@@ -22,7 +22,13 @@ import { readExcludedAccountIds } from "@/lib/admin/exclude-accounts-server";
 import { listFeedbackReports } from "@/lib/feedback/inbox-store";
 import { listAppUsers } from "@/lib/services/app-users";
 
-export default async function AdminInboxPage() {
+export default async function AdminInboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ report?: string }>;
+}) {
+  const params = await searchParams;
+  const requestedId = Number(params.report);
   const [reports, users, excludedIds] = await Promise.all([
     listFeedbackReports(100),
     listAppUsers(),
@@ -99,7 +105,10 @@ export default async function AdminInboxPage() {
           />
         ) : (
           <AdminTableFrame>
-            <InboxReportsTable reports={visibleReports} />
+            <InboxReportsTable
+              reports={visibleReports}
+              initialOpenId={Number.isInteger(requestedId) ? requestedId : null}
+            />
           </AdminTableFrame>
         )}
       </AdminSection>

@@ -27,8 +27,14 @@ function reportFrom(report: FeedbackListItem): string {
   );
 }
 
-export function InboxReportsTable({ reports }: { reports: FeedbackListItem[] }) {
-  const [openId, setOpenId] = useState<number | null>(null);
+export function InboxReportsTable({
+  reports,
+  initialOpenId = null,
+}: {
+  reports: FeedbackListItem[];
+  initialOpenId?: number | null;
+}) {
+  const [openId, setOpenId] = useState<number | null>(initialOpenId);
   const open = reports.find((report) => report.id === openId) ?? null;
 
   return (

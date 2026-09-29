@@ -1,6 +1,6 @@
 /**
  * Client-safe feedback kinds, labels, and report formatting.
- * Submissions go to the hosted inbox (Neon) and email notify, then Linear later.
+ * Submissions go to the hosted inbox (Neon), email notify and Linear Triage.
  */
 
 export const FEEDBACK_KINDS = ["bug", "idea", "other"] as const;
