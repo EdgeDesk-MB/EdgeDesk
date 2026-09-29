@@ -1,0 +1,125 @@
+# Preview checks (EDGE-226). Runs Playwright journeys against every
+# successful Vercel Preview deployment, sets the "Preview checks" commit
+# status, and posts screenshots on the PR (and on the Linear ticket when
+# LINEAR_API_KEY is set). Details: edgeways/scripts/preview/README.md.
+name: Preview checks
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: Preview URL to check, for example https://edgeways-abc123-edgeways.vercel.app
+        required: true
+      extra_path:
+        description: Optional extra page, for example /definitely-missing to prove a failing journey fails the status
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  statuses: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  journeys:
+    name: Preview checks
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Preview')
+    # On the job, not the workflow, so skipped events (pending statuses,
+    # production) never cancel a run in progress.
+    concurrency:
+      group: preview-checks-${{ github.event.deployment.sha || github.sha }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHA: ${{ github.event.deployment.sha || github.sha }}
+      PREVIEW_URL: ${{ github.event.deployment_status.environment_url || inputs.preview_url }}
+      EXTRA_PATH: ${{ inputs.extra_path }}
+      BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      RESULTS_DIR: artifacts/preview-checks
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: edgeways
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Mark status pending
+        run: >-
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" --silent
+          -f state=pending -f context="Preview checks"
+          -f description="Running journeys" -f target_url="$RUN_URL"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: edgeways/package-lock.json
+
+      # Scripts are skipped: the journeys need only playwright and tsx, not
+      # native modules such as better-sqlite3.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run journeys
+        id: journeys
+        continue-on-error: true
+        run: |
+          args=(--base-url "$PREVIEW_URL" --out "$RESULTS_DIR")
+          if [ -n "$EXTRA_PATH" ]; then args+=(--extra-path "$EXTRA_PATH"); fi
+          npm run -s preview:journeys -- "${args[@]}" > /dev/null
+
+      - name: Upload artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-checks-${{ github.run_id }}-${{ github.run_attempt }}
+          path: edgeways/artifacts/preview-checks
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Publish screenshots
+        id: assets
+        if: always() && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        continue-on-error: true
+        run: bash scripts/preview/publish-assets.sh
+
+      - name: Post comments
+        if: always() && hashFiles('edgeways/artifacts/preview-checks/results.json') != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ASSET_BASE_URL: ${{ steps.assets.outputs.asset_base_url }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: npm run -s preview:report
+
+      - name: Set final status
+        if: always()
+        env:
+          OUTCOME: ${{ steps.journeys.outcome }}
+        run: |
+          results="$RESULTS_DIR/results.json"
+          if [ "$OUTCOME" = "success" ]; then state=success
+          elif [ -f "$results" ]; then state=failure
+          else state=error
+          fi
+          if [ -f "$results" ]; then
+            description="$(jq -r 'if (.journeys | length) == 0 then "Could not run: \(.error // "no journeys")"[0:140] else "\([.journeys[] | select(.ok)] | length) of \(.journeys | length) journeys passed" end' "$results")"
+          else
+            description="Journeys did not run"
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" --silent \
+            -f state="$state" -f context="Preview checks" \
+            -f description="$description" -f target_url="$RUN_URL"
+          echo "Preview checks: $state, $description"
+          [ "$state" = "success" ]
