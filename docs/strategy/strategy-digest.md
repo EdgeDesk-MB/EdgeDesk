@@ -1,6 +1,6 @@
 # Strategy digest (for automated ticket triage)
 
-last_reviewed: 2026-09-21
+last_reviewed: 2026-09-29
 status: reviewed by Sam, 2026-09-21
 
 This is a compact, citable index of Edgeways strategy, built for the n8n alignment gate. It is not a source of truth. When it disagrees with a source file, the source wins and this file is stale. Cite entry IDs (V1, NG3, D7 and so on). Status entries (BT and RK) go stale fastest: check their review_by date and verify against `edgeways/docs/roadmap/product-roadmap.md` section 6 and Linear (team EDGE).
@@ -78,6 +78,7 @@ ID prefixes: V vision, PR principle, NG non-goal, HR hard engineering rule, D de
 - PX2: New feature ideas are never scheduled directly. They land in roadmap section 9 (Future ideas) first and are promoted into a phase only after Sam has reviewed them. A decided no is recorded too.
 - PX3: Product scope or roadmap tasks are planning work. Agents stop and defer to the planning flow; no code.
 - PX4: Statuses flip in roadmap section 6 the day a phase lands. Work is tracked in Linear (team EDGE; Live Readiness initiative; Post-Launch Desk and Live Sport project).
+- PX5 (Sam, 2026-09-29): Delivery pipeline tooling is in scope and serves BT1 (running the live app): CI and preview checks, journey screenshots, visual regression, review assist, and signals that file into Linear Triage (errors, feedback, analytics, payments). It is not a product feature, so PX2 and PX3 do not apply. It must not change what customers see, and it follows the same HR and NG rules.
 
 ## Routing hints for executors (from AGENTS.md and docs/Local-vs-Cloud-Model-Strategy.md)
 
