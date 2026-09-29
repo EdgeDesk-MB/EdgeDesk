@@ -12,11 +12,14 @@ import {
   recordAppUserLegalAcceptance,
 } from "@/lib/services/app-users";
 import { primaryClerkEmail } from "@/lib/db/desk-scope";
+import { signUpMethodFromClerkUser } from "@/lib/analytics/sign-up-completed";
 
 type ClerkUserLike = {
   id: string;
   unsafeMetadata?: unknown;
   primaryEmailAddress?: { emailAddress?: string | null } | null;
+  externalAccounts?: Array<{ provider?: string | null }> | null;
+  emailAddresses?: unknown[] | null;
 } | null;
 
 export function clerkLegalAccepted(user: ClerkUserLike): boolean {
@@ -33,6 +36,7 @@ export async function syncLegalAcceptanceFromClerkUser(
     await ensureAppUser({
       clerkUserId: user.id,
       email: primaryClerkEmail(user as Parameters<typeof primaryClerkEmail>[0]),
+      signUpMethod: signUpMethodFromClerkUser(user),
     });
     await recordAppUserLegalAcceptance({
       clerkUserId: user.id,

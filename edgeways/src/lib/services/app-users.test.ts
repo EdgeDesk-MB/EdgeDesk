@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const { captureServerEvent } = vi.hoisted(() => ({
+  captureServerEvent: vi.fn(),
+}));
+vi.mock("@/lib/analytics/server-capture", () => ({ captureServerEvent }));
 import { eq } from "drizzle-orm";
 import { db, appUsers } from "@/lib/db";
 import { DEFAULT_BOOTSTRAP_ADMIN_EMAIL } from "@/lib/admin/emails";
@@ -53,6 +58,23 @@ describe("ensureAppUser", () => {
     const found = await findAppUserByClerkId(clerkUserId);
     expect(found?.email).toBe("second@example.com");
     expect(found?.createdAt).toBe(created.createdAt);
+  });
+
+  it("sends sign_up_completed once, on the first row only", async () => {
+    const clerkUserId = `user_test_signup_${Date.now()}`;
+    captureServerEvent.mockClear();
+    await ensureAppUser({
+      clerkUserId,
+      email: "signup@example.com",
+      signUpMethod: "google",
+    });
+    await ensureAppUser({ clerkUserId, email: "signup@example.com" });
+    const signUps = captureServerEvent.mock.calls.filter(
+      ([, event]) => event === "sign_up_completed"
+    );
+    expect(signUps).toEqual([
+      [clerkUserId, "sign_up_completed", { method: "google" }],
+    ]);
   });
 
   it("keeps an existing email when the later sync has none", async () => {

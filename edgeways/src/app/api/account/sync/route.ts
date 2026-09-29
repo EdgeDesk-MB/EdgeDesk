@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { ensureAppUser } from "@/lib/services/app-users";
+import { signUpMethodFromClerkUser } from "@/lib/analytics/sign-up-completed";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export const POST = withDeskScope(async function POST() {
     const row = await ensureAppUser({
       clerkUserId: userId,
       email: primaryEmail(user),
+      signUpMethod: signUpMethodFromClerkUser(user),
     });
     return NextResponse.json({
       clerkUserId: row.clerkUserId,

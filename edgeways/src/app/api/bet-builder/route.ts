@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/neon-desk-bet-builder";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
 import { deniedFeatureResponse } from "@/lib/entitlements/feed-guard";
+import { captureBetLoggedAfterResponse } from "@/lib/analytics/bet-logged-server";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,12 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   }
   if (isNeonDesk()) {
     try {
-      return NextResponse.json(await createNeonBetBuilderRun(parsed.data));
+      const created = await createNeonBetBuilderRun(parsed.data);
+      await captureBetLoggedAfterResponse({
+        betId: created.run.backBetId,
+        source: "bet_builder",
+      }).catch(() => {});
+      return NextResponse.json(created);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not save the bet builder.";
@@ -67,5 +73,10 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status });
     }
   }
-  return NextResponse.json(createBetBuilderRun(parsed.data));
+  const created = createBetBuilderRun(parsed.data);
+  await captureBetLoggedAfterResponse({
+    betId: created.run.backBetId,
+    source: "bet_builder",
+  }).catch(() => {});
+  return NextResponse.json(created);
 });

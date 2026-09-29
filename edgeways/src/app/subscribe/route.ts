@@ -33,6 +33,7 @@ import {
 } from "@/lib/referrals/persist";
 import { findAppUserByClerkId } from "@/lib/services/app-users";
 import { isWaitlistFoundingEligible } from "@/lib/services/waitlist";
+import { captureUpgradeStarted } from "@/lib/analytics/upgrade-started";
 
 export const dynamic = "force-dynamic";
 
@@ -202,6 +203,7 @@ export async function GET(request: Request) {
       );
     }
 
+    captureUpgradeStarted({ clerkUserId: userId, plan: paid.plan });
     const checkout = NextResponse.redirect(session.url);
     checkout.cookies.set(PUBLIC_DEMO_COOKIE, "", { path: "/", maxAge: 0 });
     return checkout;

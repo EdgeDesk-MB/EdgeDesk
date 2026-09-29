@@ -21,6 +21,10 @@ import {
   type AppUserRole,
 } from "@/lib/admin/emails";
 import { notifyOwnerOfNewUser } from "@/lib/admin/owner-growth-notify";
+import {
+  captureSignUpCompleted,
+  type SignUpMethod,
+} from "@/lib/analytics/sign-up-completed";
 import { syncAppUserToResendAudience } from "@/lib/admin/resend-audience-sync";
 import { adminRoleChangeBlock } from "@/lib/admin/roles";
 import type { PlanId } from "@/lib/entitlements/plans";
@@ -257,6 +261,8 @@ export async function ensureAppUser(input: {
   clerkUserId: string;
   email?: string | null;
   skipOperatorGrant?: boolean;
+  /** Analytics only: how the Clerk account signed up, when the caller knows. */
+  signUpMethod?: SignUpMethod;
 }): Promise<AppUser> {
   const clerkUserId = input.clerkUserId.trim();
   if (!clerkUserId) {
@@ -269,9 +275,12 @@ export async function ensureAppUser(input: {
   const emailChanged = Boolean(email && existing && email !== existing.email);
   const createdAt = existing?.createdAt ?? now;
   const nextEmail = email ?? existing?.email ?? null;
+  // Parallel first requests can all see `wasNew`; on Neon only the one whose
+  // upsert inserted the row (xmax = 0) reports the sign-up.
+  let insertedRow = wasNew;
 
   if (usesHostedPostgres()) {
-    await getNeonDb()
+    const upserted = await getNeonDb()
       .insert(pgUsers)
       .values({
         clerkUserId,
@@ -282,7 +291,9 @@ export async function ensureAppUser(input: {
       .onConflictDoUpdate({
         target: pgUsers.clerkUserId,
         set: { email: nextEmail, updatedAt: now },
-      });
+      })
+      .returning({ inserted: sql<boolean>`(xmax = 0)` });
+    insertedRow = upserted[0]?.inserted === true;
   } else {
     sqliteDb
       .insert(sqliteUsers)
@@ -305,6 +316,9 @@ export async function ensureAppUser(input: {
     } catch (error) {
       console.error("[app-users] owner new-user notify failed", error);
     }
+  }
+  if (wasNew && insertedRow) {
+    captureSignUpCompleted({ clerkUserId, method: input.signUpMethod });
   }
 
   const row = (await findAppUserByClerkId(clerkUserId)) ?? {
