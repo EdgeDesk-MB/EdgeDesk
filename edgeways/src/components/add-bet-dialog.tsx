@@ -211,6 +211,7 @@ import { matchOcrToEvent } from "@/lib/ocr/match-event";
 import { matchOcrToRunner } from "@/lib/ocr/match-runner";
 
 import { BetImportDialog } from "@/components/add-bet/bet-import-dialog";
+import type { BetLoggedSource } from "@/lib/analytics/bet-logged";
 
 export interface EventLite extends TrackedEventLike {
   status: string;
@@ -482,6 +483,8 @@ export function AddBetDialog({
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
   /** Prevents async re-fetches (events/exchanges) from resetting user-edited fields. */
   const hydratedKeyRef = useRef<string | null>(null);
+  /** Paste slip import filled this form: `bet_logged` source for a new save. */
+  const slipImportedRef = useRef(false);
 
   function resetFormState(opts?: { preserveFixtures?: boolean }) {
     const { date, time } = defaultEventDateTime();
@@ -529,6 +532,11 @@ export function AddBetDialog({
     if (!opts?.preserveFixtures) setKnownFixtures([]);
     setFetchedRunners([]);
     setRunnersFetchDone(false);
+    slipImportedRef.current = false;
+  }
+
+  function betLoggedSourceForSave(): BetLoggedSource {
+    return slipImportedRef.current ? "slip_import" : "manual";
   }
 
   function applyExchange(ex: ExchangeRow | null, comm?: number) {
@@ -1799,6 +1807,7 @@ export function AddBetDialog({
 
   const applyOcrFields = useCallback(
     async (fields: BetOcrFields, source: ScreenshotSource) => {
+      slipImportedRef.current = true;
       if (fields.selection?.trim()) setSelection(fields.selection.trim());
       if (fields.backStake != null && fields.backStake > 0 && source === "bookie") {
         setBackStake(fields.backStake);
@@ -2181,6 +2190,7 @@ export function AddBetDialog({
                 ...payload,
                 eventId: resolvedEventId,
                 quickLogged: prefill?.quickLogged ?? undefined,
+                analyticsSource: betLoggedSourceForSave(),
               },
             });
         setOpen(false);
@@ -2316,7 +2326,11 @@ export function AddBetDialog({
       } else {
         const { bet } = await api<{ bet: { id: number } }>("/api/bets", {
           method: "POST",
-          json: { ...payload, eventId: resolvedEventId },
+          json: {
+            ...payload,
+            eventId: resolvedEventId,
+            analyticsSource: betLoggedSourceForSave(),
+          },
         });
         await rememberOfferBetPref(resolvedOfferId, backStake, resolvedBookmaker);
         if (resolvedOfferId != null) completeEffort(resolvedOfferId);

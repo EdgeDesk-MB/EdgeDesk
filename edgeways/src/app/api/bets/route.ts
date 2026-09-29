@@ -19,6 +19,8 @@ import { syncRacingResultsForEvents } from "@/lib/services/sync-racing-results";
 import { resolveOfferForBet, resolveOfferForFreeBetUsage } from "@/lib/services/offers";
 import { linkBoostDiaryBet } from "@/lib/services/boosts";
 import { withDeskScope } from "@/lib/db/with-desk-scope";
+import { BET_LOGGED_SOURCES } from "@/lib/analytics/bet-logged";
+import { captureBetLoggedAfterResponse } from "@/lib/analytics/bet-logged-server";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +66,8 @@ const createSchema = z.object({
   purpose: z.enum(["edge", "mug"]).nullable().optional(),
   /** J2b: link a boost diary row after Place bet → Add bet confirm */
   boostDiaryId: z.number().int().positive().optional(),
+  /** Analytics only (`bet_logged`), never stored on the bet row */
+  analyticsSource: z.enum(BET_LOGGED_SOURCES).default("manual"),
 });
 
 export const GET = withDeskScope(async function GET() {
@@ -179,6 +183,10 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
           inserted.createdAt
         ).catch(() => {});
       }
+      await captureBetLoggedAfterResponse({
+        betId: inserted.id,
+        source: input.analyticsSource,
+      }).catch(() => {});
       return NextResponse.json({ bet: inserted });
     } catch (error) {
       const message =
@@ -224,6 +232,10 @@ export const POST = withDeskScope(async function POST(req: NextRequest) {
   syncOfferStatuses();
   if (inserted.offerId != null) spawnCourseOfferSiblingsIfNeeded();
 
+  await captureBetLoggedAfterResponse({
+    betId: inserted.id,
+    source: input.analyticsSource,
+  }).catch(() => {});
   return NextResponse.json({ bet: inserted });
 });
 

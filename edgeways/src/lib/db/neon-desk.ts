@@ -4,7 +4,7 @@
  */
 import "server-only";
 
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, lt } from "drizzle-orm";
 import { getDeskActor } from "@/lib/db/desk-scope";
 import { getNeonDb } from "@/lib/db/neon";
 import { toSqliteBetRow } from "@/lib/db/neon-desk-map";
@@ -101,6 +101,21 @@ export async function listNeonDeskLinkedOfferIds(
   return new Set(
     rows.map((row) => row.offerId).filter((offerId): offerId is number => offerId != null)
   );
+}
+
+/** True when this login already had a bet before `betId` (analytics `is_first`). */
+export async function neonDeskHasBetBefore(
+  betId: number,
+  clerkUserId?: string | null
+): Promise<boolean> {
+  const id = resolveClerkUserId(clerkUserId);
+  if (!id) return false;
+  const rows = await getNeonDb()
+    .select({ id: pgBets.id })
+    .from(pgBets)
+    .where(and(eq(pgBets.clerkUserId, id), lt(pgBets.id, betId)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 export async function insertNeonDeskBet(

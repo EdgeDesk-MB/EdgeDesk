@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import { isOperatorAdmin, isOwnerAdmin } from "@/lib/admin/emails";
 import { primaryClerkEmail } from "@/lib/db/desk-scope";
+import { signUpMethodFromClerkUser } from "@/lib/analytics/sign-up-completed";
 import { ensureAppUser, type AppUser } from "@/lib/services/app-users";
 
 export type AdminSession = {
@@ -24,7 +25,11 @@ export async function readAdminSession(): Promise<{
   }
   const clerkUser = await currentUser();
   const email = primaryClerkEmail(clerkUser);
-  const user = await ensureAppUser({ clerkUserId: userId, email });
+  const user = await ensureAppUser({
+    clerkUserId: userId,
+    email,
+    signUpMethod: signUpMethodFromClerkUser(clerkUser),
+  });
   const admin = isOperatorAdmin({ email: user.email ?? email, role: user.role });
   if (!admin) {
     return { signedIn: true, admin: false, session: null };
