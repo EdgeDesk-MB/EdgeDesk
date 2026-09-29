@@ -64,10 +64,11 @@ jobs:
           cache: npm
           cache-dependency-path: edgeways/package-lock.json
 
-      # Scripts are skipped: the journeys need only playwright and tsx, not
-      # native modules such as better-sqlite3.
+      # npm install, not npm ci, to match Vercel: package-lock.json is out of
+      # sync with package.json and npm ci rejects it. Scripts are skipped, the
+      # journeys need only playwright and tsx, not native modules.
       - name: Install dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
