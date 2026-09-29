@@ -3348,3 +3348,6 @@ html.marketing-reveal-armed .marketing-root [data-reveal-stagger].is-in:not(.is-
     animation: none !important;
   }
 }
+
+/* EDGE-228 visual regression test branch, never merge. */
+main h1 { color: #ff4d4d !important; }
