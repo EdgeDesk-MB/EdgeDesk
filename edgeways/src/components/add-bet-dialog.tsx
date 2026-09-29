@@ -2416,6 +2416,17 @@ export function AddBetDialog({
     />
   );
 
+  const profitTotalLabel =
+    betType === "qualifying"
+      ? advanced
+        ? "Worst case"
+        : "Qualifying loss"
+      : betType === "risk_free"
+        ? "Locked-in profit"
+        : advanced
+          ? "Worst case"
+          : "Total profit";
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -3296,22 +3307,24 @@ export function AddBetDialog({
               guaranteed={preview?.guaranteed ?? 0}
               exchange={exchange}
               venue={bookmaker}
-              totalLabel={
-                betType === "qualifying"
-                  ? advanced
-                    ? "Worst case"
-                    : "Qualifying loss"
-                  : betType === "risk_free"
-                    ? "Locked-in profit"
-                    : advanced
-                    ? "Worst case"
-                    : "Total profit"
-              }
+              totalLabel={profitTotalLabel}
+              totalClassName="max-sm:hidden"
             />
             )}
           </div>
           )}
           <div className="flex items-center justify-end gap-3 px-6 pb-4 pt-2">
+          {!isDutch && !noLay ? (
+            <div className="flex min-h-10 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 sm:hidden">
+              <span className="min-w-0 text-sm font-bold leading-tight">{profitTotalLabel}</span>
+              <MoneyFlow
+                value={preview?.guaranteed ?? 0}
+                signColor
+                signDisplay
+                className="shrink-0 text-lg font-extrabold"
+              />
+            </div>
+          ) : null}
           <div className="flex shrink-0 justify-end gap-2">
           {editBet && (
             <Button
