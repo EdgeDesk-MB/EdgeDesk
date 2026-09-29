@@ -26,7 +26,8 @@ import {
 } from "./lib";
 
 const MAIN_SELECTOR = "main, [role='main']";
-const SETTLE_MS = 2_500;
+const SETTLE_MS = 1_500;
+const NETWORK_IDLE_CAP_MS = 6_000;
 const MAX_WARNINGS = 10;
 
 type PublicJourney = {
@@ -179,9 +180,34 @@ async function newContext(browser: Browser, vp: Viewport): Promise<BrowserContex
 
 async function settle(page: Page, timeoutMs: number) {
   await page.waitForLoadState("load", { timeout: timeoutMs }).catch(() => {});
-  await page.waitForTimeout(SETTLE_MS);
   // The onboarding provider can bounce to /setup after the first state load.
+  // Desk polling can keep the network busy, hence the cap.
+  await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_CAP_MS }).catch(() => {});
+  await page.waitForTimeout(SETTLE_MS);
   await page.waitForLoadState("load", { timeout: timeoutMs }).catch(() => {});
+}
+
+/**
+ * Signed-in navigation. The app's own redirects (Clerk after sign-in,
+ * onboarding to /setup) can abort a goto mid-flight, which is not a failure:
+ * the redirect's navigation carries on and the page lands wherever the app
+ * sent it.
+ */
+async function gotoSignedIn(
+  page: Page,
+  url: string,
+  args: Args,
+): Promise<{ status: number | null; redirected: boolean }> {
+  try {
+    const res = await page.goto(url, { waitUntil: "domcontentloaded", timeout: args.timeoutMs });
+    return { status: res?.status() ?? null, redirected: false };
+  } catch (err) {
+    if (!/ERR_ABORTED|interrupted by another navigation/i.test(firstLine(err))) throw err;
+    await page.waitForLoadState("domcontentloaded", { timeout: args.timeoutMs }).catch(() => {});
+    return { status: null, redirected: true };
+  } finally {
+    await settle(page, args.timeoutMs);
+  }
 }
 
 async function runPublic(
@@ -270,17 +296,16 @@ async function runSignedIn(
   code: string,
 ) {
   await signIn(page, journey.email, code, rec, args);
+  await settle(page, args.timeoutMs);
   for (const target of journey.pages) {
-    const res = await page.goto(`${args.baseUrl}${target.path}`, {
-      waitUntil: "domcontentloaded",
-      timeout: args.timeoutMs,
-    });
-    const status = res?.status() ?? null;
+    const { status, redirected } = await gotoSignedIn(page, `${args.baseUrl}${target.path}`, args);
     if (status !== null && status >= 400) {
       rec.result.errors.push(`HTTP ${status} for ${target.path}`);
     }
-    await settle(page, args.timeoutMs);
     const pathname = new URL(page.url()).pathname;
+    if (redirected) {
+      rec.result.notes.push(`${target.path} redirected while loading, landed on ${pathname}`);
+    }
     if (pathname.startsWith("/login")) {
       throw new Error(`Signed out on ${target.path}, redirected to /login`);
     }
