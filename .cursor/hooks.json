@@ -1,10 +1,29 @@
 {
-  "version": 1,
-  "hooks": {
-    "afterFileEdit": [
-      {
-        "command": "node .cursor/hooks/guard-remind.mjs"
-      }
-    ]
-  }
+	"version": 1,
+	"hooks": {
+		"preToolUse": [
+			{
+				"command": "./.cursor/cyrus-permission-check.mjs",
+				"failClosed": true
+			}
+		],
+		"beforeShellExecution": [
+			{
+				"command": "./.cursor/cyrus-permission-check.mjs",
+				"failClosed": true
+			}
+		],
+		"beforeReadFile": [
+			{
+				"command": "./.cursor/cyrus-permission-check.mjs",
+				"failClosed": true
+			}
+		],
+		"beforeMCPExecution": [
+			{
+				"command": "./.cursor/cyrus-permission-check.mjs",
+				"failClosed": true
+			}
+		]
+	}
 }

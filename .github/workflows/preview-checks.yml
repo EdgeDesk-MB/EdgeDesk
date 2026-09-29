@@ -117,7 +117,7 @@ jobs:
           mkdir -p "$BASELINE_DIR"
           if git fetch --quiet --depth=1 origin refs/heads/preview-checks-assets 2>/dev/null &&
              git cat-file -e FETCH_HEAD:baseline/baseline.json 2>/dev/null; then
-            git archive FETCH_HEAD baseline | tar -x -C "$BASELINE_DIR" --strip-components=1
+            git -C "$GITHUB_WORKSPACE" archive --format=tar FETCH_HEAD:baseline | tar -x -C "$BASELINE_DIR"
             echo "Baseline from main $(jq -r '.sha[0:7]' "$BASELINE_DIR/baseline.json"), taken $(jq -r .takenAt "$BASELINE_DIR/baseline.json")"
           else
             echo "No visual baseline yet"
