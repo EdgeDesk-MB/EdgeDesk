@@ -923,6 +923,7 @@ export const ProfitTable = memo(function ProfitTable({
   guaranteed,
   exchange,
   venue,
+  totalClassName,
 }: {
   rows: OutcomeRow[];
   totalLabel?: string;
@@ -930,6 +931,7 @@ export const ProfitTable = memo(function ProfitTable({
   exchange?: ExchangeRow | null;
   /** Selected bookmaker/venue name for the back leg - see `BackPanel`. */
   venue?: string;
+  totalClassName?: string;
 }) {
   const brandOverride = useVenueBrandOverride(venue);
   const ready = useSettledPanelTint();
@@ -1024,7 +1026,12 @@ export const ProfitTable = memo(function ProfitTable({
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between rounded-lg bg-muted/60 px-4 py-3">
+        <div
+          className={cn(
+            "flex items-center justify-between rounded-lg bg-muted/60 px-4 py-3",
+            totalClassName
+          )}
+        >
           <span className="text-sm font-bold">{totalLabel}</span>
           <MoneyFlow value={guaranteed} signColor signDisplay className="text-2xl font-extrabold" />
         </div>
