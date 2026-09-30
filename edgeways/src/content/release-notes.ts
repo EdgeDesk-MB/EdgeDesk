@@ -32,6 +32,55 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
 
 export const RELEASE_NOTES: ReleaseNoteGroup[] = [
   {
+    date: "2026-09-29",
+    title: "Your own lay stake, a faster History, and calmer updates",
+    summary:
+      "You can now set your own lay stake in the calculators, History opens faster on a long desk, and updates wait until you're not in the middle of something.",
+    entries: [
+      {
+        kind: "feature",
+        area: "Calculators",
+        href: "/calculators",
+        text: "You can now type your own lay stake. It's tagged Manual, and Reset to auto brings back the suggested stake.",
+      },
+      {
+        kind: "improvement",
+        area: "History",
+        href: "/history",
+        text: "It's now quicker to open History on a busy desk. Recent days load first, and older days follow as you scroll.",
+      },
+      {
+        kind: "improvement",
+        area: "History",
+        href: "/history",
+        text: "Full time now shows the match minute, like goals do. That's 90' for a normal finish, or 120' after extra time or penalties.",
+      },
+      {
+        kind: "improvement",
+        area: "Alerts",
+        href: "/alerts",
+        text: "We've grouped Alerts by day, with the same date rows as History, so it's clearer what came in when.",
+      },
+      {
+        kind: "improvement",
+        area: "Add bet",
+        href: "/tracker",
+        text: "Your total profit or qualifying loss now sits next to Save on a phone, so you can check it before you save.",
+      },
+      {
+        kind: "improvement",
+        area: "Updates",
+        text: "New versions now load at a quiet moment, such as when you move to another page. We never refresh while a dialog is open, a save is running or a field is unsaved, or when you've only flipped away to check a price.",
+      },
+      {
+        kind: "improvement",
+        area: "Refer a friend",
+        href: "/settings",
+        text: "Refer a friend no longer pops up on your first visit. It asks once, when a settled bet first takes your profit above £0. You can still find it in Settings.",
+      },
+    ],
+  },
+  {
     date: "2026-09-15",
     title: "Early-payout Desk, and a simpler Add bet",
     summary:
