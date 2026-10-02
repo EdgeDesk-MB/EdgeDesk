@@ -864,7 +864,8 @@ surface. The plate switches via `in-data-[slot=card]` and
   navigation to a page. Keep
   `toastPlanLock` for gated clicks that are not a page or a modal.
   In-page Edge features on a desk that still works (Racing live cards,
-  2UP alerts) use `edgeLockBanner`: full-width `--edge/20` rectangle,
+  2UP alerts) use `edgeLockBanner`: full-width `--edge/10` rectangle (not `/20`, which
+  fails 4.5:1 for the title and body on the light canvas),
   solid `--edge` bolt well + Zap, **View plans** `variant="edge"`. Not
   an `<EmptyState>` plate. `promo="racing"` / `promo="twoUp"`. Race picks
   inside the courses card stays the page empty. Fixtures → Racing (page
