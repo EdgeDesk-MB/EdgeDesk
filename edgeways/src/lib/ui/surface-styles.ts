@@ -884,7 +884,9 @@ export const edgePanelStrong = cn(
  * Full-width Edge lock banner on a desk that still works (Racing, 2UP).
  * Stronger than {@link edgePanel}. Pair with `variant="edge"` View plans
  * and a solid `--edge` bolt well. Core page locks stay on `<EmptyState>`.
+ * Keep the fill at `/10`: `/20` drops the title and muted body under 4.5:1
+ * on the light canvas.
  */
 export const edgeLockBanner = cn(
-  "w-full min-w-0 rounded-lg border border-edge/40 bg-edge/20 px-4 py-3.5 sm:px-5"
+  "w-full min-w-0 rounded-lg border border-edge/40 bg-edge/10 px-4 py-3.5 sm:px-5"
 );
