@@ -33,16 +33,20 @@ export interface MarketDef {
 
 const TWO_WAY_MATCH: MarketDef[] = [
   { value: "match_winner", label: "Match winner", options: ["home", "away"], singleWinner: true },
-  { value: "handicap", label: "Handicap", singleWinner: true },
-  { value: "over_under", label: "Over/Under", singleWinner: true },
+  // Handicap and Over/Under keep no line in the market key and take a
+  // free-text selection, so two lays here can be different lines (Over 1.5
+  // and Over 2.5) that both lose. The football Over/Under keys name their
+  // line, so those are safe to share.
+  { value: "handicap", label: "Handicap" },
+  { value: "over_under", label: "Over/Under" },
   { value: "other", label: "Other" },
 ];
 
 /** NBA / NFL / MLB / NHL books list the two-way winner as Moneyline. */
 const MONEYLINE_MATCH: MarketDef[] = [
   { value: "match_winner", label: "Moneyline", options: ["home", "away"], singleWinner: true },
-  { value: "handicap", label: "Handicap", singleWinner: true },
-  { value: "over_under", label: "Over/Under", singleWinner: true },
+  { value: "handicap", label: "Handicap" },
+  { value: "over_under", label: "Over/Under" },
   { value: "other", label: "Other" },
 ];
 

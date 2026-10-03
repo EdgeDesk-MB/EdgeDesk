@@ -121,15 +121,50 @@ describe("exchangeReserve", () => {
     ).toBe(252);
   });
 
-  it("treats blank selections as separate positions, not one merged bucket", () => {
-    // A quick-logged lay can land without a selection. We cannot prove two of
-    // them are the same result, and crediting them as one would drop the
-    // shared-liability return that balances already show.
+  it("adds unnamed lays together rather than assuming they hedge", () => {
+    // Racing clears the selection once an event is linked, so two blank lays
+    // can easily be the same horse. Claiming a hedge we cannot prove would
+    // show cash the exchange has not released.
     const lays = [
       lay({ id: 1, selection: "", layStake: 20, layOdds: 4.8 }),
       lay({ id: 2, selection: "", layStake: 200, layOdds: 1.88 }),
     ];
-    expect(exchangeReserve(lays)).toBe(156.4);
+    expect(exchangeReserve(lays)).toBe(252);
+    expect(sharedLiabilityReturn(lays)).toBe(0);
+  });
+
+  it("collides one selection typed two ways", () => {
+    // Spacing, case and punctuation vary between betslip imports and the
+    // dropdown. 100 @ 2.0 + 100 @ 3.0 on one horse locks the full 300.
+    const lays = [
+      lay({ id: 1, market: "win", selection: "Constitution Hill", layStake: 100, layOdds: 2 }),
+      lay({ id: 2, market: "win", selection: "constitution  hill", layStake: 100, layOdds: 3 }),
+    ];
+    expect(exchangeReserve(lays)).toBe(300);
+  });
+
+  it("does not share Over/Under or Handicap, where the line is not in the key", () => {
+    // "Over 1.5" and "Over 2.5" both lose on 3 goals, and the generic market
+    // key cannot tell the two lines apart.
+    for (const market of ["over_under", "handicap"]) {
+      expect(
+        exchangeReserve([
+          lay({ id: 1, market, selection: "Over 1.5", layStake: 100, layOdds: 2 }),
+          lay({ id: 2, market, selection: "Over 2.5", layStake: 100, layOdds: 3 }),
+        ])
+      ).toBe(300);
+    }
+  });
+
+  it("shares a football Over/Under market, which names its line", () => {
+    // Over and Under 2.5 are the two results of one market.
+    //   over wins:  -200.00 + 100 x 0.98 = -102.00  <- worst
+    //   under wins: -100.00 + 100 x 0.98 = -2.00
+    const lays = [
+      lay({ id: 1, market: "over_under_2_5", selection: "under", layStake: 100, layOdds: 2 }),
+      lay({ id: 2, market: "over_under_2_5", selection: "over", layStake: 100, layOdds: 3 }),
+    ];
+    expect(exchangeReserve(lays)).toBe(102);
   });
 
   it("sums reserves across separate markets", () => {

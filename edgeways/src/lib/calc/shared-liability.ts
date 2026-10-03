@@ -89,11 +89,15 @@ export function layLiability(
   return roundPence(lay.layStake * (lay.layOdds - 1));
 }
 
-/** Backer stake kept when a lay wins, net of commission. */
+/**
+ * Backer stake kept when a lay wins, net of commission. Left unrounded:
+ * rounding per lay and then summing drifts up to about half a penny a lay,
+ * always towards showing more free cash than the exchange has.
+ */
 function layWinnings(lay: SharedLiabilityLay): number {
   if (!(lay.layStake > 0) || !(lay.layOdds > 1)) return 0;
   const commission = Number.isFinite(lay.commission) ? lay.commission : 0;
-  return roundPence(lay.layStake * (1 - Math.min(Math.max(commission, 0), 1)));
+  return lay.layStake * (1 - Math.min(Math.max(commission, 0), 1));
 }
 
 /**
@@ -112,12 +116,23 @@ function shareKey(lay: SharedLiabilityLay): string {
  * Which result this lay rides on. Two lays on the same selection lose
  * together, so they share a bucket and their liabilities add up.
  *
- * A blank selection is keyed to the lay itself. Quick-logged lays can land
- * without one, and we cannot prove two of those are the same result.
+ * Unnamed lays all land in one bucket. Racing clears the selection when an
+ * event is linked, so blanks are common, and treating two of them as
+ * separate results would claim a hedge we cannot prove. Adding the
+ * liabilities is the safe reading.
+ *
+ * Spacing, case and punctuation are normalised so one runner typed two ways
+ * still collides. Two genuinely different spellings of the same selection
+ * (an imported "EVERTON" against a dropdown "home") would still read as
+ * separate results and over-credit; naming them needs the linked event's
+ * teams, which this engine does not take.
  */
 function outcomeKey(lay: SharedLiabilityLay): string {
-  const selection = lay.selection.trim().toLowerCase();
-  return selection ? `sel:${selection}` : `unknown:${lay.id}`;
+  const selection = lay.selection
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return selection ? `sel:${selection}` : "sel:unnamed";
 }
 
 /** Worst-case loss across the results of one single-winner market group. */
@@ -131,23 +146,19 @@ function groupReserve(lays: SharedLiabilityLay[]): number {
       key,
       roundPence((liabilityByOutcome.get(key) ?? 0) + layLiability(lay))
     );
-    winningsByOutcome.set(
-      key,
-      roundPence((winningsByOutcome.get(key) ?? 0) + layWinnings(lay))
-    );
+    winningsByOutcome.set(key, (winningsByOutcome.get(key) ?? 0) + layWinnings(lay));
   }
 
-  const totalWinnings = roundPence(
-    [...winningsByOutcome.values()].reduce((sum, w) => sum + w, 0)
-  );
+  const totalWinnings = [...winningsByOutcome.values()].reduce((sum, w) => sum + w, 0);
 
   // One laid result wins: that bucket's liability goes, every other lay in
   // the market wins its backer stake. A result nobody laid winning pays all
   // of them, which is never the worst case, so it needs no scenario.
   let worst = 0;
   for (const [key, liability] of liabilityByOutcome) {
-    const others = roundPence(totalWinnings - (winningsByOutcome.get(key) ?? 0));
-    const net = roundPence(others - liability);
+    const net = roundPence(
+      totalWinnings - (winningsByOutcome.get(key) ?? 0) - liability
+    );
     if (net < worst) worst = net;
   }
 

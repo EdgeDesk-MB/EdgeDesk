@@ -136,13 +136,11 @@ describe("marketHasSingleWinner", () => {
       "match_odds",
       "match_winner",
       "btts",
-      "over_under",
       "over_under_2_5",
       "correct_score",
       "draw_no_bet",
       "first_goalscorer",
       "half_time_full_time",
-      "handicap",
       "outright",
       "set_betting",
       "win",
@@ -154,7 +152,11 @@ describe("marketHasSingleWinner", () => {
   it("rejects markets where two selections can land together", () => {
     // Several runners place; home winning settles both home/draw and
     // home/away; many players score; each way is a win + place composite.
+    // Generic Over/Under and Handicap keep no line in the key, so two lays
+    // there can be different lines that both lose.
     for (const market of [
+      "over_under",
+      "handicap",
       "place",
       "double_chance",
       "anytime_goalscorer",
