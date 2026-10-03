@@ -1,0 +1,42 @@
+{
+  "sha": "deadab6181479fc30204ed8aee7333e654f72b0c",
+  "baseUrl": "https://edgeways.app",
+  "takenAt": "2026-10-02T10:14:27.807Z",
+  "runUrl": "https://github.com/EdgeDesk-MB/EdgeDesk/actions/runs/36994223428",
+  "journeys": [
+    "home-desktop",
+    "home-mobile",
+    "sign-in-desktop",
+    "sign-in-mobile"
+  ],
+  "shots": [
+    {
+      "key": "home-desktop-signed-out",
+      "file": "home-desktop-01-signed-out.png",
+      "journeyId": "home",
+      "viewport": "desktop",
+      "label": "signed out"
+    },
+    {
+      "key": "home-mobile-signed-out",
+      "file": "home-mobile-01-signed-out.png",
+      "journeyId": "home",
+      "viewport": "mobile",
+      "label": "signed out"
+    },
+    {
+      "key": "sign-in-desktop-signed-out",
+      "file": "sign-in-desktop-01-signed-out.png",
+      "journeyId": "sign-in",
+      "viewport": "desktop",
+      "label": "signed out"
+    },
+    {
+      "key": "sign-in-mobile-signed-out",
+      "file": "sign-in-mobile-01-signed-out.png",
+      "journeyId": "sign-in",
+      "viewport": "mobile",
+      "label": "signed out"
+    }
+  ]
+}
