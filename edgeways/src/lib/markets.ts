@@ -17,53 +17,71 @@ export interface MarketDef {
   auto?: boolean;
   /** Fixed selection options; free-text selection when omitted */
   options?: string[];
+  /**
+   * Exactly one selection in this market can win. Lays on different
+   * selections of a single-winner market share liability on the exchange,
+   * which only locks the worst case (see `calc/shared-liability.ts`).
+   *
+   * Leave it off whenever two selections can land together, because the
+   * exchange then locks both liabilities in full. Place markets (several
+   * runners place), Double chance (home/draw and home/away both win when
+   * home wins), Anytime goalscorer and Each way / Extra place are the ones
+   * that catch people out. `other` is free-text, so never assume.
+   */
+  singleWinner?: boolean;
 }
 
 const TWO_WAY_MATCH: MarketDef[] = [
-  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
-  { value: "handicap", label: "Handicap" },
-  { value: "over_under", label: "Over/Under" },
+  { value: "match_winner", label: "Match winner", options: ["home", "away"], singleWinner: true },
+  { value: "handicap", label: "Handicap", singleWinner: true },
+  { value: "over_under", label: "Over/Under", singleWinner: true },
   { value: "other", label: "Other" },
 ];
 
 /** NBA / NFL / MLB / NHL books list the two-way winner as Moneyline. */
 const MONEYLINE_MATCH: MarketDef[] = [
-  { value: "match_winner", label: "Moneyline", options: ["home", "away"] },
-  { value: "handicap", label: "Handicap" },
-  { value: "over_under", label: "Over/Under" },
+  { value: "match_winner", label: "Moneyline", options: ["home", "away"], singleWinner: true },
+  { value: "handicap", label: "Handicap", singleWinner: true },
+  { value: "over_under", label: "Over/Under", singleWinner: true },
   { value: "other", label: "Other" },
 ];
 
 const OUTRIGHT: MarketDef[] = [
-  { value: "outright", label: "Outright / winner" },
+  { value: "outright", label: "Outright / winner", singleWinner: true },
+  // Top 5 / top 10: several players land together, so no shared liability.
   { value: "top_finish", label: "Top finish" },
   { value: "other", label: "Other" },
 ];
 
 const RACING_STYLE: MarketDef[] = [
-  { value: "win", label: "Winner" },
+  { value: "win", label: "Winner", singleWinner: true },
+  // Several runners place, so two place lays can both lose.
   { value: "place", label: "Place" },
   { value: "other", label: "Other" },
 ];
 
 /** Auto-settled football markets are 90-minute / full time. Extra time later. */
 const FOOTBALL_MARKETS: MarketDef[] = [
-  { value: "match_odds", label: "Match odds", auto: true, options: ["home", "draw", "away"] },
-  { value: "btts", label: "Both teams to score", auto: true, options: ["yes", "no"] },
-  { value: "over_under_1_5", label: "Over/Under 1.5 goals", auto: true, options: ["over", "under"] },
-  { value: "over_under_2_5", label: "Over/Under 2.5 goals", auto: true, options: ["over", "under"] },
-  { value: "over_under_3_5", label: "Over/Under 3.5 goals", auto: true, options: ["over", "under"] },
-  { value: "correct_score", label: "Correct score", auto: true },
-  { value: "first_goalscorer", label: "First goalscorer" },
+  { value: "match_odds", label: "Match odds", auto: true, options: ["home", "draw", "away"], singleWinner: true },
+  { value: "btts", label: "Both teams to score", auto: true, options: ["yes", "no"], singleWinner: true },
+  { value: "over_under_1_5", label: "Over/Under 1.5 goals", auto: true, options: ["over", "under"], singleWinner: true },
+  { value: "over_under_2_5", label: "Over/Under 2.5 goals", auto: true, options: ["over", "under"], singleWinner: true },
+  { value: "over_under_3_5", label: "Over/Under 3.5 goals", auto: true, options: ["over", "under"], singleWinner: true },
+  { value: "correct_score", label: "Correct score", auto: true, singleWinner: true },
+  { value: "first_goalscorer", label: "First goalscorer", singleWinner: true },
+  // Several players score, so two anytime lays can both lose.
   { value: "anytime_goalscorer", label: "Anytime goalscorer" },
-  { value: "draw_no_bet", label: "Draw no bet", auto: true, options: ["home", "away"] },
+  { value: "draw_no_bet", label: "Draw no bet", auto: true, options: ["home", "away"], singleWinner: true },
+  // home/draw and home/away both win when home wins, so not single-winner.
   { value: "double_chance", label: "Double chance", auto: true, options: ["home/draw", "home/away", "draw/away"] },
-  { value: "half_time_full_time", label: "Half time / Full time" },
+  { value: "half_time_full_time", label: "Half time / Full time", singleWinner: true },
   { value: "other", label: "Other" },
 ];
 
 const HORSE_RACING_MARKETS_LIST: MarketDef[] = [
-  { value: "win", label: "Winner", auto: true },
+  { value: "win", label: "Winner", auto: true, singleWinner: true },
+  // Each way and Extra place are win + place composites: a winner also
+  // places, so the two halves of the lay can lose together.
   { value: "each_way", label: "Each way" },
   { value: "extra_place", label: "Extra place" },
   { value: "place", label: "Place", auto: true },
@@ -71,21 +89,22 @@ const HORSE_RACING_MARKETS_LIST: MarketDef[] = [
 ];
 
 const TENNIS_MARKETS_LIST: MarketDef[] = [
-  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
-  { value: "set_betting", label: "Set betting" },
+  { value: "match_winner", label: "Match winner", options: ["home", "away"], singleWinner: true },
+  { value: "set_betting", label: "Set betting", singleWinner: true },
   { value: "other", label: "Other" },
 ];
 
 const CRICKET_MARKETS: MarketDef[] = [
-  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
+  { value: "match_winner", label: "Match winner", options: ["home", "away"], singleWinner: true },
+  // Dead heats split a top-batsman / top-bowler market, so leave these out.
   { value: "top_batsman", label: "Top batsman" },
   { value: "top_bowler", label: "Top bowler" },
   { value: "other", label: "Other" },
 ];
 
 const DARTS_MARKETS: MarketDef[] = [
-  { value: "match_winner", label: "Match winner", options: ["home", "away"] },
-  { value: "correct_score", label: "Correct score" },
+  { value: "match_winner", label: "Match winner", options: ["home", "away"], singleWinner: true },
+  { value: "correct_score", label: "Correct score", singleWinner: true },
   { value: "other", label: "Other" },
 ];
 
@@ -146,6 +165,32 @@ export function isEarlyPayoutMarket(sport: string, market: string): boolean {
 /** Whether the result engine can settle this market from score / race result. */
 export function isAutoSettleMarket(sport: string, market: string): boolean {
   return !!marketDef(sport, market)?.auto;
+}
+
+/**
+ * Market keys where every sport catalogue agrees only one selection can win.
+ * Derived from the catalogue, so adding a market cannot silently opt in: a
+ * key counts only when it appears somewhere and every entry is flagged.
+ */
+const SINGLE_WINNER_MARKETS: ReadonlySet<string> = (() => {
+  const seen = new Map<string, boolean>();
+  for (const def of Object.values(MARKETS).flat()) {
+    const agreed = seen.get(def.value);
+    const single = def.singleWinner === true;
+    seen.set(def.value, agreed === undefined ? single : agreed && single);
+  }
+  return new Set(
+    [...seen.entries()].filter(([, single]) => single).map(([value]) => value)
+  );
+})();
+
+/**
+ * Exactly one selection of this market can win, so lay liabilities on
+ * different selections share on the exchange. Unknown markets answer false:
+ * reserving both liabilities in full is the safe direction.
+ */
+export function marketHasSingleWinner(market: string): boolean {
+  return SINGLE_WINNER_MARKETS.has(market.trim());
 }
 
 /**

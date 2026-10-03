@@ -29,6 +29,10 @@ import {
 } from "@/lib/accounts/free-bet-lot-balance";
 import { applyWageringRequirement } from "@/lib/accounts/wagering";
 import { roundPence } from "@/lib/calc/money";
+import {
+  openLedgeredLays,
+  sharedLiabilityReturn,
+} from "@/lib/calc/shared-liability";
 import type { DutchLegRecord } from "@/lib/calc/settlement";
 import {
   EARLY_FREE_BET_AWARD_REASON,
@@ -92,18 +96,21 @@ function accountFreeBetBalance(accountId: number): number {
 }
 
 /**
- * When multiple lay bets cover different outcomes of the same market the
- * exchange only locks the worst-case net liability, not the sum of all
- * individual liabilities (only one outcome can win).
+ * When multiple lay bets cover different results of the same single-winner
+ * market the exchange only locks the worst case, not the sum of all
+ * individual liabilities (only one result can win).
  *
  * Returns the excess that was debited vs what actually needs to be reserved,
  * so it can be added back to the displayed balance.
  *
- * Example: lay Norway @4.8 (liability 75.69) + lay England @1.88 (liability
- * 176.00) on the same match. Sum deducted = 251.69, worst case (England wins)
- * = -176.00 + 19.52 winnings = -156.08. Return = 95.61.
+ * Example: lay Norway 20 @ 4.8 (liability 76.00) + lay England 200 @ 1.88
+ * (liability 176.00) on the same match. Sum deducted = 252.00, worst case
+ * (England wins) = -176.00 + 19.60 winnings = -156.40. Return = 95.60.
+ *
+ * The maths lives in `calc/shared-liability.ts`, shared with the hosted desk
+ * and the Add bet funding check so all three agree.
  */
-function sharedLiabilityReturn(accountId: number): number {
+function accountSharedLiabilityReturn(accountId: number): number {
   // Which bets had their liability ledgered to this account?
   const betIdRows = db
     .select({ betId: balanceTransactions.betId })
@@ -120,57 +127,8 @@ function sharedLiabilityReturn(accountId: number): number {
   if (betIdRows.length === 0) return 0;
   const betIds = betIdRows.map((r) => r.betId as number);
 
-  // Among those bets, which are still open lay bets on a known event?
-  const openLayBets = db
-    .select()
-    .from(bets)
-    .where(inArray(bets.id, betIds))
-    .all()
-    .filter(
-      (b) =>
-        b.status === "open" &&
-        b.balanceLedgered === 1 &&
-        b.layStake > 0 &&
-        b.layOdds > 1 &&
-        b.eventId != null
-    );
-
-  // Group by event (= market)
-  const byEvent = new Map<number, typeof openLayBets>();
-  for (const bet of openLayBets) {
-    const group = byEvent.get(bet.eventId!) ?? [];
-    group.push(bet);
-    byEvent.set(bet.eventId!, group);
-  }
-
-  let totalReturn = 0;
-
-  for (const groupBets of byEvent.values()) {
-    if (groupBets.length < 2) continue; // Single lay: no shared-liability benefit
-
-    const totalLiability = groupBets.reduce(
-      (sum, b) => sum + b.layStake * (b.layOdds - 1),
-      0
-    );
-
-    // Simulate each scenario: one selection wins the market (that lay loses),
-    // all others win.  Take the worst outcome.
-    let worstCase = Infinity;
-    for (const loser of groupBets) {
-      const loserLiability = loser.layStake * (loser.layOdds - 1);
-      const otherWinnings = groupBets
-        .filter((b) => b.id !== loser.id)
-        .reduce((sum, b) => sum + b.layStake * (1 - b.commission), 0);
-      const netOutcome = -loserLiability + otherWinnings;
-      if (netOutcome < worstCase) worstCase = netOutcome;
-    }
-
-    // Reserve only the worst-case loss (0 if all outcomes are profitable)
-    const shouldReserve = worstCase < 0 ? -worstCase : 0;
-    totalReturn += totalLiability - shouldReserve;
-  }
-
-  return Math.max(0, totalReturn);
+  const ledgeredBets = db.select().from(bets).where(inArray(bets.id, betIds)).all();
+  return sharedLiabilityReturn(openLedgeredLays(ledgeredBets));
 }
 
 function accountCashBalance(accountId: number): number {
@@ -183,7 +141,7 @@ function accountCashBalance(accountId: number): number {
     .reduce((s, t) => s + t.amount, 0);
   // Round to pence so IEEE dust from summing ledger rows never surfaces as
   // a tiny negative £0.00 (red) or a non-zero compare against exact 0.
-  return roundPence(raw + sharedLiabilityReturn(accountId));
+  return roundPence(raw + accountSharedLiabilityReturn(accountId));
 }
 
 function accountPendingIn(accountId: number): number {
@@ -254,7 +212,7 @@ export function getOpenInBetsTotal(): number {
     .from(accounts)
     .all()
     .filter((a) => a.type === "exchange")
-    .reduce((sum, a) => sum + sharedLiabilityReturn(a.id), 0);
+    .reduce((sum, a) => sum + accountSharedLiabilityReturn(a.id), 0);
 
   return Math.max(0, raw - sharedReturn);
 }

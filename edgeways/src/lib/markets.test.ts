@@ -6,6 +6,7 @@ import {
   isEarlyPayoutMarket,
   linkableEventsForSport,
   marketDef,
+  marketHasSingleWinner,
   marketUsesLinkedEventSides,
 } from "./markets";
 
@@ -126,5 +127,51 @@ describe("linkableEventsForSport", () => {
       1, 2,
     ]);
     expect(linkableEventsForSport(events, "cricket").map((e) => e.id)).toEqual([3, 4]);
+  });
+});
+
+describe("marketHasSingleWinner", () => {
+  it("accepts markets where exactly one selection can win", () => {
+    for (const market of [
+      "match_odds",
+      "match_winner",
+      "btts",
+      "over_under",
+      "over_under_2_5",
+      "correct_score",
+      "draw_no_bet",
+      "first_goalscorer",
+      "half_time_full_time",
+      "handicap",
+      "outright",
+      "set_betting",
+      "win",
+    ]) {
+      expect(marketHasSingleWinner(market)).toBe(true);
+    }
+  });
+
+  it("rejects markets where two selections can land together", () => {
+    // Several runners place; home winning settles both home/draw and
+    // home/away; many players score; each way is a win + place composite.
+    for (const market of [
+      "place",
+      "double_chance",
+      "anytime_goalscorer",
+      "each_way",
+      "extra_place",
+      "top_finish",
+      "top_batsman",
+      "top_bowler",
+    ]) {
+      expect(marketHasSingleWinner(market)).toBe(false);
+    }
+  });
+
+  it("rejects free-text and unknown markets, because sharing is unproven", () => {
+    expect(marketHasSingleWinner("other")).toBe(false);
+    expect(marketHasSingleWinner("two_up")).toBe(false);
+    expect(marketHasSingleWinner("")).toBe(false);
+    expect(marketHasSingleWinner("not_a_market")).toBe(false);
   });
 });
