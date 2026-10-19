@@ -1,6 +1,6 @@
 # Strategy digest (for automated ticket triage)
 
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-19
 status: reviewed by Sam, 2026-09-21
 
 This is a compact, citable index of Edgeways strategy, built for the n8n alignment gate. It is not a source of truth. When it disagrees with a source file, the source wins and this file is stale. Cite entry IDs (V1, NG3, D7 and so on). Status entries (BT and RK) go stale fastest: check their review_by date and verify against `edgeways/docs/roadmap/product-roadmap.md` section 6 and Linear (team EDGE).
@@ -79,6 +79,7 @@ ID prefixes: V vision, PR principle, NG non-goal, HR hard engineering rule, D de
 - PX3: Product scope or roadmap tasks are planning work. Agents stop and defer to the planning flow; no code.
 - PX4: Statuses flip in roadmap section 6 the day a phase lands. Work is tracked in Linear (team EDGE; Live Readiness initiative; Post-Launch Desk and Live Sport project).
 - PX5 (Sam, 2026-09-29): Delivery pipeline tooling is in scope and serves BT1 (running the live app): CI and preview checks, journey screenshots, visual regression, review assist, and signals that file into Linear Triage (errors, feedback, analytics, payments). It is not a product feature, so PX2 and PX3 do not apply. It must not change what customers see, and it follows the same HR and NG rules.
+- PX6 (Sam, 2026-10-19): Research tickets pass the gate. A ticket labelled `Research`, or whose description says it is a research spike, is desk research: competitor and market scans, tool and API evaluations, pricing and ToS reviews, and "how could Edgeways out-do X" exploration. Research is deliberately loose and wide. It may range over ideas outside the current bets, phases and non-goals, and it never needs Sam's verdict, a scope decision or a section 9 entry before it starts. PX2 and PX3 apply to what comes out of research, not to the research itself: findings that suggest a feature land in section 9 for Sam's review, and any build becomes a new ticket that goes through the gate as normal. Non-goals (NG) are things research reports against, never reasons to block it. Research must not write product code, sign up for or pay for provider accounts, place bets, or change what customers see.
 
 ## Routing hints for executors (from AGENTS.md and docs/Local-vs-Cloud-Model-Strategy.md)
 
