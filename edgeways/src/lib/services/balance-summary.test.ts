@@ -144,8 +144,8 @@ describe("balanceSummaryFromRows", () => {
     // = -176 + 19.60 winnings = -156.40. Return = 95.60.
     const exchange = account({ id: 1, name: "Betfair", type: "exchange" });
     const bets = [
-      bet({ id: 1, eventId: 9, layStake: 20, layOdds: 4.8 }),
-      bet({ id: 2, eventId: 9, layStake: 200, layOdds: 1.88 }),
+      bet({ id: 1, eventId: 9, selection: "away", layStake: 20, layOdds: 4.8 }),
+      bet({ id: 2, eventId: 9, selection: "home", layStake: 200, layOdds: 1.88 }),
     ];
     const txs = [
       tx({ id: 1, accountId: 1, amount: -76, category: "bet_stake", betId: 1 }),
@@ -156,6 +156,53 @@ describe("balanceSummaryFromRows", () => {
     expect(summary.inBets).toBe(156.4);
     // Liquid -156.40 + inBets 156.40 rounds to -0 (same as the SQLite path).
     expect(Math.abs(summary.bankroll)).toBe(0);
+  });
+
+  it("does not share two markets of one event, or two lays on one selection", () => {
+    // Shared liability needs the same single-winner market AND different
+    // results. Match odds against Both teams to score can both lose, and so
+    // can two lays on home. Either way the full 252.00 stays locked.
+    const exchange = account({ id: 1, name: "Betfair", type: "exchange" });
+    const txs = [
+      tx({ id: 1, accountId: 1, amount: -76, category: "bet_stake", betId: 1 }),
+      tx({ id: 2, accountId: 1, amount: -176, category: "bet_stake", betId: 2 }),
+    ];
+
+    const acrossMarkets = balanceSummaryFromRows(
+      [exchange],
+      txs,
+      [
+        bet({ id: 1, eventId: 9, market: "match_odds", selection: "home", layStake: 20, layOdds: 4.8 }),
+        bet({ id: 2, eventId: 9, market: "btts", selection: "yes", layStake: 200, layOdds: 1.88 }),
+      ]
+    );
+    expect(acrossMarkets.accounts[0]?.balance).toBe(-252);
+
+    const sameSelection = balanceSummaryFromRows(
+      [exchange],
+      txs,
+      [
+        bet({ id: 1, eventId: 9, selection: "home", layStake: 20, layOdds: 4.8 }),
+        bet({ id: 2, eventId: 9, selection: "home", layStake: 200, layOdds: 1.88 }),
+      ]
+    );
+    expect(sameSelection.accounts[0]?.balance).toBe(-252);
+  });
+
+  it("does not share a Place market, where several runners can place", () => {
+    const exchange = account({ id: 1, name: "Betfair", type: "exchange" });
+    const summary = balanceSummaryFromRows(
+      [exchange],
+      [
+        tx({ id: 1, accountId: 1, amount: -76, category: "bet_stake", betId: 1 }),
+        tx({ id: 2, accountId: 1, amount: -176, category: "bet_stake", betId: 2 }),
+      ],
+      [
+        bet({ id: 1, eventId: 9, market: "place", selection: "Runner A", layStake: 20, layOdds: 4.8 }),
+        bet({ id: 2, eventId: 9, market: "place", selection: "Runner B", layStake: 200, layOdds: 1.88 }),
+      ]
+    );
+    expect(summary.accounts[0]?.balance).toBe(-252);
   });
 
   it("does not share liability across different events", () => {

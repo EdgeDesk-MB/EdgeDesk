@@ -44,8 +44,9 @@ import {
 import {
   ExchangeBalanceIssue,
   ExchangeBalanceWell,
-  editBetReservedLiability,
-  exchangeNeedsFunding,
+  ExchangeSharedLiabilityNote,
+  exchangeFundingNeed,
+  openLaysOnExchange,
 } from "@/components/add-bet/exchange-balance";
 import { backVenueKind } from "@/lib/accounts/resolve-venue";
 import { BookmakerSelect } from "@/components/calc/bookmaker-select";
@@ -2372,16 +2373,27 @@ export function AddBetDialog({
   }
 
   const showEpToggle = !!(epSport && isEarlyPayoutMarket(sport, effectiveMarket));
-  const reservedLayLiability = editBetReservedLiability(editBet, exchange?.id);
-  const layExceedsBalance =
-    !noLay &&
-    exchangeNeedsFunding(
-      appState?.balances?.accounts,
-      exchange?.id,
-      exchange?.name ?? "",
-      preview?.totalLiability ?? 0,
-      reservedLayLiability
-    );
+  // Only one result of a single-winner market can win, so an open lay on
+  // another result of this market already holds cash this one can use.
+  // Price the lay against the rise in the wallet's reserve, not its own
+  // liability. An unlinked event gives no market to share with.
+  const layFunding = exchangeFundingNeed(
+    appState?.balances?.accounts,
+    exchange?.id,
+    exchange?.name ?? "",
+    {
+      id: editBet?.id ?? "add-bet",
+      eventId: selectedEvent?.id ?? null,
+      market: effectiveMarket,
+      selection,
+      layStake: preview?.totalLayStake ?? 0,
+      layOdds: preview?.effectiveLayOdds ?? 0,
+      commission: commission / 100,
+    },
+    openLaysOnExchange(appState?.bets, exchange?.id)
+  );
+  const layExceedsBalance = !noLay && layFunding.needsFunding;
+  const laySharesLiability = !noLay && !layFunding.needsFunding && layFunding.shared;
 
   const bookieBalanceStrip = (
     <BackBookieBalanceStrip
@@ -3268,6 +3280,12 @@ export function AddBetDialog({
                   accounts={appState?.balances?.accounts}
                 />
                 {layExceedsBalance ? <ExchangeBalanceIssue /> : null}
+                {laySharesLiability ? (
+                  <ExchangeSharedLiabilityNote
+                    cashRequired={layFunding.cashRequired}
+                    grossLiability={layFunding.grossLiability}
+                  />
+                ) : null}
               </div>
             </LayPanel>
             )}

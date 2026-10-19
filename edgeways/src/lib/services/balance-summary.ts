@@ -7,6 +7,10 @@
  * free_bet ledger rows).
  */
 import { roundPence } from "@/lib/calc/money";
+import {
+  openLedgeredLays,
+  sharedLiabilityReturn,
+} from "@/lib/calc/shared-liability";
 import type {
   AccountRow,
   BalanceTransactionRow,
@@ -33,12 +37,13 @@ export function openBetInBetsAmountFromRow(
 }
 
 /**
- * When multiple lay bets cover different outcomes of the same market the
- * exchange only locks the worst-case net liability, not the sum of all
- * individual liabilities (only one outcome can win).
+ * When multiple lay bets cover different results of the same single-winner
+ * market the exchange only locks the worst case, not the sum of the
+ * individual liabilities. Returns the excess that was debited bet by bet, so
+ * it can be added back to the displayed balance.
  *
- * Returns the excess that was debited vs what actually needs to be reserved,
- * so it can be added back to the displayed balance.
+ * The maths lives in `calc/shared-liability.ts`, shared with the SQLite desk
+ * and the Add bet funding check so all three agree.
  */
 function sharedLiabilityReturnFromRows(
   accountId: number,
@@ -57,51 +62,9 @@ function sharedLiabilityReturnFromRows(
   );
   if (betIds.size === 0) return 0;
 
-  const openLayBets = bets.filter(
-    (b) =>
-      betIds.has(b.id) &&
-      b.status === "open" &&
-      b.balanceLedgered === 1 &&
-      b.layStake > 0 &&
-      b.layOdds > 1 &&
-      b.eventId != null
+  return sharedLiabilityReturn(
+    openLedgeredLays(bets.filter((b) => betIds.has(b.id)))
   );
-
-  const byEvent = new Map<number, BetRow[]>();
-  for (const bet of openLayBets) {
-    const group = byEvent.get(bet.eventId!) ?? [];
-    group.push(bet);
-    byEvent.set(bet.eventId!, group);
-  }
-
-  let totalReturn = 0;
-
-  for (const groupBets of byEvent.values()) {
-    if (groupBets.length < 2) continue; // Single lay: no shared-liability benefit
-
-    const totalLiability = groupBets.reduce(
-      (sum, b) => sum + b.layStake * (b.layOdds - 1),
-      0
-    );
-
-    // Simulate each scenario: one selection wins the market (that lay loses),
-    // all others win.  Take the worst outcome.
-    let worstCase = Infinity;
-    for (const loser of groupBets) {
-      const loserLiability = loser.layStake * (loser.layOdds - 1);
-      const otherWinnings = groupBets
-        .filter((b) => b.id !== loser.id)
-        .reduce((sum, b) => sum + b.layStake * (1 - b.commission), 0);
-      const netOutcome = -loserLiability + otherWinnings;
-      if (netOutcome < worstCase) worstCase = netOutcome;
-    }
-
-    // Reserve only the worst-case loss (0 if all outcomes are profitable)
-    const shouldReserve = worstCase < 0 ? -worstCase : 0;
-    totalReturn += totalLiability - shouldReserve;
-  }
-
-  return Math.max(0, totalReturn);
 }
 
 function accountCashBalanceFromRows(
